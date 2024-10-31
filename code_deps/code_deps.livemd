@@ -1,0 +1,82 @@
+# Code deps
+
+```elixir
+require Logger
+Logger.configure(level: :info)
+Mix.install([{:code_deps, path: __DIR__}, :kino])
+```
+
+## Base
+
+## Erlang
+
+```elixir
+erl_asm =
+  Path.wildcard("/Users/matheksm/.asdf/installs/erlang/27.0/**/*.beam")
+  |> Enum.map(&BeamASM.parse/1)
+```
+
+```elixir
+erl_funs = erl_asm |> Enum.flat_map(&BeamASM.analyze/1) |> Map.new()
+```
+
+## Elixir
+
+```elixir
+ex_asm =
+  Path.wildcard("#{__DIR__}/../../ew/elixir/lib/elixir/ebin/*.beam")
+  |> Enum.map(&BeamASM.parse/1)
+```
+
+```elixir
+ex_funs = ex_asm |> Enum.flat_map(&BeamASM.analyze/1) |> Map.new()
+```
+
+## Find missing NIFs
+
+```elixir
+funs = Map.merge(erl_funs, ex_funs)
+```
+
+```elixir
+nif_funs =
+  ex_funs
+  |> Map.keys()
+  |> Enum.filter(&MFA.elixir_module?/1)
+  |> Enum.flat_map(fn fun ->
+    GraphUtils.accessible(funs, fun, &MFA.elixir_module?/1)
+    |> Enum.filter(fn fun -> {:erlang, :nif_error, 1} in funs[fun] end)
+    |> Enum.map(fn nif -> {nif, fun} end)
+  end)
+  |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  |> Enum.map(fn {name, dependents} -> {name, dependents |> Enum.uniq() |> Enum.sort()} end)
+  |> Enum.sort()
+```
+
+```elixir
+# this could be done with BeamASM module too
+
+avm_asts =
+  Path.wildcard("#{__DIR__}/../../ew/AtomVM/libs/estdlib/**/*.erl")
+  |> Enum.map(&ErlAST.parse/1)
+
+avm_a = Map.new(avm_asts, &ErlAST.analyze/1)
+avm_funs = Enum.flat_map(avm_a, fn {_mod, funs} -> funs end) |> Map.new()
+avm_fun_names = Map.keys(avm_funs) |> MapSet.new()
+```
+
+```elixir
+existing_funs = MapSet.union(avm_fun_names, AVMBIFs.list()) |> MapSet.put({:erlang, :nif_error, 1})
+missing_nifs = nif_funs |> Enum.reject(fn {fun, _deps} -> fun in existing_funs end) |> Enum.sort()
+
+missing_nifs_str =
+  Enum.map_join(missing_nifs, "\n", fn {fun, calls} ->
+    "`#{MFA.print(fun)}` | #{Enum.map_join(calls, ", ", &"`#{MFA.print(&1)}`")}"
+  end)
+
+File.write!("#{__DIR__}/missing_nifs.md", """
+nif | dependent functions from Elixir stdlib
+--- | ---
+#{missing_nifs_str}
+""")
+```
