@@ -1,0 +1,4 @@
+%{
+  "exatomvm": {:git, "https://github.com/atomvm/exatomvm.git", "434f730fcadd929df8e76c6561ee2ea1ab24d011", []},
+  "uf2tool": {:hex, :uf2tool, "1.1.0", "7091931234ca5a256b66ea691983867d51229798622d083f85c1ad779798a734", [:rebar3], [], "hexpm", "1a7e5ca7ef3d19c7a0b0acf3db804b3188e0980884acffa13fd57d733507b73d"},
+}
