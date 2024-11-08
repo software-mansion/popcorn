@@ -24,6 +24,3 @@ fission_lib-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-
-/estdlib_ebin/
-/out/

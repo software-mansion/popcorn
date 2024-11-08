@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8" />
+  <title>IEx in the browser via WASM via AtomVM</title>
+</head>
+
+<body>
+  <h1>IEx in the browser via WASM via AtomVM</h1>
+  <p>
+    Type Erlang code in the textarea below and press CTRL+Enter or click 'evaluate' to run it.
+  </p>
+
+  <textarea id="code" style="width:500px;height:300px;font-family:monospace">case lists:max([1,3,2]) of
+  3 -> ok;
+  2 -> error
+end.</textarea><br>
+  <button id="eval">Evaluate</button>
+  <p style="font-family:monospace">
+    Time: <span id="time"></span><br>
+    Result: <span id="result"></span>
+  </p>
+
+  <script>
+    var Module = {
+      arguments: ["iex_wasm.avm"],
+    };
+  </script>
+  <script async>
+    window.document.getElementById('eval').onclick = async () => {
+      console.log('evaluating');
+      const t = performance.now();
+      const result = await Module.call('main', document.getElementById("code").value);
+      const dt = +(performance.now() - t).toFixed(3);
+      console.log(`took ${dt} ms, result: ${result}`)
+      window.document.getElementById('time').innerHTML = `${dt} ms`;
+      window.document.getElementById('result').innerHTML = result;
+    };
+    document.getElementById("code").addEventListener('keydown', (event) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        document.getElementById("eval").click();
+      }
+    });
+  </script>
+  <script async src="AtomVM.js"></script>
+</body>
+
+</html>
