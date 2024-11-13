@@ -1,8 +1,4 @@
-defmodule IexWasm do
-  # this compiler option is to suppress warnings when compiling the VM
-  # it is not needed or recommended for user apps.
-  @compile {:no_warn_undefined, [Console]}
-
+defmodule IExWASM do
   def start() do
     Console.print("Hello World\n")
     Process.register(self(), :main)
