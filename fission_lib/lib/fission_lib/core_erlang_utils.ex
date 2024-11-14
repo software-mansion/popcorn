@@ -58,22 +58,40 @@ defmodule FissionLib.CoreErlangUtils do
 
   The injected code prints module, function and arity of each remote call.
   """
-  def add_dupa_tracing(
-        {:c_call, call_meta, {:c_literal, mod_meta, mod} = mv, {:c_literal, fun_meta, _fun} = fv,
-         args}
-      )
-      when mod not in [:erlang, :console] do
-    {:c_call, call_meta, {:c_literal, mod_meta, :dupa_trace}, {:c_literal, fun_meta, :dupa_trace},
-     [mv, fv | add_dupa_tracing(args)]}
+  def add_simple_tracing({:c_module, module_meta, module_spec, exports, specs, body}) do
+    {:c_literal, _meta, module} = module_spec
+    body = if module == :simple_trace, do: body, else: do_add_simple_tracing(body)
+    {:c_module, module_meta, module_spec, exports, specs, body}
   end
 
-  def add_dupa_tracing(ast), do: traverse(ast, &add_dupa_tracing/1)
+  defp do_add_simple_tracing(
+         {:c_call, call_meta, {:c_literal, mod_meta, mod} = mv, {:c_literal, fun_meta, _fun} = fv,
+          args}
+       )
+       when mod != :erlang do
+    {file, line} =
+      Enum.reduce(call_meta, {~c"no_file", 0}, fn
+        {:file, file}, {_file, line} when is_list(file) -> {file, line}
+        {line, _column}, {file, _line} when is_integer(line) -> {file, line}
+        _other, acc -> acc
+      end)
+
+    {:c_call, call_meta, {:c_literal, mod_meta, :simple_trace}, {:c_literal, fun_meta, :trace},
+     [
+       mv,
+       fv,
+       {:c_literal, fun_meta, file},
+       {:c_literal, fun_meta, line} | do_add_simple_tracing(args)
+     ]}
+  end
+
+  defp do_add_simple_tracing(ast), do: traverse(ast, &do_add_simple_tracing/1)
 
   @doc """
   Dumps the Core Erlang AST and Core Erlang code into files.
   """
   def debug(ast, name \\ "out") do
-    File.write!("#{name}.ast.erl", inspect(ast, pretty: true, limit: :infinity))
+    File.write!("#{name}.ast.exs", inspect(ast, pretty: true, limit: :infinity))
     File.open("#{name}.core", [:write], &:beam_listing.module(&1, ast))
   end
 

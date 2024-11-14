@@ -93,7 +93,7 @@ defmodule FissionLib.Build do
             CoreErlangUtils.parse(path)
         end
 
-      ast = if add_tracing, do: CoreErlangUtils.add_dupa_tracing(ast), else: ast
+      ast = if add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
       CoreErlangUtils.serialize(ast, Path.join(out_dir, name))
     end)
 
