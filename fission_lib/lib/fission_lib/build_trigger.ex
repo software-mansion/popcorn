@@ -16,5 +16,10 @@ defmodule FissionLib.BuildTrigger do
 
   out_dir = Mix.Project.build_path()
   config = FissionLib.Config.get()
-  FissionLib.Build.build(out_dir, config.erl_stdlib_beam_paths, config.add_tracing)
+
+  FissionLib.Build.build(
+    out_dir,
+    config.ex_stdlib_beam_paths ++ config.erl_stdlib_beam_paths,
+    config.add_tracing
+  )
 end

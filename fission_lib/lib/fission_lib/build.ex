@@ -6,7 +6,7 @@ defmodule FissionLib.Build do
   Runs `compile/2` and `patch/3`, then packs output beams
   into a single *.avm file.
   """
-  def build(out_dir, erl_stdlib_beam_paths, add_tracing) do
+  def build(out_dir, stdlib_beam_paths, add_tracing) do
     build_dir = Path.join(out_dir, "fission_lib")
     File.rm_rf!(build_dir)
     File.mkdir_p!("#{build_dir}/patches_ebin")
@@ -16,7 +16,7 @@ defmodule FissionLib.Build do
 
     patch_beam_paths = Path.wildcard("#{build_dir}/patches_ebin/*.beam")
 
-    patch(erl_stdlib_beam_paths, patch_beam_paths, "#{build_dir}/final_ebin",
+    patch(stdlib_beam_paths, patch_beam_paths, "#{build_dir}/final_ebin",
       add_tracing: add_tracing
     )
 
