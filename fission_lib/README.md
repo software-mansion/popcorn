@@ -1,6 +1,6 @@
 # FissionLib
 
-Library providing Erlang and Elixir stdlibs, allowing to compile projects to `.avm` and run them with AtomVM.
+Library that takes Erlang and Elixir stdlibs from the system, patches them so that they can work with AtomVM, and bundles them along with your project into an `.avm` file that can be run with AtomVM.
 
 The idea is the following:
 - Decouple AtomVM versions of Erlang and Elixir stdlibs from the AtomVM itself

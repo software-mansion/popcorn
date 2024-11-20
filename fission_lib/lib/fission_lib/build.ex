@@ -12,7 +12,7 @@ defmodule FissionLib.Build do
     File.mkdir_p!("#{build_dir}/patches_ebin")
     File.mkdir_p!("#{build_dir}/final_ebin")
 
-    compile("libs", "#{build_dir}/patches_ebin")
+    compile("patches", "#{build_dir}/patches_ebin")
 
     patch_beam_paths = Path.wildcard("#{build_dir}/patches_ebin/*.beam")
 
@@ -33,13 +33,13 @@ defmodule FissionLib.Build do
   that are customized for the AtomVM, as well as some AtomVM-specific
   utilities.
 
-  The sources to be compiled reside in the `libs` directory.
+  The sources to be compiled reside in the `patches` directory.
   """
-  def compile(libs_dir, out_dir) do
+  def compile(patches_dir, out_dir) do
     yrl_dir = Path.join(out_dir, "yrl")
     File.mkdir_p!(yrl_dir)
 
-    ex_paths = Path.wildcard("#{libs_dir}/**/*.ex")
+    ex_paths = Path.wildcard("#{patches_dir}/**/*.ex")
 
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
@@ -49,14 +49,14 @@ defmodule FissionLib.Build do
       {_out, 0} = System.shell("elixirc --ignore-module-conflict -o #{out_dir} #{file}")
     end)
 
-    yrl_paths = Path.wildcard("#{libs_dir}/**/*.yrl")
+    yrl_paths = Path.wildcard("#{patches_dir}/**/*.yrl")
 
     process_async(yrl_paths, fn file ->
       IO.puts("Compiling #{file}")
       {_out, 0} = System.shell("erlc -o #{yrl_dir} #{file}")
     end)
 
-    erl_paths = Path.wildcard("#{libs_dir}/**/*.erl") ++ Path.wildcard("#{yrl_dir}/*.erl")
+    erl_paths = Path.wildcard("#{patches_dir}/**/*.erl") ++ Path.wildcard("#{yrl_dir}/*.erl")
 
     process_async(erl_paths, fn file ->
       IO.puts("Compiling #{file}")
