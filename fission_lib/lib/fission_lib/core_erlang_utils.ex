@@ -113,6 +113,11 @@ defmodule FissionLib.CoreErlangUtils do
     end
   end
 
+  defp rename_funs({:id, {line, col, id}}, ctx) do
+    "-" <> id = Atom.to_string(id)
+    {:id, {line, col, :"-#{ctx.prefix}_#{id}"}}
+  end
+
   defp rename_funs(ast, ctx) do
     traverse(ast, &rename_funs(&1, ctx))
   end
