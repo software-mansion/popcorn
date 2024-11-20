@@ -1,9 +1,9 @@
 defmodule FissionLib.BuildTrigger do
   @moduledoc false
-  # Triggers the libs compilation. May hang LSP ¯\_(ツ)_/¯
+  # Triggers the patches compilation. May hang LSP ¯\_(ツ)_/¯
 
-  @libs "libs/**/*"
-  paths = Path.wildcard(@libs)
+  @patches "patches/**/*"
+  paths = Path.wildcard(@patches)
   @paths_hash :erlang.md5(paths)
 
   for path <- paths do
@@ -11,7 +11,7 @@ defmodule FissionLib.BuildTrigger do
   end
 
   def __mix_recompile__?() do
-    Path.wildcard(@libs) |> :erlang.md5() != @paths_hash
+    Path.wildcard(@patches) |> :erlang.md5() != @paths_hash
   end
 
   out_dir = Mix.Project.build_path()
