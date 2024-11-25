@@ -107,7 +107,8 @@
     term_to_binary/1,
     timestamp/0,
     universaltime/0,
-    localtime/0
+    localtime/0,
+    nif_error/1
 ]).
 
 -export_type([
@@ -1254,3 +1255,6 @@ universaltime() ->
 -spec localtime() -> calendar:datetime().
 localtime() ->
     erlang:nif_error(undefined).
+
+%% Patch reason: nif_error is a NIF itself in the Beam, not implemented in Atom
+nif_error(_Reason) -> erlang:error("Nif not loaded").
