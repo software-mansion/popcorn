@@ -43,7 +43,7 @@ defmodule FissionLib.CoreErlangUtils do
 
     patch_body = rename_funs(patch_body, %{prefix: "avmp", funs: patch_exports})
 
-    body = orig_body ++ patch_body
+    body = patch_body ++ orig_body
 
     exports =
       MapSet.union(orig_exports, patch_exports) |> Enum.sort() |> Enum.map(&{:c_var, [], &1})
@@ -65,10 +65,10 @@ defmodule FissionLib.CoreErlangUtils do
   end
 
   defp do_add_simple_tracing(
-         {:c_call, call_meta, {:c_literal, mod_meta, mod} = mv, {:c_literal, fun_meta, _fun} = fv,
+         {:c_call, call_meta, {:c_literal, mod_meta, mod} = mv, {:c_literal, fun_meta, fun} = fv,
           args}
        )
-       when mod != :erlang do
+       when mod != :erlang or fun == :nif_error do
     {file, line} =
       Enum.reduce(call_meta, {~c"no_file", 0}, fn
         {:file, file}, {_file, line} when is_list(file) -> {file, line}

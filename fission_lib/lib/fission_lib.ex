@@ -15,7 +15,10 @@ defmodule FissionLib do
   `start/0` function as the `start_module` option.
   """
   @spec pack([
-          {:output_path, String.t()} | {:start_module, module} | {:fission_lib_path, String.t()}
+          {:output_path, String.t()}
+          | {:start_module, module}
+          | {:fission_lib_path, String.t()}
+          | {:artifacts, [String.t()]}
         ]) :: :ok
   def pack(options \\ []) do
     options =
@@ -23,16 +26,14 @@ defmodule FissionLib do
       |> Keyword.validate!(
         output_path: Config.get(:out_path),
         start_module: Config.get(:start_module),
-        fission_lib_path: "#{@build_path}/fission_lib.avm"
+        fission_lib_path: "#{@build_path}/fission_lib.avm",
+        artifacts: Path.wildcard("#{@build_path}/**/*.{beam,app}")
       )
       |> Map.new()
 
     :packbeam_api.create(
       ~c"#{options.output_path}",
-      Enum.map(
-        [options.fission_lib_path] ++ Path.wildcard("#{@build_path}/**/*.{beam,app}"),
-        &String.to_charlist/1
-      ),
+      Enum.map([options.fission_lib_path] ++ options.artifacts, &String.to_charlist/1),
       %{start_module: options.start_module}
     )
     |> case do

@@ -108,7 +108,8 @@
     timestamp/0,
     universaltime/0,
     localtime/0,
-    nif_error/1
+    nif_error/1,
+    bump_reductions/1
 ]).
 
 -export_type([
@@ -1258,3 +1259,8 @@ localtime() ->
 
 %% Patch reason: nif_error is a NIF itself in the Beam, not implemented in Atom
 nif_error(_Reason) -> erlang:error("Nif not loaded").
+
+%% Patch reason: nif not implemented in Atom
+%% It's a mock for now
+%% See https://linear.app/swmansion/project/erlangbump-reductions-missing-02f6ff09cac1/overview
+bump_reductions(_Reductions) -> true.
