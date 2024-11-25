@@ -29,4 +29,4 @@ module =
   #{impls}
   """
 
-File.write!("#{__DIR__}/libs/fission_utils/simple_trace.erl", module)
+File.write!("#{__DIR__}/patches/fission_utils/simple_trace.erl", module)
