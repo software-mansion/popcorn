@@ -2,6 +2,8 @@
 
 -export([map_next/3]).
 
+%% Patch reason: missing NIF in Atom
+%%
 %% return the next assoc in the iterator and a new iterator
 -spec map_next(I, M, A) -> {K, V, NI} | list() when
     I :: non_neg_integer() | list(),

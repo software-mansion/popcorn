@@ -1,3 +1,5 @@
+% Patch reason: missing persistent_term NIFs in Atom
+% This implementation is based on ETS
 %
 % This file is part of AtomVM.
 % ETS based implementation of persistent_term.
