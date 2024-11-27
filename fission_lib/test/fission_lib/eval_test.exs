@@ -2,6 +2,8 @@ defmodule FissionLib.EvalTest do
   use ExUnit.Case, async: true
   require Logger
 
+  @atomvm_path Application.compile_env!(:fission_lib, :atomvm_path)
+
   @moduletag :tmp_dir
   setup_all do
     {_output, 0} = System.shell("elixirc -o tmp test/fixtures/eval.ex", stderr_to_stdout: true)
@@ -18,10 +20,7 @@ defmodule FissionLib.EvalTest do
   defp run(code, tmp_dir) do
     File.write!("tmp/code.erl", code)
 
-    {_output, ret_val} =
-      System.shell(
-        "/Users/matheksm/ew/FissionVM/build/src/AtomVM tmp/eval.avm &> #{tmp_dir}/log.txt"
-      )
+    {_output, ret_val} = System.shell("#{@atomvm_path} tmp/eval.avm &> #{tmp_dir}/log.txt")
 
     assert ret_val == 0,
            "Executing code with erl_eval failed, see #{Path.relative_to_cwd(tmp_dir)}/log.txt for logs"

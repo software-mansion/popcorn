@@ -33,7 +33,7 @@ defmodule FissionLib do
 
     :packbeam_api.create(
       ~c"#{options.output_path}",
-      Enum.map([options.fission_lib_path] ++ options.artifacts, &String.to_charlist/1),
+      Enum.map([options.fission_lib_path | options.artifacts], &String.to_charlist/1),
       %{start_module: options.start_module}
     )
     |> case do
