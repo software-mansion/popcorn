@@ -56,7 +56,7 @@ defmodule FissionLib.Build do
       {_out, 0} = System.shell("erlc -o #{yrl_dir} #{file}")
     end)
 
-    erl_paths = Path.wildcard("#{patches_dir}/**/*.erl") ++ Path.wildcard("#{yrl_dir}/*.erl")
+    erl_paths = Path.wildcard("#{patches_dir}/**/*.{erl,S}") ++ Path.wildcard("#{yrl_dir}/*.erl")
 
     process_async(erl_paths, fn file ->
       IO.puts("Compiling #{file}")
@@ -78,23 +78,29 @@ defmodule FissionLib.Build do
 
     (stdlib_beams ++ patch_beams)
     |> Enum.group_by(&Path.basename/1)
-    |> process_async(fn {name, paths} ->
-      IO.puts("Patching #{name}")
+    |> process_async(fn
+      # prim_eval fais to be parsed, probably because it's compiled from an asm (*.S) file
+      # so we just copy it
+      {name, [_estd_path, avm_path]} when name == "prim_eval.beam" ->
+        File.cp!(avm_path, Path.join(out_dir, name))
 
-      ast =
-        case paths do
-          [estd_path, avm_path] ->
-            CoreErlangUtils.merge_modules(
-              CoreErlangUtils.parse(estd_path),
-              CoreErlangUtils.parse(avm_path)
-            )
+      {name, paths} ->
+        IO.puts("Patching #{name}")
 
-          [path] ->
-            CoreErlangUtils.parse(path)
-        end
+        ast =
+          case paths do
+            [estd_path, avm_path] ->
+              CoreErlangUtils.merge_modules(
+                CoreErlangUtils.parse(estd_path),
+                CoreErlangUtils.parse(avm_path)
+              )
 
-      ast = if add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
-      CoreErlangUtils.serialize(ast, Path.join(out_dir, name))
+            [path] ->
+              CoreErlangUtils.parse(path)
+          end
+
+        ast = if add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
+        CoreErlangUtils.serialize(ast, Path.join(out_dir, name))
     end)
 
     :ok
