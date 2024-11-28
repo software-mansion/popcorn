@@ -40,30 +40,7 @@ end.
       Result: <span id="result"></span>
     </p>
 
-    <script>
-      var Module = {
-        arguments: ["iex_wasm.avm"],
-      };
-    </script>
-    <script async>
-      window.document.getElementById("eval").onclick = async () => {
-        console.log("evaluating");
-        const t = performance.now();
-        const result = await Module.call(
-          "main",
-          document.getElementById("code").value
-        );
-        const dt = +(performance.now() - t).toFixed(3);
-        console.log(`took ${dt} ms, result: ${result}`);
-        window.document.getElementById("time").innerHTML = `${dt} ms`;
-        window.document.getElementById("result").innerHTML = result;
-      };
-      document.getElementById("code").addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-          document.getElementById("eval").click();
-        }
-      });
-    </script>
+    <script async src="script.js"></script>
     <script async src="AtomVM.js"></script>
   </body>
 </html>
