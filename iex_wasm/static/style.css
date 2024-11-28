@@ -1,10 +1,50 @@
-#result {
-  font-family: monospace;
+:root {
+  --swm-header: #001a72;
+  --swm-text: #232736;
+  --swm-background: #fcfcff;
+  --swm-yellow-40: #fff1b2;
+  --swm-red-100: #ff6259;
+  --swm-active-btn: var(--swm-text);
 }
 
-.text-area-container {
+@media (prefers-color-scheme: dark) {
+  :root {
+    --swm-header: #eef0ff;
+    --swm-text: #fcfcff;
+    --swm-background: #232736;
+    --swm-yellow-40: #fff9db;
+    --swm-red-100: #ff7774;
+    --swm-active-btn: var(--swm-background);
+  }
+}
+
+.container {
   display: flex;
-  gap: 2em;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.controls {
+  display: flex;
+  gap: 1em;
+  justify-content: flex-end;
+}
+
+.controls *:first-child {
+  margin-right: auto;
+}
+
+.logs {
+  display: flex;
+  flex-direction: column;
+  max-height: 30em;
+  width: 60em;
+  min-height: 3em;
+  padding: 0.5em;
+  margin: 0;
+  font-size: small;
+  overflow: scroll;
+  border: 1px solid var(--swm-text);
 }
 
 body {
@@ -23,43 +63,31 @@ p,
 h1,
 h2,
 h3 {
-  background-color: #fdfdfd;
-  color: #151515;
+  color: var(--swm-text);
+  background-color: var(--swm-background);
 }
 
 h1,
 h2,
 h3 {
+  color: var(--swm-header);
   line-height: 1.2;
 }
 
 button {
-  border: 1px solid #151515;
+  border: 1px solid var(--swm-text);
   padding: 1em;
+  align-self: flex-start;
 }
 
 button:active {
-  color: #151515;
-  background-color: #fff1b2;
+  color: var(--swm-active-btn);
+  background-color: var(--swm-yellow-40);
 }
 
 textarea {
   font-size: medium;
   padding: 0.5em;
   font-family: monospace;
-  border: 1px solid #151515;
-}
-
-@media (prefers-color-scheme: dark) {
-  body,
-  button,
-  textarea,
-  p,
-  h1,
-  h2,
-  h3 {
-    color: #fdfdfd;
-    background: #151515;
-    border-color: #fdfdfd;
-  }
+  border: 1px solid var(--swm-text);
 }
