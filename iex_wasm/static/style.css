@@ -1,3 +1,12 @@
+#result {
+  font-family: monospace;
+}
+
+.text-area-container {
+  display: flex;
+  gap: 2em;
+}
+
 body {
   max-width: max-content;
   margin: 40px auto;
@@ -5,6 +14,16 @@ body {
   font: 18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+body,
+button,
+textarea,
+p,
+h1,
+h2,
+h3 {
+  background-color: #fdfdfd;
   color: #151515;
 }
 
@@ -19,6 +38,11 @@ button {
   padding: 1em;
 }
 
+button:active {
+  color: #151515;
+  background-color: #fff1b2;
+}
+
 textarea {
   font-size: medium;
   padding: 0.5em;
@@ -26,23 +50,16 @@ textarea {
   border: 1px solid #151515;
 }
 
-#result {
-  font-family: monospace;
-}
-
-.text-area-container {
-  display: flex;
-  gap: 2em;
-}
-
 @media (prefers-color-scheme: dark) {
   body,
+  button,
   textarea,
-  button,
-  button,
-  textarea {
-    color: #e6e6e6;
+  p,
+  h1,
+  h2,
+  h3 {
+    color: #fdfdfd;
     background: #151515;
-    border-color: #e6e6e6;
+    border-color: #fdfdfd;
   }
 }
