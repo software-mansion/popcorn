@@ -2,30 +2,27 @@ defmodule FissionLib.EvalTest do
   use ExUnit.Case, async: true
   require Logger
 
-  @atomvm_path Application.compile_env!(:fission_lib, :atomvm_path)
-
   @moduletag :tmp_dir
   setup_all do
-    {_output, 0} = System.shell("elixirc -o tmp test/fixtures/eval.ex", stderr_to_stdout: true)
+    quote do
+      code = var!(code) |> :erlang.binary_to_list()
+      {:ok, tokens, _} = :erl_scan.string(code)
+      IO.puts("Scanned")
+      {:ok, exprs} = :erl_parse.parse_exprs(tokens)
+      IO.puts("Parsed")
 
-    FissionLib.pack(
-      artifacts: ["tmp/Elixir.Eval.beam"],
-      start_module: Eval,
-      output_path: "tmp/eval.avm"
-    )
+      case :erl_eval.exprs(exprs, []) do
+        {:value, value, _new_bindings} -> {:ok, value}
+        other -> {:error, other}
+      end
+    end
+    |> RunInAtomVM.compile("tmp", [:code])
 
     :ok
   end
 
   defp run(code, tmp_dir) do
-    File.write!("tmp/code.erl", code)
-
-    {_output, ret_val} = System.shell("#{@atomvm_path} tmp/eval.avm &> #{tmp_dir}/log.txt")
-
-    assert ret_val == 0,
-           "Executing code with erl_eval failed, see #{Path.relative_to_cwd(tmp_dir)}/log.txt for logs"
-
-    assert {:ok, result} = File.read!("tmp/result.bin") |> :erlang.binary_to_term()
+    assert {:ok, result} = RunInAtomVM.run("tmp", tmp_dir, code: code)
     result
   end
 
