@@ -2,24 +2,24 @@ defmodule FissionLib.CoreErlangUtils do
   @moduledoc false
 
   @doc """
-  Parses a beam file into the Core Erlang AST.
+  Parses a beam binary into the Core Erlang AST.
   """
-  def parse(path) do
+  def parse(beam) do
     {:ok, {_module, [abstract_code: {_backend, abstract_code}]}} =
-      :beam_lib.chunks(~c"#{path}", [:abstract_code])
+      :beam_lib.chunks(beam, [:abstract_code])
 
     {:ok, _module, ast} = :compile.noenv_forms(abstract_code, [:to_core])
     ast
   end
 
   @doc """
-  Compiles the Core Erlang AST into a beam file.
-  For some reason, a serialized file fails to be parsed again,
+  Compiles the Core Erlang AST into a beam binary.
+  For some reason, the serialized beam fails to be parsed again,
   for mysterious reasons.
   """
-  def serialize(ast, path) do
+  def serialize(ast) do
     {:ok, _module, beam} = :compile.noenv_forms(ast, [:from_core])
-    File.write!(path, beam)
+    beam
   end
 
   @doc """
@@ -32,16 +32,42 @@ defmodule FissionLib.CoreErlangUtils do
   def merge_modules(orig_ast, patch_ast) do
     {:c_module, _meta, module_spec, orig_exports, orig_specs, orig_body} = orig_ast
     {:c_module, _meta, _module, patch_exports, patch_specs, patch_body} = patch_ast
+
+    patch_private_overrides =
+      patch_specs
+      |> Enum.flat_map(fn
+        {{:c_literal, _meta1, :compile}, {:c_literal, _meta2, params}} -> params
+        _other -> []
+      end)
+      |> Enum.flat_map(fn
+        {:flb_patch_private, funs} -> List.wrap(funs)
+        _other -> []
+      end)
+      |> MapSet.new()
+
     orig_exports = MapSet.new(orig_exports, fn {:c_var, _meta, fa} -> fa end)
-    patch_exports = MapSet.new(patch_exports, fn {:c_var, _meta, fa} -> fa end)
+
+    patch_exports =
+      patch_exports
+      |> MapSet.new(fn {:c_var, _meta, fa} -> fa end)
+      |> MapSet.difference(patch_private_overrides)
 
     orig_body =
-      rename_funs(orig_body, %{
+      orig_body
+      |> remove_funs(
+        MapSet.intersection(orig_exports, patch_exports)
+        |> MapSet.union(patch_private_overrides)
+      )
+      |> rename_funs_and_local_calls(%{
         prefix: "avmo",
-        funs: MapSet.difference(orig_exports, patch_exports)
+        except: MapSet.union(orig_exports, patch_private_overrides)
       })
 
-    patch_body = rename_funs(patch_body, %{prefix: "avmp", funs: patch_exports})
+    patch_body =
+      rename_funs_and_local_calls(patch_body, %{
+        prefix: "avmp",
+        except: MapSet.union(patch_exports, patch_private_overrides)
+      })
 
     body = patch_body ++ orig_body
 
@@ -95,31 +121,41 @@ defmodule FissionLib.CoreErlangUtils do
     File.open("#{name}.core", [:write], &:beam_listing.module(&1, ast))
   end
 
-  defp rename_funs({:c_var, meta, {function, arity} = fa} = ast, ctx)
+  defp remove_funs(ast, funs) do
+    Enum.reject(ast, fn
+      {{:c_var, _var_meta, {fun, arity}}, {:c_fun, _fun_meta, _vars, _body}} ->
+        {fun, arity} in funs
+
+      _ast ->
+        false
+    end)
+  end
+
+  defp rename_funs_and_local_calls({:c_var, meta, {function, arity} = fa} = ast, ctx)
        when is_atom(function) and is_integer(arity) do
-    if fa in ctx.funs do
+    if fa in ctx.except do
       ast
     else
       {:c_var, meta, {:"#{ctx.prefix}_#{function}", arity}}
     end
   end
 
-  defp rename_funs({:function, {function, arity} = fa} = ast, ctx)
+  defp rename_funs_and_local_calls({:function, {function, arity} = fa} = ast, ctx)
        when is_atom(function) and is_integer(arity) do
-    if fa in ctx.funs do
+    if fa in ctx.except do
       ast
     else
       {:function, {:"#{ctx.prefix}_#{function}", arity}}
     end
   end
 
-  defp rename_funs({:id, {line, col, id}}, ctx) do
+  defp rename_funs_and_local_calls({:id, {line, col, id}}, ctx) do
     "-" <> id = Atom.to_string(id)
     {:id, {line, col, :"-#{ctx.prefix}_#{id}"}}
   end
 
-  defp rename_funs(ast, ctx) do
-    traverse(ast, &rename_funs(&1, ctx))
+  defp rename_funs_and_local_calls(ast, ctx) do
+    traverse(ast, &rename_funs_and_local_calls(&1, ctx))
   end
 
   defp traverse(ast, fun) when is_tuple(ast) do

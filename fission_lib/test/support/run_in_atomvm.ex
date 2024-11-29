@@ -13,7 +13,7 @@ defmodule RunInAtomVM do
     File.rm_rf!(build_path)
     File.mkdir_p!(build_path)
 
-    [{mod, beam}] = code |> module(vars, build_path) |> Code.compile_quoted()
+    [{mod, beam}] = code |> module(vars, build_path) |> Utils.compile_quoted(build_path)
     beam_name = "#{build_path}/#{inspect(mod)}.beam"
     File.write!(beam_name, beam)
 
