@@ -64,10 +64,12 @@ defmodule FissionLib.CoreErlangUtils do
       })
 
     patch_body =
-      rename_funs_and_local_calls(patch_body, %{
+      patch_body
+      |> rename_funs_and_local_calls(%{
         prefix: "avmp",
         except: MapSet.union(patch_exports, patch_private_overrides)
       })
+      |> inject_private_calls()
 
     body = patch_body ++ orig_body
 
@@ -119,6 +121,7 @@ defmodule FissionLib.CoreErlangUtils do
   def debug(ast, name \\ "out") do
     File.write!("#{name}.ast.exs", inspect(ast, pretty: true, limit: :infinity))
     File.open("#{name}.core", [:write], &:beam_listing.module(&1, ast))
+    ast
   end
 
   defp remove_funs(ast, funs) do
@@ -130,6 +133,15 @@ defmodule FissionLib.CoreErlangUtils do
         false
     end)
   end
+
+  defp inject_private_calls(
+         {:c_call, call_meta, {:c_literal, _mod_meta, :flb_priv}, {:c_literal, fun_meta, fun},
+          args}
+       ) do
+    {:c_apply, call_meta, {:c_var, fun_meta, {:"avmo_#{fun}", length(args)}}, args}
+  end
+
+  defp inject_private_calls(ast), do: traverse(ast, &inject_private_calls/1)
 
   defp rename_funs_and_local_calls({:c_var, meta, {function, arity} = fa} = ast, ctx)
        when is_atom(function) and is_integer(arity) do
