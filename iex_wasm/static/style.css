@@ -10,8 +10,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --swm-header: #eef0ff;
-    --swm-text: #fcfcff;
+    --swm-header: #fcfcff;
+    --swm-text: #c1c6e5;
     --swm-background: #232736;
     --swm-yellow-100: #fd4;
     --swm-red-100: #ff7774;
@@ -76,6 +76,7 @@ body {
 body,
 button,
 textarea,
+a,
 p,
 h1,
 h2,
