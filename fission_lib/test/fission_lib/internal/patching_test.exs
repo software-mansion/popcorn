@@ -22,7 +22,7 @@ defmodule FissionLib.Internal.PatchingTest do
           defp priv_baz4(), do: :baz4
         end,
         quote do
-          @compile {:no_warn_undefined, :flb_priv}
+          @compile {:no_warn_undefined, :flb_module}
           def pub_hello(x), do: priv_foo({:patch_hello, x, priv_bar()})
           defp priv_foo(x), do: {:yay, x}
           defp priv_bar(), do: :patch_bar
@@ -33,8 +33,9 @@ defmodule FissionLib.Internal.PatchingTest do
           def priv_baz3(), do: :patch_baz3
           def pub_call_ups(), do: pub_ups()
           defp pub_ups(), do: :patch_ups
-          def pub_call_orig_bar(), do: :flb_priv.priv_bar()
-          def pub_call_orig_baz4(), do: :flb_priv.priv_baz4()
+          def pub_call_orig_bar(), do: :flb_module.priv_bar()
+          def pub_call_orig_baz4(), do: :flb_module.priv_baz4()
+          def pub_call_hello_flb_module(x), do: :flb_module.pub_hello(x)
         end,
         tmp_dir
       )
@@ -47,6 +48,7 @@ defmodule FissionLib.Internal.PatchingTest do
     assert :patch_ups = module.pub_call_ups()
     assert :bar = module.pub_call_orig_bar()
     assert :baz4 = module.pub_call_orig_baz4()
+    assert {:yay, {:patch_hello, :world2, :patch_bar}} = module.pub_call_hello_flb_module(:world2)
     refute function_exported?(module, :priv_baz, 0)
     refute function_exported?(module, :priv_baz2, 0)
   end

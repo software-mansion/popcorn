@@ -31,7 +31,8 @@ defmodule FissionLib.CoreErlangUtils do
   """
   def merge_modules(orig_ast, patch_ast) do
     {:c_module, _meta, module_spec, orig_exports, orig_specs, orig_body} = orig_ast
-    {:c_module, _meta, _module, patch_exports, patch_specs, patch_body} = patch_ast
+    {:c_module, _meta, _module_spec, patch_exports, patch_specs, patch_body} = patch_ast
+    {:c_literal, _spec, module} = module_spec
 
     patch_private_overrides =
       patch_specs
@@ -52,6 +53,8 @@ defmodule FissionLib.CoreErlangUtils do
       |> MapSet.new(fn {:c_var, _meta, fa} -> fa end)
       |> MapSet.difference(patch_private_overrides)
 
+    exports = MapSet.union(orig_exports, patch_exports)
+
     orig_body =
       orig_body
       |> remove_funs(
@@ -69,16 +72,15 @@ defmodule FissionLib.CoreErlangUtils do
         prefix: "avmp",
         except: MapSet.union(patch_exports, patch_private_overrides)
       })
-      |> inject_private_calls()
+      |> inject_private_calls(module, exports)
 
     body = patch_body ++ orig_body
 
-    exports =
-      MapSet.union(orig_exports, patch_exports) |> Enum.sort() |> Enum.map(&{:c_var, [], &1})
+    exports_ast = exports |> Enum.sort() |> Enum.map(&{:c_var, [], &1})
 
     specs = orig_specs ++ patch_specs
 
-    {:c_module, [], module_spec, exports, specs, body}
+    {:c_module, [], module_spec, exports_ast, specs, body}
   end
 
   @doc """
@@ -135,13 +137,22 @@ defmodule FissionLib.CoreErlangUtils do
   end
 
   defp inject_private_calls(
-         {:c_call, call_meta, {:c_literal, _mod_meta, :flb_priv}, {:c_literal, fun_meta, fun},
-          args}
+         {:c_call, call_meta, {:c_literal, mod_meta, :flb_module}, {:c_literal, fun_meta, fun},
+          args},
+         module,
+         exports
        ) do
-    {:c_apply, call_meta, {:c_var, fun_meta, {:"avmo_#{fun}", length(args)}}, args}
+    arity = length(args)
+
+    if {fun, arity} in exports do
+      {:c_call, call_meta, {:c_literal, mod_meta, module}, {:c_literal, fun_meta, fun}, args}
+    else
+      {:c_apply, call_meta, {:c_var, fun_meta, {:"avmo_#{fun}", arity}}, args}
+    end
   end
 
-  defp inject_private_calls(ast), do: traverse(ast, &inject_private_calls/1)
+  defp inject_private_calls(ast, module, exports),
+    do: traverse(ast, &inject_private_calls(&1, module, exports))
 
   defp rename_funs_and_local_calls({:c_var, meta, {function, arity} = fa} = ast, ctx)
        when is_atom(function) and is_integer(arity) do
