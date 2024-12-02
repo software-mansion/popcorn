@@ -79,7 +79,7 @@ function setup() {
   Elements.codeInput.addEventListener("keydown", (event) => {
     const cmdEnter = event.key === "Enter" && (event.metaKey || event.ctrlKey);
     if (cmdEnter) {
-      evalCode();
+      evalErlang();
     }
   });
 }
