@@ -1,12 +1,13 @@
 defmodule ElixirWasm do
   def start() do
-    :elixir.start([], [])
     spawn(&loop/0)
   end
 
   defp loop() do
     receive do
       {:emscripten, {:call, promise, data}} ->
+        if :elixir_config |> Process.whereis() |> is_nil(), do: :elixir.start([], [])
+
         result =
           case Code.eval_string(data, [], __ENV__) do
             {result, _binding} -> result
