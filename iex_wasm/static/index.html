@@ -1,54 +1,52 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/style.css" />
+    <title>IEx x WASM x AtomVM</title>
+  </head>
 
-<head>
-  <meta charset="utf-8" />
-  <link rel="stylesheet" href="/style.css" />
-  <title>IEx x WASM x AtomVM</title>
-</head>
+  <body>
+    <h1>IEx in the browser via WASM via AtomVM</h1>
+    <p>
+      Type Erlang code in the textarea below and press CTRL+Enter or click
+      'evaluate' to run it.
+    </p>
+    <a href="/elixir">Also, try Elixir</a>
 
-<body>
-  <h1>IEx in the browser via WASM via AtomVM</h1>
-  <p>
-    Type Erlang code in the textarea below and press CTRL+Enter or click
-    'evaluate' to run it.
-  </p>
-  <a href="/elixir">Also, try Elixir</a>
-
-  <div class="horizontal-container">
-    <div class="container">
-      <h3>Erlang code eval</h3>
-      <textarea id="code" rows="20" cols="60"></textarea>
-      <div class="controls">
-        <button id="eval" value="erlang"><b>Evaluate</b></button>
-        <button id="example-case" value="erlang"><b>Example: case</b></button>
+    <div class="horizontal-container">
+      <div class="container">
+        <h3>Erlang code eval</h3>
+        <textarea id="code" rows="20" cols="60"></textarea>
+        <div class="controls">
+          <button id="eval" value="erlang"><b>Evaluate</b></button>
+          <button id="example-case" value="erlang"><b>Example: case</b></button>
+        </div>
+      </div>
+      <div class="container">
+        <h3>Erlang module eval</h3>
+        <textarea id="module" rows="20" cols="60"></textarea>
+        <div class="controls">
+          <button class="secondary-btn" id="eval-module">
+            <b>Compile module</b>
+          </button>
+          <button id="example-basic-module">Example: basic module</button>
+        </div>
       </div>
     </div>
-    <div class="container">
-      <h3>Erlang module eval</h3>
-      <textarea id="module" rows="20" cols="60"></textarea>
-      <div class="controls">
-        <button class="secondary-btn" id="eval-module">
-          <b>Compile module</b>
-        </button>
-        <button id="example-basic-module">Example: basic module</button>
+    <p>
+      Time: <span id="time"></span><br />
+      Result: <code id="result"></code>
+    </p>
+    <details open>
+      <summary>Logs</summary>
+      <div class="container">
+        <button id="clear">Clear</button>
+        <pre id="logs" class="logs"></pre>
       </div>
-    </div>
-  </div>
-  <p>
-    Time: <span id="time"></span><br />
-    Result: <code id="result"></code>
-  </p>
-  <details open>
-    <summary>Logs</summary>
-    <div class="container">
-      <button id="clear">Clear</button>
-      <pre id="logs" class="logs"></pre>
-    </div>
-  </details>
+    </details>
 
-  <script async src="script.js"></script>
-  <script async src="AtomVM.js"></script>
-</body>
-
+    <script async src="script.js"></script>
+    <script async src="AtomVM.js"></script>
+  </body>
 </html>
