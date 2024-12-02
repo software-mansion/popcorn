@@ -13,8 +13,6 @@
     A :: iterator | list(),
     NI :: maps:iterator().
 
+%% Patch reason: it uses native code in OTP
 map_next(I, M, iterator) ->
-    Ks = maps:keys(M),
-    K = lists:nth(I + 1, Ks),
-    V = maps:get(K, M),
-    {K, V, [I + 1 | M]}.
+    maps:next([I | M]).

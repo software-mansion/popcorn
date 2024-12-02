@@ -310,8 +310,11 @@ system_flag(_Key, _Value) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec md5(Data :: binary()) -> binary().
-md5(Data) when is_binary(Data) ->
-    crypto:hash(md5, Data).
+%% Patch reason: AVM patch; md5 uses native mbedtls implementation that isn't easily linked
+%% so we use vendored implementation
+%% Patch reason: AVM patch; md5 accepts iolist as well
+md5(Data) when is_binary(Data) orelse is_list(Data) ->
+    erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
 %% @param   Module Name of module

@@ -2,9 +2,10 @@
   --swm-header: #001a72;
   --swm-text: #232736;
   --swm-background: #fcfcff;
-  --swm-yellow-40: #fff1b2;
+  --swm-yellow-40: #ffd61e;
   --swm-red-100: #ff6259;
-  --swm-active-btn: var(--swm-text);
+  --swm-green-100: #57b495;
+  --swm-blue-100: #38acdd;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -12,15 +13,31 @@
     --swm-header: #eef0ff;
     --swm-text: #fcfcff;
     --swm-background: #232736;
-    --swm-yellow-40: #fff9db;
+    --swm-yellow-100: #fd4;
     --swm-red-100: #ff7774;
-    --swm-active-btn: var(--swm-background);
+    --swm-green-100: #3fc684;
+    --swm-blue-100: #00a9f0;
   }
+}
+
+.primary-btn:active {
+  color: var(--swm-background);
+  background-color: var(--swm-yellow-40);
+}
+
+.secondary-btn:active {
+  color: var(--swm-text);
+  background-color: var(--swm-green-100);
 }
 
 .container {
   display: flex;
   flex-direction: column;
+  gap: 1em;
+}
+
+.horizontal-container {
+  display: flex;
   gap: 1em;
 }
 
@@ -81,8 +98,8 @@ button {
 }
 
 button:active {
-  color: var(--swm-active-btn);
-  background-color: var(--swm-yellow-40);
+  color: var(--swm-text);
+  background-color: var(--swm-blue-100);
 }
 
 textarea {
