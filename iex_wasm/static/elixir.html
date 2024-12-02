@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="/style.css" />
+  <title>Elixir in the browser via WASM via AtomVM</title>
+</head>
+
+<body>
+  <h1>Elixir in the browser via WASM via AtomVM</h1>
+  <p>
+    Type Elixir code in the textarea below and press CTRL+Enter or click
+    'evaluate' to run it.
+  </p>
+  <a href="/">Also, try Erlang</a>
+
+  <div>
+    <div class="container">
+      <h3>Elixir code eval</h3>
+      <textarea id="code" rows="20" cols="60"></textarea>
+      <div class="controls">
+        <button id="eval" value="elixir"><b>Evaluate</b></button>
+        <button id="example-case" value="elixir"><b>Example</b></button>
+      </div>
+    </div>
+  </div>
+  <p>
+    Time: <span id="time"></span><br />
+    Result: <code id="result"></code>
+  </p>
+  <details open>
+    <summary>Logs</summary>
+    <div class="container">
+      <button id="clear">Clear</button>
+      <pre id="logs" class="logs"></pre>
+    </div>
+  </details>
+
+  <script async src="script.js"></script>
+  <script async src="AtomVM.js"></script>
+</body>
+
+</html>

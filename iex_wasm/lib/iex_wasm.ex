@@ -2,6 +2,8 @@ defmodule IExWASM do
   def start() do
     Console.print("Starting application...\n")
     Process.register(self(), :main)
+    pid = ElixirWasm.start()
+    Process.register(pid, :elixir_iex)
     loop()
   end
 
