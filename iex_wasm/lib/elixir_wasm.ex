@@ -1,7 +1,6 @@
 defmodule ElixirWasm do
   def start() do
     :elixir.start([], [])
-    :elixir_config.start_link()
     spawn(&loop/0)
   end
 
