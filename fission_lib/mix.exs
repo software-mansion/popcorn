@@ -2,10 +2,19 @@ defmodule FissionLib.MixProject do
   use Mix.Project
 
   def project do
+    otp_version =
+      "#{:code.root_dir()}/releases/#{System.otp_release()}/OTP_VERSION"
+      |> File.read!()
+      |> String.trim()
+
+    unless otp_version == "26.0.2" do
+      raise "FissionLib only supports OTP 26.0.2 and Elixir 1.17.3"
+    end
+
     [
       app: :fission_lib,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "1.17.3",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps()
