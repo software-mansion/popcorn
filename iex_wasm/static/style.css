@@ -1,3 +1,52 @@
+:root {
+  --swm-header: #001a72;
+  --swm-text: #232736;
+  --swm-background: #fcfcff;
+  --swm-yellow-40: #fff1b2;
+  --swm-red-100: #ff6259;
+  --swm-active-btn: var(--swm-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --swm-header: #eef0ff;
+    --swm-text: #fcfcff;
+    --swm-background: #232736;
+    --swm-yellow-40: #fff9db;
+    --swm-red-100: #ff7774;
+    --swm-active-btn: var(--swm-background);
+  }
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+}
+
+.controls {
+  display: flex;
+  gap: 1em;
+  justify-content: flex-end;
+}
+
+.controls *:first-child {
+  margin-right: auto;
+}
+
+.logs {
+  display: flex;
+  flex-direction: column;
+  max-height: 30em;
+  width: 60em;
+  min-height: 3em;
+  padding: 0.5em;
+  margin: 0;
+  font-size: small;
+  overflow: scroll;
+  border: 1px solid var(--swm-text);
+}
+
 body {
   max-width: max-content;
   margin: 40px auto;
@@ -5,44 +54,40 @@ body {
   font: 18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  color: #151515;
+}
+
+body,
+button,
+textarea,
+p,
+h1,
+h2,
+h3 {
+  color: var(--swm-text);
+  background-color: var(--swm-background);
 }
 
 h1,
 h2,
 h3 {
+  color: var(--swm-header);
   line-height: 1.2;
 }
 
 button {
-  border: 1px solid #151515;
+  border: 1px solid var(--swm-text);
   padding: 1em;
+  align-self: flex-start;
+}
+
+button:active {
+  color: var(--swm-active-btn);
+  background-color: var(--swm-yellow-40);
 }
 
 textarea {
   font-size: medium;
   padding: 0.5em;
   font-family: monospace;
-  border: 1px solid #151515;
-}
-
-#result {
-  font-family: monospace;
-}
-
-.text-area-container {
-  display: flex;
-  gap: 2em;
-}
-
-@media (prefers-color-scheme: dark) {
-  body,
-  textarea,
-  button,
-  button,
-  textarea {
-    color: #e6e6e6;
-    background: #151515;
-    border-color: #e6e6e6;
-  }
+  border: 1px solid var(--swm-text);
 }
