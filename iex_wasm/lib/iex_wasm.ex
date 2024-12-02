@@ -70,15 +70,12 @@ defmodule IExWASM do
 
   defp split_forms(forms) do
     split_on_dots = fn
-      {:dot, _} = f, {current, forms} ->
-        new_form = Enum.reverse([f | current])
-        {[], [new_form | forms]}
-
-      f, {current, forms} ->
-        {[f | current], forms}
+      {:dot, _} = f, current -> {:cont, Enum.reverse([f | current]), []}
+      f, current -> {:cont, [f | current]}
     end
 
-    {[], split} = Enum.reduce(forms, {[], []}, split_on_dots)
-    Enum.reverse(split)
+    ensure_empty_acc = fn [] -> {:cont, []} end
+
+    Enum.chunk_while(forms, [], split_on_dots, ensure_empty_acc)
   end
 end
