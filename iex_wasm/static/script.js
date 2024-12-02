@@ -8,6 +8,14 @@ const CODE_EXAMPLES = {
     "  2 -> error",
     "end.",
   ].join("\n"),
+  ELIXIR: [
+    "double = fn x -> x * 2 end",
+    "list = Enum.map([1,2,3], double)",
+    "case Enum.max(list) do",
+    " 6 -> :ok",
+    " _ -> :error",
+    "end"
+  ].join("\n")
 };
 
 const MODULE_EXAMPLES = {
@@ -66,16 +74,20 @@ const Elements = {
 
 function setup() {
   Elements.exampleCaseButton.onclick = () => {
-    Elements.codeInput.value = CODE_EXAMPLES.CASE;
+    Elements.codeInput.value = Elements.exampleCaseButton.value === "elixir" ? CODE_EXAMPLES.ELIXIR : CODE_EXAMPLES.CASE;
   };
-  Elements.exampleBasicModuleButton.onclick = () => {
-    Elements.moduleInput.value = MODULE_EXAMPLES.BASIC;
-  };
+
+  if (Elements.moduleButton) {
+    Elements.exampleBasicModuleButton.onclick = () => {
+      Elements.moduleInput.value = MODULE_EXAMPLES.BASIC;
+    };
+    Elements.moduleButton.onclick = () => compileErlangModule();
+  }
+
   Elements.clearButton.onclick = () => {
     Elements.logsDisplay.innerHTML = "";
   };
-  Elements.evalButton.onclick = () => evalErlang();
-  Elements.moduleButton.onclick = () => compileErlangModule();
+  Elements.evalButton.onclick = () => evalCode();
   Elements.codeInput.addEventListener("keydown", (event) => {
     const cmdEnter = event.key === "Enter" && (event.metaKey || event.ctrlKey);
     if (cmdEnter) {
@@ -127,6 +139,19 @@ function displayLog(lines, errors) {
   });
 }
 
+async function evalCode() {
+  const language = Elements.evalButton.value;
+  if (language == "elixir") {
+    await evalElixir();
+  } else {
+    await evalErlang();
+  }
+}
+
+async function evalElixir() {
+  await executeElixir(Elements.codeInput.value);
+}
+
 async function evalErlang() {
   await executeErlang(Elements.codeInput.value, TYPE.EVAL);
 }
@@ -151,6 +176,20 @@ async function executeErlang(code, type) {
   console.log("Evaluating");
   const { result, dtMs } = await profile(async () =>
     Module.call("main", type + ":" + code)
+  );
+  console.log(`Took ${dtMs} ms, result: ${result}`);
+
+  Elements.timeDisplay.textContent = `${dtMs.toFixed(3)} ms`;
+  Elements.resultDisplay.textContent = result;
+}
+
+async function executeElixir(code) {
+  if (code === "") {
+    return;
+  }
+  console.log("Evaluating");
+  const { result, dtMs } = await profile(async () =>
+    Module.call("elixir_iex", code)
   );
   console.log(`Took ${dtMs} ms, result: ${result}`);
 
