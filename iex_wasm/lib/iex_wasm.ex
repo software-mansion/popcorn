@@ -45,7 +45,7 @@ defmodule IExWASM do
         |> Enum.map(parse_form)
         |> :compile.noenv_forms(compile_opts)
 
-      :code.load_binary(module, "nofile", module_bin)
+      :code.load_binary(module, ~c"nofile", module_bin)
     catch
       error -> {:error, error}
     end

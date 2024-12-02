@@ -736,7 +736,7 @@ unique([X, Y | Tail], Fun) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec duplicate(integer(), Elem) -> [Elem].
-%% Patch reason: Count can be 0 too
+%% Patch reason: AVM patch; Count can be 0 too
 duplicate(Count, Elem) when is_integer(Count) andalso Count >= 0 ->
     duplicate(Count, Elem, []).
 
