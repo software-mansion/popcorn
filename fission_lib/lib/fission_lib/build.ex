@@ -91,16 +91,18 @@ defmodule FissionLib.Build do
           case paths do
             [estd_path, avm_path] ->
               CoreErlangUtils.merge_modules(
-                CoreErlangUtils.parse(estd_path),
-                CoreErlangUtils.parse(avm_path)
+                CoreErlangUtils.parse(File.read!(estd_path)),
+                CoreErlangUtils.parse(File.read!(avm_path))
               )
 
             [path] ->
-              CoreErlangUtils.parse(path)
+              CoreErlangUtils.parse(File.read!(path))
           end
 
         ast = if add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
-        CoreErlangUtils.serialize(ast, Path.join(out_dir, name))
+
+        beam = CoreErlangUtils.serialize(ast)
+        File.write!(Path.join(out_dir, name), beam)
     end)
 
     :ok

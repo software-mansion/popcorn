@@ -1,21 +1,21 @@
 defmodule FissionLib.CodeTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   @moduletag :tmp_dir
 
   test "code load module", %{tmp_dir: tmp_dir} do
-    [{Foo, beam}] =
+    [{CodeTest.Foo, beam}] =
       quote do
-        defmodule Foo do
+        defmodule CodeTest.Foo do
           def foo(x), do: x + 1
         end
       end
-      |> Code.compile_quoted()
+      |> Utils.compile_quoted(tmp_dir)
 
     result =
       quote do
-        :code.load_binary(Foo, ~c"", var!(beam))
-        Foo.foo(2)
+        :code.load_binary(CodeTest.Foo, ~c"", var!(beam))
+        apply(CodeTest.Foo, :foo, [2])
       end
       |> RunInAtomVM.expr(tmp_dir, beam: beam)
 

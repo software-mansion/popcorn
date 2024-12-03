@@ -1,5 +1,5 @@
 defmodule RunExprTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   @moduletag :tmp_dir
 
