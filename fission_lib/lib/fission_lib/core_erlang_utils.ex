@@ -58,7 +58,8 @@ defmodule FissionLib.CoreErlangUtils do
     orig_body =
       orig_body
       |> remove_funs(
-        MapSet.intersection(orig_exports, patch_exports)
+        orig_exports
+        |> MapSet.intersection(patch_exports)
         |> MapSet.union(patch_private_overrides)
       )
       |> rename_funs_and_local_calls(%{
@@ -136,23 +137,21 @@ defmodule FissionLib.CoreErlangUtils do
     end)
   end
 
-  defp inject_private_calls(
-         {:c_call, call_meta, {:c_literal, mod_meta, :flb_module}, {:c_literal, fun_meta, fun},
-          args},
-         module,
-         exports
-       ) do
-    arity = length(args)
+  defp inject_private_calls(ast, module, exports) do
+    with {:c_call, call_meta, mod_ast, fun_ast, args} <- ast,
+         {:c_literal, mod_meta, :flb_module} <- mod_ast,
+         {:c_literal, fun_meta, fun} <- fun_ast do
+      arity = length(args)
 
-    if {fun, arity} in exports do
-      {:c_call, call_meta, {:c_literal, mod_meta, module}, {:c_literal, fun_meta, fun}, args}
+      if {fun, arity} in exports do
+        {:c_call, call_meta, {:c_literal, mod_meta, module}, {:c_literal, fun_meta, fun}, args}
+      else
+        {:c_apply, call_meta, {:c_var, fun_meta, {:"avmo_#{fun}", arity}}, args}
+      end
     else
-      {:c_apply, call_meta, {:c_var, fun_meta, {:"avmo_#{fun}", arity}}, args}
+      _other -> traverse(ast, &inject_private_calls(&1, module, exports))
     end
   end
-
-  defp inject_private_calls(ast, module, exports),
-    do: traverse(ast, &inject_private_calls(&1, module, exports))
 
   defp rename_funs_and_local_calls({:c_var, meta, {function, arity} = fa} = ast, ctx)
        when is_atom(function) and is_integer(arity) do
