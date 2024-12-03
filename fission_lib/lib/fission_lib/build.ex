@@ -1,116 +1,180 @@
 defmodule FissionLib.Build do
   @moduledoc false
+  require FissionLib.Config
   alias FissionLib.CoreErlangUtils
+
+  @config FissionLib.Config.get([:add_tracing, :ex_stdlib_beam_paths, :erl_stdlib_beam_paths])
+
+  @app_path Mix.Project.app_path()
+  @build_path "#{@app_path}/flb_patches_ebin"
+  @cache_path "#{@app_path}/flb_patch_cache"
+
+  # When this module is recompiled, we need to
+  # patch from scratch
+  File.rm(@cache_path)
 
   @doc """
   Runs `compile/2` and `patch/3`, then packs output beams
   into a single *.avm file.
   """
-  def build(out_dir, stdlib_beam_paths, add_tracing) do
-    build_dir = Path.join(out_dir, "fission_lib")
-    File.rm_rf!(build_dir)
-    File.mkdir_p!("#{build_dir}/patches_ebin")
-    File.mkdir_p!("#{build_dir}/final_ebin")
+  def build(opts \\ []) do
+    opts = opts |> Keyword.validate!(out_dir: @app_path, force: false) |> Map.new()
+    stdlib_beam_paths = @config.ex_stdlib_beam_paths ++ @config.erl_stdlib_beam_paths
+    patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}")
 
-    compile("patches", "#{build_dir}/patches_ebin")
+    cache =
+      with false <- opts.force,
+           {:ok, cache} <- File.read(@cache_path),
+           cache = :erlang.binary_to_term(cache),
+           # If a patch was removed, we need to remove the old build
+           # to avoid adding stale artifacts to the bundle
+           missing_srcs = Map.drop(cache, patches_srcs),
+           true <- Enum.empty?(missing_srcs) do
+        cache
+      else
+        _cant_use_cache ->
+          File.rm_rf!(@cache_path)
+          File.rm_rf!(@build_path)
+          File.mkdir_p!(@build_path)
+          %{}
+      end
 
-    patch_beam_paths = Path.wildcard("#{build_dir}/patches_ebin/*.beam")
+    {patches_srcs, cache} = handle_cache(patches_srcs, cache)
 
-    patch(stdlib_beam_paths, patch_beam_paths, "#{build_dir}/final_ebin",
-      add_tracing: add_tracing
-    )
+    patch(stdlib_beam_paths, patches_srcs, @build_path)
+    transfer_stdlib(stdlib_beam_paths, @build_path)
+
+    IO.puts("Bundling fission_lib.avm")
 
     :packbeam_api.create(
-      ~c"#{out_dir}/fission_lib.avm",
-      Path.wildcard("#{build_dir}/final_ebin/*.beam") |> Enum.map(&String.to_charlist/1)
+      ~c"#{opts.out_dir}/fission_lib.avm",
+      Path.wildcard("#{@build_path}/*.beam") |> Enum.map(&String.to_charlist/1)
     )
+
+    File.write!(@cache_path, :erlang.term_to_binary(cache))
 
     :ok
   end
 
-  @doc """
-  Compiles the parts of Erlang and Elixir standard libraries
-  that are customized for the AtomVM, as well as some AtomVM-specific
-  utilities.
+  defp handle_cache(paths, cache) do
+    Enum.flat_map_reduce(paths, %{}, fn path, new_cache ->
+      hash = path |> File.read!() |> :erlang.md5()
+      new_cache = Map.put(new_cache, path, hash)
 
-  The sources to be compiled reside in the `patches` directory.
-  """
-  def compile(patches_dir, out_dir) do
-    yrl_dir = Path.join(out_dir, "yrl")
-    File.mkdir_p!(yrl_dir)
+      if hash == cache[path] do
+        {[], new_cache}
+      else
+        {[path], new_cache}
+      end
+    end)
+  end
 
-    ex_paths = Path.wildcard("#{patches_dir}/**/*.ex")
+  # Compiles and applies patches to Erlang and Elixir standard libraries,
+  # so they could work with the AtomVM.
+  # The patching works by replacing original functions implementations
+  # with custom ones.
+  # The sources of the patches reside in the `patches` directory.
+  defp patch(stdlib_beams, patch_srcs, out_dir) do
+    stdlib_beams = Map.new(stdlib_beams, &{Path.basename(&1), &1})
 
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
     # will override stdlib modules.
-    process_async(ex_paths, fn file ->
-      IO.puts("Compiling #{file}")
-      {_out, 0} = System.shell("elixirc --ignore-module-conflict -o #{out_dir} #{file}")
+    process_async(patch_srcs, fn src ->
+      with_tmp_dir(out_dir, fn tmp_dir ->
+        IO.puts("Compiling #{src}")
+        compile_patch(src, tmp_dir)
+
+        Path.wildcard("#{tmp_dir}/*")
+        |> Enum.map(fn path ->
+          name = Path.basename(path)
+          do_patch(name, stdlib_beams[name], path, out_dir)
+          name
+        end)
+      end)
     end)
+  end
 
-    yrl_paths = Path.wildcard("#{patches_dir}/**/*.yrl")
+  defp compile_patch(path, tmp_dir) do
+    cmd =
+      case Path.extname(path) do
+        ".ex" ->
+          "elixirc --ignore-module-conflict -o #{tmp_dir} #{path}"
 
-    process_async(yrl_paths, fn file ->
-      IO.puts("Compiling #{file}")
-      {_out, 0} = System.shell("erlc -o #{yrl_dir} #{file}")
-    end)
+        ".yrl" ->
+          erl_path = "#{tmp_dir}/#{Path.basename(path, ".yrl")}.erl"
 
-    erl_paths = Path.wildcard("#{patches_dir}/**/*.{erl,S}") ++ Path.wildcard("#{yrl_dir}/*.erl")
+          "erlc -o #{tmp_dir} #{path} && erlc +debug_info -o #{tmp_dir} #{erl_path} && rm #{erl_path}"
 
-    process_async(erl_paths, fn file ->
-      IO.puts("Compiling #{file}")
-      # debug_info is needed to disasseble the beam file later
-      {_out, 0} = System.shell("erlc +debug_info -o #{out_dir} #{file}")
-    end)
+        ext when ext in [".erl", ".S"] ->
+          "erlc +debug_info -o #{tmp_dir} #{path}"
+      end
 
-    File.rm_rf!(yrl_dir)
-
+    {_out, 0} = System.shell(cmd)
     :ok
   end
 
-  @doc """
-  Replaces functions in the stdlib with the AtomVM-specific
-  implementations compiled with `compile/2`.
-  """
-  def patch(stdlib_beams, patch_beams, out_dir, opts \\ []) do
-    [add_tracing: add_tracing] = Keyword.validate!(opts, add_tracing: false)
+  # prim_eval fais to be parsed, probably because it's compiled from an asm (*.S) file
+  # so we just copy it
+  defp do_patch("prim_eval.beam" = name, _stdlib, patch, out_dir) do
+    File.cp!(patch, Path.join(out_dir, name))
+  end
 
-    (stdlib_beams ++ patch_beams)
-    |> Enum.group_by(&Path.basename/1)
-    |> process_async(fn
-      # prim_eval fais to be parsed, probably because it's compiled from an asm (*.S) file
-      # so we just copy it
-      {name, [_estd_path, avm_path]} when name == "prim_eval.beam" ->
-        File.cp!(avm_path, Path.join(out_dir, name))
+  # This is only needed to add tracing
+  # but we execute it always for consistency
+  # To be replaced with File.cp when we improve tracing in AtomVM
+  defp do_patch(name, nil, patch, out_dir) do
+    IO.puts("Patching #{name}")
+    ast = File.read!(patch) |> CoreErlangUtils.parse()
+    ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
+    beam = CoreErlangUtils.serialize(ast)
+    File.write!(Path.join(out_dir, name), beam)
+  end
 
-      {name, paths} ->
-        IO.puts("Patching #{name}")
+  defp do_patch(name, stdlib, patch, out_dir) do
+    IO.puts("Patching #{name}")
 
-        ast =
-          case paths do
-            [estd_path, avm_path] ->
-              CoreErlangUtils.merge_modules(
-                CoreErlangUtils.parse(File.read!(estd_path)),
-                CoreErlangUtils.parse(File.read!(avm_path))
-              )
+    ast =
+      CoreErlangUtils.merge_modules(
+        CoreErlangUtils.parse(File.read!(stdlib)),
+        CoreErlangUtils.parse(File.read!(patch))
+      )
 
-            [path] ->
-              CoreErlangUtils.parse(File.read!(path))
-          end
+    ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
+    beam = CoreErlangUtils.serialize(ast)
+    File.write!(Path.join(out_dir, name), beam)
+  end
 
-        ast = if add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
+  # This is only needed to add tracing
+  # but we execute it always for consistency
+  # To be removed when we improve tracing in AtomVM
+  defp transfer_stdlib(stdlib_beams, out_dir) do
+    patched_beams = Path.wildcard("#{out_dir}/*") |> MapSet.new(&Path.basename/1)
 
-        beam = CoreErlangUtils.serialize(ast)
-        File.write!(Path.join(out_dir, name), beam)
+    stdlib_beams
+    |> Enum.reject(&(Path.basename(&1) in patched_beams))
+    |> process_async(fn path ->
+      name = Path.basename(path)
+      IO.puts("Transferring #{name}")
+      ast = File.read!(path) |> CoreErlangUtils.parse()
+      ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
+      beam = CoreErlangUtils.serialize(ast)
+      File.write!(Path.join(out_dir, name), beam)
     end)
-
-    :ok
   end
 
   defp process_async(enum, fun, opts \\ []) do
     enum
     |> Task.async_stream(fun, [timeout: 30_000, ordered: false] ++ opts)
     |> Stream.run()
+  end
+
+  defp with_tmp_dir(path, fun) do
+    tmp_dir = "#{path}/tmp_#{:erlang.unique_integer([:positive])}"
+    File.rm_rf!(tmp_dir)
+    File.mkdir!(tmp_dir)
+    result = fun.(tmp_dir)
+    File.rm_rf!(tmp_dir)
+    result
   end
 end

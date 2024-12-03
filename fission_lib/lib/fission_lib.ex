@@ -3,9 +3,11 @@ defmodule FissionLib do
   Library providing Erlang and Elixir stdlibs, allowing
   to compile projects to `.avm` and run them with AtomVM.
   """
-  alias __MODULE__.Config
+  require __MODULE__.Config
 
   @build_path Mix.Project.build_path()
+
+  @config __MODULE__.Config.get([:start_module, :out_path])
 
   @doc """
   Packs compiled project files along with the Fission Lib into
@@ -15,7 +17,7 @@ defmodule FissionLib do
   `start/0` function as the `start_module` option.
   """
   @spec pack([
-          {:output_path, String.t()}
+          {:out_path, String.t()}
           | {:start_module, module}
           | {:fission_lib_path, String.t()}
           | {:artifacts, [String.t()]}
@@ -24,15 +26,15 @@ defmodule FissionLib do
     options =
       options
       |> Keyword.validate!(
-        output_path: Config.get(:out_path),
-        start_module: Config.get(:start_module),
-        fission_lib_path: "#{@build_path}/fission_lib.avm",
+        out_path: @config.out_path,
+        start_module: @config.start_module,
+        fission_lib_path: "#{Mix.Project.app_path()}/fission_lib.avm",
         artifacts: Path.wildcard("#{@build_path}/**/*.{beam,app}")
       )
       |> Map.new()
 
     :packbeam_api.create(
-      ~c"#{options.output_path}",
+      ~c"#{options.out_path}",
       Enum.map([options.fission_lib_path | options.artifacts], &String.to_charlist/1),
       %{start_module: options.start_module}
     )
