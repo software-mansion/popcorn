@@ -2,7 +2,7 @@ max_args = 20
 exports = Enum.map_join(0..max_args, ", ", fn i -> "trace/#{i + 4}" end)
 
 print = fn action, arity ->
-  ~s<console:print([erlang:pid_to_list(self()), " #{action} ", erlang:atom_to_list(M), ".", erlang:atom_to_list(F), "/#{arity} ", File, ":", erlang:integer_to_list(Line), "\\n"])>
+  ~s<console:print([erlang:pid_to_list(self()), pad(Count * 2), " #{action} ", erlang:atom_to_list(M), ".", erlang:atom_to_list(F), "/#{arity} ", File, ":", erlang:integer_to_list(Line), "\\n"])>
 end
 
 impls =
@@ -11,8 +11,14 @@ impls =
 
     """
     trace(M, F, File, Line#{if args != "", do: ", "}#{args}) ->
+        Count = case get(iex_wasm_call_count) of
+            undefined -> 0;
+            N -> N
+        end,
         #{print.("call", arity)},
+        put(iex_wasm_call_count, Count + 1),
         R = M:F(#{args}),
+        put(iex_wasm_call_count, Count),
         #{print.("retn", arity)},
         R.
     """
@@ -25,6 +31,10 @@ module =
   -module(simple_trace).
 
   -export([#{exports}]).
+
+  pad(N) -> pad(N, []).
+  pad(0, Acc) -> Acc;
+  pad(N, Acc) when N > 0 -> pad(N - 1, [$\\s | Acc]).
 
   #{impls}
   """
