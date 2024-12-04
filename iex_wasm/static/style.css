@@ -65,7 +65,7 @@
 }
 
 body {
-  max-width: max-content;
+  max-width: 80%;
   margin: 40px auto;
   padding: 0 10px;
   font: 18px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -101,6 +101,10 @@ button {
 button:active {
   color: var(--swm-text);
   background-color: var(--swm-blue-100);
+}
+
+pre {
+  white-space: pre-wrap;
 }
 
 textarea {
