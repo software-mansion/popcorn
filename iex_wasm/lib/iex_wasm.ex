@@ -48,7 +48,7 @@ defmodule IExWASM do
         |> :compile.noenv_forms(compile_opts)
 
       :code.load_binary(module, ~c"nofile", module_bin)
-    catch
+    rescue
       error -> {:error, error}
     end
   end
@@ -59,7 +59,7 @@ defmodule IExWASM do
       {:ok, exprs} = :erl_parse.parse_exprs(tokens)
       {:value, value, _} = :erl_eval.exprs(exprs, [])
       value
-    catch
+    rescue
       error -> {:error, error}
     end
   end
