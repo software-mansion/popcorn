@@ -34,11 +34,12 @@ defmodule FissionLib do
       )
       |> Map.new()
 
-    :packbeam_api.create(
-      ~c"#{options.out_path}",
-      Enum.map([options.fission_lib_path | options.artifacts], &String.to_charlist/1),
-      %{start_module: options.start_module}
-    )
+    fission_lib_artifacts = Path.wildcard("#{@app_path}/**/*")
+    artifacts = [options.fission_lib_path | options.artifacts -- fission_lib_artifacts]
+
+    :packbeam_api.create(~c"#{options.out_path}", Enum.map(artifacts, &String.to_charlist/1), %{
+      start_module: options.start_module
+    })
     |> case do
       :ok -> :ok
       {:error, reason} -> raise "Packing error, reason: #{inspect(reason)}"
