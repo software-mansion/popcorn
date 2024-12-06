@@ -6,6 +6,7 @@ defmodule FissionLib do
   require __MODULE__.Config
 
   @build_path Mix.Project.build_path()
+  @app_path Mix.Project.app_path()
 
   @config __MODULE__.Config.get([:start_module, :out_path])
 
@@ -28,7 +29,7 @@ defmodule FissionLib do
       |> Keyword.validate!(
         out_path: @config.out_path,
         start_module: @config.start_module,
-        fission_lib_path: "#{Mix.Project.app_path()}/fission_lib.avm",
+        fission_lib_path: "#{@app_path}/fission_lib.avm",
         artifacts: Path.wildcard("#{@build_path}/**/*.{beam,app}")
       )
       |> Map.new()
