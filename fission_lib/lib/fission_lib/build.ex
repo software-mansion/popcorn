@@ -33,11 +33,12 @@ defmodule FissionLib.Build do
         cache
       else
         _cant_use_cache ->
-          File.rm_rf!(@cache_path)
           File.rm_rf!(@build_path)
           File.mkdir_p!(@build_path)
           %{}
       end
+
+    File.rm_rf!(@cache_path)
 
     {patches_srcs, cache} = handle_cache(patches_srcs, cache)
 
