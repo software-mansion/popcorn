@@ -58,9 +58,11 @@
     seq/2, seq/3,
     sort/1, sort/2,
     split/2,
+    partition/2,
     usort/1, usort/2,
     duplicate/2,
-    sublist/2
+    sublist/2,
+    unzip/1
 ]).
 
 %%-----------------------------------------------------------------------------
@@ -673,6 +675,24 @@ split(N, [H | T], R) ->
     split(N - 1, T, [H | R]);
 split(_, [], _) ->
     badarg.
+
+partition(Pred, L) when is_function(Pred, 1) ->
+    partition(Pred, L, [], []).
+
+partition(_Pred, [], A, B) ->
+    {A, B};
+partition(Pred, [H | T], A, B) ->
+    case Pred(H) of
+        true ->
+            partition(Pred, T, [H | A], B);
+        false ->
+            partition(Pred, T, A, [H | B])
+    end.
+
+unzip(Ts) -> unzip(Ts, [], []).
+
+unzip([{X, Y} | Ts], Xs, Ys) -> unzip(Ts, [X | Xs], [Y | Ys]);
+unzip([], Xs, Ys) -> {?MODULE:reverse(Xs), ?MODULE:reverse(Ys)}.
 
 %% Attribution: https://erlang.org/doc/programming_examples/list_comprehensions.html#quick-sort
 %% @private
