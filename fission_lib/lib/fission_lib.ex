@@ -3,12 +3,12 @@ defmodule FissionLib do
   Library providing Erlang and Elixir stdlibs, allowing
   to compile projects to `.avm` and run them with AtomVM.
   """
-  require __MODULE__.Config
+  require FissionLib.Config
 
   @build_path Mix.Project.build_path()
   @app_path Mix.Project.app_path()
 
-  @config __MODULE__.Config.get([:start_module, :out_path])
+  @config FissionLib.Config.get([:start_module, :out_path])
 
   @doc """
   Packs compiled project files along with the Fission Lib into

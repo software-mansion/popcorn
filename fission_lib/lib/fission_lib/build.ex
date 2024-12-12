@@ -38,7 +38,7 @@ defmodule FissionLib.Build do
           %{}
       end
 
-    File.rm_rf!(@cache_path)
+    File.rm(@cache_path)
 
     {patches_srcs, cache} = handle_cache(patches_srcs, cache)
 
