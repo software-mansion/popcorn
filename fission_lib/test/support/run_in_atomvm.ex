@@ -20,7 +20,7 @@ defmodule RunInAtomVM do
     FissionLib.pack(
       artifacts: [beam_name],
       start_module: RunExpr,
-      output_path: "#{build_path}/bundle.avm"
+      out_path: "#{build_path}/bundle.avm"
     )
 
     :ok

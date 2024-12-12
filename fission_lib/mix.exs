@@ -17,6 +17,7 @@ defmodule FissionLib.MixProject do
       elixir: "1.17.3",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
+      aliases: [compile: ["compile", &patch/1]],
       deps: deps()
     ]
   end
@@ -29,6 +30,10 @@ defmodule FissionLib.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp patch(_args) do
+    FissionLib.Build.build()
+  end
 
   defp deps do
     [

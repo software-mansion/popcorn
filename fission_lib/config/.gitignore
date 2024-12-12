@@ -1,1 +1,1 @@
-config.priv.exs
+*.secret.exs
