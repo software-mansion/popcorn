@@ -711,7 +711,7 @@ split(Name0) ->
 
 
 unix_splitb(Name) ->
-    L = binary:split(Name,<<"/">>,[global]),%Patched due to fact that binary:split doesn't support lists of patterns.
+    L = binary:split(Name,<<"/">>,[global]),%Patch reason: binary:split using list of separators.
     LL = case L of
 	     [<<>>|Rest] when Rest =/= [] ->
 		 [<<"/">>|Rest];
@@ -844,7 +844,7 @@ do_flatten(Atom, Tail) when is_atom(Atom) ->
     atom_to_list(Atom) ++ flatten(Tail).
 
 filename_string_to_binary(List) ->
-    case unicode:characters_to_binary(flatten(List),latin1,file:native_name_encoding()) of %Patched because characters_to_binary/3 doesn's support unicode
+    case unicode:characters_to_binary(flatten(List),utf8,file:native_name_encoding()) of %Patch reason: changed unicode to utf8 due to lack of support.
 	{error,_,_} ->
 	    erlang:error(badarg);
 	Bin when is_binary(Bin) ->

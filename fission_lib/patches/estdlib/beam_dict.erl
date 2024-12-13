@@ -367,7 +367,7 @@ my_term_to_binary(Term) ->
     %% options for the compiler. (When this comment was written, some time
     %% after the release of OTP 22, the default minor version was 1.)
 
-    %Patched due to usage of unsupported options
+    %Patch reason:  due to usage of unsupported options
     term_to_binary(Term).
 
 %% Returns the type table.

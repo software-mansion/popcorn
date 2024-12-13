@@ -144,7 +144,7 @@ getenv(VarName, DefaultValue) ->
       Osname :: atom().
 
 type() ->
-    {unix, darwin}. %Patched due to lack of implemenation in AtomVM.
+    {unix, darwin}. %Patch reason: unsupported erlang:system_info(os_type) call.
 
 -spec version() -> VersionString | {Major, Minor, Release} when
       VersionString :: string(),
