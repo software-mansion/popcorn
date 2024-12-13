@@ -604,8 +604,8 @@ comp_ret_ok(Code, #compile{warnings = Warn0, module = Mod, options = Opts} = St)
                         not member(no_code_generation, Opts)
                 of
                     true ->
-                    [Code];
-                    false -> 
+                        [Code];
+                    false ->
                         []
                 end,
             Ret2 =
