@@ -23,9 +23,7 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
         {Binary, PersistedAttributes, Autoload} =
             elixir_erl_compiler:spawn(fun() ->
                 PersistedAttributes = ets:lookup_element(DataBag, persisted_attributes, 2),
-                erlang:display(PersistedAttributes),
                 Attributes = attributes(DataSet, DataBag, PersistedAttributes),
-                erlang:display("ATTRIBUTES PASSED"),
                 {AllDefinitions, Private} = elixir_def:fetch_definitions(Module, E),
 
                 OnLoadAttribute = lists:keyfind(on_load, 1, Attributes),

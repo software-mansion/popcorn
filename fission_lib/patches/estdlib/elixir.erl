@@ -117,8 +117,7 @@ start(_Type, _Args) ->
     case elixir_sup:start_link() of
         {ok, Sup} ->
             {ok, Sup, Tab};
-        {error, Reason} = Error ->
-            console:print(Reason),
+        {error, _Reason} = Error ->
             elixir_config:delete(Tab),
             Error
     end.

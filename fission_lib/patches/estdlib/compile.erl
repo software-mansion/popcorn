@@ -486,7 +486,6 @@ fold_comp([], _Run, Code, St) ->
 run_sub_passes_1([{Name, Run} | Ps], Runner, St0) when
     is_atom(Name), is_function(Run, 1)
 ->
-    erlang:display({xddd, run_sub_passes_1, Name}),
     try Runner(Name, Run, St0) of
         St ->
             run_sub_passes_1(Ps, Runner, St)
@@ -617,7 +616,6 @@ comp_ret_ok(Code, #compile{warnings = Warn0, module = Mod, options = Opts} = St)
     end.
 
 comp_ret_err(#compile{warnings = Warn0, errors = Err0, options = Opts} = St) ->
-    console:print("COMP RETURN ERROR"),
     Warn = messages_per_file(Warn0),
     Err = messages_per_file(Err0),
     report_errors(St#compile{errors = Err}),
