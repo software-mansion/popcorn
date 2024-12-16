@@ -119,10 +119,8 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
             end
     after
         flb_module:put_compiler_modules(CompilerModules),
-        %Patch reason: ets:delete not yet implemented
-        % ets:delete(DataSet),
-        % ets:delete(DataBag),
-        %Patch reason: end
+        ets:delete(DataSet),
+        ets:delete(DataBag),
         elixir_code_server:call({undefmodule, Ref})
     end.
 %% Add attributes handling to the form
