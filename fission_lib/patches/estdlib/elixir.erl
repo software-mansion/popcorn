@@ -100,7 +100,7 @@ start(_Type, _Args) ->
         %% Compiler options
         {docs, true},
         {ignore_already_consolidated, false},
-        {ignore_module_conflict, false},
+        {ignore_module_conflict, true},
         {on_undefined_variable, raise},
         {parser_options, [{columns, true}]},
         {debug_info, true},
@@ -117,8 +117,7 @@ start(_Type, _Args) ->
     case elixir_sup:start_link() of
         {ok, Sup} ->
             {ok, Sup, Tab};
-        {error, Reason} = Error ->
-            console:print(Reason),
+        {error, _Reason} = Error ->
             elixir_config:delete(Tab),
             Error
     end.

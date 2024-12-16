@@ -9,12 +9,12 @@ const CODE_EXAMPLES = {
     "end.",
   ].join("\n"),
   ELIXIR: [
-    "double = fn x -> x * 2 end",
-    "list = Enum.map([1,2,3], double)",
-    "case Enum.max(list) do",
-    " 6 -> :ok",
-    " _ -> :error",
-    "end"
+    "defmodule Adder do",
+    " def add(a,b) do",
+    "   a + b",
+    " end",
+    "end",
+    "Adder.add(1,1)"
   ].join("\n")
 };
 

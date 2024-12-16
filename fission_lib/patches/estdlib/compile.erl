@@ -196,28 +196,32 @@ run_sub_passes(Ps, St) ->
 -define(pass(P), {P, fun P/2}).
 -define(pass(P, T), {P, fun T/1, fun P/2}).
 
+%% Patch reason: os:getenv/1 is not supported.
 env_default_opts() ->
-    Key = "ERL_COMPILER_OPTIONS",
-    case os:getenv(Key) of
-        false ->
-            [];
-        Str when is_list(Str) ->
-            case erl_scan:string(Str) of
-                {ok, Tokens, _} ->
-                    Dot = {dot, erl_anno:new(1)},
-                    case erl_parse:parse_term(Tokens ++ [Dot]) of
-                        {ok, List} when is_list(List) -> List;
-                        {ok, Term} ->
-                            [Term];
-                        {error, _Reason} ->
-                            io:format("Ignoring bad term in ~s\n", [Key]),
-                            []
-                    end;
-                {error, {_, _, _Reason}, _} ->
-                    io:format("Ignoring bad term in ~s\n", [Key]),
-                    []
-            end
-    end.
+    [].
+% env_default_opts() ->
+%     Key = "ERL_COMPILER_OPTIONS",
+%     case os:getenv(Key) of
+%         false ->
+%             [];
+%         Str when is_list(Str) ->
+%             case erl_scan:string(Str) of
+%                 {ok, Tokens, _} ->
+%                     Dot = {dot, erl_anno:new(1)},
+%                     case erl_parse:parse_term(Tokens ++ [Dot]) of
+%                         {ok, List} when is_list(List) -> List;
+%                         {ok, Term} ->
+%                             [Term];
+%                         {error, _Reason} ->
+%                             io:format("Ignoring bad term in ~s\n", [Key]),
+%                             []
+%                     end;
+%                 {error, {_, _, _Reason}, _} ->
+%                     io:format("Ignoring bad term in ~s\n", [Key]),
+%                     []
+%             end
+%     end.
+%% Patch reason: end
 
 do_compile(Input, Opts0) ->
     Opts = expand_opts(Opts0),
@@ -482,7 +486,6 @@ fold_comp([], _Run, Code, St) ->
 run_sub_passes_1([{Name, Run} | Ps], Runner, St0) when
     is_atom(Name), is_function(Run, 1)
 ->
-    erlang:display({xddd, run_sub_passes_1, Name}),
     try Runner(Name, Run, St0) of
         St ->
             run_sub_passes_1(Ps, Runner, St)
@@ -599,8 +602,10 @@ comp_ret_ok(Code, #compile{warnings = Warn0, module = Mod, options = Opts} = St)
                     member(binary, Opts) andalso
                         not member(no_code_generation, Opts)
                 of
-                    true -> [Code];
-                    false -> []
+                    true ->
+                        [Code];
+                    false ->
+                        []
                 end,
             Ret2 =
                 case member(return_warnings, Opts) of

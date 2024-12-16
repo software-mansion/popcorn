@@ -62,6 +62,8 @@
     usort/1, usort/2,
     duplicate/2,
     sublist/2,
+    splitwith/2,
+    partition/2,
     unzip/1
 ]).
 
@@ -590,8 +592,9 @@ join_1(_Sep, []) ->
 %%-----------------------------------------------------------------------------
 -spec seq(From :: integer(), To :: integer()) -> list().
 seq(From, To) when is_integer(From) andalso is_integer(To) andalso From =< To ->
-    seq_r(From, To, 1, []).
-
+    seq_r(From, To, 1, []);
+seq(From, To) when is_integer(From) andalso is_integer(To) andalso From - 1 == To ->
+    [].
 %%-----------------------------------------------------------------------------
 %% @param   From    from integer
 %% @param   To      to Integer
@@ -680,7 +683,7 @@ partition(Pred, L) when is_function(Pred, 1) ->
     partition(Pred, L, [], []).
 
 partition(_Pred, [], A, B) ->
-    {A, B};
+    {?MODULE:reverse(A), ?MODULE:reverse(B)};
 partition(Pred, [H | T], A, B) ->
     case Pred(H) of
         true ->
@@ -779,3 +782,21 @@ sublist(List, Len) when is_integer(Len) andalso Len >= 0 ->
 sublist0([], _Len) -> [];
 sublist0(_, 0) -> [];
 sublist0([H | Tail], Len) -> [H | sublist0(Tail, Len - 1)].
+
+-spec splitwith(Pred, List) -> {List1, List2} when
+    Pred :: fun((T) -> boolean()),
+    List :: [T],
+    List1 :: [T],
+    List2 :: [T],
+    T :: term().
+
+splitwith(Pred, List) when is_function(Pred, 1) ->
+    splitwith_1(Pred, List, []).
+
+splitwith_1(Pred, [Hd | Tail], Taken) ->
+    case Pred(Hd) of
+        true -> splitwith_1(Pred, Tail, [Hd | Taken]);
+        false -> {?MODULE:reverse(Taken), [Hd | Tail]}
+    end;
+splitwith_1(_Pred, [], Taken) ->
+    {?MODULE:reverse(Taken), []}.
