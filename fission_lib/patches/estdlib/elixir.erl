@@ -100,7 +100,7 @@ start(_Type, _Args) ->
         %% Compiler options
         {docs, true},
         {ignore_already_consolidated, false},
-        {ignore_module_conflict, false},
+        {ignore_module_conflict, true},
         {on_undefined_variable, raise},
         {parser_options, [{columns, true}]},
         {debug_info, true},
