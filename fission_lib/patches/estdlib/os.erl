@@ -7,4 +7,4 @@
 
 type() ->
     %Patch reason: unsupported erlang:system_info(os_type) call.
-    {unix, darwin}.
+    {unix, wasm}.
