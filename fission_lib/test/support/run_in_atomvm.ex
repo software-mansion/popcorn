@@ -60,6 +60,7 @@ defmodule RunInAtomVM do
         end
 
         defp run(opts) do
+          _no_warn_unused = opts
           unquote_splicing(assignments)
           unquote(code)
         end

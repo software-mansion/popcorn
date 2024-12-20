@@ -5,7 +5,6 @@ defmodule FissionLib.Internal.PatchingTest do
 
   @moduletag :tmp_dir
 
-  @tag :target
   test "patching", %{tmp_dir: tmp_dir} do
     module =
       patch_and_load(
