@@ -76,3 +76,4 @@ These options can be set by putting a `config :fission_lib, option: value` line 
 - `add_tracing` - If `true`, injects a simple tracing code that prints module, function and arity of each cross-module call. Defaults to `false`.
 - `erl_stdlib_beam_paths` - List of paths to Erlang stdlib `.beam` files. Defaults to `Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam")`
 - `ex_stdlib_beam_paths` - List of paths to Elixir stdlib `.beam` files. Defaults to `Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam")`
+- `avm_source` - See `Mix.Tasks.FissionLib.BuildAvm` or type `mix help fission_lib.build_avm`

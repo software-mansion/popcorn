@@ -6,14 +6,15 @@ For now, it's a textarea where you can type Erlang code and run it (fully in bro
 
 It uses FissionLib under the hood.
 
-To run build, type:
+To build, type:
 
 ```sh
 mix deps.get
+mix fission_lib.build_avm --target wasm --out-dir static
 mix compile
 ```
 
-This will generate the `static/iex_wasm.avm` file, which along with other files in the `static` directory constitutes a static website with the project.
+This will generate the `static/iex_wasm.avm`, `static/AtomVM.js` and `static/AtomVM.wasm` files, which along with other files in the `static` directory constitute a static website with the project.
 
 You can serve it by running
 
