@@ -73,21 +73,24 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
     ref = if opts[:ref], do: ["-b", opts[:ref]], else: []
     output = Path.join(@build_dir, "atomvm_src")
     File.rm_rf!(output)
-    IO.puts("Cloning AtomVM from #{addr}")
+    IO.puts(:stderr, "Cloning AtomVM from #{addr}")
     cmd(["git", "clone", addr] ++ ref ++ ["--", output])
     output
   end
 
-  defp cmd(cmd, opts \\ []) do
-    System.cmd(hd(cmd), tl(cmd), [use_stdio: false] ++ opts)
-    |> handle_shell_status()
-  end
+  defp cmd([command | args], opts \\ []) do
+    opts = Keyword.put_new(opts, :use_stdio, false)
 
-  defp handle_shell_status({_out, 0}), do: :ok
+    case System.cmd(command, args, opts) do
+      {_output, 0} ->
+        :ok
 
-  defp handle_shell_status({_out, status}) do
-    System.stop(status)
-    Process.sleep(:infinity)
+      {_output, status} ->
+        System.stop(status)
+        # Wait because System.stop is async
+        Process.sleep(:infinity)
+    end
+
     :ok
   end
 

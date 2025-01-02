@@ -45,7 +45,7 @@ defmodule FissionLib.Build do
     patch(stdlib_beam_paths, patches_srcs, @build_path)
     transfer_stdlib(stdlib_beam_paths, @build_path)
 
-    IO.puts("Bundling fission_lib.avm")
+    IO.puts(:stderr, "Bundling fission_lib.avm")
 
     :packbeam_api.create(
       ~c"#{opts.out_dir}/fission_lib.avm",
@@ -83,7 +83,7 @@ defmodule FissionLib.Build do
     # will override stdlib modules.
     process_async(patch_srcs, fn src ->
       with_tmp_dir(out_dir, fn tmp_dir ->
-        IO.puts("Compiling #{src}")
+        IO.puts(:stderr, "Compiling #{src}")
         compile_patch(src, tmp_dir)
 
         Path.wildcard("#{tmp_dir}/*")
@@ -125,7 +125,7 @@ defmodule FissionLib.Build do
   # but we execute it always for consistency
   # To be replaced with File.cp when we improve tracing in AtomVM
   defp do_patch(name, nil, patch, out_dir) do
-    IO.puts("Patching #{name}")
+    IO.puts(:stderr, "Patching #{name}")
     ast = File.read!(patch) |> CoreErlangUtils.parse()
     ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
     beam = CoreErlangUtils.serialize(ast)
@@ -133,7 +133,7 @@ defmodule FissionLib.Build do
   end
 
   defp do_patch(name, stdlib, patch, out_dir) do
-    IO.puts("Patching #{name}")
+    IO.puts(:stderr, "Patching #{name}")
 
     ast =
       CoreErlangUtils.merge_modules(
@@ -156,7 +156,7 @@ defmodule FissionLib.Build do
     |> Enum.reject(&(Path.basename(&1) in patched_beams))
     |> process_async(fn path ->
       name = Path.basename(path)
-      IO.puts("Transferring #{name}")
+      IO.puts(:stderr, "Transferring #{name}")
       ast = File.read!(path) |> CoreErlangUtils.parse()
       ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
       beam = CoreErlangUtils.serialize(ast)
