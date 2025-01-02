@@ -38,35 +38,31 @@ defmodule IExWASM do
       form
     end
 
-    try do
-      {:ok, tokens, _} = :erl_scan.string(string)
-
-      {:ok, module, module_bin} =
-        tokens
-        |> split_forms()
-        |> Enum.map(parse_form)
-        |> :compile.noenv_forms(compile_opts)
-
-      :code.load_binary(module, ~c"nofile", module_bin)
-    rescue
-      error -> {:error, error}
+    with {:ok, tokens, _end_location} <- :erl_scan.string(string),
+         {:ok, module, module_bin} <-
+           tokens
+           |> split_forms()
+           |> Enum.map(parse_form)
+           |> :compile.noenv_forms(compile_opts),
+         {:module, _module} <- :code.load_binary(module, ~c"nofile", module_bin) do
+      :ok
     end
+  rescue
+    error -> {:error, error, __STACKTRACE__}
   end
 
   defp eval(string, :eval) do
-    try do
-      {:ok, tokens, _} = :erl_scan.string(string)
-      {:ok, exprs} = :erl_parse.parse_exprs(tokens)
-      {:value, value, _} = :erl_eval.exprs(exprs, [])
+    with {:ok, tokens, _end_location} <- :erl_scan.string(string),
+         {:ok, exprs} <- :erl_parse.parse_exprs(tokens),
+         {:value, value, _bindings} <- :erl_eval.exprs(exprs, []) do
       value
-    rescue
-      error -> {:error, error}
     end
+  rescue
+    error -> {:error, error, __STACKTRACE__}
   end
 
   defp resolve(term, promise) do
     value = :io_lib.format(~c"~p", [term])
-
     :emscripten.promise_resolve(promise, value)
   end
 
