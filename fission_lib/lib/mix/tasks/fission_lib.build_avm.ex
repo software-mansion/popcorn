@@ -12,7 +12,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
   where the <source> can be:
   - `{:path, string}` - local path to AtomVM source
   - `{:git, address}` - GIT address to clone the AtomVM from
-  - `{:git, address, branch: branch}` - like above, allows specifying
+  - `{:git, address, ref: ref}` - like above, allows specifying
     branch, tag or commit ref
 
   Then you can run this task with the following options:
@@ -20,6 +20,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
   - `out_dir` - where to output built artifacts (defaults to CWD)
   - `out_name` - used to name the built artifacts (defaults to "AtomVM")
   """
+
   use Mix.Task
   require FissionLib.Config
 
@@ -27,6 +28,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
 
   @build_dir Mix.Project.app_path()
   @config FissionLib.Config.get([:avm_source])
+  @options_defaults %{target: :unix, out_dir: ".", out_name: "AtomVM"}
 
   def run(args) do
     unless @config.avm_source do
@@ -37,12 +39,9 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
       """
     end
 
-    defaults = %{target: :unix, out_dir: ".", out_name: "AtomVM"}
-
-    {options, _rest} =
-      OptionParser.parse!(args, strict: defaults |> Map.keys() |> Keyword.from_keys(:string))
-
-    options = Map.merge(defaults, Map.new(options))
+    parser_config = [strict: @options_defaults |> Map.keys() |> Keyword.from_keys(:string)]
+    {options, _rest} = OptionParser.parse!(args, parser_config)
+    options = Map.merge(@options_defaults, Map.new(options))
 
     avm_source =
       case @config.avm_source do
@@ -51,62 +50,51 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
         {:git, uri, opts} -> fetch_repo(uri, opts)
       end
 
-    pwd = File.cwd!()
+    cmd(~w"cmake .", cd: avm_source)
 
     case String.to_existing_atom(options.target) do
       :unix ->
         build_dir = Path.join(avm_source, "build")
         File.mkdir_p!(build_dir)
-        File.cd!(build_dir)
-        shell("cmake ..")
-        shell("make -j #{System.schedulers()}")
-        File.cd!(pwd)
-        cp_artifact(build_dir, "src/AtomVM", options)
+        cmd(~w"make -j", cd: build_dir)
+        cp_artifact("src/AtomVM", build_dir, options)
 
       :wasm ->
         build_dir = Path.join(avm_source, "src/platforms/emscripten/build")
         File.mkdir_p!(build_dir)
-        File.cd!(build_dir)
-        shell("emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web")
-        shell("emmake make -j #{System.schedulers()}")
-        File.cd!(pwd)
-        cp_artifact(build_dir, "src/AtomVM.js", options)
-        cp_artifact(build_dir, "src/AtomVM.wasm", options)
+        cmd(~w"emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web", cd: build_dir)
+        cmd(~w"emmake make -j", cd: build_dir)
+        cp_artifact("src/AtomVM.js", build_dir, options)
+        cp_artifact("src/AtomVM.wasm", build_dir, options)
     end
   end
 
   defp fetch_repo(addr, opts \\ []) do
-    branch = if opts[:branch], do: ["-b", opts[:branch]], else: []
+    ref = if opts[:ref], do: ["-b", opts[:ref]], else: []
     output = Path.join(@build_dir, "atomvm_src")
     File.rm_rf!(output)
     IO.puts("Cloning AtomVM from #{addr}")
-
-    System.cmd("git", ["clone", addr] ++ branch ++ ["--", output])
-    |> handle_shell_status()
-
+    cmd(["git", "clone", addr] ++ ref ++ ["--", output])
     output
   end
 
-  defp shell(cmd) do
-    System.shell("#{cmd} 1>&2")
+  defp cmd(cmd, opts \\ []) do
+    System.cmd(hd(cmd), tl(cmd), [use_stdio: false] ++ opts)
     |> handle_shell_status()
   end
 
   defp handle_shell_status({_out, 0}), do: :ok
 
   defp handle_shell_status({_out, status}) do
-    if status != 0 do
-      System.stop(status)
-      Process.sleep(:infinity)
-    end
-
+    System.stop(status)
+    Process.sleep(:infinity)
     :ok
   end
 
-  defp cp_artifact(build_dir, subpath, options) do
+  defp cp_artifact(subpath, build_dir, options) do
     File.cp!(
       Path.join(build_dir, subpath),
-      Path.join(options.out_dir, "#{options.out_name}#{Path.extname(subpath)}")
+      Path.join(options.out_dir, options.out_name <> Path.extname(subpath))
     )
   end
 end
