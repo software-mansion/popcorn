@@ -39,4 +39,30 @@ defmodule Code do
   def ensure_compiled?(module) do
     match?({:module, ^module}, ensure_compiled(module))
   end
+
+  def eval_string(string, binding \\ [], opts \\ [])
+
+  def eval_string(string, binding, %Macro.Env{} = env) do
+    validated_eval_string(string, binding, env)
+  end
+
+  def eval_string(string, binding, opts) when is_list(opts) do
+    validated_eval_string(string, binding, opts)
+  end
+
+  defp validated_eval_string(string, binding, opts_or_env) do
+    %{line: line, file: file} = env = env_for_eval(opts_or_env)
+    forms = :elixir.string_to_quoted!(to_charlist(string), line, 1, file, [])
+    IO.inspect({:xddd, forms})
+    {value, binding, _env} = eval_verify(:eval_forms, [forms, binding, env])
+    {value, binding}
+  end
+
+  defp eval_verify(fun, args) do
+    Module.ParallelChecker.verify(fn ->
+      apply(:elixir, fun, args)
+    end)
+  end
+
+  def env_for_eval(env_or_opts), do: :elixir.env_for_eval(env_or_opts)
 end
