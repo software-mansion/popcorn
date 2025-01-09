@@ -88,10 +88,12 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
 
                 Binary = elixir_erl:compile(ModuleMap),
                 Autoload = proplists:get_value(autoload, CompileOpts, true),
+                erlang:display({elixir_module______, Module, Binary, Autoload}),
+
                 flb_module:spawn_parallel_checker(CheckerInfo, Module, ModuleMap),
+                erlang:display({elixir_module______, Module, Binary, Autoload}),
                 {Binary, PersistedAttributes, Autoload}
             end),
-
         Autoload andalso
             code:load_binary(Module, flb_module:beam_location(ModuleAsCharlist), Binary),
         flb_module:put_compiler_modules(CompilerModules),
