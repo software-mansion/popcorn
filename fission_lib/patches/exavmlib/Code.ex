@@ -53,7 +53,6 @@ defmodule Code do
   defp validated_eval_string(string, binding, opts_or_env) do
     %{line: line, file: file} = env = env_for_eval(opts_or_env)
     forms = :elixir.string_to_quoted!(to_charlist(string), line, 1, file, [])
-    IO.inspect({:xddd, forms})
     {value, binding, _env} = eval_verify(:eval_forms, [forms, binding, env])
     {value, binding}
   end
