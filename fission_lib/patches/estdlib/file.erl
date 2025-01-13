@@ -24,7 +24,7 @@
         'exdev'.
 %%% BIFs
 
--export([native_name_encoding/0]).
+-export([native_name_encoding/0, open/2]).
 
 -spec native_name_encoding() -> latin1 | utf8.
 native_name_encoding() ->
@@ -42,3 +42,6 @@ native_name_encoding() ->
 
 get_cwd() ->
     prim_file:get_cwd(). %Patch reason: Needed to use nif directly.
+
+
+open(_File, _Opts) -> {error, not_implemented}.

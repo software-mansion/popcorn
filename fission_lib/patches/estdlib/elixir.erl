@@ -475,7 +475,8 @@ eval_external_handler(Ann, FunOrModFun, Args) ->
                                 Stacktrace),
 
             %% Now we prune any shared code path from erl_eval
-            {current_stacktrace, Current} = erlang:process_info(self(), current_stacktrace),
+            % {current_stacktrace, Current} = erlang:process_info(self(), current_stacktrace),
+            Current = [],
 
             %% We need to make sure that we don't generate more
             %% frames than supported. So we do our best to drop

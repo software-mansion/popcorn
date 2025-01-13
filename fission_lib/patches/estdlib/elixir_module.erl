@@ -143,7 +143,7 @@ invalid_module_name(Module) ->
 compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
     erlang:display({elixir_module__compile________________, Module, Line}),
     File = ?key(E, file),
-    check_module_availability(Module, Line, E),
+    % check_module_availability(Module, Line, E),
     elixir_env:trace(defmodule, E),
 
     CompilerModules = compiler_modules(),
@@ -593,8 +593,9 @@ expand_callback(Line, M, F, Args, Acc, Fun) ->
 %% Add attributes handling to the form
 
 attributes(DataSet, DataBag, PersistedAttributes) ->
-    [{Key, Value}
-     || Key <- PersistedAttributes, Value <- lookup_attribute(DataSet, DataBag, Key)].
+    [].
+    % [{Key, Value}
+    %  || Key <- PersistedAttributes, Value <- lookup_attribute(DataSet, DataBag, Key)].
 
 lookup_attribute(DataSet, DataBag, Key) when is_atom(Key) ->
     case ets:lookup(DataSet, Key) of

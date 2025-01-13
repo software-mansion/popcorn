@@ -31,6 +31,8 @@ read_snippet(File, Position) ->
   get_file_line(File, LineNumber).
 
 get_file_line(File, LineNumber) when is_integer(LineNumber), LineNumber > 0 ->
+  io:put_chars("dupa3"),
+  io:put_chars(File),
   case file:open(File, [read, binary]) of
     {ok, IoDevice} ->
       Line = traverse_file_line(IoDevice, LineNumber),
@@ -453,17 +455,17 @@ prefix(warning) -> highlight(<<"warning:">>, warning);
 prefix(error) -> highlight(<<"error:">>, error);
 prefix(hint) -> highlight(<<"hint:">>, hint).
 
-highlight(Message, Severity) ->
-  case {Severity, application:get_env(elixir, ansi_enabled, false)} of
-    {warning, true} -> yellow(Message);
-    {error, true} -> red(Message);
-    {hint, true} -> blue(Message);
-    _ -> Message
-  end.
+highlight(Message, _Severity) -> Message.
+  % case {Severity, application:get_env(elixir, ansi_enabled, false)} of
+  %   {warning, true} -> yellow(Message);
+  %   {error, true} -> red(Message);
+  %   {hint, true} -> blue(Message);
+  %   _ -> Message
+  % end.
 
-yellow(Msg) -> ["\e[33m", Msg, "\e[0m"].
-blue(Msg) -> ["\e[34m", Msg, "\e[0m"].
-red(Msg) -> ["\e[31m", Msg, "\e[0m"].
+% yellow(Msg) -> ["\e[33m", Msg, "\e[0m"].
+% blue(Msg) -> ["\e[34m", Msg, "\e[0m"].
+% red(Msg) -> ["\e[31m", Msg, "\e[0m"].
 
 env_format(Meta, #{file := EnvFile} = E) ->
   {File, Position} = meta_location(Meta, EnvFile),

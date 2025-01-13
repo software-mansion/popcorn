@@ -426,7 +426,7 @@ defmodule Exception do
   end
 
   def format_stacktrace_entry({module, fun, arity, location}) do
-    format_application(module) <> format_location(location) <> format_mfa(module, fun, arity)
+    format_location(location) <> format_mfa(module, fun, arity)
   end
 
   def format_stacktrace_entry({fun, arity, location}) do

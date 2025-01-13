@@ -18,7 +18,9 @@ identifier_tokenizer() ->
 %% Key-value store (concurrent reads, serial writes)
 
 get(Key) ->
-  [{_, Value}] = ets:lookup(?MODULE, Key),
+  Result = ets:lookup(?MODULE, Key),
+  erlang:display(Result),
+  [{_, Value}] = Result,
   Value.
 
 get(Key, Default) ->
