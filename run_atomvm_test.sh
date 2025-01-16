@@ -1,10 +1,4 @@
 #!/bin/bash
-# Copyright (c) Meta Platforms, Inc. and affiliates. All rights reserved.
-#
-# This source code is licensed under the Apache 2.0 license found in
-# the LICENSE file in the root directory of this source tree.
-
-# NOT -e, since detecting crashes and treating them correctly is the whole point of this program
 set -uo pipefail
 
 main() {
@@ -32,9 +26,6 @@ main() {
     rm "${avm_filename}"
       exit 0
     elif [[ ${erl_result} == 124 ]] || [[ ${erl_result} == 137 ]]  || [[ ${erl_result} == 1 ]]; then
-      # 124 is the error code returned by timeout if it soft-kills its target
-      # 137 is the error code returned by timeout if it hard-kills its target after the soft-kill was ignored
-      # It is expected that fuzzer-generated code will often lead the VM to timeout, so we don't consider this interesting
       echo "File ${beam_filename}: timeout"
       rm "${beam_filename}"
       rm "${avm_filename}"
