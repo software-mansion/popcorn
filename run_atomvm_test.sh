@@ -10,8 +10,8 @@ set -uo pipefail
 main() {
   max_memory_in_kb=2000000
   atomvm_timeout_in_s=30
-  atomvm_path="/Users/tomaszsobkiewicz/Desktop/Workspace/nifs_copy/build/src/AtomVM"
-  packbeam_path="/Users/tomaszsobkiewicz/Desktop/Workspace/AtomVM/build/tools/packbeam/PackBEAM"
+  atomvm_path=""
+  packbeam_path=""
   avm_lib_path="../fission_lib/_build/dev/fission_lib.avm"
 
 
