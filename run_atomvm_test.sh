@@ -15,7 +15,6 @@ main() {
   packbeam_path=""
   avm_lib_path="../fission_lib/_build/dev/fission_lib.avm"
 
-  # ulimit -m ${max_memory_in_kb}
 
   filename="$1"
   directory="${filename%/*}" # remove the shortest suffix that matches the pattern /*
@@ -39,16 +38,15 @@ main() {
       # It is expected that fuzzer-generated code will often lead the VM to timeout, so we don't consider this interesting
       echo "File ${beam_filename}: timeout"
       rm "${beam_filename}"
-    rm "${avm_filename}"
+      rm "${avm_filename}"
       exit 0
     else
-      echo "INTERESTING: erl crashed on ${beam_filename}, produced from: ${filename} with error code ${erl_result}!"
+      echo "INTERESTING: AVM crashed on ${beam_filename}, produced from: ${filename} with error code ${erl_result}!"
       rm "${beam_filename}"
       rm "${avm_filename}"
       exit ${erl_result}
     fi
   else
-    # Contrary to erl, erlc is not supposed to ever hang forever on valid Erlang input
     echo "INTERESTING: erlc either crashed or timed out on ${filename}!"
     exit 42
   fi
