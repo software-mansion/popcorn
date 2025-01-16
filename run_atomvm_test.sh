@@ -9,10 +9,9 @@ set -uo pipefail
 
 main() {
   max_memory_in_kb=2000000
-  timeout_in_s=3
   atomvm_timeout_in_s=30
-  atomvm_path=""
-  packbeam_path=""
+  atomvm_path="/Users/tomaszsobkiewicz/Desktop/Workspace/nifs_copy/build/src/AtomVM"
+  packbeam_path="/Users/tomaszsobkiewicz/Desktop/Workspace/AtomVM/build/tools/packbeam/PackBEAM"
   avm_lib_path="../fission_lib/_build/dev/fission_lib.avm"
 
 
@@ -27,7 +26,7 @@ main() {
     timeout -k 1 ${atomvm_timeout_in_s} "${packbeam_path}" -i "${avm_filename}" "${beam_filename}" "${avm_lib_path}"
     timeout -k 1 ${atomvm_timeout_in_s} "${atomvm_path}" "${avm_filename}" 1> /dev/null
     erl_result=$?   
-    if [[ ${erl_result} == 0 ]]; then
+    if [[ ${erl_result} == 1 ]]; then
       echo "File ${beam_filename}: completed normally"
       rm "${beam_filename}"
     rm "${avm_filename}"
