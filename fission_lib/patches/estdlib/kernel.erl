@@ -31,17 +31,25 @@
 %%%-----------------------------------------------------------------
 start(_, []) ->
     %% Setup the logger and configure the kernel logger environment
-    ok = logger:internal_init_logger(),
-    case supervisor:start_link({local, kernel_sup}, kernel, []) of
-	{ok, Pid} ->
-            ok = erl_signal_handler:start(),
-            ok = logger:add_handlers(kernel),
-            {ok, Pid, []};
-	Error -> Error
-    end.
+    % ok = logger:internal_init_logger(),
+    % case supervisor:start_link({local, kernel_sup}, kernel, []) of
+	% {ok, Pid} ->
+    %         ok = erl_signal_handler:start(),
+    %         ok = logger:add_handlers(kernel),
+    %         {ok, Pid, []};
+	% Error -> Error
+    % end.
+    {ok, spawn(fun () -> console:print(["Spawning kernel app ", pid_to_list(self()), "\n"]), mock_loop() end), []}.
 
 stop(_State) ->
     ok.
+
+mock_loop() ->
+    receive 
+        Message -> console:print(io_lib:format("CHUJJJJJJ ~p\n", [Message]))
+    end,
+    mock_loop().
+
 
 %%-------------------------------------------------------------------
 %% Some configuration parameters for kernel are changed

@@ -117,6 +117,7 @@ call(AppMaster, Req) ->
 init(Parent, Starter, ApplData, Type) ->
     link(Parent),
     process_flag(trap_exit, true),
+	console:print([pid_to_list(self()), " starting application_master ", atom_to_list(ApplData#appl_data.name), "\n"]),
     OldGleader =
         case group_leader() == whereis(init) of
             true -> init;
@@ -139,9 +140,11 @@ init(Parent, Starter, ApplData, Type) ->
 	    proc_lib:init_ack(Starter, {ok,self()}),
 	    main_loop(Parent, State#state{child = Pid});
 	{error, Reason} ->    % apply(M,F,A) returned error
-	    exit(Reason);
+	    console:print("am e1\n"),
+		exit(Reason);
 	Else ->               % apply(M,F,A) returned erroneous
-	    exit(Else)
+	    console:print("am e2\n"),
+		exit(Else)
     end.
 
 %%-----------------------------------------------------------------
@@ -177,7 +180,13 @@ init_loop(Pid, Tag, State, Type) ->
     end.
 
 main_loop(Parent, State) ->
-    receive
+	% Message = receive
+	% 	M -> M
+	% end,
+	% % console:print(["am msg ", io_lib:format("~p\n", [Message])]),
+	% console:print("am msg\n"),
+    % case Message of
+	receive
 	IoReq when element(1, IoReq) =:= io_request ->
             _ = relay_to_group_leader(IoReq, State),
 	    main_loop(Parent, State);
@@ -221,6 +230,7 @@ handle_msg({get_child, Tag, From}, State) ->
 handle_msg({stop, Tag, From}, State) ->
     catch terminate(normal, State),
     From ! {Tag, ok},
+	console:print("am e3\n"),
     exit(normal);
 handle_msg({child, Ref, GrandChild, Mod}, #state{req=Reqs0}=State) ->
     {value, {_, Tag, From}, Reqs} = lists:keytake(Ref, 1, Reqs0),
@@ -233,6 +243,7 @@ terminate(Reason, State = #state{child=Child, children=Children, req=Reqs}) ->
     _ = [From ! {Tag, error} || {_, Tag, From} <- Reqs],
     terminate_child(Child, State),
     kill_children(Children),
+	console:print("am e4\n"),
     exit(Reason).
 
 %% If the group_leader is the `init` process, the message is meant to
@@ -376,6 +387,7 @@ loop_it(Parent, Child, Mod, AppState) ->
 		{'EXIT', Child, _} -> ok
 	    end,
 	    catch Mod:stop(NewAppState),
+		console:print("am e5\n"),
 	    exit(normal);
 	{'EXIT', Parent, Reason} ->
 	    NewAppState = prep_stop(Mod, AppState),
@@ -384,10 +396,12 @@ loop_it(Parent, Child, Mod, AppState) ->
 		{'EXIT', Child, _} -> ok
 	    end,
 	    catch Mod:stop(NewAppState),
+		console:print("am e6\n"),
 	    exit(Reason);
 	{'EXIT', Child, Reason} -> % forward *all* exit reasons (inc. normal)
 	    NewAppState = prep_stop(Mod, AppState),
 	    catch Mod:stop(NewAppState),
+		console:print("am e7\n"),
 	    exit(Reason);
 	_ ->
 	    loop_it(Parent, Child, Mod, AppState)
@@ -446,7 +460,10 @@ kill_all_procs_1([P|Ps], Self, N) ->
 kill_all_procs_1([], _, 0) -> ok;
 kill_all_procs_1([], _, _) -> kill_all_procs().
 
-set_timer(infinity) -> ok;
+set_timer(infinity) ->
+	console:print("timer infinity\n"),
+	ok;
 set_timer(Time) ->
+	console:print("WTF timer\n"),
     {ok, _} = timer:exit_after(Time, timeout),
     ok.

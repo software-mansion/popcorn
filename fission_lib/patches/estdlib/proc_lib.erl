@@ -168,7 +168,7 @@ spawn_link(Node, M, F, A) when is_atom(M), is_atom(F), is_list(A) ->
 spawn_opt(F, Opts) when is_function(F) ->
     Parent = get_my_name(),
     Ancestors = get_ancestors(),
-    erlang:spawn_opt(?MODULE, init_p, [Parent,Ancestors,F],Opts).
+    simple_trace_proc:trace(erlang:spawn_opt(?MODULE, init_p, [Parent,Ancestors,F],Opts)).
 
 -spec spawn_opt(Node, Function, SpawnOpts) -> pid() | {pid(), reference()} when
       Node :: node(),
@@ -178,7 +178,7 @@ spawn_opt(F, Opts) when is_function(F) ->
 spawn_opt(Node, F, Opts) when is_function(F) ->
     Parent = get_my_name(),
     Ancestors = get_ancestors(),
-    erlang:spawn_opt(Node, ?MODULE, init_p, [Parent,Ancestors,F], Opts).
+    simple_trace_proc:trace(erlang:spawn_opt(Node, ?MODULE, init_p, [Parent,Ancestors,F], Opts)).
 
 -spec spawn_opt(Module, Function, Args, SpawnOpts) -> pid() | {pid(), reference()} when
       Module :: module(),
@@ -189,7 +189,7 @@ spawn_opt(Node, F, Opts) when is_function(F) ->
 spawn_opt(M, F, A, Opts) when is_atom(M), is_atom(F), is_list(A) ->
     Parent = get_my_name(),
     Ancestors = get_ancestors(),
-    erlang:spawn_opt(?MODULE, init_p, [Parent,Ancestors,M,F,A], Opts).
+    simple_trace_proc:trace(erlang:spawn_opt(?MODULE, init_p, [Parent,Ancestors,M,F,A], Opts)).
 
 -spec spawn_opt(Node, Module, Function, Args, SpawnOpts) -> pid() | {pid(), reference()} when
       Node :: node(),
@@ -201,7 +201,7 @@ spawn_opt(M, F, A, Opts) when is_atom(M), is_atom(F), is_list(A) ->
 spawn_opt(Node, M, F, A, Opts) when is_atom(M), is_atom(F), is_list(A) ->
     Parent = get_my_name(),
     Ancestors = get_ancestors(),
-    erlang:spawn_opt(Node, ?MODULE, init_p, [Parent,Ancestors,M,F,A], Opts).
+    simple_trace_proc:trace(erlang:spawn_opt(Node, ?MODULE, init_p, [Parent,Ancestors,M,F,A], Opts)).
 
 spawn_mon(M,F,A) ->
     Parent = get_my_name(),
@@ -808,19 +808,21 @@ get_ancestors() ->
 	_                 -> []
     end.
 
-proc_info(Pid,Item) when node(Pid) =:= node() ->
-    process_info(Pid,Item);
 proc_info(Pid,Item) ->
-    case lists:member(node(Pid),nodes()) of
-	true ->
-	    check(rpc:call(node(Pid), erlang, process_info, [Pid, Item]));
-	_ ->
-	    hidden
-    end.
+    process_info(Pid,Item).
+% proc_info(Pid,Item) when node(Pid) =:= node() ->
+%     process_info(Pid,Item);
+% proc_info(Pid,Item) ->
+%     case lists:member(node(Pid),nodes()) of
+% 	true ->
+% 	    check(rpc:call(node(Pid), erlang, process_info, [Pid, Item]));
+% 	_ ->
+% 	    hidden
+%     end.
 
-check({badrpc,nodedown}) -> undefined;
-check({badrpc,Error})    -> Error;
-check(Res)               -> Res.
+% check({badrpc,nodedown}) -> undefined;
+% check({badrpc,Error})    -> Error;
+% check(Res)               -> Res.
 
 %%% -----------------------------------------------------------
 %%% Format a generated crash info structure.

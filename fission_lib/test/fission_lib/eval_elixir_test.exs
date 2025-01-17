@@ -7,6 +7,11 @@ defmodule FissionLib.EvalElixirTest do
     quote do
       if Process.whereis(:elixir_config) == nil, do: :elixir.start([], [])
       # {result, _bindings} = Code.eval_quoted(var!(code))
+      # IO.puts("start kernel")
+      # :application_controller.start(:kernel)
+      # IO.puts("start elixir")
+      # :application.ensure_all_started(:elixir)
+      # IO.puts("eval code")
       {result, _bindings} = Code.eval_string(var!(code), [], __ENV__)
       result
     end
@@ -33,38 +38,46 @@ defmodule FissionLib.EvalElixirTest do
   @tag :check
   test "check", %{tmp_dir: tmp_dir} do
     quote do
-      e =
-        {{:badmatch, {:error, :enoent}},
-         [
-           {:ts_config_http, :parse_config, 2,
-            [{:file, ~c"src/tsung_controller/ts_config_http.erl"}, {:line, 63}]},
-           {:lists, :foldl, 3, [{:file, ~c"lists.erl"}, {:line, 1261}]},
-           {:ts_config, :parse, 2,
-            [{:file, ~c"src/tsung_controller/ts_config.erl"}, {:line, 437}]},
-           {:lists, :foldl, 3, [{:file, ~c"lists.erl"}, {:line, 1261}]},
-           {:ts_config, :handle_read, 3,
-            [{:file, ~c"src/tsung_controller/ts_config.erl"}, {:line, 85}]},
-           {:ts_config, :read, 2, [{:file, ~c"src/tsung_controller/ts_config.erl"}, {:line, 70}]},
-           {:ts_config_server, :handle_call, 3,
-            [{:file, ~c"src/tsung_controller/ts_config_server.erl"}, {:line, 206}]},
-           {:gen_server, :try_handle_call, 4, [{:file, ~c"gen_server.erl"}, {:line, 607}]}
-         ]}
-
-      :io.format(~c"~p\n", [e])
-      :ok
+      # Process.register(self(), :dupa)
+      # :erlang.display(:gen.get_proc_name({:local, :dupa}))
+      # :erlang.process_info(self(), :registered_name)
+      # :erlang.put(:dupa, 1)
+      # :erlang.get(:dupa)
+      # x = fn a when tuple_size(a) == 2 -> :ok end
+      # x.({:a, :b})
+      # x = fn a when a != :erlang.node() -> :ok end
+      # x.(:a)
+      :ets.new(:dupa, [:named_table, :public, {:read_concurrency, true}])
+      # :ets.delete(:dupa)
     end
     |> RunInAtomVM.expr(tmp_dir)
     |> IO.inspect()
   end
 
+  # @tag :app
+  # test "app", %{tmp_dir: tmp_dir} do
+  #   quote do
+  #     :application_controller.start(:kernel)
+  #     Process.sleep(1000)
+  #     :console.print("\n\n-------------------------------------------\n\n")
+  #     :application.ensure_all_started(:elixir)
+  #     :ok
+  #     # pid = Process.whereis(:application_controller)
+  #     # :erlang.pid_to_list(pid)
+  #   end
+  #   |> eval(tmp_dir)
+  #   |> IO.inspect()
+  # end
+
   @tag :mod
   test "module", %{tmp_dir: tmp_dir} do
     quote do
       defmodule Adder do
-        def dupa(x), do: :ok
+        def dupa(), do: :ok
         # def blah, do: :blah_ret
       end
     end
     |> eval(tmp_dir)
+    |> IO.inspect()
   end
 end

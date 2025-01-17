@@ -31,7 +31,6 @@ read_snippet(File, Position) ->
   get_file_line(File, LineNumber).
 
 get_file_line(File, LineNumber) when is_integer(LineNumber), LineNumber > 0 ->
-  io:put_chars("dupa3"),
   io:put_chars(File),
   case file:open(File, [read, binary]) of
     {ok, IoDevice} ->

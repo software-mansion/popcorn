@@ -220,12 +220,13 @@ call(Process, Label, Request, Timeout) when is_pid(Process),
     do_call(Process, Label, Request, Timeout);
 call(Process, Label, Request, Timeout)
   when Timeout =:= infinity; is_integer(Timeout), Timeout >= 0 ->
-    Fun = fun(Pid) -> do_call(Pid, Label, Request, Timeout) end,
+    Fun = fun(Pid) -> console:print("predupa_call\n"), do_call(Pid, Label, Request, Timeout) end,
     do_for_proc(Process, Fun).
 
 -dialyzer({no_improper_lists, do_call/4}).
 
 do_call(Process, _Label, _Request, _Timeout) when Process =:= self() ->
+    console:print("dupa_call0"),
     exit(calling_self);
 do_call(Process, Label, Request, infinity)
   when (is_pid(Process)
@@ -233,6 +234,7 @@ do_call(Process, Label, Request, infinity)
        orelse (element(2, Process) == node()
                andalso is_atom(element(1, Process))
                andalso (tuple_size(Process) =:= 2)) ->
+    console:print("dupa_call"),
     Mref = erlang:monitor(process, Process),
     %% Local without timeout; no need to use alias since we unconditionally
     %% will wait for either a reply or a down message which corresponds to
@@ -246,6 +248,7 @@ do_call(Process, Label, Request, infinity)
             exit(Reason)
     end;
 do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
+    console:print("dupa_call2"),
     Mref = erlang:monitor(process, Process, [{alias,demonitor}]),
 
     Tag = [alias | Mref],
@@ -312,8 +315,11 @@ send_request(Process, Tag, Request, Label, ReqIdCol) when is_map(ReqIdCol) ->
 -dialyzer({no_improper_lists, do_send_request/3}).
 
 do_send_request(Process, Tag, Request) ->
+    console:print("dupa_monitor"),
     ReqId = erlang:monitor(process, Process, [{alias, demonitor}]),
+    console:print("dupa_send"),
     _ = erlang:send(Process, {Tag, {self(), [alias|ReqId]}, Request}, [noconnect]),
+    console:print("dupa_sent"),
     ReqId.
 
 -spec '@wait_response_recv_opt'(term(), term(), term()) -> ok.
@@ -583,6 +589,8 @@ do_for_proc(Process, Fun)
   when ((tuple_size(Process) == 2 andalso element(1, Process) == global)
 	orelse
 	  (tuple_size(Process) == 3 andalso element(1, Process) == via)) ->
+
+    console:print("dupa_do_for_proc3"),
     case where(Process) of
 	Pid when is_pid(Pid) ->
 	    Node = node(Pid),

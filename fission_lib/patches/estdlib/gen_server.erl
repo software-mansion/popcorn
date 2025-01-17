@@ -1194,6 +1194,7 @@ handle_msg(Msg, Parent, Name, State, CbCache, HibernateAfterTimeout, Debug) ->
     handle_common_reply(Reply, Parent, Name, undefined, Msg, CbCache, HibernateAfterTimeout, State, Debug).
 
 handle_common_reply(Reply, Parent, Name, From, Msg, CbCache, HibernateAfterTimeout, State) ->
+    erlang:display({dupa_common_reply, Reply}),
     Mod = CbCache#callback_cache.module,
     case Reply of
 	{ok, {noreply, NState}} ->
@@ -1213,6 +1214,7 @@ handle_common_reply(Reply, Parent, Name, From, Msg, CbCache, HibernateAfterTimeo
     end.
 
 handle_common_reply(Reply, Parent, Name, From, Msg, CbCache, HibernateAfterTimeout, State, Debug) ->
+    erlang:display(dupa_common_reply2),
     Mod = CbCache#callback_cache.module,
     case Reply of
 	{ok, {noreply, NState}} ->

@@ -42,6 +42,7 @@ update(Key, Fun) ->
 
 new(Opts) ->
   Tab = ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
+  erlang:display(Opts),
   true = ets:insert_new(?MODULE, Opts),
   Tab.
 
