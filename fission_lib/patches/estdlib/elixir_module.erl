@@ -7,7 +7,8 @@
 compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
     File = ?key(E, file),
     flb_module:check_module_availability(Module, Line, E),
-    elixir_env:trace(defmodule, E),
+    % Patch reason: tracing doesn't work on AVM yet
+    % elixir_env:trace(defmodule, E),
 
     CompilerModules = flb_module:compiler_modules(),
     {Tables, Ref} = flb_module:build(Module, Line, File, E),
@@ -58,11 +59,13 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
                 UsesBehaviours = flb_module:bag_lookup_element(DataBag, {accumulate, behaviour}, 2),
                 Impls = flb_module:bag_lookup_element(DataBag, impls, 2),
 
-                AfterVerify = flb_module:bag_lookup_element(DataBag, {accumulate, after_verify}, 2),
-                [
-                    elixir_env:trace({remote_function, [], VerifyMod, VerifyFun, 1}, CallbackE)
-                 || {VerifyMod, VerifyFun} <- AfterVerify
-                ],
+                % Patch reason: tracing doesn't work on AVM yet
+                % AfterVerify = flb_module:bag_lookup_element(DataBag, {accumulate, after_verify}, 2),
+                % [
+                %     elixir_env:trace({remote_function, [], VerifyMod, VerifyFun, 1}, CallbackE)
+                %  || {VerifyMod, VerifyFun} <- AfterVerify
+                % ],
+                AfterVerify = [],
 
                 ModuleMap = #{
                     struct => flb_module:get_struct(DataSet),
@@ -96,7 +99,7 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
             code:load_binary(Module, flb_module:beam_location(ModuleAsCharlist), Binary),
         flb_module:put_compiler_modules(CompilerModules),
         flb_module:eval_callbacks(Line, DataBag, after_compile, [CallbackE, Binary], CallbackE),
-        elixir_env:trace({on_module, Binary, none}, ModuleE),
+        % elixir_env:trace({on_module, Binary, none}, ModuleE),
         % warn_unused_attributes(DataSet, DataBag, PersistedAttributes, E), %Patch reason - it uses ets:select and we don't currently need warnings.
         flb_module:make_module_available(Module, Binary),
         (CheckerInfo == undefined) andalso
