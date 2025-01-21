@@ -16,7 +16,7 @@ defmodule ElixirModules do
 
   @simple_module """
   defmodule Adder do
-    def calc(_a, _b), do: :added
+    def calc(a, b), do: a + b
   end
   """
 
