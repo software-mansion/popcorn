@@ -1,7 +1,6 @@
 -module(elixir_module).
 -include("elixir.hrl").
 -define(counter_attr, {elixir, counter}).
--compile({flb_patch_private, attributes/3}).
 -compile({flb_patch_private, compile/7}).
 
 compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
@@ -24,7 +23,7 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
         {Binary, PersistedAttributes, Autoload} =
             elixir_erl_compiler:spawn(fun() ->
                 PersistedAttributes = ets:lookup_element(DataBag, persisted_attributes, 2),
-                Attributes = attributes(DataSet, DataBag, PersistedAttributes),
+                Attributes = flb_module:attributes(DataSet, DataBag, PersistedAttributes),
                 {AllDefinitions, Private} = elixir_def:fetch_definitions(Module, E),
 
                 OnLoadAttribute = lists:keyfind(on_load, 1, Attributes),
@@ -126,14 +125,3 @@ compile(Line, Module, ModuleAsCharlist, Block, Vars, Prune, E) ->
         ets:delete(DataBag),
         elixir_code_server:call({undefmodule, Ref})
     end.
-%% Add attributes handling to the form
-
-%Patch reason: PersistedAttributes might not be a list
-attributes(DataSet, DataBag, PersistedAttributes) when not is_list(PersistedAttributes) ->
-    attributes(DataSet, DataBag, [PersistedAttributes]);
-attributes(DataSet, DataBag, PersistedAttributes) ->
-    Result = [
-        {Key, flb_module:lookup_attribute(DataSet, DataBag, Key)}
-     || Key <- PersistedAttributes
-    ],
-    Result.
