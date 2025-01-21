@@ -6,7 +6,7 @@ defmodule ElixirModules do
   end
   """
 
-  @fibonacci_modules """
+  @fibonacci_module """
   defmodule Fibonacci do
       def calc(0) do 0 end
       def calc(1) do 1 end
@@ -14,10 +14,16 @@ defmodule ElixirModules do
   end
   """
 
+  @simple_module """
+  defmodule Adder do
+    def calc(_a, _b), do: :added
+  end
+  """
+
   def start() do
     :elixir.start([], [])
 
-    (@fibonacci_modules <> "\nFibonacci.calc(10)\n")
+    (@simple_module <> "\Adder.calc(10, 20)\n")
     |> eval()
     |> print()
   end
