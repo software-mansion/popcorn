@@ -19,11 +19,11 @@ for file in "$directory"/*.stderr; do
   if [ ! -s "$file" ]; then
     mv "$directory/$test_prefix."* "$directory/compilation_error/"
   else
-    if grep -q "Unexpected nbits vaue @" "$file"; then
+    if grep -q "Unexpected nbits value @" "$file"; then
       mv "$directory/$test_prefix."* "$directory/nbits/"
     elif grep -q "AddressSanitizer:DEADLYSIGNAL" "$file"; then
       mv "$directory/$test_prefix."* "$directory/asan/"
-    elif grep -iq "Unexpected operand" "$file"; then
+    elif grep -q "Unexpected operand" "$file"; then
       mv "$directory/$test_prefix."* "$directory/operand/"
     else
       mv "$directory/$test_prefix."* "$directory/other/"
