@@ -35,10 +35,21 @@ defmodule ElixirModules do
   Guard.f(5)
   """
 
+  @multiple_fns_module """
+  defmodule MultipleFns do
+    def a(x), do: MultipleFns.b(x) + 1
+    def b(x), do: MultipleFns.c(x) + 1
+    def c(x), do: MultipleFns.d(x) + 1
+    def d(x), do: x
+  end
+
+  MultipleFns.a(0) == 3
+  """
+
   def start() do
     :elixir.start([], [])
 
-    @factorial_module
+    @multiple_fns_module
     |> eval()
     |> print()
   end
