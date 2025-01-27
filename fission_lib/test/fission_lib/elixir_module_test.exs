@@ -3,16 +3,15 @@ defmodule FissionLib.ElixirModuleTest do
   require Logger
 
   @moduletag :tmp_dir
-  @path_to_examples "test/examples"
+  @examples_path "./test/examples"
   setup_all do
     quote do
-      code = var!(code) |> :erlang.binary_to_list()
       :elixir.start([], [])
-      case Code.eval_string(code, [], __ENV__) do
-        {result, _binding} -> result
-        other -> other
-      end
 
+      var!(code)
+      |> :erlang.binary_to_list()
+      |> Code.eval_string([], __ENV__)
+      |> elem(0)
     end
     |> RunInAtomVM.compile("tmp_mod_elixir", [:code])
 
@@ -23,11 +22,16 @@ defmodule FissionLib.ElixirModuleTest do
     assert {:module, _name, _bin, _} = RunInAtomVM.run("tmp_mod_elixir", tmp_dir, code: code)
   end
 
-  defp assert_ok(x), do: assert({:module, _name, _bin, _} = x)
+  defmacrop assert_ok(x) do
+    quote do
+      assert({:module, _name, _bin, _} = unquote(x))
+    end
+  end
 
   test "simple_module", %{tmp_dir: tmp_dir} do
     """
     defmodule Start do
+
     end
     """
     |> run(tmp_dir)
@@ -35,9 +39,7 @@ defmodule FissionLib.ElixirModuleTest do
   end
 
   test "CapybaraHabitat", %{tmp_dir: tmp_dir} do
-    File.read!(
-      "#{@path_to_examples}/CapybaraHabitat.ex"
-    )
+    File.read!("#{@examples_path}/CapybaraHabitat.ex")
     |> run(tmp_dir)
     |> assert_ok()
   end

@@ -3,7 +3,7 @@ defmodule FissionLib.ErlangModuleTest do
   require Logger
 
   @moduletag :tmp_dir
-  @path_to_examples "test/examples"
+  @examples_path "./test/examples"
   setup_all do
     quote do
       code = var!(code) |> :erlang.binary_to_list()
@@ -21,7 +21,6 @@ defmodule FissionLib.ErlangModuleTest do
       ensure_empty_acc = fn [] -> {:cont, []} end
 
       {:ok, tokens, _} = :erl_scan.string(code)
-      IO.puts("Scanned")
 
       {:ok, module, module_bin} =
         Enum.chunk_while(tokens, [], split_on_dots, ensure_empty_acc)
@@ -34,8 +33,6 @@ defmodule FissionLib.ErlangModuleTest do
           :no_docs
         ])
 
-      IO.puts("compiled")
-
       :code.load_binary(module, ~c"nofile", module_bin)
     end
     |> RunInAtomVM.compile("tmp_mod_erl", [:code])
@@ -45,6 +42,10 @@ defmodule FissionLib.ErlangModuleTest do
 
   defp run(code, tmp_dir) do
     assert {:module, _} = RunInAtomVM.run("tmp_mod_erl", tmp_dir, code: code)
+  end
+
+  defp run_failing(code, tmp_dir) do
+    assert {:error, _output} = RunInAtomVM.run_failing("tmp_mod_erl", tmp_dir, code: code)
   end
 
   defp assert_ok(x), do: assert({:module, _} = x)
@@ -62,25 +63,24 @@ defmodule FissionLib.ErlangModuleTest do
   end
 
   test "simple_module_from_file", %{tmp_dir: tmp_dir} do
-    File.read!(
-      "#{@path_to_examples}/example.erl"
-    )
+    File.read!("#{@examples_path}/example.erl")
     |> run(tmp_dir)
     |> assert_ok()
   end
 
-  test "uuid", %{tmp_dir: tmp_dir} do
-    File.read!(
-      "#{@path_to_examples}/uuid.erl"
-    )
+  test "uuid is failing due to variable overflow", %{tmp_dir: tmp_dir} do
+    File.read!("#{@examples_path}/uuid.erl")
+    |> run_failing(tmp_dir)
+  end
+
+  test "greetings", %{tmp_dir: tmp_dir} do
+    File.read!("#{@examples_path}/greetings.erl")
     |> run(tmp_dir)
     |> assert_ok()
   end
 
-  test "capybara_habitat" ,%{tmp_dir: tmp_dir} do
-    File.read!(
-      "#{@path_to_examples}/capybara_habitat.erl"
-    )
+  test "capybara_habitat", %{tmp_dir: tmp_dir} do
+    File.read!("#{@examples_path}/capybara_habitat.erl")
     |> run(tmp_dir)
     |> assert_ok()
   end
