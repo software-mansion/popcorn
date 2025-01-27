@@ -48,8 +48,6 @@ defmodule FissionLib.ErlangModuleTest do
     assert {:error, _output} = RunInAtomVM.run_failing("tmp_mod_erl", tmp_dir, code: code)
   end
 
-  defp assert_ok(x), do: assert({:module, _} = x)
-
   test "simple_module", %{tmp_dir: tmp_dir} do
     """
     -module(test).
@@ -59,13 +57,11 @@ defmodule FissionLib.ErlangModuleTest do
         A + B.
     """
     |> run(tmp_dir)
-    |> assert_ok()
   end
 
   test "simple_module_from_file", %{tmp_dir: tmp_dir} do
     File.read!("#{@examples_path}/example.erl")
     |> run(tmp_dir)
-    |> assert_ok()
   end
 
   test "uuid is failing due to variable overflow", %{tmp_dir: tmp_dir} do
@@ -76,12 +72,10 @@ defmodule FissionLib.ErlangModuleTest do
   test "greetings", %{tmp_dir: tmp_dir} do
     File.read!("#{@examples_path}/greetings.erl")
     |> run(tmp_dir)
-    |> assert_ok()
   end
 
   test "capybara_habitat", %{tmp_dir: tmp_dir} do
     File.read!("#{@examples_path}/capybara_habitat.erl")
     |> run(tmp_dir)
-    |> assert_ok()
   end
 end

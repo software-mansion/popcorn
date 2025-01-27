@@ -22,12 +22,6 @@ defmodule FissionLib.ElixirModuleTest do
     assert {:module, _name, _bin, _} = RunInAtomVM.run("tmp_mod_elixir", tmp_dir, code: code)
   end
 
-  defmacrop assert_ok(x) do
-    quote do
-      assert({:module, _name, _bin, _} = unquote(x))
-    end
-  end
-
   test "simple_module", %{tmp_dir: tmp_dir} do
     """
     defmodule Start do
@@ -35,12 +29,10 @@ defmodule FissionLib.ElixirModuleTest do
     end
     """
     |> run(tmp_dir)
-    |> assert_ok()
   end
 
   test "CapybaraHabitat", %{tmp_dir: tmp_dir} do
     File.read!("#{@examples_path}/CapybaraHabitat.ex")
     |> run(tmp_dir)
-    |> assert_ok()
   end
 end
