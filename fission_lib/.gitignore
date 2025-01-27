@@ -24,3 +24,5 @@ fission_lib-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+/tmp_mod_erl/
+/tmp_mod_elixir/

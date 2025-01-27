@@ -40,6 +40,20 @@ defmodule RunInAtomVM do
     File.read!("#{build_path}/result.bin") |> :erlang.binary_to_term()
   end
 
+  def run_failing(dir, tmp_dir, opts \\ []) do
+    build_path = "#{dir}/_build"
+    opts = opts |> Map.new() |> :erlang.term_to_binary()
+    File.write!("#{build_path}/opts.bin", opts)
+
+    {output, ret_val} =
+      System.shell("#{@atomvm_path} #{build_path}/bundle.avm &> #{tmp_dir}/log.txt")
+
+    assert ret_val == 1,
+           "Code that should be failing in AtomVM succeded, see #{Path.relative_to_cwd(tmp_dir)}/log.txt for logs"
+
+    {:error, output}
+  end
+
   defp module(code, vars, build_path) do
     assignments =
       for v <- vars do
