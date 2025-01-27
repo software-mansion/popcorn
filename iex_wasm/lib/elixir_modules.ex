@@ -4,6 +4,8 @@ defmodule ElixirModules do
     def calc(0), do: 1
     def calc(n) when n > 0, do: n * calc(n - 1)
   end
+
+  Factorial.calc(5)
   """
 
   @fibonacci_module """
@@ -12,18 +14,31 @@ defmodule ElixirModules do
       def calc(1) do 1 end
       def calc(n) do fib(n-1) + fib(n-2) end
   end
+
+  Fibonacci.calc(10)
   """
 
   @simple_module """
   defmodule Adder do
     def calc(a, b), do: a + b
   end
+
+  Adder.calc(10, 20)
+  """
+
+  @guard_module """
+  defmodule Guard do
+    def f(n) when n > 0, do: f(n-1)
+    def f(0), do: :error
+  end
+
+  Guard.f(5)
   """
 
   def start() do
     :elixir.start([], [])
 
-    (@simple_module <> "\Adder.calc(10, 20)\n")
+    @factorial_module
     |> eval()
     |> print()
   end

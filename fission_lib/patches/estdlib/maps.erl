@@ -499,7 +499,9 @@ take(Key, Map) when is_map(Map) ->
             {V, Map2};
         _ ->
             Map
-    end.
+    end;
+take(_Key, Map) ->
+    error({badmap, Map}).
 
 %%-----------------------------------------------------------------------------
 %% @param   Key     the key to update
