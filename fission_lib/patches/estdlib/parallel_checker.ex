@@ -235,6 +235,7 @@ defmodule Module.ParallelChecker do
   ## Module checking
 
   defp check_module(module_map, _cache, _log?) do
+    # patch reason: diagnostics doesn't work
     %{
       module: module,
       # file: file,
@@ -260,13 +261,13 @@ defmodule Module.ParallelChecker do
     #     definitions
     #   )
 
-    # patch reason: diagnostics doesn't work
     diagnostics = []
       # module
       # |> Module.Types.warnings(file, definitions, no_warn_undefined, cache)
       # |> Kernel.++(behaviour_warnings)
       # |> group_warnings()
       # |> emit_warnings(log?)
+    # Patch reason: end
 
     module_map
     |> Map.get(:after_verify, [])
