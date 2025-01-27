@@ -32,3 +32,10 @@ Cross-Origin-Embedder-Policy: "require-corp"
 ```
 
 for the WASM AtomVM to work.
+
+## Deploy
+
+- Build `.avm` file and AtomVM WASM binary in release mode (`MIX_ENV=prod mix compile`).
+- Connect to server via ssh.
+- Copy files into the server (`scp -A -r <SOURCE_DIR> root@<IP>:/var/www/wasm-$(date "+%Y-%m-%d")`).
+- Update symlink to point to new directory (in `/var/www/`: `ln -sf ./wasm-DATE html`)
