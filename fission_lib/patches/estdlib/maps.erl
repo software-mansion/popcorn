@@ -57,6 +57,7 @@
     merge/2,
     merge_with/3,
     remove/2,
+    take/2,
     update/3
 ]).
 
@@ -488,6 +489,18 @@ remove(Key, Map) when is_map(Map) ->
 remove(Key, [Pos | Map] = Iterator) when is_integer(Pos) andalso is_map(Map) ->
     iterate_remove(Key, maps:next(Iterator), ?MODULE:new());
 remove(_Key, Map) when not is_map(Map) ->
+    error({badmap, Map}).
+
+take(Key, Map) when is_map(Map) ->
+    case ?MODULE:is_key(Key, Map) of
+        true ->
+            {_K, V, _It} = Next = maps:next(maps:iterator(Map)),
+            Map2 = iterate_remove(Key, Next, ?MODULE:new()),
+            {V, Map2};
+        _ ->
+            Map
+    end;
+take(_Key, Map) ->
     error({badmap, Map}).
 
 %%-----------------------------------------------------------------------------
