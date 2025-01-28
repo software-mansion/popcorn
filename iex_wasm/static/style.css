@@ -121,6 +121,7 @@ button {
     border: 1px solid var(--swm-text);
     padding: 1em;
     align-self: flex-start;
+    font-size: 12px;
 }
 
 button:active {
