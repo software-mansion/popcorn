@@ -24,3 +24,6 @@ iex_wasm-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# ignore DS_Store
+.DS_Store
