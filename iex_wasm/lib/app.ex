@@ -1,9 +1,7 @@
-defmodule IExWASM do
+defmodule App do
   def start() do
-    Console.print("Starting application...\n")
+    Console.print("Starting interpreter...\n")
     Process.register(self(), :main)
-    pid = ElixirWasm.start()
-    Process.register(pid, :elixir_iex)
     loop()
   end
 
@@ -13,7 +11,6 @@ defmodule IExWASM do
         {type, code} = type(message)
 
         code
-        |> :erlang.binary_to_list()
         |> eval(type)
         |> resolve(promise)
     end
@@ -21,10 +18,21 @@ defmodule IExWASM do
     loop()
   end
 
-  defp type("eval:" <> code), do: {:eval, code}
-  defp type("module:" <> code), do: {:module, code}
+  defp type("eval:elixir:" <> code), do: {:elixir, code}
+  defp type("eval:erlang:" <> code), do: {:erlang, code}
+  defp type("eval_module:erlang:" <> code), do: {{:module, :erlang}, code}
 
-  defp eval(string, :module) do
+  defp eval(code, :elixir) do
+    unless Process.whereis(:elixir_config) do
+      :elixir.start([], [])
+    end
+
+    code
+    |> Code.eval_string([], __ENV__)
+    |> elem(0)
+  end
+
+  defp eval(code, {:module, :erlang}) do
     compile_opts = [
       :deterministic,
       :return_errors,
@@ -38,7 +46,8 @@ defmodule IExWASM do
       form
     end
 
-    with {:ok, tokens, _end_location} <- :erl_scan.string(string),
+    with code = :erlang.binary_to_list(code),
+         {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, module, module_bin} <-
            tokens
            |> split_forms()
@@ -51,8 +60,9 @@ defmodule IExWASM do
     error -> {:error, error, __STACKTRACE__}
   end
 
-  defp eval(string, :eval) do
-    with {:ok, tokens, _end_location} <- :erl_scan.string(string),
+  defp eval(code, :erlang) do
+    with code = :erlang.binary_to_list(code),
+         {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, exprs} <- :erl_parse.parse_exprs(tokens),
          {:value, value, _bindings} <- :erl_eval.exprs(exprs, []) do
       value
