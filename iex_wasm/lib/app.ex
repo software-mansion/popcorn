@@ -46,8 +46,8 @@ defmodule App do
       form
     end
 
-    with code = :erlang.binary_to_list(code),
-         {:ok, tokens, _end_location} <- :erl_scan.string(code),
+    code = :erlang.binary_to_list(code)
+    with {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, module, module_bin} <-
            tokens
            |> split_forms()
@@ -61,8 +61,8 @@ defmodule App do
   end
 
   defp eval(code, :erlang) do
-    with code = :erlang.binary_to_list(code),
-         {:ok, tokens, _end_location} <- :erl_scan.string(code),
+    code = :erlang.binary_to_list(code)
+    with {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, exprs} <- :erl_parse.parse_exprs(tokens),
          {:value, value, _bindings} <- :erl_eval.exprs(exprs, []) do
       value
