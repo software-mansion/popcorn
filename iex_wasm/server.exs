@@ -14,8 +14,8 @@ defmodule Router do
     send_file(conn, 200, "static/index.html")
   end
 
-  get "/elixir" do
-    send_file(conn, 200, "static/elixir.html")
+  get "/erlang" do
+    send_file(conn, 200, "static/erlang.html")
   end
 
   match _ do

@@ -1,34 +1,12 @@
 const LOG_TIMEOUT_MS = 1000;
-const TYPE = { EVAL: "eval", MODULE: "module" };
 
-const CODE_EXAMPLES = {
-  CASE: [
-    "case lists:max([1,3,2]) of",
-    "  3 -> ok;",
-    "  2 -> error",
-    "end.",
-  ].join("\n"),
-  ELIXIR: [
-    "defmodule Adder do",
-    " def add(a,b) do",
-    "   a + b",
-    " end",
-    "end",
-    "Adder.add(1,1)"
-  ].join("\n")
-};
-
-const MODULE_EXAMPLES = {
-  BASIC: [
-    "-module(basic).",
-    "-export([add/2]).",
-    "",
-    "add(A, B) -> A + B.",
-  ].join("\n"),
-};
+const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
+const EVAL_ELIXIR = "eval:elixir";
+const EVAL_ERLANG = "eval:erlang";
+const EVAL_ERLANG_MODULE = "eval_module:erlang";
 
 var Module = {
-  arguments: ["iex_wasm.avm"],
+  arguments: ["app.avm"],
   print(text) {
     console.log(text);
     log(text, false);
@@ -49,8 +27,8 @@ const Elements = {
   get exampleCaseButton() {
     return document.getElementById("example-case");
   },
-  get exampleBasicModuleButton() {
-    return document.getElementById("example-basic-module");
+  get exampleModuleButton() {
+    return document.getElementById("example-module");
   },
   get clearButton() {
     return document.getElementById("clear");
@@ -60,6 +38,9 @@ const Elements = {
   },
   get moduleInput() {
     return document.getElementById("module");
+  },
+  get stateDisplay() {
+    return document.getElementById("state");
   },
   get timeDisplay() {
     return document.getElementById("time");
@@ -72,28 +53,123 @@ const Elements = {
   },
 };
 
+let EXAMPLES;
+if (LANGUAGE === "elixir") {
+  EXAMPLES = {
+    CASE: `
+case Enum.max([1, 2, 3]) do
+  3 -> {:ok, 3}
+  2 -> {:error, 2}
+end
+`.trim(),
+
+    MODULE: `
+defmodule Adder do
+  def add(a,b) do
+    a + b
+  end
+end
+
+{:sum, Adder.add(10, 20)}
+`.trim(),
+  };
+} else {
+  EXAMPLES = {
+    CASE: `
+case lists:max([1,3,2]) of
+  3 -> {ok, 3};
+  2 -> {error, 2}
+end.
+`.trim(),
+
+    MODULE: `
+-module(basic).
+-export([add/2]).
+
+add(A, B) -> A + B.
+`.trim(),
+  };
+}
+
 function setup() {
   Elements.exampleCaseButton.onclick = () => {
-    Elements.codeInput.value = Elements.exampleCaseButton.value === "elixir" ? CODE_EXAMPLES.ELIXIR : CODE_EXAMPLES.CASE;
+    setExample(EXAMPLES.CASE);
+  };
+  Elements.exampleModuleButton.onclick = () => {
+    setExample(EXAMPLES.MODULE);
   };
 
-  if (Elements.moduleButton) {
-    Elements.exampleBasicModuleButton.onclick = () => {
-      Elements.moduleInput.value = MODULE_EXAMPLES.BASIC;
+  if (LANGUAGE === "erlang") {
+    Elements.moduleButton.onclick = () => {
+      const code = Elements.moduleInput.value.trim();
+      evalCode(code);
     };
-    Elements.moduleButton.onclick = () => compileErlangModule();
   }
 
   Elements.clearButton.onclick = () => {
     Elements.logsDisplay.innerHTML = "";
   };
-  Elements.evalButton.onclick = () => evalCode();
+  Elements.evalButton.onclick = () => {
+    const code = Elements.codeInput.value.trim();
+    evalCode(code);
+  };
   Elements.codeInput.addEventListener("keydown", (event) => {
     const cmdEnter = event.key === "Enter" && (event.metaKey || event.ctrlKey);
     if (cmdEnter) {
-      evalErlang();
+      const code = Elements.codeInput.value.trim();
+      evalCode(code);
     }
   });
+}
+
+function isErlangModule(code) {
+  return code.startsWith("-module(");
+}
+
+function setExample(code) {
+  if (LANGUAGE === "erlang" && isErlangModule(code)) {
+    Elements.moduleInput.value = code;
+  } else {
+    Elements.codeInput.value = code;
+  }
+}
+
+async function evalCode(code) {
+  if (code === "") {
+    return;
+  }
+
+  let command;
+  if (LANGUAGE === "elixir") {
+    command = `${EVAL_ELIXIR}:${code}`;
+  } else if (isErlangModule(code)) {
+    command = `${EVAL_ERLANG_MODULE}:${code}`;
+  } else {
+    command = `${EVAL_ERLANG}:${code}`;
+  }
+
+  Elements.stateDisplay.textContent = "Evaluating...";
+
+  try {
+    const { result, dtMs } = await profile(async () =>
+      Module.call("main", command),
+    );
+    Elements.stateDisplay.textContent = "Done.";
+    console.log(`Took ${dtMs} ms, result: ${result}`);
+
+    Elements.timeDisplay.textContent = `${dtMs.toFixed(3)} ms`;
+    Elements.resultDisplay.textContent = result;
+  } catch {
+    Elements.stateDisplay.textContent = "Evaluation error!";
+  }
+}
+
+async function profile(fn) {
+  const t = performance.now();
+  const result = await fn();
+  const dtMs = performance.now() - t;
+
+  return { result, dtMs };
 }
 
 function log(text, isError) {
@@ -137,64 +213,6 @@ function displayLog(lines, errors) {
     top: Elements.logsDisplay.scrollHeight,
     behavior: "instant",
   });
-}
-
-async function evalCode() {
-  const language = Elements.evalButton.value;
-  if (language == "elixir") {
-    await evalElixir();
-  } else {
-    await evalErlang();
-  }
-}
-
-async function evalElixir() {
-  await executeElixir(Elements.codeInput.value);
-}
-
-async function evalErlang() {
-  await executeErlang(Elements.codeInput.value, TYPE.EVAL);
-}
-
-async function compileErlangModule() {
-  await executeErlang(Elements.moduleInput.value, TYPE.MODULE);
-}
-
-async function profile(fn) {
-  const t = performance.now();
-  const result = await fn();
-  const dtMs = performance.now() - t;
-
-  return { result, dtMs };
-}
-
-async function executeErlang(code, type) {
-  if (code === "") {
-    return;
-  }
-
-  console.log("Evaluating");
-  const { result, dtMs } = await profile(async () =>
-    Module.call("main", type + ":" + code)
-  );
-  console.log(`Took ${dtMs} ms, result: ${result}`);
-
-  Elements.timeDisplay.textContent = `${dtMs.toFixed(3)} ms`;
-  Elements.resultDisplay.textContent = result;
-}
-
-async function executeElixir(code) {
-  if (code === "") {
-    return;
-  }
-  console.log("Evaluating");
-  const { result, dtMs } = await profile(async () =>
-    Module.call("elixir_iex", code)
-  );
-  console.log(`Took ${dtMs} ms, result: ${result}`);
-
-  Elements.timeDisplay.textContent = `${dtMs.toFixed(3)} ms`;
-  Elements.resultDisplay.textContent = result;
 }
 
 setup();

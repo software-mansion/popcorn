@@ -25,5 +25,5 @@ iex_wasm-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
-# generated AVM and wasm
-static/
+# ignore DS_Store
+.DS_Store

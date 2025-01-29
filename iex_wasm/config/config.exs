@@ -7,11 +7,15 @@ string_to_bool = fn
   "false" -> false
 end
 
-include_tracing = "EX_TRACING" |> System.get_env("true") |> string_to_bool.()
+include_tracing =
+  case System.get_env("EX_TRACING") do
+    nil -> config_env() != :prod
+    option -> string_to_bool.(option)
+  end
 
 config :fission_lib,
-  out_path: "static/iex_wasm.avm",
-  start_module: IExWASM,
+  out_path: "static/app.avm",
+  start_module: App,
   add_tracing: include_tracing,
   avm_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
 
