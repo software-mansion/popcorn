@@ -212,9 +212,9 @@ defmodule FissionLib.AtomVM do
     end
   end
 
-  defp module(code, vars, build_path) do
+  defp module(code, bindings, build_path) do
     assignments =
-      for v <- vars do
+      for v <- bindings do
         quote do
           unquote(Macro.var(v, nil)) = Map.fetch!(opts, unquote(v))
         end
