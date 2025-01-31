@@ -18,11 +18,3 @@ config :fission_lib,
   start_module: App,
   add_tracing: include_tracing,
   avm_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
-
-build_test_modules = "EX_MODULES" |> System.get_env("false") |> string_to_bool.()
-
-if build_test_modules do
-  config :fission_lib,
-    out_path: "static/elixir_modules.avm",
-    start_module: ElixirModules
-end
