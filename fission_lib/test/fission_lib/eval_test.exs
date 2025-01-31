@@ -54,4 +54,14 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.eval(:erlang_expr)
     |> AtomVM.assert_result(:ok)
   end
+
+  async_test "closure" do
+    """
+    A = fun() -> 5 end,
+    B = 10,
+    A() + B.
+    """
+    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.assert_result(15)
+  end
 end
