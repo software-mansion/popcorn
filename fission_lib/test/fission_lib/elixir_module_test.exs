@@ -2,11 +2,12 @@ defmodule FissionLib.ElixirModuleTest do
   use ExUnit.Case, async: true
   require Logger
   require FissionLib.AtomVM
+  import FissionLib.AsyncTest
   alias FissionLib.AtomVM
 
   @examples_path "./test/examples"
 
-  test "simple module" do
+  async_test "simple module" do
     """
     defmodule Start do
 
@@ -16,7 +17,7 @@ defmodule FissionLib.ElixirModuleTest do
     |> AtomVM.assert_is_module()
   end
 
-  test "Capybara habitat - genserver" do
+  async_test "Capybara habitat - genserver" do
     "#{@examples_path}/CapybaraHabitat.ex"
     |> File.read!()
     |> AtomVM.eval(:elixir)

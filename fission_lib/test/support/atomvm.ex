@@ -63,9 +63,10 @@ defmodule FissionLib.AtomVM do
 
   def run_with_bindings(bundle_path, bindings) do
     dir = Path.dirname(bundle_path)
+    run_id = :erlang.unique_integer([:positive])
 
-    result_path = Path.join(dir, "result.bin")
-    bindings_path = Path.join(dir, "opts.bin")
+    result_path = Path.join(dir, "result-#{run_id}.bin")
+    bindings_path = Path.join(dir, "opts-#{run_id}.bin")
 
     logs_dir = Path.join(dir, "logs")
     File.mkdir_p!(logs_dir)
@@ -79,7 +80,8 @@ defmodule FissionLib.AtomVM do
     |> then(&File.write(bindings_path, &1))
 
     # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-    {output, exit_status} = System.shell("$(#{@atomvm_path} #{bundle_path} &> #{log_path})")
+    {output, exit_status} =
+      System.shell("$(AVM_RUN_ID=#{run_id} #{@atomvm_path} #{bundle_path} &> #{log_path})")
 
     result =
       case File.read(result_path) do
@@ -102,11 +104,23 @@ defmodule FissionLib.AtomVM do
     File.exists?(build_dir)
   end
 
-  def delete_run_logs do
-    @compile_dir
-    |> Path.join("**/logs")
-    |> Path.wildcard()
-    |> Enum.each(&File.rm_rf!/1)
+  def delete_run_artifacts do
+    logs =
+      @compile_dir
+      |> Path.join("**/logs")
+      |> Path.wildcard()
+
+    opts =
+      @compile_dir
+      |> Path.join("**/opts-*.bin")
+      |> Path.wildcard()
+
+    results =
+      @compile_dir
+      |> Path.join("**/result-*.bin")
+      |> Path.wildcard()
+
+    Enum.each(logs ++ opts ++ results, &File.rm_rf!/1)
   end
 
   def compile_quoted(ast, bindings) when is_ast(ast) do
@@ -225,9 +239,10 @@ defmodule FissionLib.AtomVM do
         @compile autoload: false, no_warn_undefined: :atomvm
 
         def start() do
-          opts = read_opts()
+          run_id = :atomvm.posix_getenv(~c"AVM_RUN_ID")
+          opts = read_opts(run_id)
           result = run(opts)
-          write_result(result)
+          write_result(result, run_id)
           :ok
         end
 
@@ -237,18 +252,20 @@ defmodule FissionLib.AtomVM do
           unquote(code)
         end
 
-        defp read_opts() do
-          {:ok, fd} = :atomvm.posix_open(~c"#{unquote(build_path)}/opts.bin", [:o_rdonly])
+        defp read_opts(run_id) do
+          {:ok, fd} =
+            :atomvm.posix_open(~c"#{unquote(build_path)}/opts-#{run_id}.bin", [:o_rdonly])
+
           {:ok, opts} = :atomvm.posix_read(fd, 1_000_000)
           :erlang.binary_to_term(opts)
         end
 
-        defp write_result(result) do
+        defp write_result(result, run_id) do
           result_bin = :erlang.term_to_binary(result)
 
           {:ok, fd} =
             :atomvm.posix_open(
-              ~c"#{unquote(build_path)}/result.bin",
+              ~c"#{unquote(build_path)}/result-#{run_id}.bin",
               [:o_creat, :o_wronly],
               String.to_integer("644", 8)
             )

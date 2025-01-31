@@ -1,11 +1,12 @@
 defmodule FissionLib.ErlangModuleTest do
   use ExUnit.Case, async: true
   require Logger
+  import FissionLib.AsyncTest
   alias FissionLib.AtomVM
 
   @examples_path "./test/examples"
 
-  test "Adder" do
+  async_test "Adder" do
     """
     -module(adder).
     -export([add/2]).
@@ -17,21 +18,21 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
-  test "UUID - too big literals" do
+  async_test "UUID - too big literals" do
     "#{@examples_path}/uuid.erl"
     |> File.read!()
     |> AtomVM.eval(:erlang)
     |> AtomVM.assert_is_module()
   end
 
-  test "Greetings - message passing" do
+  async_test "Greetings - message passing" do
     "#{@examples_path}/greetings.erl"
     |> File.read!()
     |> AtomVM.eval(:erlang)
     |> AtomVM.assert_is_module()
   end
 
-  test "Capybara habitat - message passing" do
+  async_test "Capybara habitat - message passing" do
     "#{@examples_path}/capybara_habitat.erl"
     |> File.read!()
     |> AtomVM.eval(:erlang)

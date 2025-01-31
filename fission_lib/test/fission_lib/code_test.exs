@@ -1,9 +1,10 @@
 defmodule FissionLib.CodeTest do
   use ExUnit.Case, async: true
   require FissionLib.AtomVM
+  import FissionLib.AsyncTest
   alias FissionLib.AtomVM
 
-  test "code load module" do
+  async_test "code load module" do
     [{CodeTest.Foo, beam}] =
       quote do
         defmodule CodeTest.Foo do
