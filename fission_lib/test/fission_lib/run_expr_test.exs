@@ -1,16 +1,16 @@
 defmodule RunExprTest do
   use ExUnit.Case, async: true
+  require FissionLib.AtomVM
   alias FissionLib.AtomVM
 
-  @moduletag :tmp_dir
-
-  test "run simple expression", %{tmp_dir: tmp_dir} do
-    result =
+  test "run simple expression" do
+    info =
       quote do
         var!(n) + 3
       end
-      |> AtomVM.expr(tmp_dir, n: 2)
+      |> AtomVM.compile_quoted([:n])
+      |> AtomVM.run_with_bindings(n: 2)
 
-    assert result == 5
+    assert 5 = info.result
   end
 end

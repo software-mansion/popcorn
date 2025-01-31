@@ -1,62 +1,39 @@
 defmodule FissionLib.EvalTest do
   use ExUnit.Case, async: true
   require Logger
+  require FissionLib.AtomVM
   alias FissionLib.AtomVM
 
-  @moduletag :tmp_dir
-  setup_all do
-    quote do
-      code = var!(code) |> :erlang.binary_to_list()
-      {:ok, tokens, _} = :erl_scan.string(code)
-      IO.puts("Scanned")
-      {:ok, exprs} = :erl_parse.parse_exprs(tokens)
-      IO.puts("Parsed")
-
-      case :erl_eval.exprs(exprs, []) do
-        {:value, value, _new_bindings} -> {:ok, value}
-        other -> {:error, other}
-      end
-    end
-    |> AtomVM.compile("tmp", [:code])
-
-    :ok
+  test "add" do
+    "1 + 2."
+    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.assert_result(3)
   end
 
-  defp run(code, tmp_dir) do
-    assert {:ok, result} = AtomVM.run("tmp", tmp_dir, code: code)
-    result
-  end
-
-  defp assert_ok(x), do: assert(x == :ok)
-
-  test "add", %{tmp_dir: tmp_dir} do
-    assert 3 == run("1 + 2.", tmp_dir)
-  end
-
-  test "case", %{tmp_dir: tmp_dir} do
+  test "case" do
     """
     case lists:max([1,3,2]) of
-      3 -> ok;
+      3 -> {max, 3};
       2 -> error
     end.
     """
-    |> run(tmp_dir)
-    |> assert_ok()
+    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.assert_result({:max, 3})
   end
 
-  test "send receive", %{tmp_dir: tmp_dir} do
+  test "send receive" do
     """
     self() ! message,
 
     receive
-      message -> ok
+      message -> received
     end.
     """
-    |> run(tmp_dir)
-    |> assert_ok()
+    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.assert_result(:received)
   end
 
-  test "spawn", %{tmp_dir: tmp_dir} do
+  test "spawn" do
     """
     Parent = self(),
 
@@ -73,7 +50,7 @@ defmodule FissionLib.EvalTest do
     end,
     ok.
     """
-    |> run(tmp_dir)
-    |> assert_ok()
+    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.assert_result(:ok)
   end
 end
