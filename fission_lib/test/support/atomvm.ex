@@ -1,4 +1,4 @@
-defmodule RunInAtomVM do
+defmodule FissionLib.AtomVM do
   import ExUnit.Assertions
 
   @atomvm_path Application.compile_env!(:fission_lib, :atomvm_path)

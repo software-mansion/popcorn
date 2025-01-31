@@ -1,5 +1,6 @@
 defmodule FissionLib.StackTraceTest do
   use ExUnit.Case, async: true
+  alias FissionLib.AtomVM
   @moduletag :tmp_dir
 
   test "stacktrace", %{tmp_dir: tmp_dir} do
@@ -11,7 +12,7 @@ defmodule FissionLib.StackTraceTest do
           e -> {e, __STACKTRACE__}
         end
       end
-      |> RunInAtomVM.expr(tmp_dir)
+      |> AtomVM.expr(tmp_dir)
 
     assert %FunctionClauseError{module: :orddict, function: :take, arity: 2} = error
 

@@ -1,6 +1,7 @@
 defmodule FissionLib.ErlangModuleTest do
   use ExUnit.Case, async: true
   require Logger
+  alias FissionLib.AtomVM
 
   @moduletag :tmp_dir
   @examples_path "./test/examples"
@@ -35,17 +36,17 @@ defmodule FissionLib.ErlangModuleTest do
 
       :code.load_binary(module, ~c"nofile", module_bin)
     end
-    |> RunInAtomVM.compile("tmp_mod_erl", [:code])
+    |> AtomVM.compile("tmp_mod_erl", [:code])
 
     :ok
   end
 
   defp run(code, tmp_dir) do
-    assert {:module, _} = RunInAtomVM.run("tmp_mod_erl", tmp_dir, code: code)
+    assert {:module, _} = AtomVM.run("tmp_mod_erl", tmp_dir, code: code)
   end
 
   defp run_failing(code, tmp_dir) do
-    assert {:error, _output} = RunInAtomVM.run_failing("tmp_mod_erl", tmp_dir, code: code)
+    assert {:error, _output} = AtomVM.run_failing("tmp_mod_erl", tmp_dir, code: code)
   end
 
   test "simple_module", %{tmp_dir: tmp_dir} do

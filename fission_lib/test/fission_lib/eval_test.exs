@@ -1,6 +1,7 @@
 defmodule FissionLib.EvalTest do
   use ExUnit.Case, async: true
   require Logger
+  alias FissionLib.AtomVM
 
   @moduletag :tmp_dir
   setup_all do
@@ -16,13 +17,13 @@ defmodule FissionLib.EvalTest do
         other -> {:error, other}
       end
     end
-    |> RunInAtomVM.compile("tmp", [:code])
+    |> AtomVM.compile("tmp", [:code])
 
     :ok
   end
 
   defp run(code, tmp_dir) do
-    assert {:ok, result} = RunInAtomVM.run("tmp", tmp_dir, code: code)
+    assert {:ok, result} = AtomVM.run("tmp", tmp_dir, code: code)
     result
   end
 

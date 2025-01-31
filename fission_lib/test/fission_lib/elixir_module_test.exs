@@ -1,6 +1,7 @@
 defmodule FissionLib.ElixirModuleTest do
   use ExUnit.Case, async: true
   require Logger
+  alias FissionLib.AtomVM
 
   @moduletag :tmp_dir
   @examples_path "./test/examples"
@@ -13,13 +14,13 @@ defmodule FissionLib.ElixirModuleTest do
       |> Code.eval_string([], __ENV__)
       |> elem(0)
     end
-    |> RunInAtomVM.compile("tmp_mod_elixir", [:code])
+    |> AtomVM.compile("tmp_mod_elixir", [:code])
 
     :ok
   end
 
   defp run(code, tmp_dir) do
-    assert {:module, _name, _bin, _} = RunInAtomVM.run("tmp_mod_elixir", tmp_dir, code: code)
+    assert {:module, _name, _bin, _} = AtomVM.run("tmp_mod_elixir", tmp_dir, code: code)
   end
 
   test "simple_module", %{tmp_dir: tmp_dir} do

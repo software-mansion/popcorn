@@ -1,6 +1,8 @@
 defmodule FissionLib.CodeTest do
   use ExUnit.Case, async: true
 
+  alias FissionLib.AtomVM
+
   @moduletag :tmp_dir
 
   test "code load module", %{tmp_dir: tmp_dir} do
@@ -17,7 +19,7 @@ defmodule FissionLib.CodeTest do
         :code.load_binary(CodeTest.Foo, ~c"", var!(beam))
         apply(CodeTest.Foo, :foo, [2])
       end
-      |> RunInAtomVM.expr(tmp_dir, beam: beam)
+      |> AtomVM.expr(tmp_dir, beam: beam)
 
     assert result == 3
   end

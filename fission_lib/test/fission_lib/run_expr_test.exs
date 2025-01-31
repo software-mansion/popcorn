@@ -1,5 +1,6 @@
 defmodule RunExprTest do
   use ExUnit.Case, async: true
+  alias FissionLib.AtomVM
 
   @moduletag :tmp_dir
 
@@ -8,7 +9,7 @@ defmodule RunExprTest do
       quote do
         var!(n) + 3
       end
-      |> RunInAtomVM.expr(tmp_dir, n: 2)
+      |> AtomVM.expr(tmp_dir, n: 2)
 
     assert result == 5
   end
