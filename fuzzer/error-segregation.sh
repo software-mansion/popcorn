@@ -21,6 +21,10 @@ mkdir -p "${directory}/nbits"
 mkdir -p "${directory}/asan"
 mkdir -p "${directory}/operand"
 mkdir -p "${directory}/compilation_error"
+mkdir -p "${directory}/timeout"
+mkdir -p "${directory}/abort"
+mkdir -p "${directory}/badarg"
+mkdir -p "${directory}/function_clause"
 mkdir -p "${directory}/other"
 
 for file in "${directory}"/*.stderr; do
@@ -36,6 +40,14 @@ for file in "${directory}"/*.stderr; do
       mv "${test_n}."* "${directory}/asan/"
     elif grep_command -q "Unexpected operand" "${file}"; then
       mv "${test_n}."* "${directory}/operand/"
+    elif grep_command -q "Killed: 9" "${file}"; then
+      mv "${test_n}."* "${directory}/timeout/"
+    elif grep_command -q "Abort trap: 6" "${file}"; then
+      mv "${test_n}."* "${directory}/abort/"
+    elif grep_command -q "badarg" "${file}"; then
+      mv "${test_n}."* "${directory}/badarg/"
+    elif grep_command -q "function_clause" "${file}"; then
+      mv "${test_n}."* "${directory}/function_clause/"
     else
       mv "${test_n}."* "$directory/other/"
     fi
