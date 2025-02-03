@@ -2,9 +2,9 @@
 set -uo pipefail
 main() {
   atomvm_timeout_in_s=30
-  atomvm_path=""
-  packbeam_path=""
-  avm_lib_path="../fission_lib/_build/dev/fission_lib.avm" 
+  atomvm_path="$AVM_ATOM_VM_BIN"
+  packbeam_path="$AVM_PACKBEAM_BIN"
+  avm_lib_path="$AVM_FISSION_LIB_AVM"
 
   if [ "$#" -eq 0 ]; then
     echo "Usage: $0 <path_to_erlang_file>"
@@ -26,7 +26,7 @@ main() {
   if [[ ${erlc_result} == 0 ]]; then
     timeout -k 1 ${atomvm_timeout_in_s} "${packbeam_path}" -i "${avm_filename}" "${beam_filename}" "${avm_lib_path}"
     timeout -k 1 ${atomvm_timeout_in_s} "${atomvm_path}" "${avm_filename}" 1> /dev/null
-    erl_result=$?   
+    erl_result=$?
     if [[ ${erl_result} == 1 ]]; then
       echo "File ${beam_filename}: completed normally"
       rm "${beam_filename}"

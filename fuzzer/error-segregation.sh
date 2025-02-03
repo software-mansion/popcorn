@@ -1,5 +1,14 @@
 #!/bin/bash
 
+grep_command() {
+    if command -v rg 2>&1 >/dev/null
+    then
+        rg "$@"
+    else
+        grep "$@"
+    fi
+}
+
 directory=$1
 
 if [ -z "$directory" ]; then
@@ -19,11 +28,11 @@ for file in "$directory"/*.stderr; do
   if [ ! -s "$file" ]; then
     mv "$directory/$test_prefix."* "$directory/compilation_error/"
   else
-    if grep -q "Unexpected nbits value @" "$file"; then
+    if grep_command -q "Unexpected nbits value @" "$file"; then
       mv "$directory/$test_prefix."* "$directory/nbits/"
-    elif grep -q "AddressSanitizer:DEADLYSIGNAL" "$file"; then
+    elif grep_command -q "AddressSanitizer:DEADLYSIGNAL" "$file"; then
       mv "$directory/$test_prefix."* "$directory/asan/"
-    elif grep -q "Unexpected operand" "$file"; then
+    elif grep_command -q "Unexpected operand" "$file"; then
       mv "$directory/$test_prefix."* "$directory/operand/"
     else
       mv "$directory/$test_prefix."* "$directory/other/"
