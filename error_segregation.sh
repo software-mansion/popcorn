@@ -8,7 +8,8 @@ if [ -z "$directory" ]; then
 fi
 
 mkdir -p "$directory/nbits"
-mkdir -p "$directory/asan"
+mkdir -p "$directory/asan-deadlysignal"
+mkdir -p "$directory/asan-heap-use"
 mkdir -p "$directory/operand"
 mkdir -p "$directory/compilation_error"
 mkdir -p "$directory/other"
@@ -21,8 +22,10 @@ for file in "$directory"/*.stderr; do
   else
     if grep -q "Unexpected nbits value @" "$file"; then
       mv "$directory/$test_prefix."* "$directory/nbits/"
+    elif grep -q "AddressSanitizer: heap-use-after-free" "$file"; then
+    mv "$directory/$test_prefix."* "$directory/asan-heap-use"
     elif grep -q "AddressSanitizer:DEADLYSIGNAL" "$file"; then
-      mv "$directory/$test_prefix."* "$directory/asan/"
+      mv "$directory/$test_prefix."* "$directory/asan-deadlysignal/"
     elif grep -q "Unexpected operand" "$file"; then
       mv "$directory/$test_prefix."* "$directory/operand/"
     else

@@ -1,0 +1,6 @@
+out/
+interesting/
+minimized/
+target/
+scripts
+*.md
