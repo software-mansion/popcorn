@@ -28,7 +28,7 @@ for file in "${directory}"/*.stderr; do
   test_n="${directory}/$(basename $file .stderr)"
 
   if [[ ! -s "${file}" ]]; then
-    mv "${test_n}"* "${directory}/compilation_error/"
+    mv "${test_n}."* "${directory}/compilation_error/"
   else
     if grep_command -q "Unexpected nbits value @" "${file}"; then
       mv "${test_n}."* "${directory}/nbits/"
