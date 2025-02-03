@@ -1,19 +1,20 @@
 #!/bin/bash
-set -uo pipefail
-main() {
-  atomvm_timeout_in_s=30
-  atomvm_path="$AVM_ATOM_VM_BIN"
-  packbeam_path="$AVM_PACKBEAM_BIN"
-  avm_lib_path="$AVM_FISSION_LIB_AVM"
+set -euo pipefail
 
-  if [ "$#" -eq 0 ]; then
+main() {
+  atomvm_timeout_in_s="${AVM_FUZZ_TIMEOUT_S}"
+  atomvm_path="${AVM_ATOM_VM_BIN}"
+  packbeam_path="${AVM_PACKBEAM_BIN}"
+  avm_lib_path="${AVM_FISSION_LIB_AVM}"
+
+  if [[ "$#" -eq 0 ]]; then
     echo "Usage: $0 <path_to_erlang_file>"
     exit 1
   fi
   filename="$1"
 
-  if ! [[ -f "$filename" ]]; then
-    echo "Error: File '$filename' does not exist."
+  if ! [[ -f "${filename}" ]]; then
+    echo "Error: File '${filename}' does not exist."
     exit 1
   fi
 
@@ -21,11 +22,11 @@ main() {
   beam_filename="${filename%.*}.beam"
   avm_filename="${filename%.*}.avm"
 
-  timeout -k 1 ${atomvm_timeout_in_s} erlc -W0 -o "${directory}" "${filename}"
+  timeout -k 1 "${atomvm_timeout_in_s}" erlc -W0 -o "${directory}" "${filename}"
   erlc_result=$?
   if [[ ${erlc_result} == 0 ]]; then
-    timeout -k 1 ${atomvm_timeout_in_s} "${packbeam_path}" -i "${avm_filename}" "${beam_filename}" "${avm_lib_path}"
-    timeout -k 1 ${atomvm_timeout_in_s} "${atomvm_path}" "${avm_filename}" 1> /dev/null
+    timeout -k 1 "${atomvm_timeout_in_s}" "${packbeam_path}" -i "${avm_filename}" "${beam_filename}" "${avm_lib_path}"
+    timeout -k 1 "${atomvm_timeout_in_s}" "${atomvm_path}" "${avm_filename}" 1> /dev/null
     erl_result=$?
     if [[ ${erl_result} == 1 ]]; then
       echo "File ${beam_filename}: completed normally"
@@ -41,7 +42,7 @@ main() {
       echo "INTERESTING: AVM crashed on ${beam_filename}, produced from: ${filename} with error code ${erl_result}!"
       rm "${beam_filename}"
       rm "${avm_filename}"
-      exit ${erl_result}
+      exit "${erl_result}"
     fi
   else
     echo "INTERESTING: erlc either crashed or timed out on ${filename}!"

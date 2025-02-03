@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 grep_command() {
     if command -v rg 2>&1 >/dev/null
@@ -9,33 +10,34 @@ grep_command() {
     fi
 }
 
-directory=$1
-
-if [ -z "$directory" ]; then
+if [[ -z "$1" ]]; then
   echo "Usage: $0 <path_to_directory>"
   exit 1
 fi
 
-mkdir -p "$directory/nbits"
-mkdir -p "$directory/asan"
-mkdir -p "$directory/operand"
-mkdir -p "$directory/compilation_error"
-mkdir -p "$directory/other"
+directory="$1"
 
-for file in "$directory"/*.stderr; do
-  test_prefix=$(basename "$file" .stderr)
+mkdir -p "${directory}/nbits"
+mkdir -p "${directory}/asan"
+mkdir -p "${directory}/operand"
+mkdir -p "${directory}/compilation_error"
+mkdir -p "${directory}/other"
 
-  if [ ! -s "$file" ]; then
-    mv "$directory/$test_prefix."* "$directory/compilation_error/"
+for file in "${directory}"/*.stderr; do
+  # e.g. interesting/test11
+  test_n="${directory}/$(basename $file .stderr)"
+
+  if [[ ! -s "${file}" ]]; then
+    mv "${test_n}"* "${directory}/compilation_error/"
   else
-    if grep_command -q "Unexpected nbits value @" "$file"; then
-      mv "$directory/$test_prefix."* "$directory/nbits/"
-    elif grep_command -q "AddressSanitizer:DEADLYSIGNAL" "$file"; then
-      mv "$directory/$test_prefix."* "$directory/asan/"
-    elif grep_command -q "Unexpected operand" "$file"; then
-      mv "$directory/$test_prefix."* "$directory/operand/"
+    if grep_command -q "Unexpected nbits value @" "${file}"; then
+      mv "${test_n}."* "${directory}/nbits/"
+    elif grep_command -q "AddressSanitizer:DEADLYSIGNAL" "${file}"; then
+      mv "${test_n}."* "${directory}/asan/"
+    elif grep_command -q "Unexpected operand" "${file}"; then
+      mv "${test_n}."* "${directory}/operand/"
     else
-      mv "$directory/$test_prefix."* "$directory/other/"
+      mv "${test_n}."* "$directory/other/"
     fi
   fi
 done
