@@ -30,6 +30,12 @@ mkdir -p "${directory}/other"
 for file in "${directory}"/*.stderr; do
   # e.g. interesting/test11
   test_n="${directory}/$(basename $file .stderr)"
+  test_stdout="${test_n}.stdout"
+
+  if [[ ! -s "${test_stdout}" ]]; then
+    # remove empty stdout files
+    rm "${test_stdout}"
+  fi
 
   if [[ ! -s "${file}" ]]; then
     mv "${test_n}."* "${directory}/compilation_error/"
