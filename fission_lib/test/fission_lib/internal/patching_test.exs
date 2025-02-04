@@ -8,12 +8,15 @@ defmodule FissionLib.Internal.PatchingTest do
 
   setup_all do
     debug_info = Code.get_compiler_option(:debug_info)
+    ignore_module_conflict = Code.get_compiler_option(:ignore_module_conflict)
 
     # By default, Elixir doesn't store debug info in test env to speed up compilation
     Code.put_compiler_option(:debug_info, true)
+    Code.put_compiler_option(:ignore_module_conflict, true)
 
     on_exit(fn ->
       Code.put_compiler_option(:debug_info, debug_info)
+      Code.put_compiler_option(:ignore_module_conflict, ignore_module_conflict)
     end)
   end
 

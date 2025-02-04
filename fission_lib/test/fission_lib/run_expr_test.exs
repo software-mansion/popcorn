@@ -9,10 +9,10 @@ defmodule RunExprTest do
   async_test "run simple expression", %{tmp_dir: run_dir} do
     info =
       quote do
-        var!(n) + 3
+        args.n + 3
       end
-      |> AtomVM.compile_quoted([:n])
-      |> AtomVM.run_with_bindings(run_dir, n: 2)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.run(run_dir, n: 2)
 
     assert 5 = info.result
   end

@@ -5,7 +5,7 @@ defmodule FissionLib.Support.AtomVM do
   Provides convenience assertions and `eval/3` function
   to evaluate Erlang or Elixir code as a string.
 
-  `compile_quoted/2` and `run_with_bindings/3` are lower level API used for tests
+  `compile_quoted/2` and `run/3` are lower level API used for tests
   that run one-off code without evaluation. This works by first compiling
   a module with some AST that can use `var!` for runtime input.
 
@@ -50,8 +50,8 @@ defmodule FissionLib.Support.AtomVM do
 
     info =
       fragment
-      |> compile_quoted([:code])
-      |> run_with_bindings(run_dir, code: code)
+      |> compile_quoted()
+      |> run(run_dir, code: code)
 
     if failing do
       assert info.exit_status != 0,
@@ -64,19 +64,20 @@ defmodule FissionLib.Support.AtomVM do
     info.result
   end
 
-  def run_with_bindings(bundle_path, run_dir, bindings) do
+  def run(bundle_path, run_dir, args \\ []) do
     result_path = Path.join(run_dir, "result.bin")
-    bindings_path = Path.join(run_dir, "opts.bin")
+    args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
 
-    bindings
+    args
     |> Map.new()
     |> :erlang.term_to_binary()
-    |> then(&File.write(bindings_path, &1))
+    |> then(&File.write(args_path, &1))
 
     # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-    {output, exit_status} =
-      System.shell("$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} &> #{log_path})")
+    cmd = "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
+    File.write!(log_path, "Run command: #{cmd}\n")
+    {output, exit_status} = System.shell(cmd)
 
     result =
       case File.read(result_path) do
@@ -99,7 +100,7 @@ defmodule FissionLib.Support.AtomVM do
     File.exists?(build_dir)
   end
 
-  def compile_quoted(ast, bindings) when is_ast(ast) do
+  def compile_quoted(ast) when is_ast(ast) do
     hash = ast |> :erlang.phash2() |> to_string()
     build_dir = Path.join(@compile_dir, hash)
     avm_path = Path.join(build_dir, "bundle.avm")
@@ -112,7 +113,7 @@ defmodule FissionLib.Support.AtomVM do
 
       [beam_path] =
         ast
-        |> module(bindings)
+        |> module()
         |> run_elixirc(build_dir)
 
       FissionLib.pack(artifacts: [beam_path], start_module: RunExpr, out_path: avm_path)
@@ -149,7 +150,7 @@ defmodule FissionLib.Support.AtomVM do
     quote do
       :elixir.start([], [])
 
-      var!(code)
+      args.code
       |> Code.eval_string([], __ENV__)
       |> elem(0)
     end
@@ -157,7 +158,7 @@ defmodule FissionLib.Support.AtomVM do
 
   def ast_fragment(:eval_erlang_expr) do
     quote do
-      code = var!(code) |> :erlang.binary_to_list()
+      code = args.code |> :erlang.binary_to_list()
       {:ok, tokens, _} = :erl_scan.string(code)
       IO.puts("Scanned")
       {:ok, exprs} = :erl_parse.parse_exprs(tokens)
@@ -169,7 +170,7 @@ defmodule FissionLib.Support.AtomVM do
 
   def ast_fragment(:eval_erlang_module) do
     quote do
-      code = var!(code) |> :erlang.binary_to_list()
+      code = args.code |> :erlang.binary_to_list()
 
       parse_form = fn form_tok ->
         {:ok, form} = :erl_parse.parse_form(form_tok)
@@ -206,34 +207,26 @@ defmodule FissionLib.Support.AtomVM do
   defp to_ast_fragment_type(:erlang_module), do: :eval_erlang_module
   defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
-  defp module(code, bindings) do
-    assignments =
-      for v <- bindings do
-        quote do
-          unquote(Macro.var(v, nil)) = Map.fetch!(opts, unquote(v))
-        end
-      end
-
+  defp module(code) do
     quote do
       defmodule RunExpr do
         @compile autoload: false, no_warn_undefined: :atomvm
 
         def start() do
           run_dir = :atomvm.posix_getenv(~c"AVM_RUN_DIR")
-          opts = read_opts(run_dir)
-          result = run(opts)
+          args = read_args(run_dir)
+          result = run(args)
           write_result(result, run_dir)
           :ok
         end
 
-        defp run(opts) do
-          _no_warn_unused = opts
-          unquote_splicing(assignments)
+        defp run(args) do
+          _supppress_unused = args
           unquote(code)
         end
 
-        defp read_opts(run_dir) do
-          path = ~c"#{run_dir}/opts.bin"
+        defp read_args(run_dir) do
+          path = ~c"#{run_dir}/args.bin"
           {:ok, fd} = :atomvm.posix_open(path, [:o_rdonly])
           {:ok, opts} = :atomvm.posix_read(fd, 1_000_000)
           :erlang.binary_to_term(opts)

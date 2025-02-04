@@ -17,11 +17,11 @@ defmodule FissionLib.CodeTest do
 
     info =
       quote do
-        :code.load_binary(CodeTest.Foo, ~c"", var!(beam))
+        :code.load_binary(CodeTest.Foo, ~c"", args.beam)
         apply(CodeTest.Foo, :foo, [2])
       end
-      |> AtomVM.compile_quoted([:beam])
-      |> AtomVM.run_with_bindings(run_dir, beam: beam)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.run(run_dir, beam: beam)
 
     assert info.result == 3
   end
