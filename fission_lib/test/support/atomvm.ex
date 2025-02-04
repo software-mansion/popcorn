@@ -5,16 +5,17 @@ defmodule FissionLib.Support.AtomVM do
   Provides convenience assertions and `eval/3` function
   to evaluate Erlang or Elixir code as a string.
 
-  `compile_quoted/2` and `run_with_bindings/2` are lower level API used for tests
+  `compile_quoted/2` and `run_with_bindings/3` are lower level API used for tests
   that run one-off code without evaluation. This works by first compiling
   a module with some AST that can use `var!` for runtime input.
 
   This input is provided by serializing terms to `opts.bin` which is read
   when this module runs `start/0`. We then write code output to `result.bin`.
 
-  Compiled files are cached with phash2 key of AST contents under app's priv directory.
+  Compiled files are cached with phash2 key of AST contents under tmp/modules/ directory.
   All eval tests run the same underlying code so `eval` expects
   module to be compiled and cached prior to call.
+  Input and output files for tests running concurently are keyed by `AVM_RUN_DIR` which stores path prefix.
   """
   import ExUnit.Assertions
 
