@@ -13,7 +13,12 @@ defmodule FissionLib.Support.AsyncTest do
              end,
              do: block
            ) do
-    id = :crypto.strong_rand_bytes(12) |> Base.encode16()
+    id =
+      :erlang.term_to_binary(block)
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.encode16(case: :lower)
+      |> String.slice(0..12)
+
     test_module_name = Module.concat(__CALLER__.module, "AsyncTest_#{id}")
     fun_name = :"async_test_#{id}"
     after_compile_fun_name = :"async_test_ac_#{id}"
