@@ -6,6 +6,4 @@ for type <- [:eval_elixir, :eval_erlang_module, :eval_erlang_expr] do
   |> AtomVM.compile_quoted([:code])
 end
 
-AtomVM.delete_run_artifacts()
-
 ExUnit.start(capture_log: true)

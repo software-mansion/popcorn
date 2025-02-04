@@ -4,13 +4,15 @@ defmodule RunExprTest do
   import FissionLib.Support.AsyncTest
   alias FissionLib.Support.AtomVM
 
-  async_test "run simple expression" do
+  @moduletag :tmp_dir
+
+  async_test "run simple expression", %{tmp_dir: run_dir} do
     info =
       quote do
         var!(n) + 3
       end
       |> AtomVM.compile_quoted([:n])
-      |> AtomVM.run_with_bindings(n: 2)
+      |> AtomVM.run_with_bindings(run_dir, n: 2)
 
     assert 5 = info.result
   end

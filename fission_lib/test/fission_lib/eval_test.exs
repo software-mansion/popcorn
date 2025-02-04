@@ -5,24 +5,26 @@ defmodule FissionLib.EvalTest do
   import FissionLib.Support.AsyncTest
   alias FissionLib.Support.AtomVM
 
-  async_test "add" do
+  @moduletag :tmp_dir
+
+  async_test "add", %{tmp_dir: dir} do
     "1 + 2."
-    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result(3)
   end
 
-  async_test "case" do
+  async_test "case", %{tmp_dir: dir} do
     """
     case lists:max([1,3,2]) of
       3 -> {max, 3};
       2 -> error
     end.
     """
-    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result({:max, 3})
   end
 
-  async_test "send receive" do
+  async_test "send receive", %{tmp_dir: dir} do
     """
     self() ! message,
 
@@ -30,11 +32,11 @@ defmodule FissionLib.EvalTest do
       message -> received
     end.
     """
-    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result(:received)
   end
 
-  async_test "spawn" do
+  async_test "spawn", %{tmp_dir: dir} do
     """
     Parent = self(),
 
@@ -51,17 +53,17 @@ defmodule FissionLib.EvalTest do
     end,
     ok.
     """
-    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result(:ok)
   end
 
-  async_test "closure" do
+  async_test "closure", %{tmp_dir: dir} do
     """
     A = fun() -> 5 end,
     B = 10,
     A() + B.
     """
-    |> AtomVM.eval(:erlang_expr)
+    |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result(15)
   end
 end

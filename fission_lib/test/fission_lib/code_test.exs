@@ -4,7 +4,9 @@ defmodule FissionLib.CodeTest do
   import FissionLib.Support.AsyncTest
   alias FissionLib.Support.AtomVM
 
-  async_test "code load module" do
+  @moduletag :tmp_dir
+
+  async_test "code load module", %{tmp_dir: run_dir} do
     [{CodeTest.Foo, beam}] =
       quote do
         defmodule CodeTest.Foo do
@@ -19,7 +21,7 @@ defmodule FissionLib.CodeTest do
         apply(CodeTest.Foo, :foo, [2])
       end
       |> AtomVM.compile_quoted([:beam])
-      |> AtomVM.run_with_bindings(beam: beam)
+      |> AtomVM.run_with_bindings(run_dir, beam: beam)
 
     assert info.result == 3
   end

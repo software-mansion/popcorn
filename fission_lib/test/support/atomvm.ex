@@ -19,7 +19,8 @@ defmodule FissionLib.Support.AtomVM do
   import ExUnit.Assertions
 
   @atomvm_path Application.compile_env!(:fission_lib, :atomvm_path)
-  @compile_dir :code.priv_dir(:fission_lib)
+  # mix always compiles files from project root
+  @compile_dir Path.join([File.cwd!(), "tmp", "modules"])
 
   defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
@@ -38,6 +39,7 @@ defmodule FissionLib.Support.AtomVM do
   end
 
   def eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
+    run_dir = Keyword.fetch!(opts, :run_dir)
     failing = Keyword.get(opts, :failing, false)
     fragment = type |> to_ast_fragment_type() |> ast_fragment()
 
@@ -48,7 +50,7 @@ defmodule FissionLib.Support.AtomVM do
     info =
       fragment
       |> compile_quoted([:code])
-      |> run_with_bindings(code: code)
+      |> run_with_bindings(run_dir, code: code)
 
     if failing do
       assert info.exit_status != 0,
@@ -61,18 +63,10 @@ defmodule FissionLib.Support.AtomVM do
     info.result
   end
 
-  def run_with_bindings(bundle_path, bindings) do
-    dir = Path.dirname(bundle_path)
-    run_id = :erlang.unique_integer([:positive])
-
-    result_path = Path.join(dir, "result-#{run_id}.bin")
-    bindings_path = Path.join(dir, "opts-#{run_id}.bin")
-
-    logs_dir = Path.join(dir, "logs")
-    File.mkdir_p!(logs_dir)
-
-    unix_now = DateTime.now!("Etc/UTC") |> DateTime.to_iso8601()
-    log_path = Path.join(logs_dir, "#{unix_now}.txt")
+  def run_with_bindings(bundle_path, run_dir, bindings) do
+    result_path = Path.join(run_dir, "result.bin")
+    bindings_path = Path.join(run_dir, "opts.bin")
+    log_path = Path.join(run_dir, "logs.txt")
 
     bindings
     |> Map.new()
@@ -81,7 +75,7 @@ defmodule FissionLib.Support.AtomVM do
 
     # $() suppresses sh error about process signal traps, i.e. when AVM crashes
     {output, exit_status} =
-      System.shell("$(AVM_RUN_ID=#{run_id} #{@atomvm_path} #{bundle_path} &> #{log_path})")
+      System.shell("$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} &> #{log_path})")
 
     result =
       case File.read(result_path) do
@@ -104,25 +98,6 @@ defmodule FissionLib.Support.AtomVM do
     File.exists?(build_dir)
   end
 
-  def delete_run_artifacts do
-    logs =
-      @compile_dir
-      |> Path.join("**/logs")
-      |> Path.wildcard()
-
-    opts =
-      @compile_dir
-      |> Path.join("**/opts-*.bin")
-      |> Path.wildcard()
-
-    results =
-      @compile_dir
-      |> Path.join("**/result-*.bin")
-      |> Path.wildcard()
-
-    Enum.each(logs ++ opts ++ results, &File.rm_rf!/1)
-  end
-
   def compile_quoted(ast, bindings) when is_ast(ast) do
     hash = ast |> :erlang.phash2() |> to_string()
     build_dir = Path.join(@compile_dir, hash)
@@ -136,7 +111,7 @@ defmodule FissionLib.Support.AtomVM do
 
       [beam_path] =
         ast
-        |> module(bindings, build_dir)
+        |> module(bindings)
         |> run_elixirc(build_dir)
 
       FissionLib.pack(artifacts: [beam_path], start_module: RunExpr, out_path: avm_path)
@@ -146,9 +121,9 @@ defmodule FissionLib.Support.AtomVM do
   end
 
   defp run_elixirc(ast, dir) do
-    copy_beam_to_dir = fn path ->
-      beam_name = Path.basename(path)
-      destination_path = Path.join(dir, beam_name)
+    copy_artifacts_to_dir = fn path ->
+      file_name = Path.basename(path)
+      destination_path = Path.join(dir, file_name)
       File.cp!(path, destination_path)
 
       destination_path
@@ -162,11 +137,11 @@ defmodule FissionLib.Support.AtomVM do
     File.write!(source_path, Macro.to_string(ast))
     {_output, 0} = System.shell("elixirc #{source_path} -o #{build_dir}")
 
-    beams = build_dir |> Path.join("*.beam") |> Path.wildcard()
-    paths = Enum.map(beams, copy_beam_to_dir)
+    files = build_dir |> Path.join("*.{ex,beam}") |> Path.wildcard()
+    paths = Enum.map(files, copy_artifacts_to_dir)
     File.rm_rf!(build_dir)
 
-    paths
+    Enum.filter(paths, &(Path.extname(&1) == ".beam"))
   end
 
   def ast_fragment(:eval_elixir) do
@@ -230,7 +205,7 @@ defmodule FissionLib.Support.AtomVM do
   defp to_ast_fragment_type(:erlang_module), do: :eval_erlang_module
   defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
-  defp module(code, bindings, build_path) do
+  defp module(code, bindings) do
     assignments =
       for v <- bindings do
         quote do
@@ -243,10 +218,10 @@ defmodule FissionLib.Support.AtomVM do
         @compile autoload: false, no_warn_undefined: :atomvm
 
         def start() do
-          run_id = :atomvm.posix_getenv(~c"AVM_RUN_ID")
-          opts = read_opts(run_id)
+          run_dir = :atomvm.posix_getenv(~c"AVM_RUN_DIR")
+          opts = read_opts(run_dir)
           result = run(opts)
-          write_result(result, run_id)
+          write_result(result, run_dir)
           :ok
         end
 
@@ -256,24 +231,17 @@ defmodule FissionLib.Support.AtomVM do
           unquote(code)
         end
 
-        defp read_opts(run_id) do
-          {:ok, fd} =
-            :atomvm.posix_open(~c"#{unquote(build_path)}/opts-#{run_id}.bin", [:o_rdonly])
-
+        defp read_opts(run_dir) do
+          path = ~c"#{run_dir}/opts.bin"
+          {:ok, fd} = :atomvm.posix_open(path, [:o_rdonly])
           {:ok, opts} = :atomvm.posix_read(fd, 1_000_000)
           :erlang.binary_to_term(opts)
         end
 
-        defp write_result(result, run_id) do
+        defp write_result(result, run_dir) do
           result_bin = :erlang.term_to_binary(result)
-
-          {:ok, fd} =
-            :atomvm.posix_open(
-              ~c"#{unquote(build_path)}/result-#{run_id}.bin",
-              [:o_creat, :o_wronly],
-              String.to_integer("644", 8)
-            )
-
+          path = ~c"#{run_dir}/result.bin"
+          {:ok, fd} = :atomvm.posix_open(path, [:o_creat, :o_wronly], 0o644)
           {:ok, _size} = :atomvm.posix_write(fd, result_bin)
           :ok
         end

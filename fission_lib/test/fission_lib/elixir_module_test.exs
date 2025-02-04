@@ -6,8 +6,9 @@ defmodule FissionLib.ElixirModuleTest do
   alias FissionLib.Support.AtomVM
 
   @examples_path "./test/examples"
+  @moduletag :tmp_dir
 
-  async_test "Factorial" do
+  async_test "Factorial", %{tmp_dir: dir} do
     """
     defmodule Factorial do
       def calc(0), do: 1
@@ -16,11 +17,11 @@ defmodule FissionLib.ElixirModuleTest do
 
     Factorial.calc(5)
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(120)
   end
 
-  async_test "Fibonacci" do
+  async_test "Fibonacci", %{tmp_dir: dir} do
     """
     defmodule Fibonacci do
         def calc(0) do 0 end
@@ -30,11 +31,11 @@ defmodule FissionLib.ElixirModuleTest do
 
     Fibonacci.calc(10)
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(55)
   end
 
-  async_test "Adder" do
+  async_test "Adder", %{tmp_dir: dir} do
     """
     defmodule Adder do
       def calc(a, b), do: a + b
@@ -42,11 +43,11 @@ defmodule FissionLib.ElixirModuleTest do
 
     Adder.calc(10, 20)
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(30)
   end
 
-  async_test "Guard" do
+  async_test "Guard", %{tmp_dir: dir} do
     """
     defmodule Guard do
       def f(n) when n > 0, do: f(n-1)
@@ -55,11 +56,11 @@ defmodule FissionLib.ElixirModuleTest do
 
     Guard.f(5)
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(:done)
   end
 
-  async_test "Guard" do
+  async_test "MultipleFns", %{tmp_dir: dir} do
     """
     defmodule MultipleFns do
       def a(x), do: MultipleFns.b(x) + 1
@@ -70,24 +71,24 @@ defmodule FissionLib.ElixirModuleTest do
 
     MultipleFns.a(0)
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(3)
   end
 
-  async_test "simple module" do
+  async_test "simple module", %{tmp_dir: dir} do
     """
     defmodule Start do
 
     end
     """
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_is_module()
   end
 
-  async_test "Capybara habitat - genserver" do
+  async_test "Capybara habitat - genserver", %{tmp_dir: dir} do
     "#{@examples_path}/CapybaraHabitat.ex"
     |> File.read!()
-    |> AtomVM.eval(:elixir)
+    |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_is_module()
   end
 end

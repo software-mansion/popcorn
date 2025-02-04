@@ -4,7 +4,9 @@ defmodule FissionLib.StackTraceTest do
   import FissionLib.Support.AsyncTest
   alias FissionLib.Support.AtomVM
 
-  async_test "stacktrace" do
+  @moduletag :tmp_dir
+
+  async_test "stacktrace", %{tmp_dir: run_dir} do
     info =
       quote do
         try do
@@ -14,7 +16,7 @@ defmodule FissionLib.StackTraceTest do
         end
       end
       |> AtomVM.compile_quoted([])
-      |> AtomVM.run_with_bindings([])
+      |> AtomVM.run_with_bindings(run_dir, [])
 
     {error, stacktrace} = info.result
 
