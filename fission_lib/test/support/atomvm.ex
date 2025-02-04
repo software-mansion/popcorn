@@ -39,6 +39,9 @@ defmodule FissionLib.Support.AtomVM do
     assert is_elixir_module or is_erlang_module, "Returned value isn't a module"
   end
 
+  @doc """
+  Evaluates a string using precompiled evaluation code.
+  """
   def eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
     run_dir = Keyword.fetch!(opts, :run_dir)
     failing = Keyword.get(opts, :failing, false)
@@ -64,6 +67,9 @@ defmodule FissionLib.Support.AtomVM do
     info.result
   end
 
+  @doc """
+  Runs compiled .avm bundle with passed args.
+  """
   def run(bundle_path, run_dir, args \\ []) do
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
@@ -100,6 +106,10 @@ defmodule FissionLib.Support.AtomVM do
     File.exists?(build_dir)
   end
 
+  @doc """
+  Appends passed ast to common code that reads input from args.bin and writing to result.bin.
+  Ast may reference `args` variable that is read from input file while calling `run/3`.
+  """
   def compile_quoted(ast) when is_ast(ast) do
     hash = ast |> :erlang.phash2() |> to_string()
     build_dir = Path.join(@compile_dir, hash)
