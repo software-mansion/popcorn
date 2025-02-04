@@ -22,7 +22,7 @@ defmodule FissionLib.Support.AtomVM do
   @compile_dir :code.priv_dir(:fission_lib)
 
   defguardp is_ast(ast) when tuple_size(ast) == 3
-  defguardp is_eval_type(type) when type in [:erlang, :erlang_expr, :elixir]
+  defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
   defmacro assert_result(result, expected) do
     quote do
@@ -39,7 +39,7 @@ defmodule FissionLib.Support.AtomVM do
 
   def eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
     failing = Keyword.get(opts, :failing, false)
-    fragment = eval_fragment(type)
+    fragment = type |> to_ast_fragment_type() |> ast_fragment()
 
     if not compiled?(fragment) do
       raise "Compile eval module before using it"
@@ -169,7 +169,7 @@ defmodule FissionLib.Support.AtomVM do
     paths
   end
 
-  def eval_fragment(:elixir) do
+  def ast_fragment(:eval_elixir) do
     quote do
       :elixir.start([], [])
 
@@ -179,7 +179,7 @@ defmodule FissionLib.Support.AtomVM do
     end
   end
 
-  def eval_fragment(:erlang_expr) do
+  def ast_fragment(:eval_erlang_expr) do
     quote do
       code = var!(code) |> :erlang.binary_to_list()
       {:ok, tokens, _} = :erl_scan.string(code)
@@ -191,7 +191,7 @@ defmodule FissionLib.Support.AtomVM do
     end
   end
 
-  def eval_fragment(:erlang) do
+  def ast_fragment(:eval_erlang_module) do
     quote do
       code = var!(code) |> :erlang.binary_to_list()
 
@@ -225,6 +225,10 @@ defmodule FissionLib.Support.AtomVM do
       :code.load_binary(module, ~c"nofile", module_bin)
     end
   end
+
+  defp to_ast_fragment_type(:elixir), do: :eval_elixir
+  defp to_ast_fragment_type(:erlang_module), do: :eval_erlang_module
+  defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
   defp module(code, bindings, build_path) do
     assignments =

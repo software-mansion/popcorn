@@ -1,8 +1,8 @@
 alias FissionLib.Support.AtomVM
 
-for type <- [:elixir, :erlang, :erlang_expr] do
+for type <- [:eval_elixir, :eval_erlang_module, :eval_erlang_expr] do
   type
-  |> AtomVM.eval_fragment()
+  |> AtomVM.ast_fragment()
   |> AtomVM.compile_quoted([:code])
 end
 

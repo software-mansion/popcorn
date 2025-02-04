@@ -14,28 +14,28 @@ defmodule FissionLib.ErlangModuleTest do
     add(A, B) ->
         A + B.
     """
-    |> AtomVM.eval(:erlang)
+    |> AtomVM.eval(:erlang_module)
     |> AtomVM.assert_is_module()
   end
 
   async_test "UUID - too big literals" do
     "#{@examples_path}/uuid.erl"
     |> File.read!()
-    |> AtomVM.eval(:erlang)
+    |> AtomVM.eval(:erlang_module)
     |> AtomVM.assert_is_module()
   end
 
   async_test "Greetings - message passing" do
     "#{@examples_path}/greetings.erl"
     |> File.read!()
-    |> AtomVM.eval(:erlang)
+    |> AtomVM.eval(:erlang_module)
     |> AtomVM.assert_is_module()
   end
 
   async_test "Capybara habitat - message passing" do
     "#{@examples_path}/capybara_habitat.erl"
     |> File.read!()
-    |> AtomVM.eval(:erlang)
+    |> AtomVM.eval(:erlang_module)
     |> AtomVM.assert_is_module()
   end
 end
