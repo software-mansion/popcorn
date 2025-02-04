@@ -82,7 +82,7 @@ defmodule FissionLib.Support.AtomVM do
 
     # $() suppresses sh error about process signal traps, i.e. when AVM crashes
     cmd = "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
-    File.write!(log_path, "Run command: #{cmd}\n")
+    File.write!(log_path, "Run command: #{cmd}\n\n\n")
     {output, exit_status} = System.shell(cmd)
 
     result =
