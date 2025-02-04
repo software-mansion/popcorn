@@ -1,8 +1,8 @@
 defmodule FissionLib.ErlangModuleTest do
   use ExUnit.Case, async: true
   require Logger
-  import FissionLib.AsyncTest
-  alias FissionLib.AtomVM
+  import FissionLib.Support.AsyncTest
+  alias FissionLib.Support.AtomVM
 
   @examples_path "./test/examples"
 

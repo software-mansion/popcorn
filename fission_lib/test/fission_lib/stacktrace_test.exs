@@ -1,8 +1,8 @@
 defmodule FissionLib.StackTraceTest do
   use ExUnit.Case, async: true
-  require FissionLib.AtomVM
-  import FissionLib.AsyncTest
-  alias FissionLib.AtomVM
+  require FissionLib.Support.AtomVM
+  import FissionLib.Support.AsyncTest
+  alias FissionLib.Support.AtomVM
 
   async_test "stacktrace" do
     info =

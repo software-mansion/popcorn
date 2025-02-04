@@ -1,4 +1,4 @@
-defmodule FissionLib.AsyncTest do
+defmodule FissionLib.Support.AsyncTest do
   @moduledoc false
   # Helper for creating asynchronous tests
   # - creates a public function instead of a test

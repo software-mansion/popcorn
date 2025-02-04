@@ -1,9 +1,9 @@
 defmodule FissionLib.ElixirModuleTest do
   use ExUnit.Case, async: true
   require Logger
-  require FissionLib.AtomVM
-  import FissionLib.AsyncTest
-  alias FissionLib.AtomVM
+  require FissionLib.Support.AtomVM
+  import FissionLib.Support.AsyncTest
+  alias FissionLib.Support.AtomVM
 
   @examples_path "./test/examples"
 

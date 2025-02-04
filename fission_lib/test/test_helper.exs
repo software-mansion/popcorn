@@ -1,4 +1,4 @@
-alias FissionLib.AtomVM
+alias FissionLib.Support.AtomVM
 
 for type <- [:elixir, :erlang, :erlang_expr] do
   type

@@ -1,4 +1,4 @@
-defmodule FissionLib.AtomVM do
+defmodule FissionLib.Support.AtomVM do
   @moduledoc """
   Used to run AtomVM instances in tests.
 
