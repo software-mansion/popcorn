@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: ./run [n]
+# Usage: ./run.sh [n]
 # Run fuzzer, generating n samples. Defaults to 1000 runs.
 
 if [[ ! -f .env ]]; then
@@ -31,6 +31,6 @@ mkdir -p interesting
 # Failing samples are written to interesting/ directory with `test{}` template names.
 echo ""
 echo "Generating outputs (timeout: ${AVM_FUZZ_TIMEOUT_S}s)..."
-seq "${n}" | parallel --bar --line-buffer "${AVM_ERLFUZZ_BIN}" fuzz -c ./run-atomvm-test.sh  --tmp-directory out --interesting-directory interesting 'test{}'
+seq "${n}" | parallel --bar --line-buffer "${AVM_ERLFUZZ_BIN}" --disable-maybe fuzz -c ./run-atomvm-test.sh  --tmp-directory out --interesting-directory interesting 'test{}'
 echo 'Sorting output...'
 ./error-segregation.sh interesting
