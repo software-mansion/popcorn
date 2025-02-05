@@ -223,7 +223,7 @@ defmodule FissionLib.Support.AtomVM do
         @compile autoload: false, no_warn_undefined: :atomvm
 
         def start() do
-          run_dir = :atomvm.posix_getenv(~c"AVM_RUN_DIR")
+          run_dir = :os.getenv(~c"AVM_RUN_DIR")
           args = read_args(run_dir)
           result = run(args)
           write_result(result, run_dir)
