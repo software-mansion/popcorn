@@ -1,0 +1,3 @@
+[submodule "fuzzer/erlfuzz"]
+	path = fuzzer/erlfuzz
+	url = git@github.com:software-mansion-labs/erlfuzz.git
