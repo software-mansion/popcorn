@@ -1,9 +1,13 @@
 defmodule FissionLib.StackTraceTest do
   use ExUnit.Case, async: true
+  require FissionLib.Support.AtomVM
+  import FissionLib.Support.AsyncTest
+  alias FissionLib.Support.AtomVM
+
   @moduletag :tmp_dir
 
-  test "stacktrace", %{tmp_dir: tmp_dir} do
-    {error, stacktrace} =
+  async_test "stacktrace", %{tmp_dir: run_dir} do
+    info =
       quote do
         try do
           :orddict.take(:not_an_orddict, 1)
@@ -11,7 +15,10 @@ defmodule FissionLib.StackTraceTest do
           e -> {e, __STACKTRACE__}
         end
       end
-      |> RunInAtomVM.expr(tmp_dir)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.run(run_dir)
+
+    {error, stacktrace} = info.result
 
     assert %FunctionClauseError{module: :orddict, function: :take, arity: 2} = error
 
@@ -23,7 +30,6 @@ defmodule FissionLib.StackTraceTest do
 
     lines = [1, start_line, run_line, 1000]
     assert lines == Enum.sort(lines)
-
     assert code_file |> to_string() |> String.ends_with?("/code.ex")
   end
 end

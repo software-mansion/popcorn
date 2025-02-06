@@ -1,24 +1,28 @@
 defmodule FissionLib.CodeTest do
   use ExUnit.Case, async: true
+  require FissionLib.Support.AtomVM
+  import FissionLib.Support.AsyncTest
+  alias FissionLib.Support.AtomVM
 
   @moduletag :tmp_dir
 
-  test "code load module", %{tmp_dir: tmp_dir} do
+  async_test "code load module", %{tmp_dir: run_dir} do
     [{CodeTest.Foo, beam}] =
       quote do
         defmodule CodeTest.Foo do
           def foo(x), do: x + 1
         end
       end
-      |> Utils.compile_quoted(tmp_dir)
+      |> Code.compile_quoted()
 
-    result =
+    info =
       quote do
-        :code.load_binary(CodeTest.Foo, ~c"", var!(beam))
+        :code.load_binary(CodeTest.Foo, ~c"", args.beam)
         apply(CodeTest.Foo, :foo, [2])
       end
-      |> RunInAtomVM.expr(tmp_dir, beam: beam)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.run(run_dir, beam: beam)
 
-    assert result == 3
+    assert info.result == 3
   end
 end

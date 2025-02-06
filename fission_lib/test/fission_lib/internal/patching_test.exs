@@ -1,9 +1,24 @@
 defmodule FissionLib.Internal.PatchingTest do
-  use ExUnit.Case, async: true
+  # Test is sync due to global compile options being changed
+  use ExUnit.Case, async: false
 
   alias FissionLib.CoreErlangUtils
 
   @moduletag :tmp_dir
+
+  setup_all do
+    debug_info = Code.get_compiler_option(:debug_info)
+    ignore_module_conflict = Code.get_compiler_option(:ignore_module_conflict)
+
+    # By default, Elixir doesn't store debug info in test env to speed up compilation
+    Code.put_compiler_option(:debug_info, true)
+    Code.put_compiler_option(:ignore_module_conflict, true)
+
+    on_exit(fn ->
+      Code.put_compiler_option(:debug_info, debug_info)
+      Code.put_compiler_option(:ignore_module_conflict, ignore_module_conflict)
+    end)
+  end
 
   test "patching", %{tmp_dir: tmp_dir} do
     module =
@@ -61,7 +76,7 @@ defmodule FissionLib.Internal.PatchingTest do
           unquote(orig)
         end
       end
-      |> Utils.compile_quoted(tmp_dir)
+      |> Code.compile_quoted(tmp_dir)
 
     [{_module, patch}] =
       quote do
@@ -69,7 +84,7 @@ defmodule FissionLib.Internal.PatchingTest do
           unquote(patch)
         end
       end
-      |> Utils.compile_quoted(tmp_dir)
+      |> Code.compile_quoted(tmp_dir)
 
     beam =
       CoreErlangUtils.merge_modules(CoreErlangUtils.parse(orig), CoreErlangUtils.parse(patch))
