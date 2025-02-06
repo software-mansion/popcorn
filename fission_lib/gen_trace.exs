@@ -2,7 +2,7 @@ max_args = 20
 exports = Enum.map_join(0..max_args, ", ", fn i -> "trace/#{i + 4}" end)
 
 print = fn action, arity ->
-  ~s<console:print([erlang:pid_to_list(self()), pad(Count * 2), " #{action} ", erlang:atom_to_list(M), ".", erlang:atom_to_list(F), "/#{arity} ", File, ":", erlang:integer_to_list(Line), "\\n"])>
+  ~s<console:print([erlang:pid_to_list(self()), " ", name(), " ", pad(Count * 2), " #{action} ", erlang:atom_to_list(M), ".", erlang:atom_to_list(F), "/#{arity} ", File, ":", erlang:integer_to_list(Line), "\\n"])>
 end
 
 impls =
@@ -35,6 +35,19 @@ module =
   pad(N) -> pad(N, []).
   pad(0, Acc) -> Acc;
   pad(N, Acc) when N > 0 -> pad(N - 1, [$\\s | Acc]).
+
+  name() ->
+    case get('__proc_name__') of
+      undefined ->
+        Name =
+          case process_info(self(), registered_name) of
+            [] -> [];
+            {registered_name, Name2} -> atom_to_list(Name2)
+          end,
+        put('__proc_name__', Name),
+        Name;
+      Name -> Name
+    end.
 
   #{impls}
   """

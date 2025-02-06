@@ -1,6 +1,7 @@
 
 -module(file).
--export([get_cwd/0]).
+-export([get_cwd/0, open/2]).
+
 %% data types
 -type filename()  :: string().
 -type posix() ::
@@ -42,3 +43,7 @@ native_name_encoding() ->
 
 get_cwd() ->
     prim_file:get_cwd(). %Patch reason: Needed to use nif directly.
+
+% Patch reason: this dummy implementation is sufficient
+% for some calls not to break
+open(_File, _Opts) -> {error, not_implemented}.
