@@ -2,7 +2,7 @@
 set -euo pipefail
 
 main() {
-  atomvm_timeout_in_s="${AVM_FUZZ_TIMEOUT_S}"
+  atomvm_timeout_in_s="${AVM_FUZZ_TIMEOUT_S:-5}"
   atomvm_path="${AVM_ATOM_VM_BIN}"
   packbeam_path="${AVM_PACKBEAM_BIN}"
   avm_lib_path="${AVM_FISSION_LIB_AVM}"

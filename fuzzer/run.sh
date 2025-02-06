@@ -30,7 +30,7 @@ mkdir -p interesting
 # Generate n samples using run_atomvm_test.sh to determine if sample is failing.
 # Failing samples are written to interesting/ directory with `test{}` template names.
 echo ""
-echo "Generating outputs (timeout: ${AVM_FUZZ_TIMEOUT_S}s)..."
+echo "Generating outputs (timeout: ${AVM_FUZZ_TIMEOUT_S:-5}s)..."
 seq "${n}" | parallel --bar --line-buffer "${AVM_ERLFUZZ_BIN}" fuzz -c ./run-atomvm-test.sh  --tmp-directory out --interesting-directory interesting 'test{}'
 echo 'Sorting output...'
 ./error-segregation.sh interesting
