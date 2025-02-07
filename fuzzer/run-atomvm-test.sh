@@ -28,7 +28,7 @@ main() {
     timeout -k 1 "${atomvm_timeout_in_s}" "${packbeam_path}" -i "${avm_filename}" "${beam_filename}" "${avm_lib_path}"
     timeout -k 1 "${atomvm_timeout_in_s}" "${atomvm_path}" "${avm_filename}" 1> /dev/null
     erl_result=$?
-    if [[ ${erl_result} == 1 ]]; then
+    if [[ ${erl_result} == 0 ]]; then
       echo "File ${beam_filename}: completed normally"
       rm "${beam_filename}"
       rm "${avm_filename}"

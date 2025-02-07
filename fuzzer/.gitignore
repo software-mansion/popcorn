@@ -3,3 +3,5 @@
 out/
 # samples that failed
 interesting/
+# minimized samples
+minimized/
