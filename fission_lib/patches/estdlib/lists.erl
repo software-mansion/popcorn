@@ -752,21 +752,6 @@ unique([X, Y | Tail], Fun) ->
     end.
 
 %%-----------------------------------------------------------------------------
-%% @param   Elem the element to duplicate
-%% @param   Count the number of times to duplicate the element
-%% @returns a list made of Elem duplicate Count times
-%% @doc     Duplicate an element
-%% @end
-%%-----------------------------------------------------------------------------
--spec duplicate(integer(), Elem) -> [Elem].
-%% Patch reason: AVM patch; Count can be 0 too
-duplicate(Count, Elem) when is_integer(Count) andalso Count >= 0 ->
-    duplicate(Count, Elem, []).
-
-duplicate(0, _Elem, Acc) -> Acc;
-duplicate(Count, Elem, Acc) -> duplicate(Count - 1, Elem, [Elem | Acc]).
-
-%%-----------------------------------------------------------------------------
 %% @param   List list to take the sublist from
 %% @param   Len the number of elements to get from List
 %% @returns a list made of the first `Len' elements of `List'

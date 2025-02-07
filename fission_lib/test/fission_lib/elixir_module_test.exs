@@ -91,4 +91,24 @@ defmodule FissionLib.ElixirModuleTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_is_module()
   end
+
+  async_test "lists_duplicate", %{tmp_dir: dir} do
+    """
+    :lists.duplicate(0, "a")
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result([])
+
+    """
+    :lists.duplicate(1, "a")
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(["a"])
+
+    """
+    :lists.duplicate(7, "a")
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(["a", "a", "a", "a", "a", "a", "a"])
+  end
 end
