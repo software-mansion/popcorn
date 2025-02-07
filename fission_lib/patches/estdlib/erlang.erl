@@ -34,7 +34,6 @@
     process_info/2,
     system_info/1,
     system_flag/2,
-    md5/1,
     is_map/1,
     is_map_key/2,
     map_size/1,
@@ -300,20 +299,6 @@ system_info(_Key) ->
 %%-----------------------------------------------------------------------------
 -spec system_flag(Key :: atom(), term()) -> term().
 system_flag(_Key, _Value) ->
-    erlang:nif_error(undefined).
-
-%%-----------------------------------------------------------------------------
-%% @param   Data data to compute hash of, as a binary.
-%% @returns the md5 hash of the input Data, as a 16-byte binary.
-%% @doc     Computes the MD5 hash of an input binary, as defined by
-%%          https://www.ietf.org/rfc/rfc1321.txt
-%% @end
-%%-----------------------------------------------------------------------------
--spec md5(Data :: binary()) -> binary().
-%% Patch reason: AVM patch; md5 uses native mbedtls implementation that isn't easily linked
-%% so we use vendored implementation
-%% Patch reason: AVM patch; md5 accepts iolist as well
-md5(Data) when is_binary(Data) orelse is_list(Data) ->
     erlang:nif_error(undefined).
 
 %%-----------------------------------------------------------------------------
