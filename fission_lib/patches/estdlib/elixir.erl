@@ -1,7 +1,8 @@
 %% Main entry point for Elixir functions. All of those functions are
 %% private to the Elixir compiler and reserved to be used by Elixir only.
 -module(elixir).
--export([start/2]).
+-export([start/2,eval_external_handler/3]).
+-define(elixir_eval_env, {elixir, eval_env}).
 
 %% Patch reason: currently we need to disable encoding/endianees test
 start(_Type, _Args) ->
@@ -83,4 +84,63 @@ start(_Type, _Args) ->
         {error, _Reason} = Error ->
             elixir_config:delete(Tab),
             Error
+    end.
+
+eval_external_handler(Ann, FunOrModFun, Args) ->
+    Current = try
+        erlang:error(stacktrace)
+    catch
+        error:stacktrace:S -> S
+    end,
+
+    try
+    case FunOrModFun of
+        {Mod, Fun} -> apply(Mod, Fun, Args);
+        Fun -> apply(Fun, Args)
+    end
+    catch
+    Kind:Reason:Stacktrace ->
+        %% Take everything up to the Elixir module
+        Pruned =
+        lists:takewhile(fun
+            ({elixir,_,_,_}) -> false;
+            (_) -> true
+        end, Stacktrace),
+
+        Caller =
+        lists:dropwhile(fun
+            ({elixir,_,_,_}) -> false;
+            (_) -> true
+        end, Stacktrace),
+
+        % Patch reason: AVM doesn't implement erlang:process_info(self(), current_stacktrace)
+        %% Now we prune any shared code path from erl_eval
+        % {current_stacktrace, Current} =
+        %   erlang:process_info(self(), current_stacktrace),
+
+        %% We need to make sure that we don't generate more
+        %% frames than supported. So we do our best to drop
+        %% from the Caller, but if the caller has no frames,
+        %% we need to drop from Pruned.
+        {DroppedCaller, ToDrop} =
+        case Caller of
+            [] -> {[], true};
+            _ -> {lists:droplast(Caller), false}
+        end,
+
+        Reversed = flb_module:drop_common(lists:reverse(Current), lists:reverse(Pruned), ToDrop),
+
+        %% Add file+line information at the bottom
+        Bottom =
+        case erlang:get(?elixir_eval_env) of
+            #{file := File} ->
+            [{elixir_eval, '__FILE__', 1,
+                [{file, elixir_utils:characters_to_list(File)}, {line, erl_anno:line(Ann)}]}];
+
+            _ ->
+            []
+        end,
+
+        Custom = lists:reverse(Bottom ++ Reversed, DroppedCaller),
+        erlang:raise(Kind, Reason, Custom)
     end.
