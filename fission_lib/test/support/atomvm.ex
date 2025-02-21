@@ -168,7 +168,8 @@ defmodule FissionLib.Support.AtomVM do
 
   def ast_fragment(:eval_elixir) do
     quote do
-      :elixir.start([], [])
+      :application_controller.start(:kernel)
+      :application.ensure_all_started(:elixir)
 
       args.code
       |> Code.eval_string([], __ENV__)
