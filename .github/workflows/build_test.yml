@@ -1,0 +1,60 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Build & test
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  MIX_ENV: test
+
+jobs:
+  build:
+
+    name: Build & test
+    runs-on: ubuntu-22.04
+
+    defaults:
+      run:
+        working-directory: fission_lib
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: webfactory/ssh-agent@v0.6.0
+      with:
+        ssh-private-key: |
+          ${{ secrets.ACCESS_TO_FISSIONVM }}
+    - name: Set up Elixir
+      uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
+      with:
+        elixir-version: '1.17.3'
+        otp-version: '26.0.2'
+    - name: Restore dependencies cache
+      uses: actions/cache@v3
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+    - name: Install AtomVM deps
+      run: |
+        sudo apt install -y gperf libmbedtls-dev zlib1g-dev
+    - name: Install dependencies
+      run: mix deps.get
+    - name: Compile
+      run:  mix compile
+    - name: Build AtomVM
+      run: |
+        export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
+        mix fission_lib.build_avm --out-dir _build --cmake-opts SANITIZER=OFF
+    - name: Run tests
+      run: mix test

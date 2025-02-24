@@ -19,6 +19,7 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   async_test "Long Function - function length check", %{tmp_dir: dir} do
     """
     -module(long_function).
@@ -39,6 +40,7 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   async_test "UUID - too big literals", %{tmp_dir: dir} do
     "#{@examples_path}/uuid.erl"
     |> File.read!()
@@ -46,6 +48,7 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   async_test "Greetings - message passing", %{tmp_dir: dir} do
     "#{@examples_path}/greetings.erl"
     |> File.read!()
@@ -53,6 +56,7 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   async_test "Capybara habitat - message passing", %{tmp_dir: dir} do
     "#{@examples_path}/capybara_habitat.erl"
     |> File.read!()

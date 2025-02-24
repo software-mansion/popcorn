@@ -28,7 +28,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
 
   @build_dir Mix.Project.app_path()
   @config FissionLib.Config.get([:avm_source])
-  @options_defaults %{target: :unix, out_dir: ".", out_name: "AtomVM"}
+  @options_defaults %{target: "unix", out_dir: ".", out_name: "AtomVM", cmake_opts: ""}
 
   def run(args) do
     unless @config.avm_source do
@@ -42,6 +42,8 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
     parser_config = [strict: @options_defaults |> Map.keys() |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(@options_defaults, Map.new(options))
+    {cmake_opts, options} = Map.pop(options, :cmake_opts)
+    cmake_opts = cmake_opts |> String.split(" ") |> Enum.map(&"-D#{&1}")
 
     avm_source =
       case @config.avm_source do
@@ -50,19 +52,27 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
         {:git, uri, opts} -> fetch_repo(uri, opts)
       end
 
-    cmd(~w"cmake .", cd: avm_source)
+    # Skip building AtomVM stdlib
+    File.write!(Path.join(avm_source, "libs/CMakeLists.txt"), "\n")
 
     case String.to_existing_atom(options.target) do
       :unix ->
         build_dir = Path.join(avm_source, "build")
         File.mkdir_p!(build_dir)
+        cmd(~w"cmake .. -DAVM_BUILD_RUNTIME_ONLY=1" ++ cmake_opts, cd: build_dir)
         cmd(~w"make -j", cd: build_dir)
         cp_artifact("src/AtomVM", build_dir, options)
 
       :wasm ->
         build_dir = Path.join(avm_source, "src/platforms/emscripten/build")
         File.mkdir_p!(build_dir)
-        cmd(~w"emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web", cd: build_dir)
+
+        cmd(
+          ~w"emcmake cmake .. -DAVM_BUILD_RUNTIME_ONLY=1 -DAVM_EMSCRIPTEN_ENV=web" ++
+            cmake_opts,
+          cd: build_dir
+        )
+
         cmd(~w"emmake make -j", cd: build_dir)
         cp_artifact("src/AtomVM.js", build_dir, options)
         cp_artifact("src/AtomVM.wasm", build_dir, options)
