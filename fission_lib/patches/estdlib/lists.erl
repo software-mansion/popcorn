@@ -60,10 +60,8 @@
     split/2,
     partition/2,
     usort/1, usort/2,
-    duplicate/2,
     sublist/2,
     splitwith/2,
-    partition/2,
     unzip/1
 ]).
 
