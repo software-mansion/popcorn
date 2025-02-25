@@ -1,4 +1,5 @@
-%% There is a possibility of ill-implemented single catch command that is why this patch is implemented.
+%% Patch reason: single catch command is ill-implemented
+
 -module(erl_parse).
 
 -export([first_anno/1]).
