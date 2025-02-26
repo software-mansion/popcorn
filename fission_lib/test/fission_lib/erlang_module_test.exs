@@ -19,6 +19,13 @@ defmodule FissionLib.ErlangModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  async_test "Long Function - function length check", %{tmp_dir: dir} do
+    "#{@examples_path}/long_function.erl"
+    |> File.read!()
+    |> AtomVM.eval(:erlang_module, run_dir: dir)
+    |> AtomVM.assert_is_module()
+  end
+
   async_test "UUID - too big literals", %{tmp_dir: dir} do
     "#{@examples_path}/uuid.erl"
     |> File.read!()
