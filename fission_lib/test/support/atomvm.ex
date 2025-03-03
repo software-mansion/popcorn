@@ -56,7 +56,7 @@ defmodule FissionLib.Support.AtomVM do
     info =
       fragment
       |> compile_quoted()
-      |> run(run_dir, code: code)
+      |> try_run(run_dir, code: code)
 
     if failing do
       assert info.exit_status != 0,
@@ -73,6 +73,21 @@ defmodule FissionLib.Support.AtomVM do
   Runs compiled .avm bundle with passed args.
   """
   def run(bundle_path, run_dir, args \\ []) do
+    assert %{exit_status: 0, result: result} = try_run(bundle_path, run_dir, args)
+    result
+  end
+
+  @doc """
+  Runs compiled .avm bundle with passed args.
+  Doesn't crash in case of failure, always returns an `info` map.
+  """
+  @spec try_run(String.t(), String.t(), list()) :: %{
+          exit_status: integer(),
+          output: String.t(),
+          result: term(),
+          log_path: String.t()
+        }
+  def try_run(bundle_path, run_dir, args \\ []) do
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
