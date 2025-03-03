@@ -99,7 +99,7 @@ defmodule FissionLib.CoreErlangUtils do
          {:c_call, call_meta, {:c_literal, mod_meta, mod} = mv, {:c_literal, fun_meta, fun} = fv,
           args}
        )
-       when mod != :erlang or fun == :nif_error do
+       when mod != :erlang or fun in [:nif_error, :error] do
     {file, line} =
       Enum.reduce(call_meta, {~c"no_file", 0}, fn
         {:file, file}, {_file, line} when is_list(file) -> {file, line}
@@ -116,7 +116,42 @@ defmodule FissionLib.CoreErlangUtils do
      ]}
   end
 
-  defp do_add_simple_tracing(ast), do: traverse(ast, &do_add_simple_tracing/1)
+  defp do_add_simple_tracing(
+         {:c_apply, call_meta, {:c_var, fun_meta, {fun, _arity}}, args} = apply
+       ) do
+    if String.contains?("#{fun}", "$") or :compiler_generated in call_meta do
+      apply
+    else
+      {file, line} =
+        Enum.reduce(call_meta, {~c"no_file", 0}, fn
+          {:file, file}, {_file, line} when is_list(file) -> {file, line}
+          {line, _column}, {file, _line} when is_integer(line) -> {file, line}
+          _other, acc -> acc
+        end)
+
+      trace_args = [
+        {:c_literal, fun_meta, fun},
+        {:c_literal, call_meta, length(args)},
+        {:c_literal, call_meta, file},
+        {:c_literal, call_meta, line}
+      ]
+
+      trace_apply =
+        {:c_call, call_meta, {:c_literal, call_meta, :simple_trace},
+         {:c_literal, call_meta, :trace_apply}, trace_args}
+
+      {:c_seq, [], trace_apply, apply}
+    end
+  end
+
+  defp do_add_simple_tracing(ast) do
+    if is_tuple(ast) and tuple_size(ast) >= 2 and is_list(elem(ast, 1)) and
+         :compiler_generated in elem(ast, 1) do
+      ast
+    else
+      traverse(ast, &do_add_simple_tracing/1)
+    end
+  end
 
   @doc """
   Dumps the Core Erlang AST and Core Erlang code into files.
