@@ -16,7 +16,7 @@ defmodule FissionLib.StackTraceTest do
         end
       end
       |> AtomVM.compile_quoted()
-      |> AtomVM.run(run_dir)
+      |> AtomVM.try_run(run_dir)
 
     {error, stacktrace} = info.result
 
