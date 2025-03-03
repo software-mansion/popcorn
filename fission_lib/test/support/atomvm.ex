@@ -19,7 +19,9 @@ defmodule FissionLib.Support.AtomVM do
   """
   import ExUnit.Assertions
 
-  @atomvm_path Application.compile_env!(:fission_lib, :atomvm_path)
+  require Logger
+
+  @atomvm_path Application.compile_env(:fission_lib, :atomvm_path, "_build/AtomVM")
   # mix always compiles files from project root
   @compile_dir Path.join([File.cwd!(), "tmp", "modules"])
 
@@ -80,10 +82,18 @@ defmodule FissionLib.Support.AtomVM do
     |> :erlang.term_to_binary()
     |> then(&File.write(args_path, &1))
 
+    unless match?({_output, 0}, System.shell("which #{@atomvm_path}")) do
+      raise """
+      AtomVM not found, please run `mix fission_lib.build_avm --out-dir _build` \
+      or put `config :fission_lib, atomvm_path: "path/to/AtomVM"` in your config.exs
+      """
+    end
+
     # $() suppresses sh error about process signal traps, i.e. when AVM crashes
     cmd = "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
     {output, exit_status} = System.shell(cmd)
+    if System.get_env("CI") == "true", do: Logger.info(File.read!(log_path))
 
     result =
       case File.read(result_path) do

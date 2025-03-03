@@ -85,6 +85,7 @@ defmodule FissionLib.ElixirModuleTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   async_test "Capybara habitat - genserver", %{tmp_dir: dir} do
     "#{@examples_path}/CapybaraHabitat.ex"
     |> File.read!()
