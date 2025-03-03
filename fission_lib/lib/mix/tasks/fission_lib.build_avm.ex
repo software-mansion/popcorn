@@ -43,7 +43,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(@options_defaults, Map.new(options))
     {cmake_opts, options} = Map.pop(options, :cmake_opts)
-    cmake_opts = cmake_opts |> String.split(" ") |> Enum.map(&"-D#{&1}")
+    cmake_opts = cmake_opts |> String.split(" ", trim: true) |> Enum.map(&"-D#{&1}")
 
     avm_source =
       case @config.avm_source do
