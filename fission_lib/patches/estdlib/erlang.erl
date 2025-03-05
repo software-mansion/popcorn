@@ -108,7 +108,8 @@
     universaltime/0,
     localtime/0,
     nif_error/1,
-    bump_reductions/1
+    bump_reductions/1,
+    fun_info/1
 ]).
 
 -export_type([
@@ -3156,3 +3157,5 @@ nif_error(_Reason) -> erlang:error("Nif not loaded").
 %% It's a mock for now
 %% See https://linear.app/swmansion/project/erlangbump-reductions-missing-02f6ff09cac1/overview
 bump_reductions(_Reductions) -> true.
+
+fun_info(Fun) -> [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]].
