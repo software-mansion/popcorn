@@ -93,7 +93,7 @@ defmodule FissionLib.EvalTest do
     """
     term = {:ok, ["a", 2, 3.0]}
     ~c"~p"
-    :io_lib.format([term])
+    |> :io_lib.format([term])
     |> to_string()
     """
     |> AtomVM.eval(:elixir, run_dir: dir)
