@@ -105,6 +105,6 @@ ensure_loaded(_Module) ->
 which(_Module) ->
     non_existing.
 
-% Patch reason: mock implmenetation, prevents ParallelChecker.cache_module/2 from crashing
+% Patch reason: mock implementation, prevents ParallelChecker.cache_module/2 from crashing
 get_object_code(_Module) ->
     error.
