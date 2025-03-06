@@ -433,12 +433,17 @@ defmodule Exception do
     format_location(location) <> format_fa(fun, arity)
   end
 
-  defp format_application(module) do
+  defp format_application(_module) do
     # We cannot use Application due to bootstrap issues
-    case :application.get_application(module) do
-      {:ok, app} -> "(" <> Atom.to_string(app) <> ") "
-      :undefined -> ""
-    end
+
+    # Patch reason: :application.get_application uses :ets.match,
+    # not implemented in AtomVM
+
+    # case :application.get_application(module) do
+    #   {:ok, app} -> "(" <> Atom.to_string(app) <> ") "
+    #   :undefined -> ""
+    # end
+    ""
   end
 
   @doc """
