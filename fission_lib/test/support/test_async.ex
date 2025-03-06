@@ -1,4 +1,6 @@
 defmodule FissionLib.Support.AsyncTest do
+  use ExUnit.Case, async: true
+  alias FissionLib.Support.AtomVM
   @moduledoc false
   # Helper for creating asynchronous tests
   # - creates a public function instead of a test
@@ -58,5 +60,53 @@ defmodule FissionLib.Support.AsyncTest do
 
       Module.delete_attribute(__MODULE__, :tag)
     end
+  end
+
+  def with_section(exprs_list, section) do
+    exprs_list
+    |> Enum.map(fn {code_string, expected} -> {section, code_string, expected} end)
+  end
+
+#
+#  defmacro assert_eval(line, expected) do
+#    quote do
+#      async_test "introduction", %{tmp_dir: dir} do
+#        result =
+#          unquote(line)
+#          |> AtomVM.eval(:elixir, run_dir: dir)
+#
+#        assert unquote(expected) === result
+#      end
+#    end
+#  end
+
+  defmacro assert_eval(code_string, expected) do
+    quote do
+      async_test "evaluation", %{tmp_dir: dir} do
+        result =
+          unquote(code_string)
+          |> AtomVM.eval(:elixir, run_dir: dir)
+        unquote(__MODULE__).assert_expectation(unquote(expected), result)
+      end
+    end
+  end
+  
+  defmacro assert_eval_module(code_string) do
+    quote do
+      async_test "evaluation", %{tmp_dir: dir} do
+        result =
+          unquote(code_string)
+          |> AtomVM.eval(:elixir, run_dir: dir)
+          |> AtomVM.assert_is_module()
+      end
+    end
+  end
+
+  def assert_expectation({:expect_fn, f}, result) when is_function(f) do
+    assert f.(result)
+  end
+
+  def assert_expectation(e, result) do
+    assert e === result
   end
 end
