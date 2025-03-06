@@ -66,4 +66,28 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.eval(:erlang_expr, run_dir: dir)
     |> AtomVM.assert_result(15)
   end
+
+  @tag :skip
+  async_test "io_lib", %{tmp_dir: dir} do
+    """
+    term = {:ok, ["a", 2, 3.0]}
+    ~c"~p"
+    :io_lib.format([term])
+    |> to_string()
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("{ok,[<<\"a\">>,2,3.0]}")
+  end
+
+  async_test "rescue", %{tmp_dir: dir} do
+    """
+    try do
+      1 + :ok
+    rescue
+      e -> e
+    end
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%ArithmeticError{message: "bad argument in arithmetic expression"})
+  end
 end
