@@ -192,7 +192,6 @@ handle_info(_, S) ->
 % Patch reason: AtomVM doesn't support reading apps from .app files,
 % so for now several apps are hardcoded
 make_appl(Name) when is_atom(Name) ->
-  console:print("make_appl\n"),
 	{ok, flb_module:make_appl_i(get_hardcoded_app(Name))};
 
 make_appl(Application) ->

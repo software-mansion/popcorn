@@ -70,6 +70,24 @@ defmodule FissionLib.Support.AtomVM do
   end
 
   @doc """
+  Evaluates a string using precompiled evaluation code.
+
+  Doesn't crash in case of failure, always returns an `info` map.
+  """
+  def try_eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
+    run_dir = Keyword.fetch!(opts, :run_dir)
+    fragment = type |> to_ast_fragment_type() |> ast_fragment()
+
+    if not compiled?(fragment) do
+      raise "Compile eval module before using it"
+    end
+
+    fragment
+    |> compile_quoted()
+    |> try_run(run_dir, code: code)
+  end
+
+  @doc """
   Runs compiled .avm bundle with passed args.
   """
   def run(bundle_path, run_dir, args \\ []) do

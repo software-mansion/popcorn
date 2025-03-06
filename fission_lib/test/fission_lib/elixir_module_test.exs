@@ -112,4 +112,29 @@ defmodule FissionLib.ElixirModuleTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(["a", "a", "a", "a", "a", "a", "a"])
   end
+
+  async_test "Warnings", %{tmp_dir: dir} do
+    info =
+      """
+      defmodule W do
+        def foo(a, b, c), do: {a, b}
+      end
+
+      res1 = W.foo(10, 20, 30)
+
+      defmodule W do
+        def bar(a, b, c), do: {b, c}
+      end
+
+      res2 = W.bar(10, 20, 30)
+      {res1, res2}
+      """
+      |> AtomVM.try_eval(:elixir, run_dir: dir)
+
+    assert %{exit_status: 0, result: {{10, 20}, {20, 30}}} = info
+    logs = File.read!(info.log_path)
+    assert String.contains?(logs, "warning: {unused_var,c,false}")
+    assert String.contains?(logs, "warning: {module_defined,'Elixir.RunExpr.W'}")
+    assert String.contains?(logs, "warning: {unused_var,a,false}")
+  end
 end
