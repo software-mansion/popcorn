@@ -3086,12 +3086,187 @@ defmodule FissionLib.GettingStartedTest do
 # Erlang libraries =====================================================================================================
 #=======================================================================================================================
 
+  """
+  is_atom(String)
+  """
+  |> assert_eval(true)
 
+  """
+  String.first("hello")
+  """
+  |> assert_eval("h")
+
+  """
+  is_atom(:binary)
+  """
+  |> assert_eval(true)
+
+  """
+  :binary.first("hello")
+  """
+  |> assert_eval(104)
+
+  """
+  String.to_charlist("Ø")
+  """
+  |> assert_eval([216])
+
+  """
+  :binary.bin_to_list("Ø")
+  """
+  |> assert_eval([195, 152])
+
+#  """
+#  :io.format("Pi is approximately given by:~10.3f~n", [:math.pi])
+#  """
+#  |> assert_eval(:ok)
+
+  """
+  to_string(:io_lib.format("Pi is approximately given by:~10.3f~n", [:math.pi]))
+  """
+  |> assert_eval("Pi is approximately given by:     3.142\n")
+
+  """
+  Base.encode16(:crypto.hash(:sha256, "Elixir"))
+  """
+  |> assert_eval("3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB")
+
+#  """
+#  def application do
+#    [extra_applications: [:crypto]]
+#  end
+#  """
+#  |> assert_eval()
+
+#  todo :digraph module
+#  """
+#  digraph = :digraph.new()
+#  coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
+#  [v0, v1, v2] = (for c <- coords, do: :digraph.add_vertex(digraph, c))
+#  :digraph.add_edge(digraph, v0, v1)
+#  :digraph.add_edge(digraph, v1, v2)
+#  :digraph.get_short_path(digraph, v0, v2)
+#  """
+#  |> assert_eval([{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}])
+
+#  todo :ets module
+#  """
+#  table = :ets.new(:ets_test, [])
+#  # Store as tuples with {name, population}
+#  :ets.insert(table, {"China", 1_374_000_000})
+#  :ets.insert(table, {"India", 1_284_000_000})
+#  :ets.insert(table, {"USA", 322_000_000})
+#  :ets.tab2list(table)
+#  """
+#  |> assert_eval([])
+
+  """
+  angle_45_deg = :math.pi() * 45.0 / 180.0
+  :math.sin(angle_45_deg)
+  """
+  |> assert_eval(0.7071067811865475)
+
+  """
+  :math.exp(55.0)
+  """
+  |> assert_eval(7.694785265142018e23)
+
+  """
+  :math.log(7.694785265142018e23)
+  """
+  |> assert_eval(55.0)
+
+  """
+  q = :queue.new
+  q = :queue.in("A", q)
+  q = :queue.in("B", q)
+  {value, q} = :queue.out(q)
+  value
+  """
+  |> assert_eval({:value, "A"})
+
+  """
+  q = :queue.new
+  q = :queue.in("A", q)
+  q = :queue.in("B", q)
+  {value, q} = :queue.out(q)
+  {value, q} = :queue.out(q)
+  value
+  """
+  |> assert_eval({:value, "B"})
+
+  """
+  q = :queue.new
+  q = :queue.in("A", q)
+  q = :queue.in("B", q)
+  {value, q} = :queue.out(q)
+  {value, q} = :queue.out(q)
+  {value, q} = :queue.out(q)
+  value
+  """
+  |> assert_eval(:empty)
+
+#  todo :rand module
+#  """
+#  :rand.uniform()
+#  """
+#  |> assert_eval({:expect_fn, &is_float/1})
+#
+#  """
+#  _ = :rand.seed(:exs1024, {123, 123534, 345345})
+#  :rand.uniform()
+#  """
+#  |> assert_eval({:expect_fn, &is_float/1})
+
+#  """
+#  :rand.uniform(6)
+#  6
+#  """
+#  |> assert_eval(6)
+#
+#  """
+#  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
+#  """
+#  |> assert_eval({:ok, 633})
+
+  """
+  song = "
+  Mary had a little lamb,
+  His fleece was white as snow,
+  And everywhere that Mary went,
+  The lamb was sure to go."
+  compressed = :zlib.compress(song)
+  byte_size(song)
+  """
+  |> assert_eval(110)
+  
+  """
+  song = "
+  Mary had a little lamb,
+  His fleece was white as snow,
+  And everywhere that Mary went,
+  The lamb was sure to go."
+  compressed = :zlib.compress(song)
+  byte_size(compressed)
+  """
+  |> assert_eval(99)
+  
+#  """
+#  song = "
+#  Mary had a little lamb,
+#  His fleece was white as snow,
+#  And everywhere that Mary went,
+#  The lamb was sure to go."
+#  compressed = :zlib.compress(song)
+#  :zlib.uncompress(compressed)
+#  """
+#  |> assert_eval("\nMary had a little lamb,\nHis fleece was white as snow,\nAnd everywhere that Mary went,\nThe lamb was sure to go.")
 
 #=======================================================================================================================
 # Debugging ============================================================================================================
 #=======================================================================================================================
 
+#  todo testing IO
 #  """
 #  (1..10)
 #  |> IO.inspect()
@@ -3102,12 +3277,12 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 #
+#  prints:
 #  """
 #  1..10
 #  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
 #  110
 #  """
-#  |> assert_eval()
 #
 #  """
 #  [1, 2, 3]
