@@ -62,24 +62,6 @@ defmodule FissionLib.Support.AsyncTest do
     end
   end
 
-  def with_section(exprs_list, section) do
-    exprs_list
-    |> Enum.map(fn {code_string, expected} -> {section, code_string, expected} end)
-  end
-
-#
-#  defmacro assert_eval(line, expected) do
-#    quote do
-#      async_test "introduction", %{tmp_dir: dir} do
-#        result =
-#          unquote(line)
-#          |> AtomVM.eval(:elixir, run_dir: dir)
-#
-#        assert unquote(expected) === result
-#      end
-#    end
-#  end
-
   defmacro assert_eval(code_string, expected) do
     quote do
       async_test "evaluation", %{tmp_dir: dir} do
