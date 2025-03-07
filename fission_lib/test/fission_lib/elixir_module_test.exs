@@ -133,8 +133,8 @@ defmodule FissionLib.ElixirModuleTest do
 
     assert %{exit_status: 0, result: {{10, 20}, {20, 30}}} = info
     logs = File.read!(info.log_path)
-    assert String.contains?(logs, "warning: {unused_var,c,false}")
-    assert String.contains?(logs, "warning: {module_defined,'Elixir.RunExpr.W'}")
-    assert String.contains?(logs, "warning: {unused_var,a,false}")
+    assert String.contains?(logs, "warning: variable \"c\" is unused")
+    assert String.contains?(logs, "warning: redefining module RunExpr.W")
+    assert String.contains?(logs, "warning: variable \"a\" is unused")
   end
 end
