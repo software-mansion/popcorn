@@ -10,7 +10,6 @@ defmodule FissionLib.GettingStartedTest do
 #=======================================================================================================================
   
   assert_eval("40 + 2\n", 42)
-  
   """
   "hello" <> " world"
   """
@@ -56,22 +55,22 @@ defmodule FissionLib.GettingStartedTest do
   assert_eval("true and true\n", true)
   assert_eval("false or is_boolean(true)\n", true)
 
-  # todo assert_eval("1 and true\n", "** (BadBooleanError) expected a boolean on left-side of "and", got: 1")
+  # todo 1 Implement expecting errors assert_eval("1 and true\n", "** (BadBooleanError) expected a boolean on left-side of "and", got: 1")
 
   assert_eval("false and raise(\"This error will never be raised\")\n", false)
   assert_eval("true or raise(\"This error will never be raised\")\n", true)
 
-  # todo not implemented '||'
-  #    assert_eval("1 || true\n", 1)
-  #    assert_eval("false || 11\n", 11)
-  # todo not implemented '&&'
-  #    assert_eval("nil && 13\n", nil)
-  #    assert_eval("true && 17\n", 17)
+  # todo 2 not implemented '||'
+  # assert_eval("1 || true\n", 1)
+  # assert_eval("false || 11\n", 11)
+  # todo 3 not implemented '&&'
+  # assert_eval("nil && 13\n", nil)
+  # assert_eval("true && 17\n", 17)
 
   assert_eval("!true\n", false)
-  #    todo '!' not implemented for integer or nil
-  #    assert_eval("!1\n", false)
-  #    assert_eval("!nil\n", true)
+  # todo 4 '!' not implemented for integer or nil
+  # assert_eval("!1\n", false)
+  # assert_eval("!nil\n", true)
   assert_eval(":apple\n", :apple)
   assert_eval(":orange\n" ,:orange)
   assert_eval(":watermelon\n" ,:watermelon)
@@ -86,7 +85,7 @@ defmodule FissionLib.GettingStartedTest do
   assert_eval("\"hellö\"", "hellö")
 
   assert_eval("\"hello \" <> \"world!\"", "hello world!")
-  # todo #{} is not working
+  # todo 5 #{} is not working
   #    """
   #    string = "world"
   #    "hello \#\{string\}!"
@@ -98,7 +97,6 @@ defmodule FissionLib.GettingStartedTest do
   #    "i am \#\{number\} years old!"
   #    """
   #    |> assert_eval("i am 42 years old!")
-  
   """
   \"hello
   world\"
@@ -137,36 +135,32 @@ defmodule FissionLib.GettingStartedTest do
   assert_eval("length([1, 2, 3])\n", 3)
 
   assert_eval("[1, 2, 3] ++ [4, 5, 6]\n", [1, 2, 3, 4, 5, 6])
-#  todo assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
+#  todo 6 subtraction of two lists with different type terms inside is failing
+#  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
 
   """
   list = [1, 2, 3]
   hd(list)
-  
   """
   |> assert_eval(1)
-  
   """
   list = [1, 2, 3]
   hd(list)
   tl(list)
-  
   """
   |> assert_eval([2, 3])
 
-#    todo hd([]) "** (ArgumentError) argument error"
+#  todo 1 Implement expecting errors hd([]) "** (ArgumentError) argument error"
 
   assert_eval("[11, 12, 13]\n", ~c"\v\f\r")
   assert_eval("[104, 101, 108, 108, 111]\n", ~c"hello")
 
   assert_eval("{:ok, \"hello\"}\n", {:ok, "hello"})
   assert_eval("tuple_size({:ok, \"hello\"})", 2)
-  
   """
   tuple = {:ok, "hello"}
   elem(tuple, 1)
   tuple_size(tuple)
-  
   """
   |> assert_eval(2)
   
@@ -177,11 +171,9 @@ defmodule FissionLib.GettingStartedTest do
   tuple
   """
   |> assert_eval({:ok, "hello"})
-  
   """
   tuple = {:ok, "hello"}
   put_elem(tuple, 1, "world")
-  
   """
   |> assert_eval({:ok, "world"})
 
@@ -191,7 +183,6 @@ defmodule FissionLib.GettingStartedTest do
   [0] ++ list
   """
   |> assert_eval([0, 1, 2, 3])
-  
   """
   list = [1, 2, 3]
   # This is slow as we need to traverse `list` to append 4
@@ -202,25 +193,22 @@ defmodule FissionLib.GettingStartedTest do
   """
   tuple = {:a, :b, :c, :d}
   put_elem(tuple, 2, :e)
-  
   """
   |> assert_eval({:a, :b, :e, :d})
 
-#  todo idk why String.split is failing
+#  todo 7 String.split is failing
 #  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
 #  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
 
   assert_eval("String.split_at(\"hello world\", 3)", {"hel", "lo world"})
   assert_eval("String.split_at(\"hello world\", -4)", {"hello w", "orld"})
 
-#  todo i dont think we are able to test it but idrk
+#  todo [TO_DISCUSS] module File
 #  assert_eval("File.read(\"path/to/existing/file\")", {:ok, "... contents ..."})
 #  assert_eval("File.read(\"path/to/unknown/file\")", {:error, :enoent})
-  
   """
   tuple = {:ok, "hello"}
   elem(tuple, 1)
-  
   """
   |> assert_eval("hello")
 
@@ -233,13 +221,14 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(1)
   
-  # todo create a assert_badmatch function or macro
+  #  todo 1 Implement expecting errors create a assert_badmatch function or macro
   #  """
   #  x = 1
   #  1 = x
   #  2 = x
   #  """
-  #  |> assert_badmatch() todo create a assert_undefined_variable function or macro
+  #  |> assert_badmatch() 
+  #  todo 1 Implement expecting errors create a assert_undefined_variable function or macro
   #  """
   #  1 = unknown
   #  """
@@ -250,7 +239,6 @@ defmodule FissionLib.GettingStartedTest do
   a
   """
   |> assert_eval(:hello)
-  
   """
   {a, b, c} = {:hello, "world", 42}
   b
@@ -290,7 +278,6 @@ defmodule FissionLib.GettingStartedTest do
   head
   """
   |> assert_eval(1)
-  
   """
   [head | tail] = [1, 2, 3]
   tail
@@ -333,7 +320,6 @@ defmodule FissionLib.GettingStartedTest do
   #  {y, ^x} = {2, 2}
   #  """
   #  |> assert_badmatch()
-  
   """
   x = 1
   [^x, 2, 3] = [1, 2, 3]
@@ -341,14 +327,12 @@ defmodule FissionLib.GettingStartedTest do
   y
   """
   |> assert_eval(2)
-  
   """
   x = 1
   [^x, 2, 3] = [1, 2, 3]
   {y, ^x} = {2, 1}
   """
   |> assert_eval({2, 1})
-  
   """
   x = 1
   [^x, 2, 3] = [1, 2, 3]
@@ -359,13 +343,13 @@ defmodule FissionLib.GettingStartedTest do
   #  {y, 1} = {2, 2}
   #  """
   #  |> assert_badmatch()
-  
   """
   [head | _] = [1, 2, 3]
   head
   """
   |> assert_eval(1)
 
+  #  todo 1 Implement expecting errors create a assert_compile_error function or macro
   #  """
   #  _
   #  """
@@ -380,7 +364,7 @@ defmodule FissionLib.GettingStartedTest do
 # case, cond, and if ===================================================================================================
 #=======================================================================================================================
 
-# todo AVM does not like cases with pattern matching to not used variables? "_x" works just fine xD
+#  todo 8 Unused variables causes eval to fail (in the following "_x" works just fine)
 #  """
 #  case {1, 2, 3} do
 #    {1, x, 3} ->
@@ -412,27 +396,27 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("Will match")
 
-  #  todo
+  #  todo 1 Implement expecting errors create a assert_argument_error function or macro
   #  """
   #  hd(1)
   #  """
   #  |> assert_argument_error()
 
-#  """
-#  case 1 do
-#    x when hd(x) -> "Won't match"
-#    x -> "Got \#\{x\}"
-#  end
-#  """
-#  |> assert_eval("Got 1")
-  
-#  todo
-#  """
-#  case :ok do
-#    :error -> "Won't match"
-#  end
-#  """
-#  |> assert_case_clause_error()
+  #  """
+  #  case 1 do
+  #    x when hd(x) -> "Won't match"
+  #    x -> "Got \#\{x\}"
+  #  end
+  #  """
+  #  |> assert_eval("Got 1")
+    
+  #  todo 1 Implement expecting errors create a assert_case_clause_error function or macro
+  #  """
+  #  case :ok do
+  #    :error -> "Won't match"
+  #  end
+  #  """
+  #  |> assert_case_clause_error()
 
   """
   if true do
@@ -447,7 +431,8 @@ defmodule FissionLib.GettingStartedTest do
   end
   """
   |> assert_eval(nil)
-#  todo if nil is not working as expected
+  
+#  todo 9 fix if statement (if nil is not working as expected)
 #  """
 #  if nil do
 #    "This won't be seen"
@@ -457,7 +442,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval(nil)
   
-#  todo if true is not working as expected
+#  todo 9 fix if with match inside (this could be caused by 8)
 #  """
 #  x = 1
 #  if true do
@@ -496,7 +481,6 @@ defmodule FissionLib.GettingStartedTest do
   end
   """
   |> assert_eval("This is always true (equivalent to else)")
-  
   """
   cond do
     hd([1, 2, 3]) ->
@@ -509,7 +493,7 @@ defmodule FissionLib.GettingStartedTest do
 # Anonymous functions ==================================================================================================
 #=======================================================================================================================
 
-# todo think if it should display documentation string
+  # todo [TO_DISCUSS] think if it should display documentation string
   #  """
   #  h trunc/1
   #  """
@@ -522,18 +506,15 @@ defmodule FissionLib.GettingStartedTest do
   """
   add = fn a, b -> a + b end
   add.(1, 2)
-  
   """
   |> assert_eval(3)
-  
   """
   add = fn a, b -> a + b end
   is_function(add)
-  
   """
   |> assert_eval(true)
 
-#  todo is_function/2 not implemented?
+#  todo 10 is_function/2 not implemented
 #  """
 #  add = fn a, b -> a + b end
 #  is_function(add, 2)
@@ -545,16 +526,14 @@ defmodule FissionLib.GettingStartedTest do
 #  is_function(add, 1)
 #  """
 #  |> assert_eval(false)
-  
   """
   add = fn a, b -> a + b end
   double = fn a -> add.(a, a) end
   double.(2)
-  
   """
   |> assert_eval(4)
 
-#  todo i guess running function like (fn x -> x end).(1) does not work
+#  todo 11 specific evaluation of anonymous function does not work (possibly because of zero arguments)
 #  """
 #  x = 42
 #  (fn -> x = 0 end).()
@@ -574,25 +553,22 @@ defmodule FissionLib.GettingStartedTest do
     x, y -> x * y
   end
   f.(1, 3)
-  
   """
   |> assert_eval(4)
-  
   """
   f = fn
     x, y when x > 0 -> x + y
     x, y -> x * y
   end
   f.(-1, 3)
-  
   """
   |> assert_eval(-3)
 
-#   todo
+#  todo 1 Implement expecting errors
 #  """
 #  f2 = fn
-#  x, y when x > 0 -> x + y
-#  x, y, z -> x * y + z
+#    x, y when x > 0 -> x + y
+#    x, y, z -> x * y + z
 #  end
 #  """
 #  |> assert_compile_error()
@@ -605,11 +581,10 @@ defmodule FissionLib.GettingStartedTest do
   """
   fun = &is_atom/1
   is_function(fun)
-  
   """
   |> assert_eval(true)
   
-#  todo guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
+#  todo 12 guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
 #  """
 #  fun = &is_atom/1
 #  :erlang.is_atom(:hello)
@@ -638,7 +613,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(&:erlang.+/2)
 
-#  todo I guess this is similar to is_atom/1 situation
+#  todo 13 :erlang.+/2 is not working as an anonymous function
 #  """
 #  add = &+/2
 #  add.(1, 2)
@@ -655,11 +630,10 @@ defmodule FissionLib.GettingStartedTest do
   """
   fun = &(&1 + 1)
   fun.(1)
-  
   """
   |> assert_eval(2)
 
-#  todo - known problem with #{}
+#  todo 5 #{} is not working
 #  """
 #  fun2 = &"Good \#\{&1\}"
 #  fun2.("morning")
@@ -673,7 +647,6 @@ defmodule FissionLib.GettingStartedTest do
   """
   string = "hello"
   is_binary(string)
-  
   """
   |> assert_eval(true)
 
@@ -693,14 +666,12 @@ defmodule FissionLib.GettingStartedTest do
   """
   string = "héllo"
   String.length(string)
-  
   """
   |> assert_eval(5)
 
   """
   string = "héllo"
   byte_size(string)
-  
   """
   |> assert_eval(6)
 
@@ -710,12 +681,12 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(["👩", "‍", "🚒"])
 
-#  todo
+#  todo 13 String.graphemes/1 does not work for fireman emote
 #  """
 #  String.graphemes("👩‍🚒")
 #  """
 #  |> assert_eval(["👩‍🚒"])
-  
+
   """
   String.length("👩‍🚒")
   """
@@ -726,13 +697,13 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(<<104, 101, 197, 130, 197, 130, 111, 0>>)
 
-#  todo
+#  todo 14 IO.inspect with option :binaries fails with function_clause error
 #  """
 #  IO.inspect("hełło", binaries: :as_binaries)
 #  """
 #  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111>>)
 
-# todo "::" does not work for binaries
+# todo 15 "::" does not work for binaries
   assert_eval("<<42>> == <<42::8>>\n", true)
 #  assert_eval("<<3::4>>\n", <<3::size(4)>>)
 #  assert_eval("<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>\n", true)
@@ -748,13 +719,13 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(2)
   
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  <<0, 1, x>> = <<0, 1, 2, 3>>
 #  """
 #  |> assert_badmatch()
 
-# todo
+# todo 15 "::" does not work for binaries
 #  """
 #  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
 #  head
@@ -783,13 +754,11 @@ defmodule FissionLib.GettingStartedTest do
   head == ?b
   """
   |> assert_eval(true)
-  
   """
   <<head, rest::binary>> = "banana"
   rest
   """
   |> assert_eval("anana")
-  
   """
   "ü" <> <<0>>
   """
@@ -823,7 +792,6 @@ defmodule FissionLib.GettingStartedTest do
   ~c"hello"
   """
   |> assert_eval(~c"hello")
-  
   """
   [?h, ?e, ?l, ?l, ?o]
   """
@@ -833,30 +801,27 @@ defmodule FissionLib.GettingStartedTest do
   ~c"hełło"
   """
   |> assert_eval([104, 101, 322, 322, 111])
-  
   """
   is_list(~c"hełło")
   """
   |> assert_eval(true)
-  
   """
   heartbeats_per_minute = [99, 97, 116]
   """
   |> assert_eval(~c"cat")
   
-#  todo "'cat'" instead of "[99, 97, 116]"
+#  todo 16 inspect/2 returns "'cat'" instead of "[99, 97, 116]"
 #  """
 #  heartbeats_per_minute = [99, 97, 116]
 #  inspect(heartbeats_per_minute, charlists: :as_list)
 #  """
 #  |> assert_eval("[99, 97, 116]")
-  
   """
   to_charlist("hełło")
   """
   |> assert_eval([104, 101, 322, 322, 111])
 
-  #  todo "heBBo" instead of "hełło"
+#  todo 17 to_string/1 "heBBo" instead of "hełło"
 #  """
 #  to_string(~c"hełło")
 #  """
@@ -872,12 +837,11 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("1")
   
-  #  todo
+  #  todo 1 Implement expecting errors
   #  """
   #  ~c"this " <> ~c"fails"
   #  """
   #  |> assert_argument_error()
-  
   """
   ~c"this " ++ ~c"works"
   """
@@ -887,7 +851,6 @@ defmodule FissionLib.GettingStartedTest do
   #  "he" ++ "llo"
   #  """
   #  |> assert_argument_error()
-  
   """
   "he" <> "llo"
   """
@@ -902,7 +865,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(["1", "2", "3", "4"])
 
-#  todo Keyword not works in option here??
+#  todo 18 Keyword does not work in option for String.split/3
 #  """
 #  String.split("1 2 3 4", " ", [parts: 3])
 #  """
@@ -974,7 +937,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(1)
 
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  [a: a] = [a: 1, b: 2]
 #  ** (MatchError) no match of right hand side value: [a: 1, b: 2]
@@ -1038,7 +1001,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(1)
 
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  %{:c => c} = %{:a => 1, 2 => :b}
 #  ** (MatchError) no match of right hand side value: %{2 => :b, :a => 1}
@@ -1076,7 +1039,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("John")
 
-#todo
+#  todo 1 Implement expecting errors
 #  """
 #  map.agee
 #  ** (KeyError) key :agee not found in: %{name: "John", age: 23}
@@ -1090,7 +1053,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(%{name: "Mary", age: 23})
 
-# todo
+#  todo 1 Implement expecting errors
 #  """
 #  %{map | agee: 27}
 #  ** (KeyError) key :agee not found in: %{name: "John", age: 23}
@@ -1158,7 +1121,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(3)
 
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  defmodule Math do
 #    def sum(a, b) do
@@ -1202,6 +1165,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(false)
 
+#  todo 1 Implement expecting errors
 #  """
 #  defmodule Math do
 #    def zero?(0) do
@@ -1240,11 +1204,11 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval_module()
 
-#  todo "<>" does not work for variables - works only for plain strings
-#  todo default arguments defined with "\\" also have some problems
+#  todo 19 "<>" does not work for variables - works only for plain strings
+#  todo 20 using default arguments defined with "\\" fails (use \\\\ inside the string code to test this behaviour)
 #  """
 #  defmodule Concat do
-#    def join(a, b, sep \\ " ") do
+#    def join(a, b, sep \\\\ " ") do
 #      {a, b, sep}
 #    end
 #  end
@@ -1357,6 +1321,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(:ok)
 
+#  todo 1 Implement expecting errors
 #  """
 #  Recursion.print_multiple_times("Hello!", -1)
 #  ** (FunctionClauseError) no function clause matching in Recursion.print_multiple_times/2
@@ -1455,16 +1420,10 @@ defmodule FissionLib.GettingStartedTest do
   Enum.reduce([1, 2, 3], 0, fn x, acc -> x + acc end)
   """
   |> assert_eval(6)
-  
   """
   Enum.map([1, 2, 3], fn x -> x * 2 end)
   """
   |> assert_eval([2, 4, 6])
-
-  """
-  Enum.reduce([1, 2, 3], 0, fn x, acc -> x + acc end)
-  """
-  |> assert_eval(6)
   
   """
   Enum.map([1, 2, 3], &(&1 * 2))
@@ -1484,7 +1443,8 @@ defmodule FissionLib.GettingStartedTest do
   Enum.map(1..3, fn x -> x * 2 end)
   """
   |> assert_eval([2, 4, 6])
-
+  
+#  todo 13 :erlang.+/2 is not working as an anonymous function
 #  """
 #  Enum.reduce(1..3, 0, &+/2)
 #  """
@@ -1496,7 +1456,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval([1, 3])
   
-#  todo the following freezes test execution idk why xDD
+#  todo 21 the following freezes test execution
 #  """
 #  odd? = fn x -> rem(x, 2) != 0 end
 #  1..100_000 |> Enum.map(&(&1 * 3)) |> Enum.filter(odd?) |> Enum.sum()
@@ -1515,7 +1475,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval(7500000000)
 
-#  todo assert_is_stream?
+#  todo [TO_DISCUSS] assert_is_stream?
 #  """
 #  1..100_000 |> Stream.map(&(&1 * 3))
 #  #Stream<[enum: 1..100000, funs: [#Function<34.16982430/1 in Stream.map/2>]]>
@@ -1534,7 +1494,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
 
-#  todo File - idk if we want to test this module at all
+#  todo [TO_DISCUSS] module File
 #  """
 #  "path/to/file" |> File.stream!() |> Enum.take(10)
 #  """
@@ -1544,13 +1504,13 @@ defmodule FissionLib.GettingStartedTest do
 ## Processes ============================================================================================================
 ##=======================================================================================================================
 
-# todo "unknown external type: 83"
+#  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
 #  """
 #  spawn(fn -> 1 + 2 end)
 #  """
 #  |> assert_eval({:expect_fn, &is_pid/1})
 
-#  todo process with "pid" is still alive (Process.alive?/1 is true)
+#  todo 23 process with "pid" is still alive (Process.alive?/1 is true)
 #  """
 #  pid = spawn(fn -> 1 + 2 end)
 #  Process.alive?(pid)
@@ -1581,6 +1541,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("nothing after 1s")
 
+#  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
 #  """
 #  parent = self()
 #  spawn(fn -> send(parent, {:hello, self()}) end)
@@ -1596,7 +1557,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval(:hello)
 
-#  todo 
+#  todo 1 Implement expecting errors
 #  """
 #  spawn(fn -> raise "oops" end)
 #  #PID<0.58.0>
@@ -1607,7 +1568,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_error()
 
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  self()
 #  #PID<0.41.0>
@@ -1623,7 +1584,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_error()
 
-#  todo
+#  todo 1 Implement expecting errors
 #  """
 #  Task.start(fn -> raise "oops" end)
 #  {:ok, #PID<0.55.0>}
@@ -1638,7 +1599,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_error()
 
-#  todo
+#  todo 24 defining module that uses Task and trying to create such Task is causing compilation problems
 #  """
 #  defmodule KV do
 #    def start_link do
@@ -1660,7 +1621,8 @@ defmodule FissionLib.GettingStartedTest do
 #  flush()
 #  """
 #  |> assert_eval(nil)
-
+  
+#  todo 24 - the "pid" variable in the following is the "pid" variable from the former
 #  """
 #  send(pid, {:put, :hello, :world})
 #  {:put, :hello, :world}
@@ -1683,7 +1645,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
-#  todo
+#  todo 25 using Agent is causing the evaluation to fail
 #  """
 #  {:ok, pid} = Agent.start_link(fn -> %{} end)
 #  Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
@@ -1696,7 +1658,7 @@ defmodule FissionLib.GettingStartedTest do
 ## IO and the file system ===============================================================================================
 ##=======================================================================================================================
 
-#  todo idk how to test it
+#  todo [TO_DISCUSS] how to test that
 #  """
 #  IO.puts("hello world")
 #  hello world
@@ -1712,7 +1674,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(:ok)
 
-#  todo idk how to test it
+#  todo [TO_DISCUSS] module File
 #  """
 #  {:ok, file} = File.open("path/to/file/hello", [:write])
 #  {:ok, #PID<0.47.0>}
@@ -1760,6 +1722,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval("/Users/jose/hello")
 #
+#  todo [TO_DISCUSS] module File
 #  """
 #  {:ok, file} = File.open("hello")
 #  {:ok, #PID<0.47.0>}
@@ -1793,17 +1756,18 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 #
+# todo 19 "<>" does not work for variables - works only for plain strings
 #  """
 #  name = "Mary"
 #  IO.puts("Hello " <> name <> "!")
 #  """
-#  |> assert_eval()
-#
-#  """
-#  name = "Mary"
-#  IO.puts(["Hello ", name, "!"])
-#  """
-#  |> assert_eval()
+#  |> assert_eval(:ok)
+
+  """
+  name = "Mary"
+  IO.puts(["Hello ", name, "!"])
+  """
+  |> assert_eval(:ok)
 
   """
   Enum.join(["apple", "banana", "lemon"], ",")
@@ -1834,6 +1798,7 @@ defmodule FissionLib.GettingStartedTest do
 ## alias, require, import, and use ======================================================================================
 ##=======================================================================================================================
 
+#  todo [TO_DISCUSS] how do we want to test it - define module Foo here? 
 #  """
 #  # Alias the module so it can be called as Bar instead of Foo.Bar
 #  alias Foo.Bar, as: Bar
@@ -1849,6 +1814,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
+#  todo 26 using alias inside a module does not work
 #  """
 #  defmodule Stats do
 #    alias Math.List, as: List
@@ -1867,6 +1833,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(Math.List)
 
+#  todo [TO_DISCUSS] Should we test the following (it requires implementing at least some content of the function)
 #  """
 #  defmodule Math do
 #    def plus(a, b) do
@@ -1881,6 +1848,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
+#  todo 1 Implement expecting errors
 #  """
 #  Integer.is_odd(3)
 #  ** (UndefinedFunctionError) function Integer.is_odd/1 is undefined or private. However, there is a macro with the same name and arity. Be sure to require Integer if you intend to invoke this macro
@@ -1910,7 +1878,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval_module()
 
-#  todo problem with loading the module
+#  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
 #  """
 #  defmodule AssertionTest do
 #    use ExUnit.Case, async: true
@@ -1922,6 +1890,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval_module()
 
+#  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
 #  """
 #  defmodule Example do
 #    use Feature, option: :value
@@ -1929,6 +1898,8 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval_module()
 
+
+#  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
 #  """
 #  defmodule Example do
 #    require Feature
@@ -1967,7 +1938,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval([1, 2, 3])
 
-#  todo define module inside module does not work
+#  todo 28 nested modules do not work
 #  """
 #  defmodule Foo do
 #    defmodule Bar do
@@ -2010,7 +1981,7 @@ defmodule FissionLib.GettingStartedTest do
 ## Module attributes ====================================================================================================
 ##=======================================================================================================================
 
-#  todo idk how to or if we want to test the following
+#  todo [TO_DISCUSS] decide how to or if we want to test the following
 #  """
 #  defmodule MyServer do
 #    @moduledoc "My server code."
@@ -2046,7 +2017,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
-#  todo this should actually work in theory but doesnt for some reason
+#  todo 28 module attributes do not work
 #  """
 #  defmodule MyServer do
 #    @service URI.parse("https://example.com")
@@ -2086,7 +2057,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval_module()
 
-#  todo idk how to or if we want to test the following
+#  todo [TO_DISCUSS] how to or if we want to test the following
 #  """
 #  def some_function, do: do_something_with(@example)
 #  def another_function, do: do_something_else_with(@example)
@@ -2149,13 +2120,13 @@ defmodule FissionLib.GettingStartedTest do
   map[:a]
   """
   |> assert_eval(1)
-  
   """
   map = %{a: 1, b: 2}
   %{map | a: 3}
   """
   |> assert_eval(%{a: 3, b: 2})
 
+#  todo 29 implement/fix structs
 #  """
 #  defmodule User do
 #    defstruct name: "John", age: 27
@@ -2207,7 +2178,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
   
-#  todo
+#  todo 1 Implement expecting errors
 #
 #  """
 #  john = %User{}
@@ -2220,7 +2191,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
-#  todo structs definition seems to not work
+#  todo 29 implement/fix structs
 #  """
 #  defmodule Product do
 #    defstruct [:name]
@@ -2237,7 +2208,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval(%{age: 27, email: nil, name: "John"})
 
-#  todo assert syntax error
+#  todo 1 Implement expecting errors
 #  """
 #  defmodule User do
 #    defstruct [name: "John", age: 27, :email]
@@ -2271,7 +2242,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval_module()
   
-#  todo protocols just dont work
+#  todo 30 implement/fix protocols
 #  """
 #  defprotocol Utility do
 #    @spec type(t) :: String.t()
@@ -2389,26 +2360,18 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 #
+  """
+  Enum.reduce(1..3, 0, fn x, acc -> x + acc end)
+  """
+  |> assert_eval(6)
+
+#  todo 5 #{} is not working
 #  """
-#  Enum.map([1, 2, 3], fn x -> x * 2 end)
-#  [2, 4, 6]
-#  Enum.reduce(1..3, 0, fn x, acc -> x + acc end)
-#  6
+#  "age: \#\{25\}"
 #  """
-#  |> assert_eval()
-#
-#  """
-#  to_string(:hello)
-#  "hello"
-#  """
-#  |> assert_eval()
-#
-#  """
-#  "age: #{25}"
-#  "age: 25"
-#  """
-#  |> assert_eval()
-#
+#  |> assert_eval("age: 25")
+
+#  todo 1 Implement expecting errors
 #  """
 #  tuple = {1, 2, 3}
 #  {1, 2, 3}
@@ -2416,7 +2379,8 @@ defmodule FissionLib.GettingStartedTest do
 #  ** (Protocol.UndefinedError) protocol String.Chars not implemented for {1, 2, 3} of type Tuple
 #  """
 #  |> assert_eval()
-#
+  
+#  todo 5 #{} is not working
 #  """
 #  "tuple: #{inspect(tuple)}"
 #  "tuple: {1, 2, 3}"
@@ -2462,7 +2426,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval([0, 9])
 
-#  todo File module - idk if we want to test it
+#  todo [TO_DISCUSS] module File
 #  """
 #  dirs = ["/home/mikey", "/home/james"]
 #
@@ -2496,7 +2460,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(%{"a" => 1, "b" => 4})
 
-#  todo IO
+#  todo [TO_DISCUSS] how to test IO
 #  """
 #  stream = IO.stream(:stdio, :line)
 #  for line <- stream, into: stream do
@@ -2509,7 +2473,7 @@ defmodule FissionLib.GettingStartedTest do
 # Sigils ============================================================================================================
 #=======================================================================================================================
 
-#  todo "~r" does not work :(
+#  todo 31 "~r" and "~i" do not work
 #  """
 #  # A regular expression that matches strings which contain "foo" or "bar":
 #  regex = ~r/foo|bar/
@@ -2599,7 +2563,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval([:foo, :bar, :bat])
 
-#  todo #{}
+#  todo 5 #{} is not working
 #  """
 #  ~s(String with escape codes \x26 \#{"inter" <> "polation"})
 #  """
@@ -2610,7 +2574,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval("String without escape codes \\x26 without \#{interpolation}")
 
-#  todo I doubt we gonna test the "@docs"
+#  todo [TO_DISCUSS] I doubt we gonna test the "@docs"
 #  """
 #  ~s"""
 #  this is
@@ -2679,13 +2643,13 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("Etc/UTC")
 
-#  todo "~r"
+#  todo 31 "~r" and "~i" do not work
 #  """
 #  sigil_r(<<"foo">>, [?i])
 #  """
 #  |> assert_eval(~r"foo"i)
 
-#  todo "~i"
+#  todo 31 "~r" and "~i" do not work
 #  """
 #  defmodule MySigils do
 #    def sigil_i(string, []), do: String.to_integer(string)
@@ -2758,7 +2722,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval("Error!")
 
-#  todo File module?
+#  todo [TO_DISCUSS] module File
 #  """
 #  File.read("hello")
 #  {:error, :enoent}
@@ -2795,7 +2759,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
-#  todo #{}
+#  todo 5 #{} is not working
 #  """
 #  try do
 #    Enum.each(-50..50, fn x ->
@@ -2848,6 +2812,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval_module()
 
+#  todo [TO_DISCUSS] module File
 #  """
 #  {:ok, file} = File.open("sample", [:utf8, :write])
 #  try do
@@ -2929,7 +2894,8 @@ defmodule FissionLib.GettingStartedTest do
 # Writing documentation ================================================================================================
 #=======================================================================================================================
 
-#  todo idk if we want to test "@docs"
+  #  todo [TO_DISCUSS] if we want to test "@docs"
+  #  todo [TO_DISCUSS] if we want to test defs outside of defmodules - should we implement dummy modules for that?
 #  """
 #  defmodule MyApp.Hello do
 #    @moduledoc """
@@ -3046,7 +3012,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(:this)
 
-#  todo decide how to test it
+#  todo [TO_DISCUSS] decide how to test it
 #  """
 #  if variable? do
 #    Call.this()
@@ -3138,7 +3104,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval()
 
-#  todo :digraph module
+#  todo 32 fix :digraph module
 #  """
 #  digraph = :digraph.new()
 #  coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
@@ -3149,7 +3115,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval([{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}])
 
-#  todo :ets module
+#  todo 33 fix :ets module
 #  """
 #  table = :ets.new(:ets_test, [])
 #  # Store as tuples with {name, population}
@@ -3206,7 +3172,7 @@ defmodule FissionLib.GettingStartedTest do
   """
   |> assert_eval(:empty)
 
-#  todo :rand module
+#  todo 34 fix :rand module
 #  """
 #  :rand.uniform()
 #  """
@@ -3224,6 +3190,7 @@ defmodule FissionLib.GettingStartedTest do
 #  """
 #  |> assert_eval(6)
 #
+#  todo [TO_DISCUSS] file operations
 #  """
 #  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
 #  """
@@ -3239,7 +3206,6 @@ defmodule FissionLib.GettingStartedTest do
   byte_size(song)
   """
   |> assert_eval(110)
-  
   """
   song = "
   Mary had a little lamb,
@@ -3250,7 +3216,7 @@ defmodule FissionLib.GettingStartedTest do
   byte_size(compressed)
   """
   |> assert_eval(99)
-  
+#  todo 35 fix :zlib.uncompress/1
 #  """
 #  song = "
 #  Mary had a little lamb,
@@ -3266,7 +3232,7 @@ defmodule FissionLib.GettingStartedTest do
 # Debugging ============================================================================================================
 #=======================================================================================================================
 
-#  todo testing IO
+#  todo [TO_DISCUSS] testing IO
 #  """
 #  (1..10)
 #  |> IO.inspect()
@@ -3276,7 +3242,6 @@ defmodule FissionLib.GettingStartedTest do
 #  |> IO.inspect()
 #  """
 #  |> assert_eval()
-#
 #  prints:
 #  """
 #  1..10
@@ -3292,12 +3257,11 @@ defmodule FissionLib.GettingStartedTest do
 #  |> Enum.sum
 #  """
 #  |> assert_eval()
-#
+#  prints
 #  """
 #  before: [1, 2, 3]
 #  after: [2, 4, 6]
 #  """
-#  |> assert_eval()
 #
 #  """
 #  def some_fun(a, b, c) do
