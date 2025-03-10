@@ -5,18 +5,6 @@ const EVAL_ELIXIR = "eval:elixir";
 const EVAL_ERLANG = "eval:erlang";
 const EVAL_ERLANG_MODULE = "eval_module:erlang";
 
-var Module = {
-  arguments: ["app.avm"],
-  print(text) {
-    console.log(text);
-    log(text, false);
-  },
-  printErr(text) {
-    console.error(text);
-    log(text, true);
-  },
-};
-
 const Elements = {
   get evalButton() {
     return document.getElementById("eval");
@@ -51,6 +39,9 @@ const Elements = {
   get logsDisplay() {
     return document.getElementById("logs");
   },
+  get evalFrame() {
+    return document.getElementById("evalFrame");
+  }
 };
 
 let EXAMPLES;
@@ -92,6 +83,18 @@ add(A, B) -> A + B.
 }
 
 function setup() {
+  window.addEventListener("message", (e) => {
+    if (e.data.type == "result") {
+      handleEvalResult(e.data.value);
+    } else if (e.data.type == "log") {
+      displayLog(e.data.value, false);
+    } else if (e.data.type == "log_error") {
+      displayLog(e.data.value, true);
+    } else {
+      console.error("Invalid message", e.data);
+    }
+  });
+
   Elements.exampleCaseButton.onclick = () => {
     setExample(EXAMPLES.CASE);
   };
@@ -149,66 +152,32 @@ async function evalCode(code) {
   }
 
   Elements.stateDisplay.textContent = "Evaluating...";
+  Elements.logsDisplay.innerHTML = "";
 
-  try {
-    const { result, dtMs } = await profile(async () =>
-      Module.call("main", command),
-    );
+  Elements.evalFrame.contentWindow.postMessage({ type: "eval", value: command });
+}
+
+function handleEvalResult(result) {
+  if (result.status == "ok") {
     Elements.stateDisplay.textContent = "Done.";
-    console.log(`Took ${dtMs} ms, result: ${result}`);
-
-    Elements.timeDisplay.textContent = `${dtMs.toFixed(3)} ms`;
-    Elements.resultDisplay.textContent = result;
-  } catch {
+    Elements.timeDisplay.textContent = `${result.dtMs.toFixed(3)} ms`;
+    Elements.resultDisplay.textContent = result.value;
+  } else if (result.status == "error") {
     Elements.stateDisplay.textContent = "Evaluation error!";
+    Elements.timeDisplay.textContent = "";
+    Elements.resultDisplay.textContent = "";
   }
 }
 
-async function profile(fn) {
-  const t = performance.now();
-  const result = await fn();
-  const dtMs = performance.now() - t;
+function displayLog(log, isError) {
+  const lineElement = document.createElement("span");
+  lineElement.textContent = log;
 
-  return { result, dtMs };
-}
-
-function log(text, isError) {
-  if (this.lines === undefined) {
-    this.lines = [];
-    this.errors = new Set();
-    this.timer = undefined;
-  }
-
-  this.lines.push(text);
   if (isError) {
-    this.errors.add(this.lines.length - 1);
+    lineElement.style.color = "var(--swm-red-100)";
   }
 
-  clearTimeout(this.timer);
-  this.timer = setTimeout(() => {
-    displayLog(this.lines, this.errors);
-
-    this.lines = [];
-    this.errors.clear();
-    this.timer = undefined;
-  }, LOG_TIMEOUT_MS);
-}
-
-function displayLog(lines, errors) {
-  const fragment = document.createDocumentFragment();
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const isError = errors.has(i);
-    const lineElement = document.createElement("span");
-    lineElement.textContent = line;
-
-    if (isError) {
-      lineElement.style.color = "var(--swm-red-100)";
-    }
-    fragment.appendChild(lineElement);
-  }
-
-  Elements.logsDisplay.appendChild(fragment);
+  Elements.logsDisplay.appendChild(lineElement);
   Elements.logsDisplay.scrollTo({
     top: Elements.logsDisplay.scrollHeight,
     behavior: "instant",
