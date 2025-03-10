@@ -2,7 +2,7 @@ defmodule FissionLib.HexdocsTestHelper do
   use ExUnit.Case, async: true
   alias FissionLib.Support.AtomVM
   import FissionLib.Support.AsyncTest
-  
+
   defmacro assert_eval(code_string, expected) do
     quote do
       async_test "evaluation", %{tmp_dir: dir} do
@@ -42,7 +42,7 @@ defmodule FissionLib.HexdocsTest do
 
   @moduletag :tmp_dir
   @additional_prep ""
-  
+
   # =======================================================================================================================
   # Introduction =========================================================================================================
   # =======================================================================================================================
@@ -246,7 +246,7 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("String.split_at(\"hello world\", 3)", {"hel", "lo world"})
   assert_eval("String.split_at(\"hello world\", -4)", {"hello w", "orld"})
 
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  assert_eval("File.read(\"path/to/existing/file\")", {:ok, "... contents ..."})
   #  assert_eval("File.read(\"path/to/unknown/file\")", {:error, :enoent})
   """
@@ -541,16 +541,6 @@ defmodule FissionLib.HexdocsTest do
   # Anonymous functions ==================================================================================================
   # =======================================================================================================================
 
-  # todo think if it should display documentation string
-  #  """
-  #  h trunc/1
-  #  """
-  #  |> assert_eval("")
-  #  """
-  #  h Kernel.trunc/1
-  #  """
-  #  |> assert_eval("")
-
   """
   add = fn a, b -> a + b end
   add.(1, 2)
@@ -753,7 +743,7 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111>>)
 
-  # todo 15 "::" does not work for binaries
+  #  todo 15 "::" does not work for binaries
   assert_eval("<<42>> == <<42::8>>\n", true)
   #  assert_eval("<<3::4>>\n", <<3::size(4)>>)
   #  assert_eval("<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>\n", true)
@@ -775,7 +765,7 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_badmatch()
 
-  # todo 15 "::" does not work for binaries
+  #  todo 15 "::" does not work for binaries
   #  """
   #  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
   #  head
@@ -1499,26 +1489,24 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval(7500000000)
 
-  #  todo [] assert_is_stream? is_struct or something
+  #  todo 39 "Unknown external term type: <number>" when calling the Stream module functions
   #  """
   #  1..100_000 |> Stream.map(&(&1 * 3))
-  #  #Stream<[enum: 1..100000, funs: [#Function<34.16982430/1 in Stream.map/2>]]>
   #  """
-  #  |> assert_eval()
+  #  |> assert_eval(fn term -> is_struct(term, Stream) end)
   #
   #  """
   #  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?)
-  #  #Stream<[enum: 1..100000, funs: [...]]>
   #  """
-  #  |> assert_eval()
+  #  |> assert_eval(fn term -> is_struct(term, Stream) end)
+  #
+  #  """
+  #  stream = Stream.cycle([1, 2, 3])
+  #  Enum.take(stream, 10)
+  #  """
+  #  |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
 
-  """
-  stream = Stream.cycle([1, 2, 3])
-  Enum.take(stream, 10)
-  """
-  |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
-
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  "path/to/file" |> File.stream!() |> Enum.take(10)
   #  """
@@ -1682,7 +1670,7 @@ defmodule FissionLib.HexdocsTest do
   ## IO and the file system ===============================================================================================
   ## =======================================================================================================================
 
-  #  todo [] how to test that output try_eval
+  #  todo 38 testing IO - take result from try_run and output and assert it
   #  """
   #  IO.puts("hello world")
   #  hello world
@@ -1698,7 +1686,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(:ok)
 
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  {:ok, file} = File.open("path/to/file/hello", [:write])
   #  {:ok, #PID<0.47.0>}
@@ -1746,7 +1734,7 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval("/Users/jose/hello")
   #
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  {:ok, file} = File.open("hello")
   #  {:ok, #PID<0.47.0>}
@@ -1821,22 +1809,6 @@ defmodule FissionLib.HexdocsTest do
   ## =======================================================================================================================
   ## alias, require, import, and use ======================================================================================
   ## =======================================================================================================================
-
-  #  todo [TO_DISCUSS] how do we want to test it - define module Foo here? do not test it
-  #  """
-  #  # Alias the module so it can be called as Bar instead of Foo.Bar
-  #  alias Foo.Bar, as: Bar
-  #
-  #  # Require the module in order to use its macros
-  #  require Foo
-  #
-  #  # Import functions from Foo so they can be called without the `Foo.` prefix
-  #  import Foo
-  #
-  #  # Invokes the custom code defined in Foo as an extension point
-  #  use Foo
-  #  """
-  #  |> assert_eval()
 
   #  todo 26 using alias inside a module does not work
   #  """
@@ -2379,7 +2351,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([0, 9])
 
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  dirs = ["/home/mikey", "/home/james"]
   #
@@ -2413,7 +2385,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(%{"a" => 1, "b" => 4})
 
-  #  todo [TO_DISCUSS] how to test IO
+  #  todo 38 testing IO - take result from try_run and output and assert it
   #  """
   #  stream = IO.stream(:stdio, :line)
   #  for line <- stream, into: stream do
@@ -2674,7 +2646,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval("Error!")
 
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  File.read("hello")
   #  {:error, :enoent}
@@ -2764,7 +2736,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval_module()
 
-  #  todo [TO_DISCUSS] module File
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  {:ok, file} = File.open("sample", [:utf8, :write])
   #  try do
@@ -3021,7 +2993,7 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval(6)
   #
-  #  todo file operations
+  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
   #  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
   #  """
@@ -3065,7 +3037,7 @@ defmodule FissionLib.HexdocsTest do
   # Debugging ============================================================================================================
   # =======================================================================================================================
 
-  #  todo [TO_DISCUSS] testing IO
+  #  todo 38 testing IO - take result from try_run and output and assert it
   #  """
   #  (1..10)
   #  |> IO.inspect()
@@ -3075,13 +3047,13 @@ defmodule FissionLib.HexdocsTest do
   #  |> IO.inspect()
   #  """
   #  |> assert_eval()
-  #  prints:
-  #  """
-  #  1..10
-  #  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
-  #  110
-  #  """
   #
+  ##  prints:
+  ##
+  ##  1..10
+  ##  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+  ##  110
+  
   #  """
   #  [1, 2, 3]
   #  |> IO.inspect(label: "before")
@@ -3090,49 +3062,16 @@ defmodule FissionLib.HexdocsTest do
   #  |> Enum.sum
   #  """
   #  |> assert_eval()
-  #  prints
-  #  """
-  #  before: [1, 2, 3]
-  #  after: [2, 4, 6]
-  #  """
   #
-  #  """
-  #  def some_fun(a, b, c) do
-  #    IO.inspect(binding())
-  #    ...
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  [a: :foo, b: "bar", c: :baz]
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  # In my_file.exs
-  #  feature = %{name: :dbg, inspiration: "Rust"}
-  #  dbg(feature)
-  #  dbg(Map.put(feature, :in_version, "1.14.0"))
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  # In dbg_pipes.exs
-  #  __ENV__.file
-  #  |> String.split("/", trim: true)
-  #  |> List.last()
-  #  |> File.exists?()
-  #  |> dbg()
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  $ iex
-  #  :observer.start()
-  #  """
-  #  |> assert_eval()
-  
+  ##  prints:
+  ##
+  ##  before: [1, 2, 3]
+  ##  after: [2, 4, 6]
+
+  # =======================================================================================================================
+  # Enum cheatsheet =======================================================================================================
+  # =======================================================================================================================
+
   @additional_prep """
   cart = [
     %{fruit: "apple", count: 3},
@@ -3201,6 +3140,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(true)
 
+  #  todo 36 Fix "=~"
   #  """
   #  Enum.filter(cart, &(&1.fruit =~ "o"))
   #  """
@@ -3284,7 +3224,7 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval(["apple", "orange"])
 
-  #  todo IO
+  #  todo 38 testing IO - take result from try_run and output and assert it
   #  """
   #  Enum.each(cart, &IO.puts(&1.fruit))
   #  apple
@@ -3469,19 +3409,19 @@ defmodule FissionLib.HexdocsTest do
    end)
   """
   |> assert_eval(
-       {[
-         "apple",
-         "apple",
-         "apple",
-         "banana",
-         "orange",
-         "orange",
-         "orange",
-         "orange",
-         "orange",
-         "orange"
-       ], 10}
-     )
+    {[
+       "apple",
+       "apple",
+       "apple",
+       "banana",
+       "orange",
+       "orange",
+       "orange",
+       "orange",
+       "orange",
+       "orange"
+     ], 10}
+  )
 
   """
   for item <- cart,
@@ -3781,22 +3721,22 @@ defmodule FissionLib.HexdocsTest do
   Enum.split(cart, 1)
   """
   |> assert_eval(
-       {[%{fruit: "apple", count: 3}],
-         [
-           %{fruit: "banana", count: 1},
-           %{fruit: "orange", count: 6}
-         ]}
-     )
+    {[%{fruit: "apple", count: 3}],
+     [
+       %{fruit: "banana", count: 1},
+       %{fruit: "orange", count: 6}
+     ]}
+  )
 
   """
   Enum.split(cart, -1)
   """
   |> assert_eval(
-       {[
-         %{fruit: "apple", count: 3},
-         %{fruit: "banana", count: 1}
-       ], [%{fruit: "orange", count: 6}]}
-     )
+    {[
+       %{fruit: "apple", count: 3},
+       %{fruit: "banana", count: 1}
+     ], [%{fruit: "orange", count: 6}]}
+  )
 
   #  """
   #  Enum.split_while(cart, &(&1.fruit =~ "e"))
@@ -3870,28 +3810,6 @@ defmodule FissionLib.HexdocsTest do
   #  Enum.take_while(cart, &(&1.fruit =~ "e"))
   #  """
   #  |> assert_eval([%{fruit: "apple", count: 3}])
-
-  #  """
-  #  Enum.random(cart)
-  #  """
-  #  |> assert_eval(%{fruit: "orange", count: 6})
-
-  #  """
-  #  Enum.take_random(cart, 2)
-  #  """
-  #  |> assert_eval([
-  #    %{fruit: "orange", count: 6},
-  #    %{fruit: "apple", count: 3}
-  #  ])
-
-  #  """
-  #  Enum.shuffle(cart)
-  #  """
-  #  |> assert_eval([
-  #    %{fruit: "orange", count: 6},
-  #    %{fruit: "apple", count: 3},
-  #    %{fruit: "banana", count: 1}
-  #  ])
 
   """
   Enum.chunk_by(cart, &String.length(&1.fruit))
