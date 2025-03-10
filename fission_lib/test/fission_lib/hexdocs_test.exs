@@ -3053,7 +3053,7 @@ defmodule FissionLib.HexdocsTest do
   ##  1..10
   ##  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
   ##  110
-  
+
   #  """
   #  [1, 2, 3]
   #  |> IO.inspect(label: "before")
