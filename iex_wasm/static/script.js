@@ -84,14 +84,10 @@ add(A, B) -> A + B.
 
 function setup() {
   window.addEventListener("message", (e) => {
-    if (e.data.type == "result") {
-      handleEvalResult(e.data.value);
-    } else if (e.data.type == "log") {
+    if (e.data.type == "log") {
       displayLog(e.data.value, false);
     } else if (e.data.type == "log_error") {
       displayLog(e.data.value, true);
-    } else {
-      console.error("Invalid message", e.data);
     }
   });
 
@@ -154,10 +150,11 @@ async function evalCode(code) {
   Elements.stateDisplay.textContent = "Evaluating...";
   Elements.logsDisplay.innerHTML = "";
 
-  Elements.evalFrame.contentWindow.postMessage({ type: "eval", value: command });
-}
+  do {
+    Elements.evalFrame.contentWindow.postMessage({ type: "eval", value: command });
+  } while ("timeout" == await timeout(receiveMessage("evaluating"), 100))
 
-function handleEvalResult(result) {
+  const result = await receiveMessage("result");
   if (result.status == "ok") {
     Elements.stateDisplay.textContent = "Done.";
     Elements.timeDisplay.textContent = `${result.dtMs.toFixed(3)} ms`;
@@ -182,6 +179,26 @@ function displayLog(log, isError) {
     top: Elements.logsDisplay.scrollHeight,
     behavior: "instant",
   });
+}
+
+function receiveMessage(type) {
+  return new Promise(function (resolve) {
+    window.addEventListener("message", function messageListener(e) {
+      if (e.data.type == type) {
+        window.removeEventListener("message", messageListener);
+        resolve(e.data.value);
+      }
+    });
+  });
+}
+
+function timeout(promise, timeout) {
+  return Promise.race([
+    promise,
+    new Promise(function (resolve) {
+      setTimeout(function () { resolve("timeout"); }, timeout);
+    })
+  ]);
 }
 
 setup();

@@ -1,5 +1,6 @@
 var Module = {
   arguments: ["app.avm"],
+  onRuntimeInitialized: init,
   print(text) {
     console.log(text);
     window.parent.postMessage({ type: "log", value: text });
@@ -30,14 +31,21 @@ async function evalCode(command) {
     return { status: "error", value: e };
   }
 }
-window.addEventListener("message", async (e) => {
-  if (e.data.type == "eval") {
-    const result = await evalCode(e.data.value);
-    window.parent.postMessage({ type: "result", value: result });
-    if (result.status == "error") {
-      window.location.reload();
+
+async function init() {
+  // Wait until the receive loop starts within AVM
+  await new Promise(r => setTimeout(r, 100));
+  console.log("init")
+  window.addEventListener("message", async (e) => {
+    if (e.data.type == "eval") {
+      window.parent.postMessage({ type: "evaluating" });
+      const result = await evalCode(e.data.value);
+      window.parent.postMessage({ type: "result", value: result });
+      if (result.status == "error") {
+        window.location.reload();
+      }
+    } else {
+      console.error("Invalid message", e.data);
     }
-  } else {
-    console.error("Invalid message", e.data);
-  }
-});
+  });
+}
