@@ -115,17 +115,14 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("false and raise(\"This error will never be raised\")\n", false)
   assert_eval("true or raise(\"This error will never be raised\")\n", true)
 
-  # todo 2 not implemented '||'
-  # assert_eval("1 || true\n", 1)
-  # assert_eval("false || 11\n", 11)
-  # todo 3 not implemented '&&'
-  # assert_eval("nil && 13\n", nil)
-  # assert_eval("true && 17\n", 17)
+  assert_eval("1 || true\n", 1)
+  assert_eval("false || 11\n", 11)
+  assert_eval("nil && 13\n", nil)
+  assert_eval("true && 17\n", 17)
 
   assert_eval("!true\n", false)
-  # todo 4 '!' not implemented for integer or nil
-  # assert_eval("!1\n", false)
-  # assert_eval("!nil\n", true)
+  assert_eval("!1\n", false)
+  assert_eval("!nil\n", true)
   assert_eval(":apple\n", :apple)
   assert_eval(":orange\n", :orange)
   assert_eval(":watermelon\n", :watermelon)
@@ -141,11 +138,11 @@ defmodule FissionLib.HexdocsTest do
 
   assert_eval("\"hello \" <> \"world!\"", "hello world!")
   # todo 5 #{} is not working
-  #    """
-  #    string = "world"
-  #    "hello \#\{string\}!"
-  #    """
-  #    |> assert_eval("hello world!")
+  """
+  string = "world"
+  "hello \#{string}!"
+  """
+  |> assert_eval("hello world!")
 
   #    """
   #    number = 42

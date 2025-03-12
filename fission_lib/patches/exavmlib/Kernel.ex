@@ -208,4 +208,206 @@ defmodule Kernel do
   defp struct(%_{} = struct, fields, fun) do
     Enum.reduce(fields, struct, fun)
   end
+
+  @doc guard: true
+  defmacro left in right do
+    in_body? = __CALLER__.context == nil
+
+    expand =
+      case bootstrapped?(Macro) do
+        true -> &Macro.expand(&1, __CALLER__)
+        false -> & &1
+      end
+
+    case expand.(right) do
+      [] when not in_body? ->
+        false
+
+      [] ->
+        quote do
+          _ = unquote(left)
+          false
+        end
+
+      [head | tail] = list ->
+        # We only expand lists in the body if they are relatively
+        # short and it is made only of literal expressions.
+        case not in_body? or small_literal_list?(right) do
+          true -> in_var(in_body?, left, &in_list(&1, head, tail, expand, list, in_body?))
+          false -> quote(do: :lists.member(unquote(left), unquote(right)))
+        end
+
+      %{} = right ->
+        raise ArgumentError, "found unescaped value on the right side of in/2: #{inspect(right)}"
+
+      right ->
+        with {:%{}, _meta, fields} <- right,
+             [__struct__: Elixir.Range, first: first, last: last, step: step] <-
+               :lists.usort(fields) do
+          in_var(in_body?, left, &in_range(&1, expand.(first), expand.(last), expand.(step)))
+        else
+          _ when in_body? ->
+            quote(do: Elixir.Enum.member?(unquote(right), unquote(left)))
+
+          _ ->
+            raise_on_invalid_args_in_2(right)
+        end
+    end
+  end
+
+  defp raise_on_invalid_args_in_2(right) do
+    raise ArgumentError, <<
+      "invalid right argument for operator \"in\", it expects a compile-time proper list ",
+      "or compile-time range on the right side when used in guard expressions, got: ",
+      Macro.to_string(right)::binary
+    >>
+  end
+
+  defp in_var(false, ast, fun), do: fun.(ast)
+
+  defp in_var(true, {atom, _, context} = var, fun) when is_atom(atom) and is_atom(context),
+       do: fun.(var)
+
+  defp in_var(true, ast, fun) do
+    quote do
+      var = unquote(ast)
+      unquote(fun.(quote(do: var)))
+    end
+  end
+
+  defp small_literal_list?(list) when is_list(list) and length(list) <= 32 do
+    :lists.all(fn x -> is_binary(x) or is_atom(x) or is_number(x) end, list)
+  end
+
+  defp small_literal_list?(_list), do: false
+
+  defp in_range(left, first, last, step) when is_integer(step) do
+    in_range_literal(left, first, last, step)
+  end
+
+  defp in_range(left, first, last, step) do
+    quoted =
+      quote do
+        :erlang.is_integer(unquote(left)) and :erlang.is_integer(unquote(first)) and
+        :erlang.is_integer(unquote(last)) and
+        ((:erlang.>(unquote(step), 0) and
+          unquote(increasing_compare(left, first, last))) or
+         (:erlang.<(unquote(step), 0) and
+          unquote(decreasing_compare(left, first, last))))
+      end
+
+    in_range_step(quoted, left, first, step)
+  end
+
+  defp in_range_literal(left, first, first, _step) when is_integer(first) do
+    quote do: :erlang."=:="(unquote(left), unquote(first))
+  end
+
+  defp in_range_literal(left, first, last, step) when step > 0 do
+    quoted =
+      quote do
+        :erlang.andalso(
+          :erlang.is_integer(unquote(left)),
+          unquote(increasing_compare(left, first, last))
+        )
+      end
+
+    in_range_step(quoted, left, first, step)
+  end
+
+  defp in_range_literal(left, first, last, step) when step < 0 do
+    quoted =
+      quote do
+        :erlang.andalso(
+          :erlang.is_integer(unquote(left)),
+          unquote(decreasing_compare(left, first, last))
+        )
+      end
+
+    in_range_step(quoted, left, first, step)
+  end
+
+  defp in_range_step(quoted, _left, _first, step) when step == 1 or step == -1 do
+    quoted
+  end
+
+  defp in_range_step(quoted, left, first, step) do
+    quote do
+      :erlang.andalso(
+        unquote(quoted),
+        :erlang."=:="(:erlang.rem(unquote(left) - unquote(first), unquote(step)), 0)
+      )
+    end
+  end
+
+  defp in_list(left, head, tail, expand, right, in_body?) do
+    [head | tail] = :lists.map(&comp(left, &1, expand, right, in_body?), [head | tail])
+    :lists.foldl(&quote(do: :erlang.orelse(unquote(&2), unquote(&1))), head, tail)
+  end
+
+  defp comp(left, {:|, _, [head, tail]}, expand, right, in_body?) do
+    case expand.(tail) do
+      [] ->
+        quote(do: :erlang."=:="(unquote(left), unquote(head)))
+
+      [tail_head | tail] ->
+        quote do
+          :erlang.orelse(
+            :erlang."=:="(unquote(left), unquote(head)),
+            unquote(in_list(left, tail_head, tail, expand, right, in_body?))
+          )
+        end
+
+      tail when in_body? ->
+        quote do
+          :erlang.orelse(
+            :erlang."=:="(unquote(left), unquote(head)),
+            :lists.member(unquote(left), unquote(tail))
+          )
+        end
+
+      _ ->
+        raise_on_invalid_args_in_2(right)
+    end
+  end
+
+  defp comp(left, right, _expand, _right, _in_body?) do
+    quote(do: :erlang."=:="(unquote(left), unquote(right)))
+  end
+
+  defp increasing_compare(var, first, last) do
+    quote do
+      :erlang.andalso(
+        :erlang.>=(unquote(var), unquote(first)),
+        :erlang."=<"(unquote(var), unquote(last))
+      )
+    end
+  end
+
+  defp decreasing_compare(var, first, last) do
+    quote do
+      :erlang.andalso(
+        :erlang."=<"(unquote(var), unquote(first)),
+        :erlang.>=(unquote(var), unquote(last))
+      )
+    end
+  end
+
+  defp bootstrapped?(_), do: true
+
+
+  @spec inspect(Inspect.t(), keyword) :: String.t()
+  def inspect(term, opts \\ []) when is_list(opts) do
+    opts = Inspect.Opts.new(opts)
+
+    limit =
+      case opts.pretty do
+        true -> opts.width
+        false -> :infinity
+      end
+
+    doc = Inspect.Algebra.group(Inspect.Algebra.to_doc(term, opts))
+    IO.iodata_to_binary(Inspect.Algebra.format(doc, limit))
+  end
+  
 end
