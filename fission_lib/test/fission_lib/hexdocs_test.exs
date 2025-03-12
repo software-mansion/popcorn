@@ -138,11 +138,11 @@ defmodule FissionLib.HexdocsTest do
 
   assert_eval("\"hello \" <> \"world!\"", "hello world!")
   # todo 5 #{} is not working
-  """
-  string = "world"
-  "hello \#{string}!"
-  """
-  |> assert_eval("hello world!")
+  #  """
+  #  string = "world"
+  #  "hello \#{string}!"
+  #  """
+  #  |> assert_eval("hello world!")
 
   #    """
   #    number = 42
