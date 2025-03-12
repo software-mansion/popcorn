@@ -174,8 +174,7 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("length([1, 2, 3])\n", 3)
 
   assert_eval("[1, 2, 3] ++ [4, 5, 6]\n", [1, 2, 3, 4, 5, 6])
-  #  todo 6 subtraction of two lists with different type terms inside is failing
-  #  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
+  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
 
   """
   list = [1, 2, 3]
