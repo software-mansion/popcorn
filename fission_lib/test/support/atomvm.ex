@@ -122,11 +122,16 @@ defmodule FissionLib.Support.AtomVM do
       """
     end
 
-    # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-    cmd = "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
+    cmd =
+      if System.get_env("CI") == "true" do
+        "AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path}"
+      else
+        # $() suppresses sh error about process signal traps, i.e. when AVM crashes
+        "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
+      end
+
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
     {output, exit_status} = System.shell(cmd)
-    if System.get_env("CI") == "true", do: Logger.info(File.read!(log_path))
 
     result =
       case File.read(result_path) do

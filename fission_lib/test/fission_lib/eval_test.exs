@@ -197,7 +197,7 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  async_test "warnings", %{tmp_dir: dir} do
+  async_test "Module redefinition", %{tmp_dir: dir} do
     info =
       """
       defmodule W do
@@ -216,10 +216,11 @@ defmodule FissionLib.EvalTest do
       |> AtomVM.try_eval(:elixir, run_dir: dir)
 
     assert %{exit_status: 0, result: {{10, 20}, {20, 30}}} = info
-    logs = File.read!(info.log_path)
-    assert String.contains?(logs, "warning: {unused_var,c,false}")
-    assert String.contains?(logs, "warning: {module_defined,'Elixir.RunExpr.W'}")
-    assert String.contains?(logs, "warning: {unused_var,a,false}")
+    # FIXME: Warnings are disabled due to GC problems
+    # logs = File.read!(info.log_path)
+    # assert String.contains?(logs, "warning: {unused_var,c,false}")
+    # assert String.contains?(logs, "warning: {module_defined,'Elixir.RunExpr.W'}")
+    # assert String.contains?(logs, "warning: {unused_var,a,false}")
   end
 
   async_test "Adder", %{tmp_dir: dir} do

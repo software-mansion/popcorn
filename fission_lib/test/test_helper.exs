@@ -9,4 +9,6 @@ for type <- [:eval_elixir, :eval_erlang_module, :eval_erlang_expr] do
   |> AtomVM.compile_quoted()
 end
 
-ExUnit.start(capture_log: true)
+ci_opts = if System.get_env("CI") == "true", do: [max_cases: 1], else: []
+
+ExUnit.start([capture_log: true] ++ ci_opts)
