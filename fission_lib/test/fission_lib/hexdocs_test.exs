@@ -240,8 +240,8 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval({:a, :b, :e, :d})
 
   #  todo 7 String.split is failing
-  #  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
-  #  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
+  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
+  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
 
   assert_eval("String.split_at(\"hello world\", 3)", {"hel", "lo world"})
   assert_eval("String.split_at(\"hello world\", -4)", {"hello w", "orld"})
