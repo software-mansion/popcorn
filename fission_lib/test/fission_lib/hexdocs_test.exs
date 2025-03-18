@@ -9,8 +9,7 @@ defmodule FissionLib.HexdocsTestHelper do
         result =
           (@additional_prep <> unquote(code_string))
           |> AtomVM.eval(:elixir, run_dir: dir)
-
-        unquote(__MODULE__).assert_expectation(unquote(expected), result)
+          |> unquote(__MODULE__).assert_expectation(unquote(expected))
       end
     end
   end
@@ -25,12 +24,29 @@ defmodule FissionLib.HexdocsTestHelper do
       end
     end
   end
+  
+  defmacro assert_error(code_string, expected_error) do
+    quote do
+      async_test "evaluation", %{tmp_dir: dir} do
+        result =
+          "try do\n" <>
+          (@additional_prep <> unquote(code_string)) <>
+          """
+          rescue
+            e -> e
+          end
+          """
+          |> AtomVM.eval(:elixir, run_dir: dir)
+        assert unquote(expected_error) = result
+      end
+    end
+  end
 
-  def assert_expectation({:expect_fn, f}, result) when is_function(f) do
+  def assert_expectation(result, {:expect_fn, f}) when is_function(f) do
     assert f.(result)
   end
 
-  def assert_expectation(e, result) do
+  def assert_expectation(result, e) do
     assert e === result
   end
 end
@@ -94,7 +110,7 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("true and true\n", true)
   assert_eval("false or is_boolean(true)\n", true)
 
-  # todo 1 Implement expecting errors assert_eval("1 and true\n", "** (BadBooleanError) expected a boolean on left-side of "and", got: 1")
+  assert_error("1 and true\n", %BadBooleanError{})
 
   assert_eval("false and raise(\"This error will never be raised\")\n", false)
   assert_eval("true or raise(\"This error will never be raised\")\n", true)
@@ -190,9 +206,8 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([2, 3])
 
-  #  todo 1 Implement expecting errors 
-  #  hd([]) "** (ArgumentError) argument error"
-
+  assert_error("hd([])\n", %ArgumentError{})
+  
   assert_eval("[11, 12, 13]\n", ~c"\v\f\r")
   assert_eval("[104, 101, 108, 108, 111]\n", ~c"hello")
 
@@ -264,19 +279,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(1)
 
-  #  todo 1 Implement expecting errors create a assert_badmatch function or macro
-  #  """
-  #  x = 1
-  #  1 = x
-  #  2 = x
-  #  """
-  #  |> assert_badmatch() 
-  #  todo 1 Implement expecting errors create a assert_undefined_variable function or macro
-  #  """
-  #  1 = unknown
-  #  """
-  #  |> assert_undefined_variable()
-  #
+  """
+  x = 1
+  1 = x
+  2 = x
+  """
+  |> assert_error(%MatchError{})
+  
   """
   {a, b, c} = {:hello, "world", 42}
   a
@@ -289,15 +298,15 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval("world")
 
-  #  """
-  #  {a, b, c} = {:hello, "world"}
-  #  """
-  #  |> assert_badmatch()
+  """
+  {a, b, c} = {:hello, "world"}
+  """
+  |> assert_error(%MatchError{})
 
-  #  """
-  #  {a, b, c} = [:hello, "world", 42]
-  #  """
-  #  |> assert_badmatch()
+  """
+  {a, b, c} = [:hello, "world", 42]
+  """
+  |> assert_error(%MatchError{})
 
   """
   {:ok, result} = {:ok, 13}
@@ -305,11 +314,11 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(13)
 
-  #  """
-  #  {:ok, result} = {:ok, 13}
-  #  {:ok, result} = {:error, :oops}
-  #  """
-  #  |> assert_badmatch()
+  """
+  {:ok, result} = {:ok, 13}
+  {:ok, result} = {:error, :oops}
+  """
+  |> assert_error(%MatchError{})
 
   """
   [a, b, c] = [1, 2, 3]
@@ -329,10 +338,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([2, 3])
 
-  #  """
-  #  [head | tail] = []
-  #  """
-  #  |> assert_badmatch()
+  """
+  [head | tail] = []
+  """
+  |> assert_error(%MatchError{})
 
   """
   list = [1, 2, 3]
@@ -346,25 +355,25 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(2)
 
-  #  """
-  #  x = 1
-  #  ^x = 2
-  #  """
-  #  |> assert_badmatch()
+  """
+  x = 1
+  ^x = 2
+  """
+  |> assert_error(%MatchError{})
 
-  #  """
-  #  1 = 2
-  #  """
-  #  |> assert_badmatch()
+  """
+  1 = 2
+  """
+  |> assert_error(%MatchError{})
 
-  #  """
-  #  x = 1
-  #  [^x, 2, 3] = [1, 2, 3]
-  #  {y, ^x} = {2, 1}
-  #  y
-  #  {y, ^x} = {2, 2}
-  #  """
-  #  |> assert_badmatch()
+  """
+  x = 1
+  [^x, 2, 3] = [1, 2, 3]
+  {y, ^x} = {2, 1}
+  y
+  {y, ^x} = {2, 2}
+  """
+  |> assert_error(%MatchError{})
   """
   x = 1
   [^x, 2, 3] = [1, 2, 3]
@@ -386,26 +395,16 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([1, 2, 3])
 
-  #  """
-  #  {y, 1} = {2, 2}
-  #  """
-  #  |> assert_badmatch()
+  """
+  {y, 1} = {2, 2}
+  """
+  |> assert_error(%MatchError{})
+  
   """
   [head | _] = [1, 2, 3]
   head
   """
   |> assert_eval(1)
-
-  #  todo 1 Implement expecting errors create a assert_compile_error function or macro
-  #  """
-  #  _
-  #  """
-  #  |> assert_compile_error()
-
-  #  """
-  #  length([1, [2], 3]) = 3
-  #  """
-  #  |> assert_compile_error()
 
   # =======================================================================================================================
   # case, cond, and if ===================================================================================================
@@ -443,11 +442,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval("Will match")
 
-  #  todo 1 Implement expecting errors create a assert_argument_error function or macro
-  #  """
-  #  hd(1)
-  #  """
-  #  |> assert_argument_error()
+  """
+  hd(1)
+  """
+  |> assert_error(%ArgumentError{})
 
   #  """
   #  case 1 do
@@ -457,13 +455,12 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval("Got 1")
 
-  #  todo 1 Implement expecting errors create a assert_case_clause_error function or macro
-  #  """
-  #  case :ok do
-  #    :error -> "Won't match"
-  #  end
-  #  """
-  #  |> assert_case_clause_error()
+  """
+  case :ok do
+    :error -> "Won't match"
+  end
+  """
+  |> assert_error(%CaseClauseError{})
 
   """
   if true do
@@ -603,15 +600,6 @@ defmodule FissionLib.HexdocsTest do
   f.(-1, 3)
   """
   |> assert_eval(-3)
-
-  #  todo 1 Implement expecting errors
-  #  """
-  #  f2 = fn
-  #    x, y when x > 0 -> x + y
-  #    x, y, z -> x * y + z
-  #  end
-  #  """
-  #  |> assert_compile_error()
 
   """
   fun = &is_atom/1
@@ -759,11 +747,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(2)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  <<0, 1, x>> = <<0, 1, 2, 3>>
-  #  """
-  #  |> assert_badmatch()
+  """
+  <<0, 1, x>> = <<0, 1, 2, 3>>
+  """
+  |> assert_error(%MatchError{})
 
   #  todo 15 "::" does not work for binaries
   #  """
@@ -882,11 +869,12 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval("1")
 
-  #  todo 1 Implement expecting errors
+  #  todo 40 concat does not returning ArgumentError with sigil c
   #  """
   #  ~c"this " <> ~c"fails"
   #  """
-  #  |> assert_argument_error()
+  #  |> assert_error(%ArgumentError{})
+  
   """
   ~c"this " ++ ~c"works"
   """
@@ -972,19 +960,15 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(1)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  [a: a] = [a: 1, b: 2]
-  #  ** (MatchError) no match of right hand side value: [a: 1, b: 2]
-  #  """
-  #  |> assert_error()
-  #
-  #
-  #  """
-  #  [b: b, a: a] = [a: 1, b: 2]
-  #  ** (MatchError) no match of right hand side value: [a: 1, b: 2]
-  #  """
-  #  |> assert_error()
+  """
+  [a: a] = [a: 1, b: 2]
+  """
+  |> assert_error(%MatchError{})
+
+  """
+  [b: b, a: a] = [a: 1, b: 2]
+  """
+  |> assert_error(%MatchError{})
 
   """
   if true do
@@ -1029,12 +1013,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(1)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  %{:c => c} = %{:a => 1, 2 => :b}
-  #  ** (MatchError) no match of right hand side value: %{2 => :b, :a => 1}
-  #  """
-  #  |> assert_error()
+  """
+  %{:c => c} = %{:a => 1, 2 => :b}
+  """
+  |> assert_error(%MatchError{})
 
   """
   Map.get(%{:a => 1, 2 => :b}, :a)
@@ -1056,31 +1038,29 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(%{name: "John", age: 23})
 
-  """
+  @additional_prep """
   map = %{name: "John", age: 23}
+  """
+  
+  """
   map.name
   """
   |> assert_eval("John")
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  map.agee
-  #  ** (KeyError) key :agee not found in: %{name: "John", age: 23}
-  #  """
-  #  |> assert_error()
+  """
+  map.agee
+  """
+  |> assert_error(%KeyError{})
 
   """
-  map = %{name: "John", age: 23}
   %{map | name: "Mary"}
   """
   |> assert_eval(%{name: "Mary", age: 23})
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  %{map | agee: 27}
-  #  ** (KeyError) key :agee not found in: %{name: "John", age: 23}
-  #  """
-  #  |> assert_error()
+  """
+  %{map | agee: 27}
+  """
+  |> assert_error(%KeyError{})
 
   """
   users = [
@@ -1136,20 +1116,19 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(3)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  defmodule Math do
-  #    def sum(a, b) do
-  #      do_sum(a, b)
-  #    end
-  #
-  #    defp do_sum(a, b) do
-  #      a + b
-  #    end
-  #  end
-  #  Math.do_sum(1,2)
-  #  """
-  #  |> assert_error()
+  """
+  defmodule Math do
+    def sum(a, b) do
+      do_sum(a, b)
+    end
+
+    defp do_sum(a, b) do
+      a + b
+    end
+  end
+  Math.do_sum(1,2)
+  """
+  |> assert_error(%UndefinedFunctionError{})
 
   """
   defmodule Math do
@@ -1180,37 +1159,37 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(false)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  defmodule Math do
-  #    def zero?(0) do
-  #      true
-  #    end
-  #
-  #    def zero?(x) when is_integer(x) do
-  #      false
-  #    end
-  #  end
-  #
-  #  Math.zero?([1, 2, 3])
-  #  """
-  #  |> assert_function_clause_error()
+  """
+  defmodule Math do
+    def zero?(0) do
+      true
+    end
 
-  #  """
-  #  defmodule Math do
-  #    def zero?(0) do
-  #      true
-  #    end
-  #
-  #    def zero?(x) when is_integer(x) do
-  #      false
-  #    end
-  #  end
-  #
-  #  Math.zero?(0.0)
-  #  """
-  #  |> assert_function_clause_error()
+    def zero?(x) when is_integer(x) do
+      false
+    end
+  end
 
+  Math.zero?([1, 2, 3])
+  """
+  |> assert_error(%FunctionClauseError{})
+
+  #  todo 41 error - unsupported
+#  """
+#  defmodule Math do
+#    def zero?(0) do
+#      true
+#    end
+#
+#    def zero?(x) when is_integer(x) do
+#      false
+#    end
+#  end
+#
+#  Math.zero?(0.0)
+#  """
+#  |> assert_error(%FunctionClauseError{})
+  
   """
   defmodule Math do
     def zero?(0), do: true
@@ -1320,7 +1299,7 @@ defmodule FissionLib.HexdocsTest do
   ## Recursion ============================================================================================================
   ## =======================================================================================================================
 
-  """
+  @additional_prep """
   defmodule Recursion do
     def print_multiple_times(msg, n) when n > 0 do
       IO.puts(msg)
@@ -1331,27 +1310,17 @@ defmodule FissionLib.HexdocsTest do
       :ok
     end
   end
-
+  """
+  
+  """
   Recursion.print_multiple_times("Hello!", 3)
   """
   |> assert_eval(:ok)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  Recursion.print_multiple_times("Hello!", -1)
-  #  ** (FunctionClauseError) no function clause matching in Recursion.print_multiple_times/2
-  #
-  #      The following arguments were given to Recursion.print_multiple_times/2:
-  #
-  #          # 1
-  #          "Hello!"
-  #
-  #          # 2
-  #          -1
-  #
-  #      iex:1: Recursion.print_multiple_times/2
-  #  """
-  #  |> assert_function_clause_error()
+  """
+  Recursion.print_multiple_times("Hello!", -1)
+  """
+  |> assert_error(%FunctionClauseError{})
 
   """
   defmodule Math do
@@ -1493,12 +1462,12 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  1..100_000 |> Stream.map(&(&1 * 3))
   #  """
-  #  |> assert_eval(fn term -> is_struct(term, Stream) end)
+  #  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
   #
   #  """
   #  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?)
   #  """
-  #  |> assert_eval(fn term -> is_struct(term, Stream) end)
+  #  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
   #
   #  """
   #  stream = Stream.cycle([1, 2, 3])
@@ -1568,48 +1537,23 @@ defmodule FissionLib.HexdocsTest do
   #  flush()
   #  """
   #  |> assert_eval(:hello)
-
-  #  todo 1 Implement expecting errors
-  #  """
-  #  spawn(fn -> raise "oops" end)
-  #  #PID<0.58.0>
-  #
-  #  [error] Process #PID<0.58.00> raised an exception
-  #  ** (RuntimeError) oops
-  #      (stdlib) erl_eval.erl:668: :erl_eval.do_apply/6
-  #  """
-  #  |> assert_error()
-
-  #  todo 1 Implement expecting errors
-  #  """
-  #  self()
-  #  #PID<0.41.0>
-  #  spawn_link(fn -> raise "oops" end)
-  #
-  #  ** (EXIT from #PID<0.41.0>) evaluator process exited with reason: an exception was raised:
-  #      ** (RuntimeError) oops
-  #          (stdlib) erl_eval.erl:668: :erl_eval.do_apply/6
-  #
-  #  [error] Process #PID<0.289.0> raised an exception
-  #  ** (RuntimeError) oops
-  #      (stdlib) erl_eval.erl:668: :erl_eval.do_apply/6
-  #  """
-  #  |> assert_error()
-
-  #  todo 1 Implement expecting errors
-  #  """
-  #  Task.start(fn -> raise "oops" end)
-  #  {:ok, #PID<0.55.0>}
-  #
-  #  15:22:33.046 [error] Task #PID<0.55.0> started from #PID<0.53.0> terminating
-  #  ** (RuntimeError) oops
-  #      (stdlib) erl_eval.erl:668: :erl_eval.do_apply/6
-  #      (elixir) lib/task/supervised.ex:85: Task.Supervised.do_apply/2
-  #      (stdlib) proc_lib.erl:247: :proc_lib.init_p_do_apply/3
-  #  Function: #Function<20.99386804/0 in :erl_eval.expr/5>
-  #      Args: []
-  #  """
-  #  |> assert_error()
+  
+# todo - seems like the process is raising error in a good enough way but for some reason exception is not caught in trycatch
+# todo - that is a behaviour exactly the same as in iex console so idk how to test it
+#  """
+#  spawn(fn -> raise "oops" end)
+#  """
+#  |> assert_error(%RuntimeError{})
+#
+#  """
+#  spawn_link(fn -> raise "oops" end)
+#  """
+#  |> assert_error(%RuntimeError{})
+#
+#  """
+#  Task.start(fn -> raise "oops" end)
+#  """
+#  |> assert_error(%RuntimeError{})
 
   #  todo 24 defining module that uses Task and trying to create such Task is causing compilation problems
   #  """
@@ -1829,13 +1773,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(Math.List)
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  Integer.is_odd(3)
-  #  ** (UndefinedFunctionError) function Integer.is_odd/1 is undefined or private. However, there is a macro with the same name and arity. Be sure to require Integer if you intend to invoke this macro
-  #      (elixir) Integer.is_odd(3)
-  #  """
-  #  |> assert_eval()
+  """
+  Integer.is_odd(3)
+  """
+  |> assert_error(%UndefinedFunctionError{})
 
   """
   require Integer
@@ -1988,14 +1929,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval_module()
 
-  #  """
-  #  h Math # Access the docs for the module Math
-  #  ...
-  #  h Math.sum # Access the docs for the sum function
-  #  ...
-  #  """
-  #  |> assert_eval()
-
   #  todo 28 module attributes do not work
   #  """
   #  defmodule MyServer do
@@ -2053,12 +1986,12 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(%{a: 3, b: 2})
 
   #  todo 29 implement/fix structs
-  #  """
-  #  defmodule User do
-  #    defstruct name: "John", age: 27
-  #  end
-  #  """
-  #  |> assert_eval()
+  #    """
+  #    defmodule User do
+  #      defstruct name: "John", age: 27
+  #    end
+  #    """
+  #    |> assert_eval_module()
   #
   #  """
   #  %User{}
@@ -2103,19 +2036,20 @@ defmodule FissionLib.HexdocsTest do
   #  User
   #  """
   #  |> assert_eval()
-
-  #  todo 1 Implement expecting errors
+  
+  #  @additional_prep """
+  #  john = %User{}
+  #  """
+    
+  #  """
+  #  john[:name]
+  #  """
+  #  |> assert_eval(%UndefinedFunctionError{})
   #
   #  """
-  #  john = %User{}
-  #  %User{age: 27, name: "John"}
-  #  john[:name]
-  #  ** (UndefinedFunctionError) function User.fetch/2 is undefined (User does not implement the Access behaviour)
-  #               User.fetch(%User{age: 27, name: "John"}, :name)
   #  Enum.each(john, fn {field, value} -> IO.puts(value) end)
-  #  ** (Protocol.UndefinedError) protocol Enumerable not implemented for %User{age: 27, name: "John"} of type User (a struct)
   #  """
-  #  |> assert_eval()
+  #  |> assert_eval(%Protocol.UndefinedError{})
 
   #  todo 29 implement/fix structs
   #  """
@@ -2134,14 +2068,12 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval(%{age: 27, email: nil, name: "John"})
 
-  #  todo 1 Implement expecting errors
   #  """
   #  defmodule User do
   #    defstruct [name: "John", age: 27, :email]
   #  end
-  #  ** (SyntaxError) iex:107: unexpected expression after keyword list. Keyword lists must always come last in lists and maps.
   #  """
-  #  |> assert_eval()
+  #  |> assert_error(%SyntaxError{})
   #
   #  """
   #  defmodule Car do
@@ -2149,10 +2081,8 @@ defmodule FissionLib.HexdocsTest do
   #    defstruct [:model, :make]
   #  end
   #  %Car{}
-  #  ** (ArgumentError) the following keys must also be given when building struct Car: [:make]
-  #      expanding struct: Car.__struct__/1
   #  """
-  #  |> assert_eval()
+  #  |> assert_error(%ArgumentError{})
 
   # =======================================================================================================================
   # Protocols ============================================================================================================
@@ -2296,14 +2226,12 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval("age: 25")
 
-  #  todo 1 Implement expecting errors
-  #  """
-  #  tuple = {1, 2, 3}
-  #  {1, 2, 3}
-  #  "tuple: #{tuple}"
-  #  ** (Protocol.UndefinedError) protocol String.Chars not implemented for {1, 2, 3} of type Tuple
-  #  """
-  #  |> assert_eval()
+  #  todo 5 #{} is not working
+#    """
+#    tuple = {1, 2, 3}
+#    "tuple: #\{tuple\}"
+#    """
+#    |> assert_error(%Protocol.UndefinedError{})
 
   #  todo 5 #{} is not working
   #  """
@@ -2598,25 +2526,21 @@ defmodule FissionLib.HexdocsTest do
   # try, catch, and rescue ===============================================================================================
   # =======================================================================================================================
 
-  #  """
-  #  :foo + 1
-  #  ** (ArithmeticError) bad argument in arithmetic expression
-  #       :erlang.+(:foo, 1)
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  raise "oops"
-  #  ** (RuntimeError) oops
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  raise ArgumentError, message: "invalid argument foo"
-  #  ** (ArgumentError) invalid argument foo
-  #  """
-  #  |> assert_eval()
-  #
+    """
+    :foo + 1
+    """
+    |> assert_error(%ArithmeticError{})
+
+    """
+    raise "oops"
+    """
+    |> assert_error(%RuntimeError{message: "oops"})
+
+    """
+    raise ArgumentError, message: "invalid argument foo"
+    """
+    |> assert_error(%ArgumentError{})
+
   #  """
   #  defmodule MyError do
   #    defexception message: "default message"
@@ -2779,18 +2703,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(:small)
 
-  #  """
-  #  try do
-  #    raise "fail"
-  #    what_happened = :did_not_raise
-  #  rescue
-  #    _ -> what_happened = :rescued
-  #  end
-  #  what_happened
-  #  ** (CompileError) undefined variable "what_happened"
-  #  """
-  #  |> assert_eval()
-
   """
   what_happened =
     try do
@@ -2802,17 +2714,6 @@ defmodule FissionLib.HexdocsTest do
   what_happened
   """
   |> assert_eval(:rescued)
-
-  #  """
-  #  try do
-  #    raise "fail"
-  #    another_what_happened = :did_not_raise
-  #  rescue
-  #    _ -> another_what_happened
-  #  end
-  #  ** (CompileError) undefined variable "another_what_happened"
-  #  """
-  #  |> assert_eval()
 
   # =======================================================================================================================
   # Writing documentation ================================================================================================
@@ -3528,11 +3429,10 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(%{fruit: "apple", count: 3})
 
-  #  """
-  #  Enum.fetch!(cart, 10)
-  #  ** (Enum.OutOfBoundsError) out of bounds error
-  #  """
-  #  |> assert_eval()
+  """
+  Enum.fetch!(cart, 10)
+  """
+  |> assert_error(%Enum.OutOfBoundsError{})
 
   """
   Enum.with_index(cart)
