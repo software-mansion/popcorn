@@ -936,11 +936,11 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(true)
 
-  #  """
-  #  import String, only: [split: 1, split: 2]
-  #  split("hello world")
-  #  """
-  #  |> assert_eval(["hello", "world"])
+  """
+  import String, only: [split: 1, split: 2]
+  split("hello world")
+  """
+  |> assert_eval(["hello", "world"])
 
   """
   list = [a: 1, b: 2]
