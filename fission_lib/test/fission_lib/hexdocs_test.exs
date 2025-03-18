@@ -286,12 +286,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_error(%MatchError{})
   
-#  todo 1 compile error
-#  """
-#  1 = unknown
-#  """
-#  |> assert_error(%CompileError{})
-
   """
   {a, b, c} = {:hello, "world", 42}
   a
@@ -411,17 +405,6 @@ defmodule FissionLib.HexdocsTest do
   head
   """
   |> assert_eval(1)
-
-  #  todo 1 compile error
-  #  """
-  #  _
-  #  """
-  #  |> assert_compile_error()
-
-  #  """
-  #  length([1, [2], 3]) = 3
-  #  """
-  #  |> assert_compile_error()
 
   # =======================================================================================================================
   # case, cond, and if ===================================================================================================
@@ -617,16 +600,6 @@ defmodule FissionLib.HexdocsTest do
   f.(-1, 3)
   """
   |> assert_eval(-3)
-
-
-  #  todo 1 compile error
-#  """
-#  f2 = fn
-#    x, y when x > 0 -> x + y
-#    x, y, z -> x * y + z
-#  end
-#  """
-#  |> assert_error(%CompileError{})
 
   """
   fun = &is_atom/1
@@ -2730,18 +2703,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(:small)
 
-  #  """
-  #  try do
-  #    raise "fail"
-  #    what_happened = :did_not_raise
-  #  rescue
-  #    _ -> what_happened = :rescued
-  #  end
-  #  what_happened
-  #  ** (CompileError) undefined variable "what_happened"
-  #  """
-  #  |> assert_eval()
-
   """
   what_happened =
     try do
@@ -2753,17 +2714,6 @@ defmodule FissionLib.HexdocsTest do
   what_happened
   """
   |> assert_eval(:rescued)
-
-  #  """
-  #  try do
-  #    raise "fail"
-  #    another_what_happened = :did_not_raise
-  #  rescue
-  #    _ -> another_what_happened
-  #  end
-  #  ** (CompileError) undefined variable "another_what_happened"
-  #  """
-  #  |> assert_eval()
 
   # =======================================================================================================================
   # Writing documentation ================================================================================================
