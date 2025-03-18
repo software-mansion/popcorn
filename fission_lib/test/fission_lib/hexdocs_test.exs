@@ -1678,7 +1678,7 @@ defmodule FissionLib.HexdocsTest do
   #  File.read("path/to/file/unknown")
   #  {:error, :enoent}
   #  File.read!("path/to/file/unknown")
-  #  ** (File.Error{}) could not read file "path/to/file/unknown": no such file or directory
+  #  ** (File.Error) could not read file "path/to/file/unknown": no such file or directory
   #  """
   #  |> assert_eval()
   #
@@ -1716,7 +1716,7 @@ defmodule FissionLib.HexdocsTest do
   #  File.close(file)
   #  :ok
   #  IO.write(file, "is anybody out there")
-  #  ** (ErlangError{}) Erlang error: :terminated:
+  #  ** (ErlangError) Erlang error: :terminated:
   #
   #    * 1st argument: the device has terminated
   #
@@ -1735,7 +1735,7 @@ defmodule FissionLib.HexdocsTest do
   #  IO.write(pid, "hello")
   #  {:io_request, #PID<0.41.0>, #Reference<0.0.8.91>,
   #   {:put_chars, :unicode, "hello"}}
-  #  ** (ErlangError{}) erlang error: :terminated
+  #  ** (ErlangError) erlang error: :terminated
   #  """
   #  |> assert_eval()
   #
@@ -2030,7 +2030,7 @@ defmodule FissionLib.HexdocsTest do
   #
   #  """
   #  %User{oops: :field}
-  #  ** (KeyError{}) key :oops not found expanding struct: User.__struct__/1
+  #  ** (KeyError) key :oops not found expanding struct: User.__struct__/1
   #  """
   #  |> assert_eval()
   #
@@ -2042,7 +2042,7 @@ defmodule FissionLib.HexdocsTest do
   #  jane = %{john | name: "Jane"}
   #  %User{age: 27, name: "Jane"}
   #  %{jane | oops: :field}
-  #  ** (KeyError{}) key :oops not found in: %User{age: 27, name: "Jane"}
+  #  ** (KeyError) key :oops not found in: %User{age: 27, name: "Jane"}
   #  """
   #  |> assert_eval()
   #
@@ -2052,7 +2052,7 @@ defmodule FissionLib.HexdocsTest do
   #  name
   #  "John"
   #  %User{} = %{}
-  #  ** (MatchError{}) no match of right hand side value: %{}
+  #  ** (MatchError) no match of right hand side value: %{}
   #  """
   #  |> assert_eval()
   #
@@ -2071,12 +2071,12 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  john[:name]
   #  """
-  #  |> assert_eval(UndefinedFunctionError{})
+  #  |> assert_eval(%UndefinedFunctionError{})
   #
   #  """
   #  Enum.each(john, fn {field, value} -> IO.puts(value) end)
   #  """
-  #  |> assert_eval(Protocol.UndefinedError{})
+  #  |> assert_eval(%Protocol.UndefinedError{})
 
   #  todo 29 implement/fix structs
   #  """
@@ -2180,7 +2180,7 @@ defmodule FissionLib.HexdocsTest do
   #
   #  """
   #  Size.size([1, 2, 3])
-  #  ** (Protocol.UndefinedError{}) protocol Size not implemented for [1, 2, 3] of type List
+  #  ** (Protocol.UndefinedError) protocol Size not implemented for [1, 2, 3] of type List
   #  """
   #  |> assert_eval()
   #
@@ -2190,7 +2190,7 @@ defmodule FissionLib.HexdocsTest do
   #  set = %MapSet{} = MapSet.new
   #  MapSet.new([])
   #  Size.size(set)
-  #  ** (Protocol.UndefinedError{}) protocol Size not implemented for MapSet.new([]) of type MapSet (a struct)
+  #  ** (Protocol.UndefinedError) protocol Size not implemented for MapSet.new([]) of type MapSet (a struct)
   #  """
   #  |> assert_eval()
   #
@@ -2450,7 +2450,7 @@ defmodule FissionLib.HexdocsTest do
   #  |> assert_eval("String with escape codes & interpolation")
   #
   #  """
-  #  ~S(String without escape codes \x26 without \\#{interpolation})
+  #  ~S(String without escape codes \x26 without \#{interpolation})
   #  """
   #  |> assert_eval("String without escape codes \\x26 without \#{interpolation}")
 
@@ -2573,9 +2573,9 @@ defmodule FissionLib.HexdocsTest do
   #    defexception message: "default message"
   #  end
   #  raise MyError
-  #  ** (MyError{}) default message
+  #  ** (MyError) default message
   #  raise MyError, message: "custom message"
-  #  ** (MyError{}) custom message
+  #  ** (MyError) custom message
   #  """
   #  |> assert_eval()
 
@@ -2618,7 +2618,7 @@ defmodule FissionLib.HexdocsTest do
   #
   #  """
   #  File.read!("unknown")
-  #  ** (File.Error{}) could not read file "unknown": no such file or directory
+  #  ** (File.Error) could not read file "unknown": no such file or directory
   #      (elixir) lib/file.ex:272: File.read!/1
   #  """
   #  |> assert_eval()
@@ -2696,7 +2696,7 @@ defmodule FissionLib.HexdocsTest do
   #  after
   #    File.close(file)
   #  end
-  #  ** (RuntimeError{}) oops, something went wrong
+  #  ** (RuntimeError) oops, something went wrong
   #  """
   #  |> assert_eval()
 
@@ -2710,7 +2710,7 @@ defmodule FissionLib.HexdocsTest do
   #  end
   #  RunAfter.without_even_trying
   #  cleaning up!
-  #  ** (RuntimeError{}) oops
+  #  ** (RuntimeError) oops
   #  """
   #  |> assert_eval()
 
@@ -2738,7 +2738,7 @@ defmodule FissionLib.HexdocsTest do
   #    _ -> what_happened = :rescued
   #  end
   #  what_happened
-  #  ** (CompileError{}) undefined variable "what_happened"
+  #  ** (CompileError) undefined variable "what_happened"
   #  """
   #  |> assert_eval()
 
@@ -2761,7 +2761,7 @@ defmodule FissionLib.HexdocsTest do
   #  rescue
   #    _ -> another_what_happened
   #  end
-  #  ** (CompileError{}) undefined variable "another_what_happened"
+  #  ** (CompileError) undefined variable "another_what_happened"
   #  """
   #  |> assert_eval()
 
