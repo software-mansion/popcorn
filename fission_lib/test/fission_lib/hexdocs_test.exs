@@ -897,10 +897,10 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval("1")
 
   #  todo 40 concat does not returning ArgumentError with sigil c
-#  """
-#  ~c"this " <> ~c"fails"
-#  """
-#  |> assert_error(%ArgumentError{})
+  #  """
+  #  ~c"this " <> ~c"fails"
+  #  """
+  #  |> assert_error(%ArgumentError{})
   
   """
   ~c"this " ++ ~c"works"
