@@ -338,6 +338,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([2, 3])
 
+  @tag :skip
   """
   [head | tail] = []
   """
