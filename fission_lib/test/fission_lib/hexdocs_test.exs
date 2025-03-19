@@ -1322,7 +1322,8 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_error(%FunctionClauseError{})
 
-  """
+
+  @additional_prep """
   defmodule Math do
     def sum_list([head | tail], accumulator) do
       sum_list(tail, head + accumulator)
@@ -1332,55 +1333,29 @@ defmodule FissionLib.HexdocsTest do
       accumulator
     end
   end
-
+  """
+  
+  """
   Math.sum_list([1, 2, 3], 0)
   """
   |> assert_eval(6)
 
   """
-  defmodule Math do
-    def sum_list([head | tail], accumulator) do
-      sum_list(tail, head + accumulator)
-    end
-
-    def sum_list([], accumulator) do
-      accumulator
-    end
-  end
-
   Math.sum_list([2, 3], 1)
   """
   |> assert_eval(6)
 
   """
-  defmodule Math do
-    def sum_list([head | tail], accumulator) do
-      sum_list(tail, head + accumulator)
-    end
-
-    def sum_list([], accumulator) do
-      accumulator
-    end
-  end
-
   Math.sum_list([3], 3)
   """
   |> assert_eval(6)
 
   """
-  defmodule Math do
-    def sum_list([head | tail], accumulator) do
-      sum_list(tail, head + accumulator)
-    end
-
-    def sum_list([], accumulator) do
-      accumulator
-    end
-  end
-
   Math.sum_list([], 6)
   """
   |> assert_eval(6)
+
+  @additional_prep ""
 
   """
   defmodule Math do
