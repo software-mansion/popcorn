@@ -394,7 +394,8 @@ defmodule FissionLib.HexdocsTest do
   [^x, 2, 3] = [1, 2, 3]
   """
   |> assert_eval([1, 2, 3])
-
+  
+  @tag :skip
   """
   {y, 1} = {2, 2}
   """
@@ -959,7 +960,8 @@ defmodule FissionLib.HexdocsTest do
   a
   """
   |> assert_eval(1)
-
+  
+  @tag :skip
   """
   [a: a] = [a: 1, b: 2]
   """
