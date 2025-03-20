@@ -447,13 +447,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_error(%ArgumentError{})
 
-  #  """
-  #  case 1 do
-  #    x when hd(x) -> "Won't match"
-  #    x -> "Got \#\{x\}"
-  #  end
-  #  """
-  #  |> assert_eval("Got 1")
+  """
+  case 1 do
+    x when hd(x) -> "Won't match"
+    x -> "Got \#{x}"
+  end
+  """
+  |> assert_eval("Got 1")
 
   """
   case :ok do
@@ -662,7 +662,7 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(2)
 
   """
-  fun2 = &"Good \#\{&1\}"
+  fun2 = &"Good \#{&1}"
   fun2.("morning")
   """
   |> assert_eval("Good morning")
