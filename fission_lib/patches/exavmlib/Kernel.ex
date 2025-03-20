@@ -257,5 +257,12 @@ defmodule Kernel do
         end
     end
   end
+
+  # Patch reason: the Kernel.to_string macro is not seen as a macro 
+  # unless it is implemented inside a patch
+  
+  defmacro to_string(term) do
+    quote(do: :"Elixir.String.Chars".to_string(unquote(term)))
+  end
   
 end
