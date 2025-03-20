@@ -137,18 +137,19 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("\"hellö\"", "hellö")
 
   assert_eval("\"hello \" <> \"world!\"", "hello world!")
-  # todo 5 #{} is not working
-  #  """
-  #  string = "world"
-  #  "hello \#{string}!"
-  #  """
-  #  |> assert_eval("hello world!")
+  
+  """
+  string = "world"
+  "hello \#{string}!"
+  """
+  |> assert_eval("hello world!")
 
-  #    """
-  #    number = 42
-  #    "i am \#\{number\} years old!"
-  #    """
-  #    |> assert_eval("i am 42 years old!")
+  """
+  number = 42
+  "i am \#{number} years old!"
+  """
+  |> assert_eval("i am 42 years old!")
+  
   """
   \"hello
   world\"
@@ -660,12 +661,11 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(2)
 
-  #  todo 5 #{} is not working
-  #  """
-  #  fun2 = &"Good \#\{&1\}"
-  #  fun2.("morning")
-  #  """
-  #  |> assert_eval("Good morning")
+  """
+  fun2 = &"Good \#\{&1\}"
+  fun2.("morning")
+  """
+  |> assert_eval("Good morning")
 
   # =======================================================================================================================
   # Binaries, strings, and charlists =====================================================================================
@@ -2194,25 +2194,23 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(6)
 
-  #  todo 5 #{} is not working
-  #  """
-  #  "age: \#\{25\}"
-  #  """
-  #  |> assert_eval("age: 25")
+  """
+  "age: \#{25}"
+  """
+  |> assert_eval("age: 25")
 
-  #  todo 5 #{} is not working
-#    """
-#    tuple = {1, 2, 3}
-#    "tuple: #\{tuple\}"
-#    """
-#    |> assert_error(%Protocol.UndefinedError{})
+  """
+  tuple = {1, 2, 3}
+  "tuple: \#{tuple}"
+  """
+  |> assert_error(%Protocol.UndefinedError{})
 
-  #  todo 5 #{} is not working
-  #  """
-  #  "tuple: #{inspect(tuple)}"
-  #  "tuple: {1, 2, 3}"
-  #  """
-  #  |> assert_eval()
+  """
+  tuple = {1, 2, 3}
+  "tuple: \#{inspect(tuple)}"
+  """
+  |> assert_eval("tuple: {1, 2, 3}")
+  
   #
   #  """
   #  {1, 2, 3}
@@ -2390,16 +2388,15 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval([:foo, :bar, :bat])
 
-  #  todo 5 #{} is not working
-  #  """
-  #  ~s(String with escape codes \x26 \#{"inter" <> "polation"})
-  #  """
-  #  |> assert_eval("String with escape codes & interpolation")
-  #
-  #  """
-  #  ~S(String without escape codes \x26 without \#{interpolation})
-  #  """
-  #  |> assert_eval("String without escape codes \\x26 without \#{interpolation}")
+  """
+  ~s(String with escape codes \x26 \#{"inter" <> "polation"})
+  """
+  |> assert_eval("String with escape codes & interpolation")
+
+  """
+  ~S(String without escape codes \\x26 without \#{interpolation})
+  """
+  |> assert_eval("String without escape codes \\x26 without \#{interpolation}")
 
   #  """
   #  ~s"""
@@ -2581,18 +2578,17 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval()
 
-  #  todo 5 #{} is not working
-  #  """
-  #  try do
-  #    Enum.each(-50..50, fn x ->
-  #      if rem(x, 13) == 0, do: throw(x)
-  #    end)
-  #    "Got nothing"
-  #  catch
-  #    x -> "Got \#{x}"
-  #  end
-  #  """
-  #  |> assert_eval("Got -39")
+  """
+  try do
+    Enum.each(-50..50, fn x ->
+      if rem(x, 13) == 0, do: throw(x)
+    end)
+    "Got nothing"
+  catch
+    x -> "Got \#{x}"
+  end
+  """
+  |> assert_eval("Got -39")
 
   """
   Enum.find(-50..50, &(rem(&1, 13) == 0))

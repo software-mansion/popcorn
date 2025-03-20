@@ -258,4 +258,8 @@ defmodule Kernel do
     end
   end
   
+  defmacro to_string(term) do
+    quote(do: :"Elixir.String.Chars".to_string(unquote(term)))
+  end
+  
 end
