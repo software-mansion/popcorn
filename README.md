@@ -16,3 +16,12 @@ git submodule update --init --recursive
 - `fission_lib` - Elixir lib bundling code into `.avm` file for AtomVM
 - `fuzzer` - testing AtomVM with fuzzed Erlang code
 - `iex_wasm` - IEx in browser via WASM & AtomVM
+
+## First steps
+
+We're using mise to manage tools versions. See the [Getting started](https://mise.jdx.dev/getting-started.html)
+Once set up, install required tools with:
+
+```console
+mise install
+```
