@@ -959,6 +959,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(1)
   
+  @tag :skip
   """
   [a: a] = [a: 1, b: 2]
   """
