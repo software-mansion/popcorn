@@ -1,3 +1,4 @@
+%% Patch reason: in AVM the option "-unit:Size" inside bitstrings is not supported
 -module(eval_bits).
 
 -export([expr_grp/3,expr_grp/4]).
@@ -5,7 +6,6 @@
 -define(STACKTRACE,
         element(2, erlang:process_info(self(), current_stacktrace))).
 
-%% Patch reason: in AVM the option "-unit:Size" inside bitstrings is not supported
 expr_grp(Fields, Bindings, EvalFun, ErrorFun) ->
     expr_grp(Fields, Bindings, EvalFun, ErrorFun, <<>>).
 
