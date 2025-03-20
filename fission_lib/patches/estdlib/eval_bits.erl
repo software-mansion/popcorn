@@ -13,9 +13,6 @@ expr_grp(Fields, Bindings, EvalFun) ->
     expr_grp(Fields, Bindings, EvalFun, fun flb_module:default_error/3, <<>>).
 
 expr_grp(FS, Bs0, EvalFun, ErrorFun, Acc) ->
-    %% Separate the evaluation of values, sizes, and TLS:s from the
-    %% creation of the binary in order to mimic compiled code when it
-    %% comes to loops and failures.
     {ListOfEvalField,Bs1} = expr_grp1(FS, Bs0, EvalFun, ErrorFun, [], 1),
     {value,flb_module:create_binary(ListOfEvalField, Acc),Bs1}.
 
@@ -40,7 +37,7 @@ eval_field({bin_element, Anno, {string, _, S}, Size0, Options0}, Bs0, Fun, Error
             Type, Endian, Sign, ErrorFun, Pos))/bitstring>> ||
             C <- S >>,
         case S of
-            "" -> % find errors also when the string is empty
+            "" ->
                 _ = eval_exp_field1(Anno, 0, Size, Unit, Type, Endian, Sign, ErrorFun, Pos),
                 ok;
             _ ->
