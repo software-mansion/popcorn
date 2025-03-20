@@ -210,7 +210,7 @@ defmodule Kernel do
   end
 
 # Patch reason: the "left in right" macro is not capable of 
-# being used in guard is it is defined outside of Kernel.ex patch
+# being used in guard if it is defined outside of Kernel.ex patch
 
   @doc guard: true
   defmacro left in right do
