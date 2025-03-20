@@ -208,4 +208,54 @@ defmodule Kernel do
   defp struct(%_{} = struct, fields, fun) do
     Enum.reduce(fields, struct, fun)
   end
+
+# Patch reason: the "left in right" macro is not capable of 
+# being used in guard if it is defined outside of Kernel.ex patch
+
+  @doc guard: true
+  defmacro left in right do
+    in_body? = __CALLER__.context == nil
+
+    expand =
+      case :flb_module.bootstrapped?(Macro) do
+        true -> &Macro.expand(&1, __CALLER__)
+        false -> & &1
+      end
+
+    case expand.(right) do
+      [] when not in_body? ->
+        false
+
+      [] ->
+        quote do
+          _ = unquote(left)
+          false
+        end
+
+      [head | tail] = list ->
+        # We only expand lists in the body if they are relatively
+        # short and it is made only of literal expressions.
+        case not in_body? or :flb_module.small_literal_list?(right) do
+          true -> :flb_module.in_var(in_body?, left, &:flb_module.in_list(&1, head, tail, expand, list, in_body?))
+          false -> quote(do: :lists.member(unquote(left), unquote(right)))
+        end
+
+      %{} = right ->
+        raise ArgumentError, "found unescaped value on the right side of in/2: #{inspect(right)}"
+
+      right ->
+        with {:%{}, _meta, fields} <- right,
+             [__struct__: Elixir.Range, first: first, last: last, step: step] <-
+               :lists.usort(fields) do
+          :flb_module.in_var(in_body?, left, &:flb_module.in_range(&1, expand.(first), expand.(last), expand.(step)))
+        else
+          _ when in_body? ->
+            quote(do: Elixir.Enum.member?(unquote(right), unquote(left)))
+
+          _ ->
+            :flb_module.raise_on_invalid_args_in_2(right)
+        end
+    end
+  end
+  
 end
