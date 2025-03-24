@@ -1,3931 +1,2533 @@
 defmodule FissionLib.HexdocsTestHelper do
   use ExUnit.Case, async: true
   alias FissionLib.Support.AtomVM
+  alias __MODULE__, as: Helper
   import FissionLib.Support.AsyncTest
 
-  defmacro assert_eval(code_string, expected) do
+  defmacro test_ast(common, input, opts, tag) do
     quote do
-      async_test "evaluation", %{tmp_dir: dir} do
-        result =
-          (@additional_prep <> unquote(code_string))
-          |> AtomVM.eval(:elixir, run_dir: dir)
-          |> unquote(__MODULE__).assert_expectation(unquote(expected))
+      @tag skip: Keyword.get(unquote(opts), :skip, false)
+      @tag unquote(tag)
+      async_test Helper.test_name(
+                   unquote(common) <> unquote(input),
+                   unquote(tag)
+                 ),
+                 %{tmp_dir: dir} do
+        {opts, unsupported} = supported_opts(unquote(opts))
+        opts = Map.new(unquote(opts))
+        common = unquote(common)
+        input = unquote(input)
+
+        if unsupported != [] do
+          keys = unsupported |> Keyword.keys() |> inspect()
+          IO.warn("Unsupported options: #{keys}")
+        end
+
+        info =
+          "#{common}\n#{input}"
+          |> Helper.maybe_wrap_in_try(opts)
+          |> AtomVM.try_eval(:elixir, run_dir: dir)
+
+        assert info.exit_status == 0, """
+        Atom VM crashed, check
+        \t'#{info.log_path}'
+        for logs.
+
+        Snippet:
+        #{input}
+
+        Common code:
+        #{if common != "", do: common, else: "(empty)"}
+        """
+
+        message = fn type, expected ->
+          """
+          Snippet:
+          #{input}
+
+          Failed #{type} assertion
+          result: #{inspect(info.result, pretty: true)}
+          expected: #{inspect(expected, pretty: true)}
+
+          Common code:
+          #{if common != "", do: common, else: "(empty)"}
+          """
+        end
+
+        case opts do
+          %{raises: error} -> assert is_struct(info.result, error), message.(:raises, error)
+          %{output: out} -> assert info.result === out, message.(:output, out)
+          %{predicate: pred} -> assert pred.(info.result), message.(:predicate, pred)
+        end
+
+        case Map.fetch(opts, :stdout) do
+          {:ok, stdout} -> assert info.output == stdout
+          :error -> :ok
+        end
       end
     end
   end
 
-  defmacro assert_eval_module(code_string) do
+  defmacro create_tests(test_cases, tag: tag) do
+    caller = __CALLER__
+
+    test_cases_ast =
+      test_cases
+      |> Enum.flat_map(fn {input_or_common, opts} ->
+        opts
+        |> Macro.expand(caller)
+        |> Keyword.pop(:cases)
+        |> case do
+          {nil, opts} ->
+            input = input_or_common
+
+            [
+              quote do
+                test_ast("", unquote(input), unquote(opts), unquote(tag))
+              end
+            ]
+
+          {cases, opts} ->
+            common = input_or_common
+
+            for {case, case_opts} <- cases do
+              quote do
+                test_ast(
+                  unquote(common),
+                  unquote(case),
+                  Keyword.merge(unquote(opts), unquote(case_opts)),
+                  unquote(tag)
+                )
+              end
+            end
+        end
+      end)
+
     quote do
-      async_test "evaluation", %{tmp_dir: dir} do
-        result =
-          (@additional_prep <> unquote(code_string))
-          |> AtomVM.eval(:elixir, run_dir: dir)
-          |> AtomVM.assert_is_module()
-      end
+      (unquote_splicing(test_cases_ast))
     end
   end
 
-  defmacro assert_error(code_string, expected_error) do
-    quote do
-      async_test "evaluation", %{tmp_dir: dir} do
-        result =
-          ("try do\n" <>
-             (@additional_prep <> unquote(code_string)) <>
-             """
-             rescue
-               e -> e
-             end
-             """)
-          |> AtomVM.eval(:elixir, run_dir: dir)
+  def as_multiple_cases(common_or_input, opts) do
+    case Keyword.fetch(opts, :cases) do
+      {:ok, cases} ->
+        common = common_or_input
 
-        assert unquote(expected_error) = result
-      end
+        for case <- cases do
+          {common, case}
+        end
+
+      :error ->
+        input = common_or_input
+        [{input, {"", opts}}]
     end
   end
 
-  def assert_expectation(result, {:expect_fn, f}) when is_function(f) do
-    assert f.(result)
+  def maybe_wrap_in_try(code, %{raises: _error}) do
+    """
+    try do
+    #{code}
+    rescue
+      e -> e
+    end
+    """
   end
 
-  def assert_expectation(result, e) do
-    assert e === result
+  def maybe_wrap_in_try(code, _opts), do: code
+
+  def supported_opts(opts) do
+    supported_opts = [:raises, :output, :predicate, :skip, :cases, :stdout]
+    Keyword.split(opts, supported_opts)
   end
+
+  def test_name(input, tag) do
+    hash = :crypto.hash(:blake2s, input) |> Base.encode16(case: :lower) |> String.slice(0..8)
+    name = String.slice(input, 0..50)
+
+    escaped =
+      for <<c <- name>>, into: "" do
+        if c in 32..127 and c != ?', do: <<c>>, else: "_"
+      end
+
+    "eval_#{to_string(tag)}_#{hash}: #{escaped}"
+  end
+end
+
+defmodule User do
+  defstruct [:name, :age]
 end
 
 defmodule FissionLib.HexdocsTest do
   use ExUnit.Case, async: true
   require FissionLib.Support.AtomVM
+  alias FissionLib.Support.AtomVM
   import FissionLib.HexdocsTestHelper
 
   @moduletag :tmp_dir
-  @additional_prep ""
 
-  # =======================================================================================================================
-  # Introduction =========================================================================================================
-  # =======================================================================================================================
-
-  assert_eval("40 + 2\n", 42)
-
-  """
-  "hello" <> " world"
-  """
-  |> assert_eval("hello world")
-
-  # =======================================================================================================================
-  # Basic types ==========================================================================================================
-  # =======================================================================================================================
-
-  assert_eval("1\n", {:expect_fn, &is_integer/1})
-  assert_eval("1\n", {:expect_fn, &is_integer/1})
-  assert_eval("0x1F\n", {:expect_fn, &is_integer/1})
-  assert_eval("1.0\n", {:expect_fn, &is_float/1})
-  assert_eval("true\n", {:expect_fn, &is_boolean/1})
-  assert_eval(":atom\n", {:expect_fn, &is_atom/1})
-  assert_eval("\"elixir\"\n", {:expect_fn, &String.valid?/1})
-  assert_eval("[1, 2, 3]\n", {:expect_fn, &is_list/1})
-  assert_eval("{1, 2, 3}\n", {:expect_fn, &is_tuple/1})
-
-  assert_eval("1 + 2\n", 3)
-  assert_eval("5 * 5\n", 25)
-  assert_eval("10 / 2\n", 5.0)
-
-  assert_eval("div(10, 2)\n", 5)
-  assert_eval("div 10, 2\n", 5)
-  assert_eval("rem 10, 3\n", 1)
-
-  assert_eval("0b1010\n", 10)
-  assert_eval("0o777\n", 511)
-  assert_eval("0x1F\n", 31)
-  assert_eval("1.0\n", 1.0)
-  assert_eval("1.0e-10\n", 1.0e-10)
-
-  assert_eval("round(3.58)\n", 4)
-  assert_eval("trunc(3.58)\n", 3)
-
-  assert_eval("is_integer(1)\n", true)
-  assert_eval("is_integer(2.0)\n", false)
-
-  assert_eval("true\n", true)
-  assert_eval("true == false\n", false)
-
-  assert_eval("true and true\n", true)
-  assert_eval("false or is_boolean(true)\n", true)
-
-  assert_error("1 and true\n", %BadBooleanError{})
-
-  assert_eval("false and raise(\"This error will never be raised\")\n", false)
-  assert_eval("true or raise(\"This error will never be raised\")\n", true)
-
-  assert_eval("1 || true\n", 1)
-  assert_eval("false || 11\n", 11)
-  assert_eval("nil && 13\n", nil)
-  assert_eval("true && 17\n", 17)
-
-  assert_eval("!true\n", false)
-  assert_eval("!1\n", false)
-  assert_eval("!nil\n", true)
-  assert_eval(":apple\n", :apple)
-  assert_eval(":orange\n", :orange)
-  assert_eval(":watermelon\n", :watermelon)
-
-  assert_eval(":apple == :apple\n", true)
-  assert_eval(":apple == :orange\n", false)
-
-  assert_eval("true == :true\n", true)
-  assert_eval("is_atom(false)\n", true)
-  assert_eval("is_boolean(:false)\n", true)
-
-  assert_eval("\"hellö\"", "hellö")
-
-  assert_eval("\"hello \" <> \"world!\"", "hello world!")
-
-  """
-  string = "world"
-  "hello \#{string}!"
-  """
-  |> assert_eval("hello world!")
-
-  """
-  number = 42
-  "i am \#{number} years old!"
-  """
-  |> assert_eval("i am 42 years old!")
-
-  """
-  \"hello
-  world\"
-  """
-  |> assert_eval("hello\nworld")
-
-  assert_eval("\"hello\nworld\"\n", "hello\nworld")
-
-  assert_eval("IO.puts(\"hello\nworld\")", :ok)
-
-  assert_eval("is_binary(\"hellö\")\n", true)
-
-  assert_eval("byte_size(\"hellö\")\n", 6)
-
-  assert_eval("String.length(\"hellö\")\n", 5)
-
-  assert_eval("String.upcase(\"hellö\")\n", "HELLÖ")
-
-  assert_eval("1 == 1\n", true)
-  assert_eval("1 != 2\n", true)
-  assert_eval("1 < 2\n", true)
-
-  assert_eval("\"foo\" == \"foo\"\n", true)
-  assert_eval("\"foo\" == \"bar\"\n", false)
-
-  assert_eval("1 == 1.0\n", true)
-  assert_eval("1 == 2.0\n", false)
-
-  assert_eval("1 === 1.0\n", false)
-
-  # =======================================================================================================================
-  # Lists and tuples =====================================================================================================
-  # =======================================================================================================================
-
-  assert_eval("[1, 2, true, 3]\n", [1, 2, true, 3])
-  assert_eval("length([1, 2, 3])\n", 3)
-
-  assert_eval("[1, 2, 3] ++ [4, 5, 6]\n", [1, 2, 3, 4, 5, 6])
-  #  todo 6 subtraction of two lists with different type terms inside is failing
-  @tag :skip
-  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
-
-  """
-  list = [1, 2, 3]
-  hd(list)
-  """
-  |> assert_eval(1)
-
-  """
-  list = [1, 2, 3]
-  hd(list)
-  tl(list)
-  """
-  |> assert_eval([2, 3])
-
-  assert_error("hd([])\n", %ArgumentError{})
-
-  assert_eval("[11, 12, 13]\n", ~c"\v\f\r")
-  assert_eval("[104, 101, 108, 108, 111]\n", ~c"hello")
-
-  assert_eval("{:ok, \"hello\"}\n", {:ok, "hello"})
-  assert_eval("tuple_size({:ok, \"hello\"})", 2)
-
-  """
-  tuple = {:ok, "hello"}
-  elem(tuple, 1)
-  tuple_size(tuple)
-  """
-  |> assert_eval(2)
-
-  """
-  tuple = {:ok, "hello"}
-  put_elem(tuple, 1, "world")
-  tuple
-  """
-  |> assert_eval({:ok, "hello"})
-
-  """
-  tuple = {:ok, "hello"}
-  put_elem(tuple, 1, "world")
-  """
-  |> assert_eval({:ok, "world"})
-
-  """
-  list = [1, 2, 3]
-  # This is fast as we only need to traverse `[0]` to prepend to `list`
-  [0] ++ list
-  """
-  |> assert_eval([0, 1, 2, 3])
-
-  """
-  list = [1, 2, 3]
-  # This is slow as we need to traverse `list` to append 4
-  list ++ [4]
-  """
-  |> assert_eval([1, 2, 3, 4])
-
-  """
-  tuple = {:a, :b, :c, :d}
-  put_elem(tuple, 2, :e)
-  """
-  |> assert_eval({:a, :b, :e, :d})
-
-  #  todo 7 String.split is failing
-  @tag :skip
-  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
-  @tag :skip
-  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
-
-  assert_eval("String.split_at(\"hello world\", 3)", {"hel", "lo world"})
-  assert_eval("String.split_at(\"hello world\", -4)", {"hello w", "orld"})
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  @tag :skip
-  assert_eval("File.read(\"path/to/existing/file\")", {:ok, "... contents ..."})
-  @tag :skip
-  assert_eval("File.read(\"path/to/unknown/file\")", {:error, :enoent})
-
-  """
-  tuple = {:ok, "hello"}
-  elem(tuple, 1)
-  """
-  |> assert_eval("hello")
-
-  # =======================================================================================================================
-  # Pattern matching =====================================================================================================
-  # =======================================================================================================================
-  """
-  x = 1
-  x
-  """
-  |> assert_eval(1)
-
-  """
-  x = 1
-  1 = x
-  2 = x
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  {a, b, c} = {:hello, "world", 42}
-  a
-  """
-  |> assert_eval(:hello)
-
-  """
-  {a, b, c} = {:hello, "world", 42}
-  b
-  """
-  |> assert_eval("world")
-
-  """
-  {a, b, c} = {:hello, "world"}
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  {a, b, c} = [:hello, "world", 42]
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  {:ok, result} = {:ok, 13}
-  result
-  """
-  |> assert_eval(13)
-
-  """
-  {:ok, result} = {:ok, 13}
-  {:ok, result} = {:error, :oops}
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  [a, b, c] = [1, 2, 3]
-  a
-  """
-  |> assert_eval(1)
-
-  """
-  [head | tail] = [1, 2, 3]
-  head
-  """
-  |> assert_eval(1)
-
-  """
-  [head | tail] = [1, 2, 3]
-  tail
-  """
-  |> assert_eval([2, 3])
-
-  @tag :skip
-  """
-  [head | tail] = []
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  list = [1, 2, 3]
-  [0 | list]
-  """
-  |> assert_eval([0, 1, 2, 3])
-
-  """
-  x = 1
-  x = 2
-  """
-  |> assert_eval(2)
-
-  """
-  x = 1
-  ^x = 2
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  1 = 2
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  x = 1
-  [^x, 2, 3] = [1, 2, 3]
-  {y, ^x} = {2, 1}
-  y
-  {y, ^x} = {2, 2}
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  x = 1
-  [^x, 2, 3] = [1, 2, 3]
-  {y, ^x} = {2, 1}
-  y
-  """
-  |> assert_eval(2)
-
-  """
-  x = 1
-  [^x, 2, 3] = [1, 2, 3]
-  {y, ^x} = {2, 1}
-  """
-  |> assert_eval({2, 1})
-
-  """
-  x = 1
-  [^x, 2, 3] = [1, 2, 3]
-  """
-  |> assert_eval([1, 2, 3])
-
-  @tag :skip
-  """
-  {y, 1} = {2, 2}
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  [head | _] = [1, 2, 3]
-  head
-  """
-  |> assert_eval(1)
-
-  # =======================================================================================================================
-  # case, cond, and if ===================================================================================================
-  # =======================================================================================================================
-
-  #  todo 8 Unused variables causes eval to fail (in the following "_x" works just fine)
-  @tag :skip
-  """
-  case {1, 2, 3} do
-    {1, x, 3} ->
-      "This clause will match and bind x to 2 in this clause"
-    {4, 5, 6} ->
-      "This clause won't match"
-    _ ->
-      "This clause would match any value"
-  end
-  """
-  |> assert_eval("This clause will match and bind x to 2 in this clause")
-
-  """
-  x = 1
-  case 10 do
-    ^x -> "Won't match"
-    _ -> "Will match"
-  end
-  """
-  |> assert_eval("Will match")
-
-  """
-  case {1, 2, 3} do
-    {1, x, 3} when x > 0 ->
-      "Will match"
-    _ ->
-      "Would match, if guard condition were not satisfied"
-  end
-  """
-  |> assert_eval("Will match")
-
-  """
-  hd(1)
-  """
-  |> assert_error(%ArgumentError{})
-
-  """
-  case 1 do
-    x when hd(x) -> "Won't match"
-    x -> "Got \#{x}"
-  end
-  """
-  |> assert_eval("Got 1")
-
-  """
-  case :ok do
-    :error -> "Won't match"
-  end
-  """
-  |> assert_error(%CaseClauseError{})
-
-  """
-  if true do
-    "This works!"
-  end
-  """
-  |> assert_eval("This works!")
-
-  """
-  if false do
-    "This will never be seen"
-  end
-  """
-  |> assert_eval(nil)
-
-  #  todo 9 fix if statement (if nil is not working as expected)
-  @tag :skip
-  """
-  if nil do
-    "This won't be seen"
-  else
-    "This will"
-  end
-  """
-  |> assert_eval(nil)
-
-  #  todo 9 fix if with match inside (this could be caused by 8)
-  @tag :skip
-  """
-  x = 1
-  if true do
-    x = x + 1
-  end
-  """
-  |> assert_eval(2)
-
-  @tag :skip
-  """
-  x = 1
-  if true do
-    x = x + 1
-  end
-  x
-  """
-  |> assert_eval(1)
-
-  """
-  x = 1
-  x = if true do
-    x + 1
-  else
-    x
-  end
-  """
-  |> assert_eval(2)
-
-  """
-  cond do
-    2 + 2 == 5 ->
-      "This is never true"
-    2 * 2 == 3 ->
-      "Nor this"
-    true ->
-      "This is always true (equivalent to else)"
-  end
-  """
-  |> assert_eval("This is always true (equivalent to else)")
-
-  """
-  cond do
-    hd([1, 2, 3]) ->
-      "1 is considered as true"
-  end
-  """
-  |> assert_eval("1 is considered as true")
-
-  # =======================================================================================================================
-  # Anonymous functions ==================================================================================================
-  # =======================================================================================================================
-
-  """
-  add = fn a, b -> a + b end
-  add.(1, 2)
-  """
-  |> assert_eval(3)
-
-  """
-  add = fn a, b -> a + b end
-  is_function(add)
-  """
-  |> assert_eval(true)
-
-  #  todo 10 is_function/2 not implemented
-  @tag :skip
-  """
-  add = fn a, b -> a + b end
-  is_function(add, 2)
-  """
-  |> assert_eval(true)
-
-  @tag :skip
-  """
-  add = fn a, b -> a + b end
-  is_function(add, 1)
-  """
-  |> assert_eval(false)
-
-  """
-  add = fn a, b -> a + b end
-  double = fn a -> add.(a, a) end
-  double.(2)
-  """
-  |> assert_eval(4)
-
-  #  todo 11 specific evaluation of anonymous function does not work (possibly because of zero arguments)
-  @tag :skip
-  """
-  x = 42
-  (fn -> x = 0 end).()
-  """
-  |> assert_eval(0)
-
-  @tag :skip
-  """
-  x = 42
-  (fn -> x = 0 end).()
-  x
-  """
-  |> assert_eval(42)
-
-  """
-  f = fn
-    x, y when x > 0 -> x + y
-    x, y -> x * y
-  end
-  f.(1, 3)
-  """
-  |> assert_eval(4)
-
-  """
-  f = fn
-    x, y when x > 0 -> x + y
-    x, y -> x * y
-  end
-  f.(-1, 3)
-  """
-  |> assert_eval(-3)
-
-  """
-  fun = &is_atom/1
-  """
-  |> assert_eval(&:erlang.is_atom/1)
-
-  """
-  fun = &is_atom/1
-  is_function(fun)
-  """
-  |> assert_eval(true)
-
-  #  todo 12 guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
-  @tag :skip
-  """
-  fun = &is_atom/1
-  :erlang.is_atom(:hello)
-  """
-  |> assert_eval(true)
-
-  @tag :skip
-  """
-  fun = &is_atom/1
-  fun.(123)
-  """
-  |> assert_eval(false)
-
-  """
-  fun = &String.length/1
-  """
-  |> assert_eval(&String.length/1)
-
-  """
-  fun = &String.length/1
-  fun.("hello")
-  """
-  |> assert_eval(5)
-
-  """
-  add = &+/2
-  """
-  |> assert_eval(&:erlang.+/2)
-
-  #  todo 13 :erlang.+/2 is not working as an anonymous function
-  @tag :skip
-  """
-  add = &+/2
-  add.(1, 2)
-  """
-  |> assert_eval(3)
-
-  @tag :skip
-  """
-  add = &+/2
-  is_arity_2 = fn fun -> is_function(fun, 2) end
-  is_arity_2.(add)
-  """
-  |> assert_eval(true)
-
-  """
-  fun = &(&1 + 1)
-  fun.(1)
-  """
-  |> assert_eval(2)
-
-  """
-  fun2 = &"Good \#{&1}"
-  fun2.("morning")
-  """
-  |> assert_eval("Good morning")
-
-  # =======================================================================================================================
-  # Binaries, strings, and charlists =====================================================================================
-  # =======================================================================================================================
-
-  """
-  string = "hello"
-  is_binary(string)
-  """
-  |> assert_eval(true)
-
-  assert_eval("?a\n", 97)
-  assert_eval("?ł\n", 322)
-
-  """
-  "\u0061" == "a"
-  """
-  |> assert_eval(true)
-
-  """
-  0x0061 = 97 = ?a
-  """
-  |> assert_eval(97)
-
-  """
-  string = "héllo"
-  String.length(string)
-  """
-  |> assert_eval(5)
-
-  """
-  string = "héllo"
-  byte_size(string)
-  """
-  |> assert_eval(6)
-
-  """
-  String.codepoints("👩‍🚒")
-  ["👩", "‍", "🚒"]
-  """
-  |> assert_eval(["👩", "‍", "🚒"])
-
-  #  todo 13 String.graphemes/1 does not work for fireman emote
-  @tag :skip
-  """
-  String.graphemes("👩‍🚒")
-  """
-  |> assert_eval(["👩‍🚒"])
-
-  """
-  String.length("👩‍🚒")
-  """
-  |> assert_eval(1)
-
-  """
-  "hełło" <> <<0>>
-  """
-  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111, 0>>)
-
-  #  todo 14 IO.inspect with option :binaries fails with function_clause error
-  @tag :skip
-  """
-  IO.inspect("hełło", binaries: :as_binaries)
-  """
-  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111>>)
-
-  #  todo 15 "::" does not work for binaries
-  assert_eval("<<42>> == <<42::8>>\n", true)
-  @tag :skip
-  assert_eval("<<3::4>>\n", <<3::size(4)>>)
-  @tag :skip
-  assert_eval("<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>\n", true)
-  @tag :skip
-  assert_eval("is_bitstring(<<3::4>>)\n", true)
-  @tag :skip
-  assert_eval("is_binary(<<3::4>>)\n", false)
-  assert_eval("is_bitstring(<<0, 255, 42>>)\n", true)
-  assert_eval("is_binary(<<0, 255, 42>>)\n", true)
-  @tag :skip
-  assert_eval("is_binary(<<42::16>>)\n", true)
-
-  """
-  <<0, 1, x>> = <<0, 1, 2>>
-  x
-  """
-  |> assert_eval(2)
-
-  """
-  <<0, 1, x>> = <<0, 1, 2, 3>>
-  """
-  |> assert_error(%MatchError{})
-
-  #  todo 15 "::" does not work for binaries
-  @tag :skip
-  """
-  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
-  head
-  """
-  |> assert_eval(<<0, 1>>)
-
-  @tag :skip
-  """
-  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
-  rest
-  """
-  |> assert_eval(<<2, 3>>)
-
-  assert_eval("is_binary(\"hello\")\n", true)
-  assert_eval("is_binary(<<239, 191, 19>>)\n", true)
-  assert_eval("String.valid?(<<239, 191, 19>>)\n", false)
-
-  """
-  "a" <> "ha"
-  """
-  |> assert_eval("aha")
-
-  assert_eval("<<0, 1>> <> <<2, 3>>\n", <<0, 1, 2, 3>>)
-
-  """
-  <<head, rest::binary>> = "banana"
-  head == ?b
-  """
-  |> assert_eval(true)
-
-  """
-  <<head, rest::binary>> = "banana"
-  rest
-  """
-  |> assert_eval("anana")
-
-  """
-  "ü" <> <<0>>
-  """
-  |> assert_eval(<<195, 188, 0>>)
-
-  """
-  <<x, rest::binary>> = "über"
-  x == ?ü
-  """
-  |> assert_eval(false)
-
-  """
-  <<x, rest::binary>> = "über"
-  rest
-  """
-  |> assert_eval(<<188, 98, 101, 114>>)
-
-  """
-  <<x::utf8, rest::binary>> = "über"
-  x == ?ü
-  """
-  |> assert_eval(true)
-
-  """
-  <<x::utf8, rest::binary>> = "über"
-  rest
-  """
-  |> assert_eval("ber")
-
-  """
-  ~c"hello"
-  """
-  |> assert_eval(~c"hello")
-
-  """
-  [?h, ?e, ?l, ?l, ?o]
-  """
-  |> assert_eval(~c"hello")
-
-  """
-  ~c"hełło"
-  """
-  |> assert_eval([104, 101, 322, 322, 111])
-
-  """
-  is_list(~c"hełło")
-  """
-  |> assert_eval(true)
-
-  """
-  heartbeats_per_minute = [99, 97, 116]
-  """
-  |> assert_eval(~c"cat")
-
-  #  todo 16 inspect/2 returns "'cat'" instead of "[99, 97, 116]"
-  @tag :skip
-  """
-  heartbeats_per_minute = [99, 97, 116]
-  inspect(heartbeats_per_minute, charlists: :as_list)
-  """
-  |> assert_eval("[99, 97, 116]")
-
-  """
-  to_charlist("hełło")
-  """
-  |> assert_eval([104, 101, 322, 322, 111])
-
-  #  todo 17 to_string/1 "heBBo" instead of "hełło"
-  @tag :skip
-  """
-  to_string(~c"hełło")
-  """
-  |> assert_eval("hełło")
-
-  """
-  to_string(:hello)
-  """
-  |> assert_eval("hello")
-
-  """
-  to_string(1)
-  """
-  |> assert_eval("1")
-
-  #  todo 40 concat does not returning ArgumentError with sigil c
-  @tag :skip
-  """
-  ~c"this " <> ~c"fails"
-  """
-  |> assert_error(%ArgumentError{})
-
-  """
-  ~c"this " ++ ~c"works"
-  """
-  |> assert_eval(~c"this works")
-
-  @tag :skip
-  """
-  "he" ++ "llo"
-  """
-  |> assert_error(%ArgumentError{})
-
-  """
-  "he" <> "llo"
-  """
-  |> assert_eval("hello")
-
-  # =======================================================================================================================
-  # Keyword lists and maps ===============================================================================================
-  # =======================================================================================================================
-
-  """
-  String.split("1 2 3 4", " ")
-  """
-  |> assert_eval(["1", "2", "3", "4"])
-
-  #  todo 18 Keyword does not work in option for String.split/3
-  @tag :skip
-  """
-  String.split("1 2 3 4", " ", [parts: 3])
-  """
-  |> assert_eval(["1", "2", "3 4"])
-
-  @tag :skip
-  """
-  String.split("1  2  3  4", " ", [parts: 3])
-  """
-  |> assert_eval(["1", "", "2  3  4"])
-
-  @tag :skip
-  """
-  String.split("1  2  3  4", " ", [parts: 3, trim: true])
-  """
-  |> assert_eval(["1", "2", " 3  4"])
-
-  @tag :skip
-  """
-  String.split("1  2  3  4", " ", parts: 3, trim: true)
-  """
-  |> assert_eval(["1", "2", " 3  4"])
-
-  """
-  [{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]
-  """
-  |> assert_eval(true)
-
-  @tag :skip
-  """
-  import String, only: [split: 1, split: 2]
-  split("hello world")
-  """
-  |> assert_eval(["hello", "world"])
-
-  """
-  list = [a: 1, b: 2]
-  list ++ [c: 3]
-  """
-  |> assert_eval(a: 1, b: 2, c: 3)
-
-  """
-  list = [a: 1, b: 2]
-  [a: 0] ++ list
-  """
-  |> assert_eval(a: 0, a: 1, b: 2)
-
-  """
-  list = [a: 1, b: 2]
-  list[:a]
-  """
-  |> assert_eval(1)
-
-  """
-  list = [a: 1, b: 2]
-  list[:b]
-  """
-  |> assert_eval(2)
-
-  """
-  [a: a] = [a: 1]
-  a
-  """
-  |> assert_eval(1)
-
-  @tag :skip
-  """
-  [a: a] = [a: 1, b: 2]
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  [b: b, a: a] = [a: 1, b: 2]
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  if true do
-     "This will be seen"
-  else
-    "This won't"
-  end
-  """
-  |> assert_eval("This will be seen")
-
-  """
-  if true, do: "This will be seen", else: "This won't"
-  """
-  |> assert_eval("This will be seen")
-
-  """
-  map = %{:a => 1, 2 => :b}
-  map[:a]
-  """
-  |> assert_eval(1)
-
-  """
-  map = %{:a => 1, 2 => :b}
-  map[2]
-  """
-  |> assert_eval(:b)
-
-  """
-  map = %{:a => 1, 2 => :b}
-  map[:c]
-  """
-  |> assert_eval(nil)
-
-  """
-  %{} = %{:a => 1, 2 => :b}
-  """
-  |> assert_eval(%{2 => :b, :a => 1})
-
-  """
-  %{:a => a} = %{:a => 1, 2 => :b}
-  a
-  """
-  |> assert_eval(1)
-
-  """
-  %{:c => c} = %{:a => 1, 2 => :b}
-  """
-  |> assert_error(%MatchError{})
-
-  """
-  Map.get(%{:a => 1, 2 => :b}, :a)
-  """
-  |> assert_eval(1)
-
-  """
-  Map.put(%{:a => 1, 2 => :b}, :c, 3)
-  """
-  |> assert_eval(%{2 => :b, :a => 1, :c => 3})
-
-  """
-  Map.to_list(%{:a => 1, 2 => :b})
-  """
-  |> assert_eval([{2, :b}, {:a, 1}])
-
-  """
-  map = %{:name => "John", :age => 23}
-  """
-  |> assert_eval(%{name: "John", age: 23})
-
-  @additional_prep """
-  map = %{name: "John", age: 23}
-  """
-
-  """
-  map.name
-  """
-  |> assert_eval("John")
-
-  """
-  map.agee
-  """
-  |> assert_error(%KeyError{})
-
-  """
-  %{map | name: "Mary"}
-  """
-  |> assert_eval(%{name: "Mary", age: 23})
-
-  """
-  %{map | agee: 27}
-  """
-  |> assert_error(%KeyError{})
-
-  """
-  users = [
-    john: %{name: "John", age: 27, languages: ["Erlang", "Ruby", "Elixir"]},
-    mary: %{name: "Mary", age: 29, languages: ["Elixir", "F#", "Clojure"]}
+  # Introduction
+  [
+    {"40 + 2", output: 42},
+    {
+      """
+      "hello" <> " world"
+      """,
+      output: "hello world"
+    }
   ]
-  users[:john].age
-  """
-  |> assert_eval(27)
+  |> create_tests(tag: :introduction)
 
-  """
-  users = [
-    john: %{name: "John", age: 27, languages: ["Erlang", "Ruby", "Elixir"]},
-    mary: %{name: "Mary", age: 29, languages: ["Elixir", "F#", "Clojure"]}
+  # Basic types
+  [
+    {"40 + 2", output: 42},
+    {
+      """
+      "hello" <> " world"
+      """,
+      output: "hello world"
+    },
+    # types
+    {"1", predicate: &is_integer/1},
+    {"0x1F", predicate: &is_integer/1},
+    {"1.0", predicate: &is_float/1},
+    {"true", predicate: &is_boolean/1},
+    {":atom", predicate: &is_atom/1},
+    {~s|"elixir"|, predicate: &String.valid?/1},
+    {"[1, 2, 3]\n", predicate: &is_list/1},
+    {"{1, 2, 3}\n", predicate: &is_tuple/1},
+    # arithmetic
+    {"1 + 2", output: 3},
+    {"5 * 5", output: 25},
+    {"10 / 2", output: 5.0},
+    # int division
+    {"div(10, 2)", output: 5},
+    {"div 10, 2", output: 5},
+    {"rem 10, 3", output: 1},
+    # bin repressentation
+    {"0b1010", output: 10},
+    {"0o777", output: 511},
+    {"0x1F", output: 31},
+    {"1.0", output: 1.0},
+    {"1.0e-10", output: 1.0e-10},
+    # rounding
+    {"round(3.58)", output: 4},
+    {"trunc(3.58)", output: 3},
+    # is_integer
+    {"is_integer(1)", output: true},
+    {"is_integer(2.0)", output: false},
+    # bools
+    {"true", output: true},
+    {"true == false", output: false},
+    {"true and true", output: true},
+    {"false or is_boolean(true)", output: true},
+    {"1 and true", raises: BadBooleanError},
+    # short circuiting
+    {~s|false and raise("This error will never be raised")|, output: false},
+    {~s|true or raise("This error will never be raised")|, output: true},
+    # non-bool: !, ||, &&
+    {"1 || true", output: 1},
+    {"false || 11", output: 11},
+    {"nil && 13", output: nil},
+    {"true && 17", output: 17},
+    {"!true", output: false},
+    {"!1", output: false},
+    {"!nil", output: true},
+    # atoms
+    {":apple", output: :apple},
+    {":orange", output: :orange},
+    {":watermelon", output: :watermelon},
+    {":apple == :apple", output: true},
+    {":apple == :orange", output: false},
+    {"true == :true", output: true},
+    {"is_atom(false)", output: true},
+    {"is_boolean(:false)", output: true},
+    # strings, interpolation
+    {~s|"hellö"|, output: "hellö"},
+    {~s|"hello " <> "world!"|, output: "hello world!"},
+    {
+      """
+      string = "world"
+      "hello \#{string}!"
+      """,
+      output: "hello world!"
+    },
+    {
+      """
+      number = 42
+      "i am \#{number} years old!"
+      """,
+      output: "i am 42 years old!"
+    },
+    {
+      """
+      "hello
+      world"
+      """,
+      output: "hello\nworld"
+    },
+    {~s|"hello\nworld"|, output: "hello\nworld"},
+    {
+      ~s|IO.puts("hello\nworld")|,
+      output: :ok, stdout: "hello\nworld", skip: true
+    },
+    {~s|is_binary("hellö")|, output: true},
+    {~s|byte_size("hellö")|, output: 6},
+    {~s|String.length("hellö")|, output: 5},
+    {~s|String.upcase("hellö")|, output: "HELLÖ"},
+    # comparison
+    {"1 == 1", output: true},
+    {"1 != 2", output: true},
+    {"1 < 2", output: true},
+    {~s|"foo" == "foo"|, output: true},
+    {~s|"foo" == "bar"|, output: false},
+    {"1 == 1.0", output: true},
+    {"1 == 2.0", output: false},
+    {"1 === 1.0", output: false}
   ]
-  users = put_in(users[:john].age, 31)
-  """
-  |> assert_eval(
-    john: %{age: 31, languages: ["Erlang", "Ruby", "Elixir"], name: "John"},
-    mary: %{age: 29, languages: ["Elixir", "F#", "Clojure"], name: "Mary"}
-  )
+  |> create_tests(tag: :basic_types)
 
-  """
-  users = [
-    john: %{name: "John", age: 27, languages: ["Erlang", "Ruby", "Elixir"]},
-    mary: %{name: "Mary", age: 29, languages: ["Elixir", "F#", "Clojure"]}
-  ]
-  users = put_in(users[:john].age, 31)
-  users = update_in(users[:mary].languages, fn languages -> List.delete(languages, "Clojure") end)
-  """
-  |> assert_eval(
-    john: %{age: 31, languages: ["Erlang", "Ruby", "Elixir"], name: "John"},
-    mary: %{age: 29, languages: ["Elixir", "F#"], name: "Mary"}
-  )
-
-  # =======================================================================================================================
-  # Modules and functions ================================================================================================
-  # =======================================================================================================================
-
-  """
-  String.length("hello")
-  """
-  |> assert_eval(5)
-
-  """
-  defmodule Math do
-    def sum(a, b) do
-      a + b
-    end
-  end
-
-  Math.sum(1, 2)
-  """
-  |> assert_eval(3)
-
-  """
-  defmodule Math do
-    def sum(a, b) do
-      do_sum(a, b)
-    end
-
-    defp do_sum(a, b) do
-      a + b
-    end
-  end
-  Math.do_sum(1,2)
-  """
-  |> assert_error(%UndefinedFunctionError{})
-
-  """
-  defmodule Math do
-    def zero?(0) do
-      true
-    end
-
-    def zero?(x) when is_integer(x) do
-      false
-    end
-  end
-  Math.zero?(0)
-  """
-  |> assert_eval(true)
-
-  """
-  defmodule Math do
-    def zero?(0) do
-      true
-    end
-
-    def zero?(x) when is_integer(x) do
-      false
-    end
-  end
-
-  Math.zero?(1)
-  """
-  |> assert_eval(false)
-
-  """
-  defmodule Math do
-    def zero?(0) do
-      true
-    end
-
-    def zero?(x) when is_integer(x) do
-      false
-    end
-  end
-
-  Math.zero?([1, 2, 3])
-  """
-  |> assert_error(%FunctionClauseError{})
-
-  #  todo 41 error - unsupported
-  @tag :skip
-  """
-  defmodule Math do
-    def zero?(0) do
-      true
-    end
-
-    def zero?(x) when is_integer(x) do
-      false
-    end
-  end
-
-  Math.zero?(0.0)
-  """
-  |> assert_error(%FunctionClauseError{})
-
-  """
-  defmodule Math do
-    def zero?(0), do: true
-    def zero?(x) when is_integer(x), do: false
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 19 "<>" does not work for variables - works only for plain strings
-  #  todo 20 using default arguments defined with "\\" fails (use \\\\ inside the string code to test this behaviour)
-  @tag :skip
-  """
-  defmodule Concat do
-    def join(a, b, sep \\\\ " ") do
-      {a, b, sep}
-    end
-  end
-  Concat.join("Hello", "world")
-  """
-  |> assert_eval("Hello world")
-
-  @tag :skip
-  """
-  defmodule Concat do
-    def join(a, b, sep \\ " ") do
-      a <> sep <> b
-    end
-  end
-  Concat.join("Hello", "world", "_")
-  """
-  |> assert_eval("Hello_world")
-
-  @tag :skip
-  """
-  defmodule DefaultTest do
-    def dowork(x \\ "hello") do
+  # Case, cond, and if
+  [
+    {
+      """
+      case {1, 2, 3} do
+        {1, x, 3} ->
+          "This clause will match and bind x to 2 in this clause"
+        {4, 5, 6} ->
+          "This clause won't match"
+        _ ->
+          "This clause would match any value"
+      end
+      """,
+      output: "This clause will match and bind x to 2 in this clause"
+    },
+    {
+      """
+      x = 1
+      case 10 do
+        ^x -> "Won't match"
+        _ -> "Will match"
+      end
+      """,
+      output: "Will match"
+    },
+    {
+      """
+      case {1, 2, 3} do
+        {1, x, 3} when x > 0 ->
+          "Will match"
+        _ ->
+          "Would match, if guard condition were not satisfied"
+      end
+      """,
+      output: "Will match"
+    },
+    {"hd(1)", raises: ArgumentError},
+    {
+      """
+      case 1 do
+        x when hd(x) -> "Won't match"
+        x -> "Got \#{x}"
+      end
+      """,
+      output: "Got 1"
+    },
+    {
+      """
+      case :ok do
+        :error -> "Won't match"
+      end
+      """,
+      raises: CaseClauseError
+    },
+    {
+      """
+      if true do
+        "This works!"
+      end
+      """,
+      output: "This works!"
+    },
+    {
+      """
+      if false do
+        "This will never be seen"
+      end
+      """,
+      output: nil
+    },
+    {
+      """
+      if nil do
+        "This won't be seen"
+      else
+        "This will"
+      end
+      """,
+      output: "This will"
+    },
+    {
+      """
+      x = 1
+      if true do
+        x = x + 1
+      end
+      """,
+      output: 2
+    },
+    {
+      """
+      x = 1
+      if true do
+        x = x + 1
+      end
       x
-    end
-  end
-  DefaultTest.dowork()
-  DefaultTest.dowork(123)
-  DefaultTest.dowork()
-  """
-  |> assert_eval("hello")
+      """,
+      output: 1
+    },
+    {
+      """
+      x = 1
+      x = if true do
+        x + 1
+      else
+        x
+      end
+      """,
+      output: 2
+    },
+    {
+      """
+      cond do
+        2 + 2 == 5 ->
+          "This is never true"
+        2 * 2 == 3 ->
+          "Nor this"
+        true ->
+          "This is always true (equivalent to else)"
+      end
+      """,
+      output: "This is always true (equivalent to else)"
+    },
+    {
+      """
+      cond do
+        hd([1, 2, 3]) ->
+          "1 is considered as true"
+      end
+      """,
+      output: "1 is considered as true"
+    }
+  ]
+  |> create_tests(tag: :case_cond_if)
 
-  @tag :skip
-  """
-  defmodule DefaultTest do
-    def dowork(x \\ "hello") do
+  # Anonymous functions
+  [
+    {
+      """
+      add = fn a, b -> a + b end
+      add.(1, 2)
+      """,
+      output: 3
+    },
+    {
+      """
+      add = fn a, b -> a + b end
+      is_function(add)
+      """,
+      output: true
+    },
+    {
+      """
+      add = fn a, b -> a + b end
+      is_function(add, 2)
+      """,
+      output: true, skip: true
+    },
+    {
+      """
+      add = fn a, b -> a + b end
+      is_function(add, 1)
+      """,
+      output: false, skip: true
+    },
+    {
+      """
+      add = fn a, b -> a + b end
+      double = fn a -> add.(a, a) end
+      double.(2)
+      """,
+      output: 4
+    },
+    {
+      """
+      x = 42
+      (fn -> x = 0 end).()
+      """,
+      output: 0
+    },
+    {
+      """
+      x = 42
+      (fn -> x = 0 end).()
       x
-    end
-  end
-  DefaultTest.dowork(123)
-  """
-  |> assert_eval(123)
+      """,
+      output: 42
+    },
+    {
+      """
+      f = fn
+        x, y when x > 0 -> x + y
+        x, y -> x * y
+      end
+      f.(1, 3)
+      """,
+      output: 4
+    },
+    {
+      """
+      f = fn
+        x, y when x > 0 -> x + y
+        x, y -> x * y
+      end
+      f.(-1, 3)
+      """,
+      output: -3
+    },
+    {"fun = &is_atom/1", output: &:erlang.is_atom/1},
+    {
+      """
+      fun = &is_atom/1
+      is_function(fun)
+      """,
+      output: true
+    },
+    {
+      """
+      fun = &is_atom/1
+      fun.(:hello)
+      """,
+      output: true, skip: true
+    },
+    {
+      """
+      fun = &is_atom/1
+      fun.(123)
+      """,
+      output: false, skip: true
+    },
+    {
+      """
+      fun = &String.length/1
+      """,
+      output: &String.length/1
+    },
+    {
+      """
+      fun = &String.length/1
+      fun.("hello")
+      """,
+      output: 5
+    },
+    {
+      """
+      add = &+/2
+      """,
+      output: &:erlang.+/2
+    },
+    {
+      """
+      add = &+/2
+      add.(1, 2)
+      """,
+      output: 3, skip: true
+    },
+    {
+      """
+      add = &+/2
+      is_arity_2 = fn fun -> is_function(fun, 2) end
+      is_arity_2.(add)
+      """,
+      output: true, skip: true
+    },
+    {
+      """
+      fun = &(&1 + 1)
+      fun.(1)
+      """,
+      output: 2
+    },
+    {
+      """
+      fun2 = &"Good \#{&1}"
+      fun2.("morning")
+      """,
+      output: "Good morning"
+    }
+  ]
+  |> create_tests(tag: :anonymous_functions)
 
-  @tag :skip
-  """
-  defmodule Concat do
-    # A function head declaring defaults
-    def join(a, b, sep \\ " ")
+  # Binaries
+  [
+    {
+      """
+      string = "hello"
+      is_binary(string)
+      """,
+      output: true
+    },
+    {"?a", output: 97},
+    {"?ł", output: 322},
+    {~s|"\u0061" == "a"|, output: true},
+    {"0x0061 = 97 = ?a", output: 97},
+    {
+      """
+      string = "héllo"
+      String.length(string)
+      """,
+      output: 5
+    },
+    {
+      """
+      string = "héllo"
+      byte_size(string)
+      """,
+      output: 6
+    },
+    {~s|String.codepoints("👩‍🚒")|, output: ["👩", "‍", "🚒"]},
+    {~s|String.graphemes("👩‍🚒")|, output: ["👩‍🚒"], skip: true},
+    {~s|String.length("👩‍🚒")|, output: 1},
+    {~s|"hełło" <> <<0>>|, output: <<104, 101, 197, 130, 197, 130, 111, 0>>},
+    {
+      ~s|IO.inspect("hełło", binaries: :as_binaries)|,
+      output: <<104, 101, 197, 130, 197, 130, 111>>, skip: true
+    },
+    {"<<42>> == <<42::8>>", output: true},
+    {"<<3::4>>", output: <<3::size(4)>>, skip: true},
+    {"<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>", output: true, skip: true},
+    {"is_bitstring(<<3::4>>)", output: true, skip: true},
+    {"is_binary(<<3::4>>)", output: false, skip: true},
+    {"is_bitstring(<<0, 255, 42>>)", output: true},
+    {"is_binary(<<0, 255, 42>>)", output: true},
+    {"is_binary(<<42::16>>)", output: true},
+    {
+      """
+      <<0, 1, x>> = <<0, 1, 2>>
+      x
+      """,
+      output: 2
+    },
+    {"<<0, 1, x>> = <<0, 1, 2, 3>>", raises: MatchError},
+    {
+      """
+      <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
+      head
+      """,
+      output: <<0, 1>>, skip: true
+    },
+    {
+      """
+      <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
+      rest
+      """,
+      output: <<2, 3>>, skip: true
+    },
+    {~s|is_binary("hello")|, output: true},
+    {"is_binary(<<239, 191, 19>>)", output: true},
+    {"String.valid?(<<239, 191, 19>>)", output: false},
+    {~s|"a" <> "ha"|, output: "aha"},
+    {"<<0, 1>> <> <<2, 3>>", output: <<0, 1, 2, 3>>},
+    {
+      """
+      <<head, rest::binary>> = "banana"
+      head == ?b
+      """,
+      output: true
+    },
+    {
+      """
+      <<head, rest::binary>> = "banana"
+      rest
+      """,
+      output: "anana"
+    },
+    {~s|"ü" <> <<0>>|, output: <<195, 188, 0>>},
+    {
+      """
+      <<x, rest::binary>> = "über"
+      x == ?ü
+      """,
+      output: false
+    },
+    {
+      """
+      <<x, rest::binary>> = "über"
+      rest
+      """,
+      output: <<188, 98, 101, 114>>
+    },
+    {
+      """
+      <<x::utf8, rest::binary>> = "über"
+      x == ?ü
+      """,
+      output: true
+    },
+    {
+      """
+      <<x::utf8, rest::binary>> = "über"
+      rest
+      """,
+      output: "ber"
+    },
+    {~s|~c"hello"|, output: ~c"hello"},
+    {"[?h, ?e, ?l, ?l, ?o]", output: ~c"hello"},
+    {~s|~c"hełło"|, output: [104, 101, 322, 322, 111]},
+    {~s|is_list(~c"hełło")|, output: true},
+    {
+      """
+      heartbeats_per_minute = [99, 97, 116]
+      inspect(heartbeats_per_minute, charlists: :as_list)
+      """,
+      output: [99, 97, 116], skip: true
+    },
+    {~s|to_charlist("hełło")|, output: [104, 101, 322, 322, 111]},
+    {~s|to_string(~c"hełło")|, output: "hełło", skip: true},
+    {"to_string(1)", output: "1"},
+    {~s|~c"this " <> ~c"fails"|, raises: ArgumentError, skip: true},
+    {~s|~c"this " ++ ~c"works"|, output: ~c"this works"},
+    {~s|"he" ++ "llo"|, raises: ArgumentError},
+    {~s|"he" <> "llo"|, output: "hello"}
+  ]
+  |> create_tests(tag: :binaries)
 
-    def join(a, b, _sep) when b == "" do
+  # Keyword lists, maps
+  [
+    {~s|String.split("1 2 3 4", " ")|, output: ["1", "2", "3", "4"]},
+    {~s|String.split("1 2 3 4", " ", [parts: 3])|, output: ["1", "2", "3 4"], skip: true},
+    {~s|String.split("1  2  3  4", " ", [parts: 3])|, output: ["1", "", "2  3  4"], skip: true},
+    {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|,
+     output: ["1", "2", " 3  4"], skip: true},
+    {"[{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]", output: true},
+    {
+      """
+      import String, only: [split: 1, split: 2]
+      split("hello world")
+      """,
+      output: ["hello", "world"], skip: true
+    },
+    {
+      "list = [a: 1, b: 2]",
+      cases: [
+        {"list ++ [c: 3]", output: [a: 1, b: 2, c: 3]},
+        {"[a: 0] ++ list", output: [a: 0, a: 1, b: 2]},
+        {"list[:a]", output: 1},
+        {"list[:b]", output: 2}
+      ]
+    },
+    {
+      """
+      [a: a] = [a: 1]
       a
-    end
+      """,
+      output: 1
+    },
+    {"[a: a] = [a: 1, b: 2]", raises: MatchError},
+    {"[b: b, a: a] = [a: 1, b: 2]", raises: MatchError},
+    {
+      "map = %{:a => 1, 2 => :b}",
+      cases: [
+        {"map[:a]", output: 1},
+        {"map[2]", output: :b},
+        {"map[:c]", output: nil}
+      ]
+    },
+    {
+      "map = %{:a => 1, 2 => :b}",
+      cases: [
+        {"%{} = map", output: %{:a => 1, 2 => :b}},
+        {
+          """
+          %{:a => a} = map
+          a
+          """,
+          output: 1
+        },
+        {"%{:c => c} = map", raises: MatchError},
+        {"Map.get(map, :a)", output: 1},
+        {"Map.put(map, :c, 3)", output: %{2 => :b, :a => 1, :c => 3}},
+        {"Map.to_list(map)", output: [{2, :b}, {:a, 1}]}
+      ]
+    },
+    {
+      ~s|map = %{:name => "John", :age => 23}|,
+      cases: [
+        {"map.name", output: "John"},
+        {"map.agee", raises: KeyError},
+        {~s/%{map | name: "Mary"}/, output: %{name: "Mary", age: 23}},
+        {"%{map | agee: 27}", raises: KeyError}
+      ]
+    },
+    {
+      """
+      users = [
+        john: %{name: "John", age: 27, languages: ["Erlang", "Ruby", "Elixir"]},
+        mary: %{name: "Mary", age: 29, languages: ["Elixir", "F#", "Clojure"]}
+      ]
+      """,
+      cases: [
+        {"users[:john].age", output: 27},
+        {
+          "put_in(users[:john].age, 31)",
+          output: [
+            john: %{age: 31, languages: ["Erlang", "Ruby", "Elixir"], name: "John"},
+            mary: %{age: 29, languages: ["Elixir", "F#", "Clojure"], name: "Mary"}
+          ]
+        },
+        {
+          ~s|update_in(users[:mary].languages, fn languages -> List.delete(languages, "Clojure") end)|,
+          output: [
+            john: %{age: 27, languages: ["Erlang", "Ruby", "Elixir"], name: "John"},
+            mary: %{age: 29, languages: ["Elixir", "F#"], name: "Mary"}
+          ]
+        }
+      ]
+    }
+  ]
+  |> create_tests(tag: :kw_maps)
 
-    def join(a, b, sep) do
-      a <> sep <> b
-    end
-  end
+  # Modules
+  [
+    {~s|String.length("hello")|, output: 5},
+    {
+      """
+      defmodule Math do
+        def sum(a, b) do
+          a + b
+        end
+      end
 
-  Concat.join("Hello", "")
-  """
-  |> assert_eval("Hello")
+      Math.sum(1, 2)
+      """,
+      output: 3
+    },
+    {
+      """
+      defmodule Math do
+        def sum(a, b) do
+          do_sum(a, b)
+        end
 
-  @tag :skip
-  """
-  defmodule Concat do
-    # A function head declaring defaults
-    def join(a, b, sep \\ " ")
+        defp do_sum(a, b) do
+          a + b
+        end
+      end
+      Math.do_sum(1,2)
+      """,
+      raises: UndefinedFunctionError
+    },
+    {
+      """
+      defmodule Math do
+        def zero?(0) do
+          true
+        end
 
-    def join(a, b, _sep) when b == "" do
-      a
-    end
+        def zero?(x) when is_integer(x) do
+          false
+        end
+      end
+      """,
+      cases: [
+        {"", predicate: &AtomVM.assert_is_module/1},
+        {"Math.zero?(0)", output: true},
+        {"Math.zero?(1)", output: false},
+        {"Math.zero?([1, 2, 3])", raises: FunctionClauseError},
+        {"Math.zero?(0.0)", raises: FunctionClauseError, skip: true}
+      ]
+    },
+    {
+      """
+      defmodule Concat do
+        def join(a, b, sep \\\\ " ") do
+          a <> sep <> b
+        end
+      end
+      """,
+      skip: true,
+      cases: [
+        {~s|Concat.join("Hello", "world")|, output: "Hello world"},
+        {~s|Concat.join("Hello", "world", "_")|, output: "Hello_world"}
+      ]
+    },
+    {
+      """
+      defmodule Concat do
+        # A function head declaring defaults
+        def join(a, b, sep \\\\ " ")
 
-    def join(a, b, sep) do
-      a <> sep <> b
-    end
-  end
-  Concat.join("Hello", "world"))
-  """
-  |> assert_eval("Hello world")
+        def join(a, b, _sep) when b == "" do
+          a
+        end
 
-  @tag :skip
-  """
-  defmodule Concat do
-    # A function head declaring defaults
-    def join(a, b, sep \\ " ")
+        def join(a, b, sep) do
+          a <> sep <> b
+        end
+      end
+      """,
+      skip: true,
+      cases: [
+        {~s|Concat.join("Hello", "")|, output: "Hello"},
+        {~s|Concat.join("Hello", "world", " ")|, output: "Hello world"},
+        {~s|Concat.join("Hello", "world", "_")|, output: "Hello_world"}
+      ]
+    },
+    {
+      """
+      defmodule DefaultTest do
+        def dowork(x \\\\ "hello") do
+          x
+        end
+      end
+      """,
+      skip: true,
+      cases: [
+        {"DefaultTest.dowork()", output: "hello"},
+        {"DefaultTest.dowork(123)", output: 123}
+      ]
+    }
+  ]
+  |> create_tests(tag: :modules)
 
-    def join(a, b, _sep) when b == "" do
-      a
-    end
+  # Recursion
+  [
+    {
+      """
+      defmodule Recursion do
+        def print_multiple_times(msg, n) when n > 0 do
+          IO.puts(msg)
+          print_multiple_times(msg, n - 1)
+        end
 
-    def join(a, b, sep) do
-      a <> sep <> b
-    end
-  end
-  Concat.join("Hello", "world", "_")
-  """
-  |> assert_eval("Hello_world")
+        def print_multiple_times(_msg, 0) do
+          :ok
+        end
+      end
+      """,
+      cases: [
+        {
+          ~s|Recursion.print_multiple_times("Hello!", 3)|,
+          output: :ok, stdout: "Hello!\nHello!\nHello!\n"
+        },
+        {
+          ~s|Recursion.print_multiple_times("Hello!", -1)|,
+          raises: FunctionClauseError
+        }
+      ]
+    },
+    {
+      """
+      defmodule Math do
+        def sum_list([head | tail], accumulator) do
+          sum_list(tail, head + accumulator)
+        end
 
-  ## =======================================================================================================================
-  ## Recursion ============================================================================================================
-  ## =======================================================================================================================
+        def sum_list([], accumulator) do
+          accumulator
+        end
+      end
+      """,
+      cases: [
+        {"Math.sum_list([1, 2, 3], 0)", output: 6},
+        {"Math.sum_list([2, 3], 1)", output: 6},
+        {"Math.sum_list([3], 3)", output: 6},
+        {"Math.sum_list([], 6)", output: 6}
+      ]
+    },
+    {
+      """
+      defmodule Math do
+        def double_each([head | tail]) do
+          [head * 2 | double_each(tail)]
+        end
 
-  @additional_prep """
-  defmodule Recursion do
-    def print_multiple_times(msg, n) when n > 0 do
-      IO.puts(msg)
-      print_multiple_times(msg, n - 1)
-    end
+        def double_each([]) do
+          []
+        end
+      end
 
-    def print_multiple_times(_msg, 0) do
-      :ok
-    end
-  end
-  """
+      Math.double_each([1, 2, 3])
+      """,
+      output: [2, 4, 6]
+    },
+    {"Enum.reduce([1, 2, 3], 0, fn x, acc -> x + acc end)", output: 6},
+    {"Enum.map([1, 2, 3], fn x -> x * 2 end)", output: [2, 4, 6]},
+    {"Enum.map([1, 2, 3], &(&1 * 2))", output: [2, 4, 6]}
+  ]
+  |> create_tests(tag: :recursion)
 
-  """
-  Recursion.print_multiple_times("Hello!", 3)
-  """
-  |> assert_eval(:ok)
+  # Enumerables
+  [
+    {"Enum.map(%{1 => 2, 3 => 4}, fn {k, v} -> k * v end)", output: [2, 12]},
+    {"Enum.map(1..3, fn x -> x * 2 end)", output: [2, 4, 6]},
+    {
+      """
+      Enum.reduce(1..3, 0, &+/2)
+      """,
+      output: 6, skip: true
+    },
+    {
+      """
+      odd? = fn x -> rem(x, 2) != 0 end
+      Enum.filter(1..3, odd?)
+      """,
+      output: [1, 3]
+    },
+    {
+      """
+      odd? = fn x -> rem(x, 2) != 0 end
+      1..100_000 |> Enum.map(&(&1 * 3)) |> Enum.filter(odd?) |> Enum.sum()
+      """,
+      # slow
+      output: 7_500_000_000, skip: true
+    },
+    {
+      """
+      odd? = fn x -> rem(x, 2) != 0 end
+      Enum.sum(Enum.filter(Enum.map(1..100_000, &(&1 * 3)), odd?))
+      """,
+      # slow
+      output: 7_500_000_000, skip: true
+    },
+    {
+      """
+      odd? = fn x -> rem(x, 2) != 0 end
+      1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?) |> Enum.sum()
+      """,
+      # slow
+      output: 7_500_000_000, skip: true
+    },
+    {"1..100_000 |> Stream.map(&(&1 * 3))", predicate: &is_struct(&1, Stream), skip: true},
+    {
+      """
+      stream = Stream.cycle([1, 2, 3])
+      Enum.take(stream, 10)
+      """,
+      output: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1]
+    }
+  ]
+  |> create_tests(tag: :enums)
 
-  """
-  Recursion.print_multiple_times("Hello!", -1)
-  """
-  |> assert_error(%FunctionClauseError{})
-
-  @additional_prep """
-  defmodule Math do
-    def sum_list([head | tail], accumulator) do
-      sum_list(tail, head + accumulator)
-    end
-
-    def sum_list([], accumulator) do
-      accumulator
-    end
-  end
-  """
-
-  """
-  Math.sum_list([1, 2, 3], 0)
-  """
-  |> assert_eval(6)
-
-  """
-  Math.sum_list([2, 3], 1)
-  """
-  |> assert_eval(6)
-
-  """
-  Math.sum_list([3], 3)
-  """
-  |> assert_eval(6)
-
-  """
-  Math.sum_list([], 6)
-  """
-  |> assert_eval(6)
-
-  @additional_prep ""
-
-  """
-  defmodule Math do
-    def double_each([head | tail]) do
-      [head * 2 | double_each(tail)]
-    end
-
-    def double_each([]) do
-      []
-    end
-  end
-
-  Math.double_each([1, 2, 3])
-  """
-  |> assert_eval([2, 4, 6])
-
-  """
-  Enum.reduce([1, 2, 3], 0, fn x, acc -> x + acc end)
-  """
-  |> assert_eval(6)
-
-  """
-  Enum.map([1, 2, 3], fn x -> x * 2 end)
-  """
-  |> assert_eval([2, 4, 6])
-
-  """
-  Enum.map([1, 2, 3], &(&1 * 2))
-  """
-  |> assert_eval([2, 4, 6])
-
-  ## =======================================================================================================================
-  ## Enumerables and Streams ==============================================================================================
-  ## =======================================================================================================================
-
-  """
-  Enum.map(%{1 => 2, 3 => 4}, fn {k, v} -> k * v end)
-  """
-  |> assert_eval([2, 12])
-
-  """
-  Enum.map(1..3, fn x -> x * 2 end)
-  """
-  |> assert_eval([2, 4, 6])
-
-  #  todo 13 :erlang.+/2 is not working as an anonymous function
-  @tag :skip
-  """
-  Enum.reduce(1..3, 0, &+/2)
-  """
-  |> assert_eval(6)
-
-  """
-  odd? = fn x -> rem(x, 2) != 0 end
-  Enum.filter(1..3, odd?)
-  """
-  |> assert_eval([1, 3])
-
-  #  todo 21 the following freezes test execution
-  @tag :skip
-  """
-  odd? = fn x -> rem(x, 2) != 0 end
-  1..100_000 |> Enum.map(&(&1 * 3)) |> Enum.filter(odd?) |> Enum.sum()
-  """
-  |> assert_eval(7_500_000_000)
-
-  @tag :skip
-  """
-  odd? = fn x -> rem(x, 2) != 0 end
-  Enum.sum(Enum.filter(Enum.map(1..100_000, &(&1 * 3)), odd?))
-  """
-  |> assert_eval(7_500_000_000)
-
-  @tag :skip
-  """
-  odd? = fn x -> rem(x, 2) != 0 end
-  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?) |> Enum.sum()
-  """
-  |> assert_eval(7_500_000_000)
-
-  #  todo 39 "Unknown external term type: <number>" when calling the Stream module functions
-  @tag :skip
-  """
-  1..100_000 |> Stream.map(&(&1 * 3))
-  """
-  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
-
-  @tag :skip
-  """
-  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?)
-  """
-  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
-
-  @tag :skip
-  """
-  stream = Stream.cycle([1, 2, 3])
-  Enum.take(stream, 10)
-  """
-  |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  "path/to/file" |> File.stream!() |> Enum.take(10)
-  #  """
-  #  |> assert_eval()
-
-  ## =======================================================================================================================
-  ## Processes ============================================================================================================
-  ## =======================================================================================================================
-
-  #  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
-  @tag :skip
-  """
-  spawn(fn -> 1 + 2 end)
-  """
-  |> assert_eval({:expect_fn, &is_pid/1})
-
-  #  todo 23 process with "pid" is still alive (Process.alive?/1 is true)
-  @tag :skip
-  """
-  pid = spawn(fn -> 1 + 2 end)
-  Process.alive?(pid)
-  """
-  |> assert_eval(false)
-
-  """
-  self()
-  Process.alive?(self())
-  """
-  |> assert_eval(true)
-
-  """
-  send(self(), {:hello, "world"})
-  receive do
-    {:hello, msg} -> msg
-    {:world, _msg} -> "won't match"
-  end
-  """
-  |> assert_eval("world")
-
-  """
-  receive do
-    {:hello, msg}  -> msg
-  after
-    1_000 -> "nothing after 1s"
-  end
-  """
-  |> assert_eval("nothing after 1s")
-
-  #  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
-  @tag :skip
-  """
-  parent = self()
-  spawn(fn -> send(parent, {:hello, self()}) end)
-  receive do
-    {:hello, pid} -> "Got hello from \#{inspect pid}"
-  end
-  """
-  |> assert_eval("Got hello from #PID<0.48.0>")
-
-  @tag :skip
-  """
-  send(self(), :hello)
-  flush()
-  """
-  |> assert_eval(:hello)
-
-  # todo - seems like the process is raising error in a good enough way but for some reason exception is not caught in trycatch
-  # todo - that is a behaviour exactly the same as in iex console so idk how to test it
-
-  @tag :skip
-  """
-  spawn(fn -> raise "oops" end)
-  """
-  |> assert_error(%RuntimeError{})
-
-  @tag :skip
-  """
-  spawn_link(fn -> raise "oops" end)
-  """
-  |> assert_error(%RuntimeError{})
-
-  @tag :skip
-  """
-  Task.start(fn -> raise "oops" end)
-  """
-  |> assert_error(%RuntimeError{})
-
-  #  todo 24 defining module that uses Task and trying to create such Task is causing compilation problems
-  @tag :skip
-  """
-  defmodule KV do
-    def start_link do
-      Task.start_link(fn -> loop(%{}) end)
-    end
-
-    defp loop(map) do
+  # Processes
+  [
+    {"spawn(fn -> 1 + 2 end)", predicate: &is_pid/1, skip: true},
+    {
+      """
+      pid = spawn(fn -> 1 + 2 end)
+      Process.sleep(50) # 50ms
+      Process.alive?(pid)
+      """,
+      output: false
+    },
+    {"Process.alive?(self())", output: true},
+    {
+      """
+      send(self(), {:hello, "world"})
       receive do
-        {:get, key, caller} ->
-          send(caller, Map.get(map, key))
-          loop(map)
-        {:put, key, value} ->
-          loop(Map.put(map, key, value))
+        {:hello, msg} -> msg
+        {:world, _msg} -> "won't match"
       end
-    end
-  end
-  {:ok, pid} = KV.start_link()
-  send(pid, {:get, :hello, self()})
-  flush()
-  """
-  |> assert_eval(nil)
+      """,
+      output: "world"
+    },
+    {
+      """
+      receive do
+        {:hello, msg}  -> msg
+      after
+        100 -> "nothing after 100ms"
+      end
+      """,
+      output: "nothing after 100ms"
+    },
+    {
+      """
+      parent = self()
+      spawn(fn -> send(parent, {:hello, self()}) end)
+      receive do
+        {:hello, pid} -> "Got hello from \#{inspect(pid)}"
+      end
+      """,
+      predicate: &(&1 =~ ~r/Got hello from #PID<0\.\d+\.0>/)
+    },
+    {~s|spawn(fn -> raise "oops" end)|, raises: RuntimeError, skip: true},
+    {~s|spawn_link(fn -> raise "oops" end)|, raises: RuntimeError, skip: true},
+    {~s|Task.start(fn -> raise "oops" end)|, raises: RuntimeError, skip: true},
+    {
+      """
+      defmodule KV do
+        def start_link do
+          Task.start_link(fn -> loop(%{}) end)
+        end
 
-  #  todo 24 - the "pid" variable in the following is the "pid" variable from the former
-  @tag :skip
-  """
-  send(pid, {:put, :hello, :world})
-  send(pid, {:get, :hello, self()})
-  flush()
-  # :world
-  """
-  |> assert_eval(:ok)
+        defp loop(map) do
+          receive do
+            {:get, key, caller} ->
+              send(caller, Map.get(map, key))
+              loop(map)
+            {:put, key, value} ->
+              loop(Map.put(map, key, value))
+          end
+        end
+      end
+      {:ok, pid} = KV.start_link()
+      """,
+      cases: [
+        {
+          """
+          send(pid, {:get, :hello, self()})
+          receive do
+            msg -> msg
+          end
+          """,
+          output: nil
+        },
+        {
+          """
+          send(pid, {:put, :hello, :world})
+          send(pid, {:get, :hello, self()})
+          receive do
+            msg -> msg
+          end
+          """,
+          output: :world
+        },
+        {
+          """
+          Process.register(pid, :kv)
+          send(:kv, {:put, :hello, :world})
+          send(:kv, {:get, :hello, self()})
+          receive do
+            msg -> msg
+          end
+          """,
+          output: :world
+        }
+      ],
+      skip: true
+    },
+    {
+      """
+      {:ok, pid} = Agent.start_link(fn -> %{} end)
+      Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
+      Agent.get(pid, fn map -> Map.get(map, :hello) end)
+      """,
+      output: :world
+    }
+  ]
+  |> create_tests(tag: :processes)
 
-  @tag :skip
-  """
-  Process.register(pid, :kv)
-  send(:kv, {:get, :hello, self()})
-  flush()
-  :world
-  """
-  |> assert_eval(:ok)
+  # IO
+  # Most are commented out: we're not supporting stdin and we don't have sample file
+  [
+    {~s|IO.puts("hello world")|, output: :ok, stdout: "hello world\n"},
+    # {~s|IO.gets("yes or no? ")|, stdin: "yes\n"},
+    # {
+    #   """
+    #   IO.puts(:stderr, "hello world")
+    #   """,
+    #   output: :ok, stderr: "hello world\n"
+    # },
+    # {
+    #   """
+    #   {:ok, file} = File.open("path/to/file/hello", [:write])
+    #   IO.binwrite(file, "world")
+    #   File.close(file)
+    #   File.read("path/to/file/hello")
+    #   """, output: "world"
+    # },
+    # {~s|File.read("path/to/file/hello")|, output: {:ok, "world"}},
+    # {~s|File.read!("path/to/file/hello")|, output: "world"},
+    # {~s|File.read!("path/to/file/unknown")|, output: {:error, :enoent}},
+    # {~s|File.read!("path/to/file/unknown")|, raises: File.Error},
+    # {~s|Path.expand("~/hello")|, output: "/Users/jose/hello"},
+    # {
+    #   """
+    #   {:ok, file} = File.open("hello")
+    #   :ok = File.close(file)
+    #   IO.write(file, "is anybody out there")
+    #   """,
+    #   raises: ErlangError
+    # },
+    # {
+    #   """
+    #   pid = spawn(fn ->
+    #     receive do
+    #       msg -> IO.inspect(msg)
+    #     end
+    #   end)
+    #   IO.write(pid, "hello")
+    #   """,
+    #   predicate: &match?({:io_request, _pid, _ref, {:put_chars, :unicode, "hello"}}, &1)
+    # },
+    {
+      """
+      name = "Mary"
+      IO.puts("Hello " <> name <> "!")
+      """,
+      output: :ok, stdout: "Hello Mary!\n"
+    },
+    {
+      """
+      name = "Mary"
+      IO.puts(["Hello ", name, "!"])
+      """,
+      output: :ok, stdout: "Hello Mary!\n"
+    },
+    {
+      ~s|Enum.join(["apple", "banana", "lemon"], ",")|,
+      output: "apple,banana,lemon"
+    },
+    {
+      ~s|Enum.intersperse(["apple", "banana", "lemon"], ",")|,
+      output: ["apple", ",", "banana", ",", "lemon"]
+    },
+    {
+      ~s|IO.puts(["apple", [",", "banana", [",", "lemon"]]])|,
+      output: :ok, stdout: "apple,banana,lemon\n"
+    },
+    {
+      ~s|IO.puts(["apple", ?,, "banana", ?,, "lemon"])|,
+      output: :ok, stdout: "apple,banana,lemon\n"
+    },
+    {
+      ~s|IO.puts([?O, ?l, ?á, ?\\s, "Mary", ?!])|,
+      output: :ok, stdout: "Olá Mary!\n", skip: true
+    }
+  ]
+  |> create_tests(tag: :io)
 
-  #  todo 25 using Agent is causing the evaluation to fail
-  @tag :skip
-  """
-  {:ok, pid} = Agent.start_link(fn -> %{} end)
-  Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
-  Agent.get(pid, fn map -> Map.get(map, :hello) end)
-  """
-  |> assert_eval(:world)
-
-  ## =======================================================================================================================
-  ## IO and the file system ===============================================================================================
-  ## =======================================================================================================================
-
-  #  todo 38 testing IO - take result from try_run and output and assert it
-  @tag :skip
-  """
-  IO.puts("hello world")
-  hello world
-  :ok
-  IO.gets("yes or no? ")
-  yes or no? yes
-  "yes\n"
-  """
-  |> assert_eval(:ok)
-
-  """
-  IO.puts(:stderr, "hello world")
-  """
-  |> assert_eval(:ok)
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  {:ok, file} = File.open("path/to/file/hello", [:write])
-  #  {:ok, #PID<0.47.0>}
-  #  IO.binwrite(file, "world")
-  #  :ok
-  #  File.close(file)
-  #  :ok
-  #  File.read("path/to/file/hello")
-  #  {:ok, "world"}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  File.read("path/to/file/hello")
-  #  {:ok, "world"}
-  #  File.read!("path/to/file/hello")
-  #  "world"
-  #  File.read("path/to/file/unknown")
-  #  {:error, :enoent}
-  #  File.read!("path/to/file/unknown")
-  #  ** (File.Error) could not read file "path/to/file/unknown": no such file or directory
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  case File.read("path/to/file/hello") do
-  #    {:ok, body} -> # do something with the `body`
-  #    {:error, reason} -> # handle the error caused by `reason`
-  #  end
-  #  """
-  #  |> assert_eval()
-
-  #  """
-  #  {:ok, body} = File.read("path/to/file/unknown")
-  #  """
-  #  |> assert_eval()
-
-  """
-  Path.join("foo", "bar")
-  """
-  |> assert_eval("foo/bar")
-
-  #  """
-  #  Path.expand("~/hello")
-  #  """
-  #  |> assert_eval("/Users/jose/hello")
-  #
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  {:ok, file} = File.open("hello")
-  #  {:ok, #PID<0.47.0>}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  File.close(file)
-  #  :ok
-  #  IO.write(file, "is anybody out there")
-  #  ** (ErlangError) Erlang error: :terminated:
-  #
-  #    * 1st argument: the device has terminated
-  #
-  #      (stdlib 5.0) io.erl:94: :io.put_chars(#PID<0.114.0>, "is anybody out there")
-  #      iex:4: (file)
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  pid = spawn(fn ->
-  #    receive do
-  #      msg -> IO.inspect(msg)
-  #    end
-  #  end)
-  #  #PID<0.57.0>
-  #  IO.write(pid, "hello")
-  #  {:io_request, #PID<0.41.0>, #Reference<0.0.8.91>,
-  #   {:put_chars, :unicode, "hello"}}
-  #  ** (ErlangError) erlang error: :terminated
-  #  """
-  #  |> assert_eval()
-  #
-  # todo 19 "<>" does not work for variables - works only for plain strings
-  @tag :skip
-  """
-  name = "Mary"
-  IO.puts("Hello " <> name <> "!")
-  """
-  |> assert_eval(:ok)
-
-  """
-  name = "Mary"
-  IO.puts(["Hello ", name, "!"])
-  """
-  |> assert_eval(:ok)
-
-  """
-  Enum.join(["apple", "banana", "lemon"], ",")
-  """
-  |> assert_eval("apple,banana,lemon")
-
-  """
-  Enum.intersperse(["apple", "banana", "lemon"], ",")
-  """
-  |> assert_eval(["apple", ",", "banana", ",", "lemon"])
-
-  """
-  IO.puts(["apple", [",", "banana", [",", "lemon"]]])
-  """
-  |> assert_eval(:ok)
-
-  """
-  IO.puts(["apple", ?,, "banana", ?,, "lemon"])
-  """
-  |> assert_eval(:ok)
-
-  """
-  IO.puts([?O, ?l, ?á, ?\\s, "Mary", ?!])
-  """
-  |> assert_eval(:ok)
-
-  ## =======================================================================================================================
-  ## alias, require, import, and use ======================================================================================
-  ## =======================================================================================================================
-
-  #  todo 26 using alias inside a module does not work
-  @tag :skip
-  """
-  defmodule Stats do
-    alias Math.List, as: List
-    # In the remaining module definition List expands to Math.List.
-  end
-  """
-  |> assert_eval_module()
-
-  """
-  alias Math.List
-  """
-  |> assert_eval(Math.List)
-
-  """
-  alias Math.List, as: List
-  """
-  |> assert_eval(Math.List)
-
-  """
-  Integer.is_odd(3)
-  """
-  |> assert_error(%UndefinedFunctionError{})
-
-  """
-  require Integer
-  Integer.is_odd(3)
-  """
-  |> assert_eval(true)
-
-  """
-  import List, only: [duplicate: 2]
-  duplicate(:ok, 3)
-  """
-  |> assert_eval([:ok, :ok, :ok])
-
-  """
-  defmodule Math do
-    def some_function do
+  # Alias, require, use
+  [
+    {
+      """
+      defmodule Math do
+        defmodule List do
+        end
+      end
+      """,
+      cases: [
+        {
+          """
+          alias Math.List
+          List
+          """,
+          output: Math.List
+        },
+        {
+          """
+          alias Math.List, as: List
+          List
+          """,
+          output: Math.List
+        }
+      ],
+      skip: true
+    },
+    {"Integer.is_odd(3)", raises: UndefinedFunctionError},
+    {
+      """
+      require Integer
+      Integer.is_odd(3)
+      """,
+      output: true
+    },
+    {
+      """
       import List, only: [duplicate: 2]
-      duplicate(:ok, 10)
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  @tag :skip
-  """
-  defmodule AssertionTest do
-    use ExUnit.Case, async: true
-
-    test "always pass" do
-      assert true
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  @tag :skip
-  """
-  defmodule Example do
-    use Feature, option: :value
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  @tag :skip
-  """
-  defmodule Example do
-    require Feature
-    Feature.__using__(option: :value)
-  end
-  """
-  |> assert_eval_module()
-
-  """
-  is_atom(String)
-  """
-  |> assert_eval(true)
-
-  """
-  to_string(String)
-  """
-  |> assert_eval("Elixir.String")
-
-  """
-  :"Elixir.String" == String
-  """
-  |> assert_eval(true)
-
-  """
-  List.flatten([1, [2], 3])
-  """
-  |> assert_eval([1, 2, 3])
-
-  """
-  :"Elixir.List".flatten([1, [2], 3])
-  """
-  |> assert_eval([1, 2, 3])
-
-  """
-  :lists.flatten([1, [2], 3])
-  """
-  |> assert_eval([1, 2, 3])
-
-  #  todo 28 nested modules do not work
-  @tag :skip
-  """
-  defmodule Foo do
-    defmodule Bar do
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  defmodule Foo.Bar do
-  end
-
-  defmodule Foo do
-    alias Foo.Bar
-    # Can still access it as `Bar`
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  defmodule Foo do
-    defmodule Bar do
-      defmodule Baz do
+      duplicate(:ok, 3)
+      """,
+      output: [:ok, :ok, :ok]
+    },
+    {
+      """
+      defmodule Math do
+        def some_function do
+          import List, only: [duplicate: 2]
+          duplicate(:ok, 10)
+        end
       end
-    end
-  end
 
-  alias Foo.Bar.Baz
-  # The module `Foo.Bar.Baz` is now available as `Baz`
-  # However, the module `Foo.Bar` is *not* available as `Bar`
-  """
-  |> assert_eval(Foo.Bar.Baz)
-
-  @tag :skip
-  """
-  alias MyApp.{Foo, Bar, Baz}
-  """
-  |> assert_eval([MyApp.Foo, MyApp.Bar, MyApp.Baz])
-
-  ## =======================================================================================================================
-  ## Module attributes ====================================================================================================
-  ## =======================================================================================================================
-
-  """
-  defmodule MyServer do
-    @moduledoc "My server code."
-  end
-  """
-  |> assert_eval_module()
-
-  """
-  defmodule Math do
-    @moduledoc \"""
-    Provides math-related functions.
-
-    ## Examples
-
-        Math.sum(1, 2)
-        3
-
-    \"""
-
-    @doc \"""
-    Calculates the sum of two numbers.
-    \"""
-    def sum(a, b), do: a + b
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 28 module attributes do not work
-  @tag :skip
-  """
-  defmodule MyServer do
-    @service URI.parse("https://example.com")
-    IO.inspect(@service)
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  defmodule MyServer do
-    @unknown
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  defmodule MyApp.Status do
-    @service URI.parse("https://example.com")
-    def status(email) do
-      SomeHttpClient.get(@service)
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  defmodule MyApp.Status do
-    def status(email) do
-      SomeHttpClient.get(%URI{
-        authority: "example.com",
-        host: "example.com",
-        port: 443,
-        scheme: "https"
-      })
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  # =======================================================================================================================
-  # Structs ==============================================================================================================
-  # =======================================================================================================================
-
-  """
-  map = %{a: 1, b: 2}
-  map[:a]
-  """
-  |> assert_eval(1)
-
-  """
-  map = %{a: 1, b: 2}
-  %{map | a: 3}
-  """
-  |> assert_eval(%{a: 3, b: 2})
-
-  #  todo 29 implement/fix structs
-  @tag :skip
-  """
-  defmodule User do
-    defstruct name: "John", age: 27
-  end
-  """
-  |> assert_eval_module()
-
-  @tag :skip
-  """
-  %User{}
-  %User{age: 27, name: "John"}
-  %User{name: "Jane"}
-  %User{age: 27, name: "Jane"}
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  %User{oops: :field}
-  ** (KeyError) key :oops not found expanding struct: User.__struct__/1
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  john = %User{}
-  %User{age: 27, name: "John"}
-  john.name
-  "John"
-  jane = %{john | name: "Jane"}
-  %User{age: 27, name: "Jane"}
-  %{jane | oops: :field}
-  ** (KeyError) key :oops not found in: %User{age: 27, name: "Jane"}
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  %User{name: name} = john
-  %User{age: 27, name: "John"}
-  name
-  "John"
-  %User{} = %{}
-  ** (MatchError) no match of right hand side value: %{}
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  is_map(john)
-  true
-  john.__struct__
-  User
-  """
-  |> assert_eval(:ok)
-
-  #  @additional_prep """
-  #  john = %User{}
-  #  """
-
-  @tag :skip
-  """
-  john[:name]
-  """
-  |> assert_eval(%UndefinedFunctionError{})
-
-  @tag :skip
-  """
-  Enum.each(john, fn {field, value} -> IO.puts(value) end)
-  """
-  |> assert_eval(%Protocol.UndefinedError{})
-
-  #  todo 29 implement/fix structs
-  @tag :skip
-  """
-  defmodule Product do
-    defstruct [:name]
-  end
-  %Product{}
-  """
-  |> assert_eval(%{name: nil})
-
-  @tag :skip
-  """
-  defmodule User do
-    defstruct [:email, name: "John", age: 27]
-  end
-  %User{}
-  """
-  |> assert_eval(%{age: 27, email: nil, name: "John"})
-
-  @tag :skip
-  """
-  defmodule User do
-    defstruct [name: "John", age: 27, :email]
-  end
-  """
-  |> assert_error(%SyntaxError{})
-
-  @tag :skip
-  """
-  defmodule Car do
-    @enforce_keys [:make]
-    defstruct [:model, :make]
-  end
-  %Car{}
-  """
-  |> assert_error(%ArgumentError{})
-
-  # =======================================================================================================================
-  # Protocols ============================================================================================================
-  # =======================================================================================================================
-
-  """
-  defmodule Utility do
-    def type(value) when is_binary(value), do: "string"
-    def type(value) when is_integer(value), do: "integer"
-    # ... other implementations ...
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 30 implement/fix protocols
-
-  @tag :skip
-  """
-  defprotocol Utility do
-    @spec type(t) :: String.t()
-    def type(value)
-  end
-
-  defimpl Utility, for: BitString do
-    def type(_value), do: "string"
-  end
-
-  defimpl Utility, for: Integer do
-    def type(_value), do: "integer"
-  end
-
-  Utility.type("foo")
-  Utility.type(123)
-  """
-  |> assert_eval("integer")
-
-  @tag :skip
-  """
-  defprotocol Size do
-    @doc "Calculates the size (and not the length!) of a data structure"
-    def size(data)
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defimpl Size, for: BitString do
-    def size(string), do: byte_size(string)
-  end
-
-  defimpl Size, for: Map do
-    def size(map), do: map_size(map)
-  end
-
-  defimpl Size, for: Tuple do
-    def size(tuple), do: tuple_size(tuple)
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  Size.size("foo")
-  3
-  Size.size({:ok, "hello"})
-  2
-  Size.size(%{label: "some label"})
-  1
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  Size.size([1, 2, 3])
-  ** (Protocol.UndefinedError) protocol Size not implemented for [1, 2, 3] of type List
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  Size.size(%{})
-  0
-  set = %MapSet{} = MapSet.new
-  MapSet.new([])
-  Size.size(set)
-  ** (Protocol.UndefinedError) protocol Size not implemented for MapSet.new([]) of type MapSet (a struct)
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defimpl Size, for: MapSet do
-    def size(set), do: MapSet.size(set)
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defmodule User do
-    defstruct [:name, :age]
-  end
-
-  defimpl Size, for: User do
-    def size(_user), do: 2
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defimpl Size, for: Any do
-    def size(_), do: 0
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defmodule OtherUser do
-    @derive [Size]
-    defstruct [:name, :age]
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defprotocol Size do
-    @fallback_to_any true
-    def size(data)
-  end
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  defimpl Size, for: Any do
-    def size(_), do: 0
-  end
-  """
-  |> assert_eval(:ok)
-
-  """
-  Enum.reduce(1..3, 0, fn x, acc -> x + acc end)
-  """
-  |> assert_eval(6)
-
-  """
-  "age: \#{25}"
-  """
-  |> assert_eval("age: 25")
-
-  """
-  tuple = {1, 2, 3}
-  "tuple: \#{tuple}"
-  """
-  |> assert_error(%Protocol.UndefinedError{})
-
-  """
-  tuple = {1, 2, 3}
-  "tuple: \#{inspect(tuple)}"
-  """
-  |> assert_eval("tuple: {1, 2, 3}")
-
-  @tag :skip
-  """
-  {1, 2, 3}
-  {1, 2, 3}
-  %User{}
-  %User{name: "john", age: 27}
-  """
-  |> assert_eval(:ok)
-
-  @tag :skip
-  """
-  inspect &(&1+2)
-  "#Function<6.71889879/1 in :erl_eval.expr/5>"
-  """
-  |> assert_eval(:ok)
-
-  ## =======================================================================================================================
-  ## Comprehensions =======================================================================================================
-  ## =======================================================================================================================
-
-  """
-  for n <- [1, 2, 3, 4], do: n * n
-  """
-  |> assert_eval([1, 4, 9, 16])
-
-  """
-  for n <- 1..4, do: n * n
-  """
-  |> assert_eval([1, 4, 9, 16])
-
-  """
-  values = [good: 1, good: 2, bad: 3, good: 4]
-  for {:good, n} <- values, do: n * n
-  """
-  |> assert_eval([1, 4, 16])
-
-  """
-  for n <- 0..5, rem(n, 3) == 0, do: n * n
-  """
-  |> assert_eval([0, 9])
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  dirs = ["/home/mikey", "/home/james"]
-  #
-  #  for dir <- dirs,
-  #      file <- File.ls!(dir),
-  #      path = Path.join(dir, file),
-  #      File.regular?(path) do
-  #    File.stat!(path).size
-  #  end
-  #  """
-  #  |> assert_eval()
-
-  """
-  for i <- [:a, :b, :c], j <- [1, 2], do:  {i, j}
-  """
-  |> assert_eval(a: 1, a: 2, b: 1, b: 2, c: 1, c: 2)
-
-  """
-  pixels = <<213, 45, 132, 64, 76, 32, 76, 0, 0, 234, 32, 15>>
-  for <<r::8, g::8, b::8 <- pixels>>, do: {r, g, b}
-  """
-  |> assert_eval([{213, 45, 132}, {64, 76, 32}, {76, 0, 0}, {234, 32, 15}])
-
-  """
-  for <<c <- " hello world ">>, c != ?\\s, into: "", do: <<c>>
-  """
-  |> assert_eval("helloworld")
-
-  """
-  for {key, val} <- %{"a" => 1, "b" => 2}, into: %{}, do: {key, val * val}
-  """
-  |> assert_eval(%{"a" => 1, "b" => 4})
-
-  #  todo 38 testing IO - take result from try_run and output and assert it
-  @tag :skip
-  """
-  stream = IO.stream(:stdio, :line)
-  for line <- stream, into: stream do
-    String.upcase(line) <> "\n"
-  end
-  """
-  |> assert_eval(:ok)
-
-  # =======================================================================================================================
-  # Sigils ============================================================================================================
-  # =======================================================================================================================
-
-  #  todo 31 "~r" and "~i" do not work
-  @tag :skip
-  """
-  # A regular expression that matches strings which contain "foo" or "bar":
-  regex = ~r/foo|bar/
-  "foo" =~ ~r/foo|bar/
-  """
-  |> assert_eval(true)
-
-  @tag :skip
-  """
-  # A regular expression that matches strings which contain "foo" or "bar":
-  regex = ~r/foo|bar/
-  "bat" =~ regex
-  """
-  |> assert_eval(false)
-
-  @tag :skip
-  """
-  "HELLO" =~ ~r/hello/
-  """
-  |> assert_eval(false)
-
-  @tag :skip
-  """
-  "HELLO" =~ ~r/hello/i
-  """
-  |> assert_eval(true)
-
-  @tag :skip
-  """
-  ~r/hello/
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r|hello|
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r"hello"
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r'hello'
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r(hello)
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r[hello]
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r{hello}
-  """
-  |> assert_eval(~r/hello/)
-
-  @tag :skip
-  """
-  ~r<hello>
-  """
-  |> assert_eval(~r/hello/)
-
-  """
-  ~s(this is a string with "double" quotes, not 'single' ones)
-  """
-  |> assert_eval("this is a string with \"double\" quotes, not 'single' ones")
-
-  """
-  [?c, ?a, ?t]
-  """
-  |> assert_eval(~c"cat")
-
-  """
-  ~c(this is a char list containing "double quotes")
-  """
-  |> assert_eval(~c"this is a char list containing \"double quotes\"")
-
-  @tag :skip
-  """
-  ~w(foo bar bat)
-  """
-  |> assert_eval(["foo", "bar", "bat"])
-
-  @tag :skip
-  """
-  ~w(foo bar bat)a
-  """
-  |> assert_eval([:foo, :bar, :bat])
-
-  """
-  ~s(String with escape codes \x26 \#{"inter" <> "polation"})
-  """
-  |> assert_eval("String with escape codes & interpolation")
-
-  """
-  ~S(String without escape codes \\x26 without \#{interpolation})
-  """
-  |> assert_eval("String without escape codes \\x26 without \#{interpolation}")
-
-  #  """
-  #  ~s"""
-  #  this is
-  #  a heredoc string
-  #  \"""
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  @doc """
-  #  Converts double-quotes to single-quotes.
-  #
-  #  ## Examples
-  #
-  #      convert("\\\"foo\\\"")
-  #      "'foo'"
-  #
-  #  \"""
-  #  def convert(...)
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  @doc ~S"""
-  #  Converts double-quotes to single-quotes.
-  #
-  #  ## Examples
-  #
-  #      convert("\"foo\"")
-  #      "'foo'"
-  #
-  #  \"""
-  #  def convert(...)
-  #  """
-  #  |> assert_eval()
-
-  """
-  d = ~D[2019-10-31]
-  d.day
-  """
-  |> assert_eval(31)
-
-  """
-  t = ~T[23:00:07.0]
-  t.second
-  """
-  |> assert_eval(7)
-
-  """
-  ndt = ~N[2019-10-31 23:00:07]
-  """
-  |> assert_eval(~N[2019-10-31 23:00:07])
-
-  """
-  dt = ~U[2019-10-31 19:59:03Z]
-  %DateTime{minute: minute, time_zone: time_zone} = dt
-  minute
-  """
-  |> assert_eval(59)
-
-  """
-  dt = ~U[2019-10-31 19:59:03Z]
-  %DateTime{minute: minute, time_zone: time_zone} = dt
-  time_zone
-  """
-  |> assert_eval("Etc/UTC")
-
-  #  todo 31 "~r" and "~i" do not work
-  @tag :skip
-  """
-  sigil_r(<<"foo">>, [?i])
-  """
-  |> assert_eval(~r"foo"i)
-
-  #  todo 31 "~r" and "~i" do not work
-  @tag :skip
-  """
-  defmodule MySigils do
-    def sigil_i(string, []), do: String.to_integer(string)
-    def sigil_i(string, [?n]), do: -String.to_integer(string)
-  end
-  import MySigils
-  ~i(13)
-  """
-  |> assert_eval(13)
-
-  @tag :skip
-  """
-  defmodule MySigils do
-    def sigil_i(string, []), do: String.to_integer(string)
-    def sigil_i(string, [?n]), do: -String.to_integer(string)
-  end
-  import MySigils
-  ~i(42)n
-  """
-  |> assert_eval(-42)
-
-  # =======================================================================================================================
-  # try, catch, and rescue ===============================================================================================
-  # =======================================================================================================================
-
-  """
-  :foo + 1
-  """
-  |> assert_error(%ArithmeticError{})
-
-  """
-  raise "oops"
-  """
-  |> assert_error(%RuntimeError{message: "oops"})
-
-  """
-  raise ArgumentError, message: "invalid argument foo"
-  """
-  |> assert_error(%ArgumentError{})
-
-  @tag :skip
-  """
-  defmodule MyError do
-    defexception message: "default message"
-  end
-  raise MyError
-  """
-  |> assert_error(%{message: "default message"})
-
-  @tag :skip
-  """
-  defmodule MyError do
-    defexception message: "default message"
-  end
-  raise MyError, message: "custom message"
-  """
-  |> assert_error(%{message: "custom message"})
-
-  """
-  try do
-    raise "oops"
-  rescue
-    e in RuntimeError -> e
-  end
-  """
-  |> assert_eval(%RuntimeError{message: "oops"})
-
-  """
-  try do
-    raise "oops"
-  rescue
-    RuntimeError -> "Error!"
-  end
-  """
-  |> assert_eval("Error!")
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  File.read("hello")
-  #  {:error, :enoent}
-  #  File.write("hello", "world")
-  #  :ok
-  #  File.read("hello")
-  #  {:ok, "world"}
-  #  """
-  #  |> assert_eval()
-
-  #  """
-  #  case File.read("hello") do
-  #    {:ok, body} -> IO.puts("Success: #{body}")
-  #    {:error, reason} -> IO.puts("Error: #{reason}")
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  File.read!("unknown")
-  #  ** (File.Error) could not read file "unknown": no such file or directory
-  #      (elixir) lib/file.ex:272: File.read!/1
-  #  """
-  #  |> assert_eval()
-
-  #  """
-  #  try do
-  #    ... some code ...
-  #  rescue
-  #    e ->
-  #      Logger.error(Exception.format(:error, e, __STACKTRACE__))
-  #      reraise e, __STACKTRACE__
-  #  end
-  #  """
-  #  |> assert_eval()
-
-  """
-  try do
-    Enum.each(-50..50, fn x ->
-      if rem(x, 13) == 0, do: throw(x)
-    end)
-    "Got nothing"
-  catch
-    x -> "Got \#{x}"
-  end
-  """
-  |> assert_eval("Got -39")
-
-  """
-  Enum.find(-50..50, &(rem(&1, 13) == 0))
-  """
-  |> assert_eval(-39)
-
-  #  """
-  #  spawn_link(fn -> exit(1) end)
-  #  ** (EXIT from #PID<0.56.0>) shell process exited with reason: 1
-  #  """
-  #  |> assert_eval()
-
-  """
-  try do
-    exit("I am exiting")
-  catch
-    :exit, _ -> "not really"
-  end
-  """
-  |> assert_eval("not really")
-
-  """
-  defmodule Example do
-    def matched_catch do
-      exit(:timeout)
-    catch
-      :exit, :timeout ->
-        {:error, :timeout}
-    end
-
-    def mismatched_catch do
-      exit(:timeout)
-    catch
-      # Since no clause matches, this catch will have no effect
-      :exit, :explosion ->
-        {:error, :explosion}
-    end
-  end
-  """
-  |> assert_eval_module()
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  {:ok, file} = File.open("sample", [:utf8, :write])
-  #  try do
-  #    IO.write(file, "olá")
-  #    raise "oops, something went wrong"
-  #  after
-  #    File.close(file)
-  #  end
-  #  ** (RuntimeError) oops, something went wrong
-  #  """
-  #  |> assert_eval()
-
-  #  """
-  #  defmodule RunAfter do
-  #    def without_even_trying do
-  #      raise "oops"
-  #    after
-  #      IO.puts("cleaning up!")
-  #    end
-  #  end
-  #  RunAfter.without_even_trying
-  #  cleaning up!
-  #  ** (RuntimeError) oops
-  #  """
-  #  |> assert_eval()
-
-  """
-  x = 2
-  try do
-    1 / x
-  rescue
-    ArithmeticError ->
-      :infinity
-  else
-    y when y < 1 and y > -1 ->
-      :small
-    _ ->
-      :large
-  end
-  """
-  |> assert_eval(:small)
-
-  """
-  what_happened =
-    try do
-      raise "fail"
-      :did_not_raise
-    rescue
-      _ -> :rescued
-    end
-  what_happened
-  """
-  |> assert_eval(:rescued)
-
-  # =======================================================================================================================
-  # Writing documentation ================================================================================================
-  # =======================================================================================================================
-
-  """
-  defmodule MyApp.Sample do
-    @doc false
-    def add(a, b), do: a + b
-  end
-  """
-  |> assert_eval_module()
-
-  ## =======================================================================================================================
-  ## Optional syntax sheet ================================================================================================
-  ## =======================================================================================================================
-
-  """
-  length([1, 2, 3]) == length [1, 2, 3]
-  """
-  |> assert_eval(true)
-
-  """
-  # do-end blocks
-  if true do
-    :this
-  else
-    :that
-  end
-  """
-  |> assert_eval(:this)
-
-  """
-  # keyword lists
-  if true, do: :this, else: :that
-  """
-  |> assert_eval(:this)
-
-  """
-  defmodule(Math, [
-    {:do, def(add(a, b), [{:do, a + b}])}
-  ])
-  """
-  |> assert_eval_module()
-
-  # =======================================================================================================================
-  # Erlang libraries =====================================================================================================
-  # =======================================================================================================================
-
-  """
-  is_atom(String)
-  """
-  |> assert_eval(true)
-
-  """
-  String.first("hello")
-  """
-  |> assert_eval("h")
-
-  """
-  is_atom(:binary)
-  """
-  |> assert_eval(true)
-
-  """
-  :binary.first("hello")
-  """
-  |> assert_eval(104)
-
-  """
-  String.to_charlist("Ø")
-  """
-  |> assert_eval([216])
-
-  """
-  :binary.bin_to_list("Ø")
-  """
-  |> assert_eval([195, 152])
-
-  @tag :skip
-  """
-  :io.format("Pi is approximately given by:~10.3f~n", [:math.pi])
-  """
-  |> assert_eval(:ok)
-
-  """
-  to_string(:io_lib.format("Pi is approximately given by:~10.3f~n", [:math.pi]))
-  """
-  |> assert_eval("Pi is approximately given by:     3.142\n")
-
-  """
-  Base.encode16(:crypto.hash(:sha256, "Elixir"))
-  """
-  |> assert_eval("3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB")
-
-  #  todo 32 fix :digraph module
-  @tag :skip
-  """
-  digraph = :digraph.new()
-  coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
-  [v0, v1, v2] = (for c <- coords, do: :digraph.add_vertex(digraph, c))
-  :digraph.add_edge(digraph, v0, v1)
-  :digraph.add_edge(digraph, v1, v2)
-  :digraph.get_short_path(digraph, v0, v2)
-  """
-  |> assert_eval([{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}])
-
-  #  todo 33 fix :ets module
-  @tag :skip
-  """
-  table = :ets.new(:ets_test, [])
-  # Store as tuples with {name, population}
-  :ets.insert(table, {"China", 1_374_000_000})
-  :ets.insert(table, {"India", 1_284_000_000})
-  :ets.insert(table, {"USA", 322_000_000})
-  :ets.tab2list(table)
-  """
-  |> assert_eval([])
-
-  """
-  angle_45_deg = :math.pi() * 45.0 / 180.0
-  :math.sin(angle_45_deg)
-  """
-  |> assert_eval(0.7071067811865475)
-
-  """
-  :math.exp(55.0)
-  """
-  |> assert_eval(7.694785265142018e23)
-
-  """
-  :math.log(7.694785265142018e23)
-  """
-  |> assert_eval(55.0)
-
-  """
-  q = :queue.new
-  q = :queue.in("A", q)
-  q = :queue.in("B", q)
-  {value, q} = :queue.out(q)
-  value
-  """
-  |> assert_eval({:value, "A"})
-
-  """
-  q = :queue.new
-  q = :queue.in("A", q)
-  q = :queue.in("B", q)
-  {value, q} = :queue.out(q)
-  {value, q} = :queue.out(q)
-  value
-  """
-  |> assert_eval({:value, "B"})
-
-  """
-  q = :queue.new
-  q = :queue.in("A", q)
-  q = :queue.in("B", q)
-  {value, q} = :queue.out(q)
-  {value, q} = :queue.out(q)
-  {value, q} = :queue.out(q)
-  value
-  """
-  |> assert_eval(:empty)
-
-  #  todo 34 fix :rand module
-  @tag :skip
-  """
-  :rand.uniform()
-  """
-  |> assert_eval({:expect_fn, &is_float/1})
-
-  @tag :skip
-  """
-  _ = :rand.seed(:exs1024, {123, 123534, 345345})
-  :rand.uniform()
-  """
-  |> assert_eval({:expect_fn, &is_float/1})
-
-  @tag :skip
-  """
-  :rand.uniform(6)
-  6
-  """
-  |> assert_eval(6)
-
-  #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  @tag :skip
-  """
-  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
-  """
-  |> assert_eval({:ok, 633})
-
-  @tag :skip
-  """
-  song = "
-  Mary had a little lamb,
-  His fleece was white as snow,
-  And everywhere that Mary went,
-  The lamb was sure to go."
-  compressed = :zlib.compress(song)
-  byte_size(song)
-  """
-  |> assert_eval(110)
-
-  @tag :skip
-  """
-  song = "
-  Mary had a little lamb,
-  His fleece was white as snow,
-  And everywhere that Mary went,
-  The lamb was sure to go."
-  compressed = :zlib.compress(song)
-  byte_size(compressed)
-  """
-  |> assert_eval(99)
-
-  #  todo 35 fix :zlib.uncompress/1
-  @tag :skip
-  """
-  song = "
-  Mary had a little lamb,
-  His fleece was white as snow,
-  And everywhere that Mary went,
-  The lamb was sure to go."
-  compressed = :zlib.compress(song)
-  :zlib.uncompress(compressed)
-  """
-  |> assert_eval(
-    "\nMary had a little lamb,\nHis fleece was white as snow,\nAnd everywhere that Mary went,\nThe lamb was sure to go."
-  )
-
-  # =======================================================================================================================
-  # Debugging ============================================================================================================
-  # =======================================================================================================================
-
-  #  todo 38 testing IO - take result from try_run and output and assert it
-  @tag :skip
-  """
-  (1..10)
-  |> IO.inspect()
-  |> Enum.map(fn x -> x * 2 end)
-  |> IO.inspect()
-  |> Enum.sum()
-  |> IO.inspect()
-  """
-  |> assert_eval(:ok)
-
-  #
-  ##  prints:
-  ##
-  ##  1..10
-  ##  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
-  ##  110
-
-  @tag :skip
-  """
-  [1, 2, 3]
-  |> IO.inspect(label: "before")
-  |> Enum.map(&(&1 * 2))
-  |> IO.inspect(label: "after")
-  |> Enum.sum
-  """
-  |> assert_eval(:ok)
-
-  #
-  ##  prints:
-  ##
-  ##  before: [1, 2, 3]
-  ##  after: [2, 4, 6]
-
-  # =======================================================================================================================
-  # Enum cheatsheet =======================================================================================================
-  # =======================================================================================================================
-
-  @additional_prep """
-  cart = [
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
+      Math.some_function()
+      """,
+      output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok]
+    },
+    {"is_atom(String)", output: true},
+    {"to_string(String)", output: "Elixir.String"},
+    {"to_string(String)", output: "Elixir.String"},
+    {~s|:"Elixir.String" == String|, output: true},
+    {"List.flatten([1, [2], 3])", output: [1, 2, 3]},
+    {~s|:"Elixir.List".flatten([1, [2], 3])|, output: [1, 2, 3]},
+    {":lists.flatten([1, [2], 3])", output: [1, 2, 3]},
+    {
+      """
+      defmodule Foo do
+        defmodule Bar do
+        end
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1, skip: true
+    },
+    {
+      """
+      defmodule Foo.Bar do
+      end
+
+      defmodule Foo do
+        alias Foo.Bar
+        # Can still access it as `Bar`
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1, skip: true
+    },
+    {
+      """
+      defmodule Foo do
+        defmodule Bar do
+          defmodule Baz do
+          end
+        end
+      end
+
+      alias Foo.Bar.Baz
+      # The module `Foo.Bar.Baz` is now available as `Baz`
+      # However, the module `Foo.Bar` is *not* available as `Bar`
+      """,
+      output: Foo.Bar.Baz, skip: true
+    }
   ]
-  """
-
-  """
-  Enum.any?(cart, & &1.fruit == "orange")
-  """
-  |> assert_eval(true)
-
-  """
-  Enum.any?(cart, & &1.fruit == "pear")
-  """
-  |> assert_eval(false)
-
-  """
-  Enum.any?([], & &1.fruit == "orange")
-  """
-  |> assert_eval(false)
-
-  """
-  Enum.all?(cart, & &1.count > 0)
-  """
-  |> assert_eval(true)
-
-  """
-  Enum.all?(cart, & &1.count > 1)
-  """
-  |> assert_eval(false)
-
-  """
-  Enum.all?([], & &1.count > 0)
-  """
-  |> assert_eval(true)
-
-  """
-  Enum.member?(cart, %{fruit: "apple", count: 3})
-  """
-  |> assert_eval(true)
-
-  """
-  Enum.member?(cart, :something_else)
-  """
-  |> assert_eval(false)
-
-  """
-  %{fruit: "apple", count: 3} in cart
-  """
-  |> assert_eval(true)
-
-  """
-  :something_else in cart
-  """
-  |> assert_eval(false)
-
-  """
-  Enum.empty?(cart)
-  """
-  |> assert_eval(false)
-
-  """
-  Enum.empty?([])
-  """
-  |> assert_eval(true)
-
-  #  todo 36 Fix "=~"
-  @tag :skip
-  """
-  Enum.filter(cart, &(&1.fruit =~ "o"))
-  """
-  |> assert_eval([%{fruit: "orange", count: 6}])
-
-  @tag :skip
-  """
-  Enum.filter(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6}
-  ])
-
-  @tag :skip
-  """
-  Enum.reject(cart, &(&1.fruit =~ "o"))
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1}
-  ])
-
-  """
-  Enum.flat_map(cart, fn item ->
-    if item.count > 1, do: [item.fruit], else: []
-  end)
-  """
-  |> assert_eval(["apple", "orange"])
-
-  @tag :skip
-  """
-  for item <- cart, item.fruit =~ "e" do
-     item
-   end
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6}
-  ])
-
-  """
-  for %{count: 1, fruit: fruit} <- cart do
-     fruit
-   end
-  """
-  |> assert_eval(["banana"])
-
-  """
-  Enum.map(cart, & &1.fruit)
-  ["apple", "banana", "orange"]
-  Enum.map(cart, fn item ->
-     %{item | count: item.count + 10}
-   end)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 13},
-    %{fruit: "banana", count: 11},
-    %{fruit: "orange", count: 16}
-  ])
-
-  """
-  Enum.map_every(cart, 2, fn item ->
-     %{item | count: item.count + 10}
-   end)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 13},
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 16}
-  ])
-
-  """
-  for item <- cart do
-     item.fruit
-   end
-  """
-  |> assert_eval(["apple", "banana", "orange"])
-
-  @tag :skip
-  """
-  for item <- cart, item.fruit =~ "e" do
-     item.fruit
-   end
-  """
-  |> assert_eval(["apple", "orange"])
-
-  #  todo 38 testing IO - take result from try_run and output and assert it
-  #  """
-  #  Enum.each(cart, &IO.puts(&1.fruit))
-  #  apple
-  #  banana
-  #  orange
-  #  :ok
-  #  """
-  #  |> assert_eval()
-
-  """
-  Enum.reduce(cart, 0, fn item, acc ->
-     item.count + acc
-   end)
-  """
-  |> assert_eval(10)
-
-  """
-  Enum.map_reduce(cart, 0, fn item, acc ->
-     {item.fruit, item.count + acc}
-   end)
-  """
-  |> assert_eval({["apple", "banana", "orange"], 10})
-
-  """
-  Enum.scan(cart, 0, fn item, acc ->
-     item.count + acc
-   end)
-  """
-  |> assert_eval([3, 4, 10])
-
-  """
-  Enum.reduce_while(cart, 0, fn item, acc ->
-     if item.fruit == "orange" do
-       {:halt, acc}
-     else
-       {:cont, item.count + acc}
-     end
-   end)
-  """
-  |> assert_eval(4)
-
-  """
-  for item <- cart, reduce: 0 do
-     acc -> item.count + acc
-   end
-  """
-  |> assert_eval(10)
-
-  @tag :skip
-  """
-  for item <- cart, item.fruit =~ "e", reduce: 0 do
-     acc -> item.count + acc
-   end
-  """
-  |> assert_eval(9)
-
-  """
-  Enum.count(cart)
-  """
-  |> assert_eval(3)
-
-  """
-  Enum.frequencies(["apple", "banana", "orange", "apple"])
-  """
-  |> assert_eval(%{"apple" => 2, "banana" => 1, "orange" => 1})
-
-  """
-  Enum.frequencies_by(cart, &String.last(&1.fruit))
-  """
-  |> assert_eval(%{"a" => 1, "e" => 2})
-
-  @tag :skip
-  """
-  Enum.count(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval(2)
-
-  @tag :skip
-  """
-  Enum.count(cart, &(&1.fruit =~ "y"))
-  """
-  |> assert_eval(0)
-
-  """
-  cart |> Enum.map(& &1.count) |> Enum.sum()
-  """
-  |> assert_eval(10)
-
-  @tag :skip
-  """
-  Enum.sum_by(cart, & &1.count)
-  """
-  |> assert_eval(10)
-
-  """
-  cart |> Enum.map(& &1.count) |> Enum.product()
-  """
-  |> assert_eval(18)
-
-  @tag :skip
-  """
-  Enum.product_by(cart, & &1.count)
-  """
-  |> assert_eval(18)
-
-  """
-  cart |> Enum.map(& &1.fruit) |> Enum.sort()
-  """
-  |> assert_eval(["apple", "banana", "orange"])
-
-  """
-  cart |> Enum.map(& &1.fruit) |> Enum.sort(:desc)
-  """
-  |> assert_eval(["orange", "banana", "apple"])
-
-  """
-  Enum.sort_by(cart, & &1.count)
-  """
-  |> assert_eval([
-    %{fruit: "banana", count: 1},
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6}
-  ])
-
-  """
-  Enum.sort_by(cart, & &1.count, :desc)
-  """
-  |> assert_eval([
-    %{fruit: "orange", count: 6},
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1}
-  ])
-
-  """
-  cart |> Enum.map(& &1.count) |> Enum.min()
-  """
-  |> assert_eval(1)
-
-  @tag :skip
-  """
-  Enum.min_by(cart, & &1.count)
-  """
-  |> assert_eval(%{fruit: "banana", count: 1})
-
-  """
-  cart |> Enum.map(& &1.count) |> Enum.max()
-  """
-  |> assert_eval(6)
-
-  @tag :skip
-  """
-  Enum.max_by(cart, & &1.count)
-  """
-  |> assert_eval(%{fruit: "orange", count: 6})
-
-  """
-  Enum.concat([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-  """
-  |> assert_eval([1, 2, 3, 4, 5, 6, 7, 8, 9])
-
-  """
-  Enum.concat([1, 2, 3], [4, 5, 6])
-  """
-  |> assert_eval([1, 2, 3, 4, 5, 6])
-
-  """
-  Enum.flat_map(cart, fn item ->
-     List.duplicate(item.fruit, item.count)
-   end)
-  """
-  |> assert_eval([
-    "apple",
-    "apple",
-    "apple",
-    "banana",
-    "orange",
-    "orange",
-    "orange",
-    "orange",
-    "orange",
-    "orange"
-  ])
-
-  """
-  Enum.flat_map_reduce(cart, 0, fn item, acc ->
-     list = List.duplicate(item.fruit, item.count)
-     acc = acc + item.count
-     {list, acc}
-   end)
-  """
-  |> assert_eval(
-    {[
-       "apple",
-       "apple",
-       "apple",
-       "banana",
-       "orange",
-       "orange",
-       "orange",
-       "orange",
-       "orange",
-       "orange"
-     ], 10}
-  )
-
-  """
-  for item <- cart,
-       fruit <- List.duplicate(item.fruit, item.count) do
-     fruit
-   end
-  """
-  |> assert_eval([
-    "apple",
-    "apple",
-    "apple",
-    "banana",
-    "orange",
-    "orange",
-    "orange",
-    "orange",
-    "orange",
-    "orange"
-  ])
-
-  """
-  pairs = [{"apple", 3}, {"banana", 1}, {"orange", 6}]
-  Enum.into(pairs, %{})
-  """
-  |> assert_eval(%{"apple" => 3, "banana" => 1, "orange" => 6})
-
-  """
-  Enum.into(cart, %{}, fn item ->
-     {item.fruit, item.count}
-   end)
-  """
-  |> assert_eval(%{"apple" => 3, "banana" => 1, "orange" => 6})
-
-  """
-  Enum.to_list(1..5)
-  """
-  |> assert_eval([1, 2, 3, 4, 5])
-
-  """
-  for item <- cart, into: %{} do
-     {item.fruit, item.count}
-   end
-  """
-  |> assert_eval(%{"apple" => 3, "banana" => 1, "orange" => 6})
-
-  """
-  Enum.dedup([1, 2, 2, 3, 3, 3, 1, 2, 3])
-  """
-  |> assert_eval([1, 2, 3, 1, 2, 3])
-
-  @tag :skip
-  """
-  Enum.dedup_by(cart, & &1.fruit =~ "a")
-  """
-  |> assert_eval([%{fruit: "apple", count: 3}])
-
-  """
-  Enum.dedup_by(cart, & &1.count < 5)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6}
-  ])
-
-  """
-  Enum.uniq([1, 2, 2, 3, 3, 3, 1, 2, 3])
-  """
-  |> assert_eval([1, 2, 3])
-
-  """
-  Enum.uniq_by(cart, &String.last(&1.fruit))
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1}
-  ])
-
-  """
-  Enum.at(cart, 0)
-  """
-  |> assert_eval(%{fruit: "apple", count: 3})
-
-  """
-  Enum.at(cart, 10)
-  """
-  |> assert_eval(nil)
-
-  """
-  Enum.at(cart, 10, :none)
-  """
-  |> assert_eval(:none)
-
-  """
-  Enum.fetch(cart, 0)
-  """
-  |> assert_eval({:ok, %{fruit: "apple", count: 3}})
-
-  """
-  Enum.fetch(cart, 10)
-  """
-  |> assert_eval(:error)
-
-  """
-  Enum.fetch!(cart, 0)
-  """
-  |> assert_eval(%{fruit: "apple", count: 3})
-
-  """
-  Enum.fetch!(cart, 10)
-  """
-  |> assert_error(%Enum.OutOfBoundsError{})
-
-  """
-  Enum.with_index(cart)
-  """
-  |> assert_eval([
-    {%{fruit: "apple", count: 3}, 0},
-    {%{fruit: "banana", count: 1}, 1},
-    {%{fruit: "orange", count: 6}, 2}
-  ])
-
-  """
-  Enum.with_index(cart, fn item, index ->
-     {item.fruit, index}
-   end)
-  """
-  |> assert_eval([
-    {"apple", 0},
-    {"banana", 1},
-    {"orange", 2}
-  ])
-
-  @tag :skip
-  """
-  Enum.find(cart, &(&1.fruit =~ "o"))
-  """
-  |> assert_eval(%{fruit: "orange", count: 6})
-
-  @tag :skip
-  """
-  Enum.find(cart, &(&1.fruit =~ "y"))
-  """
-  |> assert_eval(nil)
-
-  @tag :skip
-  """
-  Enum.find(cart, :none, &(&1.fruit =~ "y"))
-  """
-  |> assert_eval(:none)
-
-  @tag :skip
-  """
-  Enum.find_index(cart, &(&1.fruit =~ "o"))
-  """
-  |> assert_eval(2)
-
-  @tag :skip
-  """
-  Enum.find_index(cart, &(&1.fruit =~ "y"))
-  """
-  |> assert_eval(nil)
-
-  """
-  Enum.find_value(cart, fn item ->
-     if item.count == 1, do: item.fruit, else: nil
-   end)
-  """
-  |> assert_eval("banana")
-
-  """
-  Enum.find_value(cart, :none, fn item ->
-     if item.count == 100, do: item.fruit, else: nil
-   end)
-  """
-  |> assert_eval(:none)
-
-  """
-  Enum.group_by(cart, &String.last(&1.fruit))
-  """
-  |> assert_eval(%{
-    "a" => [%{fruit: "banana", count: 1}],
-    "e" => [
-      %{fruit: "apple", count: 3},
-      %{fruit: "orange", count: 6}
-    ]
-  })
-
-  """
-  Enum.group_by(cart, &String.last(&1.fruit), & &1.fruit)
-  """
-  |> assert_eval(%{
-    "a" => ["banana"],
-    "e" => ["apple", "orange"]
-  })
-
-  """
-  Enum.join(["apple", "banana", "orange"], ", ")
-  """
-  |> assert_eval("apple, banana, orange")
-
-  """
-  Enum.map_join(cart, ", ", & &1.fruit)
-  """
-  |> assert_eval("apple, banana, orange")
-
-  """
-  Enum.intersperse(["apple", "banana", "orange"], ", ")
-  """
-  |> assert_eval(["apple", ", ", "banana", ", ", "orange"])
-
-  """
-  Enum.map_intersperse(cart, ", ", & &1.fruit)
-  """
-  |> assert_eval(["apple", ", ", "banana", ", ", "orange"])
-
-  """
-  Enum.slice(cart, 0..1)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1}
-  ])
-
-  """
-  Enum.slice(cart, -2..-1)
-  """
-  |> assert_eval([
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
-  ])
-
-  """
-  Enum.slice(cart, 1, 2)
-  """
-  |> assert_eval([
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
-  ])
-
-  @additional_prep """
-  fruits = ["apple", "banana", "grape", "orange", "pear"]
-  """
-
-  @tag :skip
-  """
-  Enum.slide(fruits, 2, 0)
-  """
-  |> assert_eval(["grape", "apple", "banana", "orange", "pear"])
-
-  @tag :skip
-  """
-  Enum.slide(fruits, 2, 4)
-  """
-  |> assert_eval(["apple", "banana", "orange", "pear", "grape"])
-
-  """
-  Enum.slide(fruits, 1..3, 0)
-  """
-  |> assert_eval(["banana", "grape", "orange", "apple", "pear"])
-
-  """
-  Enum.slide(fruits, 1..3, 4)
-  """
-  |> assert_eval(["apple", "pear", "banana", "grape", "orange"])
-
-  @additional_prep """
-  cart = [
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
+  |> create_tests(tag: :alias_require)
+
+  # Module attributes
+  [
+    {
+      """
+      defmodule MyServer do
+        @moduledoc "My server code."
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1
+    },
+    {
+      """
+      defmodule Math do
+        @moduledoc \"""
+        Provides math-related functions.
+
+        ## Examples
+
+            Math.sum(1, 2)
+            3
+
+        \"""
+
+        @doc \"""
+        Calculates the sum of two numbers.
+        \"""
+        def sum(a, b), do: a + b
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1
+    },
+    {
+      """
+      defmodule MyServer do
+        @service URI.parse("https://example.com")
+        IO.inspect(@service)
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1, skip: true
+    },
+    {
+      """
+      defmodule MyServer do
+        @unknown
+      end
+      """,
+      predicate: &AtomVM.assert_is_module/1
+    }
   ]
-  """
+  |> create_tests(tag: :module_attrs)
 
-  """
-  Enum.reverse(cart)
-  """
-  |> assert_eval([
-    %{fruit: "orange", count: 6},
-    %{fruit: "banana", count: 1},
-    %{fruit: "apple", count: 3}
-  ])
+  # Structs
+  [
+    {
+      """
+      map = %{a: 1, b: 2}
+      map[:a]
+      """,
+      output: 1
+    },
+    {
+      """
+      map = %{a: 1, b: 2}
+      %{map | a: 3}
+      """,
+      output: %{a: 3, b: 2}
+    },
+    {
+      """
+      defmodule User do
+        defstruct name: "John", age: 27
+      end
+      """,
+      cases: [
+        {"", predicate: &AtomVM.assert_is_module/1},
+        {"%User{}", output: %User{age: 27, name: "John"}},
+        {~s|%User{name: "Jane"}|, output: %User{age: 27, name: "Jane"}},
+        {"%User{oops: :field}", raises: KeyError},
+        {
+          """
+          john = %User{}
+          jane = %{john | name: "Jane"}
+          %{jane | oops: :field}
+          """,
+          raises: KeyError
+        },
+        {"%User{} = %{}", raises: MatchError},
+        {
+          """
+          john = %User{}
+          {is_map(john), john.__struct__}
+          """,
+          output: {true, User}
+        },
+        {
+          """
+          john = %User{}
+          john[:name]
+          """,
+          raises: UndefinedFunctionError
+        },
+        {
+          """
+          john = %User{}
+          Enum.each(john, fn {field, value} -> IO.puts(value) end)
+          """,
+          raises: Protocol.UndefinedError
+        }
+      ],
+      skip: true
+    },
+    {
+      """
+      defmodule Car do
+        @enforce_keys [:make]
+        defstruct [:model, :make]
+      end
+      %Car{}
+      """,
+      raises: ArgumentError, skip: true
+    }
+  ]
+  |> create_tests(tag: :structs)
 
-  """
-  Enum.reverse(cart, [:this_will_be, :the_tail])
-  """
-  |> assert_eval([
-    %{fruit: "orange", count: 6},
-    %{fruit: "banana", count: 1},
-    %{fruit: "apple", count: 3},
-    :this_will_be,
-    :the_tail
-  ])
+  # Protocols
+  [
+    {
+      """
+      defprotocol Utility do
+        @spec type(t) :: String.t()
+        def type(value)
+      end
 
-  """
-  Enum.reverse_slice(cart, 1, 2)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6},
-    %{fruit: "banana", count: 1}
-  ])
+      defimpl Utility, for: BitString do
+        def type(_value), do: "string"
+      end
 
-  """
-  Enum.split(cart, 1)
-  """
-  |> assert_eval(
-    {[%{fruit: "apple", count: 3}],
-     [
-       %{fruit: "banana", count: 1},
-       %{fruit: "orange", count: 6}
-     ]}
-  )
+      defimpl Utility, for: Integer do
+        def type(_value), do: "integer"
+      end
 
-  """
-  Enum.split(cart, -1)
-  """
-  |> assert_eval(
-    {[
-       %{fruit: "apple", count: 3},
-       %{fruit: "banana", count: 1}
-     ], [%{fruit: "orange", count: 6}]}
-  )
+      Utility.type("foo")
+      Utility.type(123)
+      """,
+      output: "integer", skip: true
+    },
+    {
+      """
+      defprotocol Size do
+        @doc "Calculates the size (and not the length!) of a data structure"
+        def size(data)
+      end
 
-  @tag :skip
-  """
-  Enum.split_while(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval(
-    {[%{fruit: "apple", count: 3}],
-     [
-       %{fruit: "banana", count: 1},
-       %{fruit: "orange", count: 6}
-     ]}
-  )
+      defimpl Size, for: BitString do
+        def size(string), do: byte_size(string)
+      end
 
-  @tag :skip
-  """
-  Enum.split_with(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval(
-    {[
-       %{fruit: "apple", count: 3},
-       %{fruit: "orange", count: 6}
-     ], [%{fruit: "banana", count: 1}]}
-  )
+      defimpl Size, for: Map do
+        def size(map), do: map_size(map)
+      end
 
-  """
-  Enum.drop(cart, 1)
-  """
-  |> assert_eval([
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
-  ])
+      defimpl Size, for: Tuple do
+        def size(tuple), do: tuple_size(tuple)
+      end
+      """,
+      cases: [
+        {~s|Size.size("foo")|, output: 3},
+        {~s|Size.size({:ok, "hello"})|, output: 2},
+        {~s|Size.size(%{label: "some label"})|, output: 1},
+        {"Size.size([1, 2, 3])", raises: Protocol.UndefinedError},
+        {"Size.size(%{})", output: 0},
+        {
+          """
+          set = %MapSet{} = MapSet.new([])
+          Size.size(set)
+          """,
+          raises: Protocol.UndefinedError
+        },
+        {
+          """
+          defimpl Size, for: MapSet do
+            def size(set), do: MapSet.size(set)
+          end
 
-  """
-  Enum.drop(cart, -1)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1}
-  ])
+          Size.size(set)
+          """,
+          output: 0
+        }
+      ],
+      skip: true
+    },
+    {"Enum.reduce(1..3, 0, fn x, acc -> x + acc end)", output: 6},
+    {~s|"age: \#{25}"|, output: "age: 25"},
+    {
+      """
+      tuple = {1, 2, 3}
+      "tuple: \#{tuple}"
+      """,
+      output: Protocol.UndefinedError, skip: true
+    },
+    {
+      """
+      tuple = {1, 2, 3}
+      "tuple: \#{inspect(tuple)}"
+      """,
+      output: "tuple: {1, 2, 3}"
+    },
+    {"inspect &(&1+2)", predicate: &(&1 =~ "#Function"), skip: true}
+  ]
+  |> create_tests(tag: :protocols)
 
-  """
-  Enum.drop_every(cart, 2)
-  """
-  |> assert_eval([%{fruit: "banana", count: 1}])
+  # Comprehensions
+  [
+    {"for n <- [1, 2, 3, 4], do: n * n", output: [1, 4, 9, 16]},
+    {"for n <- 1..4, do: n * n", output: [1, 4, 9, 16]},
+    {
+      """
+      values = [good: 1, good: 2, bad: 3, good: 4]
+      for {:good, n} <- values, do: n * n
+      """,
+      output: [1, 4, 16]
+    },
+    {"for n <- 0..5, rem(n, 3) == 0, do: n * n", output: [0, 9]},
+    # {
+    #   """
+    #   dirs = ["/home/mikey", "/home/james"]
 
-  @tag :skip
-  """
-  Enum.drop_while(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval([
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
-  ])
+    #   for dir <- dirs,
+    #       file <- File.ls!(dir),
+    #       path = Path.join(dir, file),
+    #       File.regular?(path) do
+    #     File.stat!(path).size
+    #   end
+    #   """,
+    #   output: :todo
+    # },
+    {
+      "for i <- [:a, :b, :c], j <- [1, 2], do: {i, j}",
+      output: [a: 1, a: 2, b: 1, b: 2, c: 1, c: 2]
+    },
+    {
+      """
+      pixels = <<213, 45, 132, 64, 76, 32, 76, 0, 0, 234, 32, 15>>
+      for <<r::8, g::8, b::8 <- pixels>>, do: {r, g, b}
+      """,
+      output: [{213, 45, 132}, {64, 76, 32}, {76, 0, 0}, {234, 32, 15}]
+    },
+    {~s|for <<c <- " hello world ">>, c != ?\\s, into: "", do: <<c>>|, output: "helloworld"},
+    {
+      ~s|for {key, val} <- %{"a" => 1, "b" => 2}, into: %{}, do: {key, val * val}|,
+      output: %{"a" => 1, "b" => 4}
+    }
+    # {
+    #   """
+    #   stream = IO.stream(:stdio, :line)
+    #   for line <- stream, into: stream do
+    #     String.upcase(line) <> "\n"
+    #   end
+    #   """,
+    #   output: :todo
+    # }
+  ]
+  |> create_tests(tag: :comprehensions)
 
-  """
-  Enum.take(cart, 1)
-  """
-  |> assert_eval([%{fruit: "apple", count: 3}])
+  # Sigils
+  [
+    {
+      """
+      # A regular expression that matches strings which contain "foo" or "bar":
+      regex = ~r/foo|bar/
+      "foo" =~ ~r/foo|bar/
+      """,
+      output: true, skip: true
+    },
+    {
+      """
+      # A regular expression that matches strings which contain "foo" or "bar":
+      regex = ~r/foo|bar/
+      "bat" =~ regex
+      """,
+      output: true, skip: true
+    },
+    {~s|"HELLO" =~ ~r/hello/|, output: false, skip: true},
+    {~s|~r/hello/|, output: ~r/hello/, skip: true},
+    {"~w(foo bar bat)a", output: [:foo, :bar, :bat], skip: true},
+    {
+      ~s|~s(String with escape codes \x26 \#{"inter" <> "polation"})|,
+      output: "String with escape codes & interpolation"
+    },
+    {
+      "~S(String without escape codes \\x26 without \#{interpolation})",
+      output: "String without escape codes \\x26 without \#{interpolation}"
+    },
+    {
+      """
+      d = ~D[2019-10-31]
+      d.day
+      """,
+      output: 31
+    },
+    {
+      """
+      t = ~T[23:00:07.0]
+      t.second
+      """,
+      output: 7
+    },
+    {"~N[2019-10-31 23:00:07]", output: ~N[2019-10-31 23:00:07]},
+    {
+      """
+      dt = ~U[2019-10-31 19:59:03Z]
+      %DateTime{minute: minute, time_zone: time_zone} = dt
+      minute
+      """,
+      output: 59
+    },
+    {
+      """
+      dt = ~U[2019-10-31 19:59:03Z]
+      %DateTime{minute: minute, time_zone: time_zone} = dt
+      time_zone
+      """,
+      output: "Etc/UTC"
+    },
+    {~s|sigil_r(<<"foo">>, [?i])|, output: ~r"foo"i, skip: true},
+    {
+      """
+      defmodule MySigils do
+        def sigil_i(string, []), do: String.to_integer(string)
+        def sigil_i(string, [?n]), do: -String.to_integer(string)
+      end
+      import MySigils
+      """,
+      cases: [
+        {"~i(13)", output: 13},
+        {"~i(42)n", output: -42}
+      ],
+      skip: true
+    }
+  ]
+  |> create_tests(tag: :sigils)
 
-  """
-  Enum.take(cart, -1)
-  """
-  |> assert_eval([%{fruit: "orange", count: 6}])
+  # Try, catch, raise
+  [
+    {":foo + 1", raises: ArithmeticError},
+    {~s|raise "oops"|, raises: RuntimeError},
+    {~s|raise ArgumentError, message: "invalid argument foo"|, raises: ArgumentError},
+    {
+      """
+      defmodule MyError do
+        defexception message: "default message"
+      end
+      raise MyError
+      """,
+      raises: MyError, skip: true
+    },
+    {
+      """
+      try do
+        raise "oops"
+      rescue
+        e in RuntimeError -> e
+      end
+      """,
+      output: %RuntimeError{message: "oops"}
+    },
+    {
+      """
+      try do
+        raise "oops"
+      rescue
+        RuntimeError -> "Error!"
+      end
+      """,
+      output: "Error!"
+    },
+    {
+      """
+      try do
+        Enum.each(-50..50, fn x ->
+          if rem(x, 13) == 0, do: throw(x)
+        end)
+        "Got nothing"
+      catch
+        x -> "Got \#{x}"
+      end
+      """,
+      output: "Got -39"
+    },
+    {"Enum.find(-50..50, &(rem(&1, 13) == 0))", output: -39},
+    {"spawn_link(fn -> exit(1) end)", raises: :EXIT, skip: true},
+    {
+      """
+      try do
+        exit("I am exiting")
+      catch
+        :exit, _ -> "not really"
+      end
+      """,
+      output: "not really"
+    },
+    {
+      """
+      x = 2
+      try do
+        1 / x
+      rescue
+        ArithmeticError ->
+          :infinity
+      else
+        y when y < 1 and y > -1 ->
+          :small
+        _ ->
+          :large
+      end
+      """,
+      output: :small
+    },
+    {
+      """
+      what_happened =
+        try do
+          raise "fail"
+          :did_not_raise
+        rescue
+          _ -> :rescued
+        end
+      what_happened
+      """,
+      output: :rescued
+    }
+  ]
+  |> create_tests(tag: :try_catch)
 
-  """
-  Enum.take_every(cart, 2)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "orange", count: 6}
-  ])
+  # Optional syntax
+  [
+    {"length([1, 2, 3]) == length [1, 2, 3]", output: true},
+    {
+      """
+      # do-end blocks
+      if true do
+        :this
+      else
+        :that
+      end
+      """,
+      output: :this
+    },
+    {"if true, do: :this, else: :that", output: :this},
+    {
+      """
+      defmodule(Math, [
+        {:do, def(add(a, b), [{:do, a + b}])}
+      ])
+      """,
+      predicate: &AtomVM.assert_is_module/1
+    }
+  ]
+  |> create_tests(tag: :optional_syntax)
 
-  @tag :skip
-  """
-  Enum.take_while(cart, &(&1.fruit =~ "e"))
-  """
-  |> assert_eval([%{fruit: "apple", count: 3}])
+  # Erlang libraries
+  [
+    {"is_atom(String)", output: true},
+    {~s|String.first("hello")|, output: "h"},
+    {"is_atom(:binary)", output: true},
+    {~s|:binary.first("hello")|, output: 104},
+    {~s|String.to_charlist("Ø")|, output: [216]},
+    {~s|:binary.bin_to_list("Ø")|, output: [195, 152]},
+    {~s|:io.format("Pi is approximately given by:~10.3f~n", [:math.pi])|,
+     output: :ok, skip: true},
+    {
+      ~s|to_string(:io_lib.format("Pi is approximately given by:~10.3f~n", [:math.pi]))|,
+      output: "Pi is approximately given by:     3.142\n"
+    },
+    {
+      ~s|Base.encode16(:crypto.hash(:sha256, "Elixir"))|,
+      output: "3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB"
+    },
+    {
+      """
+      digraph = :digraph.new()
+      coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
+      [v0, v1, v2] = (for c <- coords, do: :digraph.add_vertex(digraph, c))
+      :digraph.add_edge(digraph, v0, v1)
+      :digraph.add_edge(digraph, v1, v2)
+      :digraph.get_short_path(digraph, v0, v2)
+      """,
+      output: [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}], skip: true
+    },
+    {
+      """
+      table = :ets.new(:ets_test, [])
+      # Store as tuples with {name, population}
+      :ets.insert(table, {"China", 1_374_000_000})
+      :ets.insert(table, {"India", 1_284_000_000})
+      :ets.insert(table, {"USA", 322_000_000})
+      :ets.tab2list(table)
+      """,
+      output: :todo, skip: true
+    },
+    {
+      """
+      angle_45_deg = :math.pi() * 45.0 / 180.0
+      :math.sin(angle_45_deg)
+      """,
+      output: 0.7071067811865475
+    },
+    {":math.exp(55.0)", output: 7.694785265142018e23},
+    {":math.log(7.694785265142018e23)", output: 55.0},
+    {
+      """
+      q = :queue.new
+      q = :queue.in("A", q)
+      q = :queue.in("B", q)
+      """,
+      cases: [
+        {
+          """
+          {value, q} = :queue.out(q)
+          value
+          """,
+          output: {:value, "A"}
+        },
+        {
+          """
+          {value, q} = :queue.out(q)
+          {value, q} = :queue.out(q)
+          value
+          """,
+          output: {:value, "B"}
+        },
+        {
+          """
+          {value, q} = :queue.out(q)
+          {value, q} = :queue.out(q)
+          {value, q} = :queue.out(q)
+          value
+          """,
+          output: :empty
+        }
+      ]
+    },
+    {":rand.uniform()", predicate: &is_float/1, skip: true},
+    {
+      """
+      _ = :rand.seed(:exs1024, {123, 123534, 345345})
+      :rand.uniform()
+      """,
+      output: :todo, skip: true
+    },
+    {":rand.uniform(6)", predicate: &is_integer/1, skip: true},
+    {
+      """
+      song = "
+      Mary had a little lamb,
+      His fleece was white as snow,
+      And everywhere that Mary went,
+      The lamb was sure to go."
+      compressed = :zlib.compress(song)
+      """,
+      cases: [
+        {"byte_size(song)", output: 110},
+        {"byte_size(compressed)", output: 99}
+      ]
+    },
+    {
+      """
+      song = "
+      Mary had a little lamb,
+      His fleece was white as snow,
+      And everywhere that Mary went,
+      The lamb was sure to go."
+      compressed = :zlib.compress(song)
+      :zlib.uncompress(compressed)
+      """,
+      output:
+        "\nMary had a little lamb,\nHis fleece was white as snow,\nAnd everywhere that Mary went,\nThe lamb was sure to go.",
+      skip: true
+    }
+  ]
+  |> create_tests(tag: :erlang_libraries)
 
-  """
-  Enum.chunk_by(cart, &String.length(&1.fruit))
-  """
-  |> assert_eval([
-    [%{fruit: "apple", count: 3}],
-    [
-      %{fruit: "banana", count: 1},
-      %{fruit: "orange", count: 6}
-    ]
-  ])
+  # Debugging
+  [
+    {
+      """
+      (1..10)
+      |> IO.inspect()
+      |> Enum.map(fn x -> x * 2 end)
+      |> IO.inspect()
+      |> Enum.sum()
+      |> IO.inspect()
+      """,
+      output: 110,
+      stdout: """
+      1..10
+      [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+      110
+      """
+    },
+    {
+      """
+      [1, 2, 3]
+      |> IO.inspect(label: "before")
+      |> Enum.map(&(&1 * 2))
+      |> IO.inspect(label: "after")
+      |> Enum.sum
+      """,
+      output: 12,
+      stdout: """
+      before: [1, 2, 3]
+      after: [2, 4, 6]
+      """,
+      skip: true
+    }
+  ]
+  |> create_tests(tag: :debugging)
 
-  """
-  Enum.chunk_every(cart, 2)
-  """
-  |> assert_eval([
-    [
-      %{fruit: "apple", count: 3},
-      %{fruit: "banana", count: 1}
-    ],
-    [%{fruit: "orange", count: 6}]
-  ])
-
-  """
-  Enum.chunk_every(cart, 2, 2, [:elements, :to_complete])
-  """
-  |> assert_eval([
-    [
-      %{fruit: "apple", count: 3},
-      %{fruit: "banana", count: 1}
-    ],
-    [
-      %{fruit: "orange", count: 6},
-      :elements
-    ]
-  ])
-
-  """
-  Enum.chunk_every(cart, 2, 1, :discard)
-  """
-  |> assert_eval([
-    [
-      %{fruit: "apple", count: 3},
-      %{fruit: "banana", count: 1}
-    ],
-    [
-      %{fruit: "banana", count: 1},
-      %{fruit: "orange", count: 6}
-    ]
-  ])
-
-  """
-  fruits = ["apple", "banana", "orange"]
-  counts = [3, 1, 6]
-  Enum.zip(fruits, counts)
-  """
-  |> assert_eval([{"apple", 3}, {"banana", 1}, {"orange", 6}])
-
-  """
-  fruits = ["apple", "banana", "orange"]
-  counts = [3, 1, 6]
-  Enum.zip_with(fruits, counts, fn fruit, count ->
-     %{fruit: fruit, count: count}
-   end)
-  """
-  |> assert_eval([
-    %{fruit: "apple", count: 3},
-    %{fruit: "banana", count: 1},
-    %{fruit: "orange", count: 6}
-  ])
-
-  @tag :skip
-  """
-  fruits = ["apple", "banana", "orange"]
-  counts = [3, 1, 6]
-  Enum.zip_reduce(fruits, counts, 0, fn fruit, count, acc ->
-     price = if fruit =~ "e", do: count * 2, else: count
-     acc + price
-   end)
-  """
-  |> assert_eval(19)
-
-  """
-  cart |> Enum.map(&{&1.fruit, &1.count}) |> Enum.unzip()
-  """
-  |> assert_eval({["apple", "banana", "orange"], [3, 1, 6]})
+  # Enum cheatsheet
+  [
+    {
+      """
+      cart = [
+        %{fruit: "apple", count: 3},
+        %{fruit: "banana", count: 1},
+        %{fruit: "orange", count: 6}
+      ]
+      """,
+      cases: [
+        {~s|Enum.any?(cart, & &1.fruit == "orange")|, output: true},
+        {~s|Enum.any?(cart, & &1.fruit == "pear")|, output: false},
+        {"Enum.all?(cart, & &1.count > 0)", output: true},
+        {"Enum.all?(cart, & &1.count > 1)", output: false},
+        {~s|Enum.member?(cart, %{fruit: "apple", count: 3})|, output: true},
+        {"Enum.member?(cart, :something_else)", output: false},
+        {~s|%{fruit: "apple", count: 3} in cart|, output: true},
+        {":something_else in cart", output: false},
+        {"Enum.empty?(cart)", output: false},
+        {~s|Enum.filter(cart, &(&1.fruit =~ "o"))|,
+         output: [%{fruit: "orange", count: 6}], skip: true},
+        {
+          ~s|Enum.filter(cart, &(&1.fruit =~ "e"))|,
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6}
+          ],
+          skip: true
+        },
+        {
+          ~s|Enum.reject(cart, &(&1.fruit =~ "o"))|,
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1}
+          ],
+          skip: true
+        },
+        {
+          """
+          Enum.flat_map(cart, fn item ->
+            if item.count > 1, do: [item.fruit], else: []
+          end)
+          """,
+          output: ["apple", "orange"]
+        },
+        {
+          """
+          for item <- cart, item.fruit =~ "e" do
+            item
+          end
+          """,
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6}
+          ],
+          skip: true
+        },
+        {
+          """
+          for %{count: 1, fruit: fruit} <- cart do
+            fruit
+          end
+          """,
+          output: ["banana"]
+        },
+        {"Enum.map(cart, & &1.fruit)", output: ["apple", "banana", "orange"]},
+        {
+          """
+          Enum.map(cart, fn item ->
+            %{item | count: item.count + 10}
+          end)
+          """,
+          output: [
+            %{fruit: "apple", count: 13},
+            %{fruit: "banana", count: 11},
+            %{fruit: "orange", count: 16}
+          ]
+        },
+        {
+          """
+          Enum.map_every(cart, 2, fn item ->
+            %{item | count: item.count + 10}
+          end)
+          """,
+          output: [
+            %{fruit: "apple", count: 13},
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 16}
+          ]
+        },
+        {
+          """
+          for item <- cart do
+            item.fruit
+          end
+          """,
+          output: ["apple", "banana", "orange"]
+        },
+        {
+          """
+          for item <- cart, item.fruit =~ "e" do
+            item.fruit
+          end
+          """,
+          output: ["apple", "orange"], skip: true
+        },
+        {
+          "Enum.each(cart, &IO.puts(&1.fruit))",
+          output: :ok,
+          stdout: """
+          apple
+          banana
+          orange
+          """
+        },
+        {
+          """
+          Enum.reduce(cart, 0, fn item, acc ->
+            item.count + acc
+          end)
+          """,
+          output: 10
+        },
+        {
+          """
+          Enum.map_reduce(cart, 0, fn item, acc ->
+            {item.fruit, item.count + acc}
+          end)
+          """,
+          output: {["apple", "banana", "orange"], 10}
+        },
+        {
+          """
+          Enum.scan(cart, 0, fn item, acc ->
+            item.count + acc
+          end)
+          """,
+          output: [3, 4, 10]
+        },
+        {
+          """
+          Enum.reduce_while(cart, 0, fn item, acc ->
+            if item.fruit == "orange" do
+              {:halt, acc}
+            else
+              {:cont, item.count + acc}
+            end
+          end)
+          """,
+          output: 4
+        },
+        {
+          """
+          for item <- cart, reduce: 0 do
+            acc -> item.count + acc
+          end
+          """,
+          output: 10
+        },
+        {
+          """
+          for item <- cart, item.fruit =~ "e", reduce: 0 do
+            acc -> item.count + acc
+          end
+          """,
+          output: 9, skip: true
+        },
+        {"Enum.count(cart)", output: 3},
+        {
+          ~s|Enum.frequencies(["apple", "banana", "orange", "apple"])|,
+          output: %{"apple" => 2, "banana" => 1, "orange" => 1}
+        },
+        {"Enum.frequencies_by(cart, &String.last(&1.fruit))", output: %{"a" => 1, "e" => 2}},
+        {~s|Enum.count(cart, &(&1.fruit =~ "e"))|, output: 2, skip: true},
+        {~s|Enum.count(cart, &(&1.fruit =~ "y"))|, output: 0, skip: true},
+        {"cart |> Enum.map(& &1.count) |> Enum.sum()", output: 10},
+        {"Enum.sum_by(cart, & &1.count)", output: :todo, skip: true},
+        {"cart |> Enum.map(& &1.count) |> Enum.product()", output: 18},
+        {"Enum.product_by(cart, & &1.count)", output: :todo, skip: true},
+        {"cart |> Enum.map(& &1.fruit) |> Enum.sort()", output: ["apple", "banana", "orange"]},
+        {
+          "cart |> Enum.map(& &1.fruit) |> Enum.sort(:desc)",
+          output: ["orange", "banana", "apple"]
+        },
+        {
+          "Enum.sort_by(cart, & &1.count)",
+          output: [
+            %{fruit: "banana", count: 1},
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          "Enum.sort_by(cart, & &1.count, :desc)",
+          output: [
+            %{fruit: "orange", count: 6},
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1}
+          ]
+        },
+        {"cart |> Enum.map(& &1.count) |> Enum.min()", output: 1},
+        {"Enum.min_by(cart, & &1.count)", output: :todo, skip: true},
+        {"cart |> Enum.map(& &1.count) |> Enum.max()", output: 6},
+        {"Enum.max_by(cart, & &1.count)", output: :todo, skip: true},
+        {"Enum.concat([[1, 2, 3], [4, 5, 6], [7, 8, 9]])", output: [1, 2, 3, 4, 5, 6, 7, 8, 9]},
+        {"Enum.concat([1, 2, 3], [4, 5, 6])", output: [1, 2, 3, 4, 5, 6]},
+        {
+          """
+          Enum.flat_map(cart, fn item ->
+            List.duplicate(item.fruit, item.count)
+          end)
+          """,
+          output: [
+            "apple",
+            "apple",
+            "apple",
+            "banana",
+            "orange",
+            "orange",
+            "orange",
+            "orange",
+            "orange",
+            "orange"
+          ]
+        },
+        {
+          """
+          Enum.flat_map_reduce(cart, 0, fn item, acc ->
+            list = List.duplicate(item.fruit, item.count)
+            acc = acc + item.count
+            {list, acc}
+          end)
+          """,
+          output:
+            {[
+               "apple",
+               "apple",
+               "apple",
+               "banana",
+               "orange",
+               "orange",
+               "orange",
+               "orange",
+               "orange",
+               "orange"
+             ], 10}
+        },
+        {
+          """
+          for item <- cart,
+              fruit <- List.duplicate(item.fruit, item.count) do
+            fruit
+          end
+          """,
+          output: [
+            "apple",
+            "apple",
+            "apple",
+            "banana",
+            "orange",
+            "orange",
+            "orange",
+            "orange",
+            "orange",
+            "orange"
+          ]
+        },
+        {
+          """
+          Enum.into(cart, %{}, fn item ->
+            {item.fruit, item.count}
+          end)
+          """,
+          output: %{"apple" => 3, "banana" => 1, "orange" => 6}
+        },
+        {
+          """
+          for item <- cart, into: %{} do
+            {item.fruit, item.count}
+          end
+          """,
+          output: %{"apple" => 3, "banana" => 1, "orange" => 6}
+        },
+        {
+          ~s|Enum.dedup_by(cart, & &1.fruit =~ "a")|,
+          output: [%{fruit: "apple", count: 3}], skip: true
+        },
+        {
+          "Enum.dedup_by(cart, & &1.count < 5)",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          "Enum.uniq_by(cart, &String.last(&1.fruit))",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1}
+          ]
+        },
+        {"Enum.at(cart, 0)", output: %{fruit: "apple", count: 3}},
+        {"Enum.at(cart, 10)", output: nil},
+        {"Enum.at(cart, 10, :none)", output: :none},
+        {"Enum.fetch(cart, 0)", output: {:ok, %{fruit: "apple", count: 3}}},
+        {"Enum.fetch(cart, 10)", output: :error},
+        {"Enum.fetch!(cart, 0)", output: %{fruit: "apple", count: 3}},
+        {"Enum.fetch!(cart, 10)", raises: Enum.OutOfBoundsError},
+        {
+          "Enum.with_index(cart)",
+          output: [
+            {%{fruit: "apple", count: 3}, 0},
+            {%{fruit: "banana", count: 1}, 1},
+            {%{fruit: "orange", count: 6}, 2}
+          ]
+        },
+        {
+          """
+          Enum.with_index(cart, fn item, index ->
+            {item.fruit, index}
+          end)
+          """,
+          output: [
+            {"apple", 0},
+            {"banana", 1},
+            {"orange", 2}
+          ]
+        },
+        {
+          ~s|Enum.find(cart, &(&1.fruit =~ "o"))|,
+          output: %{fruit: "orange", count: 6}, skip: true
+        },
+        {
+          ~s|Enum.find(cart, &(&1.fruit =~ "y"))|,
+          output: nil, skip: true
+        },
+        {
+          ~s|Enum.find(cart, :none, &(&1.fruit =~ "y"))|,
+          output: :none, skip: true
+        },
+        {
+          ~s|Enum.find_index(cart, &(&1.fruit =~ "o"))|,
+          output: 2, skip: true
+        },
+        {
+          ~s|Enum.find_index(cart, &(&1.fruit =~ "y"))|,
+          output: nil, skip: true
+        },
+        {
+          """
+          Enum.find_value(cart, fn item ->
+            if item.count == 1, do: item.fruit, else: nil
+          end)
+          """,
+          output: "banana"
+        },
+        {
+          """
+          Enum.find_value(cart, :none, fn item ->
+            if item.count == 100, do: item.fruit, else: nil
+          end)
+          """,
+          output: :none
+        },
+        {
+          "Enum.group_by(cart, &String.last(&1.fruit))",
+          output: %{
+            "a" => [%{fruit: "banana", count: 1}],
+            "e" => [
+              %{fruit: "apple", count: 3},
+              %{fruit: "orange", count: 6}
+            ]
+          }
+        },
+        {
+          "Enum.group_by(cart, &String.last(&1.fruit), & &1.fruit)",
+          output: %{
+            "a" => ["banana"],
+            "e" => ["apple", "orange"]
+          }
+        },
+        {~s|Enum.map_join(cart, ", ", & &1.fruit)|, output: "apple, banana, orange"},
+        {
+          ~s|Enum.map_intersperse(cart, ", ", & &1.fruit)|,
+          output: ["apple", ", ", "banana", ", ", "orange"]
+        },
+        {
+          "Enum.slice(cart, 0..1)",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1}
+          ]
+        },
+        {
+          "Enum.slice(cart, -2..-1)",
+          output: [
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          "Enum.slice(cart, 1, 2)",
+          output: [
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          "Enum.reverse(cart)",
+          output: [
+            %{fruit: "orange", count: 6},
+            %{fruit: "banana", count: 1},
+            %{fruit: "apple", count: 3}
+          ]
+        },
+        {
+          "Enum.reverse(cart, [:this_will_be, :the_tail])",
+          output: [
+            %{fruit: "orange", count: 6},
+            %{fruit: "banana", count: 1},
+            %{fruit: "apple", count: 3},
+            :this_will_be,
+            :the_tail
+          ]
+        },
+        {
+          "Enum.reverse_slice(cart, 1, 2)",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6},
+            %{fruit: "banana", count: 1}
+          ]
+        },
+        {
+          "Enum.split(cart, 1)",
+          output: {
+            [%{fruit: "apple", count: 3}],
+            [%{fruit: "banana", count: 1}, %{fruit: "orange", count: 6}]
+          }
+        },
+        {
+          "Enum.split(cart, -1)",
+          output: {
+            [%{fruit: "apple", count: 3}, %{fruit: "banana", count: 1}],
+            [%{fruit: "orange", count: 6}]
+          }
+        },
+        {
+          ~s|Enum.split_while(cart, &(&1.fruit =~ "e"))|,
+          output: {
+            [%{fruit: "apple", count: 3}],
+            [%{fruit: "banana", count: 1}, %{fruit: "orange", count: 6}]
+          },
+          skip: true
+        },
+        {
+          ~s|Enum.split_with(cart, &(&1.fruit =~ "e"))|,
+          output: {
+            [%{fruit: "apple", count: 3}, %{fruit: "orange", count: 6}],
+            [%{fruit: "banana", count: 1}]
+          },
+          skip: true
+        },
+        {
+          "Enum.drop(cart, 1)",
+          output: [
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          "Enum.drop(cart, -1)",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1}
+          ]
+        },
+        {
+          "Enum.drop_every(cart, 2)",
+          output: [%{fruit: "banana", count: 1}]
+        },
+        {
+          ~s|Enum.drop_while(cart, &(&1.fruit =~ "e"))|,
+          output: [
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 6}
+          ],
+          skip: true
+        },
+        {"Enum.take(cart, 1)", output: [%{fruit: "apple", count: 3}]},
+        {"Enum.take(cart, -1)", output: [%{fruit: "orange", count: 6}]},
+        {
+          "Enum.take_every(cart, 2)",
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          ~s|Enum.take_while(cart, &(&1.fruit =~ "e"))|,
+          output: [%{fruit: "apple", count: 3}], skip: true
+        },
+        {
+          "Enum.chunk_by(cart, &String.length(&1.fruit))",
+          output: [
+            [%{fruit: "apple", count: 3}],
+            [%{fruit: "banana", count: 1}, %{fruit: "orange", count: 6}]
+          ]
+        },
+        {
+          "Enum.chunk_every(cart, 2)",
+          output: [
+            [%{fruit: "apple", count: 3}, %{fruit: "banana", count: 1}],
+            [%{fruit: "orange", count: 6}]
+          ]
+        },
+        {
+          "Enum.chunk_every(cart, 2, 2, [:elements, :to_complete])",
+          output: [
+            [%{fruit: "apple", count: 3}, %{fruit: "banana", count: 1}],
+            [%{fruit: "orange", count: 6}, :elements]
+          ]
+        },
+        {
+          "Enum.chunk_every(cart, 2, 1, :discard)",
+          output: [
+            [%{fruit: "apple", count: 3}, %{fruit: "banana", count: 1}],
+            [%{fruit: "banana", count: 1}, %{fruit: "orange", count: 6}]
+          ]
+        },
+        {
+          "cart |> Enum.map(&{&1.fruit, &1.count}) |> Enum.unzip()",
+          output: {["apple", "banana", "orange"], [3, 1, 6]}
+        }
+      ]
+    },
+    {
+      """
+      fruits = ["apple", "banana", "grape", "orange", "pear"]
+      """,
+      cases: [
+        {
+          "Enum.slide(fruits, 2, 0)",
+          output: ["grape", "apple", "banana", "orange", "pear"], skip: true
+        },
+        {
+          "Enum.slide(fruits, 2, 4)",
+          output: ["apple", "banana", "orange", "pear", "grape"], skip: true
+        },
+        {"Enum.slide(fruits, 1..3, 0)", output: ["banana", "grape", "orange", "apple", "pear"]},
+        {"Enum.slide(fruits, 1..3, 4)", output: ["apple", "pear", "banana", "grape", "orange"]}
+      ]
+    },
+    {
+      """
+      fruits = ["apple", "banana", "orange"]
+      counts = [3, 1, 6]
+      """,
+      cases: [
+        {"Enum.zip(fruits, counts)", output: [{"apple", 3}, {"banana", 1}, {"orange", 6}]},
+        {
+          """
+          Enum.zip_with(fruits, counts, fn fruit, count ->
+            %{fruit: fruit, count: count}
+          end)
+          """,
+          output: [
+            %{fruit: "apple", count: 3},
+            %{fruit: "banana", count: 1},
+            %{fruit: "orange", count: 6}
+          ]
+        },
+        {
+          """
+          Enum.zip_reduce(fruits, counts, 0, fn fruit, count, acc ->
+            price = if fruit =~ "e", do: count * 2, else: count
+            acc + price
+          end)
+          """,
+          output: 19, skip: true
+        }
+      ]
+    },
+    {~s|Enum.any?([], & &1.fruit == "orange")|, output: false},
+    {"Enum.all?([], & &1.count > 0)", output: true},
+    {"Enum.empty?([])", output: true},
+    {
+      """
+      pairs = [{"apple", 3}, {"banana", 1}, {"orange", 6}]
+      Enum.into(pairs, %{})
+      """,
+      output: %{"apple" => 3, "banana" => 1, "orange" => 6}
+    },
+    {"Enum.to_list(1..5)", output: [1, 2, 3, 4, 5]},
+    {"Enum.dedup([1, 2, 2, 3, 3, 3, 1, 2, 3])", output: [1, 2, 3, 1, 2, 3]},
+    {"Enum.uniq([1, 2, 2, 3, 3, 3, 1, 2, 3])", output: [1, 2, 3]},
+    {~s|Enum.join(["apple", "banana", "orange"], ", ")|, output: "apple, banana, orange"},
+    {
+      ~s|Enum.intersperse(["apple", "banana", "orange"], ", ")|,
+      output: ["apple", ", ", "banana", ", ", "orange"]
+    }
+  ]
+  |> create_tests(tag: :enum_cheatsheet)
 end
