@@ -42,7 +42,9 @@ native_name_encoding() ->
       Reason :: posix().
 
 get_cwd() ->
-    prim_file:get_cwd(). %Patch reason: Needed to use nif directly.
+    % Patch reason: FIXME: prim_file:get_cwd() somehow triggers GC error
+    {error, eperm}.
+    % prim_file:get_cwd(). %Patch reason: Needed to use nif directly.
 
 % Patch reason: this dummy implementation is sufficient
 % for some calls not to break
