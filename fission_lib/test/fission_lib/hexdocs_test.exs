@@ -418,8 +418,6 @@ defmodule FissionLib.HexdocsTest do
   # case, cond, and if ===================================================================================================
   # =======================================================================================================================
 
-  #  todo 8 Unused variables causes eval to fail (in the following "_x" works just fine)
-  @tag :skip
   """
   case {1, 2, 3} do
     {1, x, 3} ->
@@ -485,8 +483,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(nil)
 
-  #  todo 9 fix if statement (if nil is not working as expected)
-  @tag :skip
   """
   if nil do
     "This won't be seen"
@@ -494,10 +490,8 @@ defmodule FissionLib.HexdocsTest do
     "This will"
   end
   """
-  |> assert_eval(nil)
+  |> assert_eval("This will")
 
-  #  todo 9 fix if with match inside (this could be caused by 8)
-  @tag :skip
   """
   x = 1
   if true do
@@ -506,7 +500,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(2)
 
-  @tag :skip
   """
   x = 1
   if true do
@@ -584,15 +577,12 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(4)
 
-  #  todo 11 specific evaluation of anonymous function does not work (possibly because of zero arguments)
-  @tag :skip
   """
   x = 42
   (fn -> x = 0 end).()
   """
   |> assert_eval(0)
 
-  @tag :skip
   """
   x = 42
   (fn -> x = 0 end).()
@@ -629,14 +619,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(true)
 
-  #  todo 12 guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
-  @tag :skip
   """
   fun = &is_atom/1
   :erlang.is_atom(:hello)
   """
   |> assert_eval(true)
-
+  
+  #  todo 12 guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
   @tag :skip
   """
   fun = &is_atom/1
