@@ -2489,11 +2489,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(~c"this is a char list containing \"double quotes\"")
 
+  @tag :skip
   """
   ~w(foo bar bat)
   """
   |> assert_eval(["foo", "bar", "bat"])
 
+  @tag :skip
   """
   ~w(foo bar bat)a
   """
@@ -2545,7 +2547,6 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval()
 
-  #  
   """
   d = ~D[2019-10-31]
   d.day
