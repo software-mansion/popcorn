@@ -279,4 +279,226 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.eval(:erlang_module, run_dir: dir)
     |> AtomVM.assert_is_module()
   end
+
+  async_test "Base module", %{tmp_dir: dir} do
+    ~s|Base.encode16("foobar")|
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("666F6F626172")
+  end
+
+  async_test "Bitwise module", %{tmp_dir: dir} do
+    """
+    import Bitwise
+
+    2 ||| 4
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(6)
+  end
+
+  async_test "Range module", %{tmp_dir: dir} do
+    "Range.disjoint?(1..10, 50..100)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(true)
+  end
+
+  async_test "Enum module", %{tmp_dir: dir} do
+    "Enum.all?([1,2,3], &(&1 < 5))"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(true)
+  end
+
+  async_test "Keyword module", %{tmp_dir: dir} do
+    "Keyword.fetch!([a: 1], :a)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(1)
+  end
+
+  async_test "Map module", %{tmp_dir: dir} do
+    "Map.has_key?(%{a: 1}, :a)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(true)
+  end
+
+  async_test "MapSet module", %{tmp_dir: dir} do
+    "MapSet.new([:a, :b, :c])"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%MapSet{})
+  end
+
+  async_test "List module", %{tmp_dir: dir} do
+    "List.duplicate(:ok, 3)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result([:ok, :ok, :ok])
+  end
+
+  async_test "Tuple module", %{tmp_dir: dir} do
+    "Tuple.duplicate(:ok, 3)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({:ok, :ok, :ok})
+  end
+
+  async_test "Integer module", %{tmp_dir: dir} do
+    "Integer.to_string(1)"
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("1")
+  end
+
+  async_test "ArgumentError", %{tmp_dir: dir} do
+    "hd([])"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%ArgumentError{})
+  end
+
+  async_test "ArithmeticError", %{tmp_dir: dir} do
+    ":foo + 1"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%ArithmeticError{})
+  end
+
+  @tag :skip
+  async_test "BadArityError", %{tmp_dir: dir} do
+    "Enum.map([1], fn a, b -> :bad end)"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%ErlangError{original: :badarity})
+  end
+
+  async_test "BadBooleanError", %{tmp_dir: dir} do
+    "1 and false"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%BadBooleanError{})
+  end
+
+  async_test "BadFunctionError", %{tmp_dir: dir} do
+    "Enum.map([1], :not_fun)"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%BadFunctionError{})
+  end
+
+  async_test "BadMapError", %{tmp_dir: dir} do
+    "Map.get(:not_map, :key)"
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%BadMapError{})
+  end
+
+  async_test "BadStructError", %{tmp_dir: dir} do
+    """
+    defmodule BadStructType do
+      def __struct__, do: :invalid
+      def __struct__(_), do: :invalid
+    end
+
+    struct(BadStructType)
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%ArgumentError{})
+  end
+
+  async_test "CaseClauseError", %{tmp_dir: dir} do
+    """
+    case 1 do
+      :n -> :wont_match
+    end
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%CaseClauseError{})
+  end
+
+  async_test "CondClauseError", %{tmp_dir: dir} do
+    """
+    cond do
+      false -> :wont_match
+    end
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%CondClauseError{})
+  end
+
+  async_test "FunctionClauseError", %{tmp_dir: dir} do
+    """
+    f = fn x when is_integer(x) -> :ok end
+
+    f.(:bad)
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%FunctionClauseError{})
+  end
+
+  async_test "KeyError", %{tmp_dir: dir} do
+    """
+    m = %{a: 1}
+
+    m.x
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%KeyError{})
+  end
+
+  async_test "SystemLimitError", %{tmp_dir: dir} do
+    """
+    "x"
+    |> List.duplicate(2048)
+    |> Enum.join()
+    |> String.to_atom()
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%SystemLimitError{})
+  end
+
+  async_test "SystemLimitError", %{tmp_dir: dir} do
+    """
+    Enum.doesnt_exist()
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%UndefinedFunctionError{})
+  end
+
+  async_test "WithClauseError", %{tmp_dir: dir} do
+    """
+    with :not_ok <- :ok do
+      :ok
+    else
+      :not_error -> :ok
+    end
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%WithClauseError{})
+  end
+
+  async_test "TryClauseError", %{tmp_dir: dir} do
+    """
+    try do
+      :ok
+    else
+      :not_ok -> :not_ok
+    end
+    """
+    |> wrap_in_try()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(%TryClauseError{})
+  end
+
+  defp wrap_in_try(code) do
+    """
+    try do
+      #{code}
+    rescue
+      e -> e
+    end
+    """
+  end
 end

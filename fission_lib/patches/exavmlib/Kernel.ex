@@ -103,61 +103,6 @@ defmodule Kernel do
 
   # Taken from Elixir kernel.ex
   @doc """
-  Creates and updates structs.
-
-  The `struct` argument may be an atom (which defines `defstruct`)
-  or a `struct` itself. The second argument is any `Enumerable` that
-  emits two-element tuples (key-value pairs) during enumeration.
-
-  Keys in the `Enumerable` that don't exist in the struct are automatically
-  discarded. Note that keys must be atoms, as only atoms are allowed when
-  defining a struct.
-
-  This function is useful for dynamically creating and updating structs, as
-  well as for converting maps to structs; in the latter case, just inserting
-  the appropriate `:__struct__` field into the map may not be enough and
-  `struct/2` should be used instead.
-
-  ## Examples
-
-      defmodule User do
-        defstruct name: "john"
-      end
-
-      struct(User)
-      #=> %User{name: "john"}
-
-      opts = [name: "meg"]
-      user = struct(User, opts)
-      #=> %User{name: "meg"}
-
-      struct(user, unknown: "value")
-      #=> %User{name: "meg"}
-
-      struct(User, %{name: "meg"})
-      #=> %User{name: "meg"}
-
-      # String keys are ignored
-      struct(User, %{"name" => "meg"})
-      #=> %User{name: "john"}
-
-  """
-  @spec struct(module | struct, Enum.t()) :: struct
-  def struct(struct, fields \\ []) do
-    struct(struct, fields, fn
-      {:__struct__, _val}, acc ->
-        acc
-
-      {key, val}, acc ->
-        case acc do
-          %{^key => _} -> %{acc | key => val}
-          _ -> acc
-        end
-    end)
-  end
-
-  # Taken from Elixir kernel.ex
-  @doc """
   Similar to `struct/2` but checks for key validity.
 
   The function `struct!/2` emulates the compile time behaviour
@@ -209,7 +154,7 @@ defmodule Kernel do
     Enum.reduce(fields, struct, fun)
   end
 
-# Patch reason: the "left in right" macro is not capable of 
+# Patch reason: the "left in right" macro is not capable of
 # being used in guard if it is defined outside of Kernel.ex patch
 
   @doc guard: true
@@ -258,11 +203,11 @@ defmodule Kernel do
     end
   end
 
-  # Patch reason: the Kernel.to_string macro is not seen as a macro 
+  # Patch reason: the Kernel.to_string macro is not seen as a macro
   # unless it is implemented inside a patch
-  
+
   defmacro to_string(term) do
     quote(do: :"Elixir.String.Chars".to_string(unquote(term)))
   end
-  
+
 end
