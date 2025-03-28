@@ -45,18 +45,8 @@ defmodule FissionLib.Support.AtomVM do
   Evaluates a string using precompiled evaluation code.
   """
   def eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
-    run_dir = Keyword.fetch!(opts, :run_dir)
     failing = Keyword.get(opts, :failing, false)
-    fragment = type |> to_ast_fragment_type() |> ast_fragment()
-
-    if not compiled?(fragment) do
-      raise "Compile eval module before using it"
-    end
-
-    info =
-      fragment
-      |> compile_quoted()
-      |> try_run(run_dir, code: code)
+    info = try_eval(code, type, opts)
 
     if failing do
       assert info.exit_status != 0,
@@ -115,7 +105,7 @@ defmodule FissionLib.Support.AtomVM do
     |> :erlang.term_to_binary()
     |> then(&File.write(args_path, &1))
 
-    unless match?({_output, 0}, System.shell("which #{@atomvm_path}")) do
+    unless match?({_output, 0}, System.shell("which '#{@atomvm_path}'")) do
       raise """
       AtomVM not found, please run `mix fission_lib.build_avm --out-dir _build` \
       or put `config :fission_lib, atomvm_path: "path/to/AtomVM"` in your config.exs
@@ -124,10 +114,10 @@ defmodule FissionLib.Support.AtomVM do
 
     cmd =
       if System.get_env("CI") == "true" do
-        "AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path}"
+        "AVM_RUN_DIR='#{run_dir}' '#{@atomvm_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        "$(AVM_RUN_DIR='#{run_dir}' #{@atomvm_path} #{bundle_path} >>#{log_path} 2>&1)"
+        ~s|out=$(AVM_RUN_DIR='#{run_dir}' '#{@atomvm_path}' '#{bundle_path}' 2>'#{log_path}'); echo "$out"|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
