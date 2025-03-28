@@ -24,19 +24,20 @@ defmodule FissionLib.HexdocsTestHelper do
       end
     end
   end
-  
+
   defmacro assert_error(code_string, expected_error) do
     quote do
       async_test "evaluation", %{tmp_dir: dir} do
         result =
-          "try do\n" <>
-          (@additional_prep <> unquote(code_string)) <>
-          """
-          rescue
-            e -> e
-          end
-          """
+          ("try do\n" <>
+             (@additional_prep <> unquote(code_string)) <>
+             """
+             rescue
+               e -> e
+             end
+             """)
           |> AtomVM.eval(:elixir, run_dir: dir)
+
         assert unquote(expected_error) = result
       end
     end
@@ -137,7 +138,7 @@ defmodule FissionLib.HexdocsTest do
   assert_eval("\"hellö\"", "hellö")
 
   assert_eval("\"hello \" <> \"world!\"", "hello world!")
-  
+
   """
   string = "world"
   "hello \#{string}!"
@@ -149,7 +150,7 @@ defmodule FissionLib.HexdocsTest do
   "i am \#{number} years old!"
   """
   |> assert_eval("i am 42 years old!")
-  
+
   """
   \"hello
   world\"
@@ -189,7 +190,8 @@ defmodule FissionLib.HexdocsTest do
 
   assert_eval("[1, 2, 3] ++ [4, 5, 6]\n", [1, 2, 3, 4, 5, 6])
   #  todo 6 subtraction of two lists with different type terms inside is failing
-  #  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
+  @tag :skip
+  assert_eval("[1, true, 2, false, 3, true] -- [true, false]\n", [1, 2, 3, true])
 
   """
   list = [1, 2, 3]
@@ -205,7 +207,7 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval([2, 3])
 
   assert_error("hd([])\n", %ArgumentError{})
-  
+
   assert_eval("[11, 12, 13]\n", ~c"\v\f\r")
   assert_eval("[104, 101, 108, 108, 111]\n", ~c"hello")
 
@@ -253,15 +255,20 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval({:a, :b, :e, :d})
 
   #  todo 7 String.split is failing
-  #  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
-  #  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
+  @tag :skip
+  assert_eval("String.split(\"hello world\")\n", ["hello", "world"])
+  @tag :skip
+  assert_eval("String.split(\"hello beautiful world\")\n", ["hello", "beautiful", "world"])
 
   assert_eval("String.split_at(\"hello world\", 3)", {"hel", "lo world"})
   assert_eval("String.split_at(\"hello world\", -4)", {"hello w", "orld"})
 
   #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  assert_eval("File.read(\"path/to/existing/file\")", {:ok, "... contents ..."})
-  #  assert_eval("File.read(\"path/to/unknown/file\")", {:error, :enoent})
+  @tag :skip
+  assert_eval("File.read(\"path/to/existing/file\")", {:ok, "... contents ..."})
+  @tag :skip
+  assert_eval("File.read(\"path/to/unknown/file\")", {:error, :enoent})
+
   """
   tuple = {:ok, "hello"}
   elem(tuple, 1)
@@ -283,7 +290,7 @@ defmodule FissionLib.HexdocsTest do
   2 = x
   """
   |> assert_error(%MatchError{})
-  
+
   """
   {a, b, c} = {:hello, "world", 42}
   a
@@ -373,6 +380,7 @@ defmodule FissionLib.HexdocsTest do
   {y, ^x} = {2, 2}
   """
   |> assert_error(%MatchError{})
+
   """
   x = 1
   [^x, 2, 3] = [1, 2, 3]
@@ -393,13 +401,13 @@ defmodule FissionLib.HexdocsTest do
   [^x, 2, 3] = [1, 2, 3]
   """
   |> assert_eval([1, 2, 3])
-  
+
   @tag :skip
   """
   {y, 1} = {2, 2}
   """
   |> assert_error(%MatchError{})
-  
+
   """
   [head | _] = [1, 2, 3]
   head
@@ -411,17 +419,18 @@ defmodule FissionLib.HexdocsTest do
   # =======================================================================================================================
 
   #  todo 8 Unused variables causes eval to fail (in the following "_x" works just fine)
-  #  """
-  #  case {1, 2, 3} do
-  #    {1, x, 3} ->
-  #      "This clause will match and bind x to 2 in this clause"
-  #    {4, 5, 6} ->
-  #      "This clause won't match"
-  #    _ ->
-  #      "This clause would match any value"
-  #  end
-  #  """
-  #  |> assert_eval("This clause will match and bind x to 2 in this clause")
+  @tag :skip
+  """
+  case {1, 2, 3} do
+    {1, x, 3} ->
+      "This clause will match and bind x to 2 in this clause"
+    {4, 5, 6} ->
+      "This clause won't match"
+    _ ->
+      "This clause would match any value"
+  end
+  """
+  |> assert_eval("This clause will match and bind x to 2 in this clause")
 
   """
   x = 1
@@ -477,32 +486,35 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(nil)
 
   #  todo 9 fix if statement (if nil is not working as expected)
-  #  """
-  #  if nil do
-  #    "This won't be seen"
-  #  else
-  #    "This will"
-  #  end
-  #  """
-  #  |> assert_eval(nil)
+  @tag :skip
+  """
+  if nil do
+    "This won't be seen"
+  else
+    "This will"
+  end
+  """
+  |> assert_eval(nil)
 
   #  todo 9 fix if with match inside (this could be caused by 8)
-  #  """
-  #  x = 1
-  #  if true do
-  #    x = x + 1
-  #  end
-  #  """
-  #  |> assert_eval(2)
+  @tag :skip
+  """
+  x = 1
+  if true do
+    x = x + 1
+  end
+  """
+  |> assert_eval(2)
 
-  #  """
-  #  x = 1
-  #  if true do
-  #    x = x + 1
-  #  end
-  #  x
-  #  """
-  #  |> assert_eval(1)
+  @tag :skip
+  """
+  x = 1
+  if true do
+    x = x + 1
+  end
+  x
+  """
+  |> assert_eval(1)
 
   """
   x = 1
@@ -551,17 +563,20 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(true)
 
   #  todo 10 is_function/2 not implemented
-  #  """
-  #  add = fn a, b -> a + b end
-  #  is_function(add, 2)
-  #  """
-  #  |> assert_eval(true)
+  @tag :skip
+  """
+  add = fn a, b -> a + b end
+  is_function(add, 2)
+  """
+  |> assert_eval(true)
 
-  #  """
-  #  add = fn a, b -> a + b end
-  #  is_function(add, 1)
-  #  """
-  #  |> assert_eval(false)
+  @tag :skip
+  """
+  add = fn a, b -> a + b end
+  is_function(add, 1)
+  """
+  |> assert_eval(false)
+
   """
   add = fn a, b -> a + b end
   double = fn a -> add.(a, a) end
@@ -570,18 +585,20 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(4)
 
   #  todo 11 specific evaluation of anonymous function does not work (possibly because of zero arguments)
-  #  """
-  #  x = 42
-  #  (fn -> x = 0 end).()
-  #  """
-  #  |> assert_eval(0)
+  @tag :skip
+  """
+  x = 42
+  (fn -> x = 0 end).()
+  """
+  |> assert_eval(0)
 
-  #  """
-  #  x = 42
-  #  (fn -> x = 0 end).()
-  #  x
-  #  """
-  #  |> assert_eval(42)
+  @tag :skip
+  """
+  x = 42
+  (fn -> x = 0 end).()
+  x
+  """
+  |> assert_eval(42)
 
   """
   f = fn
@@ -613,17 +630,19 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(true)
 
   #  todo 12 guards as anonymous functions are not working (adding module to the function [Kernel. or :erlang.] does not help)
-  #  """
-  #  fun = &is_atom/1
-  #  :erlang.is_atom(:hello)
-  #  """
-  #  |> assert_eval(true)
+  @tag :skip
+  """
+  fun = &is_atom/1
+  :erlang.is_atom(:hello)
+  """
+  |> assert_eval(true)
 
-  #  """
-  #  fun = &is_atom/1
-  #  fun.(123)
-  #  """
-  #  |> assert_eval(false)
+  @tag :skip
+  """
+  fun = &is_atom/1
+  fun.(123)
+  """
+  |> assert_eval(false)
 
   """
   fun = &String.length/1
@@ -642,18 +661,20 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(&:erlang.+/2)
 
   #  todo 13 :erlang.+/2 is not working as an anonymous function
-  #  """
-  #  add = &+/2
-  #  add.(1, 2)
-  #  """
-  #  |> assert_eval(3)
+  @tag :skip
+  """
+  add = &+/2
+  add.(1, 2)
+  """
+  |> assert_eval(3)
 
-  #  """
-  #  add = &+/2
-  #  is_arity_2 = fn fun -> is_function(fun, 2) end
-  #  is_arity_2.(add)
-  #  """
-  #  |> assert_eval(true)
+  @tag :skip
+  """
+  add = &+/2
+  is_arity_2 = fn fun -> is_function(fun, 2) end
+  is_arity_2.(add)
+  """
+  |> assert_eval(true)
 
   """
   fun = &(&1 + 1)
@@ -709,10 +730,11 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(["👩", "‍", "🚒"])
 
   #  todo 13 String.graphemes/1 does not work for fireman emote
-  #  """
-  #  String.graphemes("👩‍🚒")
-  #  """
-  #  |> assert_eval(["👩‍🚒"])
+  @tag :skip
+  """
+  String.graphemes("👩‍🚒")
+  """
+  |> assert_eval(["👩‍🚒"])
 
   """
   String.length("👩‍🚒")
@@ -725,20 +747,26 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(<<104, 101, 197, 130, 197, 130, 111, 0>>)
 
   #  todo 14 IO.inspect with option :binaries fails with function_clause error
-  #  """
-  #  IO.inspect("hełło", binaries: :as_binaries)
-  #  """
-  #  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111>>)
+  @tag :skip
+  """
+  IO.inspect("hełło", binaries: :as_binaries)
+  """
+  |> assert_eval(<<104, 101, 197, 130, 197, 130, 111>>)
 
   #  todo 15 "::" does not work for binaries
   assert_eval("<<42>> == <<42::8>>\n", true)
-  #  assert_eval("<<3::4>>\n", <<3::size(4)>>)
-  #  assert_eval("<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>\n", true)
-  #  assert_eval("is_bitstring(<<3::4>>)\n", true)
-  #  assert_eval("is_binary(<<3::4>>)\n", false)
+  @tag :skip
+  assert_eval("<<3::4>>\n", <<3::size(4)>>)
+  @tag :skip
+  assert_eval("<<0::1, 0::1, 1::1, 1::1>> == <<3::4>>\n", true)
+  @tag :skip
+  assert_eval("is_bitstring(<<3::4>>)\n", true)
+  @tag :skip
+  assert_eval("is_binary(<<3::4>>)\n", false)
   assert_eval("is_bitstring(<<0, 255, 42>>)\n", true)
   assert_eval("is_binary(<<0, 255, 42>>)\n", true)
-  #  assert_eval("is_binary(<<42::16>>)\n", true)
+  @tag :skip
+  assert_eval("is_binary(<<42::16>>)\n", true)
 
   """
   <<0, 1, x>> = <<0, 1, 2>>
@@ -752,17 +780,19 @@ defmodule FissionLib.HexdocsTest do
   |> assert_error(%MatchError{})
 
   #  todo 15 "::" does not work for binaries
-  #  """
-  #  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
-  #  head
-  #  """
-  #  |> assert_eval(<<0, 1>>)
+  @tag :skip
+  """
+  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
+  head
+  """
+  |> assert_eval(<<0, 1>>)
 
-  #  """
-  #  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
-  #  rest
-  #  """
-  #  |> assert_eval(<<2, 3>>)
+  @tag :skip
+  """
+  <<head::binary-size(2), rest::binary>> = <<0, 1, 2, 3>>
+  rest
+  """
+  |> assert_eval(<<2, 3>>)
 
   assert_eval("is_binary(\"hello\")\n", true)
   assert_eval("is_binary(<<239, 191, 19>>)\n", true)
@@ -842,21 +872,24 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(~c"cat")
 
   #  todo 16 inspect/2 returns "'cat'" instead of "[99, 97, 116]"
-  #  """
-  #  heartbeats_per_minute = [99, 97, 116]
-  #  inspect(heartbeats_per_minute, charlists: :as_list)
-  #  """
-  #  |> assert_eval("[99, 97, 116]")
+  @tag :skip
+  """
+  heartbeats_per_minute = [99, 97, 116]
+  inspect(heartbeats_per_minute, charlists: :as_list)
+  """
+  |> assert_eval("[99, 97, 116]")
+
   """
   to_charlist("hełło")
   """
   |> assert_eval([104, 101, 322, 322, 111])
 
   #  todo 17 to_string/1 "heBBo" instead of "hełło"
-  #  """
-  #  to_string(~c"hełło")
-  #  """
-  #  |> assert_eval("hełło")
+  @tag :skip
+  """
+  to_string(~c"hełło")
+  """
+  |> assert_eval("hełło")
 
   """
   to_string(:hello)
@@ -869,20 +902,23 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval("1")
 
   #  todo 40 concat does not returning ArgumentError with sigil c
-  #  """
-  #  ~c"this " <> ~c"fails"
-  #  """
-  #  |> assert_error(%ArgumentError{})
-  
+  @tag :skip
+  """
+  ~c"this " <> ~c"fails"
+  """
+  |> assert_error(%ArgumentError{})
+
   """
   ~c"this " ++ ~c"works"
   """
   |> assert_eval(~c"this works")
 
-  #  """
-  #  "he" ++ "llo"
-  #  """
-  #  |> assert_argument_error()
+  @tag :skip
+  """
+  "he" ++ "llo"
+  """
+  |> assert_error(%ArgumentError{})
+
   """
   "he" <> "llo"
   """
@@ -898,36 +934,41 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(["1", "2", "3", "4"])
 
   #  todo 18 Keyword does not work in option for String.split/3
-  #  """
-  #  String.split("1 2 3 4", " ", [parts: 3])
-  #  """
-  #  |> assert_eval(["1", "2", "3 4"])
+  @tag :skip
+  """
+  String.split("1 2 3 4", " ", [parts: 3])
+  """
+  |> assert_eval(["1", "2", "3 4"])
 
-  #  """
-  #  String.split("1  2  3  4", " ", [parts: 3])
-  #  """
-  #  |> assert_eval(["1", "", "2  3  4"])
+  @tag :skip
+  """
+  String.split("1  2  3  4", " ", [parts: 3])
+  """
+  |> assert_eval(["1", "", "2  3  4"])
 
-  #  """
-  #  String.split("1  2  3  4", " ", [parts: 3, trim: true])
-  #  """
-  #  |> assert_eval(["1", "2", " 3  4"])
+  @tag :skip
+  """
+  String.split("1  2  3  4", " ", [parts: 3, trim: true])
+  """
+  |> assert_eval(["1", "2", " 3  4"])
 
-  #  """
-  #  String.split("1  2  3  4", " ", parts: 3, trim: true)
-  #  """
-  #  |> assert_eval(["1", "2", " 3  4"])
+  @tag :skip
+  """
+  String.split("1  2  3  4", " ", parts: 3, trim: true)
+  """
+  |> assert_eval(["1", "2", " 3  4"])
 
   """
   [{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]
   """
   |> assert_eval(true)
 
-  #  """
-  #  import String, only: [split: 1, split: 2]
-  #  split("hello world")
-  #  """
-  #  |> assert_eval(["hello", "world"])
+  @tag :skip
+  """
+  import String, only: [split: 1, split: 2]
+  split("hello world")
+  """
+  |> assert_eval(["hello", "world"])
 
   """
   list = [a: 1, b: 2]
@@ -958,7 +999,7 @@ defmodule FissionLib.HexdocsTest do
   a
   """
   |> assert_eval(1)
-  
+
   @tag :skip
   """
   [a: a] = [a: 1, b: 2]
@@ -1041,7 +1082,7 @@ defmodule FissionLib.HexdocsTest do
   @additional_prep """
   map = %{name: "John", age: 23}
   """
-  
+
   """
   map.name
   """
@@ -1175,21 +1216,22 @@ defmodule FissionLib.HexdocsTest do
   |> assert_error(%FunctionClauseError{})
 
   #  todo 41 error - unsupported
-#  """
-#  defmodule Math do
-#    def zero?(0) do
-#      true
-#    end
-#
-#    def zero?(x) when is_integer(x) do
-#      false
-#    end
-#  end
-#
-#  Math.zero?(0.0)
-#  """
-#  |> assert_error(%FunctionClauseError{})
-  
+  @tag :skip
+  """
+  defmodule Math do
+    def zero?(0) do
+      true
+    end
+
+    def zero?(x) when is_integer(x) do
+      false
+    end
+  end
+
+  Math.zero?(0.0)
+  """
+  |> assert_error(%FunctionClauseError{})
+
   """
   defmodule Math do
     def zero?(0), do: true
@@ -1200,100 +1242,106 @@ defmodule FissionLib.HexdocsTest do
 
   #  todo 19 "<>" does not work for variables - works only for plain strings
   #  todo 20 using default arguments defined with "\\" fails (use \\\\ inside the string code to test this behaviour)
-  #  """
-  #  defmodule Concat do
-  #    def join(a, b, sep \\\\ " ") do
-  #      {a, b, sep}
-  #    end
-  #  end
-  #  Concat.join("Hello", "world")
-  #  """
-  #  |> assert_eval("Hello world")
+  @tag :skip
+  """
+  defmodule Concat do
+    def join(a, b, sep \\\\ " ") do
+      {a, b, sep}
+    end
+  end
+  Concat.join("Hello", "world")
+  """
+  |> assert_eval("Hello world")
 
-  #  """
-  #  defmodule Concat do
-  #    def join(a, b, sep \\ " ") do
-  #      a <> sep <> b
-  #    end
-  #  end
-  #  Concat.join("Hello", "world", "_")
-  #  """
-  #  |> assert_eval("Hello_world")
+  @tag :skip
+  """
+  defmodule Concat do
+    def join(a, b, sep \\ " ") do
+      a <> sep <> b
+    end
+  end
+  Concat.join("Hello", "world", "_")
+  """
+  |> assert_eval("Hello_world")
 
-  #  """
-  #  defmodule DefaultTest do
-  #    def dowork(x \\ "hello") do
-  #      x
-  #    end
-  #  end
-  #  DefaultTest.dowork()
-  #  DefaultTest.dowork(123)
-  #  DefaultTest.dowork()
-  #  """
-  #  |> assert_eval("hello")
+  @tag :skip
+  """
+  defmodule DefaultTest do
+    def dowork(x \\ "hello") do
+      x
+    end
+  end
+  DefaultTest.dowork()
+  DefaultTest.dowork(123)
+  DefaultTest.dowork()
+  """
+  |> assert_eval("hello")
 
-  #  """
-  #  defmodule DefaultTest do
-  #    def dowork(x \\ "hello") do
-  #      x
-  #    end
-  #  end
-  #  DefaultTest.dowork(123)
-  #  """
-  #  |> assert_eval(123)
+  @tag :skip
+  """
+  defmodule DefaultTest do
+    def dowork(x \\ "hello") do
+      x
+    end
+  end
+  DefaultTest.dowork(123)
+  """
+  |> assert_eval(123)
 
-  #  """
-  #  defmodule Concat do
-  #    # A function head declaring defaults
-  #    def join(a, b, sep \\ " ")
-  #
-  #    def join(a, b, _sep) when b == "" do
-  #      a
-  #    end
-  #
-  #    def join(a, b, sep) do
-  #      a <> sep <> b
-  #    end
-  #  end
-  #
-  #  Concat.join("Hello", "")
-  #  """
-  #  |> assert_eval("Hello")
+  @tag :skip
+  """
+  defmodule Concat do
+    # A function head declaring defaults
+    def join(a, b, sep \\ " ")
 
-  #  """
-  #  defmodule Concat do
-  #    # A function head declaring defaults
-  #    def join(a, b, sep \\ " ")
-  #
-  #    def join(a, b, _sep) when b == "" do
-  #      a
-  #    end
-  #
-  #    def join(a, b, sep) do
-  #      a <> sep <> b
-  #    end
-  #  end
-  #  Concat.join("Hello", "world"))
-  #  """
-  #  |> assert_eval("Hello world")
+    def join(a, b, _sep) when b == "" do
+      a
+    end
 
-  #  """
-  #  defmodule Concat do
-  #    # A function head declaring defaults
-  #    def join(a, b, sep \\ " ")
-  #
-  #    def join(a, b, _sep) when b == "" do
-  #      a
-  #    end
-  #
-  #    def join(a, b, sep) do
-  #      a <> sep <> b
-  #    end
-  #  end
-  #  Concat.join("Hello", "world", "_")
-  #  """
-  #  |> assert_eval("Hello_world")
-  #  
+    def join(a, b, sep) do
+      a <> sep <> b
+    end
+  end
+
+  Concat.join("Hello", "")
+  """
+  |> assert_eval("Hello")
+
+  @tag :skip
+  """
+  defmodule Concat do
+    # A function head declaring defaults
+    def join(a, b, sep \\ " ")
+
+    def join(a, b, _sep) when b == "" do
+      a
+    end
+
+    def join(a, b, sep) do
+      a <> sep <> b
+    end
+  end
+  Concat.join("Hello", "world"))
+  """
+  |> assert_eval("Hello world")
+
+  @tag :skip
+  """
+  defmodule Concat do
+    # A function head declaring defaults
+    def join(a, b, sep \\ " ")
+
+    def join(a, b, _sep) when b == "" do
+      a
+    end
+
+    def join(a, b, sep) do
+      a <> sep <> b
+    end
+  end
+  Concat.join("Hello", "world", "_")
+  """
+  |> assert_eval("Hello_world")
 
   ## =======================================================================================================================
   ## Recursion ============================================================================================================
@@ -1311,7 +1359,7 @@ defmodule FissionLib.HexdocsTest do
     end
   end
   """
-  
+
   """
   Recursion.print_multiple_times("Hello!", 3)
   """
@@ -1321,7 +1369,6 @@ defmodule FissionLib.HexdocsTest do
   Recursion.print_multiple_times("Hello!", -1)
   """
   |> assert_error(%FunctionClauseError{})
-
 
   @additional_prep """
   defmodule Math do
@@ -1334,7 +1381,7 @@ defmodule FissionLib.HexdocsTest do
     end
   end
   """
-  
+
   """
   Math.sum_list([1, 2, 3], 0)
   """
@@ -1387,7 +1434,6 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([2, 4, 6])
 
-  #  
   ## =======================================================================================================================
   ## Enumerables and Streams ==============================================================================================
   ## =======================================================================================================================
@@ -1403,10 +1449,11 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval([2, 4, 6])
 
   #  todo 13 :erlang.+/2 is not working as an anonymous function
-  #  """
-  #  Enum.reduce(1..3, 0, &+/2)
-  #  """
-  #  |> assert_eval(6)
+  @tag :skip
+  """
+  Enum.reduce(1..3, 0, &+/2)
+  """
+  |> assert_eval(6)
 
   """
   odd? = fn x -> rem(x, 2) != 0 end
@@ -1415,40 +1462,46 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval([1, 3])
 
   #  todo 21 the following freezes test execution
-  #  """
-  #  odd? = fn x -> rem(x, 2) != 0 end
-  #  1..100_000 |> Enum.map(&(&1 * 3)) |> Enum.filter(odd?) |> Enum.sum()
-  #  """
-  #  |> assert_eval(7500000000)
-  #
-  #  """
-  #  odd? = fn x -> rem(x, 2) != 0 end
-  #  Enum.sum(Enum.filter(Enum.map(1..100_000, &(&1 * 3)), odd?))
-  #  """
-  #  |> assert_eval(7500000000)
-  #
-  #  """
-  #  odd? = fn x -> rem(x, 2) != 0 end
-  #  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?) |> Enum.sum()
-  #  """
-  #  |> assert_eval(7500000000)
+  @tag :skip
+  """
+  odd? = fn x -> rem(x, 2) != 0 end
+  1..100_000 |> Enum.map(&(&1 * 3)) |> Enum.filter(odd?) |> Enum.sum()
+  """
+  |> assert_eval(7_500_000_000)
+
+  @tag :skip
+  """
+  odd? = fn x -> rem(x, 2) != 0 end
+  Enum.sum(Enum.filter(Enum.map(1..100_000, &(&1 * 3)), odd?))
+  """
+  |> assert_eval(7_500_000_000)
+
+  @tag :skip
+  """
+  odd? = fn x -> rem(x, 2) != 0 end
+  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?) |> Enum.sum()
+  """
+  |> assert_eval(7_500_000_000)
 
   #  todo 39 "Unknown external term type: <number>" when calling the Stream module functions
-  #  """
-  #  1..100_000 |> Stream.map(&(&1 * 3))
-  #  """
-  #  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
-  #
-  #  """
-  #  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?)
-  #  """
-  #  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
-  #
-  #  """
-  #  stream = Stream.cycle([1, 2, 3])
-  #  Enum.take(stream, 10)
-  #  """
-  #  |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
+  @tag :skip
+  """
+  1..100_000 |> Stream.map(&(&1 * 3))
+  """
+  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
+
+  @tag :skip
+  """
+  1..100_000 |> Stream.map(&(&1 * 3)) |> Stream.filter(odd?)
+  """
+  |> assert_eval({:expect_fn, fn term -> is_struct(term, Stream) end})
+
+  @tag :skip
+  """
+  stream = Stream.cycle([1, 2, 3])
+  Enum.take(stream, 10)
+  """
+  |> assert_eval([1, 2, 3, 1, 2, 3, 1, 2, 3, 1])
 
   #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
   #  """
@@ -1461,17 +1514,19 @@ defmodule FissionLib.HexdocsTest do
   ## =======================================================================================================================
 
   #  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
-  #  """
-  #  spawn(fn -> 1 + 2 end)
-  #  """
-  #  |> assert_eval({:expect_fn, &is_pid/1})
+  @tag :skip
+  """
+  spawn(fn -> 1 + 2 end)
+  """
+  |> assert_eval({:expect_fn, &is_pid/1})
 
   #  todo 23 process with "pid" is still alive (Process.alive?/1 is true)
-  #  """
-  #  pid = spawn(fn -> 1 + 2 end)
-  #  Process.alive?(pid)
-  #  """
-  #  |> assert_eval(false)
+  @tag :skip
+  """
+  pid = spawn(fn -> 1 + 2 end)
+  Process.alive?(pid)
+  """
+  |> assert_eval(false)
 
   """
   self()
@@ -1498,107 +1553,111 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval("nothing after 1s")
 
   #  todo 22 spawning anonymous function and not assigned to a variable causes "unknown external type: 83" error
-  #  """
-  #  parent = self()
-  #  spawn(fn -> send(parent, {:hello, self()}) end)
-  #  receive do
-  #    {:hello, pid} -> "Got hello from #{inspect pid}"
-  #  end
-  #  """
-  #  |> assert_eval("Got hello from #PID<0.48.0>")
+  @tag :skip
+  """
+  parent = self()
+  spawn(fn -> send(parent, {:hello, self()}) end)
+  receive do
+    {:hello, pid} -> "Got hello from \#{inspect pid}"
+  end
+  """
+  |> assert_eval("Got hello from #PID<0.48.0>")
 
-  #  """
-  #  send(self(), :hello)
-  #  flush()
-  #  """
-  #  |> assert_eval(:hello)
-  
-# todo - seems like the process is raising error in a good enough way but for some reason exception is not caught in trycatch
-# todo - that is a behaviour exactly the same as in iex console so idk how to test it
-#  """
-#  spawn(fn -> raise "oops" end)
-#  """
-#  |> assert_error(%RuntimeError{})
-#
-#  """
-#  spawn_link(fn -> raise "oops" end)
-#  """
-#  |> assert_error(%RuntimeError{})
-#
-#  """
-#  Task.start(fn -> raise "oops" end)
-#  """
-#  |> assert_error(%RuntimeError{})
+  @tag :skip
+  """
+  send(self(), :hello)
+  flush()
+  """
+  |> assert_eval(:hello)
+
+  # todo - seems like the process is raising error in a good enough way but for some reason exception is not caught in trycatch
+  # todo - that is a behaviour exactly the same as in iex console so idk how to test it
+
+  @tag :skip
+  """
+  spawn(fn -> raise "oops" end)
+  """
+  |> assert_error(%RuntimeError{})
+
+  @tag :skip
+  """
+  spawn_link(fn -> raise "oops" end)
+  """
+  |> assert_error(%RuntimeError{})
+
+  @tag :skip
+  """
+  Task.start(fn -> raise "oops" end)
+  """
+  |> assert_error(%RuntimeError{})
 
   #  todo 24 defining module that uses Task and trying to create such Task is causing compilation problems
-  #  """
-  #  defmodule KV do
-  #    def start_link do
-  #      Task.start_link(fn -> loop(%{}) end)
-  #    end
-  #
-  #    defp loop(map) do
-  #      receive do
-  #        {:get, key, caller} ->
-  #          send(caller, Map.get(map, key))
-  #          loop(map)
-  #        {:put, key, value} ->
-  #          loop(Map.put(map, key, value))
-  #      end
-  #    end
-  #  end
-  #  {:ok, pid} = KV.start_link()
-  #  send(pid, {:get, :hello, self()})
-  #  flush()
-  #  """
-  #  |> assert_eval(nil)
+  @tag :skip
+  """
+  defmodule KV do
+    def start_link do
+      Task.start_link(fn -> loop(%{}) end)
+    end
+
+    defp loop(map) do
+      receive do
+        {:get, key, caller} ->
+          send(caller, Map.get(map, key))
+          loop(map)
+        {:put, key, value} ->
+          loop(Map.put(map, key, value))
+      end
+    end
+  end
+  {:ok, pid} = KV.start_link()
+  send(pid, {:get, :hello, self()})
+  flush()
+  """
+  |> assert_eval(nil)
 
   #  todo 24 - the "pid" variable in the following is the "pid" variable from the former
-  #  """
-  #  send(pid, {:put, :hello, :world})
-  #  {:put, :hello, :world}
-  #  send(pid, {:get, :hello, self()})
-  #  {:get, :hello, #PID<0.41.0>}
-  #  flush()
-  #  :world
-  #  :ok
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  Process.register(pid, :kv)
-  #  true
-  #  send(:kv, {:get, :hello, self()})
-  #  {:get, :hello, #PID<0.41.0>}
-  #  flush()
-  #  :world
-  #  :ok
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  send(pid, {:put, :hello, :world})
+  send(pid, {:get, :hello, self()})
+  flush()
+  # :world
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  Process.register(pid, :kv)
+  send(:kv, {:get, :hello, self()})
+  flush()
+  :world
+  """
+  |> assert_eval(:ok)
 
   #  todo 25 using Agent is causing the evaluation to fail
-  #  """
-  #  {:ok, pid} = Agent.start_link(fn -> %{} end)
-  #  Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
-  #  Agent.get(pid, fn map -> Map.get(map, :hello) end)
-  #  """
-  #  |> assert_eval(:world)
+  @tag :skip
+  """
+  {:ok, pid} = Agent.start_link(fn -> %{} end)
+  Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
+  Agent.get(pid, fn map -> Map.get(map, :hello) end)
+  """
+  |> assert_eval(:world)
 
-  #
   ## =======================================================================================================================
   ## IO and the file system ===============================================================================================
   ## =======================================================================================================================
 
   #  todo 38 testing IO - take result from try_run and output and assert it
-  #  """
-  #  IO.puts("hello world")
-  #  hello world
-  #  :ok
-  #  IO.gets("yes or no? ")
-  #  yes or no? yes
-  #  "yes\n"
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  IO.puts("hello world")
+  hello world
+  :ok
+  IO.gets("yes or no? ")
+  yes or no? yes
+  "yes\n"
+  """
+  |> assert_eval(:ok)
 
   """
   IO.puts(:stderr, "hello world")
@@ -1688,11 +1747,12 @@ defmodule FissionLib.HexdocsTest do
   #  |> assert_eval()
   #
   # todo 19 "<>" does not work for variables - works only for plain strings
-  #  """
-  #  name = "Mary"
-  #  IO.puts("Hello " <> name <> "!")
-  #  """
-  #  |> assert_eval(:ok)
+  @tag :skip
+  """
+  name = "Mary"
+  IO.puts("Hello " <> name <> "!")
+  """
+  |> assert_eval(:ok)
 
   """
   name = "Mary"
@@ -1730,13 +1790,14 @@ defmodule FissionLib.HexdocsTest do
   ## =======================================================================================================================
 
   #  todo 26 using alias inside a module does not work
-  #  """
-  #  defmodule Stats do
-  #    alias Math.List, as: List
-  #    # In the remaining module definition List expands to Math.List.
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule Stats do
+    alias Math.List, as: List
+    # In the remaining module definition List expands to Math.List.
+  end
+  """
+  |> assert_eval_module()
 
   """
   alias Math.List
@@ -1776,33 +1837,36 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval_module()
 
   #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  #  """
-  #  defmodule AssertionTest do
-  #    use ExUnit.Case, async: true
-  #
-  #    test "always pass" do
-  #      assert true
-  #    end
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule AssertionTest do
+    use ExUnit.Case, async: true
+
+    test "always pass" do
+      assert true
+    end
+  end
+  """
+  |> assert_eval_module()
 
   #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  #  """
-  #  defmodule Example do
-  #    use Feature, option: :value
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule Example do
+    use Feature, option: :value
+  end
+  """
+  |> assert_eval_module()
 
   #  todo 27 Unable to open <ModuleName>.beam Failed load module: <ModuleName>.beam
-  #  """
-  #  defmodule Example do
-  #    require Feature
-  #    Feature.__using__(option: :value)
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule Example do
+    require Feature
+    Feature.__using__(option: :value)
+  end
+  """
+  |> assert_eval_module()
 
   """
   is_atom(String)
@@ -1835,43 +1899,47 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval([1, 2, 3])
 
   #  todo 28 nested modules do not work
-  #  """
-  #  defmodule Foo do
-  #    defmodule Bar do
-  #    end
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule Foo do
+    defmodule Bar do
+    end
+  end
+  """
+  |> assert_eval_module()
 
-  #  """
-  #  defmodule Foo.Bar do
-  #  end
-  #
-  #  defmodule Foo do
-  #    alias Foo.Bar
-  #    # Can still access it as `Bar`
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule Foo.Bar do
+  end
 
-  #  """
-  #  defmodule Foo do
-  #    defmodule Bar do
-  #      defmodule Baz do
-  #      end
-  #    end
-  #  end
-  #
-  #  alias Foo.Bar.Baz
-  #  # The module `Foo.Bar.Baz` is now available as `Baz`
-  #  # However, the module `Foo.Bar` is *not* available as `Bar`
-  #  """
-  #  |> assert_eval(Foo.Bar.Baz)
+  defmodule Foo do
+    alias Foo.Bar
+    # Can still access it as `Bar`
+  end
+  """
+  |> assert_eval_module()
 
-  #  """
-  #  alias MyApp.{Foo, Bar, Baz}
-  #  """
-  #  |> assert_eval(MyApp.{Foo, Bar, Baz})
+  @tag :skip
+  """
+  defmodule Foo do
+    defmodule Bar do
+      defmodule Baz do
+      end
+    end
+  end
+
+  alias Foo.Bar.Baz
+  # The module `Foo.Bar.Baz` is now available as `Baz`
+  # However, the module `Foo.Bar` is *not* available as `Bar`
+  """
+  |> assert_eval(Foo.Bar.Baz)
+
+  @tag :skip
+  """
+  alias MyApp.{Foo, Bar, Baz}
+  """
+  |> assert_eval([MyApp.Foo, MyApp.Bar, MyApp.Baz])
 
   ## =======================================================================================================================
   ## Module attributes ====================================================================================================
@@ -1905,44 +1973,48 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval_module()
 
   #  todo 28 module attributes do not work
-  #  """
-  #  defmodule MyServer do
-  #    @service URI.parse("https://example.com")
-  #    IO.inspect(@service)
-  #  end
-  #  """
-  #  |> assert_eval_module()
-  #
-  #  """
-  #  defmodule MyServer do
-  #    @unknown
-  #  end
-  #  """
-  #  |> assert_eval_module()
-  #
-  #  """
-  #  defmodule MyApp.Status do
-  #    @service URI.parse("https://example.com")
-  #    def status(email) do
-  #      SomeHttpClient.get(@service)
-  #    end
-  #  end
-  #  """
-  #  |> assert_eval_module()
-  #
-  #  """
-  #  defmodule MyApp.Status do
-  #    def status(email) do
-  #      SomeHttpClient.get(%URI{
-  #        authority: "example.com",
-  #        host: "example.com",
-  #        port: 443,
-  #        scheme: "https"
-  #      })
-  #    end
-  #  end
-  #  """
-  #  |> assert_eval_module()
+  @tag :skip
+  """
+  defmodule MyServer do
+    @service URI.parse("https://example.com")
+    IO.inspect(@service)
+  end
+  """
+  |> assert_eval_module()
+
+  @tag :skip
+  """
+  defmodule MyServer do
+    @unknown
+  end
+  """
+  |> assert_eval_module()
+
+  @tag :skip
+  """
+  defmodule MyApp.Status do
+    @service URI.parse("https://example.com")
+    def status(email) do
+      SomeHttpClient.get(@service)
+    end
+  end
+  """
+  |> assert_eval_module()
+
+  @tag :skip
+  """
+  defmodule MyApp.Status do
+    def status(email) do
+      SomeHttpClient.get(%URI{
+        authority: "example.com",
+        host: "example.com",
+        port: 443,
+        scheme: "https"
+      })
+    end
+  end
+  """
+  |> assert_eval_module()
 
   # =======================================================================================================================
   # Structs ==============================================================================================================
@@ -1961,103 +2033,115 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(%{a: 3, b: 2})
 
   #  todo 29 implement/fix structs
-  #    """
-  #    defmodule User do
-  #      defstruct name: "John", age: 27
-  #    end
-  #    """
-  #    |> assert_eval_module()
-  #
-  #  """
-  #  %User{}
-  #  %User{age: 27, name: "John"}
-  #  %User{name: "Jane"}
-  #  %User{age: 27, name: "Jane"}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  %User{oops: :field}
-  #  ** (KeyError) key :oops not found expanding struct: User.__struct__/1
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  john = %User{}
-  #  %User{age: 27, name: "John"}
-  #  john.name
-  #  "John"
-  #  jane = %{john | name: "Jane"}
-  #  %User{age: 27, name: "Jane"}
-  #  %{jane | oops: :field}
-  #  ** (KeyError) key :oops not found in: %User{age: 27, name: "Jane"}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  %User{name: name} = john
-  #  %User{age: 27, name: "John"}
-  #  name
-  #  "John"
-  #  %User{} = %{}
-  #  ** (MatchError) no match of right hand side value: %{}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  is_map(john)
-  #  true
-  #  john.__struct__
-  #  User
-  #  """
-  #  |> assert_eval()
-  
+  @tag :skip
+  """
+  defmodule User do
+    defstruct name: "John", age: 27
+  end
+  """
+  |> assert_eval_module()
+
+  @tag :skip
+  """
+  %User{}
+  %User{age: 27, name: "John"}
+  %User{name: "Jane"}
+  %User{age: 27, name: "Jane"}
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  %User{oops: :field}
+  ** (KeyError) key :oops not found expanding struct: User.__struct__/1
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  john = %User{}
+  %User{age: 27, name: "John"}
+  john.name
+  "John"
+  jane = %{john | name: "Jane"}
+  %User{age: 27, name: "Jane"}
+  %{jane | oops: :field}
+  ** (KeyError) key :oops not found in: %User{age: 27, name: "Jane"}
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  %User{name: name} = john
+  %User{age: 27, name: "John"}
+  name
+  "John"
+  %User{} = %{}
+  ** (MatchError) no match of right hand side value: %{}
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  is_map(john)
+  true
+  john.__struct__
+  User
+  """
+  |> assert_eval(:ok)
+
   #  @additional_prep """
   #  john = %User{}
   #  """
-    
-  #  """
-  #  john[:name]
-  #  """
-  #  |> assert_eval(%UndefinedFunctionError{})
-  #
-  #  """
-  #  Enum.each(john, fn {field, value} -> IO.puts(value) end)
-  #  """
-  #  |> assert_eval(%Protocol.UndefinedError{})
+
+  @tag :skip
+  """
+  john[:name]
+  """
+  |> assert_eval(%UndefinedFunctionError{})
+
+  @tag :skip
+  """
+  Enum.each(john, fn {field, value} -> IO.puts(value) end)
+  """
+  |> assert_eval(%Protocol.UndefinedError{})
 
   #  todo 29 implement/fix structs
-  #  """
-  #  defmodule Product do
-  #    defstruct [:name]
-  #  end
-  #  %Product{}
-  #  """
-  #  |> assert_eval(%{name: nil})
-  #
-  #  """
-  #  defmodule User do
-  #    defstruct [:email, name: "John", age: 27]
-  #  end
-  #  %User{}
-  #  """
-  #  |> assert_eval(%{age: 27, email: nil, name: "John"})
+  @tag :skip
+  """
+  defmodule Product do
+    defstruct [:name]
+  end
+  %Product{}
+  """
+  |> assert_eval(%{name: nil})
 
-  #  """
-  #  defmodule User do
-  #    defstruct [name: "John", age: 27, :email]
-  #  end
-  #  """
-  #  |> assert_error(%SyntaxError{})
-  #
-  #  """
-  #  defmodule Car do
-  #    @enforce_keys [:make]
-  #    defstruct [:model, :make]
-  #  end
-  #  %Car{}
-  #  """
-  #  |> assert_error(%ArgumentError{})
+  @tag :skip
+  """
+  defmodule User do
+    defstruct [:email, name: "John", age: 27]
+  end
+  %User{}
+  """
+  |> assert_eval(%{age: 27, email: nil, name: "John"})
+
+  @tag :skip
+  """
+  defmodule User do
+    defstruct [name: "John", age: 27, :email]
+  end
+  """
+  |> assert_error(%SyntaxError{})
+
+  @tag :skip
+  """
+  defmodule Car do
+    @enforce_keys [:make]
+    defstruct [:model, :make]
+  end
+  %Car{}
+  """
+  |> assert_error(%ArgumentError{})
 
   # =======================================================================================================================
   # Protocols ============================================================================================================
@@ -2073,123 +2157,135 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval_module()
 
   #  todo 30 implement/fix protocols
-  #  """
-  #  defprotocol Utility do
-  #    @spec type(t) :: String.t()
-  #    def type(value)
-  #  end
-  #
-  #  defimpl Utility, for: BitString do
-  #    def type(_value), do: "string"
-  #  end
-  #
-  #  defimpl Utility, for: Integer do
-  #    def type(_value), do: "integer"
-  #  end
-  #  
-  #  Utility.type("foo")
-  #  Utility.type(123)
-  #  """
-  #  |> assert_eval("integer")
 
-  #
-  #  """
-  #  defprotocol Size do
-  #    @doc "Calculates the size (and not the length!) of a data structure"
-  #    def size(data)
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defimpl Size, for: BitString do
-  #    def size(string), do: byte_size(string)
-  #  end
-  #
-  #  defimpl Size, for: Map do
-  #    def size(map), do: map_size(map)
-  #  end
-  #
-  #  defimpl Size, for: Tuple do
-  #    def size(tuple), do: tuple_size(tuple)
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  Size.size("foo")
-  #  3
-  #  Size.size({:ok, "hello"})
-  #  2
-  #  Size.size(%{label: "some label"})
-  #  1
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  Size.size([1, 2, 3])
-  #  ** (Protocol.UndefinedError) protocol Size not implemented for [1, 2, 3] of type List
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  Size.size(%{})
-  #  0
-  #  set = %MapSet{} = MapSet.new
-  #  MapSet.new([])
-  #  Size.size(set)
-  #  ** (Protocol.UndefinedError) protocol Size not implemented for MapSet.new([]) of type MapSet (a struct)
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defimpl Size, for: MapSet do
-  #    def size(set), do: MapSet.size(set)
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defmodule User do
-  #    defstruct [:name, :age]
-  #  end
-  #
-  #  defimpl Size, for: User do
-  #    def size(_user), do: 2
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defimpl Size, for: Any do
-  #    def size(_), do: 0
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defmodule OtherUser do
-  #    @derive [Size]
-  #    defstruct [:name, :age]
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defprotocol Size do
-  #    @fallback_to_any true
-  #    def size(data)
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  defimpl Size, for: Any do
-  #    def size(_), do: 0
-  #  end
-  #  """
-  #  |> assert_eval()
-  #
+  @tag :skip
+  """
+  defprotocol Utility do
+    @spec type(t) :: String.t()
+    def type(value)
+  end
+
+  defimpl Utility, for: BitString do
+    def type(_value), do: "string"
+  end
+
+  defimpl Utility, for: Integer do
+    def type(_value), do: "integer"
+  end
+
+  Utility.type("foo")
+  Utility.type(123)
+  """
+  |> assert_eval("integer")
+
+  @tag :skip
+  """
+  defprotocol Size do
+    @doc "Calculates the size (and not the length!) of a data structure"
+    def size(data)
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defimpl Size, for: BitString do
+    def size(string), do: byte_size(string)
+  end
+
+  defimpl Size, for: Map do
+    def size(map), do: map_size(map)
+  end
+
+  defimpl Size, for: Tuple do
+    def size(tuple), do: tuple_size(tuple)
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  Size.size("foo")
+  3
+  Size.size({:ok, "hello"})
+  2
+  Size.size(%{label: "some label"})
+  1
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  Size.size([1, 2, 3])
+  ** (Protocol.UndefinedError) protocol Size not implemented for [1, 2, 3] of type List
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  Size.size(%{})
+  0
+  set = %MapSet{} = MapSet.new
+  MapSet.new([])
+  Size.size(set)
+  ** (Protocol.UndefinedError) protocol Size not implemented for MapSet.new([]) of type MapSet (a struct)
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defimpl Size, for: MapSet do
+    def size(set), do: MapSet.size(set)
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defmodule User do
+    defstruct [:name, :age]
+  end
+
+  defimpl Size, for: User do
+    def size(_user), do: 2
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defimpl Size, for: Any do
+    def size(_), do: 0
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defmodule OtherUser do
+    @derive [Size]
+    defstruct [:name, :age]
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defprotocol Size do
+    @fallback_to_any true
+    def size(data)
+  end
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  defimpl Size, for: Any do
+    def size(_), do: 0
+  end
+  """
+  |> assert_eval(:ok)
+
   """
   Enum.reduce(1..3, 0, fn x, acc -> x + acc end)
   """
@@ -2211,22 +2307,23 @@ defmodule FissionLib.HexdocsTest do
   "tuple: \#{inspect(tuple)}"
   """
   |> assert_eval("tuple: {1, 2, 3}")
-  
-  #
-  #  """
-  #  {1, 2, 3}
-  #  {1, 2, 3}
-  #  %User{}
-  #  %User{name: "john", age: 27}
-  #  """
-  #  |> assert_eval()
-  #
-  #  """
-  #  inspect &(&1+2)
-  #  "#Function<6.71889879/1 in :erl_eval.expr/5>"
-  #  """
-  #  |> assert_eval()
-  #
+
+  @tag :skip
+  """
+  {1, 2, 3}
+  {1, 2, 3}
+  %User{}
+  %User{name: "john", age: 27}
+  """
+  |> assert_eval(:ok)
+
+  @tag :skip
+  """
+  inspect &(&1+2)
+  "#Function<6.71889879/1 in :erl_eval.expr/5>"
+  """
+  |> assert_eval(:ok)
+
   ## =======================================================================================================================
   ## Comprehensions =======================================================================================================
   ## =======================================================================================================================
@@ -2287,107 +2384,122 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(%{"a" => 1, "b" => 4})
 
   #  todo 38 testing IO - take result from try_run and output and assert it
-  #  """
-  #  stream = IO.stream(:stdio, :line)
-  #  for line <- stream, into: stream do
-  #    String.upcase(line) <> "\n"
-  #  end
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  stream = IO.stream(:stdio, :line)
+  for line <- stream, into: stream do
+    String.upcase(line) <> "\n"
+  end
+  """
+  |> assert_eval(:ok)
 
   # =======================================================================================================================
   # Sigils ============================================================================================================
   # =======================================================================================================================
 
   #  todo 31 "~r" and "~i" do not work
-  #  """
-  #  # A regular expression that matches strings which contain "foo" or "bar":
-  #  regex = ~r/foo|bar/
-  #  "foo" =~ ~r/foo|bar/
-  #  """
-  #  |> assert_eval(true)
-  #
-  #  """
-  #  # A regular expression that matches strings which contain "foo" or "bar":
-  #  regex = ~r/foo|bar/
-  #  "bat" =~ regex
-  #  """
-  #  |> assert_eval(false)
+  @tag :skip
+  """
+  # A regular expression that matches strings which contain "foo" or "bar":
+  regex = ~r/foo|bar/
+  "foo" =~ ~r/foo|bar/
+  """
+  |> assert_eval(true)
 
-  #  """
-  #  "HELLO" =~ ~r/hello/
-  #  """
-  #  |> assert_eval(false)
-  #
-  #  """
-  #  "HELLO" =~ ~r/hello/i
-  #  """
-  #  |> assert_eval(true)
-  #
-  #  """
-  #  ~r/hello/
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r|hello|
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r"hello"
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r'hello'
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r(hello)
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r[hello]
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r{hello}
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~r<hello>
-  #  """
-  #  |> assert_eval(~r/hello/)
-  #
-  #  """
-  #  ~s(this is a string with "double" quotes, not 'single' ones)
-  #  """
-  #  |> assert_eval("this is a string with \"double\" quotes, not 'single' ones")
-  #
-  #  """
-  #  [?c, ?a, ?t]
-  #  """
-  #  |> assert_eval(~c"cat")
-  #
-  #  """
-  #  ~c(this is a char list containing "double quotes")
-  #  """
-  #  |> assert_eval(~c"this is a char list containing \"double quotes\"")
-  #
-  #  """
-  #  ~w(foo bar bat)
-  #  """
-  #  |> assert_eval(["foo", "bar", "bat"])
-  #
-  #  """
-  #  ~w(foo bar bat)a
-  #  """
-  #  |> assert_eval([:foo, :bar, :bat])
+  @tag :skip
+  """
+  # A regular expression that matches strings which contain "foo" or "bar":
+  regex = ~r/foo|bar/
+  "bat" =~ regex
+  """
+  |> assert_eval(false)
+
+  @tag :skip
+  """
+  "HELLO" =~ ~r/hello/
+  """
+  |> assert_eval(false)
+
+  @tag :skip
+  """
+  "HELLO" =~ ~r/hello/i
+  """
+  |> assert_eval(true)
+
+  @tag :skip
+  """
+  ~r/hello/
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r|hello|
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r"hello"
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r'hello'
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r(hello)
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r[hello]
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r{hello}
+  """
+  |> assert_eval(~r/hello/)
+
+  @tag :skip
+  """
+  ~r<hello>
+  """
+  |> assert_eval(~r/hello/)
+
+  """
+  ~s(this is a string with "double" quotes, not 'single' ones)
+  """
+  |> assert_eval("this is a string with \"double\" quotes, not 'single' ones")
+
+  """
+  [?c, ?a, ?t]
+  """
+  |> assert_eval(~c"cat")
+
+  """
+  ~c(this is a char list containing "double quotes")
+  """
+  |> assert_eval(~c"this is a char list containing \"double quotes\"")
+
+  @tag :skip
+  """
+  ~w(foo bar bat)
+  """
+  |> assert_eval(["foo", "bar", "bat"])
+
+  @tag :skip
+  """
+  ~w(foo bar bat)a
+  """
+  |> assert_eval([:foo, :bar, :bat])
 
   """
   ~s(String with escape codes \x26 \#{"inter" <> "polation"})
@@ -2435,7 +2547,6 @@ defmodule FissionLib.HexdocsTest do
   #  """
   #  |> assert_eval()
 
-  #  
   """
   d = ~D[2019-10-31]
   d.day
@@ -2468,61 +2579,71 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval("Etc/UTC")
 
   #  todo 31 "~r" and "~i" do not work
-  #  """
-  #  sigil_r(<<"foo">>, [?i])
-  #  """
-  #  |> assert_eval(~r"foo"i)
+  @tag :skip
+  """
+  sigil_r(<<"foo">>, [?i])
+  """
+  |> assert_eval(~r"foo"i)
 
   #  todo 31 "~r" and "~i" do not work
-  #  """
-  #  defmodule MySigils do
-  #    def sigil_i(string, []), do: String.to_integer(string)
-  #    def sigil_i(string, [?n]), do: -String.to_integer(string)
-  #  end
-  #  import MySigils
-  #  ~i(13)
-  #  """
-  #  |> assert_eval(13)
-  #
-  #  """
-  #  defmodule MySigils do
-  #    def sigil_i(string, []), do: String.to_integer(string)
-  #    def sigil_i(string, [?n]), do: -String.to_integer(string)
-  #  end
-  #  import MySigils
-  #  ~i(42)n
-  #  """
-  #  |> assert_eval(-42)
+  @tag :skip
+  """
+  defmodule MySigils do
+    def sigil_i(string, []), do: String.to_integer(string)
+    def sigil_i(string, [?n]), do: -String.to_integer(string)
+  end
+  import MySigils
+  ~i(13)
+  """
+  |> assert_eval(13)
+
+  @tag :skip
+  """
+  defmodule MySigils do
+    def sigil_i(string, []), do: String.to_integer(string)
+    def sigil_i(string, [?n]), do: -String.to_integer(string)
+  end
+  import MySigils
+  ~i(42)n
+  """
+  |> assert_eval(-42)
 
   # =======================================================================================================================
   # try, catch, and rescue ===============================================================================================
   # =======================================================================================================================
 
-    """
-    :foo + 1
-    """
-    |> assert_error(%ArithmeticError{})
+  """
+  :foo + 1
+  """
+  |> assert_error(%ArithmeticError{})
 
-    """
-    raise "oops"
-    """
-    |> assert_error(%RuntimeError{message: "oops"})
+  """
+  raise "oops"
+  """
+  |> assert_error(%RuntimeError{message: "oops"})
 
-    """
-    raise ArgumentError, message: "invalid argument foo"
-    """
-    |> assert_error(%ArgumentError{})
+  """
+  raise ArgumentError, message: "invalid argument foo"
+  """
+  |> assert_error(%ArgumentError{})
 
-  #  """
-  #  defmodule MyError do
-  #    defexception message: "default message"
-  #  end
-  #  raise MyError
-  #  ** (MyError) default message
-  #  raise MyError, message: "custom message"
-  #  ** (MyError) custom message
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  defmodule MyError do
+    defexception message: "default message"
+  end
+  raise MyError
+  """
+  |> assert_error(%{message: "default message"})
+
+  @tag :skip
+  """
+  defmodule MyError do
+    defexception message: "default message"
+  end
+  raise MyError, message: "custom message"
+  """
+  |> assert_error(%{message: "custom message"})
 
   """
   try do
@@ -2764,10 +2885,11 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([195, 152])
 
-  #  """
-  #  :io.format("Pi is approximately given by:~10.3f~n", [:math.pi])
-  #  """
-  #  |> assert_eval(:ok)
+  @tag :skip
+  """
+  :io.format("Pi is approximately given by:~10.3f~n", [:math.pi])
+  """
+  |> assert_eval(:ok)
 
   """
   to_string(:io_lib.format("Pi is approximately given by:~10.3f~n", [:math.pi]))
@@ -2780,26 +2902,28 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval("3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB")
 
   #  todo 32 fix :digraph module
-  #  """
-  #  digraph = :digraph.new()
-  #  coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
-  #  [v0, v1, v2] = (for c <- coords, do: :digraph.add_vertex(digraph, c))
-  #  :digraph.add_edge(digraph, v0, v1)
-  #  :digraph.add_edge(digraph, v1, v2)
-  #  :digraph.get_short_path(digraph, v0, v2)
-  #  """
-  #  |> assert_eval([{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}])
+  @tag :skip
+  """
+  digraph = :digraph.new()
+  coords = [{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}]
+  [v0, v1, v2] = (for c <- coords, do: :digraph.add_vertex(digraph, c))
+  :digraph.add_edge(digraph, v0, v1)
+  :digraph.add_edge(digraph, v1, v2)
+  :digraph.get_short_path(digraph, v0, v2)
+  """
+  |> assert_eval([{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}])
 
   #  todo 33 fix :ets module
-  #  """
-  #  table = :ets.new(:ets_test, [])
-  #  # Store as tuples with {name, population}
-  #  :ets.insert(table, {"China", 1_374_000_000})
-  #  :ets.insert(table, {"India", 1_284_000_000})
-  #  :ets.insert(table, {"USA", 322_000_000})
-  #  :ets.tab2list(table)
-  #  """
-  #  |> assert_eval([])
+  @tag :skip
+  """
+  table = :ets.new(:ets_test, [])
+  # Store as tuples with {name, population}
+  :ets.insert(table, {"China", 1_374_000_000})
+  :ets.insert(table, {"India", 1_284_000_000})
+  :ets.insert(table, {"USA", 322_000_000})
+  :ets.tab2list(table)
+  """
+  |> assert_eval([])
 
   """
   angle_45_deg = :math.pi() * 45.0 / 180.0
@@ -2848,29 +2972,34 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(:empty)
 
   #  todo 34 fix :rand module
-  #  """
-  #  :rand.uniform()
-  #  """
-  #  |> assert_eval({:expect_fn, &is_float/1})
-  #
-  #  """
-  #  _ = :rand.seed(:exs1024, {123, 123534, 345345})
-  #  :rand.uniform()
-  #  """
-  #  |> assert_eval({:expect_fn, &is_float/1})
+  @tag :skip
+  """
+  :rand.uniform()
+  """
+  |> assert_eval({:expect_fn, &is_float/1})
 
-  #  """
-  #  :rand.uniform(6)
-  #  6
-  #  """
-  #  |> assert_eval(6)
-  #
+  @tag :skip
+  """
+  _ = :rand.seed(:exs1024, {123, 123534, 345345})
+  :rand.uniform()
+  """
+  |> assert_eval({:expect_fn, &is_float/1})
+
+  @tag :skip
+  """
+  :rand.uniform(6)
+  6
+  """
+  |> assert_eval(6)
+
   #  todo 37 module File - decide whether we want to implement an exemplary "path" to a file
-  #  """
-  #  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
-  #  """
-  #  |> assert_eval({:ok, 633})
+  @tag :skip
+  """
+  :zip.foldl(fn _, _, _, acc -> acc + 1 end, 0, :binary.bin_to_list("file.zip"))
+  """
+  |> assert_eval({:ok, 633})
 
+  @tag :skip
   """
   song = "
   Mary had a little lamb,
@@ -2882,6 +3011,7 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(110)
 
+  @tag :skip
   """
   song = "
   Mary had a little lamb,
@@ -2894,31 +3024,36 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(99)
 
   #  todo 35 fix :zlib.uncompress/1
-  #  """
-  #  song = "
-  #  Mary had a little lamb,
-  #  His fleece was white as snow,
-  #  And everywhere that Mary went,
-  #  The lamb was sure to go."
-  #  compressed = :zlib.compress(song)
-  #  :zlib.uncompress(compressed)
-  #  """
-  #  |> assert_eval("\nMary had a little lamb,\nHis fleece was white as snow,\nAnd everywhere that Mary went,\nThe lamb was sure to go.")
+  @tag :skip
+  """
+  song = "
+  Mary had a little lamb,
+  His fleece was white as snow,
+  And everywhere that Mary went,
+  The lamb was sure to go."
+  compressed = :zlib.compress(song)
+  :zlib.uncompress(compressed)
+  """
+  |> assert_eval(
+    "\nMary had a little lamb,\nHis fleece was white as snow,\nAnd everywhere that Mary went,\nThe lamb was sure to go."
+  )
 
   # =======================================================================================================================
   # Debugging ============================================================================================================
   # =======================================================================================================================
 
   #  todo 38 testing IO - take result from try_run and output and assert it
-  #  """
-  #  (1..10)
-  #  |> IO.inspect()
-  #  |> Enum.map(fn x -> x * 2 end)
-  #  |> IO.inspect()
-  #  |> Enum.sum()
-  #  |> IO.inspect()
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  (1..10)
+  |> IO.inspect()
+  |> Enum.map(fn x -> x * 2 end)
+  |> IO.inspect()
+  |> Enum.sum()
+  |> IO.inspect()
+  """
+  |> assert_eval(:ok)
+
   #
   ##  prints:
   ##
@@ -2926,14 +3061,16 @@ defmodule FissionLib.HexdocsTest do
   ##  [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
   ##  110
 
-  #  """
-  #  [1, 2, 3]
-  #  |> IO.inspect(label: "before")
-  #  |> Enum.map(&(&1 * 2))
-  #  |> IO.inspect(label: "after")
-  #  |> Enum.sum
-  #  """
-  #  |> assert_eval()
+  @tag :skip
+  """
+  [1, 2, 3]
+  |> IO.inspect(label: "before")
+  |> Enum.map(&(&1 * 2))
+  |> IO.inspect(label: "after")
+  |> Enum.sum
+  """
+  |> assert_eval(:ok)
+
   #
   ##  prints:
   ##
@@ -3013,26 +3150,29 @@ defmodule FissionLib.HexdocsTest do
   |> assert_eval(true)
 
   #  todo 36 Fix "=~"
-  #  """
-  #  Enum.filter(cart, &(&1.fruit =~ "o"))
-  #  """
-  #  |> assert_eval([%{fruit: "orange", count: 6}])
+  @tag :skip
+  """
+  Enum.filter(cart, &(&1.fruit =~ "o"))
+  """
+  |> assert_eval([%{fruit: "orange", count: 6}])
 
-  #  """
-  #  Enum.filter(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval([
-  #    %{fruit: "apple", count: 3},
-  #    %{fruit: "orange", count: 6}
-  #  ])
+  @tag :skip
+  """
+  Enum.filter(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval([
+    %{fruit: "apple", count: 3},
+    %{fruit: "orange", count: 6}
+  ])
 
-  #  """
-  #  Enum.reject(cart, &(&1.fruit =~ "o"))
-  #  """
-  #  |> assert_eval([
-  #        %{fruit: "apple", count: 3},
-  #        %{fruit: "banana", count: 1}
-  #      ])
+  @tag :skip
+  """
+  Enum.reject(cart, &(&1.fruit =~ "o"))
+  """
+  |> assert_eval([
+    %{fruit: "apple", count: 3},
+    %{fruit: "banana", count: 1}
+  ])
 
   """
   Enum.flat_map(cart, fn item ->
@@ -3041,15 +3181,16 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(["apple", "orange"])
 
-  #  """
-  #  for item <- cart, item.fruit =~ "e" do
-  #     item
-  #   end
-  #  """
-  #  |> assert_eval([
-  #        %{fruit: "apple", count: 3},
-  #        %{fruit: "orange", count: 6}
-  #      ])
+  @tag :skip
+  """
+  for item <- cart, item.fruit =~ "e" do
+     item
+   end
+  """
+  |> assert_eval([
+    %{fruit: "apple", count: 3},
+    %{fruit: "orange", count: 6}
+  ])
 
   """
   for %{count: 1, fruit: fruit} <- cart do
@@ -3089,12 +3230,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(["apple", "banana", "orange"])
 
-  #  """
-  #  for item <- cart, item.fruit =~ "e" do
-  #     item.fruit
-  #   end
-  #  """
-  #  |> assert_eval(["apple", "orange"])
+  @tag :skip
+  """
+  for item <- cart, item.fruit =~ "e" do
+     item.fruit
+   end
+  """
+  |> assert_eval(["apple", "orange"])
 
   #  todo 38 testing IO - take result from try_run and output and assert it
   #  """
@@ -3145,12 +3287,13 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(10)
 
-  #  """
-  #  for item <- cart, item.fruit =~ "e", reduce: 0 do
-  #     acc -> item.count + acc
-  #   end
-  #  """
-  #  |> assert_eval(9)
+  @tag :skip
+  """
+  for item <- cart, item.fruit =~ "e", reduce: 0 do
+     acc -> item.count + acc
+   end
+  """
+  |> assert_eval(9)
 
   """
   Enum.count(cart)
@@ -3167,35 +3310,39 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(%{"a" => 1, "e" => 2})
 
-  #  """
-  #  Enum.count(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval(2)
+  @tag :skip
+  """
+  Enum.count(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval(2)
 
-  #  """
-  #  Enum.count(cart, &(&1.fruit =~ "y"))
-  #  """
-  #  |> assert_eval(0)
+  @tag :skip
+  """
+  Enum.count(cart, &(&1.fruit =~ "y"))
+  """
+  |> assert_eval(0)
 
   """
   cart |> Enum.map(& &1.count) |> Enum.sum()
   """
   |> assert_eval(10)
 
-  #  """
-  #  Enum.sum_by(cart, & &1.count)
-  #  """
-  #  |> assert_eval(10)
+  @tag :skip
+  """
+  Enum.sum_by(cart, & &1.count)
+  """
+  |> assert_eval(10)
 
   """
   cart |> Enum.map(& &1.count) |> Enum.product()
   """
   |> assert_eval(18)
 
-  #  """
-  #  Enum.product_by(cart, & &1.count)
-  #  """
-  #  |> assert_eval(18)
+  @tag :skip
+  """
+  Enum.product_by(cart, & &1.count)
+  """
+  |> assert_eval(18)
 
   """
   cart |> Enum.map(& &1.fruit) |> Enum.sort()
@@ -3230,20 +3377,22 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval(1)
 
-  #  """
-  #  Enum.min_by(cart, & &1.count)
-  #  """
-  #  |> assert_eval(%{fruit: "banana", count: 1})
+  @tag :skip
+  """
+  Enum.min_by(cart, & &1.count)
+  """
+  |> assert_eval(%{fruit: "banana", count: 1})
 
   """
   cart |> Enum.map(& &1.count) |> Enum.max()
   """
   |> assert_eval(6)
 
-  #  """
-  #  Enum.max_by(cart, & &1.count)
-  #  """
-  #  |> assert_eval(%{fruit: "orange", count: 6})
+  @tag :skip
+  """
+  Enum.max_by(cart, & &1.count)
+  """
+  |> assert_eval(%{fruit: "orange", count: 6})
 
   """
   Enum.concat([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
@@ -3344,10 +3493,11 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([1, 2, 3, 1, 2, 3])
 
-  #  """
-  #  Enum.dedup_by(cart, & &1.fruit =~ "a")
-  #  """
-  #  |> assert_eval([%{fruit: "apple", count: 3}])
+  @tag :skip
+  """
+  Enum.dedup_by(cart, & &1.fruit =~ "a")
+  """
+  |> assert_eval([%{fruit: "apple", count: 3}])
 
   """
   Enum.dedup_by(cart, & &1.count < 5)
@@ -3425,30 +3575,35 @@ defmodule FissionLib.HexdocsTest do
     {"orange", 2}
   ])
 
-  #  """
-  #  Enum.find(cart, &(&1.fruit =~ "o"))
-  #  """
-  #  |> assert_eval(%{fruit: "orange", count: 6})
+  @tag :skip
+  """
+  Enum.find(cart, &(&1.fruit =~ "o"))
+  """
+  |> assert_eval(%{fruit: "orange", count: 6})
 
-  #  """
-  #  Enum.find(cart, &(&1.fruit =~ "y"))
-  #  """
-  #  |> assert_eval(nil)
+  @tag :skip
+  """
+  Enum.find(cart, &(&1.fruit =~ "y"))
+  """
+  |> assert_eval(nil)
 
-  #  """
-  #  Enum.find(cart, :none, &(&1.fruit =~ "y"))
-  #  """
-  #  |> assert_eval(:none)
+  @tag :skip
+  """
+  Enum.find(cart, :none, &(&1.fruit =~ "y"))
+  """
+  |> assert_eval(:none)
 
-  #  """
-  #  Enum.find_index(cart, &(&1.fruit =~ "o"))
-  #  """
-  #  |> assert_eval(2)
+  @tag :skip
+  """
+  Enum.find_index(cart, &(&1.fruit =~ "o"))
+  """
+  |> assert_eval(2)
 
-  #  """
-  #  Enum.find_index(cart, &(&1.fruit =~ "y"))
-  #  """
-  #  |> assert_eval(nil)
+  @tag :skip
+  """
+  Enum.find_index(cart, &(&1.fruit =~ "y"))
+  """
+  |> assert_eval(nil)
 
   """
   Enum.find_value(cart, fn item ->
@@ -3531,15 +3686,17 @@ defmodule FissionLib.HexdocsTest do
   fruits = ["apple", "banana", "grape", "orange", "pear"]
   """
 
-  #  """
-  #  Enum.slide(fruits, 2, 0)
-  #  """
-  #  |> assert_eval(["grape", "apple", "banana", "orange", "pear"])
+  @tag :skip
+  """
+  Enum.slide(fruits, 2, 0)
+  """
+  |> assert_eval(["grape", "apple", "banana", "orange", "pear"])
 
-  #  """
-  #  Enum.slide(fruits, 2, 4)
-  #  """
-  #  |> assert_eval(["apple", "banana", "orange", "pear", "grape"])
+  @tag :skip
+  """
+  Enum.slide(fruits, 2, 4)
+  """
+  |> assert_eval(["apple", "banana", "orange", "pear", "grape"])
 
   """
   Enum.slide(fruits, 1..3, 0)
@@ -3609,26 +3766,28 @@ defmodule FissionLib.HexdocsTest do
      ], [%{fruit: "orange", count: 6}]}
   )
 
-  #  """
-  #  Enum.split_while(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval(
-  #    {[%{fruit: "apple", count: 3}],
-  #     [
-  #       %{fruit: "banana", count: 1},
-  #       %{fruit: "orange", count: 6}
-  #     ]}
-  #  )
+  @tag :skip
+  """
+  Enum.split_while(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval(
+    {[%{fruit: "apple", count: 3}],
+     [
+       %{fruit: "banana", count: 1},
+       %{fruit: "orange", count: 6}
+     ]}
+  )
 
-  #  """
-  #  Enum.split_with(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval(
-  #    {[
-  #       %{fruit: "apple", count: 3},
-  #       %{fruit: "orange", count: 6}
-  #     ], [%{fruit: "banana", count: 1}]}
-  #  )
+  @tag :skip
+  """
+  Enum.split_with(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval(
+    {[
+       %{fruit: "apple", count: 3},
+       %{fruit: "orange", count: 6}
+     ], [%{fruit: "banana", count: 1}]}
+  )
 
   """
   Enum.drop(cart, 1)
@@ -3651,13 +3810,14 @@ defmodule FissionLib.HexdocsTest do
   """
   |> assert_eval([%{fruit: "banana", count: 1}])
 
-  #  """
-  #  Enum.drop_while(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval([
-  #    %{fruit: "banana", count: 1},
-  #    %{fruit: "orange", count: 6}
-  #  ])
+  @tag :skip
+  """
+  Enum.drop_while(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval([
+    %{fruit: "banana", count: 1},
+    %{fruit: "orange", count: 6}
+  ])
 
   """
   Enum.take(cart, 1)
@@ -3677,10 +3837,11 @@ defmodule FissionLib.HexdocsTest do
     %{fruit: "orange", count: 6}
   ])
 
-  #  """
-  #  Enum.take_while(cart, &(&1.fruit =~ "e"))
-  #  """
-  #  |> assert_eval([%{fruit: "apple", count: 3}])
+  @tag :skip
+  """
+  Enum.take_while(cart, &(&1.fruit =~ "e"))
+  """
+  |> assert_eval([%{fruit: "apple", count: 3}])
 
   """
   Enum.chunk_by(cart, &String.length(&1.fruit))
@@ -3752,15 +3913,16 @@ defmodule FissionLib.HexdocsTest do
     %{fruit: "orange", count: 6}
   ])
 
-  #  """
-  #  fruits = ["apple", "banana", "orange"]
-  #  counts = [3, 1, 6]
-  #  Enum.zip_reduce(fruits, counts, 0, fn fruit, count, acc ->
-  #     price = if fruit =~ "e", do: count * 2, else: count
-  #     acc + price
-  #   end)
-  #  """
-  #  |> assert_eval(19)
+  @tag :skip
+  """
+  fruits = ["apple", "banana", "orange"]
+  counts = [3, 1, 6]
+  Enum.zip_reduce(fruits, counts, 0, fn fruit, count, acc ->
+     price = if fruit =~ "e", do: count * 2, else: count
+     acc + price
+   end)
+  """
+  |> assert_eval(19)
 
   """
   cart |> Enum.map(&{&1.fruit, &1.count}) |> Enum.unzip()
