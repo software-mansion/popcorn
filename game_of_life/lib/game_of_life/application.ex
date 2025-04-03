@@ -10,6 +10,7 @@ defmodule GameOfLife.Application do
     children = [
       # Starts a worker by calling: GameOfLife.Worker.start_link(arg)
       # {GameOfLife.Worker, arg}
+      {Registry, keys: :unique, name: GameOfLife.CellRegistry}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
