@@ -268,7 +268,7 @@ defmodule FissionLib.HexdocsTest do
     {~s|"hello\nworld"|, output: "hello\nworld"},
     {
       ~s|IO.puts("hello\nworld")|,
-      output: :ok, stdout: "hello\nworld", skip: true
+      output: :ok, stdout: "hello\nworld\n"
     },
     {~s|is_binary("hellö")|, output: true},
     {~s|byte_size("hellö")|, output: 6},
@@ -507,14 +507,14 @@ defmodule FissionLib.HexdocsTest do
       fun = &is_atom/1
       fun.(:hello)
       """,
-      output: true, skip: true
+      output: true
     },
     {
       """
       fun = &is_atom/1
       fun.(123)
       """,
-      output: false, skip: true
+      output: false
     },
     {
       """
@@ -540,7 +540,7 @@ defmodule FissionLib.HexdocsTest do
       add = &+/2
       add.(1, 2)
       """,
-      output: 3, skip: true
+      output: 3
     },
     {
       """
