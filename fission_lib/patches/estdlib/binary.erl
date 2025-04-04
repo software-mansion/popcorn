@@ -25,7 +25,7 @@
 %%-----------------------------------------------------------------------------
 -module(binary).
 
--export([at/2, decode_hex/1, encode_hex/1, encode_hex/2, part/3, split/2, split/3]).
+-export([at/2, decode_hex/1, encode_hex/1, encode_hex/2, part/3, split/2, split/3, compile_pattern/1]).
 
 %%-----------------------------------------------------------------------------
 %% @param   Binary binary to get a byte from
@@ -115,3 +115,11 @@ split(_Binary, _Pattern) ->
 -spec split(Binary :: binary(), Pattern :: binary(), Option :: [global]) -> [binary()].
 split(_Binary, _Pattern, _Option) ->
     erlang:nif_error(undefined).
+
+%% Patch reason: String.split is using patterns compiled by compile_pattern/1
+%% AtomVM does not provide such feature. Luckily all the functions that use compiled pattern
+%% also use just a binary pattern.
+-spec compile_pattern(Pattern) -> binary() when
+    Pattern :: binary() | [binary()].
+compile_pattern(Pattern) ->
+    Pattern.

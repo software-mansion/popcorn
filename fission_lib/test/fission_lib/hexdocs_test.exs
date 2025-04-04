@@ -704,17 +704,17 @@ defmodule FissionLib.HexdocsTest do
   # Keyword lists, maps
   [
     {~s|String.split("1 2 3 4", " ")|, output: ["1", "2", "3", "4"]},
-    {~s|String.split("1 2 3 4", " ", [parts: 3])|, output: ["1", "2", "3 4"], skip: true},
-    {~s|String.split("1  2  3  4", " ", [parts: 3])|, output: ["1", "", "2  3  4"], skip: true},
+    {~s|String.split("1 2 3 4", " ", [parts: 3])|, output: ["1", "2", "3 4"]},
+    {~s|String.split("1  2  3  4", " ", [parts: 3])|, output: ["1", "", "2  3  4"]},
     {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|,
-     output: ["1", "2", " 3  4"], skip: true},
+     output: ["1", "2", " 3  4"]},
     {"[{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]", output: true},
     {
       """
       import String, only: [split: 1, split: 2]
       split("hello world")
       """,
-      output: ["hello", "world"], skip: true
+      output: ["hello", "world"]
     },
     {
       "list = [a: 1, b: 2]",
