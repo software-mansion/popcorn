@@ -21,10 +21,44 @@
 defmodule Module do
   @compile {:autoload, false}
 
-  def concat(a, b) when is_atom(a) and is_atom(b) do
-    a_string = :erlang.atom_to_binary(a, :latin1)
-    <<"Elixir.", b_string::binary>> = :erlang.atom_to_binary(b, :latin1)
+  def concat(args) when is_list(args) do
+    {parts, acc} = ensure_starts_with_elixir(args)
 
-    :erlang.binary_to_atom(a_string <> "." <> b_string, :latin1)
+    do_concat(parts, acc)
+    |> :erlang.binary_to_atom(:latin1)
   end
+
+  def concat(a, b) when (is_atom(a) or is_binary(a)) and (is_atom(b) or is_binary(b)) do
+    # a_string = :erlang.atom_to_binary(a, :latin1)
+    # <<"Elixir.", b_string::binary>> = :erlang.atom_to_binary(b, :latin1)
+    #
+    # :erlang.binary_to_atom(a_string <> "." <> b_string, :latin1)
+
+    concat([a, b])
+  end
+
+  defp ensure_starts_with_elixir([head | tail]) when is_atom(head) and not is_nil(head) do
+    ensure_starts_with_elixir([:erlang.atom_to_binary(head, :latin1) | tail])
+  end
+
+  defp ensure_starts_with_elixir(["Elixir." <> _ = head | tail]), do: {tail, head}
+  defp ensure_starts_with_elixir(["Elixir" = head | tail]), do: {tail, head}
+  defp ensure_starts_with_elixir(args), do: {args, "Elixir"}
+
+  defp do_concat([nil | tail], acc), do: do_concat(tail, acc)
+
+  defp do_concat([head | tail], acc) when is_atom(head) do
+    bin_head = head |> :erlang.atom_to_binary(:latin1) |> to_partial()
+    do_concat(tail, acc <> "." <> bin_head)
+  end
+
+  defp do_concat([head | tail], acc) when is_binary(head) do
+    do_concat(tail, acc <> "." <> to_partial(head))
+  end
+
+  defp do_concat([], acc), do: acc
+
+  defp to_partial("Elixir." <> arg), do: arg
+  defp to_partial("." <> arg), do: arg
+  defp to_partial(arg) when is_binary(arg), do: arg
 end
