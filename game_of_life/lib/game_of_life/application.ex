@@ -8,8 +8,6 @@ defmodule GameOfLife.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: GameOfLife.Worker.start_link(arg)
-      # {GameOfLife.Worker, arg}
       {Registry, keys: :unique, name: GameOfLife.CellRegistry}
     ]
 

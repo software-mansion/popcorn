@@ -6,6 +6,7 @@ defmodule GameOfLife.MixProject do
       app: :game_of_life,
       version: "0.1.0",
       elixir: "~> 1.17",
+      compilers: Mix.compilers() ++ [:fission_lib],
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -22,8 +23,8 @@ defmodule GameOfLife.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
+      # {:fission_lib, github: "software-mansion-labs/elixir-wasm", sparse: "fission_lib"},
+      {:fission_lib, path: "../fission_lib"}
     ]
   end
 end

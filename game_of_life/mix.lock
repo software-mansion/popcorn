@@ -1,0 +1,3 @@
+%{
+  "atomvm_packbeam": {:git, "https://github.com/atomvm/atomvm_packbeam.git", "2daea6d0339aa40b8a07b8ad4d4583fb64b608de", []},
+}
