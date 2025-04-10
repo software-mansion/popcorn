@@ -23,7 +23,12 @@
         <textarea id="code"></textarea>
         <div class="controls">
           <button id="eval"><b>Evaluate</b></button>
-          <button id="example-case">Example: case</button>
+          <button data-type="example" value="
+case lists:max([1,3,2]) of
+    3 -> {ok, 3};
+    2 -> {error, 2}
+end.
+          ">Example: case</button>
         </div>
       </div>
       <div class="container">
@@ -33,7 +38,12 @@
           <button class="secondary-btn" id="eval-module">
             <b>Compile module</b>
           </button>
-          <button id="example-module">Example: module</button>
+          <button data-type="example" data-input="module" value="
+-module(basic).
+-export([add/2]).
+
+add(A, B) -> A + B.
+          ">Example: module</button>
         </div>
       </div>
     </div>
@@ -50,7 +60,7 @@
       </div>
     </details>
 
-    <iframe id="evalFrame" src="eval_frame.html" style="width: 0; height: 0; visibility: hidden"></iframe>
-    <script async src="script.js" defer></script>
+    <script type="module" src="fission.js" defer></script>
+    <script type="module" src="script.js" defer></script>
   </body>
 </html>
