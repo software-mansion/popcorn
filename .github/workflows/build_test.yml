@@ -55,6 +55,6 @@ jobs:
     - name: Build AtomVM
       run: |
         export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
-        mix fission_lib.build_avm --out-dir _build --cmake-opts SANITIZER=OFF
+        mix fission_lib.build_avm --out-dir _build --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
     - name: Run tests
       run: mix test

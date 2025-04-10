@@ -197,6 +197,7 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :mr
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
       """
