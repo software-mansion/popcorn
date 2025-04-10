@@ -15,6 +15,6 @@ include_tracing =
 
 config :fission_lib,
   out_path: "static/app.avm",
-  start_module: App,
+  start_module: App.Application,
   add_tracing: include_tracing,
   avm_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}

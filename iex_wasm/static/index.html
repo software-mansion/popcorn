@@ -23,8 +23,21 @@
         <textarea id="code"></textarea>
         <div class="controls">
           <button id="eval"><b>Evaluate</b></button>
-          <button id="example-case">Example: case</button>
-          <button id="example-module">Example: module</button>
+          <button data-type="example" value="
+case Enum.max([1, 2, 3]) do
+    3 -> {:ok, 3}
+    2 -> {:error, 2}
+end
+          ">Example: case</button>
+          <button data-type="example" value="
+defmodule Adder do
+    def add(a,b) do
+        a + b
+    end
+end
+
+{:sum, Adder.add(10, 20)}
+          ">Example: module</button>
         </div>
       </div>
     </div>
@@ -41,7 +54,7 @@
       </div>
     </details>
 
-    <iframe id="evalFrame" src="eval_frame.html" style="width: 0; height: 0; visibility: hidden"></iframe>
-    <script async src="script.js" defer></script>
+    <script type="module" src="fission.js" defer></script>
+    <script type="module" src="script.js" defer></script>
   </body>
 </html>
