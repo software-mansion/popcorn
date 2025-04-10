@@ -38,7 +38,8 @@ defmodule FissionLib.Support.AtomVM do
     is_elixir_module = match?({:module, _name, _bin, _defmodule_eval_res}, eval_result)
     is_erlang_module = match?({:module, _name}, eval_result)
 
-    assert is_elixir_module or is_erlang_module, "Returned value isn't a module"
+    assert is_elixir_module or is_erlang_module,
+           "Returned value isn't a module: #{inspect(eval_result)}"
   end
 
   @doc """
