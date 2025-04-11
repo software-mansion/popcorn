@@ -442,14 +442,14 @@ defmodule FissionLib.HexdocsTest do
       add = fn a, b -> a + b end
       is_function(add, 2)
       """,
-      output: true, skip: true
+      output: true
     },
     {
       """
       add = fn a, b -> a + b end
       is_function(add, 1)
       """,
-      output: false, skip: true
+      output: false
     },
     {
       """
@@ -548,7 +548,7 @@ defmodule FissionLib.HexdocsTest do
       is_arity_2 = fn fun -> is_function(fun, 2) end
       is_arity_2.(add)
       """,
-      output: true, skip: true
+      output: true
     },
     {
       """
