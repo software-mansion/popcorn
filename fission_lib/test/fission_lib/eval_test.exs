@@ -281,6 +281,39 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
+  async_test "sigils", %{tmp_dir: dir} do
+    """
+    {
+      ~s"a b c",
+      ~w(a b c),
+      ~c"abc",
+      ~s(a #{1}),
+      ~D[2019-10-31],
+      ~T[23:00:07.0],
+      ~N[2019-10-31 23:00:07],
+      ~U[2019-10-31 19:59:03Z]
+    }
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({
+      "a b c",
+      ["a", "b", "c"],
+      [?a, ?b, ?c],
+      "a 1",
+      ~D[2019-10-31],
+      ~T[23:00:07.0],
+      ~N[2019-10-31 23:00:07],
+      ~U[2019-10-31 19:59:03Z]
+    })
+  end
+
+  @tag :skip
+  async_test "non-interpolating string sigil", %{tmp_dir: dir} do
+    ~s|~S(a #{1})|
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("a \#{1}")
+  end
+
   async_test "Base module", %{tmp_dir: dir} do
     ~s|Base.encode16("foobar")|
     |> AtomVM.eval(:elixir, run_dir: dir)
