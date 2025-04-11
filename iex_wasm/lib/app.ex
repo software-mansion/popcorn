@@ -47,6 +47,7 @@ defmodule App do
     end
 
     code = :erlang.binary_to_list(code)
+
     with {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, module, module_bin} <-
            tokens
@@ -62,6 +63,7 @@ defmodule App do
 
   defp eval(code, :erlang) do
     code = :erlang.binary_to_list(code)
+
     with {:ok, tokens, _end_location} <- :erl_scan.string(code),
          {:ok, exprs} <- :erl_parse.parse_exprs(tokens),
          {:value, value, _bindings} <- :erl_eval.exprs(exprs, []) do
@@ -72,7 +74,7 @@ defmodule App do
   end
 
   defp resolve(term, promise) do
-    value = :io_lib.format(~c"~p", [term])
+    value = inspect(term)
     :emscripten.promise_resolve(promise, value)
   end
 
