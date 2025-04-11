@@ -52,6 +52,7 @@ defmodule FissionLib.CoreErlangUtils do
       patch_exports
       |> MapSet.new(fn {:c_var, _meta, fa} -> fa end)
       |> MapSet.difference(patch_private_overrides)
+      |> MapSet.difference(MapSet.new(__info__: 1, module_info: 0, module_info: 1))
 
     exports = MapSet.union(orig_exports, patch_exports)
 
