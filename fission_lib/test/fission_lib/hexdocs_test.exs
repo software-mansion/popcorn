@@ -47,7 +47,8 @@ defmodule FissionLib.HexdocsTestHelper do
 
           Failed #{type} assertion
           result: #{inspect(info.result, pretty: true)}
-          expected: #{inspect(expected, pretty: true)}
+          expected: #{inspect(expected, pretty: true)},
+          logs: '#{info.log_path}'
 
           Common code:
           #{if common != "", do: common, else: "(empty)"}
@@ -600,7 +601,8 @@ defmodule FissionLib.HexdocsTest do
     {~s|"hełło" <> <<0>>|, output: <<104, 101, 197, 130, 197, 130, 111, 0>>},
     {
       ~s|IO.inspect("hełło", binaries: :as_binaries)|,
-      output: <<104, 101, 197, 130, 197, 130, 111>>, skip: true
+      output: <<104, 101, 197, 130, 197, 130, 111>>,
+      stdout: "<<104, 101, 197, 130, 197, 130, 111>>\n"
     },
     {"<<42>> == <<42::8>>", output: true},
     {"<<3::4>>", output: <<3::size(4)>>, skip: true},
@@ -689,7 +691,7 @@ defmodule FissionLib.HexdocsTest do
       heartbeats_per_minute = [99, 97, 116]
       inspect(heartbeats_per_minute, charlists: :as_list)
       """,
-      output: [99, 97, 116], skip: true
+      output: "[99, 97, 116]"
     },
     {~s|to_charlist("hełło")|, output: [104, 101, 322, 322, 111]},
     {~s|to_string(~c"hełło")|, output: "hełło", skip: true},
@@ -1920,8 +1922,7 @@ defmodule FissionLib.HexdocsTest do
       stdout: """
       before: [1, 2, 3]
       after: [2, 4, 6]
-      """,
-      skip: true
+      """
     }
   ]
   |> create_tests(tag: :debugging)

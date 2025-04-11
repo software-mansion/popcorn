@@ -104,7 +104,5 @@ put_chars(Chars) ->
 %% @end
 %%-----------------------------------------------------------------------------
 -spec put_chars(Device :: any(), Chars :: list() | binary()) -> ok.
-put_chars(standard_error, Chars) ->
-    put_chars(Chars);
-put_chars(standard_output, Chars) ->
+put_chars(_Device, Chars) ->
     put_chars(Chars).
