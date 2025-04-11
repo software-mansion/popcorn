@@ -20,7 +20,12 @@ defmodule IexWasm.MixProject do
 
   defp deps do
     [
-      {:fission_lib, path: "../fission_lib"}
+      {:fission_lib, path: "../fission_lib"},
+      {:playwright,
+       github: "membraneframework-labs/playwright-elixir",
+       ref: "5c02249512fa543f5e619a69b7e5c9e046605fe5",
+       only: :test},
+      {:bandit, "~> 1.1", only: :test}
     ]
   end
 end

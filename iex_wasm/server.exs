@@ -1,6 +1,8 @@
-Mix.install([
-  {:bandit, "~> 1.1"}
-])
+unless Code.ensure_loaded?(Bandit) do
+  Mix.install([
+    {:bandit, "~> 1.1"}
+  ])
+end
 
 defmodule Router do
   use Plug.Router
@@ -34,10 +36,12 @@ defmodule Router do
   end
 end
 
-bandit = {Bandit, plug: Router, scheme: :http, port: 4000}
+{opts, _argv} = OptionParser.parse!(System.argv(), strict: [port: :integer, no_wait: :boolean])
+
+bandit = {Bandit, plug: Router, scheme: :http, port: Keyword.get(opts, :port, 4000)}
 {:ok, _} = Supervisor.start_link([bandit], strategy: :one_for_one)
 
 # unless running from IEx, sleep idenfinitely so we can serve requests
-unless IEx.started?() do
+unless IEx.started?() or Keyword.get(opts, :no_wait, false) do
   Process.sleep(:infinity)
 end
