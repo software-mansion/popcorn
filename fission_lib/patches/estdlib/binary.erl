@@ -118,7 +118,9 @@ split(_Binary, _Pattern, _Option) ->
 
 %% Patch reason: String.split is using patterns compiled by compile_pattern/1
 %% AtomVM does not provide such feature. Luckily all the functions that use compiled pattern
-%% also use just a binary pattern.
+%% also use just a binary pattern. 
+%% In OTP the compiled pattern is a tuple and for now we are not supporting it - in every
+%% binary module function elixir wasm will support only binary patterns.
 -spec compile_pattern(Pattern) -> binary() when
     Pattern :: binary() | [binary()].
 compile_pattern(Pattern) ->
