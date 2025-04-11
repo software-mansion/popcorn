@@ -3,13 +3,17 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Build & test
+name: IEX WASM Build & test
 
 on:
   push:
     branches: [ "*" ]
+    paths:
+    - "iex_wasm/**"
   pull_request:
     branches: [ "*" ]
+    paths:
+    - "iex_wasm/**"
 
 permissions:
   contents: read
@@ -17,16 +21,18 @@ permissions:
 env:
   CI: true
   MIX_ENV: test
+  ImageOS: "ubuntu22"
 
 jobs:
   build:
 
-    name: Build & test
+    name: IEX WASM build & test
     runs-on: ubuntu-22.04
+    container: emscripten/emsdk
 
     defaults:
       run:
-        working-directory: fission_lib
+        working-directory: iex_wasm
 
     steps:
     - uses: actions/checkout@v4
@@ -47,14 +53,10 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - name: Install AtomVM deps
       run: |
-        sudo apt install -y gperf libmbedtls-dev zlib1g-dev
+        sudo apt update && apt install -y gperf libmbedtls-dev zlib1g-dev
     - name: Install dependencies
-      run: mix deps.get
-    - name: Compile
-      run:  mix compile
+      run: mix deps.get && mix deps.compile
+    - name: Install Playwright deps
+      run: mix playwright.install
     - name: Build AtomVM
-      run: |
-        export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
-        mix fission_lib.build_avm --out-dir _build --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
-    - name: Run tests
-      run: mix test
+      run: mix fission_lib.build_avm --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
