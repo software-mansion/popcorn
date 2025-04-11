@@ -9,7 +9,7 @@ end
 
 include_tracing =
   case System.get_env("EX_TRACING") do
-    nil -> config_env() != :prod
+    nil -> false
     option -> string_to_bool.(option)
   end
 
