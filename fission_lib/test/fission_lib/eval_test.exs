@@ -535,4 +535,14 @@ defmodule FissionLib.EvalTest do
     end
     """
   end
+  
+  async_test ":os.type/0", %{tmp_dir: dir} do
+    os_type = :os.type()
+    """
+    :os.type()
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(^os_type)
+  end
+  
 end
