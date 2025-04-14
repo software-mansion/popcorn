@@ -545,4 +545,12 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.assert_result(^os_type)
   end
   
+
+  async_test ":filename.split/1", %{tmp_dir: dir} do
+    """
+    :filename.split("path/to/a/file")
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(["path", "to", "a", "file"])
+  end
 end
