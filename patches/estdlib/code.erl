@@ -30,7 +30,6 @@
     load_abs/1,
     load_binary/3,
     ensure_loaded/1,
-    get_object_code/1,
     get_mode/0,
     is_loaded/1
 ]).
@@ -101,10 +100,6 @@ load_binary(_Module, _Filename, _Binary) ->
     Module :: atom().
 ensure_loaded(_Module) ->
     erlang:nif_error(undefined).
-
-% Patch reason: mock implementation, prevents ParallelChecker.cache_module/2 from crashing
-get_object_code(_Module) ->
-    error.
 
 %% Patch reason: there is no code server and code module is implemented differently in AtomVM
 %% eventually the latter should be implemented in AtomVM.
