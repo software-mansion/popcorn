@@ -337,7 +337,7 @@ apply(Module, Function, Args) ->
             Module:Function(Arg1, Arg2, Arg3, Arg4, Arg5);
         [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6] ->
             Module:Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6);
-                [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7] ->
+        [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7] ->
             Module:Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
         [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8] ->
             Module:Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8);
@@ -1325,7 +1325,7 @@ apply(Function, Args) ->
             Function(Arg1, Arg2, Arg3, Arg4, Arg5);
         [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6] ->
             Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6);
-                [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7] ->
+        [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7] ->
             Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7);
         [Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8] ->
             Function(Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8);
@@ -3160,8 +3160,13 @@ nif_error(_Reason) -> erlang:error("Nif not loaded").
 %% See https://linear.app/swmansion/project/erlangbump-reductions-missing-02f6ff09cac1/overview
 bump_reductions(_Reductions) -> true.
 
+%% Patch reason: nif not implemented in Atom
 fun_info(Fun) -> [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]].
 
+%% Patch reason: nifs not implemented in Atom.
+%% Important: phash and phash2 are supposed to return
+%% the same values for the same arguments across platforms.
+%% This patch doesn't satisfy this requirement.
 phash2(Term, N) ->
     Bin = erlang:term_to_binary(Term),
     Bytes = erlang:ceil(math:log2(N) / 8),
