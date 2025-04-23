@@ -109,7 +109,9 @@
     localtime/0,
     nif_error/1,
     bump_reductions/1,
-    fun_info/1
+    fun_info/1,
+    phash2/2,
+    phash/2
 ]).
 
 -export_type([
@@ -3159,3 +3161,11 @@ nif_error(_Reason) -> erlang:error("Nif not loaded").
 bump_reductions(_Reductions) -> true.
 
 fun_info(Fun) -> [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]].
+
+phash2(Term, N) ->
+    Bin = erlang:term_to_binary(Term),
+    Bytes = erlang:ceil(math:log2(N) / 8),
+    <<Hash:Bytes/integer-unit:8, _Rest/binary>> = erlang:md5(Bin),
+    (Hash rem N) + 1.
+
+phash(Term, N) -> phash2(Term, N).
