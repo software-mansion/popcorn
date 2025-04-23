@@ -4,13 +4,18 @@ defmodule FissionLib.HexdocsTestHelper do
   alias __MODULE__, as: Helper
   import FissionLib.Support.AsyncTest
 
-  defmacro test_ast(common, input, opts, tag) do
+  defmacro test_ast(common, input, opts, tags) do
+    tags = List.wrap(tags)
+
     quote do
       @tag skip: Keyword.get(unquote(opts), :skip, false)
-      @tag unquote(tag)
+      for tag <- unquote(tags) do
+        @tag tag
+      end
+
       async_test Helper.test_name(
                    unquote(common) <> unquote(input),
-                   unquote(tag)
+                   unquote(hd(tags))
                  ),
                  %{tmp_dir: dir} do
         {opts, unsupported} = supported_opts(unquote(opts))
@@ -708,8 +713,7 @@ defmodule FissionLib.HexdocsTest do
     {~s|String.split("1 2 3 4", " ")|, output: ["1", "2", "3", "4"]},
     {~s|String.split("1 2 3 4", " ", [parts: 3])|, output: ["1", "2", "3 4"]},
     {~s|String.split("1  2  3  4", " ", [parts: 3])|, output: ["1", "", "2  3  4"]},
-    {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|,
-     output: ["1", "2", " 3  4"]},
+    {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|, output: ["1", "2", " 3  4"]},
     {"[{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]", output: true},
     {
       """
@@ -1454,7 +1458,7 @@ defmodule FissionLib.HexdocsTest do
       Utility.type("foo")
       Utility.type(123)
       """,
-      output: "integer", skip: true
+      output: "integer"
     },
     {
       """
@@ -1494,12 +1498,12 @@ defmodule FissionLib.HexdocsTest do
             def size(set), do: MapSet.size(set)
           end
 
+          set = %MapSet{} = MapSet.new([])
           Size.size(set)
           """,
           output: 0
         }
-      ],
-      skip: true
+      ]
     },
     {"Enum.reduce(1..3, 0, fn x, acc -> x + acc end)", output: 6},
     {~s|"age: \#{25}"|, output: "age: 25"},
@@ -1508,7 +1512,7 @@ defmodule FissionLib.HexdocsTest do
       tuple = {1, 2, 3}
       "tuple: \#{tuple}"
       """,
-      output: Protocol.UndefinedError, skip: true
+      raises: Protocol.UndefinedError
     },
     {
       """
@@ -1519,7 +1523,7 @@ defmodule FissionLib.HexdocsTest do
     },
     {"inspect &(&1+2)", predicate: &(&1 =~ "#Function"), skip: true}
   ]
-  |> create_tests(tag: :protocols)
+  |> create_tests(tag: [:protocols, timeout: :timer.minutes(15)])
 
   # Comprehensions
   [

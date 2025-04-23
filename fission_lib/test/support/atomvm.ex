@@ -134,7 +134,8 @@ defmodule FissionLib.Support.AtomVM do
       exit_status: exit_status,
       output: output,
       result: result,
-      log_path: log_path
+      log_path: log_path,
+      lldb: "\nAVM_RUN_DIR='#{run_dir}' lldb '#{@atomvm_path}' '#{bundle_path}'"
     }
   end
 
