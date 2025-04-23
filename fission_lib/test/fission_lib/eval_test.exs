@@ -594,4 +594,47 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result([2, 3, 4, 5])
   end
+
+  async_test "reraise", %{tmp_dir: dir} do
+    {error, stacktrace} =
+      quote do
+        defmodule E do
+          def e() do
+            raise "foo"
+          end
+        end
+
+        defmodule B do
+          def b do
+            E.e()
+            :ok
+          end
+        end
+
+        defmodule A do
+          def a do
+            try do
+              B.b()
+            rescue
+              e -> reraise e, __STACKTRACE__
+            end
+
+            :ok
+          end
+        end
+
+        try do
+          A.a()
+        rescue
+          e -> {e, __STACKTRACE__}
+        end
+      end
+      |> Macro.to_string()
+      |> AtomVM.eval(:elixir, run_dir: dir)
+
+    assert error == %RuntimeError{message: "foo"}
+
+    assert [{RunExpr.E, :e, 0, _}, {RunExpr.B, :b, 0, _}, {RunExpr.A, :a, 0, _} | _rest] =
+             stacktrace
+  end
 end
