@@ -535,16 +535,16 @@ defmodule FissionLib.EvalTest do
     end
     """
   end
-  
+
   async_test ":os.type/0", %{tmp_dir: dir} do
     os_type = :os.type()
+
     """
     :os.type()
     """
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(^os_type)
   end
-  
 
   async_test ":filename.split/1", %{tmp_dir: dir} do
     """
@@ -552,5 +552,19 @@ defmodule FissionLib.EvalTest do
     """
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(["path", "to", "a", "file"])
+  end
+
+  async_test ":erlang.phash/2 and phash2/2", %{tmp_dir: dir} do
+    """
+    :erlang.phash({:a, 2.0, "foo"}, 18)
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(4)
+
+    """
+    :erlang.phash2({:a, 2.0, "foo"}, 18)
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(4)
   end
 end
