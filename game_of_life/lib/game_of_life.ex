@@ -3,23 +3,37 @@ defmodule GameOfLife do
   Documentation for `GameOfLife`.
   """
 
-  alias GameOfLife.{Cell, Grid, Supervisor}
+  alias GameOfLife.Grid
 
   def start() do
-    x = "Hello, FissionLib\n"
-    puts(x)
+    {:ok, _app} = GameOfLife.Application.start(:normal, [])
 
-    {:ok, _reg} = Registry.start_link(keys: :unique, name: GameOfLife.CellRegistry)
-    # {:ok, pid} = Grid.start_link(3, 3, [{1, 1}])
-    # grid = Grid.tick(pid)
-    # grid_str = print_grid(grid)
-    # puts(grid_str)
-    # puts("\n")
+    {:ok, _sup, %{grid_pid: pid}} =
+      GameOfLife.Supervisor.start_simulation(3, 3, [{0, 1}, {1, 1}, {2, 1}])
+
+    grid = Grid.status(pid)
+    grid_str = print_grid(grid)
+    puts(grid_str)
+    puts("\n")
+
+    for _ <- 1..5 do
+      grid = Grid.tick(pid)
+      grid_str = print_grid(grid)
+      puts(grid_str)
+      puts("\n")
+    end
+
+    :ok
   end
 
   defp puts(str) do
-    # Console.puts(str)
-    IO.puts(str)
+    case Code.ensure_loaded(Console) do
+      {:module, Console} ->
+        Console.puts(str)
+
+      _ ->
+        IO.puts(str)
+    end
   end
 
   defp print_grid(grid) do
@@ -28,9 +42,9 @@ defmodule GameOfLife do
     for row <- grid do
       for alive? <- row do
         if alive? do
-          IO.write(str, " 0")
-        else
           IO.write(str, " 1")
+        else
+          IO.write(str, " 0")
         end
       end
 

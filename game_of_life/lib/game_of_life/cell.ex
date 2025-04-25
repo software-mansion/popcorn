@@ -8,32 +8,44 @@ defmodule GameOfLife.Cell do
   #         neighbours: [pid()],
   #         epoch: non_neg_integer()
   #       }
-  defstruct coords: nil,
+  defstruct game_id: nil,
+            coords: nil,
             neighbours: [],
             parent: nil,
             epochs: [],
             pending_epoch: nil
 
-  def start_link(x, y, xSize, ySize, alive?) do
-    coords = {x, y}
-    size = {xSize, ySize}
+  def child_spec(args) do
+    game_id = Keyword.fetch!(args, :game_id)
+    size = Keyword.fetch!(args, :size)
+    coords = Keyword.fetch!(args, :coords)
+    alive? = Keyword.fetch!(args, :alive?)
 
-    # FIXME: Avoid global registry
-    GenServer.start_link(__MODULE__, [coords, size, alive?], name: cell(coords))
+    %{
+      id: coords,
+      start: {__MODULE__, :start_link, [game_id, coords, size, alive?]}
+    }
   end
 
-  def alive?(cell, epoch) do
-    GenServer.call(cell(cell), {:alive?, epoch})
+  def start_link(game_id, coords, size, alive?) do
+    GenServer.start_link(__MODULE__, {game_id, coords, size, alive?},
+      name: GameOfLife.Simulation.cell_via_tuple(game_id, coords)
+    )
+  end
+
+  def alive?(cell, epoch \\ :current) do
+    GenServer.call(cell, {:alive?, epoch})
   end
 
   def tick(cell) do
-    GenServer.cast(cell(cell), {:tick, self()})
+    GenServer.cast(cell, {:tick, self()})
   end
 
   @impl true
-  def init([{x, y}, {xSize, ySize}, alive?]) do
+  def init({game_id, {x, y}, {xSize, ySize}, alive?}) do
     {:ok,
      %__MODULE__{
+       game_id: game_id,
        coords: {x, y},
        neighbours: neighbours(x, y, xSize, ySize),
        epochs: [{0, alive?}]
@@ -41,6 +53,11 @@ defmodule GameOfLife.Cell do
   end
 
   @impl true
+  def handle_call({:alive?, :current}, _from, state) do
+    [{_current_epoch, alive?} | _] = state.epochs
+    {:reply, alive?, state}
+  end
+
   def handle_call({:alive?, epoch}, _from, state) do
     {_epoch, alive?} = List.keyfind!(state.epochs, epoch, 0)
     {:reply, alive?, state}
@@ -51,7 +68,8 @@ defmodule GameOfLife.Cell do
     [{current_epoch, alive?} | _] = state.epochs
 
     for neighbour <- state.neighbours do
-      GenServer.cast(cell(neighbour), {:get_status, current_epoch, self()})
+      cell = GameOfLife.Simulation.cell_via_tuple(state.game_id, neighbour)
+      GenServer.cast(cell, {:get_status, current_epoch, self()})
     end
 
     epoch_stats = %{
@@ -103,7 +121,4 @@ defmodule GameOfLife.Cell do
     end
     |> Enum.filter(fn {x, y} -> x >= 0 and x < xSize and y >= 0 and y < ySize end)
   end
-
-  defp cell(pid) when is_pid(pid), do: pid
-  defp cell(coords) when is_tuple(coords), do: {:via, Registry, {GameOfLife.CellRegistry, coords}}
 end

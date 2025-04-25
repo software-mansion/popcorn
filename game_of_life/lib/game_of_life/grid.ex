@@ -3,30 +3,54 @@ defmodule GameOfLife.Grid do
 
   alias GameOfLife.Cell
 
-  def start_link(xSize, ySize, alive_list) do
-    GenServer.start_link(__MODULE__, {xSize, ySize, alive_list})
+  def child_spec(args) do
+    game_id = Keyword.fetch!(args, :game_id)
+    size = Keyword.fetch!(args, :size)
+
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [game_id, size]}
+    }
   end
 
-  def notify_status(grid, coords, alive?) do
-    GenServer.cast(grid, {:status, coords, alive?})
+  def start_link(game_id, size) do
+    GenServer.start_link(__MODULE__, {game_id, size},
+      name: GameOfLife.Simulation.grid_via_tuple(game_id)
+    )
   end
 
   def tick(grid) do
     GenServer.call(grid, :tick)
   end
 
+  def status(grid) do
+    GenServer.call(grid, :status)
+  end
+
+  @doc false
+  # Internal cast for cells to respond with status
+  def notify_status(grid, coords, alive?) do
+    GenServer.cast(grid, {:status, coords, alive?})
+  end
+
   @impl true
-  def init({xSize, ySize, alive_list}) do
+  def init({game_id, {xSize, ySize}}) do
     grid =
       for x <- 0..(xSize - 1), y <- 0..(ySize - 1), into: %{} do
-        alive? = {x, y} in alive_list
-        # FIXME: Supervise cells
-        {:ok, pid} = Cell.start_link(x, y, xSize, ySize, alive?)
-        {{x, y}, pid}
+        coords = {x, y}
+        {coords, GameOfLife.Simulation.cell_pid(game_id, coords)}
       end
 
     {:ok,
-     %{grid: grid, xSize: xSize, ySize: ySize, epoch: 0, tick_progress: nil, respond_to: nil}}
+     %{
+       game_id: game_id,
+       grid: grid,
+       xSize: xSize,
+       ySize: ySize,
+       epoch: 0,
+       tick_progress: nil,
+       respond_to: nil
+     }}
   end
 
   @impl true
@@ -35,6 +59,15 @@ defmodule GameOfLife.Grid do
 
     state.grid |> Enum.each(fn {_coords, pid} -> Cell.tick(pid) end)
     {:noreply, state}
+  end
+
+  def handle_call(:status, _from, state) do
+    grid =
+      state.grid
+      |> Enum.map(fn {coords, pid} -> {coords, Cell.alive?(pid)} end)
+      |> to_matrix(state.xSize, state.ySize)
+
+    {:reply, grid, state}
   end
 
   @impl true
@@ -60,9 +93,11 @@ defmodule GameOfLife.Grid do
   end
 
   def to_matrix(flat_grid, xSize, ySize) do
+    grid_map = Map.new(flat_grid)
+
     for y <- 0..(ySize - 1) do
       for x <- 0..(xSize - 1) do
-        flat_grid[{x, y}]
+        grid_map[{x, y}]
       end
     end
   end
