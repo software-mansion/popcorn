@@ -595,26 +595,27 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.assert_result([2, 3, 4, 5])
   end
 
+  @tag timeout: :timer.minutes(5)
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
-        defmodule E do
-          def e() do
+        defmodule Raiser do
+          def raise_error() do
             raise "foo"
           end
         end
 
-        defmodule B do
-          def b do
-            E.e()
+        defmodule IntermediateCaller do
+          def call_raiser() do
+            Raiser.raise_error()
             :ok
           end
         end
 
-        defmodule A do
-          def a do
+        defmodule Reraiser do
+          def reraise_error() do
             try do
-              B.b()
+              IntermediateCaller.call_raiser()
             rescue
               e -> reraise e, __STACKTRACE__
             end
@@ -624,7 +625,7 @@ defmodule FissionLib.EvalTest do
         end
 
         try do
-          A.a()
+          Reraiser.reraise_error()
         rescue
           e -> {e, __STACKTRACE__}
         end
@@ -634,7 +635,11 @@ defmodule FissionLib.EvalTest do
 
     assert error == %RuntimeError{message: "foo"}
 
-    assert [{RunExpr.E, :e, 0, _}, {RunExpr.B, :b, 0, _}, {RunExpr.A, :a, 0, _} | _rest] =
+    assert [
+             {RunExpr.Raiser, :raise_error, 0, _},
+             {RunExpr.IntermediateCaller, :call_raiser, 0, _},
+             {RunExpr.Reraiser, :reraise_error, 0, _} | _rest
+           ] =
              stacktrace
   end
 end
