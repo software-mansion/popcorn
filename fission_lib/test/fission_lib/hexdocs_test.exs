@@ -1507,7 +1507,11 @@ defmodule FissionLib.HexdocsTest do
           output: 0
         }
       ]
-    },
+    }
+  ]
+  |> create_tests(category: :protocols, tag: :long_running, tag: [timeout: :timer.minutes(15)])
+
+  [
     {"Enum.reduce(1..3, 0, fn x, acc -> x + acc end)", output: 6},
     {~s|"age: \#{25}"|, output: "age: 25"},
     {
@@ -1526,7 +1530,7 @@ defmodule FissionLib.HexdocsTest do
     },
     {"inspect &(&1+2)", predicate: &(&1 =~ "#Function"), skip: true}
   ]
-  |> create_tests(category: :protocols, tag: [timeout: :timer.minutes(15)])
+  |> create_tests(category: :protocols)
 
   # Comprehensions
   [

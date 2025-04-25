@@ -567,4 +567,31 @@ defmodule FissionLib.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(4)
   end
+
+  async_test "Implement a protocol", %{tmp_dir: dir} do
+    quote do
+      defimpl Enumerable, for: Tuple do
+        def reduce(tuple, acc, fun) do
+          Enumerable.reduce(Tuple.to_list(tuple), acc, fun)
+        end
+
+        def count(tuple) do
+          tuple_size(tuple)
+        end
+
+        def member?(tuple, element) do
+          Enumerable.member?(Tuple.to_list(tuple), element)
+        end
+
+        def slice(tuple) do
+          {:ok, tuple_size(tuple), &Tuple.to_list/1}
+        end
+      end
+
+      Enum.map({1, 2, 3, 4}, fn x -> x + 1 end)
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result([2, 3, 4, 5])
+  end
 end
