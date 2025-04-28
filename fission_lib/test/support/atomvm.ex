@@ -130,6 +130,15 @@ defmodule FissionLib.Support.AtomVM do
         {:error, _reason} -> nil
       end
 
+    Logger.info("""
+    Evaluating code on AtomVM finished
+    exit status: #{inspect(exit_status)}
+    log path: "#{log_path}"
+    rerun with lldb: AVM_RUN_DIR='#{run_dir}' lldb '#{@atomvm_path}' '#{bundle_path}'
+    result: #{inspect(result, pretty: true)}
+    output: #{if String.trim(output) == "", do: "no output generated", else: output}\
+    """)
+
     %{
       exit_status: exit_status,
       output: output,

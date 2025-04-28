@@ -4,13 +4,18 @@ defmodule FissionLib.HexdocsTestHelper do
   alias __MODULE__, as: Helper
   import FissionLib.Support.AsyncTest
 
-  defmacro test_ast(common, input, opts, tag) do
+  defmacro test_ast(common, input, opts, category, tags) do
+    tags = [category] ++ List.wrap(tags)
+
     quote do
       @tag skip: Keyword.get(unquote(opts), :skip, false)
-      @tag unquote(tag)
+      for tag <- unquote(tags) do
+        @tag tag
+      end
+
       async_test Helper.test_name(
                    unquote(common) <> unquote(input),
-                   unquote(tag)
+                   unquote(category)
                  ),
                  %{tmp_dir: dir} do
         {opts, unsupported} = supported_opts(unquote(opts))
@@ -69,8 +74,10 @@ defmodule FissionLib.HexdocsTestHelper do
     end
   end
 
-  defmacro create_tests(test_cases, tag: tag) do
+  defmacro create_tests(test_cases, opts \\ []) do
     caller = __CALLER__
+    category = Keyword.fetch!(opts, :category)
+    tags = Keyword.get_values(opts, :tag)
 
     test_cases_ast =
       test_cases
@@ -84,7 +91,7 @@ defmodule FissionLib.HexdocsTestHelper do
 
             [
               quote do
-                test_ast("", unquote(input), unquote(opts), unquote(tag))
+                test_ast("", unquote(input), unquote(opts), unquote(category), unquote(tags))
               end
             ]
 
@@ -97,7 +104,8 @@ defmodule FissionLib.HexdocsTestHelper do
                   unquote(common),
                   unquote(case),
                   Keyword.merge(unquote(opts), unquote(case_opts)),
-                  unquote(tag)
+                  unquote(category),
+                  unquote(tags)
                 )
               end
             end
@@ -176,7 +184,7 @@ defmodule FissionLib.HexdocsTest do
       output: "hello world"
     }
   ]
-  |> create_tests(tag: :introduction)
+  |> create_tests(category: :introduction)
 
   # Basic types
   [
@@ -285,7 +293,7 @@ defmodule FissionLib.HexdocsTest do
     {"1 == 2.0", output: false},
     {"1 === 1.0", output: false}
   ]
-  |> create_tests(tag: :basic_types)
+  |> create_tests(category: :basic_types)
 
   # Case, cond, and if
   [
@@ -420,7 +428,7 @@ defmodule FissionLib.HexdocsTest do
       output: "1 is considered as true"
     }
   ]
-  |> create_tests(tag: :case_cond_if)
+  |> create_tests(category: :case_cond_if)
 
   # Anonymous functions
   [
@@ -566,7 +574,7 @@ defmodule FissionLib.HexdocsTest do
       output: "Good morning"
     }
   ]
-  |> create_tests(tag: :anonymous_functions)
+  |> create_tests(category: :anonymous_functions)
 
   # Binaries
   [
@@ -701,15 +709,14 @@ defmodule FissionLib.HexdocsTest do
     {~s|"he" ++ "llo"|, raises: ArgumentError},
     {~s|"he" <> "llo"|, output: "hello"}
   ]
-  |> create_tests(tag: :binaries)
+  |> create_tests(category: :binaries)
 
   # Keyword lists, maps
   [
     {~s|String.split("1 2 3 4", " ")|, output: ["1", "2", "3", "4"]},
     {~s|String.split("1 2 3 4", " ", [parts: 3])|, output: ["1", "2", "3 4"]},
     {~s|String.split("1  2  3  4", " ", [parts: 3])|, output: ["1", "", "2  3  4"]},
-    {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|,
-     output: ["1", "2", " 3  4"]},
+    {~s|String.split("1  2  3  4", " ", [parts: 3, trim: true])|, output: ["1", "2", " 3  4"]},
     {"[{:parts, 3}, {:trim, true}] == [parts: 3, trim: true]", output: true},
     {
       """
@@ -796,7 +803,7 @@ defmodule FissionLib.HexdocsTest do
       ]
     }
   ]
-  |> create_tests(tag: :kw_maps)
+  |> create_tests(category: :kw_maps)
 
   # Modules
   [
@@ -899,7 +906,7 @@ defmodule FissionLib.HexdocsTest do
       ]
     }
   ]
-  |> create_tests(tag: :modules)
+  |> create_tests(category: :modules)
 
   # Recursion
   [
@@ -966,7 +973,7 @@ defmodule FissionLib.HexdocsTest do
     {"Enum.map([1, 2, 3], fn x -> x * 2 end)", output: [2, 4, 6]},
     {"Enum.map([1, 2, 3], &(&1 * 2))", output: [2, 4, 6]}
   ]
-  |> create_tests(tag: :recursion)
+  |> create_tests(category: :recursion)
 
   # Enumerables
   [
@@ -1018,7 +1025,7 @@ defmodule FissionLib.HexdocsTest do
       output: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1]
     }
   ]
-  |> create_tests(tag: :enums)
+  |> create_tests(category: :enums)
 
   # Processes
   [
@@ -1127,7 +1134,7 @@ defmodule FissionLib.HexdocsTest do
       output: :world
     }
   ]
-  |> create_tests(tag: :processes)
+  |> create_tests(category: :processes)
 
   # IO
   # Most are commented out: we're not supporting stdin and we don't have sample file
@@ -1207,7 +1214,7 @@ defmodule FissionLib.HexdocsTest do
       output: :ok, stdout: "Olá Mary!\n", skip: true
     }
   ]
-  |> create_tests(tag: :io)
+  |> create_tests(category: :io)
 
   # Alias, require, use
   [
@@ -1308,7 +1315,7 @@ defmodule FissionLib.HexdocsTest do
       output: Foo.Bar.Baz, skip: true
     }
   ]
-  |> create_tests(tag: :alias_require)
+  |> create_tests(category: :alias_require)
 
   # Module attributes
   [
@@ -1359,7 +1366,7 @@ defmodule FissionLib.HexdocsTest do
       predicate: &AtomVM.assert_is_module/1
     }
   ]
-  |> create_tests(tag: :module_attrs)
+  |> create_tests(category: :module_attrs)
 
   # Structs
   [
@@ -1432,7 +1439,7 @@ defmodule FissionLib.HexdocsTest do
       raises: ArgumentError, skip: true
     }
   ]
-  |> create_tests(tag: :structs)
+  |> create_tests(category: :structs)
 
   # Protocols
   [
@@ -1454,7 +1461,7 @@ defmodule FissionLib.HexdocsTest do
       Utility.type("foo")
       Utility.type(123)
       """,
-      output: "integer", skip: true
+      output: "integer"
     },
     {
       """
@@ -1494,13 +1501,17 @@ defmodule FissionLib.HexdocsTest do
             def size(set), do: MapSet.size(set)
           end
 
+          set = %MapSet{} = MapSet.new([])
           Size.size(set)
           """,
           output: 0
         }
-      ],
-      skip: true
-    },
+      ]
+    }
+  ]
+  |> create_tests(category: :protocols, tag: :long_running, tag: [timeout: :timer.minutes(15)])
+
+  [
     {"Enum.reduce(1..3, 0, fn x, acc -> x + acc end)", output: 6},
     {~s|"age: \#{25}"|, output: "age: 25"},
     {
@@ -1508,7 +1519,7 @@ defmodule FissionLib.HexdocsTest do
       tuple = {1, 2, 3}
       "tuple: \#{tuple}"
       """,
-      output: Protocol.UndefinedError, skip: true
+      raises: Protocol.UndefinedError
     },
     {
       """
@@ -1519,7 +1530,7 @@ defmodule FissionLib.HexdocsTest do
     },
     {"inspect &(&1+2)", predicate: &(&1 =~ "#Function"), skip: true}
   ]
-  |> create_tests(tag: :protocols)
+  |> create_tests(category: :protocols)
 
   # Comprehensions
   [
@@ -1572,7 +1583,7 @@ defmodule FissionLib.HexdocsTest do
     #   output: :todo
     # }
   ]
-  |> create_tests(tag: :comprehensions)
+  |> create_tests(category: :comprehensions)
 
   # Sigils
   [
@@ -1650,7 +1661,7 @@ defmodule FissionLib.HexdocsTest do
       skip: true
     }
   ]
-  |> create_tests(tag: :sigils)
+  |> create_tests(category: :sigils)
 
   # Try, catch, raise
   [
@@ -1742,7 +1753,7 @@ defmodule FissionLib.HexdocsTest do
       output: :rescued
     }
   ]
-  |> create_tests(tag: :try_catch)
+  |> create_tests(category: :try_catch)
 
   # Optional syntax
   [
@@ -1768,7 +1779,7 @@ defmodule FissionLib.HexdocsTest do
       predicate: &AtomVM.assert_is_module/1
     }
   ]
-  |> create_tests(tag: :optional_syntax)
+  |> create_tests(category: :optional_syntax)
 
   # Erlang libraries
   [
@@ -1890,7 +1901,7 @@ defmodule FissionLib.HexdocsTest do
       skip: true
     }
   ]
-  |> create_tests(tag: :erlang_libraries)
+  |> create_tests(category: :erlang_libraries)
 
   # Debugging
   [
@@ -1925,7 +1936,7 @@ defmodule FissionLib.HexdocsTest do
       """
     }
   ]
-  |> create_tests(tag: :debugging)
+  |> create_tests(category: :debugging)
 
   # Enum cheatsheet
   [
@@ -2530,5 +2541,5 @@ defmodule FissionLib.HexdocsTest do
       output: ["apple", ", ", "banana", ", ", "orange"]
     }
   ]
-  |> create_tests(tag: :enum_cheatsheet)
+  |> create_tests(category: :enum_cheatsheet)
 end
