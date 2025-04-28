@@ -1,21 +1,24 @@
-# GameOfLife
+# GameOfLife Pocporn demo
 
-**TODO: Add description**
+Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Pocporn
 
-## Installation
+## Code usage
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `game_of_life` to your list of dependencies in `mix.exs`:
+With the `GameOfLife.Application` started, the simulation can be run by calling `GameOfLife.Supervisor.start_link` and then calling `GameOfLife.Grid.tick` to trigger next generation.
 
-```elixir
-def deps do
-  [
-    {:game_of_life, "~> 0.1.0"}
-  ]
-end
-```
+See the [AVM entrypoint](./lib/game_of_life.ex)
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/game_of_life>.
+## Running on AtomVM
 
+1. `mix deps.get`
+2. `mix compile`
+3. `/path_to_atom_vm _build/dev/bundle.avm`
+
+## Running in WASM
+
+1. `mix deps.get`
+2. `mix compile`
+3. Copy or symlink `AtomVM.js` & `AtomVM.wasm` into `wasm` folder
+4. Run `elixir wasm/server.exs`
+5. Open `http://localhost:4000/index.html`
+6. Check the console for output

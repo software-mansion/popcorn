@@ -1,10 +1,13 @@
 defmodule GameOfLife do
   @moduledoc """
-  Documentation for `GameOfLife`.
+  The entrypoint for AVM bundle. See `start/0`
   """
 
   alias GameOfLife.Grid
 
+  @doc """
+  A simple, example simulation with 3x3 grid and 5 generations
+  """
   def start() do
     {:ok, _app} = GameOfLife.Application.start(:normal, [])
 
@@ -27,6 +30,7 @@ defmodule GameOfLife do
   end
 
   defp puts(str) do
+    # Console is missing in Elixir, IO.puts fails on AtomVM
     case Code.ensure_loaded(Console) do
       {:module, Console} ->
         Console.puts(str)
