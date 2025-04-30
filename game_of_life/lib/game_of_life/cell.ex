@@ -1,20 +1,24 @@
 defmodule GameOfLife.Cell do
   use GenServer
 
-  alias GameOfLife.Grid
+  alias GameOfLife.{Grid, Simulation}
 
-  # @type t :: %__MODULE__{
-  #         alive?: boolean(),
-  #         neighbours: [pid()],
-  #         epoch: non_neg_integer()
-  #       }
+  @type t :: %__MODULE__{
+          game_id: Simulation.id(),
+          coords: Grid.coords(),
+          neighbours: [Grid.coords()],
+          epochs: [{non_neg_integer(), boolean()}],
+          pending_epoch: %{atom() => term()}
+        }
   defstruct game_id: nil,
             coords: nil,
             neighbours: [],
-            parent: nil,
             epochs: [],
             pending_epoch: nil
 
+  @doc """
+  Child specification to start `GameOfLife.Cell` as part of supervision tree
+  """
   def child_spec(args) do
     game_id = Keyword.fetch!(args, :game_id)
     size = Keyword.fetch!(args, :size)
@@ -27,16 +31,31 @@ defmodule GameOfLife.Cell do
     }
   end
 
+  @doc """
+  Starts a cell with provided initial state and register it in `GameOfLife.Simulation.registry/0`
+  """
+  @spec start_link(Simulation.id(), Grid.coords(), Grid.size(), boolean()) :: GenServer.on_start()
   def start_link(game_id, coords, size, alive?) do
     GenServer.start_link(__MODULE__, {game_id, coords, size, alive?},
       name: GameOfLife.Simulation.cell_via_tuple(game_id, coords)
     )
   end
 
+  @doc """
+  Gets the status of `GameOfLife.Cell` in provided epoch.
+
+  Returns boolean status
+  """
+  @spec alive?(GenServer.server(), epoch) :: boolean() when epoch: :current | non_neg_integer()
   def alive?(cell, epoch \\ :current) do
     GenServer.call(cell, {:alive?, epoch})
   end
 
+  @doc """
+  Starts a new epoch for the cell.
+
+  It initiates gathering status of the neighbours that results in calculating a new status
+  """
   def tick(cell) do
     GenServer.cast(cell, {:tick, self()})
   end
@@ -115,6 +134,15 @@ defmodule GameOfLife.Cell do
     {:noreply, %{state | pending_epoch: stats, epochs: epochs}}
   end
 
+  @doc """
+  Calculates neighbouring coordinates for provided `x` and `y` on the grid of provided size
+  """
+  @spec neighbours(
+          x :: non_neg_integer(),
+          y :: non_neg_integer(),
+          xSize :: pos_integer(),
+          ySize :: pos_integer()
+        ) :: [Grid.coords()]
   def neighbours(x, y, xSize, ySize) do
     for dx <- [-1, 0, 1], dy <- [-1, 0, 1], dx != 0 or dy != 0 do
       {x + dx, y + dy}
