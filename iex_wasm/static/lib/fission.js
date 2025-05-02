@@ -238,8 +238,8 @@ export class Fission {
       throw new Error("WASM iframe not mounted for reload");
     }
 
-    this.deinit();
     const container = this._iframe.parentElement;
+    this.deinit();
     this._mount(container);
   }
 

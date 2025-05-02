@@ -1,7 +1,7 @@
 defmodule App do
   use GenServer
-  import App.Fission, only: [is_wasm_message: 1]
-  alias App.Fission
+  import FissionLib.Wasm, only: [is_wasm_message: 1]
+  alias FissionLib.Wasm
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, nil, name: :main)
@@ -15,9 +15,8 @@ defmodule App do
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    raw_msg
-    |> Fission.dispatch_wasm_message(state, &handle_wasm/2)
-    |> then(fn {_reply, new_state} -> {:noreply, new_state} end)
+    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    {:noreply, new_state}
   end
 
   defp handle_wasm({:wasm_call, [action, code]}, state) do

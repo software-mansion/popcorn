@@ -34,8 +34,9 @@ defmodule FissionLib do
       )
       |> Map.new()
 
-    fission_lib_artifacts = Path.wildcard("#{@app_path}/**/*")
-    artifacts = [options.fission_lib_path | options.artifacts -- fission_lib_artifacts]
+    fission_lib_artifacts = Path.wildcard("#{@app_path}/**/*.Wasm.beam")
+    fission_lib_private_artifacts = Path.wildcard("#{@app_path}/**/*") -- fission_lib_artifacts
+    artifacts = [options.fission_lib_path | options.artifacts -- fission_lib_private_artifacts]
 
     :packbeam_api.create(~c"#{options.out_path}", Enum.map(artifacts, &String.to_charlist/1), %{
       start_module: options.start_module
