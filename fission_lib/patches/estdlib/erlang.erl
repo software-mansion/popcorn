@@ -3171,6 +3171,6 @@ phash2(Term, N) ->
     Bin = erlang:term_to_binary(Term),
     Bytes = erlang:ceil(math:log2(N) / 8),
     <<Hash:Bytes/integer-unit:8, _Rest/binary>> = erlang:md5(Bin),
-    (Hash rem N) + 1.
+    (Hash rem N).
 
-phash(Term, N) -> phash2(Term, N).
+phash(Term, N) -> phash2(Term, N) + 1.
