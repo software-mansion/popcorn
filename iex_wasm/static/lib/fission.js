@@ -46,7 +46,7 @@ export class Fission {
   constructor(params, token) {
     if (token !== INIT_TOKEN) {
       throw new Error(
-        "Don't construct object directly, use Fission.init() instead",
+        "Don't construct the Fission object directly, use Fission.init() instead",
       );
     }
     const { bundleName, onStderr, onStdout, heartbeatTimeoutMs, debug } =
@@ -68,7 +68,7 @@ export class Fission {
 
   static async init({ container, ...constructorParams }) {
     const fission = new Fission(constructorParams, INIT_TOKEN);
-    await fission._mount(container);
+    await fission._mount(container ?? document.body);
     return fission;
   }
 
@@ -87,11 +87,11 @@ export class Fission {
             <head>
               <meta name="bundle-name" content="${this._bundleName}" />
             </head>
-            <script type="module" src="fission.js" defer></script>
-            <script type="module" src="AtomVM.mjs" defer></script>
-            <script type="module" src="fission_iframe.js" defer></script>
+            <script type="module" src="./lib/fission.js" defer></script>
+            <script type="module" src="./wasm/AtomVM.mjs" defer></script>
+            <script type="module" src="./lib/fission_iframe.js" defer></script>
             <script type="module" defer>
-              import { initVm } from "./fission_iframe.js";
+              import { initVm } from "./lib/fission_iframe.js";
               initVm();
             </script>
         </html>`;

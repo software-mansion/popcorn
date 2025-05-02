@@ -1,16 +1,26 @@
 defmodule App do
-  use App.Fission.JsServer
+  use GenServer
+  import App.Fission, only: [is_wasm_message: 1]
+  alias App.Fission
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, nil, name: :main)
   end
 
+  @impl GenServer
   def init(_args) do
     Process.register(self(), :main)
     {:ok, nil}
   end
 
-  def handle_js_call({action, code}, _promise, state) do
+  @impl GenServer
+  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
+    raw_msg
+    |> Fission.dispatch_wasm_message(state, &handle_wasm/2)
+    |> then(fn {_reply, new_state} -> {:noreply, new_state} end)
+  end
+
+  defp handle_wasm({:wasm_call, [action, code]}, state) do
     type = as_type(action)
 
     try do

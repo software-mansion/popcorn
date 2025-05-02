@@ -1,4 +1,4 @@
-import { Fission } from "./fission.js";
+import { Fission } from "./lib/fission.js";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const LANGUAGE_ERLANG = "erlang";
@@ -47,7 +47,6 @@ async function setup() {
   const fission = await Fission.init({
     bundleName: "app.avm",
     debug: true,
-    container: document.body,
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });

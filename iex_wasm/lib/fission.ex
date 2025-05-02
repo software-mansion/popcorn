@@ -1,87 +1,37 @@
-defmodule App.Fission.JsServer do
-  @callback init(init_arg :: term) :: {:ok, state} when state: any
+defmodule App.Fission do
+  defguard is_wasm_message(msg) when elem(msg, 0) == :emscripten
 
-  @callback handle_js_call(request :: term, promise :: term, state :: term) ::
-              {:resolve, reply, new_state}
-              | {:reject, reply, new_state}
-              | {:noreply, new_state}
-              | {:stop, reason, reply, new_state}
-              | {:stop, reason, new_state}
-            when reply: term, new_state: term, reason: term
+  def dispatch_wasm_message({:emscripten, {:call, promise, message}}, state, handler) do
+    message
+    |> deserialize()
+    |> then(&{:wasm_call, &1})
+    |> handler.(state)
+    |> case do
+      {:resolve, reply, new_state} ->
+        resolve(reply, promise)
+        {reply, new_state}
 
-  @callback handle_js_cast(request :: term, state :: term) ::
-              {:noreply, new_state}
-              | {:stop, reason :: term, new_state}
-            when new_state: term
-
-  @optional_callbacks handle_js_cast: 2,
-                      handle_js_call: 3
-
-  @type name :: atom | {:global, term} | {:via, module, term}
-  @type option :: {:name, name} | {:timeout, timeout}
-
-  defmacro __using__(_opts) do
-    alias App.Fission.JsServer
-
-    quote location: :keep do
-      @behaviour GenServer
-
-      def handle_info({:emscripten, {:call, promise, message}}, state) do
-        message
-        |> JsServer.deserialize()
-        |> handle_js_call(promise, state)
-        |> case do
-          {:resolve, reply, new_state} ->
-            JsServer.resolve(reply, promise)
-            {:noreply, new_state}
-
-          {:reject, reply, new_state} ->
-            JsServer.reject(reply, promise)
-            {:noreply, new_state}
-
-          {:noreply, new_state} ->
-            {:noreply, new_state}
-
-          {:stop, reason, reply, new_state} ->
-            JsServer.reject(reply, promise)
-            {:stop, reason, new_state}
-
-          {:stop, reason, new_state} ->
-            {:stop, reason, new_state}
-        end
-      end
-
-      @doc false
-      def handle_js_call(msg, _promise, state) do
-        {:stop, :not_implemented, state}
-      end
-
-      @doc false
-      def handle_js_cast(msg, state) do
-        {:stop, :not_implemented, state}
-      end
-
-      defoverridable handle_js_cast: 2, handle_js_call: 3
+      {:reject, reply, new_state} ->
+        reject(reply, promise)
+        {reply, new_state}
     end
   end
 
   def resolve(term, promise) do
-    apply(:emscripten, :promise_resolve, [promise, serialize(term)])
+    :emscripten.promise_resolve(promise, serialize(term))
   end
 
   def reject(term, promise) do
-    apply(:emscripten, :promise_reject, [promise, serialize(term)])
+    :emscripten.promise_reject(promise, serialize(term))
   end
 
   @doc false
   def deserialize(message) do
-    message
-    |> String.split(":", parts: 2)
-    |> List.to_tuple()
+    String.split(message, ":", parts: 2)
   end
 
   @doc false
   def serialize(term) do
-    :io_lib.format(~c"~p", [term])
+    inspect(term)
   end
 end

@@ -8,6 +8,7 @@ defmodule IexWasm.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       compilers: Mix.compilers() ++ [:fission_lib],
+      elixirc_options: [no_warn_undefined: [:emscripten]],
       deps: deps()
     ]
   end
