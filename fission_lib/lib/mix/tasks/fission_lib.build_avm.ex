@@ -27,6 +27,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
   @requirements "deps.compile"
 
   @build_dir Mix.Project.app_path()
+  @priv_dir :code.priv_dir(:fission_lib)
   @config FissionLib.Config.get([:avm_source])
   @options_defaults %{target: "unix", out_dir: ".", out_name: "AtomVM", cmake_opts: ""}
 
@@ -74,7 +75,11 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
         )
 
         cmd(~w"emmake make -j", cd: build_dir)
-        cp_artifact("src/AtomVM.js", build_dir, options)
+        wasm_template_dir = Path.join([@priv_dir, "static-template", "wasm"])
+        File.mkdir_p!(options.out_dir)
+        File.cp_r!(wasm_template_dir, options.out_dir)
+
+        cp_artifact("src/AtomVM.mjs", build_dir, options)
         cp_artifact("src/AtomVM.wasm", build_dir, options)
     end
   end

@@ -27,3 +27,6 @@ iex_wasm-*.tar
 
 # ignore DS_Store
 .DS_Store
+
+# secret config
+config.secret.exs

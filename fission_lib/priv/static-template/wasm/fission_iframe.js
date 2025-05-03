@@ -1,4 +1,4 @@
-import init from "../wasm/AtomVM.mjs";
+import init from "./AtomVM.mjs";
 
 const MESSAGES = {
   INIT: "fission-init",
@@ -15,10 +15,10 @@ const HEARTBEAT_INTERVAL_MS = 500;
 let Module = null;
 
 export async function initVm() {
-  const bundleName = document.querySelector('meta[name="bundle-name"]').content;
+  const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
 
   Module = await init({
-    arguments: ["../" + bundleName],
+    arguments: [bundlePath],
     onRuntimeInitialized: onVmInit,
     print(text) {
       send(MESSAGES.STDOUT, text);

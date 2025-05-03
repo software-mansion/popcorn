@@ -32,7 +32,7 @@ export class Fission {
   heartbeatTimeoutMs = null;
 
   _debug = false;
-  _bundleName = null;
+  _bundlePath = null;
   _initProcess = null;
 
   _requestId = 0;
@@ -49,14 +49,14 @@ export class Fission {
         "Don't construct the Fission object directly, use Fission.init() instead",
       );
     }
-    const { bundleName, onStderr, onStdout, heartbeatTimeoutMs, debug } =
+    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
       params;
-    if (bundleName === undefined) {
-      throw new Error("bundleName is required");
+    if (bundlePath === undefined) {
+      throw new Error("bundle path is required");
     }
 
     this._debug = debug;
-    this._bundleName = bundleName;
+    this._bundlePath = bundlePath;
     this.onStdout = onStdout ?? noop;
     this.onStderr = onStderr ?? noop;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
@@ -81,17 +81,25 @@ export class Fission {
       // will be resolved on init message from iframe
       this._mountPromise = resolve;
 
+      // example pathname: "/wasm/fission.js"
+      const pathName = URL.parse(import.meta.url).pathname;
+      const lastPart = /[^/]+$/;
+      const leadingSlash = /^\//;
+      const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
+
+      const bundleDir = "../".repeat(dir.split("/").length - 1);
+
       this._iframe = document.createElement("iframe");
       this._iframe.srcdoc = `<html>
         <html lang="en" dir="ltr">
             <head>
-              <meta name="bundle-name" content="${this._bundleName}" />
+              <meta name="bundle-path" content="${bundleDir + this._bundlePath}" />
             </head>
-            <script type="module" src="./lib/fission.js" defer></script>
-            <script type="module" src="./wasm/AtomVM.mjs" defer></script>
-            <script type="module" src="./lib/fission_iframe.js" defer></script>
+            <script type="module" src="./${dir}fission.js" defer></script>
+            <script type="module" src="./${dir}AtomVM.mjs" defer></script>
+            <script type="module" src="./${dir}fission_iframe.js" defer></script>
             <script type="module" defer>
-              import { initVm } from "./lib/fission_iframe.js";
+              import { initVm } from "./${dir}fission_iframe.js";
               initVm();
             </script>
         </html>`;
