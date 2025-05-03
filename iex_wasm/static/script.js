@@ -102,7 +102,7 @@ async function sendEvalRequest(fission, code) {
 
   try {
     const action = getEvalAction(code);
-    const { data, durationMs } = await fission.call(action, code, {
+    const { data, durationMs } = await fission.call([action, code], {
       timeoutMs: 10_000,
     });
     Elements.stateDisplay.textContent = "Done.";

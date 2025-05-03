@@ -129,8 +129,7 @@ export class Fission {
     this._listenerRef = null;
   }
 
-  // TODO: collapse action and args into one argument
-  async call(action, args, { process, timeoutMs }) {
+  async call(args, { process, timeoutMs }) {
     const targetProcess = process ?? this._initProcess;
     if (this.iframe === null) {
       throw new Error("WASM iframe not mounted");
@@ -144,7 +143,6 @@ export class Fission {
       this._send(MESSAGES.CALL, {
         requestId,
         process: targetProcess,
-        action,
         args,
       });
 
@@ -161,8 +159,7 @@ export class Fission {
     return result;
   }
 
-  // TODO: collapse action and args into one argument
-  cast(action, args, { process }) {
+  cast(args, { process }) {
     const targetProcess = process ?? this._initProcess;
     if (this.iframe === null) {
       throw new Error("WASM iframe not mounted");
@@ -175,7 +172,6 @@ export class Fission {
     this._send(MESSAGES.CAST, {
       requestId,
       process: targetProcess,
-      action,
       args,
     });
   }

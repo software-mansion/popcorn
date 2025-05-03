@@ -19,7 +19,6 @@ export async function initVm() {
 
   Module = await init({
     arguments: [bundlePath],
-    onRuntimeInitialized: onVmInit,
     print(text) {
       send(MESSAGES.STDOUT, text);
     },
@@ -27,46 +26,73 @@ export async function initVm() {
       send(MESSAGES.STDERR, text);
     },
   });
+
+  Module["serialize"] = JSON.stringify;
+  Module["deserialize"] = deserialize;
+  Module["cleanupFunctions"] = new Map();
+  Module["onRemoteObjectDelete"] = (key) => {
+    const fns = Module["cleanupFunctions"];
+    const fn = fns.get(key);
+    fns.delete(key);
+    try {
+      fn?.();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const origCast = Module["cast"];
+  const origCall = Module["call"];
+  Module["cast"] = (process, args) => {
+    const serialized = Module.serialize(args);
+    origCast(process, serialized);
+  };
+  Module["call"] = (process, args) => {
+    const serialized = Module.serialize(args);
+    return origCall(process, serialized);
+  };
+  Module["onElixirReady"] = (initProcess) => {
+    onVmInit(initProcess);
+    Module["onElixirReady"] = null;
+  };
 }
 
-async function onVmInit() {
-  // TODO: implement full message receive from Elixir
-  await timeout(300);
+function onVmInit(initProcess) {
   setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
 
   window.addEventListener("message", async ({ data }) => {
     const type = data.type;
 
     if (type === MESSAGES.CALL) {
-      const { requestId, process, action, args } = data.value;
+      const { requestId, process, args } = data.value;
       send(MESSAGES.CALL_ACK, { requestId });
 
       try {
-        const result = await Module.call(process, serialize({ action, args }));
-        send(MESSAGES.CALL, { requestId, data: deserialize(result) });
+        const result = await Module.call(process, args);
+        send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
       } catch (error) {
-        send(MESSAGES.CALL, { requestId, error: deserialize(error) });
+        send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
       }
     } else if (type.startsWith("fission")) {
       `Iframe: received unhandled fission event: ${JSON.stringify(data, null, 4)}`;
     }
   });
-  send(MESSAGES.INIT, "main");
+  send(MESSAGES.INIT, initProcess);
 }
 
 function send(type, data) {
   window.parent.postMessage({ type, value: data });
 }
 
-function timeout(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function serialize({ action, args }) {
-  // TODO: serialize args
-  return [action, args].join(":");
-}
-
 function deserialize(message) {
-  return message;
+  return JSON.parse(message, (key, value) => {
+    const isRef =
+      typeof value === "object" &&
+      Object.hasOwn(value, "fission_ref") &&
+      Object.getOwnPropertyNames(value).length == 1;
+
+    if (!isRef) {
+      return value;
+    }
+    return Module.remoteObjectsMap.get(value.fission_ref);
+  });
 }

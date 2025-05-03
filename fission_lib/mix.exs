@@ -38,7 +38,8 @@ defmodule FissionLib.MixProject do
 
   defp deps do
     [
-      {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"}
+      {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
+      {:jason, "~> 1.4"}
     ]
   end
 end
