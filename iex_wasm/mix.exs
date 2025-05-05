@@ -8,7 +8,10 @@ defmodule IexWasm.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       compilers: Mix.compilers() ++ [:fission_lib],
-      deps: deps()
+      deps: deps(),
+      aliases: [
+        build_wasm: "fission_lib.build_avm --target wasm --out-dir static/wasm"
+      ]
     ]
   end
 

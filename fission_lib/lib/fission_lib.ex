@@ -5,8 +5,8 @@ defmodule FissionLib do
   """
   require FissionLib.Config
 
-  @build_path Mix.Project.build_path()
-  @app_path Mix.Project.app_path()
+  @app_build_root Mix.Project.build_path()
+  @fission_path Mix.Project.app_path()
 
   @config FissionLib.Config.get([:start_module, :out_path])
 
@@ -24,25 +24,50 @@ defmodule FissionLib do
           | {:artifacts, [String.t()]}
         ]) :: :ok
   def pack(options \\ []) do
-    options =
-      options
-      |> Keyword.validate!(
-        out_path: @config.out_path,
-        start_module: @config.start_module,
-        fission_lib_path: "#{@app_path}/fission_lib.avm",
-        artifacts: Path.wildcard("#{@build_path}/**/*.{beam,app}")
-      )
-      |> Map.new()
+    all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
+    fission_library_path = Path.join(@fission_path, "fission_lib.avm")
 
-    fission_lib_artifacts = Path.wildcard("#{@app_path}/**/*")
-    artifacts = [options.fission_lib_path | options.artifacts -- fission_lib_artifacts]
+    default_options = [
+      out_path: @config.out_path,
+      start_module: @config.start_module,
+      fission_lib_path: fission_library_path,
+      artifacts: all_beams
+    ]
 
-    :packbeam_api.create(~c"#{options.out_path}", Enum.map(artifacts, &String.to_charlist/1), %{
-      start_module: options.start_module
-    })
-    |> case do
+    options = options |> Keyword.validate!(default_options) |> Map.new()
+    artifacts = bundled_artifacts(options.artifacts, options.fission_lib_path)
+
+    case pack_bundle(options.out_path, artifacts, options.start_module) do
       :ok -> :ok
       {:error, reason} -> raise "Packing error, reason: #{inspect(reason)}"
+    end
+  end
+
+  defp bundled_artifacts(all_beams, fission_library_path) do
+    fission_lib_files = Path.wildcard(Path.join([@fission_path, "**", "*"]))
+    [wasm_lib_beam] = Path.wildcard(Path.join([@fission_path, "**", "*.Wasm.beam"]))
+
+    # include stdlib bundle, Fission.Wasm beam and filter other fission beams
+    [fission_library_path, wasm_lib_beam | all_beams -- fission_lib_files]
+  end
+
+  defp pack_bundle(output_path, beams, start_module) do
+    output_directory = Path.dirname(output_path)
+
+    # packbeam appends to the bundle if output exists, we need to delete it first
+    with :ok <- maybe_rm(output_path),
+         :ok <- File.mkdir_p(output_directory) do
+      output_path = to_charlist(output_path)
+      beams = Enum.map(beams, &String.to_charlist/1)
+      :packbeam_api.create(output_path, beams, %{start_module: start_module})
+    end
+  end
+
+  defp maybe_rm(path) do
+    case File.rm(path) do
+      :ok -> :ok
+      {:error, :enoent} -> :ok
+      error -> error
     end
   end
 end

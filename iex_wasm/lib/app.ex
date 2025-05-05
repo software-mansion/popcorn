@@ -1,35 +1,45 @@
 defmodule App do
-  def start() do
-    Console.print("Starting interpreter...\n")
+  use GenServer
+  import FissionLib.Wasm, only: [is_wasm_message: 1]
+  alias FissionLib.Wasm
+
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, nil, name: :main)
+  end
+
+  @impl GenServer
+  def init(_args) do
     Process.register(self(), :main)
-    loop()
+    {:ok, nil}
   end
 
-  defp loop() do
-    receive do
-      {:emscripten, {:call, promise, message}} ->
-        {type, code} = type(message)
+  @impl GenServer
+  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
+    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    {:noreply, new_state}
+  end
 
-        code
-        |> eval(type)
-        |> resolve(promise)
+  defp handle_wasm({:wasm_call, [action, code]}, state) do
+    type = as_type(action)
+
+    try do
+      {:resolve, eval(code, type), state}
+    rescue
+      error -> {:reject, error, state}
     end
-
-    loop()
   end
 
-  defp type("eval:elixir:" <> code), do: {:elixir, code}
-  defp type("eval:erlang:" <> code), do: {:erlang, code}
-  defp type("eval_module:erlang:" <> code), do: {{:module, :erlang}, code}
+  defp as_type("eval_elixir"), do: :elixir
+  defp as_type("eval_erlang"), do: :erlang
+  defp as_type("eval_erlang_module"), do: {:module, :erlang}
 
   defp eval(code, :elixir) do
     unless Process.whereis(:elixir_config) do
       :elixir.start([], [])
     end
 
-    code
-    |> Code.eval_string([], __ENV__)
-    |> elem(0)
+    {evaluated, _new_bindings} = Code.eval_string(code, [], __ENV__)
+    evaluated
   end
 
   defp eval(code, {:module, :erlang}) do
@@ -55,10 +65,8 @@ defmodule App do
            |> Enum.map(parse_form)
            |> :compile.noenv_forms(compile_opts),
          {:module, _module} <- :code.load_binary(module, ~c"nofile", module_bin) do
-      :ok
+      module
     end
-  rescue
-    error -> {:error, error, __STACKTRACE__}
   end
 
   defp eval(code, :erlang) do
@@ -69,13 +77,6 @@ defmodule App do
          {:value, value, _bindings} <- :erl_eval.exprs(exprs, []) do
       value
     end
-  rescue
-    error -> {:error, error, __STACKTRACE__}
-  end
-
-  defp resolve(term, promise) do
-    value = inspect(term)
-    :emscripten.promise_resolve(promise, value)
   end
 
   defp split_forms(forms) do

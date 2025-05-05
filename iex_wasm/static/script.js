@@ -1,9 +1,11 @@
-const LOG_TIMEOUT_MS = 1000;
+import { Fission } from "./wasm/fission.js";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
-const EVAL_ELIXIR = "eval:elixir";
-const EVAL_ERLANG = "eval:erlang";
-const EVAL_ERLANG_MODULE = "eval_module:erlang";
+const LANGUAGE_ERLANG = "erlang";
+const LANGUAGE_ELIXIR = "elixir";
+const EVAL_ELIXIR = "eval_elixir";
+const EVAL_ERLANG = "eval_erlang";
+const EVAL_ERLANG_MODULE = "eval_erlang_module";
 
 const Elements = {
   get evalButton() {
@@ -12,17 +14,14 @@ const Elements = {
   get moduleButton() {
     return document.getElementById("eval-module");
   },
-  get exampleCaseButton() {
-    return document.getElementById("example-case");
-  },
-  get exampleModuleButton() {
-    return document.getElementById("example-module");
-  },
   get clearButton() {
     return document.getElementById("clear");
   },
   get codeInput() {
     return document.getElementById("code");
+  },
+  get exampleButtons() {
+    return document.querySelectorAll('button[data-type="example"]');
   },
   get moduleInput() {
     return document.getElementById("module");
@@ -41,132 +40,88 @@ const Elements = {
   },
   get evalFrame() {
     return document.getElementById("evalFrame");
-  }
+  },
 };
 
-let EXAMPLES;
-if (LANGUAGE === "elixir") {
-  EXAMPLES = {
-    CASE: `
-case Enum.max([1, 2, 3]) do
-  3 -> {:ok, 3}
-  2 -> {:error, 2}
-end
-`.trim(),
-
-    MODULE: `
-defmodule Adder do
-  def add(a,b) do
-    a + b
-  end
-end
-
-{:sum, Adder.add(10, 20)}
-`.trim(),
-  };
-} else {
-  EXAMPLES = {
-    CASE: `
-case lists:max([1,3,2]) of
-  3 -> {ok, 3};
-  2 -> {error, 2}
-end.
-`.trim(),
-
-    MODULE: `
--module(basic).
--export([add/2]).
-
-add(A, B) -> A + B.
-`.trim(),
-  };
-}
-
-function setup() {
-  window.addEventListener("message", (e) => {
-    if (e.data.type == "log") {
-      displayLog(e.data.value, false);
-    } else if (e.data.type == "log_error") {
-      displayLog(e.data.value, true);
-    }
+async function setup() {
+  const fission = await Fission.init({
+    bundlePath: "wasm/app.avm",
+    debug: true,
+    onStdout: (text) => displayLog(text, { isError: false }),
+    onStderr: (text) => displayLog(text, { isError: true }),
   });
 
-  Elements.exampleCaseButton.onclick = () => {
-    setExample(EXAMPLES.CASE);
-  };
-  Elements.exampleModuleButton.onclick = () => {
-    setExample(EXAMPLES.MODULE);
-  };
-
-  if (LANGUAGE === "erlang") {
-    Elements.moduleButton.onclick = () => {
-      const code = Elements.moduleInput.value.trim();
-      evalCode(code);
+  Elements.exampleButtons.forEach((button) => {
+    button.onclick = () => {
+      const isModule = button.getAttribute("data-input") === "module";
+      const target = isModule ? Elements.moduleInput : Elements.codeInput;
+      target.textContent = button.value.trim();
     };
-  }
+  });
 
   Elements.clearButton.onclick = () => {
     Elements.logsDisplay.innerHTML = "";
   };
-  Elements.evalButton.onclick = () => {
-    const code = Elements.codeInput.value.trim();
-    evalCode(code);
-  };
-  Elements.codeInput.addEventListener("keydown", (event) => {
+
+  const evalButtons = [[Elements.evalButton, Elements.codeInput]];
+  if (LANGUAGE === LANGUAGE_ERLANG) {
+    evalButtons.push([Elements.moduleButton, Elements.moduleInput]);
+  }
+
+  for (const [button, input] of evalButtons) {
+    function evalCode() {
+      const code = input.value.trim();
+      sendEvalRequest(fission, code);
+    }
+
+    button.onclick = evalCode;
+    input.addEventListener("keydown", onCmdEnter(evalCode));
+  }
+}
+
+function onCmdEnter(fn) {
+  return (event) => {
     const cmdEnter = event.key === "Enter" && (event.metaKey || event.ctrlKey);
     if (cmdEnter) {
-      const code = Elements.codeInput.value.trim();
-      evalCode(code);
+      fn();
     }
-  });
+  };
 }
 
 function isErlangModule(code) {
   return code.startsWith("-module(");
 }
 
-function setExample(code) {
-  if (LANGUAGE === "erlang" && isErlangModule(code)) {
-    Elements.moduleInput.value = code;
-  } else {
-    Elements.codeInput.value = code;
-  }
-}
-
-async function evalCode(code) {
+async function sendEvalRequest(fission, code) {
   if (code === "") {
     return;
-  }
-
-  let command;
-  if (LANGUAGE === "elixir") {
-    command = `${EVAL_ELIXIR}:${code}`;
-  } else if (isErlangModule(code)) {
-    command = `${EVAL_ERLANG_MODULE}:${code}`;
-  } else {
-    command = `${EVAL_ERLANG}:${code}`;
   }
 
   Elements.stateDisplay.textContent = "Evaluating...";
   Elements.logsDisplay.innerHTML = "";
 
-  do {
-    Elements.evalFrame.contentWindow.postMessage({ type: "eval", value: command });
-  } while ("timeout" == await timeout(receiveMessage("evaluating"), 100))
-
-  const result = await receiveMessage("result");
-  if (result.status == "ok") {
+  try {
+    const action = getEvalAction(code);
+    const { data, durationMs } = await fission.call(action, code, {
+      timeoutMs: 10_000,
+    });
     Elements.stateDisplay.textContent = "Done.";
-    Elements.timeDisplay.textContent = `${result.dtMs.toFixed(3)} ms`;
-    Elements.resultDisplay.textContent = result.value;
-  } else if (result.status == "error") {
+    Elements.timeDisplay.textContent = `${durationMs.toFixed(3)} ms`;
+    Elements.resultDisplay.textContent = data;
+  } catch (error) {
     Elements.stateDisplay.textContent = "Evaluation error!";
     Elements.timeDisplay.textContent = "";
     Elements.resultDisplay.textContent = "";
   }
 }
 
-function displayLog(log, isError) {
+function getEvalAction(code) {
+  if (LANGUAGE === LANGUAGE_ELIXIR) return EVAL_ELIXIR;
+  if (isErlangModule(code)) return EVAL_ERLANG_MODULE;
+  return EVAL_ERLANG;
+}
+
+function displayLog(log, { isError }) {
   const lineElement = document.createElement("span");
   lineElement.textContent = log;
 
@@ -181,24 +136,4 @@ function displayLog(log, isError) {
   });
 }
 
-function receiveMessage(type) {
-  return new Promise(function (resolve) {
-    window.addEventListener("message", function messageListener(e) {
-      if (e.data.type == type) {
-        window.removeEventListener("message", messageListener);
-        resolve(e.data.value);
-      }
-    });
-  });
-}
-
-function timeout(promise, timeout) {
-  return Promise.race([
-    promise,
-    new Promise(function (resolve) {
-      setTimeout(function () { resolve("timeout"); }, timeout);
-    })
-  ]);
-}
-
-setup();
+await setup();
