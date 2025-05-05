@@ -3167,10 +3167,16 @@ fun_info(Fun) -> [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, typ
 %% Important: phash and phash2 are supposed to return
 %% the same values for the same arguments across platforms.
 %% This patch doesn't satisfy this requirement.
+%% 
+%% Note: it inherits limitations of `erlang:term_to_binary`.
+%% Any term not supported by that function will break phash/phash2 as well
+%% Special case for N = 1 allows to escape that limitation in some cases
+phash2(_Term, 1) -> 0;
+
 phash2(Term, N) ->
     Bin = erlang:term_to_binary(Term),
     Bytes = erlang:ceil(math:log2(N) / 8),
     <<Hash:Bytes/integer-unit:8, _Rest/binary>> = erlang:md5(Bin),
-    (Hash rem N) + 1.
+    (Hash rem N).
 
-phash(Term, N) -> phash2(Term, N).
+phash(Term, N) -> phash2(Term, N) + 1.

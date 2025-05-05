@@ -556,6 +556,18 @@ defmodule FissionLib.EvalTest do
 
   async_test ":erlang.phash/2 and phash2/2", %{tmp_dir: dir} do
     """
+    :erlang.phash({:a, 2.0, "foo"}, 1)
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(1)
+
+    """
+    :erlang.phash2({:a, 2.0, "foo"}, 1)
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(0)
+
+    """
     :erlang.phash({:a, 2.0, "foo"}, 18)
     """
     |> AtomVM.eval(:elixir, run_dir: dir)
@@ -565,7 +577,7 @@ defmodule FissionLib.EvalTest do
     :erlang.phash2({:a, 2.0, "foo"}, 18)
     """
     |> AtomVM.eval(:elixir, run_dir: dir)
-    |> AtomVM.assert_result(4)
+    |> AtomVM.assert_result(3)
   end
 
   async_test "Implement a protocol", %{tmp_dir: dir} do
