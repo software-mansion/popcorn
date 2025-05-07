@@ -147,6 +147,10 @@ defmodule GameOfLife.Cell do
     for dx <- [-1, 0, 1], dy <- [-1, 0, 1], dx != 0 or dy != 0 do
       {x + dx, y + dy}
     end
-    |> Enum.filter(fn {x, y} -> x >= 0 and x < xSize and y >= 0 and y < ySize end)
+    |> Enum.filter(&inside_grid?(&1, xSize, ySize))
+  end
+
+  defp inside_grid?({x, y}, xSize, ySize) do
+    x >= 0 and x < xSize and y >= 0 and y < ySize
   end
 end

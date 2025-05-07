@@ -63,7 +63,7 @@ defmodule GameOfLife.Simulation do
   @doc """
   Obtains a pid of `GameOfLife.Cell` with provided coords
   """
-  @spec cell_pid(term(), Grid.coords()) :: pid()
+  @spec cell_pid(term(), Grid.coords()) :: pid() | nil
   def cell_pid(game_id, coords) do
     with [{pid, _meta}] <- Registry.lookup(@registry_name, {game_id, coords}) do
       pid
@@ -83,7 +83,7 @@ defmodule GameOfLife.Simulation do
   @doc """
   Obtains a pid of `GameOfLife.Grid` for provided `game_id`
   """
-  @spec grid_pid(term()) :: pid()
+  @spec grid_pid(term()) :: pid() | nil
   def grid_pid(game_id) do
     with [{pid, _meta}] <- Registry.lookup(@registry_name, game_id) do
       pid

@@ -9,7 +9,8 @@ defmodule GameOfLife do
   A simple, example simulation with 3x3 grid and 5 generations
   """
   def start() do
-    {:ok, _app} = GameOfLife.Application.start(:normal, [])
+    puts("Starting simulation\n")
+    _ = GameOfLife.Application.start(:normal, [])
 
     {:ok, _sup, %{grid_pid: pid}} =
       GameOfLife.Supervisor.start_simulation(3, 3, [{0, 1}, {1, 1}, {2, 1}])
@@ -20,11 +21,14 @@ defmodule GameOfLife do
     puts("\n")
 
     for _ <- 1..5 do
-      grid = Grid.tick(pid)
-      grid_str = print_grid(grid)
-      puts(grid_str)
-      puts("\n")
+      _ = Grid.tick(pid)
     end
+
+    grid = Grid.tick(pid)
+    grid_str = print_grid(grid)
+    puts(grid_str)
+    puts("\n")
+    puts("Simulation ended\n")
 
     :ok
   end
