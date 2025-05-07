@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <title>GameOfLife AVM Demo</title>
+  </head>
+  <body>
+    <h1>Game of Life demo</h1>
+    <p>Please check the console for game_of_life output.</p>
+    <script>
+      // Arguments are loaded using fetch API.
+      var Module = {
+        arguments: ["bundle/bundle.avm"],
+      };
+    </script>
+    <script async src="AtomVM.js"></script>
+  </body>
+</html>
