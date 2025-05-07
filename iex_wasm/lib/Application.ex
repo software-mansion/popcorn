@@ -4,7 +4,7 @@ defmodule App.Application do
   def start do
     {:ok, pid} = GenServer.start_link(App, [])
     Process.register(pid, :main)
-    Wasm.send_elixir_ready("main")
+    Wasm.register("main")
     IO.puts("Starting interpreter...")
     Process.sleep(:infinity)
   end
