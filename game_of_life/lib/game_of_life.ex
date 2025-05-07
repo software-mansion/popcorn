@@ -4,6 +4,7 @@ defmodule GameOfLife do
   """
 
   alias GameOfLife.Grid
+  alias FissionLib.Wasm
 
   @doc """
   A simple, example simulation with 3x3 grid and 5 generations
@@ -11,6 +12,7 @@ defmodule GameOfLife do
   def start() do
     puts("Starting simulation\n")
     _ = GameOfLife.Application.start(:normal, [])
+    Wasm.register("main")
 
     {:ok, _sup, %{grid_pid: pid}} =
       GameOfLife.Supervisor.start_simulation(3, 3, [{0, 1}, {1, 1}, {2, 1}])
@@ -30,18 +32,12 @@ defmodule GameOfLife do
     puts("\n")
     puts("Simulation ended\n")
 
-    :ok
+    Process.sleep(:infinity)
   end
 
   defp puts(str) do
     # Console is missing in Elixir, IO.puts fails on AtomVM
-    case Code.ensure_loaded(Console) do
-      {:module, Console} ->
-        Console.puts(str)
-
-      _ ->
-        IO.puts(str)
-    end
+    IO.puts(str)
   end
 
   defp print_grid(grid) do

@@ -3,12 +3,11 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
   @moduledoc """
   #{@shortdoc}
 
-  Firstly, configure your project with
-
+  The AVM source defaults to FissionVM repo.
+  To use different source, configure your project with
   ```
   config :fission_lib, avm_source: <source>
   ```
-
   where the <source> can be:
   - `{:path, string}` - local path to AtomVM source
   - `{:git, address}` - GIT address to clone the AtomVM from
@@ -16,7 +15,7 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
     branch, tag or commit ref
 
   Then you can run this task with the following options:
-  - `target` - `unix` (default) or `wasm`
+  - `target` - `wasm` (default) `unix`
   - `out_dir` - where to output built artifacts (defaults to CWD)
   - `out_name` - used to name the built artifacts (defaults to "AtomVM")
   """
@@ -32,14 +31,6 @@ defmodule Mix.Tasks.FissionLib.BuildAvm do
   @options_defaults %{target: "unix", out_dir: ".", out_name: "AtomVM", cmake_opts: ""}
 
   def run(args) do
-    unless @config.avm_source do
-      raise """
-      Please configure AtomVM source with
-
-      config :fission_lib, avm_source: "path/to/atomvm"
-      """
-    end
-
     parser_config = [strict: @options_defaults |> Map.keys() |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(@options_defaults, Map.new(options))

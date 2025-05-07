@@ -8,7 +8,10 @@ defmodule GameOfLife.MixProject do
       elixir: "~> 1.17",
       compilers: Mix.compilers() ++ [:fission_lib],
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: [
+        build_wasm: "fission_lib.build_avm --target wasm --out-dir static/wasm"
+      ]
     ]
   end
 
