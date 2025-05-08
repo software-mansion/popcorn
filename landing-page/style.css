@@ -1,0 +1,189 @@
+@font-face {
+    font-family: "Aeonik";
+    src: url("assets/Aeonik-Regular.otf") format("opentype");
+}
+
+@font-face {
+    font-family: "Aeonik";
+    font-style: normal;
+    font-weight: 500;
+    src: url("assets/Aeonik-Medium.otf") format("opentype");
+}
+
+@font-face {
+    font-family: "Aeonik";
+    font-style: normal;
+    font-weight: 700;
+    src: url("assets/Aeonik-Bold.otf") format("opentype");
+}
+
+:root {
+    --swm-header: #001a72;
+    --swm-text: #232736;
+    --swm-background: #fcfcff;
+    --swm-yellow-100: #ffd61e;
+    --swm-red-100: #ff6259;
+    --swm-green-100: #57b495;
+    --swm-blue-100: #38acdd;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --swm-header: #fcfcff;
+        --swm-text: #c1c6e5;
+        --swm-background: #232736;
+        --swm-yellow-100: #fd4;
+        --swm-red-100: #ff7774;
+        --swm-green-100: #3fc684;
+        --swm-blue-100: #00a9f0;
+    }
+}
+
+main {
+    margin: 0 auto;
+    max-width: 60em;
+}
+body {
+    margin: 15px auto;
+    color: var(--swm-text);
+    background-color: var(--swm-background);
+    font-size: 18px;
+    line-height: 1.5;
+    font-family:
+        Aeonik,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        "Helvetica Neue",
+        Arial,
+        "Noto Sans",
+        sans-serif,
+        "Apple Color Emoji",
+        "Segoe UI Emoji",
+        "Segoe UI Symbol",
+        "Noto Color Emoji";
+}
+
+a {
+    color: var(--swm-text);
+}
+
+h1,
+h2,
+h3 {
+    color: var(--swm-header);
+    width: fit-content;
+}
+
+code {
+    text-wrap: nowrap;
+}
+
+pre {
+    border-width: 2px;
+    border-style: dashed;
+    border-color: var(--swm-text);
+    padding: 5px;
+    overflow: auto;
+}
+
+summary {
+    cursor: pointer;
+}
+
+.header {
+    color: var(--swm-text);
+}
+
+.popcorn {
+    padding: 0.5em;
+    color: var(--swm-text);
+    background-color: var(--swm-yellow-100);
+}
+@media (prefers-color-scheme: dark) {
+    .header {
+        color: var(--swm-header);
+    }
+    .popcorn {
+        color: var(--swm-background);
+    }
+}
+
+.api-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.js-method {
+    padding: 5px;
+    color: var(--swm-text);
+    background-color: var(--swm-green-100);
+}
+@media (prefers-color-scheme: dark) {
+    .js-method {
+        color: var(--swm-background);
+    }
+}
+
+.ex-function {
+    padding: 5px;
+    color: var(--swm-text);
+    background-color: var(--swm-blue-100);
+}
+@media (prefers-color-scheme: dark) {
+    .ex-function {
+        color: var(--swm-background);
+    }
+}
+
+.examples {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    background-color: var(--swm-green-100);
+    padding: 15px 0;
+    max-width: initial;
+    width: 100vw;
+    margin-left: 50%;
+    transform: translateX(-50%);
+}
+
+.example {
+    max-width: 400px;
+    max-height: 400px;
+    background-color: var(--swm-background);
+    padding: 5px;
+}
+
+.preview-img {
+    max-width: 400px;
+    max-height: 400px;
+}
+
+.todo {
+    padding: 5px;
+    background-color: var(--swm-red-100);
+    color: var(--swm-background);
+}
+
+.unselectable {
+    pointer-events: none;
+    user-select: none;
+}
+
+.note {
+    background-color: var(--swm-yellow-100);
+    padding: 15px;
+}
+
+.note * {
+    color: var(--swm-text);
+}
+@media (prefers-color-scheme: dark) {
+    .note * {
+        color: var(--swm-background);
+    }
+}
