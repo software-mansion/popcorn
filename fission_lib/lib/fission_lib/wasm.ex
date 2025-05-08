@@ -1,7 +1,20 @@
+defmodule FissionLib.RemoteObject do
+  defstruct ref: nil
+end
+
+defimpl Jason.Encoder, for: FissionLib.RemoteObject do
+  def encode(value, opts) when value.ref != nil do
+    key = :emscripten.from_remote_object(value.ref, :key)
+    Jason.Encode.map(%{fission_ref: key}, opts)
+  end
+end
+
 defmodule FissionLib.Wasm do
   @moduledoc """
-  Functions for working with messages received from JS side.
+  Functions for interacting with JS side.
   """
+  alias FissionLib.RemoteObject
+
   defguardp is_tagged_emscripten(msg) when elem(msg, 0) == :emscripten
   defguardp is_call(msg) when elem(elem(msg, 1), 0) == :call and tuple_size(elem(msg, 1)) == 3
   defguardp is_cast(msg) when elem(elem(msg, 1), 0) == :cast and tuple_size(elem(msg, 1)) == 2
@@ -31,6 +44,22 @@ defmodule FissionLib.Wasm do
 
   @type message_handler :: (wasm_message() -> handler_result())
 
+  @typedoc """
+  See `run_js/2` docs.
+  """
+  @type js_function() :: String.t()
+
+  @type run_js_opts() :: [{:return, :ref | :value} | {:args, map()}]
+
+  @type run_js_return() :: %RemoteObject{} | term()
+  @type result(t) :: {:ok, t} | {:error, term()}
+
+  @type register_event_listener_opts() :: [
+          {:event_keys, [atom()]},
+          {:target, String.t()},
+          {:selector, String.t()}
+        ]
+
   @doc """
   Deserializes raw message and calls handler with it. If the message was a :wasm_call, settles the promise with a value.
   Returns handler result.
@@ -57,31 +86,197 @@ defmodule FissionLib.Wasm do
   Deserializes message received from JS side.
   """
   @spec parse_message!(raw_message()) :: wasm_message()
-  def parse_message!({:emscripten, {:call, promise, message}}) do
-    {:wasm_call, deserialize(message), promise}
+  def parse_message!({:emscripten, {:call, promise, raw_message}}) do
+    {:ok, message} = deserialize(raw_message)
+    {:wasm_call, message, promise}
   end
 
-  def parse_message!({:emscripten, {:cast, message}}) do
-    {:wasm_cast, deserialize(message)}
+  def parse_message!({:emscripten, {:cast, raw_message}}) do
+    {:ok, message} = deserialize(raw_message)
+    {:wasm_cast, message}
   end
 
   @spec resolve(term(), promise()) :: :ok
   def resolve(term, promise) do
-    :emscripten.promise_resolve(promise, serialize(term))
-    :ok
+    with {:ok, raw_message} <- serialize(term) do
+      :emscripten.promise_resolve(promise, raw_message)
+      :ok
+    end
   end
 
   @spec reject(term(), promise()) :: :ok
   def reject(term, promise) do
-    :emscripten.promise_reject(promise, serialize(term))
+    with {:ok, raw_message} <- serialize(term) do
+      :emscripten.promise_reject(promise, raw_message)
+      :ok
+    end
+  end
+
+  @doc """
+  Runs JS code in browser's main thread in the WASM iframe context. Takes a JS function as string. The JS function takes an object with following keys:
+  - `args`: the arguments passed from Elixir and deserialized for JS.
+  - `window`: the main window context. Use it instead of calling (implicitly or explicitly) iframe window in the function.
+
+  Value returned from function is saved in JS context. It's lifetime is tied to (possibly) returned RemoteObject's ref.
+  If this ref is garbage collected by Elixir VM, value is destroyed in JS.
+
+  `opts`:
+  - `args`: a map of serializable Elixir values passed to the function. Default: `%{}`
+  - `return`: an atom controlling if `run_js` should return a remote object with reference to JS return value or deserialized return value. Possible values: `:ref`, `:value`. Default: `:ref`
+
+  By default only RemoteObject is returned.
+  Passing args and returning value introduces overhead related to serializing and deserializing.
+  """
+  @spec run_js(js_function(), run_js_opts()) :: result(run_js_return())
+  @spec run_js(js_function()) :: result(run_js_return())
+  def run_js(function, opts \\ []) do
+    %{return: return_type, args: args} = opts_to_map(opts, return: :ref, args: %{})
+
+    with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
+         {:ok, ref} <- run_js_fn(wrapped_js_fn) do
+      case return_type do
+        :ref -> {:ok, ref}
+        :value -> get_remote_object_value(ref)
+      end
+    end
+  rescue
+    e -> {:error, e}
+  end
+
+  @doc """
+  Raises on error.
+  See `run_js/2`.
+  """
+  @spec run_js!(js_function(), run_js_opts()) :: run_js_return()
+  def run_js!(function, opts \\ []) do
+    {:ok, value} = run_js(function, opts)
+    value
+  end
+
+  @doc """
+  Returns Elixir term based on RemoteObject.
+  """
+  @spec get_remote_object_value(%RemoteObject{}) :: {:ok, term()} | {:error, term()}
+  def get_remote_object_value(%RemoteObject{ref: ref}) do
+    with {:ok, serialized} <- :emscripten.from_remote_object(ref, :value) do
+      deserialize(serialized)
+    end
+  end
+
+  @doc """
+  Raises on error. See `get_remote_object_value/1`.
+  """
+  @spec get_remote_object_value(%RemoteObject{}) :: term()
+  def get_remote_object_value!(remote_object) do
+    {:ok, value} = get_remote_object_value(remote_object)
+    value
+  end
+
+  @doc """
+  Notifies JS that Elixir side finished initializing. Can be called only once.
+  """
+  def register(main_process_name) do
+    {:ok, _} =
+      """
+      ({ wasm, args }) => {
+        wasm.onElixirReady?.(args.main);
+      }
+      """
+      |> run_js(args: %{main: main_process_name})
+
     :ok
   end
 
+  @doc """
+  Registers event listener for element with given `selector`. Events will be sent to the process registered under `target` name.
+  To get event data, specify needed keys in `event_keys` list.
+
+  To unregister listener, use returned ref with `unregister_event_listener/1`
+  """
+  @spec register_event_listener(String.t(), register_event_listener_opts()) ::
+          result(run_js_return())
+  def register_event_listener(event_name, opts) do
+    %{event_keys: event_keys, target: target, selector: selector} =
+      opts_to_map(opts, event_keys: [], target: nil, selector: nil)
+
+    """
+    ({ wasm, args, window, key }) => {
+      const { selector, event_name, target, event_keys } = args;
+
+      const getEventData = (event) => {
+        const data = {};
+        for(const key of event_keys) {
+          data[key] = event[key];
+        }
+        return data;
+      };
+      const fn = (event) => {
+        wasm.cast(target, [event_name, getEventData(event)]);
+      };
+      const node = window.document.querySelector(selector);
+      node.addEventListener(event_name, fn);
+      const cleanupFn = () => {
+        node.removeEventListener(event_name, fn);
+        wasm.cleanupFunctions.delete(key);
+      };
+      wasm.cleanupFunctions.set(key, cleanupFn);
+
+      return cleanupFn;
+    }
+    """
+    |> run_js(
+      args: %{
+        selector: selector,
+        event_name: event_name,
+        target: target,
+        event_keys: event_keys
+      }
+    )
+  end
+
+  def unregister_event_listener(ref) do
+    """
+    ({ args }) => {
+      args.cleanupFn();
+    }
+    """
+    |> run_js(args: %{cleanupFn: ref})
+  end
+
+  defp with_wrapper(js_function, args) do
+    with {:ok, serialized_args} <- serialize(args) do
+      code = """
+      (Module, key) => {
+        try {
+          return (#{js_function})({
+            wasm: Module,
+            args: Module.deserialize('#{serialized_args}'),
+            window: window.parent,
+            key: key
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      """
+
+      {:ok, code}
+    end
+  end
+
   defp deserialize(message) do
-    String.split(message, ":", parts: 2)
+    Jason.decode(message)
   end
 
   defp serialize(term) do
-    inspect(term)
+    Jason.encode(term)
   end
+
+  defp run_js_fn(code) do
+    with {:ok, ref} <- :emscripten.run_remote_object_fn_script(code, main_thread: true) do
+      {:ok, %RemoteObject{ref: ref}}
+    end
+  end
+
+  defp opts_to_map(opts, values), do: opts |> Keyword.validate!(values) |> Map.new()
 end

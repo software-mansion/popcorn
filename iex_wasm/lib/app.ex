@@ -9,7 +9,6 @@ defmodule App do
 
   @impl GenServer
   def init(_args) do
-    Process.register(self(), :main)
     {:ok, nil}
   end
 
@@ -23,7 +22,7 @@ defmodule App do
     type = as_type(action)
 
     try do
-      {:resolve, eval(code, type), state}
+      {:resolve, inspect(eval(code, type)), state}
     rescue
       error -> {:reject, error, state}
     end
