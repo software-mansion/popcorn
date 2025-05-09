@@ -15,7 +15,7 @@ defmodule IexWasm.BrowserTest do
 
     # Wait until the server is ready
     page = Playwright.Browser.new_page(browser)
-    wait_for(fn -> assert %{status: 200} = Playwright.Page.goto(page, url) end)
+    wait_for(fn -> assert %{status: 200} = Playwright.Page.goto(page, url) end, 60_000)
     Playwright.Page.close(page)
 
     [browser: browser, url: url]
@@ -50,7 +50,7 @@ defmodule IexWasm.BrowserTest do
     wait_for(fn -> assert Playwright.Page.text_content(page, ~s|[id="result"]|) == result end)
   end
 
-  defp wait_for(fun, timeout \\ 5000)
+  defp wait_for(fun, timeout \\ 5_000)
 
   defp wait_for(fun, timeout) when timeout <= 0 do
     fun.()

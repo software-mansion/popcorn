@@ -28,7 +28,6 @@ jobs:
 
     name: IEX WASM build & test
     runs-on: ubuntu-22.04
-    container: emscripten/emsdk
 
     defaults:
       run:
@@ -36,6 +35,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Setup emsdk
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        # Make sure to set a version number!
+        version: 4.0.7
     - uses: webfactory/ssh-agent@v0.6.0
       with:
         ssh-private-key: |
@@ -53,10 +57,12 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - name: Install AtomVM deps
       run: |
-        sudo apt update && apt install -y gperf libmbedtls-dev zlib1g-dev
+        sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
     - name: Install dependencies
       run: mix deps.get && mix deps.compile
     - name: Install Playwright deps
       run: mix playwright.install
     - name: Build AtomVM
       run: mix fission_lib.build_avm --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
+    - name: Run tests
+      run: mix test
