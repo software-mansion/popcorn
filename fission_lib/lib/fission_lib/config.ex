@@ -7,7 +7,7 @@ defmodule FissionLib.Config do
     ex_stdlib_beam_paths: Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam"),
     out_path: "#{Mix.Project.build_path()}/bundle.avm",
     add_tracing: false,
-    avm_source: nil
+    avm_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
   }
 
   defmacro get(keys) do

@@ -16,12 +16,11 @@ include_tracing =
 config :fission_lib,
   out_path: "static/wasm/app.avm",
   start_module: App.Application,
-  add_tracing: include_tracing,
-  avm_source:
-    (case System.get_env("ATOMVM_SOURCE_PATH") do
-       nil -> {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
-       path -> {:path, path}
-     end)
+  add_tracing: include_tracing
+
+if path = System.get_env("ATOMVM_SOURCE_PATH") do
+  config :fission_lib, avm_source: {:path, path}
+end
 
 if File.exists?("#{__DIR__}/config.secret.exs") do
   import_config "config.secret.exs"

@@ -12,14 +12,10 @@ defmodule IexWasm.BrowserTest do
     url = "http://localhost:#{port}"
 
     Task.start_link(fn -> System.shell("elixir server.exs --port #{port}") end)
+
+    # Wait until the server is ready
     page = Playwright.Browser.new_page(browser)
-
-    Stream.repeatedly(fn ->
-      Process.sleep(200)
-      Playwright.Page.goto(page, url)
-    end)
-    |> Enum.find(&match?(%{status: 200}, &1))
-
+    wait_for(fn -> assert %{status: 200} = Playwright.Page.goto(page, url) end)
     Playwright.Page.close(page)
 
     [browser: browser, url: url]
