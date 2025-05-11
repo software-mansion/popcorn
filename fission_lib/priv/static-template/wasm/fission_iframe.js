@@ -87,6 +87,7 @@ function deserialize(message) {
   return JSON.parse(message, (key, value) => {
     const isRef =
       typeof value === "object" &&
+      value !== null &&
       Object.hasOwn(value, "fission_ref") &&
       Object.getOwnPropertyNames(value).length == 1;
 

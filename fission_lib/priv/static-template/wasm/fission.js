@@ -68,6 +68,7 @@ export class Fission {
 
   static async init({ container, ...constructorParams }) {
     const fission = new Fission(constructorParams, INIT_TOKEN);
+    fission._trace("Main: init, params: ", { container, ...constructorParams });
     await fission._mount(container ?? document.body);
     return fission;
   }
@@ -77,6 +78,7 @@ export class Fission {
       throw new Error("Iframe already mounted");
     }
 
+    this._trace("Main: mount, container: ", container);
     const mountPromise = new Promise((resolve) => {
       // will be resolved on init message from iframe
       this._mountPromise = resolve;
@@ -122,6 +124,7 @@ export class Fission {
       throw new Error("Iframe not mounted");
     }
 
+    this._trace("Main: deinit");
     window.removeEventListener("message", this._listenerRef);
     this._iframe.remove();
     this._iframe = null;
@@ -140,6 +143,7 @@ export class Fission {
 
     const requestId = this._requestId++;
     const callPromise = new Promise((resolve, reject) => {
+      this._trace("Main: call: ", { requestId, process, args });
       this._send(MESSAGES.CALL, {
         requestId,
         process: targetProcess,
@@ -169,6 +173,7 @@ export class Fission {
     }
 
     const requestId = this._requestId++;
+    this._trace("Main: cast: ", { requestId, process, args });
     this._send(MESSAGES.CAST, {
       requestId,
       process: targetProcess,
@@ -197,11 +202,13 @@ export class Fission {
   }
 
   _onInit(initProcess) {
+    this._trace("Main: onInit, main process: ", initProcess);
     this._mountPromise();
     this._initProcess = initProcess;
   }
 
   _onCallAck({ requestId }) {
+    this._trace("Main: onCallAck: ", { requestId, error, data });
     const callData = this._calls.get(requestId);
     if (callData === undefined) {
       throw new Error("Ack for non-existent call");
@@ -210,6 +217,7 @@ export class Fission {
   }
 
   _onCall({ requestId, error, data }) {
+    this._trace("Main: onCall: ", { requestId, error, data });
     const callData = this._calls.get(requestId);
     if (callData === undefined) {
       throw new Error("Response for non-existent call");
@@ -231,17 +239,21 @@ export class Fission {
   _onHeartbeat() {
     clearTimeout(this._heartbeatTimeout);
     this._heartbeatTimeout = setTimeout(() => {
-      this._trace("Main: hearbeat lost");
+      this._trace("Main: heartbeat lost");
       this._reloadIframe();
     }, this.heartbeatTimeoutMs);
   }
 
   _reloadIframe() {
-    this._trace("Main: reload iframe");
     if (this._iframe === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
 
+    if (document.hidden) {
+      this._trace("Main: reloading iframe skipped, window not visible");
+      return;
+    }
+    this._trace("Main: reloading iframe");
     const container = this._iframe.parentElement;
     this.deinit();
     this._mount(container);
@@ -251,9 +263,9 @@ export class Fission {
     this._iframe.contentWindow.postMessage({ type, value: data });
   }
 
-  _trace(message) {
+  _trace(...messages) {
     if (this._debug) {
-      console.trace(message);
+      console.debug(...messages);
     }
   }
 }
