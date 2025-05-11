@@ -36,7 +36,7 @@ defmodule GameOfLife.Grid do
   Returns list of lists with booleans representing alive status
   """
   @spec tick(GenServer.server()) :: [[boolean()]]
-  def(tick(grid)) do
+  def tick(grid) do
     GenServer.call(grid, :tick)
   end
 

@@ -31,6 +31,10 @@ defmodule GameOfLife.Supervisor do
     DynamicSupervisor.start_child(__MODULE__, spec)
   end
 
+  def stop_simulation(pid) do
+    DynamicSupervisor.terminate_child(__MODULE__, pid)
+  end
+
   @impl true
   def init(_init_arg) do
     DynamicSupervisor.init(strategy: :one_for_one)
