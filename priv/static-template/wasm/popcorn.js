@@ -83,25 +83,25 @@ export class Popcorn {
       // will be resolved on init message from iframe
       this._mountPromise = resolve;
 
-      // example pathname: "/wasm/popcorn.js"
-      const pathName = URL.parse(import.meta.url).pathname;
-      const lastPart = /[^/]+$/;
-      const leadingSlash = /^\//;
-      const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
+      // // example pathname: "/wasm/fission.js"
+      // const pathName = URL.parse(import.meta.url).pathname;
+      // const lastPart = /[^/]+$/;
+      // const leadingSlash = /^\//;
+      // const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
 
-      const bundleDir = "../".repeat(dir.split("/").length - 1);
+      // const bundleDir = "../".repeat(dir.split("/").length - 1);
 
       this._iframe = document.createElement("iframe");
       this._iframe.srcdoc = `<html>
         <html lang="en" dir="ltr">
             <head>
-              <meta name="bundle-path" content="${bundleDir + this._bundlePath}" />
+              <meta name="bundle-path" content="${"../" + this._bundlePath}" />
             </head>
-            <script type="module" src="./${dir}popcorn.js" defer></script>
-            <script type="module" src="./${dir}AtomVM.mjs" defer></script>
-            <script type="module" src="./${dir}popcorn_iframe.js" defer></script>
+            <script type="module" src="./wasm/fission.js" defer></script>
+            <script type="module" src="./wasm/AtomVM.mjs" defer></script>
+            <script type="module" src="./wasm/fission_iframe.js" defer></script>
             <script type="module" defer>
-              import { initVm } from "./${dir}popcorn_iframe.js";
+              import { initVm } from "./wasm/fission_iframe.js";
               initVm();
             </script>
         </html>`;
@@ -270,7 +270,7 @@ export class Popcorn {
   }
 }
 
-function noop() { }
+function noop() {}
 
 async function withTimeout(promise, ms) {
   let timeout = null;
