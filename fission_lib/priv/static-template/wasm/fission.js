@@ -208,7 +208,7 @@ export class Fission {
   }
 
   _onCallAck({ requestId }) {
-    this._trace("Main: onCallAck: ", { requestId, error, data });
+    this._trace("Main: onCallAck: ", { requestId });
     const callData = this._calls.get(requestId);
     if (callData === undefined) {
       throw new Error("Ack for non-existent call");
