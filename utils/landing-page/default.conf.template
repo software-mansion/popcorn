@@ -26,7 +26,7 @@ server {
                 return 302 /$1;
             }
         }
-#        if ($request_uri ~ ^/(.*)(?:index)?\.html(\?|$)) {
+#        if ($request_uri ~ ^/(.*)?\.html(\?|$)) {
 #            return 302 /$1$is_args$args;
 #        }
         try_files $uri $uri.html $uri/index.html $uri/ =404;
