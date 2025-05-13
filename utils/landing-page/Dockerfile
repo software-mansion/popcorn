@@ -44,34 +44,39 @@ RUN git clone https://github.com/emscripten-core/emsdk.git /root/emsdk && \
 
 # make AtomVM WASM
 RUN git clone https://github.com/software-mansion-labs/FissionVM.git /root/FissionVM
-RUN git clone https://github.com/software-mansion-labs/elixir-wasm.git /root/elixir-wasm
 RUN source /root/.env && \
-    cp -r /root/elixir-wasm/fission_lib/priv/static-template/wasm /root/ && \
+    mkdir -p /root/wasm && \
     cd /root/FissionVM/src/platforms/emscripten && \
     mkdir build && cd build && \
     emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web && \
     emmake make -j${nproc} && \
     cp src/AtomVM.mjs src/AtomVM.wasm /root/wasm/
 
+ARG COMMIT_REF ''
+RUN git clone https://github.com/software-mansion-labs/elixir-wasm.git /root/elixir-wasm
+RUN cd /root/elixir-wasm && \
+    git fetch && git checkout "$COMMIT_REF" && \
+    cp -r /root/elixir-wasm/priv/static-template/wasm /root/
+
 # ------------------------ Build static files
 RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
 RUN source /root/.env && \
-    cd /root/elixir-wasm/iex_wasm && \
+    cd /root/elixir-wasm/examples/eval_in_wasm && \
     cp -r /root/wasm static && \
     mix deps.get && mix deps.compile && mix compile
 
 RUN source /root/.env && \
-    cd /root/elixir-wasm/game_of_life && \
+    cd /root/elixir-wasm/examples/game_of_life && \
     cp -r /root/wasm static && \
     mix deps.get && mix deps.compile && mix compile
 
 RUN source /root/.env && \
-    cd /root/elixir-wasm && \
-    cp -r iex_wasm/static/ landing-page/simple_repl && \
-    cp -r game_of_life/static/ landing-page/game_of_life && \
-    cp -r landing-page /landing-page
+    cd /root/elixir-wasm/ && \
+    cp -r examples/eval_in_wasm/static/ utils/landing-page/simple_repl && \
+    cp -r examples/game_of_life/static/ utils/landing-page/game_of_life && \
+    cp -r utils/landing-page /landing-page
 
 # ------------------------ Host static files
 FROM nginx:1.27.5-alpine-slim
 COPY --from=statics /landing-page /var/www/html
-COPY default.conf /etc/nginx/conf.d/default.conf
+COPY default.conf.template /etc/nginx/conf.d/default.conf

@@ -13,7 +13,6 @@ server {
         if ($request_uri ~ ^/(.*)\.html(\?|$)) {
             return 302 /$1$is_args$args;
         }
-        try_files $uri $uri.html $uri/ =404;
+        try_files $uri $uri.html $uri/index.html $uri/ =404;
     }
 }
-

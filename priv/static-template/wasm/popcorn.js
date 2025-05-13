@@ -83,7 +83,7 @@ export class Popcorn {
       // will be resolved on init message from iframe
       this._mountPromise = resolve;
 
-      // // example pathname: "/wasm/fission.js"
+      // // example pathname: "/wasm/popcorn.js"
       // const pathName = URL.parse(import.meta.url).pathname;
       // const lastPart = /[^/]+$/;
       // const leadingSlash = /^\//;
@@ -97,11 +97,11 @@ export class Popcorn {
             <head>
               <meta name="bundle-path" content="${"../" + this._bundlePath}" />
             </head>
-            <script type="module" src="./wasm/fission.js" defer></script>
+            <script type="module" src="./wasm/popcorn.js" defer></script>
             <script type="module" src="./wasm/AtomVM.mjs" defer></script>
-            <script type="module" src="./wasm/fission_iframe.js" defer></script>
+            <script type="module" src="./wasm/popcorn_iframe.js" defer></script>
             <script type="module" defer>
-              import { initVm } from "./wasm/fission_iframe.js";
+              import { initVm } from "./wasm/popcorn_iframe.js";
               initVm();
             </script>
         </html>`;
