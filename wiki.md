@@ -1,12 +1,12 @@
 # Wiedza powszechna o Elixir WASM
 
-### Jak patchować funkcje w fission_lib?
+### Jak patchować funkcje w popcorn?
 
-- Stwórz moduł w `fission_lib/patches/*`, jeśli jeszcze nie istnieje
+- Stwórz moduł w `popcorn/patches/*`, jeśli jeszcze nie istnieje
 - Dodaj tam nową implementację funkcji. Jeśli funkcja jest prywatna, to:
-  - W Elixirze musi być zmieniona na publiczną, inaczej kompilator ją wyprunuje. Oprócz tego trzeba dodać przed nią `@compile {:flb_patch_private, name: arity}`
-  - W erlangu wystarczy dodać `-compile({flb_patch_private, name/arity}).` (musi być w miarę na górze pliku, przed implementacjami funkcji), ale jak nie zrobimy jej publicznej (`-export([name/arity])`) to linter się będzie pluł
-- Jeśli funkcja woła inne funkcje (prywatne lub publiczne) z tego samego modułu, które nie są w pliku z patchem i nie musisz ich patchować, to nie kopiuj ich, tylko zamień ich wywołania na `foo() -> :flb_module.foo()` (w Erlangu `flb_module:foo()`).
+  - W Elixirze musi być zmieniona na publiczną, inaczej kompilator ją wyprunuje. Oprócz tego trzeba dodać przed nią `@compile {:popcorn_patch_private, name: arity}`
+  - W erlangu wystarczy dodać `-compile({popcorn_patch_private, name/arity}).` (musi być w miarę na górze pliku, przed implementacjami funkcji), ale jak nie zrobimy jej publicznej (`-export([name/arity])`) to linter się będzie pluł
+- Jeśli funkcja woła inne funkcje (prywatne lub publiczne) z tego samego modułu, które nie są w pliku z patchem i nie musisz ich patchować, to nie kopiuj ich, tylko zamień ich wywołania na `foo() -> :popcorn_module.foo()` (w Erlangu `popcorn_module:foo()`).
 - Przy każdej zmianie, którą wprowadzasz względem oryginalnej funkcji, dodaj komentarz zaczynający się od `Patch reason: `, z opisem dlaczego ta funkcja została spatchowana.
 
 ### Jak działa GC w AtomVM?

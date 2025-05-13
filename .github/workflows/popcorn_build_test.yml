@@ -3,17 +3,13 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: IEX WASM Build & test
+name: Popcorn build & test
 
 on:
   push:
     branches: [ "*" ]
-    paths:
-    - "examples/iex_wasm/**"
   pull_request:
     branches: [ "*" ]
-    paths:
-    - "examples/iex_wasm/**"
 
 permissions:
   contents: read
@@ -21,25 +17,19 @@ permissions:
 env:
   CI: true
   MIX_ENV: test
-  ImageOS: "ubuntu22"
 
 jobs:
   build:
 
-    name: IEX WASM build & test
+    name: Build & test
     runs-on: ubuntu-22.04
 
     defaults:
       run:
-        working-directory: examples/iex_wasm
+        working-directory: popcorn
 
     steps:
     - uses: actions/checkout@v4
-    - name: Setup emsdk
-      uses: mymindstorm/setup-emsdk@v14
-      with:
-        # Make sure to set a version number!
-        version: 4.0.7
     - uses: webfactory/ssh-agent@v0.6.0
       with:
         ssh-private-key: |
@@ -57,12 +47,14 @@ jobs:
         restore-keys: ${{ runner.os }}-mix-
     - name: Install AtomVM deps
       run: |
-        sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
+        sudo apt install -y gperf libmbedtls-dev zlib1g-dev
     - name: Install dependencies
-      run: mix deps.get && mix deps.compile
-    - name: Install Playwright deps
-      run: mix playwright.install
+      run: mix deps.get
+    - name: Compile
+      run:  mix compile
     - name: Build AtomVM
-      run: mix popcorn.build_avm --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
+      run: |
+        export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
+        mix popcorn.build_avm --out-dir _build --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
     - name: Run tests
       run: mix test
