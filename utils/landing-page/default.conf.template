@@ -10,6 +10,13 @@ server {
         add_header Cross-Origin-Opener-Policy "same-origin";
         add_header Cross-Origin-Embedder-Policy "require-corp";
 
+        location ~* \.mjs$ {
+            types {
+                application/javascript mjs;
+            }
+            try_files $uri =404;
+        }
+
         if ($request_uri ~ ^/(.*)\.html(\?|$)) {
             return 302 /$1$is_args$args;
         }
