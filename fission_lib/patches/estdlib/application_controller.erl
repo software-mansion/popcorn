@@ -821,5 +821,17 @@ get_hardcoded_app(elixir) ->
             {time_zone_database, 'Elixir.Calendar.UTCOnlyTimeZoneDatabase'}
         ]}
     ]};
+
+get_hardcoded_app(eex) ->
+    {application,eex,
+             [{config_mtime,1726663337},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir]},
+              {description,"eex"},
+              {modules,['Elixir.EEx','Elixir.EEx.Compiler',
+                        'Elixir.EEx.Engine','Elixir.EEx.SmartEngine',
+                        'Elixir.EEx.SyntaxError']},
+              {registered,[]},
+              {vsn,"1.17.3"}]};
 get_hardcoded_app(Name) when is_atom(Name) ->
     erlang:raise(["Unknown app ", erlang:atom_to_list(Name)]).

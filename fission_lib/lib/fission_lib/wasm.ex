@@ -55,9 +55,10 @@ defmodule FissionLib.Wasm do
   @type result(t) :: {:ok, t} | {:error, term()}
 
   @type register_event_listener_opts() :: [
-          {:event_keys, [atom()]},
-          {:target, String.t()},
-          {:selector, String.t()}
+          event_keys: [atom()],
+          target_node: %RemoteObject{},
+          receiver_name: String.t(),
+          custom_data: term()
         ]
 
   @doc """
@@ -93,7 +94,11 @@ defmodule FissionLib.Wasm do
 
   def parse_message!({:emscripten, {:cast, raw_message}}) do
     {:ok, message} = deserialize(raw_message)
-    {:wasm_cast, message}
+
+    case message do
+      ["dom_event", name, data, custom] -> {:wasm_event, String.to_atom(name), data, custom}
+      cast_message -> {:wasm_cast, cast_message}
+    end
   end
 
   @spec resolve(term(), promise()) :: :ok
@@ -134,6 +139,11 @@ defmodule FissionLib.Wasm do
 
     with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
          {:ok, ref} <- run_js_fn(wrapped_js_fn) do
+      # Lv. 17 magic ahead
+      # args _must_ not be GC'd until we execute JS function since it will remove the object from JS side.
+      # Call to any external function ensures that reference will outlive JS call and compiler won't optimize it.
+      __MODULE__.id(args)
+
       case return_type do
         :ref -> {:ok, ref}
         :value -> get_remote_object_value(ref)
@@ -142,6 +152,9 @@ defmodule FissionLib.Wasm do
   rescue
     e -> {:error, e}
   end
+
+  @doc false
+  def id(x), do: x
 
   @doc """
   Raises on error.
@@ -193,15 +206,21 @@ defmodule FissionLib.Wasm do
 
   To unregister listener, use returned ref with `unregister_event_listener/1`
   """
-  @spec register_event_listener(String.t(), register_event_listener_opts()) ::
+  @spec register_event_listener(atom(), register_event_listener_opts()) ::
           result(run_js_return())
   def register_event_listener(event_name, opts) do
-    %{event_keys: event_keys, target: target, selector: selector} =
-      opts_to_map(opts, event_keys: [], target: nil, selector: nil)
+    %{
+      event_keys: event_keys,
+      target_node: target_node,
+      event_receiver: event_receiver,
+      custom_data: custom_data
+    } =
+      opts_to_map(opts, event_keys: [], target_node: nil, event_receiver: nil, custom_data: nil)
 
     """
     ({ wasm, args, window, key }) => {
-      const { selector, event_name, target, event_keys } = args;
+      const { event_receiver, event_name, target_node, event_keys, custom_data } = args;
+      const document = window.document;
 
       const getEventData = (event) => {
         const data = {};
@@ -211,9 +230,9 @@ defmodule FissionLib.Wasm do
         return data;
       };
       const fn = (event) => {
-        wasm.cast(target, [event_name, getEventData(event)]);
+        wasm.cast(event_receiver, ["dom_event", event_name, getEventData(event), custom_data]);
       };
-      const node = window.document.querySelector(selector);
+      const node = target_node;
       node.addEventListener(event_name, fn);
       const cleanupFn = () => {
         node.removeEventListener(event_name, fn);
@@ -226,10 +245,11 @@ defmodule FissionLib.Wasm do
     """
     |> run_js(
       args: %{
-        selector: selector,
         event_name: event_name,
-        target: target,
-        event_keys: event_keys
+        target_node: target_node,
+        event_receiver: event_receiver,
+        event_keys: event_keys,
+        custom_data: custom_data
       }
     )
   end
@@ -250,7 +270,7 @@ defmodule FissionLib.Wasm do
         try {
           return (#{js_function})({
             wasm: Module,
-            args: Module.deserialize('#{serialized_args}'),
+            args: Module.deserialize(JSON.stringify(#{serialized_args})),
             window: window.parent,
             key: key
           });
@@ -269,7 +289,7 @@ defmodule FissionLib.Wasm do
   end
 
   defp serialize(term) do
-    Jason.encode(term)
+    Jason.encode(term, escape: :javascript_safe)
   end
 
   defp run_js_fn(code) do

@@ -1,0 +1,91 @@
+:root {
+    --swm-header: #001a72;
+    --swm-text: #232736;
+    --swm-background: #fcfcff;
+    --swm-yellow-40: #ffd61e;
+    --swm-red-100: #ff6259;
+    --swm-green-100: #57b495;
+    --swm-blue-100: #38acdd;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --swm-header: #fcfcff;
+        --swm-text: #c1c6e5;
+        --swm-background: #232736;
+        --swm-yellow-100: #fd4;
+        --swm-red-100: #ff7774;
+        --swm-green-100: #3fc684;
+        --swm-blue-100: #00a9f0;
+    }
+}
+
+body {
+    padding: 0 15px;
+    font-size: 18px;
+    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    color: var(--swm-text);
+    background-color: var(--swm-background);
+}
+
+main {
+    margin: 40px auto;
+    display: flex;
+    gap: 15px;
+}
+
+main,
+div {
+    width: fit-content;
+}
+
+button {
+    padding: 5px;
+    border: 1px solid var(--swm-text);
+    color: var(--swm-text);
+    background-color: unset;
+}
+
+button:disabled {
+    border-style: dashed;
+}
+
+#root {
+    display: flex;
+    flex-direction: column;
+}
+
+.controls {
+    display: flex;
+    gap: 5px;
+    flex-direction: column;
+}
+
+.cell {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--swm-text);
+}
+
+.cell-dead {
+}
+
+.cell-alive {
+    background-color: var(--swm-green-100);
+}
+
+.cell-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-self: center;
+}
+
+.cell-row {
+    display: flex;
+    gap: 5px;
+    background-color: var(--swm-background);
+}

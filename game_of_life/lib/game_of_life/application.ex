@@ -9,7 +9,8 @@ defmodule GameOfLife.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: GameOfLife.Simulation.registry()},
-      GameOfLife.Supervisor
+      GameOfLife.Supervisor,
+      {GameOfLife.Ui, %{size: 10}}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

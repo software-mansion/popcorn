@@ -45,10 +45,13 @@ defmodule FissionLib do
 
   defp bundled_artifacts(all_beams, fission_library_path) do
     fission_lib_files = Path.wildcard(Path.join([@fission_path, "**", "*"]))
-    [wasm_lib_beam] = Path.wildcard(Path.join([@fission_path, "**", "*.Wasm.beam"]))
 
+    exported_beam_names =
+      "{Elixir.FissionLib.RemoteObject,Elixir.FissionLib.Wasm,Elixir.Jason.Encoder.FissionLib.RemoteObject}.beam"
+
+    api_beams = Path.wildcard(Path.join([@fission_path, "**", exported_beam_names]))
     # include stdlib bundle, Fission.Wasm beam and filter other fission beams
-    [fission_library_path, wasm_lib_beam | all_beams -- fission_lib_files]
+    [fission_library_path | api_beams] ++ (all_beams -- fission_lib_files)
   end
 
   defp pack_bundle(output_path, beams, start_module) do
