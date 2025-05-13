@@ -13,13 +13,13 @@ RUN apt-get update && apt-get -y install cmake gperf libmbedtls-dev zlib1g-dev
 # IEx WASM
 
 COPY iex_wasm /iex_wasm
-COPY fission_lib /fission_lib
+COPY popcorn /popcorn
 COPY FissionVM /FissionVM
 
 RUN cd /iex_wasm && \
     export MIX_ENV=prod && \
     rm -rf _build deps static/wasm && mix deps.get && mix deps.compile && \
-    ATOMVM_SOURCE_PATH=/FissionVM mix fission_lib.build_avm --out-dir static/wasm --target wasm && \
+    ATOMVM_SOURCE_PATH=/FissionVM mix popcorn.build_runtime --out-dir static/wasm --target wasm && \
     mix compile && \
     # Run server script to download and cache its deps
     echo "\n" | elixir server.exs

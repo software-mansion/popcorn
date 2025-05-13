@@ -20,7 +20,16 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-popcorn-*.tar
+eval_in_wasm-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# ignore DS_Store
+.DS_Store
+
+# secret config
+config.secret.exs
+
+# wasm build dir
+static/wasm
