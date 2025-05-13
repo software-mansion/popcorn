@@ -833,5 +833,36 @@ get_hardcoded_app(eex) ->
                         'Elixir.EEx.SyntaxError']},
               {registered,[]},
               {vsn,"1.17.3"}]};
+
+get_hardcoded_app(iex) ->
+    {application,iex,
+        [
+            {applications,[kernel,stdlib,elixir]},
+            {description,"iex"},
+            {modules,['Elixir.IEx','Elixir.IEx.App',
+                'Elixir.IEx.Autocomplete','Elixir.IEx.Broker',
+                'Elixir.IEx.CLI','Elixir.IEx.Config',
+                'Elixir.IEx.Evaluator','Elixir.IEx.Helpers',
+                'Elixir.IEx.History','Elixir.IEx.Info',
+                'Elixir.IEx.Info.Any','Elixir.IEx.Info.Atom',
+                'Elixir.IEx.Info.BitString','Elixir.IEx.Info.Date',
+                'Elixir.IEx.Info.DateTime','Elixir.IEx.Info.Float',
+                'Elixir.IEx.Info.Function','Elixir.IEx.Info.Integer',
+                'Elixir.IEx.Info.List','Elixir.IEx.Info.Map',
+                'Elixir.IEx.Info.NaiveDateTime','Elixir.IEx.Info.PID',
+                'Elixir.IEx.Info.Port','Elixir.IEx.Info.Range',
+                'Elixir.IEx.Info.Reference','Elixir.IEx.Info.Regex',
+                'Elixir.IEx.Info.Time','Elixir.IEx.Info.Tuple',
+                'Elixir.IEx.Introspection','Elixir.IEx.Pry',
+                'Elixir.IEx.Server']},
+            {vsn,"1.17.3"},
+            {registered,['Elixir.IEx.Broker','Elixir.IEx.Config',
+                'Elixir.IEx.Pry','Elixir.IEx.Supervisor']},
+            {mod,{'Elixir.IEx.App',[]}},
+            {env,[{colors,[]},
+                {inspect,[{pretty,true}]},
+                {history_size,20},
+                {default_prompt,<<"%prefix(%counter)>">>},
+                {alive_prompt,<<"%prefix(%node)%counter>">>}]}]};
 get_hardcoded_app(Name) when is_atom(Name) ->
     erlang:raise(["Unknown app ", erlang:atom_to_list(Name)]).

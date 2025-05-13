@@ -30,7 +30,9 @@
     load_abs/1,
     load_binary/3,
     ensure_loaded/1,
-    get_object_code/1
+    get_object_code/1,
+    get_mode/0,
+    is_loaded/1
 ]).
 
 %%-----------------------------------------------------------------------------
@@ -103,3 +105,13 @@ ensure_loaded(_Module) ->
 % Patch reason: mock implementation, prevents ParallelChecker.cache_module/2 from crashing
 get_object_code(_Module) ->
     error.
+
+get_mode() ->
+    embedded.
+
+is_loaded(Module) ->
+    case flb_module:which(Module) of
+        ModuleString when is_list(ModuleString) -> true;
+        non_existing -> false;
+        _ -> false
+    end.
