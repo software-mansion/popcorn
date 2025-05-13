@@ -76,4 +76,4 @@ These options can be set by putting a `config :popcorn, option: value` line in `
 - `add_tracing` - If `true`, injects a simple tracing code that prints module, function and arity of each cross-module call. Defaults to `false`.
 - `erl_stdlib_beam_paths` - List of paths to Erlang stdlib `.beam` files. Defaults to `Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam")`
 - `ex_stdlib_beam_paths` - List of paths to Elixir stdlib `.beam` files. Defaults to `Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam")`
-- `runtime_source` - See `Mix.Tasks.Popcorn.BuildAvm` or type `mix help popcorn.build_avm`
+- `runtime_source` - See `Mix.Tasks.Popcorn.BuildAvm` or type `mix help popcorn.build_runtime`

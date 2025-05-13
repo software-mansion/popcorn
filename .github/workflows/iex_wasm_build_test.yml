@@ -63,6 +63,6 @@ jobs:
     - name: Install Playwright deps
       run: mix playwright.install
     - name: Build AtomVM
-      run: mix popcorn.build_avm --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
+      run: mix popcorn.build_runtime --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
     - name: Run tests
       run: mix test

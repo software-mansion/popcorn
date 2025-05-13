@@ -9,7 +9,7 @@ To build, type:
 
 ```sh
 mix deps.get
-mix popcorn.build_avm --target wasm --out-dir static # ensure git can access your private SSH key if sourcing from private repository
+mix popcorn.build_runtime --target wasm --out-dir static # ensure git can access your private SSH key if sourcing from private repository
 mix compile # or `MIX_ENV=prod mix compile` to disable tracing and build in release
 ```
 

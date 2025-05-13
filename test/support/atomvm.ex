@@ -108,7 +108,7 @@ defmodule Popcorn.Support.AtomVM do
 
     unless match?({_output, 0}, System.shell("which '#{@runtime_path}'")) do
       raise """
-      AtomVM not found, please run `mix popcorn.build_avm --out-dir _build` \
+      AtomVM not found, please run `mix popcorn.build_runtime --out-dir _build` \
       or put `config :popcorn, runtime_path: "path/to/AtomVM"` in your config.exs
       """
     end

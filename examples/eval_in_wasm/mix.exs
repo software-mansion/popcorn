@@ -10,7 +10,7 @@ defmodule EvalInWasm.MixProject do
       compilers: Mix.compilers() ++ [:popcorn],
       deps: deps(),
       aliases: [
-        build_wasm: "popcorn.build_avm --target wasm --out-dir static/wasm"
+        build_wasm: "popcorn.build_runtime --target wasm --out-dir static/wasm"
       ]
     ]
   end
