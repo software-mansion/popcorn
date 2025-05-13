@@ -1,4 +1,5 @@
 server {
+    port_in_redirect off;
     listen       80;
     listen  [::]:80;
     server_name  popcorn;
@@ -17,9 +18,17 @@ server {
             try_files $uri =404;
         }
 
-        if ($request_uri ~ ^/(.*)\.html(\?|$)) {
-            return 302 /$1$is_args$args;
+        location ~ \.html$ {
+            if ($request_uri ~ ^/(.*)/index\.html$) {
+                return 302 /$1/;
+            }
+            if ($request_uri ~ ^/(.*)\.html$) {
+                return 302 /$1;
+            }
         }
+#        if ($request_uri ~ ^/(.*)(?:index)?\.html(\?|$)) {
+#            return 302 /$1$is_args$args;
+#        }
         try_files $uri $uri.html $uri/index.html $uri/ =404;
     }
 }
