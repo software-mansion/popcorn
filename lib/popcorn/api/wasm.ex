@@ -96,8 +96,11 @@ defmodule Popcorn.Wasm do
     {:ok, message} = deserialize(raw_message)
 
     case message do
-      ["dom_event", name, data, custom] -> {:wasm_event, String.to_atom(name), data, custom}
-      cast_message -> {:wasm_cast, cast_message}
+      ["_popcorn_dom_event", name, data, custom] ->
+        {:wasm_event, String.to_atom(name), data, custom}
+
+      cast_message ->
+        {:wasm_cast, cast_message}
     end
   end
 
@@ -230,7 +233,7 @@ defmodule Popcorn.Wasm do
         return data;
       };
       const fn = (event) => {
-        wasm.cast(event_receiver, ["dom_event", event_name, getEventData(event), custom_data]);
+        wasm.cast(event_receiver, ["_popcorn_dom_event", event_name, getEventData(event), custom_data]);
       };
       const node = target_node;
       node.addEventListener(event_name, fn);

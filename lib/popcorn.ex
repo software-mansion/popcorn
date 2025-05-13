@@ -7,6 +7,7 @@ defmodule Popcorn do
 
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
+  @api_dir Path.join(["popcorn", "api"])
 
   @config Popcorn.Config.get([:start_module, :out_path])
 
@@ -45,11 +46,8 @@ defmodule Popcorn do
 
   defp bundled_artifacts(all_beams, popcorn_library_path) do
     popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
+    api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
 
-    exported_beam_names =
-      "{Elixir.Popcorn.RemoteObject,Elixir.Popcorn.Wasm,Elixir.Jason.Encoder.Popcorn.RemoteObject}.beam"
-
-    api_beams = Path.wildcard(Path.join([@popcorn_path, "**", exported_beam_names]))
     # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
     [popcorn_library_path | api_beams] ++ (all_beams -- popcorn_files)
   end
@@ -72,5 +70,24 @@ defmodule Popcorn do
       {:error, :enoent} -> :ok
       error -> error
     end
+  end
+
+  defp popcorn_api_beam?(path) do
+    in_popcorn_ebin_dir?(path) and beam?(path) and beam_src_in_api_dir?(path)
+  end
+
+  defp in_popcorn_ebin_dir?(path) do
+    dir = path |> Path.relative_to(@popcorn_path) |> Path.dirname()
+    dir == "ebin"
+  end
+
+  defp beam?(path), do: Path.extname(path) == ".beam"
+
+  defp beam_src_in_api_dir?(beam_path) do
+    module_name = Path.basename(beam_path, ".beam")
+    module = Module.safe_concat([module_name])
+    src_path = to_string(module.module_info(:compile)[:source])
+
+    String.contains?(src_path, @api_dir)
   end
 end
