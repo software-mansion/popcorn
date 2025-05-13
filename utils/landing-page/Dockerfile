@@ -67,7 +67,7 @@ RUN source /root/.env && \
 
 RUN source /root/.env && \
     cd /root/elixir-wasm && \
-    cp -r iex_wasm/static/ landing-page/iex_wasm && \
+    cp -r iex_wasm/static/ landing-page/simple_repl && \
     cp -r game_of_life/static/ landing-page/game_of_life && \
     cp -r landing-page /landing-page
 
