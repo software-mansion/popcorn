@@ -13,11 +13,11 @@
     <body>
         <h1>Game of Life</h1>
         <main id="root"></main>
-        <script type="module" src="wasm/fission.js" defer></script>
+        <script type="module" src="wasm/popcorn.js" defer></script>
         <script type="module">
-            import { Fission } from "./wasm/fission.js";
+            import { Popcorn } from "./wasm/popcorn.js";
 
-            const fission = await Fission.init({
+            const popcorn = await Popcorn.init({
                 bundlePath: "wasm/bundle.avm",
                 debug: true,
                 onStdout: console.log,

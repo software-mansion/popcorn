@@ -7,9 +7,9 @@ name: Popcorn build & test
 
 on:
   push:
-    branches: [ "*" ]
+    # branches: [ "*" ]
   pull_request:
-    branches: [ "*" ]
+    # branches: [ "*" ]
 
 permissions:
   contents: read
@@ -23,10 +23,6 @@ jobs:
 
     name: Build & test
     runs-on: ubuntu-22.04
-
-    defaults:
-      run:
-        working-directory: popcorn
 
     steps:
     - uses: actions/checkout@v4

@@ -11,7 +11,7 @@ defmodule Popcorn do
   @config Popcorn.Config.get([:start_module, :out_path])
 
   @doc """
-  Packs compiled project files along with the Fission Lib into
+  Packs compiled project files along with the Popcorn Lib into
   a single `.avm` file using the AtomVM's `:packbeam` library.
 
   If the generated file should be runnable, pass a module implementing
@@ -50,7 +50,7 @@ defmodule Popcorn do
       "{Elixir.Popcorn.RemoteObject,Elixir.Popcorn.Wasm,Elixir.Jason.Encoder.Popcorn.RemoteObject}.beam"
 
     api_beams = Path.wildcard(Path.join([@popcorn_path, "**", exported_beam_names]))
-    # include stdlib bundle, Fission.Wasm beam and filter other fission beams
+    # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
     [popcorn_library_path | api_beams] ++ (all_beams -- popcorn_files)
   end
 

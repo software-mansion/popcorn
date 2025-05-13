@@ -3,17 +3,19 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: IEX WASM Build & test
+name: Eval in WASM Build & test
 
 on:
   push:
     branches: [ "*" ]
     paths:
-    - "examples/iex_wasm/**"
+    - "examples/eval_in_wasm/**"
+    - ".github/workflows/eval_in_wasm_build_test.yml"
   pull_request:
     branches: [ "*" ]
     paths:
-    - "examples/iex_wasm/**"
+    - "examples/eval_in_wasm/**"
+    - ".github/workflows/eval_in_wasm_build_test.yml"
 
 permissions:
   contents: read
@@ -31,7 +33,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: examples/iex_wasm
+        working-directory: examples/eval_in_wasm
 
     steps:
     - uses: actions/checkout@v4

@@ -5,7 +5,7 @@ end
 defimpl Jason.Encoder, for: Popcorn.RemoteObject do
   def encode(value, opts) when value.ref != nil do
     key = :emscripten.from_remote_object(value.ref, :key)
-    Jason.Encode.map(%{fission_ref: key}, opts)
+    Jason.Encode.map(%{popcorn_ref: key}, opts)
   end
 end
 

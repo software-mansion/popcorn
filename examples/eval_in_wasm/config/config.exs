@@ -15,7 +15,7 @@ include_tracing =
 
 config :popcorn,
   out_path: "static/wasm/app.avm",
-  start_module: App.Application,
+  start_module: EvalInWasm.Application,
   add_tracing: include_tracing
 
 if path = System.get_env("ATOMVM_SOURCE_PATH") do

@@ -1,4 +1,4 @@
-import { Fission } from "./wasm/fission.js";
+import { Popcorn } from "./wasm/popcorn.js";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const LANGUAGE_ERLANG = "erlang";
@@ -44,7 +44,7 @@ const Elements = {
 };
 
 async function setup() {
-  const fission = await Fission.init({
+  const popcorn = await Popcorn.init({
     bundlePath: "wasm/app.avm",
     debug: true,
     onStdout: (text) => displayLog(text, { isError: false }),
@@ -71,7 +71,7 @@ async function setup() {
   for (const [button, input] of evalButtons) {
     function evalCode() {
       const code = input.value.trim();
-      sendEvalRequest(fission, code);
+      sendEvalRequest(popcorn, code);
     }
 
     button.onclick = evalCode;
@@ -92,7 +92,7 @@ function isErlangModule(code) {
   return code.startsWith("-module(");
 }
 
-async function sendEvalRequest(fission, code) {
+async function sendEvalRequest(popcorn, code) {
   if (code === "") {
     return;
   }
@@ -102,7 +102,7 @@ async function sendEvalRequest(fission, code) {
 
   try {
     const action = getEvalAction(code);
-    const { data, durationMs } = await fission.call([action, code], {
+    const { data, durationMs } = await popcorn.call([action, code], {
       timeoutMs: 10_000,
     });
     Elements.stateDisplay.textContent = "Done.";

@@ -83,4 +83,4 @@ module =
   #{impls}
   """
 
-File.write!("#{__DIR__}/patches/fission_utils/simple_trace.erl", module)
+File.write!("#{__DIR__}/patches/popcorn_utils/simple_trace.erl", module)

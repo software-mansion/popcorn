@@ -89,7 +89,7 @@
             <p class="todo">
                 TODO: Create a command that copies built artifacts
             </p>
-            <p class="todo">TODO: Replace all fission uses with popcorn</p>
+            <p class="todo">TODO: Replace all popcorn uses with popcorn</p>
             <p>
                 First, generate a directory that will host Popcorn JS
                 library, WASM, and generated app bundle. To do that, run:
@@ -106,10 +106,10 @@
                 <summary>HTML snippet</summary>
                 <pre>
 <span class="unselectable"># static/index.html
-</span>&lt;script type=&quot;module&quot; src=&quot;wasm/fission.js&quot; defer&gt;&lt;/script&gt;
+</span>&lt;script type=&quot;module&quot; src=&quot;wasm/popcorn.js&quot; defer&gt;&lt;/script&gt;
 &lt;script type=&quot;module&quot; defer&gt;
-    import { Fission } from &quot;./wasm/fission.js&quot;;
-    const fission = await Fission.init({
+    import { Popcorn } from &quot;./wasm/popcorn.js&quot;;
+    const popcorn = await Popcorn.init({
         onStdout: console.log,
         onStderr: console.error,
     });
