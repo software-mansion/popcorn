@@ -27,7 +27,7 @@
 
     --swm-header: var(--swm-popcorn-blue);
     --swm-text: var(--swm-popcorn-black);
-    --swm-background: var(--swm-popcorn-yellow);
+    --swm-background: var(--swm-popcorn-white);
     /* --swm-background: #fcfcff; */
     /* --swm-yellow-100: #ffd61e; */
     /* --swm-red-100: #ff6259; */
@@ -42,10 +42,10 @@
         --swm-popcorn-pink-60: #ffa3a1;
         --swm-popcorn-pink-80: #fa7f7c;
         --swm-popcorn-white: #fff;
-        --swm-popcorn-black: #0d1116;
+        --swm-popcorn-black: #212121;
 
         --swm-header: var(--swm-popcorn-yellow);
-        --swm-text: var(--swm-popcorn-yellow);
+        --swm-text: var(--swm-popcorn-white);
         --swm-background: var(--swm-popcorn-black);
         /* --swm-background: #232736; */
         /* --swm-yellow-100: #fd4; */
@@ -57,8 +57,10 @@
 
 main {
     margin: 0 auto;
+    padding: 0 30px;
     max-width: 60em;
 }
+
 body {
     margin: 15px auto;
     color: var(--swm-text);
@@ -81,6 +83,21 @@ body {
         "Noto Color Emoji";
 }
 
+nav {
+    display: flex;
+    gap: 3em;
+    margin-bottom: 3em;
+}
+
+nav a {
+    color: var(--swm-header);
+    font-size: 1.1em;
+}
+
+section {
+    scroll-margin-top: 5em;
+}
+
 a {
     color: var(--swm-text);
 }
@@ -88,12 +105,16 @@ a {
 h1,
 h2,
 h3 {
-    color: var(--swm-text);
+    color: var(--swm-header);
     width: fit-content;
 }
 
 code {
-    text-wrap: nowrap;
+    /* text-wrap: nowrap; */
+}
+
+img {
+    max-width: 80vw;
 }
 
 pre {
@@ -108,9 +129,17 @@ summary {
     cursor: pointer;
 }
 
+.logo-full {
+    padding-top: 22px;
+    padding-bottom: 34px;
+}
+
 .header {
+    display: flex;
+    flex-direction: column;
     color: var(--swm-header);
     font-weight: 400;
+    font-size: 1.5em;
 }
 
 .popcorn {
@@ -141,7 +170,7 @@ summary {
 .js-method {
     padding: 5px;
     color: var(--swm-text);
-    background-color: var(--swm-popcorn-pink-60);
+    background-color: var(--swm-popcorn-yellow);
 }
 @media (prefers-color-scheme: dark) {
     .js-method {
@@ -152,7 +181,7 @@ summary {
 .ex-function {
     padding: 5px;
     color: var(--swm-text);
-    background-color: var(--swm-popcorn-pink-60);
+    background-color: var(--swm-popcorn-yellow);
 }
 @media (prefers-color-scheme: dark) {
     .ex-function {
@@ -165,8 +194,8 @@ summary {
     flex-direction: row;
     justify-content: center;
     flex-wrap: wrap;
-    background-color: var(--swm-popcorn-pink-80);
-    padding: 15px 0;
+    background-color: var(--swm-popcorn-yellow);
+    padding: 60px 0;
     max-width: initial;
     width: 100vw;
     margin-left: 50%;
@@ -182,13 +211,26 @@ summary {
 .example {
     max-width: 400px;
     max-height: 400px;
-    background-color: var(--swm-background);
-    padding: 5px;
+    background-color: var(--swm-popcorn-pink-60);
+    padding: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .example {
+        background-color: var(--swm-popcorn-black);
+    }
 }
 
 .preview-img {
     max-width: 400px;
     max-height: 400px;
+}
+
+@media screen and (max-width: 600px) {
+    .preview-img {
+        max-width: 300px;
+        max-height: 300px;
+    }
 }
 
 .unselectable {
@@ -197,7 +239,7 @@ summary {
 }
 
 .note {
-    background-color: var(--swm-popcorn-pink-60);
+    background-color: var(--swm-popcorn-pink-80);
     padding: 15px;
 }
 
@@ -205,11 +247,21 @@ summary {
     color: var(--swm-text);
 }
 @media (prefers-color-scheme: dark) {
-    .note {
-        background-color: var(--swm-popcorn-yellow);
-    }
-
     .note * {
         color: var(--swm-background);
     }
 }
+
+.arch {
+    height: 400px;
+}
+/*
+.links {
+    display: flex;
+    gap: 2em;
+}
+.links a {
+    padding: 5px;
+    flex-grow: 1;
+    border: none;
+} */

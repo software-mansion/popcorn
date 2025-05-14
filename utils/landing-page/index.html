@@ -13,25 +13,28 @@
 
     <body>
         <main>
+            <nav>
+                <a href="#getting-started">Getting started</a>
+                <a href="#api">API</a>
+                <a href="#limitations">Limitations</a>
+                <a href="#under-the-hood">Under the hood</a>
+            </nav>
             <h1 class="header">
-                <div class="popcorn">
-                    <img src="assets/logo.svg" /><span>Popcorn</span>
-                </div>
-                – run Elixir in WASM
+                <img src="assets/logo-full.svg" class="logo-full" />
+                Run Elixir in WASM
             </h1>
+
             <section id="intro">
                 <p>
-                    Popcorn is a library allowing you to write code in Elixir
-                    and run it client-side on browsers.
+                    Popcorn is a library that enables execution of Elixir code
+                    within web browsers.
                 </p>
                 <p>
-                    The code compiles with Elixir compiler to bytecode as any
-                    other Elixir code and executes in
+                    Compiled Elixir code is executed in the client-side
                     <a href="https://github.com/atomvm/AtomVM">AtomVM</a>
-                    runtime. The library provides APIs to interact with the
-                    Elixir from JS and vice versa. JS part also ensures that
-                    Elixir VM never hangs the browser and restarts it on VM
-                    crashes.
+                    runtime. Popcorn offers APIs for interactions between Elixir
+                    and JavaScript, handling serialization and communication, as
+                    well as ensuring browser responsiveness.
                 </p>
                 <p>
                     You can check Popcorn API in
@@ -40,7 +43,7 @@
                 </p>
             </section>
 
-            <h2>Examples</h2>
+            <h2>Popcorn in action</h2>
             <section id="examples" class="examples">
                 <figure class="example">
                     <img
@@ -60,7 +63,7 @@
                         class="preview-img"
                     />
                     <figcaption>
-                        <a href="/elixir_docs/basic-types/">Elixir docs</a>
+                        <a href="/elixir_docs/basic-types">Elixir docs</a>
                         "Getting started" guide with interactive snippets.
                     </figcaption>
                 </figure>
@@ -276,8 +279,7 @@ end</pre>
                 </ul>
                 <p>
                     To destroy an instance, use
-                    <code class="js-method">Popcorn.deinit()</code>
-                    static method.
+                    <code class="js-method">popcorn.deinit()</code> method.
                 </p>
                 <h3>Elixir</h3>
                 <p>
@@ -439,10 +441,39 @@ end</pre>
                     </li>
                 </ul>
             </section>
+            <h2>Limitations</h2>
+            <section id="limitations">
+                <p>
+                    We rely on AtomVM for running the compiled beams. It's a
+                    runtime designed for microcontrollers and it doesn't entire
+                    OTP. Most notably, some natively implemented functions
+                    (<abbr>NIFs</abbr>) from OTP standard library are missing.
+                    We provide patches, reimplementing some in Erlang and work
+                    on adding important NIFs directly to AtomVM. Nevertheless,
+                    some modules (e.g. <code>:timer</code>, full
+                    <code>:ets</code> selects – core Elixir code depend on them)
+                    won't work just yet.
+                </p>
+                <p>
+                    Aside of parts of standard library, AtomVM doesn't support
+                    big integers and bitstring well. There's ongoing work to
+                    support both of those.
+                </p>
+                <p>
+                    Popcorn provides set of functions that work with JS. Not all
+                    values can be sent to either JS or Elixir. Working with
+                    those values is based on passing opaque references to them.
+                </p>
+                <p>
+                    API is not stabilized yet but we mostly want to keep the
+                    current form for JS and slightly improve developer
+                    experience for Elixir parts.
+                </p>
+            </section>
             <h2>Under the hood</h2>
             <section id="under-the-hood">
                 <h3 id="code-bundle">Overall architecture</h3>
-                <img src="assets/arch.svg" height="400px" />
+                <img class="arch" src="assets/arch.svg" />
                 <p>
                     To run Elixir on the web, you need to compile Erlang/Elixir
                     runtime to WASM and load the compiled Elixir bytecode. We
@@ -455,14 +486,14 @@ end</pre>
                     of concatenated <code>.beam</code> files.
                 </p>
                 <p>
-                    This guides the architecture – main window creates an iframe
-                    and communicates with it via <code>postMessage()</code>.
-                    Script in the iframe loads WASM module and code bundle. The
-                    WASM module initializes the runtime on multiple webworkers.
-                    Main window sets up the timeouts which trigger if
-                    <code>call()</code> takes too long or if iframe doesn't
-                    respond in time (most likely crashed or got stuck on long
-                    computation).
+                    This flow guides the architecture – main window creates an
+                    iframe and communicates with it via
+                    <code>postMessage()</code>. Script in the iframe loads WASM
+                    module and code bundle. The WASM module initializes the
+                    runtime on multiple webworkers. Main window sets up the
+                    timeouts which trigger if <code>call()</code> takes too long
+                    or if iframe doesn't respond in time (most likely crashed or
+                    got stuck on long computation).
                 </p>
                 <p>
                     When initializing WASM module, the script in iframe also
@@ -510,8 +541,31 @@ end</pre>
                     back to the Elixir.
                 </p>
             </section>
-            <h2>Limitations</h2>
-            <section id="limitations"></section>
+            <h2>About</h2>
+            <section>
+                <p>Popcorn is created by Software Mansion.</p>
+                <p>
+                    Since 2012
+                    <a href="https://swmansion.com/">Software Mansion</a> is a
+                    software agency with experience in building web and mobile
+                    apps as well as complex multimedia solutions. We are Core
+                    React Native Contributors and experts in live streaming and
+                    broadcasting technologies. We can help you build your next
+                    dream product –
+                    <a href="https://swmansion.com/contact/projects">Hire us</a
+                    >.
+                </p>
+                <p>
+                    Copyright 2025,
+                    <a href="https://swmansion.com/">Software Mansion</a>
+                </p>
+                <p>
+                    <a href="https://swmansion.com/"
+                        ><img src="assets/swm-logo.svg"
+                    /></a>
+                </p>
+                <p>Licensed under the Apache License, Version 2.0.</p>
+            </section>
         </main>
     </body>
 </html>

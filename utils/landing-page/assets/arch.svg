@@ -38,7 +38,7 @@
 
         @media (prefers-color-scheme: dark) {
             rect, line {
-                fill: #0d1116;
+                fill: #212121;
                 stroke: #fffae1
             }
             text {
@@ -46,20 +46,20 @@
             }
         }
 </style>
-<rect x="7.5" y="9.5" width="137" height="33" fill="#fffae1"/>
+<rect x="7.5" y="9.5" width="137" height="33" fill="white"/>
 <rect x="7.5" y="9.5" width="137" height="33" stroke="#0d1116"/>
 <text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="17" y="30.8">Main browser window</tspan></text>
-<rect x="329.5" y="162.5" width="133" height="33" fill="#fffae1"/>
+<rect x="329.5" y="162.5" width="133" height="33" fill="white"/>
 <rect x="329.5" y="162.5" width="133" height="33" stroke="#0d1116"/>
 <text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="339" y="183.8">Elixir (WASM module)</tspan></text>
-<rect x="272.5" y="9.5" width="208" height="86" fill="#fffae1"/>
+<rect x="272.5" y="9.5" width="208" height="86" fill="white"/>
 <rect x="272.5" y="9.5" width="208" height="86" stroke="#0d1116" stroke-dasharray="2 2"/>
 <text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="359.5" y="30.8">Iframe</tspan></text>
-<rect x="282.5" y="43.5" width="181" height="34" fill="#fffae1"/>
+<rect x="282.5" y="43.5" width="181" height="34" fill="white"/>
 <rect x="282.5" y="43.5" width="181" height="34" stroke="#0d1116"/>
-<rect x="286.5" y="47.5" width="181" height="34" fill="#fffae1"/>
+<rect x="286.5" y="47.5" width="181" height="34" fill="white"/>
 <rect x="286.5" y="47.5" width="181" height="34" stroke="#0d1116"/>
-<rect x="290.5" y="51.5" width="181" height="33" fill="#fffae1"/>
+<rect x="290.5" y="51.5" width="181" height="33" fill="white"/>
 <rect x="290.5" y="51.5" width="181" height="33" stroke="#0d1116"/>
 <text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="304.5" y="72.8">WASM runtime (web worker)</tspan></text>
 <line x1="144.996" y1="27.5" x2="272.996" y2="26.5" stroke="#0d1116"/>
