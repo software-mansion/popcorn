@@ -1,4 +1,7 @@
 defmodule Popcorn.RemoteObject do
+  @moduledoc """
+  Struct for JS side communication.
+  """
   defstruct ref: nil
 end
 
@@ -11,7 +14,7 @@ end
 
 defmodule Popcorn.Wasm do
   @moduledoc """
-  Functions for interacting with JS side.
+  Functions for JS side communication.
   """
   alias Popcorn.RemoteObject
 
@@ -37,11 +40,17 @@ defmodule Popcorn.Wasm do
           {:wasm_call, data :: term(), promise()}
           | {:wasm_cast, data :: term()}
 
+  @typedoc """
+  See `handle_message!/2` docs.
+  """
   @type handler_result ::
           {:resolve, promise_reply :: term(), result :: term()}
           | {:reject, promise_reply :: term(), result :: term()}
           | term()
 
+  @typedoc """
+  See `handle_message!/2` docs.
+  """
   @type message_handler :: (wasm_message() -> handler_result())
 
   @typedoc """
@@ -188,6 +197,7 @@ defmodule Popcorn.Wasm do
     value
   end
 
+#  todo - discuss if it notifies why is it called register?
   @doc """
   Notifies JS that Elixir side finished initializing. Can be called only once.
   """
