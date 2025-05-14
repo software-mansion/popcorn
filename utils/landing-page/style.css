@@ -85,9 +85,18 @@ body {
 
 nav {
     display: flex;
-    gap: 3em;
+    row-gap: 0;
+    column-gap: 3em;
     margin-bottom: 3em;
+    flex-wrap: wrap;
 }
+
+/* @media screen and (max-width: 600px) {
+    nav {
+        flex-direction: column;
+        gap: unset;
+    }
+} */
 
 nav a {
     color: var(--swm-header);
@@ -110,7 +119,7 @@ h3 {
 }
 
 code {
-    /* text-wrap: nowrap; */
+    overflow-wrap: anywhere;
 }
 
 img {
