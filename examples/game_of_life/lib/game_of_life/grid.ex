@@ -75,6 +75,10 @@ defmodule GameOfLife.Grid do
   end
 
   @impl true
+  def handle_call(:tick, _from, state) when state.respond_to != nil do
+    raise "Overlapping tick"
+  end
+
   def handle_call(:tick, from, state) do
     state = %{state | respond_to: from, tick_progress: %{}}
 

@@ -1,5 +1,5 @@
 %{
   "atomvm_packbeam": {:git, "https://github.com/atomvm/atomvm_packbeam.git", "2daea6d0339aa40b8a07b8ad4d4583fb64b608de", []},
   "jason": {:hex, :jason, "1.4.4", "b9226785a9aa77b6857ca22832cffa5d5011a667207eb2a0ad56adb5db443b8a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b"},
-  "popcorn": {:git, "https://github.com/software-mansion/popcorn.git", "64ed6a6d9580b91c3b8f8979f45b62872689e0b4", []},
+  "popcorn": {:git, "https://github.com/software-mansion/popcorn.git", "1c3dbd20c722eb5baa10cf57522226043f9be524", []},
 }
