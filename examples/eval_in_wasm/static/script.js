@@ -45,7 +45,6 @@ const Elements = {
 
 async function setup() {
   const popcorn = await Popcorn.init({
-    bundlePath: "wasm/app.avm",
     debug: true,
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),

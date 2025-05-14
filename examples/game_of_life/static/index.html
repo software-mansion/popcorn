@@ -18,7 +18,6 @@
             import { Popcorn } from "./wasm/popcorn.js";
 
             const popcorn = await Popcorn.init({
-                bundlePath: "wasm/bundle.avm",
                 debug: true,
                 onStdout: console.log,
                 onStderr: console.error,
