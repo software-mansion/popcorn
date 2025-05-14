@@ -197,7 +197,6 @@ defmodule Popcorn.Wasm do
     value
   end
 
-#  todo - discuss if it notifies why is it called register?
   @doc """
   Notifies JS that Elixir side finished initializing. Can be called only once.
   """
@@ -267,6 +266,9 @@ defmodule Popcorn.Wasm do
     )
   end
 
+  @doc """
+  Unregister event listener. See `register_event_listener/2`.
+  """
   def unregister_event_listener(ref) do
     """
     ({ args }) => {
