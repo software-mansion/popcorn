@@ -56,14 +56,14 @@ config :popcorn, start_module: MyApp.Start
 
 Finally, run `mix deps.get` and `mix compile`, and the `bundle.avm` file will be generated in the `_build/dev/` directory. You can run it with `atomvm bundle.avm`.
 
-Alternatively, instead of adding `:popcorn` to compilers, you can run `Popcorn.pack/1` after `mix compile` with the same effect.
+Alternatively, instead of adding `:popcorn` to compilers, you can run `Popcorn.cook/1` after `mix compile` with the same effect.
 
 ## Configuration options
 
 These options can be set by putting a `config :popcorn, option: value` line in `config/config.exs`:
 
 - `start_module` - The `start/0` function in this module will be the entry point your app. Defaults to `nil` - no function will be called, the output should be embedded in another `.avm` file.
-- `out_path` - The path to the output `.avm` file. Defaults to `path_to_build/bundle.avm`, where `path_to_build` is the output of `Mix.Project.build_path/0`.
+- `out_dir` - The path to the output `.avm` file. Defaults to `path_to_build/bundle.avm`, where `path_to_build` is the output of `Mix.Project.build_path/0`.
 - `add_tracing` - If `true`, injects a simple tracing code that prints module, function and arity of each cross-module call. Defaults to `false`.
 - `erl_stdlib_beam_paths` - List of paths to Erlang stdlib `.beam` files. Defaults to `Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam")`
 - `ex_stdlib_beam_paths` - List of paths to Elixir stdlib `.beam` files. Defaults to `Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam")`

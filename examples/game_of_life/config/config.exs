@@ -4,7 +4,7 @@ root = "#{__DIR__}/../"
 
 config :popcorn,
   add_tracing: false,
-  out_path: "#{root}/static/wasm/bundle.avm",
+  out_dir: "#{root}/static/wasm",
   start_module: GameOfLife
 
 if File.exists?("#{__DIR__}/config.secret.exs") do

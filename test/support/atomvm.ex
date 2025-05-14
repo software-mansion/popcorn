@@ -21,7 +21,11 @@ defmodule Popcorn.Support.AtomVM do
 
   require Logger
 
-  @runtime_path Application.compile_env(:popcorn, :runtime_path, "_build/AtomVM")
+  @runtime_path Application.compile_env(
+                  :popcorn,
+                  :runtime_path,
+                  Path.join(Mix.Project.app_path(), "atomvm_artifacts/unix/AtomVM")
+                )
   # mix always compiles files from project root
   @compile_dir Path.join([File.cwd!(), "tmp", "modules"])
 
@@ -108,7 +112,7 @@ defmodule Popcorn.Support.AtomVM do
 
     unless match?({_output, 0}, System.shell("which '#{@runtime_path}'")) do
       raise """
-      AtomVM not found, please run `mix popcorn.build_runtime --out-dir _build` \
+      AtomVM not found, please run `mix popcorn.build_runtime` \
       or put `config :popcorn, runtime_path: "path/to/AtomVM"` in your config.exs
       """
     end
@@ -174,7 +178,12 @@ defmodule Popcorn.Support.AtomVM do
         |> module()
         |> run_elixirc(build_dir)
 
-      Popcorn.pack(artifacts: [beam_path], start_module: RunExpr, out_path: avm_path)
+      Popcorn.cook(
+        target: :unix,
+        artifacts: [beam_path],
+        start_module: RunExpr,
+        out_dir: build_dir
+      )
     end
 
     avm_path

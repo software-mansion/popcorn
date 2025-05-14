@@ -14,7 +14,7 @@ include_tracing =
   end
 
 config :popcorn,
-  out_path: "static/wasm/bundle.avm",
+  out_dir: "static/wasm",
   start_module: EvalInWasm.Application,
   add_tracing: include_tracing
 

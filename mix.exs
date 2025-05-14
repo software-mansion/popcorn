@@ -18,19 +18,51 @@ defmodule Popcorn.MixProject do
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       elixirc_options: [no_warn_undefined: [:emscripten]],
-      aliases: [compile: ["compile", &patch/1]],
+      aliases: [compile: ["compile", &download_artifacts/1, &patch/1]],
       deps: deps()
     ]
   end
 
   def application do
-    [
-      extra_applications: [:logger]
-    ]
+    [extra_applications: [:logger, :inets, :ssl, :public_key, :crypto]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp download_artifacts(_args) do
+    alias Popcorn.Utils.Download
+
+    {:url, url} =
+      Application.get_env(
+        :popcorn,
+        :runtime,
+        {:url, "https://popcorn.swmansion.com/simple_repl/wasm/"}
+      )
+
+    dir = Path.join(Mix.Project.app_path(), "atomvm_artifacts/wasm")
+    File.mkdir_p!(dir)
+    artifacts = ["AtomVM.wasm", "AtomVM.mjs"]
+    paths = Enum.map(artifacts, &Path.join(dir, &1))
+
+    unless Enum.all?(paths, &File.exists?/1) do
+      Download.start_inets_profile()
+
+      Enum.each(artifacts, fn name ->
+        path = Path.join(dir, name)
+
+        with {:ok, _stream} <-
+               Download.download("#{url}/#{name}", File.stream!(path <> ".download")) do
+          File.rename!(path <> ".download", path)
+        else
+          {:error, reason} ->
+            IO.warn("""
+            Couldn't download #{name}, reason: #{reason}, please use mix popcorn.build_runtime to build from source
+            """)
+        end
+      end)
+    end
+  end
 
   defp patch(_args) do
     Popcorn.Build.build()

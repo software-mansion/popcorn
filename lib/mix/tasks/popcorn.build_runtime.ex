@@ -16,7 +16,6 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
   Then you can run this task with the following options:
   - `target` - `wasm` (default) `unix`
-  - `out_dir` - where to output built artifacts (defaults to CWD)
   - `out_name` - used to name the built artifacts (defaults to "AtomVM")
   """
 
@@ -26,16 +25,18 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   @requirements "deps.compile"
 
   @build_dir Mix.Project.app_path()
-  @priv_dir :code.priv_dir(:popcorn)
   @config Popcorn.Config.get([:runtime_source])
-  @options_defaults %{target: "unix", out_dir: ".", out_name: "AtomVM", cmake_opts: ""}
 
   def run(args) do
-    parser_config = [strict: @options_defaults |> Map.keys() |> Keyword.from_keys(:string)]
+    options_defaults = %{cmake_opts: ""}
+    parser_config = [strict: [:target | Map.keys(options_defaults)] |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
-    options = Map.merge(@options_defaults, Map.new(options))
+    options = Map.merge(options_defaults, Map.new(options))
     {cmake_opts, options} = Map.pop(options, :cmake_opts)
     cmake_opts = cmake_opts |> String.split(" ", trim: true) |> Enum.map(&"-D#{&1}")
+
+    artifacts_dir = Path.join([@build_dir, "atomvm_artifacts", "#{options.target}"])
+    File.mkdir_p!(artifacts_dir)
 
     runtime_source =
       case @config.runtime_source do
@@ -47,13 +48,14 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     # Skip building AtomVM stdlib
     File.write!(Path.join(runtime_source, "libs/CMakeLists.txt"), "\n")
 
-    case String.to_existing_atom(options.target) do
+    case String.to_existing_atom(options[:target]) do
       :unix ->
         build_dir = Path.join(runtime_source, "build")
         File.mkdir_p!(build_dir)
         cmd(~w"cmake .. -DAVM_BUILD_RUNTIME_ONLY=1" ++ cmake_opts, cd: build_dir)
         cmd(~w"make -j", cd: build_dir)
-        cp_artifact("src/AtomVM", build_dir, options)
+
+        cp_artifact("src/AtomVM", build_dir, artifacts_dir)
 
       :wasm ->
         build_dir = Path.join(runtime_source, "src/platforms/emscripten/build")
@@ -66,12 +68,14 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
         )
 
         cmd(~w"emmake make -j", cd: build_dir)
-        wasm_template_dir = Path.join([@priv_dir, "static-template", "wasm"])
-        File.mkdir_p!(options.out_dir)
-        File.cp_r!(wasm_template_dir, options.out_dir)
+        cp_artifact("src/AtomVM.mjs", build_dir, artifacts_dir)
+        cp_artifact("src/AtomVM.wasm", build_dir, artifacts_dir)
 
-        cp_artifact("src/AtomVM.mjs", build_dir, options)
-        cp_artifact("src/AtomVM.wasm", build_dir, options)
+      nil ->
+        raise "Missing option --target"
+
+      target ->
+        raise "Invalid target #{inspect(target)}, valid targets: unix, wasm"
     end
   end
 
@@ -100,10 +104,7 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     :ok
   end
 
-  defp cp_artifact(subpath, build_dir, options) do
-    File.cp!(
-      Path.join(build_dir, subpath),
-      Path.join(options.out_dir, options.out_name <> Path.extname(subpath))
-    )
+  defp cp_artifact(subpath, build_dir, artifacts_dir) do
+    File.cp!(Path.join(build_dir, subpath), Path.join(artifacts_dir, Path.basename(subpath)))
   end
 end
