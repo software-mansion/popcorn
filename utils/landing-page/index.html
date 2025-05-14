@@ -14,7 +14,10 @@
     <body>
         <main>
             <h1 class="header">
-                <span class="popcorn">Popcorn</span> – run Elixir in WASM
+                <div class="popcorn">
+                    <img src="assets/logo.svg" /><span>Popcorn</span>
+                </div>
+                – run Elixir in WASM
             </h1>
             <section id="intro">
                 <p>
@@ -76,13 +79,11 @@
 
             <h2>Getting started</h2>
             <section id="getting-started">
-                <p class="todo">TODO: Divide sections to separate pages</p>
-
                 <div class="note">
                     <h3>Note</h3>
                     <p>
                         This library is work in progress. API is unstable and
-                        some things doesn't work. You can read more in
+                        some things don't work. You can read more in
                         <a href="#limitations">"Limitations"</a>
                         section.
                     </p>
@@ -101,10 +102,6 @@
                 </p>
 
                 <h3>JS</h3>
-                <p class="todo">
-                    TODO: Create a command that copies built artifacts
-                </p>
-                <p class="todo">TODO: Replace all popcorn uses with popcorn</p>
                 <p>
                     First, generate a directory that will host Popcorn JS
                     library, WASM, and generated app bundle. To do that, run:
@@ -161,9 +158,6 @@
     end
 end</pre>
                 </details>
-                <p class="todo">
-                    TODO: Abstract start/0 and default receiver registration
-                </p>
                 <p>
                     After we finish initializing Elixir (setting up supervision
                     trees, etc), we notify JS side by calling
@@ -517,9 +511,7 @@ end</pre>
                 </p>
             </section>
             <h2>Limitations</h2>
-            <section id="limitations">
-                <p class="todo">TODO: Write this section</p>
-            </section>
+            <section id="limitations"></section>
         </main>
     </body>
 </html>
