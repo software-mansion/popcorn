@@ -60,6 +60,7 @@ main {
     padding: 0 30px;
     max-width: 60em;
 }
+
 body {
     margin: 15px auto;
     color: var(--swm-text);
@@ -80,6 +81,21 @@ body {
         "Segoe UI Emoji",
         "Segoe UI Symbol",
         "Noto Color Emoji";
+}
+
+nav {
+    display: flex;
+    gap: 3em;
+    margin-bottom: 3em;
+}
+
+nav a {
+    color: var(--swm-header);
+    font-size: 1.1em;
+}
+
+section {
+    scroll-margin-top: 5em;
 }
 
 a {
