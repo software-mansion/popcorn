@@ -13,6 +13,8 @@ defmodule GameOfLife.Grid do
   """
   @type size :: {pos_integer(), pos_integer()}
 
+  defguardp is_tick_in_progress(state) when state.respond_to != nil or state.tick_progress != nil
+
   def child_spec(args) do
     game_id = Keyword.fetch!(args, :game_id)
     size = Keyword.fetch!(args, :size)
@@ -75,7 +77,7 @@ defmodule GameOfLife.Grid do
   end
 
   @impl true
-  def handle_call(:tick, _from, state) when state.respond_to != nil do
+  def handle_call(:tick, _from, state) when is_tick_in_progress(state) do
     raise "Overlapping tick"
   end
 

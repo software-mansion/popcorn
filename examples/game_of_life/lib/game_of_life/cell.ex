@@ -16,6 +16,8 @@ defmodule GameOfLife.Cell do
             epochs: [],
             pending_epoch: nil
 
+  defguardp is_tick_in_progress(state) when state.pending_epoch != nil
+
   @doc """
   Child specification to start `GameOfLife.Cell` as part of supervision tree
   """
@@ -83,7 +85,7 @@ defmodule GameOfLife.Cell do
   end
 
   @impl true
-  def handle_cast({:tick, _notify}, state) when state.pending_epoch != nil do
+  def handle_cast({:tick, _notify}, state) when is_tick_in_progress(state) do
     raise "Overlapping ticks"
   end
 
