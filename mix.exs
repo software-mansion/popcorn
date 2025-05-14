@@ -39,7 +39,8 @@ defmodule Popcorn.MixProject do
   defp deps do
     [
       {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
-      {:jason, "~> 1.4"}
+      {:jason, "~> 1.4"},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
     ]
   end
 end
