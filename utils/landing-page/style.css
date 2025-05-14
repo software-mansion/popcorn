@@ -247,10 +247,6 @@ summary {
     color: var(--swm-text);
 }
 @media (prefers-color-scheme: dark) {
-    /* .note {
-        background-color: var(--swm-popcorn-yellow);
-    } */
-
     .note * {
         color: var(--swm-background);
     }
