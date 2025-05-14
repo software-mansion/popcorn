@@ -1,21 +1,12 @@
-# Popcorn
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Library that takes Erlang and Elixir stdlibs from the system, patches them so that they can work with AtomVM, and bundles them along with your project into an `.avm` file that can be run with AtomVM.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/dark-mode-logo.svg">
+  <source media="(prefers-color-scheme: light)" srcset="assets/light-mode-logo.svg">
+  <img alt="Popcorn" src="assets/fallback-logo.svg">
+</picture>
 
-The idea is the following:
-- Decouple AtomVM versions of Erlang and Elixir stdlibs from the AtomVM itself
-- Don't transfer any code from the original stdlibs into the AtomVM versions anymore
-- Instead, take the stdlibs from the system
-- For the stdlib code that doesn't work in AtomVM (usually because of missing NIFs),
-provide a custom implementations in the Popcorn
-  - For the start, it's all the code from the AtomVM versions of stdlibs.
-  - (TBD) In the future, the parts of them that are copied from original stdlibs should be
-  indentified and removed
-  - (In progress) Subsequently identify missing functions in the AtomVM and either add missing
-  NIFs there or provide custom implementations in the Popcorn
-- Then, patch the original stdlibs with custom implementations by replacing particular functions
-- Provide a convenient way of bundling projects along with the patched stdlibs into a single `.avm` file (see [Usage](#usage))
-- (TBD) prune out the code that's not used by a given project to reduce the size of the bundle
+**Popcorn is a library that compiles Elixir to WebAssembly, enabling client-side execution in browsers with seamless JavaScript interoperability.**
 
 ## Usage
 
@@ -77,3 +68,15 @@ These options can be set by putting a `config :popcorn, option: value` line in `
 - `erl_stdlib_beam_paths` - List of paths to Erlang stdlib `.beam` files. Defaults to `Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam")`
 - `ex_stdlib_beam_paths` - List of paths to Elixir stdlib `.beam` files. Defaults to `Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam")`
 - `runtime_source` - See `Mix.Tasks.Popcorn.BuildAvm` or type `mix help popcorn.build_runtime`
+
+## Authors
+
+Popcorn is created by Software Mansion.
+
+Since 2012 [Software Mansion](https://swmansion.com/) is a software agency with experience in building web and mobile apps as well as complex multimedia solutions. We are Core React Native Contributors and experts in live streaming and broadcasting technologies. We can help you build your next dream product – [Hire us](https://swmansion.com/contact/projects).
+
+Copyright 2025, [Software Mansion](https://swmansion.com/)
+
+[![Software Mansion](https://logo.swmansion.com/logo?color=white&variant=desktop&width=200&tag=membrane-github)](https://swmansion.com/)
+
+Licensed under the [Apache License, Version 2.0](LICENSE)
