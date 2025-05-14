@@ -53,7 +53,6 @@ RUN source /root/.env && \
     cp src/AtomVM.mjs src/AtomVM.wasm /root/wasm/
 
 ARG COMMIT_REF ''
-RUN mkdir /root/.ssh/ && chmod 700 /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts
 RUN git clone https://github.com/software-mansion/popcorn.git /root/elixir-wasm && \
     git clone https://github.com/software-mansion-labs/elixir-docs-wasm.git /root/elixir && \
     cd /root/elixir && git checkout jgonet/docs
