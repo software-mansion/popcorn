@@ -6,7 +6,7 @@
   <img alt="Popcorn" src="assets/fallback-logo.svg">
 </picture>
 
-**Popcorn is a library that compiles Elixir to WebAssembly, enabling client-side execution in browsers with seamless JavaScript interoperability.**
+**Popcorn is a library that allows you to run client-side Elixir in browsers, with Javascript interoperability**
 
 ## Usage
 
