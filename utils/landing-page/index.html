@@ -14,11 +14,10 @@
     <body>
         <main>
             <h1 class="header">
-                <div class="popcorn">
-                    <img src="assets/logo.svg" /><span>Popcorn</span>
-                </div>
-                – run Elixir in WASM
+                <img src="assets/logo-full.svg" class="logo-full" />
+                Run Elixir in WASM
             </h1>
+
             <section id="intro">
                 <p>
                     Popcorn is a library allowing you to write code in Elixir
@@ -442,7 +441,7 @@ end</pre>
             <h2>Under the hood</h2>
             <section id="under-the-hood">
                 <h3 id="code-bundle">Overall architecture</h3>
-                <img src="assets/arch.svg" height="400px" />
+                <img class="arch" src="assets/arch.svg" />
                 <p>
                     To run Elixir on the web, you need to compile Erlang/Elixir
                     runtime to WASM and load the compiled Elixir bytecode. We
