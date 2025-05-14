@@ -6,7 +6,7 @@ defmodule GameOfLife do
   alias Popcorn.Wasm
 
   @doc """
-  A simple, example simulation with 3x3 grid and 5 generations
+  Starts `GameOfLife.Application`
   """
   def start() do
     IO.puts("Init...\n")

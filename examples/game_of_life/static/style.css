@@ -61,7 +61,7 @@ button:disabled {
 .controls {
     display: flex;
     gap: 5px;
-    flex-direction: column;
+    flex-direction: row;
 }
 
 .cell {
