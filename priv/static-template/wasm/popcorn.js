@@ -51,12 +51,9 @@ export class Popcorn {
     }
     const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
       params;
-    if (bundlePath === undefined) {
-      throw new Error("bundle path is required");
-    }
 
     this._debug = debug;
-    this._bundlePath = bundlePath;
+    this._bundlePath = bundlePath ?? "wasm/bundle.avm";
     this.onStdout = onStdout ?? noop;
     this.onStderr = onStderr ?? noop;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
@@ -69,7 +66,7 @@ export class Popcorn {
   static async init({ container, ...constructorParams }) {
     const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
     popcorn._trace("Main: init, params: ", { container, ...constructorParams });
-    await popcorn._mount(container ?? document.body);
+    await popcorn._mount(container ?? document.documentElement);
     return popcorn;
   }
 
@@ -105,7 +102,7 @@ export class Popcorn {
               initVm();
             </script>
         </html>`;
-      this._iframe.style = "visibility: hidden;";
+      this._iframe.style = "visibility: hidden; width: 0px; height: 0px; border: none";
 
       // TODO: handle multiple iframes
       this._listenerRef = this._iframeListener.bind(this);
