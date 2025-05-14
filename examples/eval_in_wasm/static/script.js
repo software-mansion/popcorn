@@ -91,7 +91,7 @@ function isErlangModule(code) {
   return code.startsWith("-module(");
 }
 
-async function sendEvalRequest(popcorn, code) {
+async function sendEvalRequest(/**@type {Popcorn}*/ popcorn, code) {
   if (code === "") {
     return;
   }

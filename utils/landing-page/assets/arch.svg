@@ -1,34 +1,70 @@
 <svg width="487" height="206" viewBox="0 0 487 206" fill="none" xmlns="http://www.w3.org/2000/svg">
 <style>
+        @font-face {
+            font-family: "Aeonik";
+            src: url("assets/Aeonik-Regular.otf") format("opentype");
+        }
+
+        @font-face {
+            font-family: "Aeonik";
+            font-style: normal;
+            font-weight: 500;
+            src: url("assets/Aeonik-Medium.otf") format("opentype");
+        }
+
+        @font-face {
+            font-family: "Aeonik";
+            font-style: normal;
+            font-weight: 700;
+            src: url("assets/Aeonik-Bold.otf") format("opentype");
+        }
+
+        svg {
+            font-family:
+                Aeonik,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                "Helvetica Neue",
+                Arial,
+                "Noto Sans",
+                sans-serif,
+                "Apple Color Emoji",
+                "Segoe UI Emoji",
+                "Segoe UI Symbol",
+                "Noto Color Emoji";
+        }
+
         @media (prefers-color-scheme: dark) {
             rect, line {
-                fill: #232736;
-                stroke: #c1c6e5
+                fill: #0d1116;
+                stroke: #fffae1
             }
             text {
-                fill: #c1c6e5;
+                fill: #fffae1;
             }
         }
 </style>
-<rect x="7.5" y="9.5" width="137" height="33" fill="#FCFCFF"/>
-<rect x="7.5" y="9.5" width="137" height="33" stroke="black"/>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="17" y="30.8">Main browser window</tspan></text>
-<rect x="329.5" y="162.5" width="133" height="33" fill="#FCFCFF"/>
-<rect x="329.5" y="162.5" width="133" height="33" stroke="black"/>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="339" y="183.8">Elixir (WASM module)</tspan></text>
-<rect x="272.5" y="9.5" width="208" height="86" fill="#FCFCFF"/>
-<rect x="272.5" y="9.5" width="208" height="86" stroke="black" stroke-dasharray="2 2"/>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="359.5" y="30.8">Iframe</tspan></text>
-<rect x="282.5" y="43.5" width="181" height="34" fill="#FCFCFF"/>
-<rect x="282.5" y="43.5" width="181" height="34" stroke="black"/>
-<rect x="286.5" y="47.5" width="181" height="34" fill="#FCFCFF"/>
-<rect x="286.5" y="47.5" width="181" height="34" stroke="black"/>
-<rect x="290.5" y="51.5" width="181" height="33" fill="#FCFCFF"/>
-<rect x="290.5" y="51.5" width="181" height="33" stroke="black"/>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="304.5" y="72.8">WASM runtime (web worker)</tspan></text>
-<line x1="144.996" y1="27.5" x2="272.996" y2="26.5" stroke="black"/>
-<line x1="376.5" y1="96" x2="376.5" y2="163" stroke="black"/>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="169" y="20.8">postMessage()</tspan></text>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="383" y="125.8">Module.call()</tspan></text>
-<text fill="black" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="383" y="140.8">Module.cast()</tspan></text>
+<rect x="7.5" y="9.5" width="137" height="33" fill="#fffae1"/>
+<rect x="7.5" y="9.5" width="137" height="33" stroke="#0d1116"/>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="17" y="30.8">Main browser window</tspan></text>
+<rect x="329.5" y="162.5" width="133" height="33" fill="#fffae1"/>
+<rect x="329.5" y="162.5" width="133" height="33" stroke="#0d1116"/>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="339" y="183.8">Elixir (WASM module)</tspan></text>
+<rect x="272.5" y="9.5" width="208" height="86" fill="#fffae1"/>
+<rect x="272.5" y="9.5" width="208" height="86" stroke="#0d1116" stroke-dasharray="2 2"/>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="359.5" y="30.8">Iframe</tspan></text>
+<rect x="282.5" y="43.5" width="181" height="34" fill="#fffae1"/>
+<rect x="282.5" y="43.5" width="181" height="34" stroke="#0d1116"/>
+<rect x="286.5" y="47.5" width="181" height="34" fill="#fffae1"/>
+<rect x="286.5" y="47.5" width="181" height="34" stroke="#0d1116"/>
+<rect x="290.5" y="51.5" width="181" height="33" fill="#fffae1"/>
+<rect x="290.5" y="51.5" width="181" height="33" stroke="#0d1116"/>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="304.5" y="72.8">WASM runtime (web worker)</tspan></text>
+<line x1="144.996" y1="27.5" x2="272.996" y2="26.5" stroke="#0d1116"/>
+<line x1="376.5" y1="96" x2="376.5" y2="163" stroke="#0d1116"/>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="169" y="20.8">postMessage()</tspan></text>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="383" y="125.8">Module.call()</tspan></text>
+<text fill="#0d1116" xml:space="preserve" style="white-space: pre" font-family="Aeonik" font-size="12" letter-spacing="0em"><tspan x="383" y="140.8">Module.cast()</tspan></text>
 </svg>

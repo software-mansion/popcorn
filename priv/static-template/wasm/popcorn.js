@@ -26,6 +26,24 @@ const MESSAGES = {
 
 const INIT_TOKEN = Symbol();
 
+// TODO: default for bundlePath
+/**
+ * @typedef {object} InitParams
+ * @property {HTMLElement} [container=document.body] container
+ * @property {string} bundlePath
+ * @property {(text: string) => void} [onStderr=noop] onStderr
+ * @property {(text: string) => void} [onStdout=noop] onStdout
+ * @property {(text: string) => void} [heartbeatTimeoutMs=15_000] heartbeatTimeoutMs
+ * @property {boolean} [debug=false] debug
+ */
+
+/** @typedef {any} AnySerializable */
+/** @typedef {{process: string}} CastOptions */
+/** @typedef {{process: string, timeoutMs: number}} CallOptions */
+
+/**
+ * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
+ */
 export class Popcorn {
   onStdout = null;
   onStderr = null;
@@ -59,10 +77,14 @@ export class Popcorn {
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
-  get iframe() {
-    return this._iframe;
-  }
-
+  /**
+   * Creates an iframe and sets up communication channels.
+   * Returns after Elixir code calls `Popcorn.Wasm.register/1`.
+   *
+   *
+   * @param {InitParams} options used to set timeouts, event handlers, path to bundle, etc.
+   * @returns {Promise<Popcorn>} Popcorn instance.
+   */
   static async init({ container, ...constructorParams }) {
     const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
     popcorn._trace("Main: init, params: ", { container, ...constructorParams });
@@ -80,25 +102,25 @@ export class Popcorn {
       // will be resolved on init message from iframe
       this._mountPromise = resolve;
 
-      // example pathname: "/wasm/popcorn.js"
-      const pathName = URL.parse(import.meta.url).pathname;
-      const lastPart = /[^/]+$/;
-      const leadingSlash = /^\//;
-      const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
+      // // example pathname: "/wasm/popcorn.js"
+      // const pathName = URL.parse(import.meta.url).pathname;
+      // const lastPart = /[^/]+$/;
+      // const leadingSlash = /^\//;
+      // const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
 
-      const bundleDir = "../".repeat(dir.split("/").length - 1);
+      // const bundleDir = "../".repeat(dir.split("/").length - 1);
 
       this._iframe = document.createElement("iframe");
       this._iframe.srcdoc = `<html>
         <html lang="en" dir="ltr">
             <head>
-              <meta name="bundle-path" content="${bundleDir + this._bundlePath}" />
+              <meta name="bundle-path" content="${"../" + this._bundlePath}" />
             </head>
-            <script type="module" src="./${dir}popcorn.js" defer></script>
-            <script type="module" src="./${dir}AtomVM.mjs" defer></script>
-            <script type="module" src="./${dir}popcorn_iframe.js" defer></script>
+            <script type="module" src="./wasm/popcorn.js" defer></script>
+            <script type="module" src="./wasm/AtomVM.mjs" defer></script>
+            <script type="module" src="./wasm/popcorn_iframe.js" defer></script>
             <script type="module" defer>
-              import { initVm } from "./${dir}popcorn_iframe.js";
+              import { initVm } from "./wasm/popcorn_iframe.js";
               initVm();
             </script>
         </html>`;
@@ -116,6 +138,9 @@ export class Popcorn {
     this._onHeartbeat();
   }
 
+  /**
+   * Destroys an iframe and resets the instance.
+   */
   deinit() {
     if (this._iframe === null) {
       throw new Error("Iframe not mounted");
@@ -129,9 +154,17 @@ export class Popcorn {
     this._listenerRef = null;
   }
 
+  /**
+   * Sends a message to Elixir process (default or from options).
+   * Waits for it to finish processing the message (by resolving sent promise) or until timeout happens.
+   *
+   * @param {AnySerializable} args sent to Elixir process.
+   * @param {CallOptions} options configures receiver process name and timeout.
+   * @returns {Promise<{ data: AnySerializable, durationMs: number, error?: AnySerializable }>} serializable value returned from Elixir and time it took to process.
+   */
   async call(args, { process, timeoutMs }) {
     const targetProcess = process ?? this._initProcess;
-    if (this.iframe === null) {
+    if (this._iframe === null) {
       throw new Error("WASM iframe not mounted");
     }
     if (targetProcess === null) {
@@ -160,9 +193,15 @@ export class Popcorn {
     return result;
   }
 
+  /**
+   * Sends a message to Elixir process (default or from options) and returns immediately.
+   *
+   * @param {AnySerializable} args sent to Elixir process.
+   * @param {CastOptions} options configures receiver process name.
+   */
   cast(args, { process }) {
     const targetProcess = process ?? this._initProcess;
-    if (this.iframe === null) {
+    if (this._iframe === null) {
       throw new Error("WASM iframe not mounted");
     }
     if (targetProcess === null) {
@@ -267,7 +306,7 @@ export class Popcorn {
   }
 }
 
-function noop() { }
+function noop() {}
 
 async function withTimeout(promise, ms) {
   let timeout = null;

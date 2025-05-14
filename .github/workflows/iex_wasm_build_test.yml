@@ -7,15 +7,16 @@ name: Eval in WASM Build & test
 
 on:
   push:
-    branches: [ "*" ]
+    branches: ["*"]
     paths:
-    - "examples/eval_in_wasm/**"
-    - ".github/workflows/eval_in_wasm_build_test.yml"
+      - "examples/eval_in_wasm/**"
+      - ".github/workflows/eval_in_wasm_build_test.yml"
+
   pull_request:
-    branches: [ "*" ]
+    branches: ["*"]
     paths:
-    - "examples/eval_in_wasm/**"
-    - ".github/workflows/eval_in_wasm_build_test.yml"
+      - "examples/eval_in_wasm/**"
+      - ".github/workflows/eval_in_wasm_build_test.yml"
 
 permissions:
   contents: read
@@ -27,7 +28,6 @@ env:
 
 jobs:
   build:
-
     name: IEX WASM build & test
     runs-on: ubuntu-22.04
 
@@ -36,35 +36,35 @@ jobs:
         working-directory: examples/eval_in_wasm
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup emsdk
-      uses: mymindstorm/setup-emsdk@v14
-      with:
-        # Make sure to set a version number!
-        version: 4.0.7
-    - uses: webfactory/ssh-agent@v0.6.0
-      with:
-        ssh-private-key: |
-          ${{ secrets.ACCESS_TO_FISSIONVM }}
-    - name: Set up Elixir
-      uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
-      with:
-        elixir-version: '1.17.3'
-        otp-version: '26.0.2'
-    - name: Restore dependencies cache
-      uses: actions/cache@v3
-      with:
-        path: deps
-        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-        restore-keys: ${{ runner.os }}-mix-
-    - name: Install AtomVM deps
-      run: |
-        sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
-    - name: Install dependencies
-      run: mix deps.get && mix deps.compile
-    - name: Install Playwright deps
-      run: mix playwright.install
-    - name: Build AtomVM
-      run: mix popcorn.build_runtime --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
-    - name: Run tests
-      run: mix test
+      - uses: actions/checkout@v4
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          # Make sure to set a version number!
+          version: 4.0.7
+      - uses: webfactory/ssh-agent@v0.6.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.ACCESS_TO_FISSIONVM }}
+      - name: Set up Elixir
+        uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
+        with:
+          elixir-version: "1.17.3"
+          otp-version: "26.0.2"
+      - name: Restore dependencies cache
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+      - name: Install AtomVM deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
+      - name: Install dependencies
+        run: mix deps.get && mix deps.compile
+      - name: Install Playwright deps
+        run: mix playwright.install
+      - name: Build AtomVM
+        run: mix popcorn.build_runtime --target wasm --out-dir static/wasm --cmake-opts "SANITIZER=OFF"
+      - name: Run tests
+        run: mix test
