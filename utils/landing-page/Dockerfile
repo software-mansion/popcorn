@@ -53,28 +53,32 @@ RUN source /root/.env && \
     cp src/AtomVM.mjs src/AtomVM.wasm /root/wasm/
 
 ARG COMMIT_REF ''
-RUN git clone https://github.com/software-mansion-labs/elixir-wasm.git /root/elixir-wasm
+RUN mkdir /root/.ssh/ && chmod 700 /root/.ssh && ssh-keyscan github.com >> /root/.ssh/known_hosts
+RUN git clone https://github.com/software-mansion/popcorn.git /root/elixir-wasm && \
+    git clone https://github.com/software-mansion-labs/elixir-docs-wasm.git /root/elixir && \
+    cd /root/elixir && git checkout jgonet/docs
 RUN cd /root/elixir-wasm && \
     git fetch && git checkout "$COMMIT_REF" && \
     cp -r /root/elixir-wasm/priv/static-template/wasm /root/
 
-# ------------------------ Build static files
-RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
-RUN source /root/.env && \
-    cd /root/elixir-wasm/examples/eval_in_wasm && \
-    cp -r /root/wasm static && \
-    mix deps.get && mix deps.compile && mix compile
+ #------------------------ Build static files
+ RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
+ RUN source /root/.env && \
+     cd /root/elixir-wasm/examples/eval_in_wasm && \
+     cp -r /root/wasm static && \
+     mix deps.get && mix deps.compile && mix compile
 
-RUN source /root/.env && \
-    cd /root/elixir-wasm/examples/game_of_life && \
-    cp -r /root/wasm static && \
-    mix deps.get && mix deps.compile && mix compile
+ RUN source /root/.env && \
+     cd /root/elixir-wasm/examples/game_of_life && \
+     cp -r /root/wasm static && \
+     mix deps.get && mix deps.compile && mix compile
 
-RUN source /root/.env && \
-    cd /root/elixir-wasm/ && \
-    cp -r examples/eval_in_wasm/static/ utils/landing-page/simple_repl && \
-    cp -r examples/game_of_life/static/ utils/landing-page/game_of_life && \
-    cp -r utils/landing-page /landing-page
+ RUN source /root/.env && \
+     cd /root/elixir-wasm/ && \
+     cp -r examples/eval_in_wasm/static/ utils/landing-page/simple_repl && \
+     cp -r examples/game_of_life/static/ utils/landing-page/game_of_life && \
+     cp -r /root/elixir/generated-docs/ utils/landing-page/elixir_docs && \
+     cp -r utils/landing-page /landing-page
 
 # ------------------------ Host static files
 FROM nginx:1.27.5-alpine-slim
