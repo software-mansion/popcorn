@@ -16,6 +16,8 @@ defmodule GameOfLife.Cell do
             epochs: [],
             pending_epoch: nil
 
+  defguardp is_tick_in_progress(state) when state.pending_epoch != nil
+
   @doc """
   Child specification to start `GameOfLife.Cell` as part of supervision tree
   """
@@ -83,20 +85,25 @@ defmodule GameOfLife.Cell do
   end
 
   @impl true
+  def handle_cast({:tick, _notify}, state) when is_tick_in_progress(state) do
+    raise "Overlapping ticks"
+  end
+
   def handle_cast({:tick, notify}, state) do
     [{current_epoch, alive?} | _] = state.epochs
 
-    for neighbour <- state.neighbours do
-      cell = GameOfLife.Simulation.cell_via_tuple(state.game_id, neighbour)
-      GenServer.cast(cell, {:get_status, current_epoch, self()})
-    end
-
     epoch_stats = %{
+      previous_epoch: current_epoch,
       previously_alive?: alive?,
       notify: notify,
       pending: length(state.neighbours),
       alive_neighbours: 0
     }
+
+    for neighbour <- state.neighbours do
+      cell = GameOfLife.Simulation.cell_via_tuple(state.game_id, neighbour)
+      GenServer.cast(cell, {:get_status, current_epoch, self()})
+    end
 
     {:noreply, %{state | pending_epoch: epoch_stats}}
   end
@@ -107,12 +114,17 @@ defmodule GameOfLife.Cell do
     {:noreply, state}
   end
 
-  def handle_cast({:status_response, epoch, alive?}, %{pending_epoch: stats} = state) do
+  def handle_cast({:status_response, epoch, _alive?}, %{pending_epoch: stats})
+      when epoch != stats.previous_epoch do
+    raise "Late status_response"
+  end
+
+  def handle_cast({:status_response, epoch, alive?}, %{pending_epoch: stats} = state)
+      when epoch == stats.previous_epoch do
     alive_diff = if alive?, do: 1, else: 0
 
     new_pending = stats.pending - 1
     alive_neighbours = stats.alive_neighbours + alive_diff
-    stats = %{stats | pending: new_pending, alive_neighbours: alive_neighbours}
 
     epochs =
       if new_pending == 0 do
@@ -125,10 +137,17 @@ defmodule GameOfLife.Cell do
 
         Grid.notify_status(stats.notify, state.coords, new_alive?)
 
-        [{epoch, new_alive?} | state.epochs]
+        [{stats.previous_epoch + 1, new_alive?} | state.epochs]
         |> Enum.take(3)
       else
         state.epochs
+      end
+
+    stats =
+      if new_pending == 0 do
+        nil
+      else
+        %{stats | pending: new_pending, alive_neighbours: alive_neighbours}
       end
 
     {:noreply, %{state | pending_epoch: stats, epochs: epochs}}
