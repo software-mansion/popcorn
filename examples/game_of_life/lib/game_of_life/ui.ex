@@ -20,7 +20,7 @@ defmodule GameOfLife.Ui do
     |> html()
     |> mount_at_root()
 
-    listener_refs = add_click_listeners(%{start: "#start"})
+    listener_refs = add_click_listeners(%{start: "#start", glider: "#glider"})
 
     # TODO: return list of refs from run_js!/2
     cell_listeners_refs =
@@ -55,10 +55,23 @@ defmodule GameOfLife.Ui do
           {:ok, sup, %{grid_pid: pid}} =
             GridSupervisor.start_simulation(state.size, state.size, alive)
 
+          remove_element("#glider")
           set_text("#start", "Stop simulation")
           timer = start_timer(@tick_speed_ms)
 
           %{state | sup_pid: sup, grid_pid: pid, timer: timer}
+
+        {:wasm_event, :click, _data, "glider"} when not is_running(state) ->
+          new_alive = [
+            [2, 0],
+            [2, 1],
+            [2, 2],
+            [1, 2],
+            [0, 1]
+          ]
+
+          set_alive_cells(new_alive)
+          %{state | alive: new_alive}
 
         {:wasm_event, :click, _data, "start"} ->
           # TODO: allow starting/stopping
@@ -77,9 +90,17 @@ defmodule GameOfLife.Ui do
           %{state | alive: new_alive}
 
         {:wasm_event, :click, _data, [x, y]} when not is_running(state) ->
-          new_alive = [[x, y] | state.alive]
-          set_alive_cells(new_alive)
-          %{state | alive: new_alive}
+          if [x, y] in state.alive do
+            new_alive = List.delete(state.alive, [x, y])
+
+            set_alive_cells(new_alive)
+            %{state | alive: new_alive}
+          else
+            new_alive = [[x, y] | state.alive]
+
+            set_alive_cells(new_alive)
+            %{state | alive: new_alive}
+          end
 
         {:wasm_event, :click, _data, [_x, _y]} ->
           state
@@ -92,6 +113,7 @@ defmodule GameOfLife.Ui do
     """
     <div class="controls">
       <button id="start">Start simulation</button>
+      <button id="glider">Use glider preset</button>
     </div>
     <div class="cell-grid">
       #{build_rows(size)}
