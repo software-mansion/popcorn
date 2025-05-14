@@ -16,7 +16,7 @@ Add the project to dependencies:
 # mix.exs
 
 def deps do
-  {:popcorn, github: "software-mansion-labs/elixir-wasm", sparse: "popcorn"}
+  {:popcorn, github: "software-mansion/popcorn"}
 end
 ```
 
