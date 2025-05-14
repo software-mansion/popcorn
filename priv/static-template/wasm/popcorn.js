@@ -163,7 +163,7 @@ export class Popcorn {
    *
    * @param {AnySerializable} args sent to Elixir process.
    * @param {CallOptions} options configures receiver process name and timeout.
-   * @returns {Promise<AnySerializable>} serializable value returned from Elixir.
+   * @returns {Promise<{ data: AnySerializable, durationMs: number, error?: AnySerializable }>} serializable value returned from Elixir and time it took to process.
    */
   async call(args, { process, timeoutMs }) {
     const targetProcess = process ?? this._initProcess;
