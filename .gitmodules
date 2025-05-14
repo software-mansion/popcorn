@@ -2,8 +2,8 @@
 	path = fuzzer/erlfuzz
 	url = git@github.com:software-mansion-labs/erlfuzz.git
 [submodule "elixir"]
-	path = elixir
+	path = examples/hexdocs/elixir
 	url = git@github.com:software-mansion-labs/elixir-docs-wasm.git
 [submodule "ex_doc"]
-	path = ex_doc
+	path = examples/hexdocs/ex_doc
 	url = git@github.com:software-mansion-labs/exdoc-wasm.git
