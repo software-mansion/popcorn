@@ -50,6 +50,6 @@ jobs:
       - name: Build AtomVM
         run: |
           export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
-          mix popcorn.build_runtime --out-dir _build --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
       - name: Run tests
         run: mix test

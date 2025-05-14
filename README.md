@@ -8,29 +8,25 @@
 
 **Popcorn is a library that allows you to run client-side Elixir in browsers, with Javascript interoperability**
 
-## Usage
+Popcorn is early stages and may break. Please report an issue if it does. Contributions are very welcome, but please open an issue before commiting too much effort.
 
-Add the project to dependencies:
+Under the hood, Popcorn runs [AtomVM](https://github.com/atomvm/AtomVM), a tiny Erlang VM.
+
+## Examples
+
+The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples` directory.
+
+## Getting started
+
+*Note: Popcorn currently only works OTP 26.0.2 and Elixir 1.17.3. We're working to lift this requirement.*
+
+Popcorn requires just a few short steps to setup. Firstly, add the project to dependencies:
 
 ```elixir
 # mix.exs
 
 def deps do
   {:popcorn, github: "software-mansion/popcorn"}
-end
-```
-
-and to compilers:
-
-```elixir
-# mix.exs
-
-def project do
-  [
-    # ...
-    compilers: Mix.compilers() ++ [:popcorn]
-  ]
-
 end
 ```
 
@@ -41,33 +37,43 @@ Create a startup module:
 
 defmodule MyApp.Start do
   def start() do
-    Console.print("Hello World\n")
+    Popcorn.Wasm.register("main")
+    IO.puts("Hello from WASM")
   end
 end
 ```
 
-and register it in the config:
+and register it in the config, along with the directory to output static artifacts:
 
 ```elixir
 # config/config.exs
-
-config :popcorn, start_module: MyApp.Start
+import Config
+config :popcorn, start_module: MyApp.Start, out_dir: "static/wasm"
 ```
 
-Finally, run `mix deps.get` and `mix compile`, and the `bundle.avm` file will be generated in the `_build/dev/` directory. You can run it with `atomvm bundle.avm`.
+Run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
 
-Alternatively, instead of adding `:popcorn` to compilers, you can run `Popcorn.pack/1` after `mix compile` with the same effect.
+```html
+<!-- index.html -->
+<html>
+  <script type="module">
+      import { Popcorn } from "./wasm/popcorn.js";
+      await Popcorn.init({ onStdout: console.log });
+  </script>
+  <body></body>
+</html>
+ ```
 
-## Configuration options
+The easiest way to host the page is to generate a simple HTTP server script with `mix popcorn.simple_server` and run it with `elixir server.exs`. Then, at http://localhost:4000, you should see `Hello from WASM` printed in the console.
 
-These options can be set by putting a `config :popcorn, option: value` line in `config/config.exs`:
+The webpage can also be hosted with any HTTP static file server, but it must add the following HTTP headers:
 
-- `start_module` - The `start/0` function in this module will be the entry point your app. Defaults to `nil` - no function will be called, the output should be embedded in another `.avm` file.
-- `out_path` - The path to the output `.avm` file. Defaults to `path_to_build/bundle.avm`, where `path_to_build` is the output of `Mix.Project.build_path/0`.
-- `add_tracing` - If `true`, injects a simple tracing code that prints module, function and arity of each cross-module call. Defaults to `false`.
-- `erl_stdlib_beam_paths` - List of paths to Erlang stdlib `.beam` files. Defaults to `Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam")`
-- `ex_stdlib_beam_paths` - List of paths to Elixir stdlib `.beam` files. Defaults to `Path.wildcard("#{Application.app_dir(:elixir)}/ebin/**/*.beam")`
-- `runtime_source` - See `Mix.Tasks.Popcorn.BuildAvm` or type `mix help popcorn.build_runtime`
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Otherwise, browsers refuse to run WASM.
 
 ## Authors
 
