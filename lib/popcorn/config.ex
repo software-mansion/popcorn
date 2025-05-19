@@ -12,7 +12,11 @@ defmodule Popcorn.Config do
     runtime_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
   }
 
-  defmacro get(keys) do
+  def get(key) do
+    Application.get_env(:popcorn, key, Map.fetch!(@defaults, key))
+  end
+
+  defmacro compile(keys) do
     defaults = Map.take(@defaults, List.wrap(keys)) |> Enum.to_list()
 
     quote do
