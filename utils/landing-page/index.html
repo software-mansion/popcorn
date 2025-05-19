@@ -20,7 +20,13 @@
                 <a href="#under-the-hood">Under the hood</a>
             </nav>
             <h1 class="header">
-                <img src="assets/logo-full.svg" class="logo-full" />
+                <object
+                    type="image/svg+xml"
+                    data="assets/logo-full.svg"
+                    role="img"
+                    class="logo-full"
+                    style="pointer-events: none"
+                ></object>
                 Run Elixir in WASM
             </h1>
 
@@ -475,7 +481,13 @@ end</pre>
             <h2>Under the hood</h2>
             <section id="under-the-hood">
                 <h3 id="code-bundle">Overall architecture</h3>
-                <img class="arch" src="assets/arch.svg" />
+                <object
+                    type="image/svg+xml"
+                    data="assets/arch.svg"
+                    role="img"
+                    class="arch"
+                    style="pointer-events: none"
+                ></object>
                 <p>
                     To run Elixir on the web, you need to compile Erlang/Elixir
                     runtime to WASM and load the compiled Elixir bytecode. We
