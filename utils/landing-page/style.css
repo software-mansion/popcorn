@@ -28,11 +28,6 @@
     --swm-header: var(--swm-popcorn-blue);
     --swm-text: var(--swm-popcorn-black);
     --swm-background: var(--swm-popcorn-white);
-    /* --swm-background: #fcfcff; */
-    /* --swm-yellow-100: #ffd61e; */
-    /* --swm-red-100: #ff6259; */
-    /* --swm-green-100: #57b495; */
-    /* --swm-blue-100: #38acdd; */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,11 +42,6 @@
         --swm-header: var(--swm-popcorn-yellow);
         --swm-text: var(--swm-popcorn-white);
         --swm-background: var(--swm-popcorn-black);
-        /* --swm-background: #232736; */
-        /* --swm-yellow-100: #fd4; */
-        /* --swm-red-100: #ff7774; */
-        /* --swm-green-100: #3fc684; */
-        /* --swm-blue-100: #00a9f0; */
     }
 }
 
@@ -90,13 +80,6 @@ nav {
     margin-bottom: 3em;
     flex-wrap: wrap;
 }
-
-/* @media screen and (max-width: 600px) {
-    nav {
-        flex-direction: column;
-        gap: unset;
-    }
-} */
 
 nav a {
     color: var(--swm-header);
@@ -264,13 +247,3 @@ summary {
 .arch {
     height: 400px;
 }
-/*
-.links {
-    display: flex;
-    gap: 2em;
-}
-.links a {
-    padding: 5px;
-    flex-grow: 1;
-    border: none;
-} */
