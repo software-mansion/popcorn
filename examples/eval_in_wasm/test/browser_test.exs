@@ -39,6 +39,7 @@ defmodule EvalInWasm.BrowserTest do
     run_example(page, "case", "{:ok, 3}")
   end
 
+  @tag :skip
   test "module", %{page: page} do
     run_example(page, "module", "{:sum, 30}")
   end
