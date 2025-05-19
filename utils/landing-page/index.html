@@ -20,13 +20,19 @@
                 <a href="#under-the-hood">Under the hood</a>
             </nav>
             <h1 class="header">
-                <object
-                    type="image/svg+xml"
-                    data="assets/logo-full.svg"
-                    role="img"
-                    class="logo-full"
-                    style="pointer-events: none"
-                ></object>
+                <picture>
+                    <source
+                        srcset="assets/logo-full-dark.svg"
+                        media="(prefers-color-scheme: dark)"
+                    />
+                    <img
+                        height="80"
+                        src="assets/logo-full.svg"
+                        class="logo-full"
+                        alt="Popcorn logo"
+                    />
+                </picture>
+
                 Run Elixir in WASM
             </h1>
 
