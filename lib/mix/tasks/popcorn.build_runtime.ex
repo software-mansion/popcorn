@@ -26,7 +26,6 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   @build_dir Mix.Project.app_path()
 
   def run(args) do
-    Application.ensure_all_started(:popcorn)
     options_defaults = %{cmake_opts: ""}
     parser_config = [strict: [:target | Map.keys(options_defaults)] |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
