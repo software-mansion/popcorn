@@ -17,10 +17,6 @@ defmodule Router do
     send_file(conn, 200, "#{@static_dir}/index.html")
   end
 
-  get "/erlang" do
-    send_file(conn, 200, "#{@static_dir}/erlang.html")
-  end
-
   match _ do
     send_resp(conn, 404, "not found")
   end
