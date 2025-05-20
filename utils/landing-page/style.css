@@ -247,3 +247,13 @@ summary {
 .arch {
     height: 400px;
 }
+
+.hljs {
+    color: var(--swm-text) !important;
+    background: var(--swm-background) !important;
+}
+
+/* .hljs-comment {
+    pointer-events: none;
+    user-select: none;
+} */
