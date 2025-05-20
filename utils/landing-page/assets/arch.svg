@@ -2,21 +2,21 @@
 <style>
         @font-face {
             font-family: "Aeonik";
-            src: url("assets/Aeonik-Regular.otf") format("opentype");
+            src: url("Aeonik-Regular.otf") format("opentype");
         }
 
         @font-face {
             font-family: "Aeonik";
             font-style: normal;
             font-weight: 500;
-            src: url("assets/Aeonik-Medium.otf") format("opentype");
+            src: url("Aeonik-Medium.otf") format("opentype");
         }
 
         @font-face {
             font-family: "Aeonik";
             font-style: normal;
             font-weight: 700;
-            src: url("assets/Aeonik-Bold.otf") format("opentype");
+            src: url("Aeonik-Bold.otf") format("opentype");
         }
 
         svg {

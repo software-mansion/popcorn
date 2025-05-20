@@ -6,11 +6,12 @@
             name="viewport"
         />
         <meta charset="utf-8" />
+        <link rel="icon" type="image/svg+xml" href="favicon.svg" />
         <link rel="icon" type="image/png" href="favicon.png" />
+
         <link rel="stylesheet" href="style.css?v=1" />
         <title>Popcorn</title>
     </head>
-
     <body>
         <main>
             <nav>
@@ -18,16 +19,44 @@
                 <a href="#api">API</a>
                 <a href="#limitations">Limitations</a>
                 <a href="#under-the-hood">Under the hood</a>
+                <a href="https://github.com/software-mansion/popcorn/">
+                    <picture>
+                        <source
+                            srcset="assets/github-mark-white.svg"
+                            media="(prefers-color-scheme: dark)"
+                        />
+                        <img
+                            height="30"
+                            src="assets/github-mark.svg"
+                            alt="Popcorn logo"
+                        />
+                    </picture>
+                </a>
             </nav>
             <h1 class="header">
-                <img src="assets/logo-full.svg" class="logo-full" />
+                <picture>
+                    <source
+                        srcset="assets/logo-full-dark.svg"
+                        media="(prefers-color-scheme: dark)"
+                    />
+                    <img
+                        height="80"
+                        src="assets/logo-full.svg"
+                        class="logo-full"
+                        alt="Popcorn logo"
+                    />
+                </picture>
+
                 Run Elixir in WASM
             </h1>
 
             <section id="intro">
                 <p>
-                    Popcorn is a library that enables execution of Elixir code
-                    within web browsers.
+                    <a href="https://github.com/software-mansion/popcorn/"
+                        >Popcorn</a
+                    >
+                    is a library that enables execution of Elixir code within
+                    web browsers.
                 </p>
                 <p>
                     Compiled Elixir code is executed in the client-side
@@ -42,6 +71,12 @@
                     You will find Popcorn API in
                     <a href="#api">"API"</a> section and read how it all works
                     in <a href="#under-the-hood">"Under the hood"</a> section.
+                </p>
+                <p>
+                    You can find source code on
+                    <a href="https://github.com/software-mansion/popcorn/"
+                        >Github</a
+                    >.
                 </p>
             </section>
 
@@ -111,8 +146,8 @@
                     First, generate a directory that will host Popcorn JS
                     library, WASM, and generated app bundle. To do that, run:
                 </p>
-                <pre>
-<span class="unselectable">$ </span>mix popcorn.build_runtime --target wasm --out-dir static/wasm</pre>
+                <pre class="language-shell">
+<code><span class="unselectable">$ </span>mix popcorn.build_runtime --target wasm --out-dir static/wasm</code></pre>
                 <p>
                     Next, in your main html you need to include the library and
                     code that sets up communication channels with Elixir. Add
@@ -121,8 +156,8 @@
                 </p>
                 <details open>
                     <summary>HTML snippet</summary>
-                    <pre>
-<span class="unselectable"># static/index.html
+                    <pre class="language-javascript">
+<code><span class="unselectable"># static/index.html
 </span>&lt;script type=&quot;module&quot; src=&quot;wasm/popcorn.js&quot; defer&gt;&lt;/script&gt;
 &lt;script type=&quot;module&quot; defer&gt;
     import { Popcorn } from &quot;./wasm/popcorn.js&quot;;
@@ -130,7 +165,7 @@
         onStdout: console.log,
         onStderr: console.error,
     });
-&lt;/script&gt;</pre>
+&lt;/script&gt;</code></pre>
                 </details>
 
                 <h3>WASM Entrypoint</h3>
@@ -141,8 +176,9 @@
                 </p>
                 <details open>
                     <summary>Entrypoint snippet</summary>
-                    <pre>
-<span class="unselectable"># lib/app/application.ex
+                    <pre
+                        class="language-elixir"
+                    ><code><span class="unselectable" class="language-elixir"># lib/app/application.ex
 </span>defmodule App.Application do
     use Application
     alias Popcorn.Wasm
@@ -161,7 +197,7 @@
         # Create default receiver process and register it under `@receiver_name`
         # ...
     end
-end</pre>
+end</code></pre>
                 </details>
                 <p>
                     After we finish initializing Elixir (setting up supervision
@@ -174,9 +210,9 @@ end</pre>
                 <p>We need to set entrypoint name in the config:</p>
                 <details open>
                     <summary>Config snippet</summary>
-                    <pre>
-<span class="unselectable"># config/config.ex
-</span>config :popcorn, start_module: App.Application</pre>
+                    <pre class="language-elixir">
+<code><span class="unselectable"># config/config.ex
+</span>config :popcorn, start_module: App.Application</code></pre>
                 </details>
                 <p>
                     At this point, your application is ready to exchange
@@ -475,7 +511,13 @@ end</pre>
             <h2>Under the hood</h2>
             <section id="under-the-hood">
                 <h3 id="code-bundle">Overall architecture</h3>
-                <img class="arch" src="assets/arch.svg" />
+                <object
+                    type="image/svg+xml"
+                    data="assets/arch.svg"
+                    role="img"
+                    class="arch"
+                    style="pointer-events: none"
+                ></object>
                 <p>
                     To run Elixir on the web, you need to compile Erlang/Elixir
                     runtime to WASM and load the compiled Elixir bytecode. We
@@ -570,4 +612,19 @@ end</pre>
             </section>
         </main>
     </body>
+    <link
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/stackoverflow-dark.min.css"
+        media="(prefers-color-scheme: dark)"
+        rel="stylesheet"
+    />
+    <link
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/stackoverflow-light.min.css"
+        media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)"
+        rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script>
+        hljs.highlightAll();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/elixir.min.js"></script>
 </html>
