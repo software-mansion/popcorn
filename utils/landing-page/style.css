@@ -75,9 +75,9 @@ body {
 
 nav {
     display: flex;
-    row-gap: 0;
+    row-gap: 1em;
     column-gap: 3em;
-    margin-bottom: 3em;
+    margin-bottom: 2em;
     flex-wrap: wrap;
 }
 
