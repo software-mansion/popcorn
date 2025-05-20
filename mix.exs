@@ -46,21 +46,27 @@ defmodule Popcorn.MixProject do
     paths = Enum.map(artifacts, &Path.join(dir, &1))
 
     unless Enum.all?(paths, &File.exists?/1) do
-      Download.start_inets_profile()
+      try do
+        Download.start_inets_profile()
+        Enum.each(artifacts, fn name -> download_artifact(url, dir, name) end)
+      after
+        Download.stop_inets_profile()
+      end
+    end
+  end
 
-      Enum.each(artifacts, fn name ->
-        path = Path.join(dir, name)
+  defp download_artifact(url, dir, name) do
+    alias Popcorn.Utils.Download
+    path = Path.join(dir, name)
 
-        with {:ok, _stream} <-
-               Download.download("#{url}/#{name}", File.stream!(path <> ".download")) do
-          File.rename!(path <> ".download", path)
-        else
-          {:error, reason} ->
-            IO.warn("""
-            Couldn't download #{name}, reason: #{reason}, please use mix popcorn.build_runtime to build from source
-            """)
-        end
-      end)
+    with {:ok, _stream} <-
+           Download.download("#{url}/#{name}", File.stream!(path <> ".download")) do
+      File.rename!(path <> ".download", path)
+    else
+      {:error, reason} ->
+        IO.warn("""
+        Couldn't download #{name}, reason: #{reason}, please use mix popcorn.build_runtime to build from source
+        """)
     end
   end
 
@@ -72,7 +78,7 @@ defmodule Popcorn.MixProject do
     [
       {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
       {:jason, "~> 1.4"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true}
     ]
   end
 end

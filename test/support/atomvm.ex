@@ -180,7 +180,7 @@ defmodule Popcorn.Support.AtomVM do
 
       Popcorn.cook(
         target: :unix,
-        artifacts: [beam_path],
+        compile_artifacts: [beam_path],
         start_module: RunExpr,
         out_dir: build_dir
       )

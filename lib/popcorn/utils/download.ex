@@ -1,6 +1,21 @@
 defmodule Popcorn.Utils.Download do
   @moduledoc false
 
+  # This module downloads files from the internet with no dependencies
+  # It's borrowed from Elixir NX https://github.com/elixir-nx/xla/blob/e7f24308aa27c75ed5ad44e2b11e9d134a0f4016/lib/xla/utils.ex#L1
+  # Thanks Jonatan
+
+  # The usage flow is the following:
+  #
+  # try do
+  #   Download.start_inets_profile()
+  #   Download.download(url, File.stream!(path))
+  # after
+  #   Download.stop_inets_profile()
+  # end
+
+  @app Mix.Project.config()[:app]
+
   @spec download(String.t(), Collectable.t(), keyword()) ::
           {:ok, Collectable.t()} | {:error, String.t()}
   def download(url, collectable, opts \\ []) do
@@ -18,13 +33,13 @@ defmodule Popcorn.Utils.Download do
       if Process.alive?(caller) do
         send(caller, {:http, reply_info})
       else
-        :httpc.cancel_request(request_id, :popcorn)
+        :httpc.cancel_request(request_id, @app)
       end
     end
 
     opts = [stream: :self, sync: false, receiver: receiver]
 
-    {:ok, request_id} = :httpc.request(:get, request, http_opts, opts, :popcorn)
+    {:ok, request_id} = :httpc.request(:get, request, http_opts, opts, @app)
 
     try do
       {acc, collector} = Collectable.into(collectable)
@@ -34,7 +49,7 @@ defmodule Popcorn.Utils.Download do
       catch
         kind, reason ->
           collector.(acc, :halt)
-          :httpc.cancel_request(request_id, :popcorn)
+          :httpc.cancel_request(request_id, @app)
           exception = Exception.normalize(kind, reason, __STACKTRACE__)
           {:error, Exception.message(exception)}
       else
@@ -44,12 +59,12 @@ defmodule Popcorn.Utils.Download do
 
         {:error, message} ->
           collector.(acc, :halt)
-          :httpc.cancel_request(request_id, :popcorn)
+          :httpc.cancel_request(request_id, @app)
           {:error, message}
       end
     catch
       kind, reason ->
-        :httpc.cancel_request(request_id, :popcorn)
+        :httpc.cancel_request(request_id, @app)
         exception = Exception.normalize(kind, reason, __STACKTRACE__)
         {:error, Exception.message(exception)}
     end
@@ -112,13 +127,13 @@ defmodule Popcorn.Utils.Download do
   def start_inets_profile() do
     # Starting an HTTP client profile allows us to scope the httpc
     # configuration options, such as proxy options
-    {:ok, _pid} = :inets.start(:httpc, profile: :popcorn)
+    {:ok, _pid} = :inets.start(:httpc, profile: @app)
     set_proxy_options()
   end
 
   @doc false
   def stop_inets_profile() do
-    :inets.stop(:httpc, :popcorn)
+    :inets.stop(:httpc, @app)
   end
 
   defp set_proxy_options() do
@@ -143,7 +158,7 @@ defmodule Popcorn.Utils.Download do
 
     if uri.host && uri.port do
       host = String.to_charlist(uri.host)
-      :httpc.set_options([{proxy_scheme, {{host, uri.port}, no_proxy}}], :popcorn)
+      :httpc.set_options([{proxy_scheme, {{host, uri.port}, no_proxy}}], @app)
     end
   end
 end

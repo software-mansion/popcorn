@@ -3,23 +3,24 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Popcorn build & test
+name: Hello Popcorn - Build & test
 
 on:
   push:
-    # branches: [ "*" ]
+    branches: ["*"]
     paths:
       - "*"
       - "!examples"
-      - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - "examples/hello_popcorn/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
+
   pull_request:
-    # branches: [ "*" ]
+    branches: ["*"]
     paths:
       - "*"
       - "!examples"
-      - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - "examples/hello_popcorn/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
 
 permissions:
   contents: read
@@ -27,14 +28,24 @@ permissions:
 env:
   CI: true
   MIX_ENV: test
+  ImageOS: "ubuntu22"
 
 jobs:
   build:
     name: Build & test
     runs-on: ubuntu-22.04
 
+    defaults:
+      run:
+        working-directory: examples/hello_popcorn
+
     steps:
       - uses: actions/checkout@v4
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          # Make sure to set a version number!
+          version: 4.0.7
       - uses: webfactory/ssh-agent@v0.6.0
         with:
           ssh-private-key: |
@@ -52,14 +63,14 @@ jobs:
           restore-keys: ${{ runner.os }}-mix-
       - name: Install AtomVM deps
         run: |
-          sudo apt install -y gperf libmbedtls-dev zlib1g-dev
+          sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
       - name: Install dependencies
-        run: mix deps.get
-      - name: Compile
-        run: mix compile
+        run: mix deps.get && mix deps.compile
+      - name: Install Playwright deps
+        run: mix playwright.install
       - name: Build AtomVM
-        run: |
-          export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
-          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+        run: mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
+      - name: Cook
+        run: mix popcorn.cook
       - name: Run tests
         run: mix test

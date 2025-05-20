@@ -1,49 +1,53 @@
 defmodule Popcorn do
   @moduledoc """
-  Library providing Erlang and Elixir stdlibs, allowing
-  to compile projects to `.avm` and run them with AtomVM.
+  Popcorn is a tool for running Elixir in the browser.
   """
-  require Popcorn.Config
 
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
+  @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
 
-  @config Popcorn.Config.get([:start_module, :out_dir])
-
   @doc """
-  Packs compiled project files along with the Popcorn Lib into
-  a single `.avm` file using the AtomVM's `:packbeam` library.
+  Generates static artifacts to run the project in the browser.
 
-  If the generated file should be runnable, pass a module implementing
-  `start/0` function as the `start_module` option.
+  `out_dir` and `start_module` are mandatory, unless provided
+  via `config.exs`, for example `config :popcorn, out_dir: "static/wasm, start_module: Start"`
+
+  Options:
+  - `out_dir` - the directory to write artifacts to
+  - `start_module` - a module with `start/0` function, the application's entry point
+  - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
+  first with `mix popcorn.build_runtime --target unix`
+  - `compile_artifacts` - compiled BEAMs and other artifacts that should be included
+  in the generated bundle. Defaults to all the `.beam` and `.app` files for the application
+  and dependencies.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:target, :wasm | :unix}
-          | {:popcorn_path, String.t()}
-          | {:artifacts, [String.t()]}
+          | {:compile_artifacts, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
     all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
-    popcorn_library_path = Path.join(@popcorn_path, "popcorn.avm")
 
     default_options = [
-      out_dir: @config.out_dir,
-      start_module: @config.start_module,
+      out_dir: Popcorn.Config.get(:out_dir),
+      start_module: Popcorn.Config.get(:start_module),
       target: :wasm,
-      popcorn_path: popcorn_library_path,
-      artifacts: all_beams
+      compile_artifacts: all_beams
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
+    ensure_option_present(options, :out_dir, "output directory")
+    ensure_option_present(options, :start_module, "start module")
 
     File.mkdir_p!(options.out_dir)
     copy_runtime_artifacts(options)
 
-    bundled_artifacts = bundled_artifacts(options.artifacts, options.popcorn_path)
+    bundled_artifacts = bundled_artifacts(options.compile_artifacts)
 
     case pack_bundle(options.out_dir, bundled_artifacts, options.start_module) do
       :ok -> :ok
@@ -51,12 +55,12 @@ defmodule Popcorn do
     end
   end
 
-  defp bundled_artifacts(all_beams, popcorn_library_path) do
+  defp bundled_artifacts(compile_artifacts) do
     popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
     api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
 
     # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
-    [popcorn_library_path | api_beams] ++ (all_beams -- popcorn_files)
+    [@popcorn_bundle_path | api_beams] ++ (compile_artifacts -- popcorn_files)
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -66,7 +70,13 @@ defmodule Popcorn do
     maybe_rm(bundle_path)
     bundle_path = to_charlist(bundle_path)
     beams = Enum.map(beams, &String.to_charlist/1)
-    :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
+
+    try do
+      :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
+    catch
+      {:start_module_not_found, _module} ->
+        raise "Cooking failed: provided start module `#{inspect(start_module)}` has not been found"
+    end
   end
 
   defp maybe_rm(path) do
@@ -104,5 +114,15 @@ defmodule Popcorn do
 
     atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
     File.cp_r!(atomvm_artifacts_dir, options.out_dir)
+  end
+
+  defp ensure_option_present(options, key, name) do
+    if options[key] == nil do
+      raise """
+      Cooking failed: #{name} not provided.
+      Please provide the `key` option or configure it by putting
+      `config :popcorn, #{key}: value` in your `config.exs`
+      """
+    end
   end
 end

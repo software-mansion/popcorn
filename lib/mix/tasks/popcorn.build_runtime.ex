@@ -20,12 +20,10 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   """
 
   use Mix.Task
-  require Popcorn.Config
 
-  @requirements "deps.compile"
+  @requirements "app.config"
 
   @build_dir Mix.Project.app_path()
-  @config Popcorn.Config.get([:runtime_source])
 
   def run(args) do
     options_defaults = %{cmake_opts: ""}
@@ -39,7 +37,7 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     File.mkdir_p!(artifacts_dir)
 
     runtime_source =
-      case @config.runtime_source do
+      case Popcorn.Config.get(:runtime_source) do
         {:path, src} -> src
         {:git, uri} -> fetch_repo(uri)
         {:git, uri, opts} -> fetch_repo(uri, opts)

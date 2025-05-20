@@ -3,7 +3,7 @@ defmodule Popcorn.Build do
   require Popcorn.Config
   alias Popcorn.CoreErlangUtils
 
-  @config Popcorn.Config.get([:add_tracing, :ex_stdlib_beam_paths, :erl_stdlib_beam_paths])
+  @config Popcorn.Config.compile([:add_tracing, :ex_stdlib_beam_paths, :erl_stdlib_beam_paths])
 
   @app_path Mix.Project.app_path()
   @build_path "#{@app_path}/popcorn_patches_ebin"
