@@ -26,7 +26,7 @@ defmodule GameOfLife.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, github: "software-mansion/popcorn"}
+      {:popcorn, path: "../.."}
     ]
   end
 end
