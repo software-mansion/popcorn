@@ -26,7 +26,7 @@
 %% @end
 %%-----------------------------------------------------------------------------
 -module(io).
--compile({popcorn_patch_private, io_request/2}).
+-compile({popcorn_patch_private, bc_req/3}).
 -export([format/1, format/2, fwrite/1, fwrite/2, get_line/1, put_chars/1, put_chars/2]).
 
 %%-----------------------------------------------------------------------------
@@ -113,72 +113,23 @@ put_chars(Chars) ->
 put_chars(_Device, Chars) ->
     put_chars(Chars).
 
-bc_req(Pid, Req0, MaybeConvert) ->
+bc_req(_Pid, Req0, _MaybeConvert) ->
+    {false,Req0}.
+%%    Patch reason:
 %%    for some reason unknown for me in the next line net_kernel:dflag_unicode_io/1 is failing in the VM and is not 
-%%    properly covered by a patch 
+%%    properly covered by a patch
+%%    OTP implementation:
 %%    case net_kernel:dflag_unicode_io(Pid) of
-    case true of
-        true ->
-            %% The most common case. A modern i/o server.
-            {false,Req0};
-        false ->
-            %% Backward compatibility only. Unlikely to ever happen.
-            case tuple_to_list(Req0) of
-                [Op,_Enc] ->
-                    {MaybeConvert,Op};
-                [Op,_Enc|T] ->
-                    Req = list_to_tuple([Op|T]),
-                    {MaybeConvert,Req}
-            end
-    end.
-
-io_request(Pid, {write,Term}) ->
-    bc_req(Pid,{put_chars,unicode,io_lib,write,[Term]},false);
-io_request(Pid, {format,Format,Args}) ->
-    bc_req(Pid,{put_chars,unicode,io_lib,format,[Format,Args]},false);
-io_request(Pid, {fwrite,Format,Args}) ->
-    bc_req(Pid,{put_chars,unicode,io_lib,fwrite,[Format,Args]},false);
-io_request(Pid, nl) ->
-    bc_req(Pid,{put_chars,unicode,io_lib:nl()},false);
-io_request(Pid, {put_chars,Enc,Chars}=Request0)
-    when is_list(Chars), node(Pid) =:= node() ->
-    %% Convert to binary data if the I/O server is guaranteed to be new
-    Request =
-        case catch unicode:characters_to_binary(Chars,Enc) of
-            Binary when is_binary(Binary) ->
-                {put_chars,Enc,Binary};
-            _ ->
-                Request0
-        end,
-    {false,Request};
-io_request(Pid, {put_chars,Enc,Chars}=Request0)
-    when is_list(Chars) ->
-    case net_kernel:dflag_unicode_io(Pid) of
-        true ->
-            case catch unicode:characters_to_binary(Chars,Enc,unicode) of
-                Binary when is_binary(Binary) ->
-                    {false,{put_chars,unicode,Binary}};
-                _ ->
-                    {false,Request0}
-            end;
-        false ->
-            %% Convert back to old style put_chars message...
-            case catch unicode:characters_to_binary(Chars,Enc,latin1) of
-                Binary when is_binary(Binary) ->
-                    {false,{put_chars,Binary}};
-                _ ->
-                    {false,{put_chars,Chars}}
-            end
-    end;
-io_request(Pid, {fread,Prompt,Format}) ->
-    bc_req(Pid,{get_until,unicode,Prompt,io_lib,fread,[Format]},true);
-io_request(Pid, {get_until,Enc,Prompt,M,F,A}) ->
-    bc_req(Pid,{get_until,Enc,Prompt,M,F,A},true);
-io_request(Pid, {get_chars,Enc,Prompt,N}) ->
-    bc_req(Pid,{get_chars,Enc,Prompt,N},true);
-io_request(Pid, {get_line,Enc,Prompt}) ->
-    bc_req(Pid,{get_line,Enc,Prompt},true);
-io_request(Pid, {get_password,Enc}) ->
-    bc_req(Pid,{get_password, Enc},true);
-io_request(_Pid, R) ->				%Pass this straight through
-    {false,R}.
+%%        true ->
+%%            %% The most common case. A modern i/o server.
+%%            {false,Req0};
+%%        false ->
+%%            %% Backward compatibility only. Unlikely to ever happen.
+%%            case tuple_to_list(Req0) of
+%%                [Op,_Enc] ->
+%%                    {MaybeConvert,Op};
+%%                [Op,_Enc|T] ->
+%%                    Req = list_to_tuple([Op|T]),
+%%                    {MaybeConvert,Req}
+%%            end
+%%    end.

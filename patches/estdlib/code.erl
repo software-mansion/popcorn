@@ -112,6 +112,5 @@ get_mode() ->
 is_loaded(Module) ->
     case popcorn_module:which(Module) of
         ModuleString when is_list(ModuleString) -> true;
-        non_existing -> false;
         _ -> false
     end.

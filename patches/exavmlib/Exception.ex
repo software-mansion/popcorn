@@ -78,7 +78,6 @@ defmodule Exception do
   Gets the message for an `exception`.
   """
   def message(%module{__exception__: true} = exception) do
-    :erlang.display({"FK", exception})
     try do
 #      for some reason the latter is crushing when invoked with FunctionClauseError
 #      module.message(exception)
@@ -507,7 +506,6 @@ defmodule Exception do
   "anonymous fn in func/arity"
   """
   def format_mfa(module, fun, arity) when is_atom(module) and is_atom(fun) do
-    :erlang.display({module, fun, arity})
     # Original code:
     # case Code.Identifier.extract_anonymous_fun_parent(fun) do
     #  {outer_name, outer_arity} ->

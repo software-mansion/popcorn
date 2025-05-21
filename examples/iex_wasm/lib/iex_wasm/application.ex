@@ -3,7 +3,8 @@ defmodule IexWasm.Application do
   import ExTTY
 
   def start do
-    :application_controller.start(:kernel)
+    {:ok, _pid} = :application_controller.start(:kernel)
+    :kernel.start([],[])
     :application.ensure_all_started(:kernel)
     :application.ensure_all_started(:elixir)
     :application.ensure_all_started(:iex)

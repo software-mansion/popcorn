@@ -20,6 +20,12 @@ defmodule IexWasm do
     {:noreply, new_state}
   end
 
+  defp handle_wasm({:wasm_call, %{"command" => "start", "language" => language}}, state) when is_language(language) do
+    type = String.to_atom(language)
+    Shell.start_link(type: type)
+    {:resolve, :ok, state}
+  end
+
   defp handle_wasm({:wasm_call, %{"command" => "code_data", "language" => language} = req}, state) when is_language(language) do
     type = String.to_atom(language)
     try do
@@ -28,12 +34,6 @@ defmodule IexWasm do
     rescue
       error -> {:resolve, error, state}
     end
-  end
-  
-  defp handle_wasm({:wasm_call, %{"command" => "start", "language" => language}}, state) when is_language(language) do
-    type = String.to_atom(language)
-    Shell.start_link(type: type)
-    {:resolve, :ok, state}
   end
   
 end

@@ -18,9 +18,6 @@ defmodule Shell do
   def handle_info({:tty_data, code_output}, %{type: type} = state) do
     """
     ({ window, args }) => {
-      console.log(args.code_output);
-      let ansiRegex = /[\\u001b\\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
-      let code_bunch = args.code_output.replace(ansiRegex, '');
       window.terminal.write(args.code_output)
     }
     """
