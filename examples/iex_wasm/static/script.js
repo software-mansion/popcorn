@@ -5,8 +5,8 @@ const LANGUAGE_ERLANG = "erlang";
 const LANGUAGE_ELIXIR = "elixir";
 
 var term = new Terminal();
-term.open(document.getElementById('terminal'));
-window.elixir_terminal = term;
+term.open(document.getElementById(LANGUAGE + '_terminal'));
+window.terminal = term;
 
 async function setup() {
   const popcorn = await Popcorn.init({
@@ -16,13 +16,24 @@ async function setup() {
     onStderr: (text) => displayLog(text, { isError: true }),
   });
   
-  window.elixir_terminal.onKey(async key => {
+  try {
+    const { data, durationMs } = await popcorn.call({"command": "start", "language": LANGUAGE}, {
+      timeoutMs: 10_000,
+    });
+  } catch (error) {
+      displayLog(error, { isError: true }) 
+  }
+  
+  window.terminal.onKey(async key => {
     console.log(key);
-    let ansiRegex = /[^\x20-\x7F\n\b\r]/g;
-    let code_bunch = key.key.replace(ansiRegex, '');
-
+    let code_bunch = key.key;
+    console.log(key.domEvent.keyCode);
+    let keyCode = key.domEvent.keyCode;
+    if (keyCode === 38 || keyCode === 40) {
+        code_bunch = '';
+    }
     try {
-      const { data, durationMs } = await popcorn.call([LANGUAGE, code_bunch], {
+      const { data, durationMs } = await popcorn.call({"command": "code_data", "language": LANGUAGE, "code": code_bunch}, {
         timeoutMs: 10_000,
       });
     } catch (error) {
@@ -38,7 +49,7 @@ function displayLog(log, { isError }) {
     log = '\x1b[31m' + log + '\x1b[0m\n\r';
     console.log(log)
   }
-  window.elixir_terminal.write(log);
+  window.terminal.write(log);
 }
 
 await setup();

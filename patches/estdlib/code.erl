@@ -110,7 +110,7 @@ get_mode() ->
     embedded.
 
 is_loaded(Module) ->
-    case flb_module:which(Module) of
+    case popcorn_module:which(Module) of
         ModuleString when is_list(ModuleString) -> true;
         non_existing -> false;
         _ -> false
