@@ -65,12 +65,12 @@ RUN cd /root/elixir-wasm && \
  RUN source /root/.env && \
      cd /root/elixir-wasm/examples/eval_in_wasm && \
      cp -r /root/wasm static && \
-     mix deps.get && mix deps.compile && mix compile
+     mix deps.get && mix deps.compile && mix popcorn.cook && mix compile
 
  RUN source /root/.env && \
      cd /root/elixir-wasm/examples/game_of_life && \
      cp -r /root/wasm static && \
-     mix deps.get && mix deps.compile && mix compile
+     mix deps.get && mix deps.compile && mix popcorn.cook && mix compile
 
  RUN source /root/.env && \
      cd /root/elixir-wasm/ && \
