@@ -64,13 +64,13 @@ RUN cd /root/elixir-wasm && \
  RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
  RUN source /root/.env && \
      cd /root/elixir-wasm/examples/eval_in_wasm && \
-     cp -r /root/wasm static && \
-     mix deps.get && mix deps.compile && mix popcorn.cook && mix compile
+     mix deps.get && mix popcorn.cook && \
+     cp -r /root/wasm static
 
  RUN source /root/.env && \
      cd /root/elixir-wasm/examples/game_of_life && \
-     cp -r /root/wasm static && \
-     mix deps.get && mix deps.compile && mix popcorn.cook && mix compile
+     mix deps.get && mix popcorn.cook && \
+     cp -r /root/wasm static
 
  RUN source /root/.env && \
      cd /root/elixir-wasm/ && \
