@@ -1,6 +1,8 @@
 -module(iex).
 -export([start/2, shell/0]).
 
+%% Patch reason: Module init is not supported in AtomVM
+%% io:setopts/1 is not supported in AtomVM
 start(Opts, MFA) ->
   {ok, _} = application:ensure_all_started(elixir),
   {ok, _} = application:ensure_all_started(iex),
@@ -15,6 +17,7 @@ start(Opts, MFA) ->
     'Elixir.IEx.Server':run_from_shell(Opts, MFA)
   end).
 
+%% Patch reason: Module init is not supported in AtomVM
 shell() ->
 %%  Args = init:get_plain_arguments(),
   Args = [],

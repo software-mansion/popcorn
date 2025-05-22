@@ -4,7 +4,7 @@ defmodule IexWasm.Application do
 
   def start do
     {:ok, _pid} = :application_controller.start(:kernel)
-    :kernel.start([],[])
+    :kernel.start([], [])
     :application.ensure_all_started(:kernel)
     :application.ensure_all_started(:elixir)
     :application.ensure_all_started(:iex)
@@ -13,5 +13,4 @@ defmodule IexWasm.Application do
     Wasm.register("main")
     Process.sleep(:infinity)
   end
-  
 end

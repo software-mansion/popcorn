@@ -24,7 +24,6 @@
 -compile({popcorn_patch_private, non_builtin_local_func/4}).
 -compile({popcorn_patch_private, initiate_records/2}).
 -compile({popcorn_patch_private, read_records/2}).
--compile({popcorn_patch_private, read_records/3}).
 -compile({popcorn_patch_private, find_file/1}).
 
 -define(LINEMAX, 30).
@@ -55,6 +54,7 @@ start(NoCtrlG, StartSync) ->
                   popcorn_module:server(NoCtrlG, StartSync)
           end).
 
+%% Patch reason: erlang:function_exported/3 not implemented in AtomVM
 non_builtin_local_func(F,As,Bs, FT) ->
 %%    Arity = length(As),
 %%    case erlang:function_exported(user_default, F, Arity) of
@@ -64,6 +64,9 @@ non_builtin_local_func(F,As,Bs, FT) ->
   popcorn_module:shell_default(F,As,Bs, FT).
 %%    end.
 
+%% Patch reason: even if the module is loaded in AtomVM it does not mean that 
+%% the path to the file is correct as we operate in WASM in Browser.
+%% Also - user_default module is never loaded in AtomVM.
 initiate_records(Bs, RT) ->
     RNs1 = popcorn_module:init_rec(shell_default, Bs, RT),
 %%    RNs2 = case code:is_loaded(user_default) of
@@ -75,18 +78,7 @@ initiate_records(Bs, RT) ->
     RNs2 = [],
     lists:usort(RNs1 ++ RNs2).
 
-read_records(File, Selected, Options) ->
-    case read_records(File, popcorn_module:listify(Options)) of
-        Error when is_tuple(Error) ->
-            Error;
-        RAs when Selected =:= '_' ->
-            RAs;
-        RAs ->
-            Sel = popcorn_module:listify(Selected),
-            [RA || {attribute,_,_,{Name,_}}=RA <- RAs,
-                   lists:member(Name, Sel)]
-    end.
-
+%% Patch reason: files are not working in Popcorn
 read_records(FileOrModule, Opts0) ->
     Opts = lists:delete(report_warnings, Opts0),
     case find_file(FileOrModule) of
@@ -107,6 +99,7 @@ read_records(FileOrModule, Opts0) ->
             Error
     end.
 
+%% Patch reason: files are not working in Popcorn
 find_file(Mod) when is_atom(Mod) ->
     case code:which(Mod) of
         File when is_list(File) ->

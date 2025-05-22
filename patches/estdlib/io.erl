@@ -57,9 +57,11 @@ format(Format, Args) when is_list(Format) andalso is_list(Args) ->
         end,
     put_chars(Msg).
 
+%% Patch reason: fwrite should behave just like format in Popcorn
 fwrite(Format) ->
     format(Format).
 
+%% Patch reason: fwrite should behave just like format in Popcorn
 fwrite(Format, Args) ->
     format(Format, Args).
 

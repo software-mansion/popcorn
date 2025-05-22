@@ -369,7 +369,8 @@ defmodule IEx.Server do
   @doc false
   def __parse__([], :eof), do: {:done, :eof, []}
   def __parse__([], chars), do: {:done, List.to_string(chars), []}
-
+  
+# Patch reason: String.replace/3 needs regex to work - regexes are not yet supported in Popcorn
   defp prompt(status, prefix, counter) do
     {mode, prefix} =
       if Node.alive?() do

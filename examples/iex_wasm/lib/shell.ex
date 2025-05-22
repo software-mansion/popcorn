@@ -10,7 +10,14 @@ defmodule Shell do
   @impl GenServer
   def init(opts) do
     type = Keyword.get(opts, :type, :elixir)
-    ExTTY.start_link(handler: self(), shell_opts: [dot_iex_path: ""], name: :"#{type}_tty", type: type)
+
+    ExTTY.start_link(
+      handler: self(),
+      shell_opts: [dot_iex_path: ""],
+      name: :"#{type}_tty",
+      type: type
+    )
+
     {:ok, %{type: type}}
   end
 
@@ -22,7 +29,7 @@ defmodule Shell do
     }
     """
     |> Wasm.run_js(args: %{code_output: code_output})
+
     {:noreply, state}
   end
-
 end

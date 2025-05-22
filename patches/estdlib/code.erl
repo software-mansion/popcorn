@@ -106,11 +106,15 @@ ensure_loaded(_Module) ->
 get_object_code(_Module) ->
     error.
 
+%% Patch reason: there is no code server and code module is implemented differently in AtomVM
+%% eventually the latter should be implemented in AtomVM.
 get_mode() ->
     embedded.
 
+%% Patch reason: there is no code server and code module is implemented differently in AtomVM
+%% eventually the latter should be implemented in AtomVM.
 is_loaded(Module) ->
     case popcorn_module:which(Module) of
-        ModuleString when is_list(ModuleString) -> true;
+        File when is_list(File) -> {file, File};
         _ -> false
     end.

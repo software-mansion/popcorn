@@ -4,9 +4,12 @@
 
 -export([load/0]).
 
+
+%% Patch reason: AtomVM is not starting kernel_safe_sup
 -spec load() -> [string()].
 load() ->
     [].
+%% Previous implementation:
 %%    wait_for_kernel_safe_sup(),
 %%    case history_status() of
 %%        enabled ->
@@ -63,11 +66,7 @@ load() ->
 %%            end
 %%    end.
 
-%%%%%%%%%%%%%%%
-%%% PRIVATE %%%
-%%%%%%%%%%%%%%%
-
-%% Return if the system is running (not stopping)
+%% Patch reason: Module init is not supported in AtomVM
 -spec init_running() -> boolean().
 init_running() ->
     true.
