@@ -19,7 +19,15 @@ defmodule Popcorn.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: [
         compile: ["compile", &download_artifacts/1, &patch/1],
-        lint: ["format --check-formatted", "credo", "dialyzer"]
+        lint: [
+          "format --check-formatted",
+          "deps.unlock --check-unused",
+          "credo",
+          "deps.compile",
+          "compile --force --warnings-as-errors",
+          "docs --warnings-as-errors",
+          "dialyzer"
+        ]
       ],
       dialyzer: [plt_add_apps: [:mix, :ex_unit]],
       deps: deps(),
