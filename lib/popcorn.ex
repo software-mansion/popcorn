@@ -100,7 +100,14 @@ defmodule Popcorn do
 
   defp beam_src_in_api_dir?(beam_path) do
     module_name = Path.basename(beam_path, ".beam")
-    module = Module.safe_concat([module_name])
+
+    module =
+      if String.starts_with?(module_name, "Elixir.") do
+        Module.safe_concat([module_name])
+      else
+        String.to_existing_atom(module_name)
+      end
+
     src_path = to_string(module.module_info(:compile)[:source])
 
     String.contains?(src_path, @api_dir)

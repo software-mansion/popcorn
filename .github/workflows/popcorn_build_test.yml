@@ -55,8 +55,8 @@ jobs:
           sudo apt install -y gperf libmbedtls-dev zlib1g-dev
       - name: Install dependencies
         run: mix deps.get
-      - name: Compile
-        run: mix compile
+      - name: Lint
+        run: mix lint
       - name: Build AtomVM
         run: |
           export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found

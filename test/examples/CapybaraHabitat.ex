@@ -1,4 +1,5 @@
 defmodule CapybaraHabitat do
+  @moduledoc false
   def start do
     {:ok, _} = Environment.start_link(10)
     {:ok, _} = Feeder.start_link()
@@ -16,6 +17,7 @@ defmodule CapybaraHabitat do
 end
 
 defmodule Environment do
+  @moduledoc false
   use GenServer
 
   def start_link(initial_food) do
@@ -76,6 +78,7 @@ defmodule Environment do
 end
 
 defmodule Feeder do
+  @moduledoc false
   use GenServer
 
   def start_link() do
@@ -103,6 +106,7 @@ defmodule Feeder do
 end
 
 defmodule Capybara do
+  @moduledoc false
   use GenServer
 
   def start_link(name, activity) do

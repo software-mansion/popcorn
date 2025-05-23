@@ -13,13 +13,33 @@ defmodule Popcorn.MixProject do
 
     [
       app: :popcorn,
-      version: "0.1.0",
+      version: "0.1.0-rc0",
       elixir: "1.17.3",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
-      elixirc_options: [no_warn_undefined: [:emscripten]],
-      aliases: [compile: ["compile", &download_artifacts/1, &patch/1]],
-      deps: deps()
+      aliases: [
+        compile: ["compile", &download_artifacts/1, &patch/1],
+        lint: [
+          "format --check-formatted",
+          "deps.unlock --check-unused",
+          "credo",
+          "deps.compile",
+          "compile --force --warnings-as-errors",
+          "docs --warnings-as-errors",
+          "dialyzer"
+        ]
+      ],
+      dialyzer: [plt_add_apps: [:mix, :ex_unit]],
+      deps: deps(),
+
+      # hex
+      description: "Popcorn: run Elixir in browser",
+      package: package(),
+
+      # docs
+      name: "Popcorn",
+      docs: docs(),
+      homepage_url: "https://popcorn.swmansion.com"
     ]
   end
 
@@ -29,6 +49,26 @@ defmodule Popcorn.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp package do
+    [
+      maintainers: ["Software Mansion"],
+      licenses: ["Apache-2.0"],
+      files: ["lib", "priv", "patches", "mix.exs", "README.md", "LICENSE", "src"],
+      links: %{
+        "GitHub" => "https://github.com/swmansion/popcorn",
+        "Popcorn website" => "https://popcorn.swmansion.com"
+      }
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "LICENSE"],
+      formatters: ["html"]
+    ]
+  end
 
   defp download_artifacts(_args) do
     alias Popcorn.Utils.Download
@@ -76,9 +116,11 @@ defmodule Popcorn.MixProject do
 
   defp deps do
     [
-      {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
+      # {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
       {:jason, "~> 1.4"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true}
+      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 end

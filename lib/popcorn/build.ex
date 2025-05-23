@@ -82,7 +82,9 @@ defmodule Popcorn.Build do
     # Compiling together may break something, as these modules
     # will override stdlib modules.
     process_async(patch_srcs, fn src ->
-      with_tmp_dir(out_dir, fn tmp_dir ->
+      tmp_dir = setup_tmp_dir(out_dir)
+
+      try do
         IO.puts(:stderr, "Compiling #{src}")
         compile_patch(src, tmp_dir)
 
@@ -92,7 +94,9 @@ defmodule Popcorn.Build do
           do_patch(name, stdlib_beams[name], path, out_dir)
           name
         end)
-      end)
+      after
+        File.rm_rf!(tmp_dir)
+      end
     end)
   end
 
@@ -170,12 +174,10 @@ defmodule Popcorn.Build do
     |> Stream.run()
   end
 
-  defp with_tmp_dir(path, fun) do
-    tmp_dir = "#{path}/tmp_#{:erlang.unique_integer([:positive])}"
+  defp setup_tmp_dir(path) do
+    tmp_dir = Path.join(path, "tmp_#{:erlang.unique_integer([:positive])}")
     File.rm_rf!(tmp_dir)
     File.mkdir!(tmp_dir)
-    result = fun.(tmp_dir)
-    File.rm_rf!(tmp_dir)
-    result
+    tmp_dir
   end
 end
