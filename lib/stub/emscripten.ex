@@ -1,8 +1,10 @@
 defmodule :emscripten do
   @moduledoc false
 
-  @spec from_remote_object(reference(), :key | :value) :: term()
-  def from_remote_object(_resource, _return) do
+  @type remote_object_ref() :: binary()
+
+  @spec from_remote_object(remote_object_ref(), :key | :value) :: term()
+  def from_remote_object(_ref, _return) do
     :erlang.nif_error(:nif_not_loaded)
   end
 
@@ -17,7 +19,7 @@ defmodule :emscripten do
   end
 
   @spec run_remote_object_fn_script(binary(), [{:main_thread, boolean()}, {:async, boolean()}]) ::
-          {:ok, reference()}
+          {:ok, remote_object_ref()}
   def run_remote_object_fn_script(_code, _opts) do
     :erlang.nif_error(:nif_not_loaded)
   end

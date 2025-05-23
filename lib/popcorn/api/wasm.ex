@@ -150,16 +150,16 @@ defmodule Popcorn.Wasm do
   def run_js(function, opts \\ []) do
     %{return: return_type, args: args} = opts_to_map(opts, return: :ref, args: %{})
 
-    with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
-         {:ok, ref} <- run_js_fn(wrapped_js_fn) do
+    with {:ok, wrapped_js_fn} <- with_wrapper(function, args) do
+      remote_object = run_js_fn(wrapped_js_fn)
       # Lv. 17 magic ahead
       # args _must_ not be GC'd until we execute JS function since it will remove the object from JS side.
       # Call to any external function ensures that reference will outlive JS call and compiler won't optimize it.
       __MODULE__.id(args)
 
       case return_type do
-        :ref -> {:ok, ref}
-        :value -> get_remote_object_value(ref)
+        :ref -> {:ok, remote_object}
+        :value -> get_remote_object_value(remote_object)
       end
     end
   rescue
@@ -310,7 +310,7 @@ defmodule Popcorn.Wasm do
 
   defp run_js_fn(code) do
     {:ok, ref} = :emscripten.run_remote_object_fn_script(code, main_thread: true)
-    {:ok, %RemoteObject{ref: ref}}
+    %RemoteObject{ref: ref}
   end
 
   defp opts_to_map(opts, values), do: opts |> Keyword.validate!(values) |> Map.new()
