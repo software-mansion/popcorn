@@ -17,8 +17,11 @@ defmodule Popcorn.MixProject do
       elixir: "1.17.3",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
-      elixirc_options: [no_warn_undefined: [:emscripten]],
-      aliases: [compile: ["compile", &download_artifacts/1, &patch/1]],
+      aliases: [
+        compile: ["compile", &download_artifacts/1, &patch/1],
+        lint: ["format --check-formatted", "credo", "dialyzer"]
+      ],
+      dialyzer: [plt_add_apps: [:mix, :ex_unit]],
       deps: deps()
     ]
   end
@@ -78,7 +81,9 @@ defmodule Popcorn.MixProject do
     [
       {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
       {:jason, "~> 1.4"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
+      {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false}
     ]
   end
 end

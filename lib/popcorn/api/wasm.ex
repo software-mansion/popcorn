@@ -2,6 +2,7 @@ defmodule Popcorn.RemoteObject do
   @moduledoc """
   Struct for JS side communication.
   """
+  @type t :: %__MODULE__{ref: term()}
   defstruct ref: nil
 end
 
@@ -60,12 +61,12 @@ defmodule Popcorn.Wasm do
 
   @type run_js_opts() :: [{:return, :ref | :value} | {:args, map()}]
 
-  @type run_js_return() :: %RemoteObject{} | term()
+  @type run_js_return() :: RemoteObject.t() | term()
   @type result(t) :: {:ok, t} | {:error, term()}
 
   @type register_event_listener_opts() :: [
           event_keys: [atom()],
-          target_node: %RemoteObject{},
+          target_node: RemoteObject.t(),
           receiver_name: String.t(),
           custom_data: term()
         ]
@@ -181,7 +182,7 @@ defmodule Popcorn.Wasm do
   @doc """
   Returns Elixir term based on RemoteObject.
   """
-  @spec get_remote_object_value(%RemoteObject{}) :: {:ok, term()} | {:error, term()}
+  @spec get_remote_object_value(RemoteObject.t()) :: {:ok, term()} | {:error, term()}
   def get_remote_object_value(%RemoteObject{ref: ref}) do
     with {:ok, serialized} <- :emscripten.from_remote_object(ref, :value) do
       deserialize(serialized)
@@ -191,7 +192,7 @@ defmodule Popcorn.Wasm do
   @doc """
   Raises on error. See `get_remote_object_value/1`.
   """
-  @spec get_remote_object_value(%RemoteObject{}) :: term()
+  @spec get_remote_object_value(RemoteObject.t()) :: term()
   def get_remote_object_value!(remote_object) do
     {:ok, value} = get_remote_object_value(remote_object)
     value
@@ -308,9 +309,8 @@ defmodule Popcorn.Wasm do
   end
 
   defp run_js_fn(code) do
-    with {:ok, ref} <- :emscripten.run_remote_object_fn_script(code, main_thread: true) do
-      {:ok, %RemoteObject{ref: ref}}
-    end
+    {:ok, ref} = :emscripten.run_remote_object_fn_script(code, main_thread: true)
+    {:ok, %RemoteObject{ref: ref}}
   end
 
   defp opts_to_map(opts, values), do: opts |> Keyword.validate!(values) |> Map.new()

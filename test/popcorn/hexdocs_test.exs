@@ -4,6 +4,7 @@ defmodule Popcorn.HexdocsTestHelper do
   alias __MODULE__, as: Helper
   import Popcorn.Support.AsyncTest
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defmacro test_ast(common, input, opts, category, tags) do
     tags = [category] ++ List.wrap(tags)
 
@@ -1828,7 +1829,7 @@ defmodule Popcorn.HexdocsTest do
       """,
       output: 0.7071067811865475
     },
-    {":math.exp(55.0)", output: 7.694785265142018e23},
+    {":math.exp(55.0)", output: 7.694_785_265_142_018e23},
     {":math.log(7.694785265142018e23)", output: 55.0},
     {
       """

@@ -278,6 +278,7 @@ defmodule Popcorn.Support.AtomVM do
   defp module(code) do
     quote do
       defmodule RunExpr do
+        @moduledoc false
         @compile autoload: false, no_warn_undefined: :atomvm
 
         def start() do
