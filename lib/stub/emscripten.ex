@@ -1,4 +1,6 @@
 defmodule :emscripten do
+  @moduledoc false
+
   @spec from_remote_object(reference(), :key | :value) :: term()
   def from_remote_object(_resource, _return) do
     :erlang.nif_error(:nif_not_loaded)

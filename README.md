@@ -1,9 +1,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/dark-mode-logo.svg">
-  <source media="(prefers-color-scheme: light)" srcset="assets/light-mode-logo.svg">
-  <img alt="Popcorn" src="assets/fallback-logo.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/dark-mode-logo.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/light-mode-logo.svg">
+  <img alt="Popcorn" src="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/fallback-logo.svg">
 </picture>
 
 **Popcorn is a library that allows you to run client-side Elixir in browsers, with Javascript interoperability**
