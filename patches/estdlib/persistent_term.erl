@@ -21,26 +21,31 @@
 % SPDX-License-Identifier: Apache-2.0 OR LGPL-2.1-or-later
 %
 -module(persistent_term).
+
 -export([get/2, put/2]).
 
 get(Key, Default) ->
-    try ets:lookup(persistent_term, Key) of
-        Result ->
-            case Result of
-                [{Key, Res}] -> Res;
-                _ -> Default
-            end
-    catch
-        error:badarg ->
-            ets:new(persistent_term, [set, public, named_table]),
-            Default
-    end.
+  try ets:lookup(persistent_term, Key) of
+    Result ->
+      case Result of
+        [{Key, Res}] ->
+          Res;
+        _ ->
+          Default
+      end
+  catch
+    error:badarg ->
+      ets:new(persistent_term, [set, public, named_table]),
+      Default
+  end.
 
 put(Key, Value) ->
-    try ets:insert(persistent_term, {Key, Value}) of
-        Result -> Result
-    catch
-        error:badarg ->
-            ets:new(persistent_term, [set, public, named_table]),
-            ets:insert(persistent_term, {Key, Value})
-    end.
+  try ets:insert(persistent_term, {Key, Value}) of
+    true ->
+      ok
+  catch
+    error:badarg ->
+      ets:new(persistent_term, [set, public, named_table]),
+      ets:insert(persistent_term, {Key, Value}),
+      ok
+  end.
