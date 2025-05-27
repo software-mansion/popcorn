@@ -23,12 +23,15 @@ defmodule Popcorn do
   - `compile_artifacts` - compiled BEAMs and other artifacts that should be included
   in the generated bundle. Defaults to all the `.beam` and `.app` files for the application
   and dependencies.
+  - `bundle_only` - only generates `bundle.avm` file. All other necessary files have to
+  be generated with `Popcorn.ingredients/1`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:target, :wasm | :unix}
           | {:compile_artifacts, [String.t()]}
+          | {:bundle_only, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
     all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
@@ -37,7 +40,8 @@ defmodule Popcorn do
       out_dir: Popcorn.Config.get(:out_dir),
       start_module: Popcorn.Config.get(:start_module),
       target: :wasm,
-      compile_artifacts: all_beams
+      compile_artifacts: all_beams,
+      bundle_only: false
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
@@ -45,7 +49,8 @@ defmodule Popcorn do
     ensure_option_present(options, :start_module, "start module")
 
     File.mkdir_p!(options.out_dir)
-    copy_runtime_artifacts(options)
+
+    unless options.bundle_only, do: copy_runtime_artifacts(options)
 
     bundled_artifacts = bundled_artifacts(options.compile_artifacts)
 
@@ -53,6 +58,20 @@ defmodule Popcorn do
       :ok -> :ok
       {:error, reason} -> raise "Cooking error, reason: #{inspect(reason)}"
     end
+  end
+
+  def ingredients(options) do
+    default_options = [
+      out_dir: Popcorn.Config.get(:out_dir),
+      target: :wasm
+    ]
+
+    options = options |> Keyword.validate!(default_options) |> Map.new()
+    ensure_option_present(options, :out_dir, "output directory")
+
+    File.mkdir_p!(options.out_dir)
+    copy_runtime_artifacts(options)
+    :ok
   end
 
   defp bundled_artifacts(compile_artifacts) do
