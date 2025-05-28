@@ -1,4 +1,4 @@
-const INIT_TIMEOUT_MS = 5_000;
+const INIT_TIMEOUT_MS = 30_000;
 const CALL_TIMEOUT_MS = 5_000;
 const HEARTBEAT_TIMEOUT_MS = 15_000;
 
@@ -306,7 +306,7 @@ export class Popcorn {
   }
 }
 
-function noop() {}
+function noop() { }
 
 async function withTimeout(promise, ms) {
   let timeout = null;
