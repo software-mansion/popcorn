@@ -1,14 +1,15 @@
 import { Popcorn } from "./wasm/popcorn.js";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
-
-var term = new Terminal();
-term.open(document.getElementById(LANGUAGE + '_terminal'));
-window.terminal = term;
+const ARROW_UP_KEY_CODE = 38;
+const ARROW_DOWN_KEY_CODE = 40;
 
 async function setup() {
+  var term = new Terminal();
+  term.open(document.getElementById(LANGUAGE + '-terminal'));
+  window.terminal = term;
+
   const popcorn = await Popcorn.init({
-    bundlePath: "wasm/app.avm",
     debug: true,
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
@@ -23,13 +24,13 @@ async function setup() {
   }
   
   window.terminal.onKey(async key => {
-    let code_bunch = key.key;
-    let keyCode = key.domEvent.keyCode;
-    if (keyCode === 38 || keyCode === 40) {
-        code_bunch = '';
+    const text = key.key;
+    const keyCode = key.domEvent.keyCode;
+    if (keyCode === ARROW_UP_KEY_CODE || keyCode === ARROW_DOWN_KEY_CODE) {
+        text = '';
     }
     try {
-      const { data, durationMs } = await popcorn.call({"command": "code_data", "language": LANGUAGE, "code": code_bunch}, {
+      const { data, durationMs } = await popcorn.call({"command": "code_data", "language": LANGUAGE, "text": text}, {
         timeoutMs: 10_000,
       });
     } catch (error) {

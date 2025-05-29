@@ -7,17 +7,17 @@ defmodule IexWasm.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      compilers: Mix.compilers() ++ [:popcorn],
+      compilers: Mix.compilers(),
       deps: deps(),
       aliases: [
-        build_wasm: "popcorn.build_runtime --target wasm --out-dir static/wasm"
+        build_wasm: "popcorn.build_runtime --target wasm"
       ]
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: []
     ]
   end
 

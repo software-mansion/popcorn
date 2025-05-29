@@ -1,6 +1,5 @@
 defmodule Shell do
   use GenServer
-  import Popcorn.Wasm
   alias Popcorn.Wasm
 
   def start_link(args) do
@@ -22,7 +21,7 @@ defmodule Shell do
   end
 
   @impl GenServer
-  def handle_info({:tty_data, code_output}, %{type: type} = state) do
+  def handle_info({:tty_data, code_output}, state) do
     """
     ({ window, args }) => {
       window.terminal.write(args.code_output)

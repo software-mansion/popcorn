@@ -32,7 +32,7 @@ defmodule IexWasm do
     type = String.to_atom(language)
 
     try do
-      :ok = ExTTY.send_text(:"#{type}_tty", req["code"])
+      :ok = ExTTY.send_text(:"#{type}_tty", req["text"])
       {:resolve, :ok, state}
     rescue
       error -> {:resolve, error, state}

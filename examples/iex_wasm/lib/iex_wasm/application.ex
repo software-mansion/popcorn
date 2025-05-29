@@ -1,6 +1,5 @@
 defmodule IexWasm.Application do
   alias Popcorn.Wasm
-  import ExTTY
 
   def start do
     {:ok, _pid} = :application_controller.start(:kernel)
