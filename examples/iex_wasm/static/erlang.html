@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0" name="viewport">
+    <meta charset="utf-8" />
+    <meta name="code-language" content="erlang" />
+    <link rel="icon" type="image/png" href="/favicon-erl.png" />
+    <link rel="stylesheet" href="/style.css" />
+    <title>IEx x WASM x AtomVM</title>
+    <link rel="stylesheet" href="assets/node_modules/@xterm/xterm/css/xterm.css" />
+    <script src="assets/node_modules/@xterm/xterm/lib/xterm.js"></script>
+  </head>
+  <body>
+    <h1 class="erl-color"><span class="erl-initial">erl</span> in the browser</h1>
+    <a href="/">Also, try iex</a>
+
+    <div id="erlang-terminal"></div>
+
+    <script type="module" src="wasm/popcorn.js" defer></script>
+    <script type="module" src="script.js" defer></script>
+  </body>
+</html>
