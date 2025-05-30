@@ -8,6 +8,12 @@ defmodule Popcorn do
   @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
+  @mix_env Mix.env()
+
+  defmodule CookingError do
+    @moduledoc false
+    defexception [:message]
+  end
 
   @doc """
   Generates static artifacts to run the project in the browser.
@@ -45,8 +51,8 @@ defmodule Popcorn do
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
-    ensure_option_present(options, :out_dir, "output directory")
-    ensure_option_present(options, :start_module, "start module")
+    ensure_option_present(options, :out_dir, "Output directory")
+    ensure_option_present(options, :start_module, "Start module")
 
     File.mkdir_p!(options.out_dir)
 
@@ -56,7 +62,7 @@ defmodule Popcorn do
 
     case pack_bundle(options.out_dir, bundled_artifacts, options.start_module) do
       :ok -> :ok
-      {:error, reason} -> raise "Cooking error, reason: #{inspect(reason)}"
+      {:error, reason} -> raise CookingError, "Reason: #{inspect(reason)}"
     end
   end
 
@@ -67,7 +73,7 @@ defmodule Popcorn do
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
-    ensure_option_present(options, :out_dir, "output directory")
+    ensure_option_present(options, :out_dir, "Output directory")
 
     File.mkdir_p!(options.out_dir)
     copy_runtime_artifacts(options)
@@ -94,7 +100,7 @@ defmodule Popcorn do
       :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
     catch
       {:start_module_not_found, _module} ->
-        raise "Cooking failed: provided start module `#{inspect(start_module)}` has not been found"
+        raise CookingError, "Provided start module `#{inspect(start_module)}` has not been found"
     end
   end
 
@@ -102,7 +108,7 @@ defmodule Popcorn do
     case File.rm(path) do
       :ok -> :ok
       {:error, :enoent} -> :ok
-      error -> raise "Cooking error: couldn't remove old bundle, reason: #{inspect(error)}"
+      error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
 
@@ -139,15 +145,24 @@ defmodule Popcorn do
     end
 
     atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
+
+    unless File.exists?(atomvm_artifacts_dir) do
+      raise CookingError, """
+      Couldn't find runtime artifacts for target `#{options.target}`. \
+      To build them from source, run \
+      `MIX_ENV=#{@mix_env} mix popcorn.build_runtime --target #{options.target}`.
+      """
+    end
+
     File.cp_r!(atomvm_artifacts_dir, options.out_dir)
   end
 
   defp ensure_option_present(options, key, name) do
     if options[key] == nil do
-      raise """
-      Cooking failed: #{name} not provided.
-      Please provide the `key` option or configure it by putting
-      `config :popcorn, #{key}: value` in your `config.exs`
+      raise CookingError, """
+      #{name} not provided. \
+      Please provide the `#{key}` option or configure it by putting \
+      `config :popcorn, #{key}: value` in your `config.exs`.
       """
     end
   end
