@@ -61,5 +61,9 @@ jobs:
         run: |
           export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
           mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+      - name: Install playwright deps
+        run: mix playwright.install
       - name: Run tests
         run: mix test
+      - name: Run WASM tests
+        run: TARGET=wasm mix test            
