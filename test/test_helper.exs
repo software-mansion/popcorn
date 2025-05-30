@@ -1,7 +1,6 @@
 alias Popcorn.Support.{AtomVM, Browser}
 
-# FIXME: Workaround for the `Popcorn.Support.AtomVM` caching not considering changing the patches
-File.rm_rf!("tmp")
+Path.wildcard("tmp/*") |> List.delete("tmp/modules") |> Enum.each(&File.rm_rf!/1)
 
 target = System.get_env("TARGET", "UNIX") |> String.downcase() |> String.to_atom()
 AtomVM.test_target(target)
