@@ -23,9 +23,6 @@ defmodule Popcorn.Support.AtomVM do
 
   @unix_path "test/fixtures/unix/AtomVM"
 
-  # mix always compiles files from project root
-  @compile_dir Path.join([File.cwd!(), "tmp", "modules"])
-
   defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
@@ -77,14 +74,13 @@ defmodule Popcorn.Support.AtomVM do
   def try_eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
     run_dir = Keyword.fetch!(opts, :run_dir)
     fragment = type |> to_ast_fragment_type() |> ast_fragment()
+    bundle_path = bundle_path(fragment)
 
-    if not compiled?(fragment) do
+    if not File.exists?(bundle_path) do
       raise "Compile eval module before using it"
     end
 
-    fragment
-    |> compile_quoted()
-    |> try_run(run_dir, code: code)
+    try_run(bundle_path, run_dir, code: code)
   end
 
   @doc """
@@ -200,11 +196,10 @@ defmodule Popcorn.Support.AtomVM do
     |> Map.merge(%{log_path: log_path, output: output})
   end
 
-  def compiled?(ast) do
+  defp bundle_path(ast) do
     hash = ast |> :erlang.phash2() |> to_string()
-    build_dir = Path.join(@compile_dir, hash)
-
-    File.exists?(build_dir)
+    build_dir = Path.join(compile_dir(), hash)
+    Path.join(build_dir, "bundle.avm")
   end
 
   @doc """
@@ -212,32 +207,35 @@ defmodule Popcorn.Support.AtomVM do
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
   def compile_quoted(ast) when is_ast(ast) do
-    hash = ast |> :erlang.phash2() |> to_string()
-    build_dir = Path.join(@compile_dir, hash)
-    avm_path = Path.join(build_dir, "bundle.avm")
-
-    stale = not File.exists?(avm_path)
+    bundle_path = bundle_path(ast)
+    build_dir = Path.dirname(bundle_path)
+    stale = not File.exists?(bundle_path)
 
     if stale do
       File.rm_rf!(build_dir)
       File.mkdir_p!(build_dir)
 
-      [beam_path] =
-        ast
-        |> module(test_target())
-        |> run_elixirc(build_dir)
-
-      Popcorn.cook(
-        target: test_target(),
-        compile_artifacts:
-          [beam_path] ++ Path.wildcard(Path.join(Mix.Project.build_path(), "**/*.{beam,app}")),
-        start_module: RunExpr,
-        out_dir: build_dir,
-        bundle_only: true
-      )
+      ast
+      |> module(test_target())
+      |> run_elixirc(build_dir)
     end
 
-    avm_path
+    beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
+
+    Popcorn.cook(
+      target: test_target(),
+      compile_artifacts:
+        beam_paths ++ Path.wildcard(Path.join(Mix.Project.build_path(), "**/*.{beam,app}")),
+      start_module: RunExpr,
+      out_dir: build_dir,
+      bundle_only: true
+    )
+
+    bundle_path
+  end
+
+  defp compile_dir() do
+    Path.join([File.cwd!(), "tmp/modules", to_string(test_target())])
   end
 
   defp run_elixirc(ast, dir) do
