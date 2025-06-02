@@ -1,6 +1,6 @@
 const INIT_TIMEOUT_MS = 30_000;
-const CALL_TIMEOUT_MS = 5_000;
-const HEARTBEAT_TIMEOUT_MS = 15_000;
+const CALL_TIMEOUT_MS = 60_000;
+const HEARTBEAT_TIMEOUT_MS = 60_000;
 
 // postMessage data:
 //  | { type: "stdout", value: string }
