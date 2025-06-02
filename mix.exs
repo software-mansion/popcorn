@@ -72,43 +72,7 @@ defmodule Popcorn.MixProject do
   end
 
   defp download_artifacts(_args) do
-    alias Popcorn.Utils.Download
-
-    {:url, url} =
-      Application.get_env(
-        :popcorn,
-        :runtime,
-        {:url, "https://popcorn.swmansion.com/simple_repl/wasm/"}
-      )
-
-    dir = Path.join(Mix.Project.app_path(), "atomvm_artifacts/wasm")
-    File.mkdir_p!(dir)
-    artifacts = ["AtomVM.wasm", "AtomVM.mjs"]
-    paths = Enum.map(artifacts, &Path.join(dir, &1))
-
-    unless Enum.all?(paths, &File.exists?/1) do
-      try do
-        Download.start_inets_profile()
-        Enum.each(artifacts, fn name -> download_artifact(url, dir, name) end)
-      after
-        Download.stop_inets_profile()
-      end
-    end
-  end
-
-  defp download_artifact(url, dir, name) do
-    alias Popcorn.Utils.Download
-    path = Path.join(dir, name)
-
-    with {:ok, _stream} <-
-           Download.download("#{url}/#{name}", File.stream!(path <> ".download")) do
-      File.rename!(path <> ".download", path)
-    else
-      {:error, reason} ->
-        IO.warn("""
-        Couldn't download #{name}, reason: #{reason}, please use mix popcorn.build_runtime to build from source
-        """)
-    end
+    Popcorn.Utils.FetchArtifacts.fetch_artifacts()
   end
 
   defp patch(_args) do

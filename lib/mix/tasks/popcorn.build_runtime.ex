@@ -59,6 +59,10 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
         build_dir = Path.join(runtime_source, "src/platforms/emscripten/build")
         File.mkdir_p!(build_dir)
 
+        unless match?({_path, 0}, System.shell("which emcmake")) do
+          raise "emcmake command not found, please make sure you have emscripten installed"
+        end
+
         cmd(
           ~w"emcmake cmake .. -DAVM_BUILD_RUNTIME_ONLY=1 -DAVM_EMSCRIPTEN_ENV=web" ++
             cmake_opts,
