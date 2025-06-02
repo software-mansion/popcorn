@@ -75,6 +75,25 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Otherwise, browsers refuse to run WASM.
 
+## Testing
+
+Popcorn tests can be run either on WASM via Playwright or natively on UNIX. To run them on WASM, run
+```
+TARGET=wasm mix test
+```
+
+To run tests on UNIX, use
+
+```
+mix popcorn.build_runtime --target unix
+```
+
+to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run
+
+```
+mix test
+```
+
 ## Authors
 
 Popcorn is created by Software Mansion.
