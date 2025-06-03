@@ -5,7 +5,7 @@ const ARROW_UP_KEY_CODE = 38;
 const ARROW_DOWN_KEY_CODE = 40;
 
 async function setup() {
-  var term = new Terminal();
+  const term = new Terminal();
   term.open(document.getElementById(LANGUAGE + '-terminal'));
   window.terminal = term;
 
