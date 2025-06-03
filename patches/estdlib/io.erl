@@ -26,8 +26,8 @@
 %% @end
 %%-----------------------------------------------------------------------------
 -module(io).
-
--export([format/1, format/2, get_line/1, put_chars/1, put_chars/2]).
+-compile({popcorn_patch_private, bc_req/3}).
+-export([format/1, format/2, fwrite/1, fwrite/2, get_line/1, put_chars/1, put_chars/2]).
 
 %%-----------------------------------------------------------------------------
 %% @doc     Equivalent to format(Format, []).
@@ -56,6 +56,14 @@ format(Format, Args) when is_list(Format) andalso is_list(Args) ->
                 io_lib:format("Bad format!  Format: ~p Args: ~p~n", [Format, Args])
         end,
     put_chars(Msg).
+
+%% Patch reason: fwrite should behave just like format in Popcorn
+fwrite(Format) ->
+    format(Format).
+
+%% Patch reason: fwrite should behave just like format in Popcorn
+fwrite(Format, Args) ->
+    format(Format, Args).
 
 %%-----------------------------------------------------------------------------
 %% @param   Prompt prompt for user input
@@ -106,3 +114,24 @@ put_chars(Chars) ->
 -spec put_chars(Device :: any(), Chars :: list() | binary()) -> ok.
 put_chars(_Device, Chars) ->
     put_chars(Chars).
+
+bc_req(_Pid, Req0, _MaybeConvert) ->
+    {false,Req0}.
+%%    Patch reason:
+%%    for some reason unknown for me in the next line net_kernel:dflag_unicode_io/1 is failing in the VM and is not 
+%%    properly covered by a patch
+%%    OTP implementation:
+%%    case net_kernel:dflag_unicode_io(Pid) of
+%%        true ->
+%%            %% The most common case. A modern i/o server.
+%%            {false,Req0};
+%%        false ->
+%%            %% Backward compatibility only. Unlikely to ever happen.
+%%            case tuple_to_list(Req0) of
+%%                [Op,_Enc] ->
+%%                    {MaybeConvert,Op};
+%%                [Op,_Enc|T] ->
+%%                    Req = list_to_tuple([Op|T]),
+%%                    {MaybeConvert,Req}
+%%            end
+%%    end.

@@ -3161,7 +3161,9 @@ nif_error(_Reason) -> erlang:error("Nif not loaded").
 bump_reductions(_Reductions) -> true.
 
 %% Patch reason: nif not implemented in Atom
-fun_info(Fun) -> [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]].
+fun_info(Fun) -> 
+    Info = [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]],
+    Info ++ [{new_index, 0}, {uniq,  erlang:unique_integer()}].
 
 %% Patch reason: nifs not implemented in Atom.
 %% Important: phash and phash2 are supposed to return
