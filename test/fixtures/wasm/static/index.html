@@ -1,0 +1,11 @@
+<html style="background-color:#181a1b">
+<head>
+    <script type="module">
+        import { Popcorn } from "./wasm/popcorn.js";
+        window.popcorn_promise = Popcorn.init({
+            bundlePath: new URLSearchParams(window.location.search).get("bundlePath"),
+            onStdout: (output) => console.log(`[popcorn stdout] ${output}`)
+        });
+    </script>
+</head>
+</html>
