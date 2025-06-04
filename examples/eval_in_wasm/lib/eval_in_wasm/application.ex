@@ -1,11 +1,15 @@
 defmodule EvalInWasm.Application do
-  alias Popcorn.Wasm
+  @moduledoc false
 
-  def start do
-    {:ok, pid} = GenServer.start_link(EvalInWasm, [])
-    Process.register(pid, :main)
-    Wasm.register("main")
-    IO.puts("Starting interpreter...")
-    Process.sleep(:infinity)
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    children = [
+      EvalInWasm
+    ]
+
+    opts = [strategy: :one_for_one, name: EvalInWasm.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 end

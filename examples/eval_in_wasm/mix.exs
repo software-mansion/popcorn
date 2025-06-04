@@ -17,13 +17,14 @@ defmodule EvalInWasm.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [],
+      mod: {EvalInWasm.Application, []}
     ]
   end
 
   defp deps do
     [
-      {:popcorn, path: "../../"},
+      {:popcorn, path: "../../", runtime: false},
       {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
     ]
   end
