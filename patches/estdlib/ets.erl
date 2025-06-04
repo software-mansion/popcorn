@@ -103,7 +103,8 @@ lookup_element(_Table, _Key, _Pos) ->
 delete(_Table, _Key) ->
     erlang:nif_error(undefined).
 
-%% Mock implementation, not checking for existance
+%% Patch reason: Mock implementation until native is provided
+%% Warning: this implementation is not checking for existance
 -spec whereis(TableName :: atom()) -> table_type() | undefined.
 whereis(TableName) ->
     TableName.

@@ -10,8 +10,6 @@
 % so instead of forwarding, handle the IO request here, preventing inifnite loop
 % of relay to self
 relay_to_group_leader(IoReq, State) ->
-  erlang:display(IoReq),
-  erlang:display(State#state.gleader),
   Self = self(),
   if % New clause
      State#state.gleader =:= Self ->
