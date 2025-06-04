@@ -29,7 +29,8 @@
     insert/2,
     lookup/2,
     lookup_element/3,
-    delete/2
+    delete/2,
+    whereis/1
 ]).
 
 -export_type([
@@ -101,3 +102,8 @@ lookup_element(_Table, _Key, _Pos) ->
 -spec delete(Table :: table(), Key :: term()) -> true.
 delete(_Table, _Key) ->
     erlang:nif_error(undefined).
+
+%% Mock implementation, not checking for existance
+-spec whereis(TableName :: atom()) -> table_type() | undefined.
+whereis(TableName) ->
+    TableName.
