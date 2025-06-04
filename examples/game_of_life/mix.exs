@@ -18,7 +18,7 @@ defmodule GameOfLife.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :eex],
+      extra_applications: [:eex],
       mod: {GameOfLife.Application, []}
     ]
   end
@@ -26,7 +26,7 @@ defmodule GameOfLife.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, path: "../.."}
+      {:popcorn, path: "../..", runtime: false}
     ]
   end
 end
