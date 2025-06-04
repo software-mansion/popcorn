@@ -14,7 +14,7 @@ defmodule HelloPopcorn.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: []
     ]
   end
 
@@ -22,7 +22,7 @@ defmodule HelloPopcorn.MixProject do
   defp deps do
     [
       # {:popcorn, github: "software-mansion/popcorn"}
-      {:popcorn, path: "../.."},
+      {:popcorn, path: "../..", runtime: false},
       {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
     ]
   end

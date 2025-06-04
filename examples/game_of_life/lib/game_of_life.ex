@@ -5,14 +5,21 @@ defmodule GameOfLife do
 
   alias Popcorn.Wasm
 
+  @doc false
+  def child_spec(_arg) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :run, []},
+      restart: :temporary
+    }
+  end
+
   @doc """
-  Starts `GameOfLife.Application`
+  Main one-time script for GoL init
   """
-  def start() do
-    IO.puts("Init...\n")
-    {:ok, _pid, _config} = :elixir.start([], [])
-    _ = GameOfLife.Application.start(:normal, [])
+  def run() do
+    IO.puts("Running...\n")
     Wasm.register("noop")
-    Process.sleep(:infinity)
+    :ignore
   end
 end

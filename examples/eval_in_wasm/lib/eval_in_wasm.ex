@@ -3,12 +3,15 @@ defmodule EvalInWasm do
   import Popcorn.Wasm, only: [is_wasm_message: 1]
   alias Popcorn.Wasm
 
+  @name :main
+
   def start_link(_) do
-    GenServer.start_link(__MODULE__, nil, name: :main)
+    GenServer.start_link(__MODULE__, nil, name: @name)
   end
 
   @impl GenServer
   def init(_args) do
+    Wasm.register(Atom.to_string(@name))
     {:ok, nil}
   end
 
