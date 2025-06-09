@@ -2,7 +2,7 @@ defmodule Popcorn.EvalTest do
   use ExUnit.Case, async: true
   require Logger
   require Popcorn.Support.AtomVM
-  import Popcorn.Support.AsyncTest
+  import AsyncTest
   alias Popcorn.Support.AtomVM
 
   @examples_path "./test/examples"
@@ -139,7 +139,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(55)
   end
 
-  async_test "Adder", %{tmp_dir: dir} do
+  async_test "Adder Elixir", %{tmp_dir: dir} do
     """
     defmodule Adder do
       def calc(a, b), do: a + b
@@ -224,7 +224,7 @@ defmodule Popcorn.EvalTest do
     # assert String.contains?(logs, "warning: {unused_var,a,false}")
   end
 
-  async_test "Adder", %{tmp_dir: dir} do
+  async_test "Adder Erlang", %{tmp_dir: dir} do
     """
     -module(adder).
     -export([add/2]).
@@ -491,7 +491,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(%SystemLimitError{})
   end
 
-  async_test "SystemLimitError", %{tmp_dir: dir} do
+  async_test "UndefinedFunctionError", %{tmp_dir: dir} do
     """
     Enum.doesnt_exist()
     """
