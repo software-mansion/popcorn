@@ -82,11 +82,11 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   end
 
   defp fetch_repo(addr, opts \\ []) do
-    ref = if opts[:ref], do: ["-b", opts[:ref]], else: []
     output = Path.join(@build_dir, "atomvm_src")
     File.rm_rf!(output)
     IO.puts(:stderr, "Cloning AtomVM from #{addr}")
-    cmd(["git", "clone", addr] ++ ref ++ ["--", output])
+    cmd(["git", "clone", addr] ++ ["--", output])
+    if ref = opts[:ref], do: cmd(["git", "checkout", ref], cd: output)
     output
   end
 

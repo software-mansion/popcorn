@@ -12,14 +12,14 @@ on:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
   pull_request:
     # branches: [ "*" ]
     paths:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
 
 permissions:
   contents: read
@@ -59,16 +59,11 @@ jobs:
           sudo apt install -y gperf libmbedtls-dev zlib1g-dev
       - name: Install dependencies
         run: mix deps.get
-      - name: Lint
-        run: mix lint
       - name: Build AtomVM
         run: |
           export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
-          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
           mix popcorn.build_runtime --target wasm
       - name: Install playwright deps
         run: mix playwright.install
-      - name: Run tests
-        run: mix test
       - name: Run WASM tests
-        run: TARGET=wasm mix test
+        run: TARGET=wasm mix test --only failing

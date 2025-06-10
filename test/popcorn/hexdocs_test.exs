@@ -805,7 +805,7 @@ defmodule Popcorn.HexdocsTest do
 
       Math.sum(1, 2)
       """,
-      output: 3
+      output: 3, tag: :failing
     },
     {
       """
@@ -820,7 +820,7 @@ defmodule Popcorn.HexdocsTest do
       end
       Math.do_sum(1,2)
       """,
-      raises: UndefinedFunctionError
+      raises: UndefinedFunctionError, tag: :failing
     },
     {
       """
@@ -840,7 +840,8 @@ defmodule Popcorn.HexdocsTest do
         {"Math.zero?(1)", output: false},
         {"Math.zero?([1, 2, 3])", raises: FunctionClauseError},
         {"Math.zero?(0.0)", raises: FunctionClauseError, skip: true}
-      ]
+      ],
+      tag: :failing
     },
     {
       """
@@ -919,7 +920,8 @@ defmodule Popcorn.HexdocsTest do
           ~s|Recursion.print_multiple_times("Hello!", -1)|,
           raises: FunctionClauseError
         }
-      ]
+      ],
+      tag: :failing
     },
     {
       """
@@ -938,7 +940,8 @@ defmodule Popcorn.HexdocsTest do
         {"Math.sum_list([2, 3], 1)", output: 6},
         {"Math.sum_list([3], 3)", output: 6},
         {"Math.sum_list([], 6)", output: 6}
-      ]
+      ],
+      tag: :failing
     },
     {
       """
@@ -954,7 +957,7 @@ defmodule Popcorn.HexdocsTest do
 
       Math.double_each([1, 2, 3])
       """,
-      output: [2, 4, 6]
+      output: [2, 4, 6], tag: :failing
     },
     {"Enum.reduce([1, 2, 3], 0, fn x, acc -> x + acc end)", output: 6},
     {"Enum.map([1, 2, 3], fn x -> x * 2 end)", output: [2, 4, 6]},
@@ -1333,7 +1336,7 @@ defmodule Popcorn.HexdocsTest do
         def sum(a, b), do: a + b
       end
       """,
-      predicate: &AtomVM.assert_is_module/1
+      predicate: &AtomVM.assert_is_module/1, tag: :failing
     },
     {
       """
@@ -1763,7 +1766,7 @@ defmodule Popcorn.HexdocsTest do
         {:do, def(add(a, b), [{:do, a + b}])}
       ])
       """,
-      predicate: &AtomVM.assert_is_module/1
+      predicate: &AtomVM.assert_is_module/1, tag: :failibg
     }
   ]
   |> create_tests(category: :optional_syntax)

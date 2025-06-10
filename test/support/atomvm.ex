@@ -168,7 +168,7 @@ defmodule Popcorn.Support.AtomVM do
     }
     """
 
-    result = Playwright.Page.evaluate(page, "async () => {#{snippet}}")
+    result = Popcorn.Support.Browser.page_eval(page, "async () => {#{snippet}}")
 
     send(log_task.pid, :eof)
     Task.await(log_task)

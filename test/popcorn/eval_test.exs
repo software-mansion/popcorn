@@ -112,6 +112,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(%ArithmeticError{message: "bad argument in arithmetic expression"})
   end
 
+  @tag :failing
   async_test "Factorial", %{tmp_dir: dir} do
     """
     defmodule Factorial do
@@ -125,6 +126,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(120)
   end
 
+  @tag :failing
   async_test "Fibonacci", %{tmp_dir: dir} do
     """
     defmodule Fibonacci do
@@ -139,6 +141,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(55)
   end
 
+  @tag :failing
   async_test "Adder", %{tmp_dir: dir} do
     """
     defmodule Adder do
@@ -151,6 +154,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(30)
   end
 
+  @tag :failing
   async_test "Guard", %{tmp_dir: dir} do
     """
     defmodule Guard do
@@ -164,6 +168,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(:done)
   end
 
+  @tag :failing
   async_test "MultipleFns", %{tmp_dir: dir} do
     """
     defmodule MultipleFns do
@@ -581,6 +586,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(3)
   end
 
+  @tag :failing
   async_test "Implement a protocol", %{tmp_dir: dir} do
     quote do
       defimpl Enumerable, for: Tuple do

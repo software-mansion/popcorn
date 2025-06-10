@@ -69,6 +69,19 @@ defmodule Popcorn.Support.Browser do
     page
   end
 
+  # Workaround for hardcoded 30 sec timeout in playwright_elixir
+  def page_eval(page, js) do
+    frame = Playwright.Page.main_frame(page)
+
+    Playwright.SDK.Channel.post(frame.session, {:guid, frame.guid}, :evaluate_expression, %{
+      expression: js,
+      is_function: Playwright.SDK.Helpers.Expression.function?(js),
+      arg: Playwright.SDK.Helpers.Serialization.serialize(%{}),
+      timeout: 1_000_000
+    })
+    |> Playwright.SDK.Helpers.Serialization.deserialize()
+  end
+
   def debug_mode?() do
     System.get_env("DEBUG") == "true"
   end

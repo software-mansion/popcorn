@@ -21,4 +21,7 @@ case target do
 end
 
 ci_opts = if System.get_env("CI") == "true", do: [max_cases: 1], else: []
-ExUnit.start([capture_log: true, exclude: [:long_running, :"skip_#{target}"]] ++ ci_opts)
+
+ExUnit.start(
+  [capture_log: true, timeout: 360_000, exclude: [:long_running, :"skip_#{target}"]] ++ ci_opts
+)
