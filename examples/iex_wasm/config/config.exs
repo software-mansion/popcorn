@@ -15,7 +15,6 @@ include_tracing =
 
 config :popcorn,
   out_dir: "static/wasm",
-  start_module: IexWasm.Application,
   add_tracing: include_tracing
 
 if path = System.get_env("ATOMVM_SOURCE_PATH") do
