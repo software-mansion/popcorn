@@ -6,8 +6,6 @@ defmodule Popcorn.Utils.FetchArtifacts do
     unix: ["AtomVM"]
   }
 
-  Application.compile_env(:popcorn, :runtime)
-
   alias Popcorn.Utils.Downloader
 
   def fetch_artifacts() do
@@ -52,10 +50,10 @@ defmodule Popcorn.Utils.FetchArtifacts do
       if File.exists?(path) do
         File.cp!(path, Path.join(dir, name))
       else
-        IO.warn("""
+        raise """
         Couldn't find runtime file #{name} in #{location} \
         please use mix popcorn.build_runtime to build from source.
-        """)
+        """
       end
     end)
   end
@@ -69,10 +67,10 @@ defmodule Popcorn.Utils.FetchArtifacts do
       File.rename!(tmp_path, path)
     else
       {:error, reason} ->
-        IO.warn("""
+        raise """
         Couldn't download #{name} from #{url}, reason: #{reason}, \
         please use mix popcorn.build_runtime to build from source.
-        """)
+        """
     end
   end
 end

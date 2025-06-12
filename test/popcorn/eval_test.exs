@@ -197,7 +197,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip_wasm
+  @tag skip_target: :wasm
   @tag :mr
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
@@ -609,7 +609,7 @@ defmodule Popcorn.EvalTest do
   end
 
   @tag timeout: :timer.minutes(5)
-  @tag :skip_wasm
+  @tag skip_target: :wasm
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do

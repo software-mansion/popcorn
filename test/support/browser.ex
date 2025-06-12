@@ -34,7 +34,7 @@ defmodule Popcorn.Support.Browser do
 
     on_exit(fn ->
       # in debug mode we want to keep the page open to allow interaction with it
-      unless debug_mode?(), do: Playwright.Page.close(page)
+      if not debug_mode?(), do: Playwright.Page.close(page)
     end)
 
     response = Playwright.Page.goto(page, url, %{wait_until: :domcontentloaded})

@@ -1243,7 +1243,7 @@ defmodule Popcorn.HexdocsTest do
       import List, only: [duplicate: 2]
       duplicate(:ok, 3)
       """,
-      output: [:ok, :ok, :ok], tag: :skip_wasm
+      output: [:ok, :ok, :ok], tag: [skip_target: :wasm]
     },
     {
       """
@@ -1256,7 +1256,7 @@ defmodule Popcorn.HexdocsTest do
 
       Math.some_function()
       """,
-      output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok], tag: :skip_wasm
+      output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok], tag: [skip_target: :wasm]
     },
     {"is_atom(String)", output: true},
     {"to_string(String)", output: "Elixir.String"},
@@ -1783,7 +1783,8 @@ defmodule Popcorn.HexdocsTest do
     },
     {
       ~s|Base.encode16(:crypto.hash(:sha256, "Elixir"))|,
-      output: "3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB", tag: :skip_wasm
+      output: "3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB",
+      tag: [skip_target: :wasm]
     },
     {
       """

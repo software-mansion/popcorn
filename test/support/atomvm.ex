@@ -112,7 +112,7 @@ defmodule Popcorn.Support.AtomVM do
 
     args |> :erlang.term_to_binary() |> then(&File.write(args_path, &1))
 
-    unless match?({_output, 0}, System.shell("which '#{@unix_path}'")) do
+    if System.shell("which '#{@unix_path}'") |> elem(1) != 0 do
       raise """
       AtomVM not found, please run `mix popcorn.build_runtime` \
       or put `config :popcorn, runtime_path: "path/to/AtomVM"` in your config.exs
@@ -222,13 +222,11 @@ defmodule Popcorn.Support.AtomVM do
 
     beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
 
-    Popcorn.cook(
-      target: test_target(),
+    Popcorn.bundle(
       compile_artifacts:
         beam_paths ++ Path.wildcard(Path.join(Mix.Project.build_path(), "**/*.{beam,app}")),
       start_module: RunExpr,
-      out_dir: build_dir,
-      bundle_only: true
+      out_dir: build_dir
     )
 
     bundle_path
