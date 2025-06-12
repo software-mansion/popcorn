@@ -330,6 +330,7 @@ apply(Module, Function, Args) ->
         [Arg1, Arg2] ->
             Module:Function(Arg1, Arg2);
         [Arg1, Arg2, Arg3] ->
+            erlang:display({"FK", Arg1, Arg2, Arg3}),
             Module:Function(Arg1, Arg2, Arg3);
         [Arg1, Arg2, Arg3, Arg4] ->
             Module:Function(Arg1, Arg2, Arg3, Arg4);

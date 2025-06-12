@@ -87,6 +87,7 @@ start(_Type, _Args) ->
     end.
 
 eval_external_handler(Ann, FunOrModFun, Args) ->
+    erlang:display({"FK", Ann, FunOrModFun, Args}),
     Current = try
         erlang:error(stacktrace)
     catch
@@ -94,9 +95,12 @@ eval_external_handler(Ann, FunOrModFun, Args) ->
     end,
 
     try
+        erlang:display({"FK2", FunOrModFun}),
     case FunOrModFun of
         {Mod, Fun} -> apply(Mod, Fun, Args);
-        Fun -> apply(Fun, Args)
+        Fun ->
+            erlang:display({"FKxD", Fun}),
+            apply(Fun, Args)
     end
     catch
     Kind:Reason:Stacktrace ->
@@ -142,5 +146,9 @@ eval_external_handler(Ann, FunOrModFun, Args) ->
         end,
 
         Custom = lists:reverse(Bottom ++ Reversed, DroppedCaller),
-        erlang:raise(Kind, Reason, Custom)
+        erlang:display({"FK4", Kind, Reason, Custom}),
+        R = erlang:raise(Kind, Reason, Custom)
+%%        erlang:display({"FK5", R}),
+%%        erlang:error(Reason)
+%%        R
     end.

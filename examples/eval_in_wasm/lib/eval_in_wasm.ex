@@ -23,7 +23,7 @@ defmodule EvalInWasm do
 
     try do
       {:resolve, inspect(eval(code, type)), state}
-    rescue
+    catch
       error -> {:reject, error, state}
     end
   end
