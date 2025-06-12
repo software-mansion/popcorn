@@ -24,14 +24,13 @@ defmodule Popcorn.Utils.FetchArtifacts do
       end)
 
     for {type, location, opts} <- runtime_specs,
-        targets = opts |> Keyword.get(:target, [:unix, :wasm]) |> List.wrap(),
-        target <- targets do
+        target <- opts |> Keyword.get(:target, [:unix, :wasm]) |> List.wrap() do
       dir = Path.join(Mix.Project.app_path(), "atomvm_artifacts/#{target}")
       File.mkdir_p!(dir)
       artifacts = Map.fetch!(@artifatcs, target)
       paths = Enum.map(artifacts, &Path.join(dir, &1))
 
-      unless Enum.all?(paths, &File.exists?/1) do
+      if not Enum.all?(paths, &File.exists?/1) do
         do_fetch_artifacts(type, location, dir, artifacts)
       end
     end
@@ -63,10 +62,11 @@ defmodule Popcorn.Utils.FetchArtifacts do
 
   defp download_artifact(url, dir, name) do
     path = Path.join(dir, name)
+    tmp_path = path <> ".download"
 
     with {:ok, _stream} <-
-           Downloader.download("#{url}/#{name}", File.stream!(path <> ".download")) do
-      File.rename!(path <> ".download", path)
+           Downloader.download("#{url}/#{name}", File.stream!(tmp_path)) do
+      File.rename!(tmp_path, path)
     else
       {:error, reason} ->
         IO.warn("""

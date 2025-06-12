@@ -56,7 +56,7 @@ defmodule Popcorn do
 
     File.mkdir_p!(options.out_dir)
 
-    unless options.bundle_only, do: copy_runtime_artifacts(options)
+    if not options.bundle_only, do: copy_runtime_artifacts(options)
 
     bundled_artifacts = bundled_artifacts(options.compile_artifacts)
 
@@ -146,7 +146,7 @@ defmodule Popcorn do
 
     atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
 
-    unless File.exists?(atomvm_artifacts_dir) do
+    if not File.exists?(atomvm_artifacts_dir) do
       raise CookingError, """
       Couldn't find runtime artifacts for target `#{options.target}`. \
       To build them from source, run \

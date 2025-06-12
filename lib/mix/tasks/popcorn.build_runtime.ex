@@ -59,7 +59,7 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
         build_dir = Path.join(runtime_source, "src/platforms/emscripten/build")
         File.mkdir_p!(build_dir)
 
-        unless match?({_path, 0}, System.shell("which emcmake")) do
+        if System.find_executable("emcmake") == nil do
           raise "emcmake command not found, please make sure you have emscripten installed"
         end
 

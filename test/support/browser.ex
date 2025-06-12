@@ -48,10 +48,10 @@ defmodule Popcorn.Support.Browser do
     # capture unhandled errors form the iframe window and re-log them again
     # otherwise Playwright won't capture them
     Playwright.Page.evaluate(page, """
-    const popcorn_iframe = document.querySelector("iframe")
+    const popcorn_iframe = document.querySelector("iframe");
     popcorn_iframe.contentWindow.addEventListener("error", (event) => {
-    const message = event.error ? event.error.message : event.message;
-      console.log(`[${event.filename}:${event.lineno}] ${message}`, event)
+      const message = event.error ? event.error.message : event.message;
+      console.log(`[${event.filename}:${event.lineno}] ${message}`, event);
     })
     """)
 
