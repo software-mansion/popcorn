@@ -12,12 +12,11 @@ defmodule Popcorn do
   @doc """
   Generates static artifacts to run the project in the browser.
 
-  `out_dir` and `start_module` are mandatory, unless provided
-  via `config.exs`, for example `config :popcorn, out_dir: "static/wasm, start_module: Start"`
+  `out_dir` and `start_module` are mandatory.
 
   Options:
   - `out_dir` - the directory to write artifacts to
-  - `start_module` - a module with `start/0` function, the application's entry point
+  - `start_module` - a module with `start/0` function, used by AtomVM as starting point 
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
   - `compile_artifacts` - compiled BEAMs and other artifacts that should be included
@@ -35,7 +34,7 @@ defmodule Popcorn do
 
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
-      start_module: Popcorn.Config.get(:start_module),
+      start_module: nil,
       target: :wasm,
       compile_artifacts: all_beams
     ]
