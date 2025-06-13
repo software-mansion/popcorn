@@ -1,15 +1,15 @@
 defmodule IexWasm.Application do
-  alias Popcorn.Wasm
+  @moduledoc false
 
-  def start do
-    {:ok, _pid} = :application_controller.start(:kernel)
-    :kernel.start([], [])
-    :application.ensure_all_started(:kernel)
-    :application.ensure_all_started(:elixir)
-    :application.ensure_all_started(:iex)
-    {:ok, pid} = IexWasm.start_link([])
-    Process.register(pid, :main)
-    Wasm.register("main")
-    Process.sleep(:infinity)
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+    children = [
+      IexWasm
+    ]
+
+    opts = [strategy: :one_for_one, name: IexWasm.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 end

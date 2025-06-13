@@ -14,27 +14,27 @@ async function setup() {
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
-  
+
   try {
-    const { data, durationMs } = await popcorn.call({"command": "start", "language": LANGUAGE}, {
+    const { data, durationMs } = await popcorn.call({ "command": "start", "language": LANGUAGE }, {
       timeoutMs: 10_000,
     });
   } catch (error) {
-      displayLog(error, { isError: true }) 
+    displayLog(error, { isError: true })
   }
-  
+
   window.terminal.onKey(async key => {
     const text = key.key;
     const keyCode = key.domEvent.keyCode;
     if (keyCode === ARROW_UP_KEY_CODE || keyCode === ARROW_DOWN_KEY_CODE) {
-        text = '';
+      text = '';
     }
     try {
-      const { data, durationMs } = await popcorn.call({"command": "code_data", "language": LANGUAGE, "text": text}, {
+      const { data, durationMs } = await popcorn.call({ "command": "code_data", "language": LANGUAGE, "text": text }, {
         timeoutMs: 10_000,
       });
     } catch (error) {
-        displayLog(error, { isError: true }) 
+      displayLog(error, { isError: true })
     }
   });
 }

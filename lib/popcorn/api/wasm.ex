@@ -201,7 +201,11 @@ defmodule Popcorn.Wasm do
   @doc """
   Notifies JS that Elixir side finished initializing. Can be called only once.
   """
-  def register(main_process_name) do
+  def register(main_process_name) when is_atom(main_process_name) do
+    register(Atom.to_string(main_process_name))
+  end
+
+  def register(main_process_name) when is_binary(main_process_name) do
     {:ok, _} =
       """
       ({ wasm, args }) => {
