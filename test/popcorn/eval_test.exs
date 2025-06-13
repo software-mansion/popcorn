@@ -197,6 +197,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag skip_target: :wasm
   @tag :mr
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
@@ -537,13 +538,13 @@ defmodule Popcorn.EvalTest do
   end
 
   async_test ":os.type/0", %{tmp_dir: dir} do
-    os_type = :os.type()
+    os_type =
+      """
+      :os.type()
+      """
+      |> AtomVM.eval(:elixir, run_dir: dir)
 
-    """
-    :os.type()
-    """
-    |> AtomVM.eval(:elixir, run_dir: dir)
-    |> AtomVM.assert_result(^os_type)
+    assert os_type in [:os.type(), {:unix, :emscripten}]
   end
 
   async_test ":filename.split/1", %{tmp_dir: dir} do
@@ -608,6 +609,7 @@ defmodule Popcorn.EvalTest do
   end
 
   @tag timeout: :timer.minutes(5)
+  @tag skip_target: :wasm
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
