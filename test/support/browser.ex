@@ -73,6 +73,12 @@ defmodule Popcorn.Support.Browser do
     System.get_env("DEBUG") == "true"
   end
 
+  def wait_for(fun, timeout \\ 5_000)
+
+  def wait_for(fun, timeout) when timeout <= 0 do
+    fun.()
+  end
+
   def wait_for(fun, timeout) do
     try do
       fun.()
