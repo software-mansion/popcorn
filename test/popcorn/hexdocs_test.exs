@@ -2,7 +2,7 @@ defmodule Popcorn.HexdocsTestHelper do
   use ExUnit.Case, async: true
   alias Popcorn.Support.AtomVM
   alias __MODULE__, as: Helper
-  import Popcorn.Support.AsyncTest
+  import AsyncTest
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defmacro test_ast(common, input, opts, category, tags) do
@@ -15,7 +15,7 @@ defmodule Popcorn.HexdocsTestHelper do
       end
 
       async_test Helper.test_name(
-                   unquote(common) <> unquote(input),
+                   unquote(common) <> unquote(input) <> " " <> inspect(unquote(opts)),
                    unquote(category)
                  ),
                  %{tmp_dir: dir} do
@@ -1273,7 +1273,6 @@ defmodule Popcorn.HexdocsTest do
       output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok]
     },
     {"is_atom(String)", output: true},
-    {"to_string(String)", output: "Elixir.String"},
     {"to_string(String)", output: "Elixir.String"},
     {~s|:"Elixir.String" == String|, output: true},
     {"List.flatten([1, [2], 3])", output: [1, 2, 3]},
