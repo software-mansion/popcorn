@@ -17,7 +17,8 @@ defmodule EvalInWasm.MixProject do
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [],
+      mod: {EvalInWasm.Application, []}
     ]
   end
 

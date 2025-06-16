@@ -1,6 +1,7 @@
 -module(supervisor).
 
 -compile({popcorn_patch_private, init_children/2}).
+-compile({popcorn_patch_private, add_restart/1}).
 
 -type auto_shutdown() :: never | any_significant | all_significant.
 -type child() :: undefined | pid().
@@ -60,3 +61,25 @@ init_children(State, StartSpec) ->
     Error ->
       {stop, {start_spec, Error}}
   end.
+
+% Patch reason: monotonic_time doesn't handle integer time units
+add_restart(State) ->
+  I = State#state.intensity,
+  P = State#state.period,
+  R = State#state.restarts,
+  % Replaced code
+  % Now = erlang:monotonic_time(1),
+  Now = erlang:monotonic_time(second),
+  R1 = add_restart(R, Now, P),
+  State1 = State#state{restarts = R1},
+  case length(R1) of
+    CurI when CurI =< I ->
+      {ok, State1};
+    _ ->
+      {terminate, State1}
+  end.
+
+add_restart(Restarts0, Now, Period) ->
+  Treshold = Now - Period,
+  Restarts1 = lists:takewhile(fun(R) -> R >= Treshold end, Restarts0),
+  [Now | Restarts1].

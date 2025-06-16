@@ -17,7 +17,8 @@ defmodule IexWasm.MixProject do
 
   def application do
     [
-      extra_applications: []
+      extra_applications: [:iex],
+      mod: {IexWasm.Application, []}
     ]
   end
 
