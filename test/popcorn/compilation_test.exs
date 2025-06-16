@@ -1,7 +1,7 @@
 defmodule Popcorn.CompilationTest do
   use ExUnit.Case, async: true
   require Popcorn.Support.AtomVM
-  import Popcorn.Support.AsyncTest
+  import AsyncTest
   alias Popcorn.Support.AtomVM
 
   @moduletag :tmp_dir

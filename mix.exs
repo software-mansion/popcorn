@@ -118,6 +118,7 @@ defmodule Popcorn.MixProject do
     [
       # {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
       {:jason, "~> 1.4"},
+      {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false}
