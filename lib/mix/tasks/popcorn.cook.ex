@@ -52,7 +52,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     if all_specs != specs do
       env = __ENV__
 
-      # Intentinally omit line number and whole stacktrace plus ensure file is relative to popcorn root
+      # Intentionally omit line number and whole stacktrace plus ensure file is relative to popcorn root
       IO.warn(
         "Disabled unsupported :logger application, some calls may break at runtime",
         file: Path.relative_to(env.file, Path.expand(__DIR__ <> "../../..")),

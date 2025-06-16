@@ -76,7 +76,8 @@ defmodule MyApp.Worker do
   def init(_init_arg) do
     Popcorn.Wasm.register(@process_name)
     IO.puts("Hello from WASM!")
-    :ignore
+    state = %{}
+    {:ok, state}
   end
 end
 ```

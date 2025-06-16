@@ -36,10 +36,6 @@ defmodule EvalInWasm do
   defp as_type("eval_erlang_module"), do: {:module, :erlang}
 
   defp eval(code, :elixir) do
-    unless Process.whereis(:elixir_config) do
-      :elixir.start([], [])
-    end
-
     {evaluated, _new_bindings} = Code.eval_string(code, [], __ENV__)
     evaluated
   end

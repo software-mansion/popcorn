@@ -1,6 +1,7 @@
 defmodule GameOfLife do
   @moduledoc """
-  The entrypoint for AVM bundle. See `start/0`
+  A module intended to be the last child of  `GameOfLife.Application`,
+  executing `run/0` when the app is ready.
   """
 
   alias Popcorn.Wasm

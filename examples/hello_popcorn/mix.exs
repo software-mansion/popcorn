@@ -23,7 +23,7 @@ defmodule HelloPopcorn.MixProject do
   defp deps do
     [
       # {:popcorn, github: "software-mansion/popcorn"}
-      {:popcorn, path: "../..", runtime: false},
+      {:popcorn, path: "../.."},
       {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
     ]
   end
