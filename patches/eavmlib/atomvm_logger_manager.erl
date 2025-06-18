@@ -19,7 +19,7 @@
 %
 
 %% @hidden
--module(logger_manager).
+-module(atomvm_logger_manager).
 
 -export([
     start_link/1,

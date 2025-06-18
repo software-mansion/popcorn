@@ -656,4 +656,27 @@ defmodule Popcorn.EvalTest do
            ] =
              stacktrace
   end
+
+  @tag :logger
+  async_test "logger", %{tmp_dir: dir} do
+    result =
+      quote do
+        # TODO: move this to the Popcorn application
+        :atomvm_logger_manager.start_link(%{log_level: :debug})
+        require Logger
+        Logger.debug("foo")
+        Logger.info("bar")
+        Logger.warning("baz")
+        Logger.error("foobar")
+      end
+      |> Macro.to_string()
+      |> AtomVM.try_eval(:elixir, run_dir: dir)
+
+    assert %{exit_status: 0, output: output} = result
+    assert [debug, info, warning, error] = String.split(output, "\n", trim: true)
+    assert debug =~ ~r/\[debug\].*foo/
+    assert info =~ ~r/\[info\].*bar/
+    assert warning =~ ~r/\[warning\].*baz/
+    assert error =~ ~r/\[error\].*foobar/
+  end
 end
