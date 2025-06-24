@@ -48,6 +48,7 @@ jobs:
         with:
           elixir-version: "1.17.3"
           otp-version: "26.0.2"
+          rebar3-version: "3.18.0"
       - name: Restore dependencies cache
         uses: actions/cache@v3
         with:
@@ -63,11 +64,9 @@ jobs:
         run: mix lint
       - name: Build AtomVM Unix
         run: |
-          export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
           mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
       - name: Build AtomVM WASM
         run: |
-          export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
           mix popcorn.build_runtime --target wasm
       - name: Install playwright deps
         run: mix playwright.install
