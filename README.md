@@ -112,7 +112,7 @@ TARGET=wasm mix test
 To run tests on UNIX, use
 
 ```
-mix popcorn.build_runtime --target unix
+MIX_ENV=test mix popcorn.build_runtime --target unix
 ```
 
 to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run

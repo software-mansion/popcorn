@@ -6,7 +6,7 @@ defmodule Popcorn.HexdocsTestHelper do
 
   defmacro test_ast(common, input, opts) do
     category = Keyword.fetch!(opts, :category)
-    warn_unsupported_opts(opts)
+    validate_opts!(opts)
 
     quote do
       @tag skip: Keyword.get(unquote(opts), :skip, false)
@@ -130,10 +130,10 @@ defmodule Popcorn.HexdocsTestHelper do
 
   def maybe_wrap_in_try(code, _opts), do: code
 
-  def warn_unsupported_opts(opts) do
+  def validate_opts!(opts) do
     supported_opts = [:category, :tag, :raises, :output, :predicate, :skip, :cases, :stdout]
     unsupported_opts = opts |> Keyword.drop(supported_opts) |> Keyword.keys()
-    if unsupported_opts != [], do: IO.warn("Unsupported options: #{inspect(unsupported_opts)}")
+    if unsupported_opts != [], do: raise("Unsupported options: #{inspect(unsupported_opts)}")
   end
 
   def test_name(input, tag) do
