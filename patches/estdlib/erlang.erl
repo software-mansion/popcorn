@@ -59,6 +59,7 @@
     binary_to_integer/1,
     binary_to_integer/2,
     binary_to_list/1,
+    binary_to_list/3,
     atom_to_binary/1,
     atom_to_binary/2,
     atom_to_list/1,
@@ -2582,6 +2583,15 @@ binary_to_integer(_Binary, Base) ->
 -spec binary_to_list(Binary :: binary()) -> [byte()].
 binary_to_list(_Binary) ->
     erlang:nif_error(undefined).
+
+% Patch reason: NIF nor available in AtomVM
+-spec binary_to_list(Binary, Start, Stop) -> [byte()] when
+      Binary :: binary(),
+      Start :: pos_integer(),
+      Stop :: pos_integer().
+binary_to_list(Binary, Start, Stop) ->
+    Chunk = erlang:binary_part(Binary, Start - 1, Stop - Start + 1),
+    erlang:binary_to_list(Chunk).
 
 %%-----------------------------------------------------------------------------
 %% @param   Atom        Atom to convert

@@ -1,3 +1,5 @@
+% Patch reason: custom logger implementation, the normal logger refuses to work in AtomVM
+
 %
 % This file is part of AtomVM.
 %
@@ -34,7 +36,7 @@
 %%     <li>No support for logging filters</li>
 %%     <li>No support for logging formatters</li>
 %%     <li>No API support for logger configuration; all configuration
-%%          must be done at initialization of the `logger_manager'</li>
+%%          must be done at initialization of the `atomvm_logger_manager'</li>
 %%     <li>No support for throttling or compacting sequences of repeated
 %%          log messages</li>
 %% </ul>
@@ -77,7 +79,7 @@
 -spec allow(Level :: level(), Module :: atom()) -> boolean().
 allow(Level, Module) ->
     ValidLevel = validate_level(Level),
-    logger_manager:allow(ValidLevel, Module).
+    atomvm_logger_manager:allow(ValidLevel, Module).
 
 %%-----------------------------------------------------------------------------
 %% @param   StringOrReport string or report
@@ -418,14 +420,11 @@ macro_log(Location, Level, StringOrReport) ->
     do_log(Level, StringOrReport, [], #{location => Location}).
 
 %% @hidden
-macro_log(Location, Level, FormatOrReport, ArgsOrMeta) when
-    is_map(FormatOrReport) andalso is_map(ArgsOrMeta)
-->
-    do_log(Level, FormatOrReport, [], ArgsOrMeta#{location => Location});
-macro_log(Location, Level, FormatOrReport, ArgsOrMeta) when
-    is_list(FormatOrReport) andalso is_list(ArgsOrMeta)
-->
-    do_log(Level, FormatOrReport, ArgsOrMeta, #{location => Location}).
+macro_log(Location, Level, FormatOrReport, ArgsOrMeta) ->
+    % erlang:display({"wat", Location, Level, FormatOrReport, ArgsOrMeta}),
+    Args = if is_list(ArgsOrMeta) -> ArgsOrMeta; true -> [] end,
+    Meta = if is_map(ArgsOrMeta) -> ArgsOrMeta; true -> #{} end,
+    macro_log(Location, Level, FormatOrReport, Args, Meta).
 
 %% @hidden
 macro_log(Location, Level, Format, Args, Meta) ->
@@ -438,7 +437,7 @@ macro_log(Location, Level, Format, Args, Meta) ->
 %% @private
 maybe_log(Level0, Format, Args, MetaData) ->
     Level = validate_level(Level0),
-    case logger_manager:allow(Level, maybe_get_module(MetaData)) of
+    case atomvm_logger_manager:allow(Level, maybe_get_module(MetaData)) of
         true ->
             do_log(Level, Format, Args, MetaData);
         _ ->
@@ -448,7 +447,7 @@ maybe_log(Level0, Format, Args, MetaData) ->
 get_handlers() ->
     %%
     %% TODO We could really use ETS here.  In its absence, because we
-    %% are punting on allowing the logger_manager to be mutable, we can
+    %% are punting on allowing the atomvm_logger_manager to be mutable, we can
     %% cache the handlers in the process dictionary.  But we need to
     %% keep track of the logger manager internal id, in case it changes
     %% (unlikely, in most scenarios).  This has a small cost of requesting
@@ -457,15 +456,15 @@ get_handlers() ->
     %%
     case erlang:get('$atomvm_logger_handlers') of
         undefined ->
-            {_Id, Handlers} = Result = logger_manager:get_handlers(),
+            {_Id, Handlers} = Result = atomvm_logger_manager:get_handlers(),
             erlang:put('$atomvm_logger_handlers', Result),
             Handlers;
         {Id, Handlers} ->
-            case logger_manager:get_id() of
+            case atomvm_logger_manager:get_id() of
                 CurrentId when Id == CurrentId ->
                     Handlers;
                 NewId ->
-                    {NewId, NewHandlers} = NewResult = logger_manager:get_handlers(),
+                    {NewId, NewHandlers} = NewResult = atomvm_logger_manager:get_handlers(),
                     erlang:put('$atomvm_logger_handlers', NewResult),
                     NewHandlers
             end
@@ -482,7 +481,7 @@ allow_handler(Level, HandlerLevel) ->
 
 %% @private
 do_log(Level, StringOrReport, Args, MetaData) when
-    (is_list(StringOrReport) orelse is_map(StringOrReport)) andalso is_list(Args) andalso
+    (is_list(StringOrReport) orelse is_map(StringOrReport) orelse is_binary(StringOrReport)) andalso is_list(Args) andalso
         is_map(MetaData)
 ->
     LogEvent = create_event(Level, StringOrReport, Args, MetaData),

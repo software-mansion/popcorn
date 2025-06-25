@@ -1,3 +1,5 @@
+% Patch reason: logger_std_h implementation that suits the patched logger
+
 %
 % This file is part of AtomVM.
 %
@@ -25,17 +27,10 @@
     log/2
 ]).
 
-%% @private
-format_msg({report, Report}) when is_map(Report) ->
-    io_lib:format("~p", [Report]);
-format_msg({Format, Args}) when is_list(Format) andalso is_list(Args) ->
-    io_lib:format(Format, Args).
-
 %% @hidden
 log(LogEvent, _Config) ->
     #{
         level := Level,
-        msg := Msg,
         pid := Pid,
         timestamp := Timestamp,
         meta := MetaData
@@ -46,7 +41,7 @@ log(LogEvent, _Config) ->
         Pid,
         maybe_format_mfa(MetaData),
         maybe_format_file_line(MetaData),
-        format_msg(Msg)
+        'Elixir.Logger.Formatter':format_event(LogEvent, 8192)
     ]).
 
 %% @private
