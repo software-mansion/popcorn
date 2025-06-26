@@ -6,6 +6,7 @@ defmodule Popcorn do
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
   @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
+  @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
 
@@ -30,36 +31,44 @@ defmodule Popcorn do
           | {:compile_artifacts, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
-    all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
+    {module, filename} = Popcorn.create_boot_module(options[:start_module])
 
-    default_options = [
-      out_dir: Popcorn.Config.get(:out_dir),
-      start_module: nil,
-      target: :wasm,
-      compile_artifacts: all_beams
-    ]
+    try do
+      all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
 
-    options = options |> Keyword.validate!(default_options) |> Map.new()
-    ensure_option_present(options, :out_dir, "output directory")
-    ensure_option_present(options, :start_module, "start module")
+      default_options = [
+        out_dir: Popcorn.Config.get(:out_dir),
+        start_module: nil,
+        target: :wasm,
+        compile_artifacts: all_beams
+      ]
 
-    File.mkdir_p!(options.out_dir)
-    copy_runtime_artifacts(options)
+      options = options |> Keyword.validate!(default_options) |> Map.new()
+      ensure_option_present(options, :out_dir, "output directory")
 
-    bundled_artifacts = bundled_artifacts(options.compile_artifacts)
+      File.mkdir_p!(options.out_dir)
+      copy_runtime_artifacts(options)
 
-    case pack_bundle(options.out_dir, bundled_artifacts, options.start_module) do
-      :ok -> :ok
-      {:error, reason} -> raise "Cooking error, reason: #{inspect(reason)}"
+      bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts])
+
+      pack_result = pack_bundle(options.out_dir, bundled_artifacts, module)
+
+      case pack_result do
+        :ok -> :ok
+        {:error, reason} -> raise "Cooking error, reason: #{inspect(reason)}"
+      end
+    after
+      :ok = File.rm!(filename)
     end
   end
 
   defp bundled_artifacts(compile_artifacts) do
     popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
     api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
+    generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
     # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
-    [@popcorn_bundle_path | api_beams] ++ (compile_artifacts -- popcorn_files)
+    [@popcorn_bundle_path | api_beams] ++ generated_beams ++ (compile_artifacts -- popcorn_files)
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -130,5 +139,130 @@ defmodule Popcorn do
       `config :popcorn, #{key}: value` in your `config.exs`
       """
     end
+  end
+
+  def create_boot_module(start_module \\ nil) do
+    config = Mix.Project.config()
+    app = Keyword.get(config, :app)
+
+    all_specs = gather_app_specs([:kernel, :stdlib, app], %{})
+
+    # FIXME: logger app is broken for now, skip it
+    specs =
+      all_specs
+      |> Map.delete(:logger)
+      |> Map.new(fn {app, spec} ->
+        spec =
+          Keyword.update(spec, :applications, [], &Enum.reject(&1, fn x -> x == :logger end))
+
+        {app, spec}
+      end)
+
+    if all_specs != specs do
+      env = __ENV__
+
+      # Intentionally omit line number and whole stacktrace plus ensure file is relative to popcorn root
+      IO.warn(
+        "Disabled unsupported :logger application, some calls may break at runtime",
+        file: Path.relative_to(env.file, Path.expand(__DIR__ <> "../../..")),
+        module: __MODULE__,
+        function: env.function
+      )
+    end
+
+    # TODO: Until separation of deps for tasks and runtime is solved, disable all apps from :popcorn
+    specs =
+      if Map.has_key?(specs, :popcorn) do
+        put_in(specs[:popcorn][:applications], [])
+      else
+        specs
+      end
+
+    # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
+    specs = put_in(specs[:kernel][:env][:shell_history], :disabled)
+
+    run =
+      if start_module != nil do
+        quote do
+          unquote(start_module).start()
+        end
+      else
+        quote do
+          case :application.get_supervisor(unquote(app)) do
+            :undefined ->
+              :ok
+
+            {:ok, pid} ->
+              ref = Process.monitor(pid)
+
+              receive do
+                {:DOWN, ^ref, :process, _object, reason} ->
+                  reason
+              end
+          end
+        end
+      end
+
+    # The module below tries to mimic BEAMs boot script, then start user's app
+    contents =
+      quote location: :keep do
+        def start() do
+          # TODO: Default boot script starts `:heart` process, but unless -heart flag is passed, it will return `:ignore`
+          # :ignore = :heart.start()
+          # TODO: Default boot script starts :logger_server, uncomment line below when :logger app is supported
+          # {:ok, _pid} = :logger_server.start_link()
+
+          specs = unquote(Macro.escape(specs))
+
+          {:ok, _ac} =
+            :application_controller.start({:application, :kernel, specs[:kernel]})
+
+          for {app, spec} <- specs, app != :kernel do
+            :ok = :application.load({:application, app, spec})
+          end
+
+          :ok = :application.start_boot(:kernel, :permanent)
+          :ok = :application.start_boot(:stdlib, :permanent)
+
+          {:ok, _apps} = Application.ensure_all_started(unquote(app), :permanent)
+
+          unquote(run)
+        end
+      end
+
+    module_name = Popcorn.Boot
+
+    {:module, _module_name, binary_content, _term} =
+      Module.create(module_name, contents, Macro.Env.location(__ENV__))
+
+    File.mkdir_p!(@popcorn_generated_path)
+    filename = Path.join(@popcorn_generated_path, "#{module_name}.beam")
+    File.write!(filename, binary_content)
+    {module_name, filename}
+  end
+
+  defp gather_app_specs([], specs), do: specs
+
+  defp gather_app_specs(apps, specs) do
+    new_apps = Enum.reject(apps, &Map.has_key?(specs, &1))
+
+    new_specs =
+      for app <- new_apps,
+          spec = Application.spec(app),
+          # Ignore missing optional apps
+          spec != nil,
+          into: %{} do
+        env = Application.get_all_env(app)
+        {app, [env: env] ++ spec}
+      end
+
+    deps =
+      new_specs
+      |> Enum.flat_map(fn
+        {_app, spec} -> spec[:applications]
+      end)
+      |> Enum.uniq()
+
+    gather_app_specs(deps, Map.merge(specs, new_specs))
   end
 end

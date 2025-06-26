@@ -276,7 +276,7 @@ defmodule Popcorn.Support.AtomVM do
   defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
   defp module(code) do
-    quote do
+    quote location: :keep do
       defmodule RunExpr do
         @moduledoc false
         @compile autoload: false, no_warn_undefined: :atomvm
