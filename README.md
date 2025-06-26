@@ -114,6 +114,52 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Otherwise, browsers refuse to run WASM.
 
+## Configuration of the runtime
+
+Popcorn runs AtomVM under the hood, and therefore it needs to either download precompied artifacts or compile it from source.
+
+Precompiled artifacts are downloaded during Popcorn compilation, from the source specified with `runtime` config key, for example:
+
+```elixir
+config :popcorn, runtime: [
+  {:url, "https://atomvm/wasm/url", target: :wasm},
+  {:path, "/path/to/atomvm/unix", target: :unix}
+]
+```
+
+If you want to build from source, specify `runtime_source`, for example:
+
+```elixir
+config :popcorn, runtime_source: {:git, "git@github.com:atomvm/repo.git"}
+```
+
+or
+
+```elixir
+config :popcorn, runtime_source: {:path, "path/to/atomvm"}
+```
+
+and run `mix popcorn.build_runtime --target <unix|wasm>`.
+
+## Testing
+
+Popcorn tests can be run either on WASM via Playwright or natively on UNIX. To run them on WASM, run
+```
+TARGET=wasm mix test
+```
+
+To run tests on UNIX, use
+
+```
+MIX_ENV=test mix popcorn.build_runtime --target unix
+```
+
+to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run
+
+```
+mix test
+```
+
 ## Authors
 
 Popcorn is created by Software Mansion.

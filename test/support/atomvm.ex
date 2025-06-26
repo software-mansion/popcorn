@@ -21,13 +21,7 @@ defmodule Popcorn.Support.AtomVM do
 
   require Logger
 
-  @runtime_path Application.compile_env(
-                  :popcorn,
-                  :runtime_path,
-                  Path.join(Mix.Project.app_path(), "atomvm_artifacts/unix/AtomVM")
-                )
-  # mix always compiles files from project root
-  @compile_dir Path.join([File.cwd!(), "tmp", "modules"])
+  @unix_path "test/fixtures/unix/AtomVM"
 
   defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
@@ -44,6 +38,14 @@ defmodule Popcorn.Support.AtomVM do
 
     assert is_elixir_module or is_erlang_module,
            "Returned value isn't a module: #{inspect(eval_result)}"
+  end
+
+  def test_target(target) do
+    Application.put_env(:popcorn, :test_target, target)
+  end
+
+  def test_target() do
+    Application.fetch_env!(:popcorn, :test_target)
   end
 
   @doc """
@@ -72,14 +74,13 @@ defmodule Popcorn.Support.AtomVM do
   def try_eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
     run_dir = Keyword.fetch!(opts, :run_dir)
     fragment = type |> to_ast_fragment_type() |> ast_fragment()
+    bundle_path = bundle_path(fragment)
 
-    if not compiled?(fragment) do
+    if not File.exists?(bundle_path) do
       raise "Compile eval module before using it"
     end
 
-    fragment
-    |> compile_quoted()
-    |> try_run(run_dir, code: code)
+    try_run(bundle_path, run_dir, code: code)
   end
 
   @doc """
@@ -90,27 +91,28 @@ defmodule Popcorn.Support.AtomVM do
     result
   end
 
-  @doc """
-  Runs compiled .avm bundle with passed args.
-  Doesn't crash in case of failure, always returns an `info` map.
-  """
-  @spec try_run(String.t(), String.t(), list()) :: %{
-          exit_status: integer(),
-          output: String.t(),
-          result: term(),
-          log_path: String.t()
-        }
   def try_run(bundle_path, run_dir, args \\ []) do
+    info = do_try_run(test_target(), bundle_path, run_dir, Map.new(args))
+
+    Logger.info("""
+    Evaluating code on AtomVM finished
+    exit status: #{inspect(info.exit_status)}
+    log path: "#{info.log_path}"
+    result: #{inspect(info.result, pretty: true)}
+    output: #{if String.trim(info.output) == "", do: "no output generated", else: info.output}\
+    """)
+
+    info
+  end
+
+  defp do_try_run(:unix, bundle_path, run_dir, args) do
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
 
-    args
-    |> Map.new()
-    |> :erlang.term_to_binary()
-    |> then(&File.write(args_path, &1))
+    args |> :erlang.term_to_binary() |> then(&File.write(args_path, &1))
 
-    unless match?({_output, 0}, System.shell("which '#{@runtime_path}'")) do
+    if System.shell("which '#{@unix_path}'") |> elem(1) != 0 do
       raise """
       AtomVM not found, please run `mix popcorn.build_runtime` \
       or put `config :popcorn, runtime_path: "path/to/AtomVM"` in your config.exs
@@ -119,10 +121,10 @@ defmodule Popcorn.Support.AtomVM do
 
     cmd =
       if System.get_env("CI") == "true" do
-        "AVM_RUN_DIR='#{run_dir}' '#{@runtime_path}' '#{bundle_path}'"
+        "AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        ~s|out=$(AVM_RUN_DIR='#{run_dir}' '#{@runtime_path}' '#{bundle_path}' 2>'#{log_path}'); echo "$out"|
+        ~s|out=$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}'); echo "$out"|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
@@ -134,15 +136,6 @@ defmodule Popcorn.Support.AtomVM do
         {:error, _reason} -> nil
       end
 
-    Logger.info("""
-    Evaluating code on AtomVM finished
-    exit status: #{inspect(exit_status)}
-    log path: "#{log_path}"
-    rerun with lldb: AVM_RUN_DIR='#{run_dir}' lldb '#{@runtime_path}' '#{bundle_path}'
-    result: #{inspect(result, pretty: true)}
-    output: #{if String.trim(output) == "", do: "no output generated", else: output}\
-    """)
-
     %{
       exit_status: exit_status,
       output: output,
@@ -151,11 +144,62 @@ defmodule Popcorn.Support.AtomVM do
     }
   end
 
-  def compiled?(ast) do
-    hash = ast |> :erlang.phash2() |> to_string()
-    build_dir = Path.join(@compile_dir, hash)
+  defp do_try_run(:wasm, bundle_path, run_dir, args) do
+    args = args |> :erlang.term_to_binary() |> Base.encode16()
 
-    File.exists?(build_dir)
+    log_path = Path.join(run_dir, "logs.txt")
+
+    log_task =
+      Task.async(fn ->
+        Stream.repeatedly(fn -> receive do: (log -> log) end)
+        |> Stream.take_while(&(&1 != :eof))
+        |> Stream.into(File.stream!(log_path))
+        |> Stream.run()
+      end)
+
+    page = Popcorn.Support.Browser.new_page(bundle_path, &send(log_task.pid, &1))
+
+    snippet = """
+    try {
+      const result = await popcorn.call("#{args}", {});
+      return result;
+    } catch (e) {
+      return {error: true}
+    }
+    """
+
+    result = Playwright.Page.evaluate(page, "async () => {#{snippet}}")
+
+    send(log_task.pid, :eof)
+    Task.await(log_task)
+
+    output =
+      File.read!(log_path)
+      # Only include lines prefixed with [popcorn stdout]
+      |> then(&Regex.replace(~r/^(?!\[popcorn stdout\]).*\n?/m, &1, "", global: true))
+      # And remove the prefix from them
+      |> then(&Regex.replace(~r/^\[popcorn stdout\] /m, &1, "", global: true))
+      # FIXME: Filter out logs that pollute stdout
+      |> then(
+        &Regex.replace(~r/^Downloading .*.beam failed, HTTP failure.*\n/m, &1, "", global: true)
+      )
+      |> then(&Regex.replace(~r/^Return value:.*\n/m, &1, "", global: true))
+
+    case result do
+      %{data: data} ->
+        result = data |> Base.decode16!() |> :erlang.binary_to_term()
+        %{exit_status: 0, result: result}
+
+      %{error: true} ->
+        %{exit_status: 1, result: nil}
+    end
+    |> Map.merge(%{log_path: log_path, output: output})
+  end
+
+  defp bundle_path(ast) do
+    hash = ast |> :erlang.phash2() |> to_string()
+    build_dir = Path.join(compile_dir(), hash)
+    Path.join(build_dir, "bundle.avm")
   end
 
   @doc """
@@ -163,30 +207,33 @@ defmodule Popcorn.Support.AtomVM do
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
   def compile_quoted(ast) when is_ast(ast) do
-    hash = ast |> :erlang.phash2() |> to_string()
-    build_dir = Path.join(@compile_dir, hash)
-    avm_path = Path.join(build_dir, "bundle.avm")
-
-    stale = not File.exists?(avm_path)
+    bundle_path = bundle_path(ast)
+    build_dir = Path.dirname(bundle_path)
+    stale = not File.exists?(bundle_path)
 
     if stale do
       File.rm_rf!(build_dir)
       File.mkdir_p!(build_dir)
 
-      [beam_path] =
-        ast
-        |> module()
-        |> run_elixirc(build_dir)
-
-      Popcorn.cook(
-        target: :unix,
-        compile_artifacts: [beam_path],
-        start_module: RunExpr,
-        out_dir: build_dir
-      )
+      ast
+      |> module(test_target())
+      |> run_elixirc(build_dir)
     end
 
-    avm_path
+    beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
+
+    Popcorn.bundle(
+      compile_artifacts:
+        beam_paths ++ Path.wildcard(Path.join(Mix.Project.build_path(), "**/*.{beam,app}")),
+      start_module: RunExpr,
+      out_dir: build_dir
+    )
+
+    bundle_path
+  end
+
+  defp compile_dir() do
+    Path.join([File.cwd!(), "tmp/modules", to_string(test_target())])
   end
 
   defp run_elixirc(ast, dir) do
@@ -275,7 +322,41 @@ defmodule Popcorn.Support.AtomVM do
   defp to_ast_fragment_type(:erlang_module), do: :eval_erlang_module
   defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
-  defp module(code) do
+  defp module(code, :wasm) do
+    quote location: :keep do
+      defmodule RunExpr do
+        @moduledoc false
+        alias Popcorn.Wasm
+
+        @compile autoload: false, no_warn_undefined: [:atomvm, Wasm]
+
+        def start() do
+          Process.register(self(), :main)
+          Wasm.register("main")
+
+          receive do
+            wasm_msg -> Wasm.handle_message!(wasm_msg, &handle_wasm_msg/1)
+          end
+
+          :ok
+        end
+
+        defp handle_wasm_msg({:wasm_call, args}) do
+          args = args |> Base.decode16!() |> :erlang.binary_to_term()
+          result = run(args)
+          result = result |> :erlang.term_to_binary() |> Base.encode16()
+          {:resolve, result, :ok}
+        end
+
+        defp run(args) do
+          _supppress_unused = args
+          unquote(code)
+        end
+      end
+    end
+  end
+
+  defp module(code, :unix) do
     quote location: :keep do
       defmodule RunExpr do
         @moduledoc false

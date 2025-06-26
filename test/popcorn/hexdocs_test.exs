@@ -4,13 +4,14 @@ defmodule Popcorn.HexdocsTestHelper do
   alias __MODULE__, as: Helper
   import AsyncTest
 
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defmacro test_ast(common, input, opts, category, tags) do
-    tags = [category] ++ List.wrap(tags)
+  defmacro test_ast(common, input, opts) do
+    category = Keyword.fetch!(opts, :category)
+    validate_opts!(opts)
 
     quote do
       @tag skip: Keyword.get(unquote(opts), :skip, false)
-      for tag <- unquote(tags) do
+      @tag unquote(category)
+      for tag <- Keyword.get_values(unquote(opts), :tag) do
         @tag tag
       end
 
@@ -19,15 +20,9 @@ defmodule Popcorn.HexdocsTestHelper do
                    unquote(category)
                  ),
                  %{tmp_dir: dir} do
-        {opts, unsupported} = supported_opts(unquote(opts))
         opts = Map.new(unquote(opts))
         common = unquote(common)
         input = unquote(input)
-
-        if unsupported != [] do
-          keys = unsupported |> Keyword.keys() |> inspect()
-          IO.warn("Unsupported options: #{keys}")
-        end
 
         info =
           "#{common}\n#{input}"
@@ -75,16 +70,12 @@ defmodule Popcorn.HexdocsTestHelper do
     end
   end
 
-  defmacro create_tests(test_cases, opts \\ []) do
-    caller = __CALLER__
-    category = Keyword.fetch!(opts, :category)
-    tags = Keyword.get_values(opts, :tag)
-
-    test_cases_ast =
-      test_cases
+  defmacro create_tests(category_tests, category_opts \\ []) do
+    category_ast =
+      category_tests
       |> Enum.flat_map(fn {input_or_common, opts} ->
-        opts
-        |> Macro.expand(caller)
+        (category_opts ++ opts)
+        |> Macro.expand(__CALLER__)
         |> Keyword.pop(:cases)
         |> case do
           {nil, opts} ->
@@ -92,7 +83,7 @@ defmodule Popcorn.HexdocsTestHelper do
 
             [
               quote do
-                test_ast("", unquote(input), unquote(opts), unquote(category), unquote(tags))
+                test_ast("", unquote(input), unquote(opts))
               end
             ]
 
@@ -101,20 +92,14 @@ defmodule Popcorn.HexdocsTestHelper do
 
             for {case, case_opts} <- cases do
               quote do
-                test_ast(
-                  unquote(common),
-                  unquote(case),
-                  Keyword.merge(unquote(opts), unquote(case_opts)),
-                  unquote(category),
-                  unquote(tags)
-                )
+                test_ast(unquote(common), unquote(case), unquote(opts ++ case_opts))
               end
             end
         end
       end)
 
     quote do
-      (unquote_splicing(test_cases_ast))
+      (unquote_splicing(category_ast))
     end
   end
 
@@ -145,9 +130,10 @@ defmodule Popcorn.HexdocsTestHelper do
 
   def maybe_wrap_in_try(code, _opts), do: code
 
-  def supported_opts(opts) do
-    supported_opts = [:raises, :output, :predicate, :skip, :cases, :stdout]
-    Keyword.split(opts, supported_opts)
+  def validate_opts!(opts) do
+    supported_opts = [:category, :tag, :raises, :output, :predicate, :skip, :cases, :stdout]
+    unsupported_opts = opts |> Keyword.drop(supported_opts) |> Keyword.keys()
+    if unsupported_opts != [], do: raise("Unsupported options: #{inspect(unsupported_opts)}")
   end
 
   def test_name(input, tag) do
@@ -1257,7 +1243,7 @@ defmodule Popcorn.HexdocsTest do
       import List, only: [duplicate: 2]
       duplicate(:ok, 3)
       """,
-      output: [:ok, :ok, :ok]
+      output: [:ok, :ok, :ok], tag: [skip_target: :wasm]
     },
     {
       """
@@ -1270,7 +1256,7 @@ defmodule Popcorn.HexdocsTest do
 
       Math.some_function()
       """,
-      output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok]
+      output: [:ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok, :ok], tag: [skip_target: :wasm]
     },
     {"is_atom(String)", output: true},
     {"to_string(String)", output: "Elixir.String"},
@@ -1797,7 +1783,8 @@ defmodule Popcorn.HexdocsTest do
     },
     {
       ~s|Base.encode16(:crypto.hash(:sha256, "Elixir"))|,
-      output: "3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB"
+      output: "3315715A7A3AD57428298676C5AE465DADA38D951BDFAC9348A8A31E9C7401CB",
+      tag: [skip_target: :wasm]
     },
     {
       """

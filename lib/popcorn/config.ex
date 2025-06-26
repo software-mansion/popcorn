@@ -10,6 +10,7 @@ defmodule Popcorn.Config do
       |> Enum.flat_map(&Path.wildcard/1),
     out_dir: nil,
     add_tracing: false,
+    runtime: {:url, "https://popcorn.swmansion.com/simple_repl/wasm/", target: :wasm},
     runtime_source: {:git, "git@github.com:software-mansion-labs/FissionVM.git"}
   }
 

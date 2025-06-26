@@ -9,6 +9,12 @@ defmodule Popcorn do
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
+  @mix_env Mix.env()
+
+  defmodule CookingError do
+    @moduledoc false
+    defexception [:message]
+  end
 
   @doc """
   Generates static artifacts to run the project in the browser.
@@ -31,6 +37,11 @@ defmodule Popcorn do
           | {:compile_artifacts, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
+    ingredients(options)
+    bundle(options)
+  end
+
+  def bundle(options \\ []) do
     {module, filename} = Popcorn.create_boot_module(options[:start_module])
 
     try do
@@ -39,15 +50,13 @@ defmodule Popcorn do
       default_options = [
         out_dir: Popcorn.Config.get(:out_dir),
         start_module: nil,
-        target: :wasm,
         compile_artifacts: all_beams
       ]
 
       options = options |> Keyword.validate!(default_options) |> Map.new()
-      ensure_option_present(options, :out_dir, "output directory")
+      ensure_option_present(options, :out_dir, "Output directory")
 
       File.mkdir_p!(options.out_dir)
-      copy_runtime_artifacts(options)
 
       bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts])
 
@@ -55,11 +64,25 @@ defmodule Popcorn do
 
       case pack_result do
         :ok -> :ok
-        {:error, reason} -> raise "Cooking error, reason: #{inspect(reason)}"
+        {:error, reason} -> raise CookingError, "Reason: #{inspect(reason)}"
       end
     after
       :ok = File.rm!(filename)
     end
+  end
+
+  def ingredients(options) do
+    default_options = [
+      out_dir: Popcorn.Config.get(:out_dir),
+      target: :wasm
+    ]
+
+    options = options |> Keyword.validate!(default_options) |> Map.new()
+    ensure_option_present(options, :out_dir, "Output directory")
+
+    File.mkdir_p!(options.out_dir)
+    copy_runtime_artifacts(options)
+    :ok
   end
 
   defp bundled_artifacts(compile_artifacts) do
@@ -83,7 +106,7 @@ defmodule Popcorn do
       :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
     catch
       {:start_module_not_found, _module} ->
-        raise "Cooking failed: provided start module `#{inspect(start_module)}` has not been found"
+        raise CookingError, "Provided start module `#{inspect(start_module)}` has not been found"
     end
   end
 
@@ -91,7 +114,7 @@ defmodule Popcorn do
     case File.rm(path) do
       :ok -> :ok
       {:error, :enoent} -> :ok
-      error -> raise "Cooking error: couldn't remove old bundle, reason: #{inspect(error)}"
+      error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
 
@@ -128,15 +151,24 @@ defmodule Popcorn do
     end
 
     atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
+
+    if not File.exists?(atomvm_artifacts_dir) do
+      raise CookingError, """
+      Couldn't find runtime artifacts for target `#{options.target}`. \
+      To build them from source, run \
+      `MIX_ENV=#{@mix_env} mix popcorn.build_runtime --target #{options.target}`.
+      """
+    end
+
     File.cp_r!(atomvm_artifacts_dir, options.out_dir)
   end
 
   defp ensure_option_present(options, key, name) do
     if options[key] == nil do
-      raise """
-      Cooking failed: #{name} not provided.
-      Please provide the `key` option or configure it by putting
-      `config :popcorn, #{key}: value` in your `config.exs`
+      raise CookingError, """
+      #{name} not provided. \
+      Please provide the `#{key}` option or configure it by putting \
+      `config :popcorn, #{key}: value` in your `config.exs`.
       """
     end
   end

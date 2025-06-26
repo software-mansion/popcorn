@@ -63,9 +63,11 @@ defmodule Popcorn.CompilationTest do
 
     assert [
              {:orddict, :take, 2, [file: ~c"orddict", line: 118]},
-             {RunExpr, :run, 1, [file: code_file, line: run_line]},
-             {RunExpr, :start, 0, [file: code_file, line: start_line]}
+             {RunExpr, :run, 1, [file: code_file, line: run_line]}
+             | rest
            ] = stacktrace
+
+    assert {RunExpr, :start, 0, [file: ^code_file, line: start_line]} = List.last(rest)
 
     lines = [1, start_line, run_line, 1000]
     assert lines == Enum.sort(lines)

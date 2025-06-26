@@ -1,4 +1,4 @@
-defmodule Popcorn.Utils.Download do
+defmodule Popcorn.Utils.Downloader do
   @moduledoc false
 
   # This module downloads files from the internet with no dependencies
@@ -8,10 +8,10 @@ defmodule Popcorn.Utils.Download do
   # The usage flow is the following:
   #
   # try do
-  #   Download.start_inets_profile()
-  #   Download.download(url, File.stream!(path))
+  #   Downloader.start_inets_profile()
+  #   Downloader.download(url, File.stream!(path))
   # after
-  #   Download.stop_inets_profile()
+  #   Downloader.stop_inets_profile()
   # end
 
   @app Mix.Project.config()[:app]

@@ -30,6 +30,11 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     parser_config = [strict: [:target | Map.keys(options_defaults)] |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(options_defaults, Map.new(options))
+
+    if not Map.has_key?(options, :target) do
+      raise "Missing option `target`"
+    end
+
     {cmake_opts, options} = Map.pop(options, :cmake_opts)
     cmake_opts = cmake_opts |> String.split(" ", trim: true) |> Enum.map(&"-D#{&1}")
 
@@ -48,6 +53,7 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
     case String.to_existing_atom(options[:target]) do
       :unix ->
+        ensure_executables!(~w"cmake make")
         build_dir = Path.join(runtime_source, "build")
         File.mkdir_p!(build_dir)
         cmd(~w"cmake .. -DAVM_BUILD_RUNTIME_ONLY=1" ++ cmake_opts, cd: build_dir)
@@ -56,6 +62,11 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
         cp_artifact("src/AtomVM", build_dir, artifacts_dir)
 
       :wasm ->
+        ensure_executables!(
+          ~w"cmake make emcmake",
+          "Please make sure you have emscripten instaled."
+        )
+
         build_dir = Path.join(runtime_source, "src/platforms/emscripten/build")
         File.mkdir_p!(build_dir)
 
@@ -104,5 +115,13 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
   defp cp_artifact(subpath, build_dir, artifacts_dir) do
     File.cp!(Path.join(build_dir, subpath), Path.join(artifacts_dir, Path.basename(subpath)))
+  end
+
+  defp ensure_executables!(executables, description \\ "") do
+    missing = Enum.reject(executables, &System.find_executable/1)
+
+    if missing != [] do
+      raise "Required commands not found: #{inspect(missing)}. #{description}"
+    end
   end
 end
