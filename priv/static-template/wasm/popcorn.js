@@ -124,7 +124,8 @@ export class Popcorn {
               initVm();
             </script>
         </html>`;
-      this._iframe.style = "visibility: hidden; width: 0px; height: 0px; border: none";
+      this._iframe.style =
+        "visibility: hidden; width: 0px; height: 0px; border: none";
 
       // TODO: handle multiple iframes
       this._listenerRef = this._iframeListener.bind(this);
@@ -306,7 +307,7 @@ export class Popcorn {
   }
 }
 
-function noop() { }
+function noop() {}
 
 async function withTimeout(promise, ms) {
   let timeout = null;

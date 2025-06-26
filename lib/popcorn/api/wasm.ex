@@ -252,7 +252,7 @@ defmodule Popcorn.Wasm do
   }
   \"\"\", %{n: 5})
 
-  #=> [%TrackedObject{}, %TrackedObject{}, %TrackedObject{}]
+  #=> {:ok, [%TrackedObject{}, %TrackedObject{}, %TrackedObject{}]}
   ```
   """
   @spec run_js2(js_function()) :: result(run_js_return())
@@ -335,6 +335,17 @@ defmodule Popcorn.Wasm do
     :ok
   end
 
+  def register2(main_process_name) do
+    """
+    ({ wasm, args }) => {
+      wasm.onElixirReady?.(args.main);
+    }
+    """
+    |> run_js2(%{main: main_process_name})
+
+    :ok
+  end
+
   @doc """
   Registers event listener for element with given `selector`. Events will be sent to the process registered under `target` name.
   To get event data, specify needed keys in `event_keys` list.
@@ -389,6 +400,50 @@ defmodule Popcorn.Wasm do
     )
   end
 
+  @spec register_event_listener2(atom(), register_event_listener_opts()) ::
+          result(run_js_return())
+  def register_event_listener2(event_name, opts) do
+    %{
+      event_keys: event_keys,
+      target_node: target_node,
+      event_receiver: event_receiver,
+      custom_data: custom_data
+    } = opts_to_map(opts, event_keys: [], target_node: nil, event_receiver: nil, custom_data: nil)
+
+    """
+    ({ wasm, args }) => {
+      const { event_receiver, event_name, target_node: node, event_keys, custom_data } = args;
+      const getEventData = (event) => {
+        const data = {};
+        for(const key of event_keys) {
+          data[key] = event[key];
+        }
+        return data;
+      };
+      const fn = (event) => {
+        wasm.cast(event_receiver, ["_popcorn_dom_event", event_name, getEventData(event), custom_data]);
+      };
+
+      node.addEventListener(event_name, fn);
+      const key = wasm.nextRemoteObjectKey();
+      const cleanupFn = () => {
+        node.removeEventListener(event_name, fn);
+        wasm.cleanupFunctions.delete(key);
+      };
+      wasm.cleanupFunctions.set(key, cleanupFn);
+
+      return [new TrackedValue({key: key, value: cleanupFn})];
+    }
+    """
+    |> run_js2(%{
+      event_name: event_name,
+      target_node: target_node,
+      event_receiver: event_receiver,
+      event_keys: event_keys,
+      custom_data: custom_data
+    })
+  end
+
   @doc """
   Unregister event listener. See `register_event_listener/2`.
   """
@@ -401,12 +456,25 @@ defmodule Popcorn.Wasm do
     |> run_js(args: %{cleanupFn: ref})
   end
 
+  @doc """
+  Unregister event listener. See `register_event_listener/2`.
+  """
+  def unregister_event_listener2(ref) do
+    """
+    ({ args }) => {
+      args.cleanupFn();
+    }
+    """
+    |> run_js2(%{cleanupFn: ref})
+  end
+
   defp with_wrapper(js_function, args) do
     with {:ok, serialized_args} <- serialize(args) do
       code = """
       (Module) => {
         const iframeWindow = globalThis.window;
         const window = globalThis.window.parent;
+        const document = globalThis.window.parent.document;
         return (#{js_function})({
           wasm: Module,
           args: Module.deserialize(JSON.stringify(#{serialized_args})),
