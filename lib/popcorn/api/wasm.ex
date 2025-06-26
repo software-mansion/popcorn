@@ -11,7 +11,7 @@ end
 
 defimpl Jason.Encoder, for: Popcorn.TrackedObject do
   def encode(value, opts) when value.ref != nil do
-    key = :emscripten.get_tracked(value.ref, :key)
+    [key] = :emscripten.get_tracked([value.ref], :key)
     Jason.Encode.map(%{popcorn_ref: key}, opts)
   end
 end
