@@ -123,14 +123,13 @@ defmodule GameOfLife.Ui do
 
   defp start_timer(ms) do
     # TODO: add unregistration on process exit
-    Wasm.run_js!(
-      """
-      ({ wasm, args }) => {
-        return setInterval(() => wasm.cast(args.receiver, "tick"), args.ms);
-      }
-      """,
-      args: %{ms: ms, receiver: @receiver_name}
-    )
+    """
+    ({ wasm, args }) => {
+      return [setInterval(() => wasm.cast(args.receiver, "tick"), args.ms)];
+    }
+    """
+    |> Wasm.run_js!(%{ms: ms, receiver: @receiver_name})
+    |> hd()
   end
 
   defp stop_timer(timer_ref) do
@@ -140,7 +139,7 @@ defmodule GameOfLife.Ui do
         clearInterval(args.timer);
       }
       """,
-      args: %{timer: timer_ref}
+      %{timer: timer_ref}
     )
   end
 
@@ -157,7 +156,7 @@ defmodule GameOfLife.Ui do
     Map.new(selectors, fn {key, selector} ->
       node_ref = query_selector(selector)
 
-      {:ok, listener_ref} =
+      {:ok, [listener_ref]} =
         Wasm.register_event_listener(:click,
           target_node: node_ref,
           event_receiver: @receiver_name,
@@ -178,44 +177,40 @@ defmodule GameOfLife.Ui do
   defp set_text(selector, text) do
     Wasm.run_js!(
       """
-      ({ window, args }) => {
-        const document = window.document;
+      ({ args }) => {
         args.node.innerText = args.text;
       }
       """,
-      args: %{node: query_selector(selector), text: text}
+      %{node: query_selector(selector), text: text}
     )
   end
 
   defp remove_element(selector) do
     Wasm.run_js!(
       """
-      ({ window, args }) => {
-        const document = window.document;
+      ({ args }) => {
         args.node.remove();
       }
       """,
-      args: %{node: query_selector(selector)}
+      %{node: query_selector(selector)}
     )
   end
 
   defp mount_at_root(html) do
     Wasm.run_js!(
       """
-      ({ window, args }) => {
-        const document = window.document;
+      ({ args }) => {
         document.querySelector("#root").innerHTML = args.html;
       }
       """,
-      args: %{html: html}
+      %{html: html}
     )
   end
 
   defp set_alive_cells(coords) do
     Wasm.run_js!(
       """
-      ({ window, args }) => {
-        const document = window.document;
+      ({ args }) => {
         const alive = new Set(args.alive_coords.map(([x,y]) => `${x},${y}`));
 
         for (const cell of document.querySelectorAll(".cell")) {
@@ -224,18 +219,17 @@ defmodule GameOfLife.Ui do
         }
       }
       """,
-      args: %{alive_coords: coords}
+      %{alive_coords: coords}
     )
   end
 
   defp query_selector(selector) do
-    Wasm.run_js!(
-      """
-      ({ window, args }) => {
-        return window.document.querySelector(args.selector);
-      }
-      """,
-      args: %{selector: selector}
-    )
+    """
+    ({ args }) => {
+      return [document.querySelector(args.selector)];
+    }
+    """
+    |> Wasm.run_js!(%{selector: selector})
+    |> hd()
   end
 end
