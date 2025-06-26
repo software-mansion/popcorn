@@ -657,6 +657,7 @@ defmodule Popcorn.EvalTest do
              stacktrace
   end
 
+  @tag :logger
   async_test "logger", %{tmp_dir: dir} do
     result =
       quote do
@@ -679,6 +680,7 @@ defmodule Popcorn.EvalTest do
     assert error =~ ~r/\[error\].*foobar/
   end
 
+  @tag :logger
   async_test "GenServer crash handling", %{tmp_dir: dir} do
     result =
       quote do

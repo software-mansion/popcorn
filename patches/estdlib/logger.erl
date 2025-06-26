@@ -421,7 +421,6 @@ macro_log(Location, Level, StringOrReport) ->
 
 %% @hidden
 macro_log(Location, Level, FormatOrReport, ArgsOrMeta) ->
-    % erlang:display({"wat", Location, Level, FormatOrReport, ArgsOrMeta}),
     Args = if is_list(ArgsOrMeta) -> ArgsOrMeta; true -> [] end,
     Meta = if is_map(ArgsOrMeta) -> ArgsOrMeta; true -> #{} end,
     macro_log(Location, Level, FormatOrReport, Args, Meta).
@@ -443,6 +442,17 @@ maybe_log(Level0, Format, Args, MetaData) ->
         _ ->
             ok
     end.
+
+format_log(Log) ->
+    {Formatter, Config} =
+        case erlang:get('$atomvm_logger_formatter') of
+            undefined ->
+                LF = atomvm_logger_manager:get_formatter(),
+                erlang:put('$atomvm_logger_formatter', LF),
+                LF;
+            LF -> LF
+        end,
+    Formatter:format(Log, Config).
 
 get_handlers() ->
     %%
@@ -490,7 +500,8 @@ do_log(Level, StringOrReport, Args, MetaData) when
             case allow_handler(Level, maps:get(level, HandlerConfig)) of
                 true ->
                     try
-                        Handler:log(LogEvent, HandlerConfig),
+                        Log = format_log(LogEvent),
+                        Handler:log(Log, HandlerConfig),
                         ok
                     catch
                         T:E:S ->
