@@ -38,10 +38,13 @@ export async function initVm() {
       fn?.();
     } catch (e) {
       console.error(e);
+    } finally {
+      Module["remoteObjectsMap"].delete(key);
     }
   };
   const origCast = Module["cast"];
   const origCall = Module["call"];
+
   Module["cast"] = (process, args) => {
     const serialized = Module.serialize(args);
     origCast(process, serialized);
@@ -50,10 +53,70 @@ export async function initVm() {
     const serialized = Module.serialize(args);
     return origCall(process, serialized);
   };
+
+  Module["onRunTrackedJs"] = (scriptString, isDebug) => {
+    const trackValue = (value) => {
+      const getKey = Module["nextRemoteObjectKey"];
+      const map = Module["remoteObjectsMap"];
+
+      const key = getKey();
+      map.set(key, value);
+      return key;
+    };
+
+    let fn;
+    try {
+      const indirectEval = eval;
+      fn = indirectEval(scriptString);
+      console.log({ scriptString, fn });
+    } catch (e) {
+      // TODO: send onEvalError for Popcorn object
+      console.error(e);
+      return null;
+    }
+    isDebug && ensureFunctionEval(fn);
+    let result;
+    try {
+      result = fn(Module);
+    } catch (e) {
+      // TODO: send onEvalError for Popcorn object
+      console.error(e);
+      return null;
+    }
+    isDebug && ensureResultKeyList(result);
+
+    return result?.map(trackValue) ?? [];
+  };
+  Module["onGetTrackedObjects"] = (keys) => {
+    const getRemoteObject = (key) => {
+      const serialize = Module["serialize"];
+      const map = Module["remoteObjectsMap"];
+
+      return serialize(map.get(key));
+    };
+    return keys.map(getRemoteObject);
+  };
+
   Module["onElixirReady"] = (initProcess) => {
     onVmInit(initProcess);
     Module["onElixirReady"] = null;
   };
+}
+
+function ensureFunctionEval(maybeFunction) {
+  if (typeof maybeFunction !== "function") {
+    throw new Error(
+      "Script passed to onRunTrackedJs() is not wrapped in a function",
+    );
+  }
+}
+
+function ensureResultKeyList(result) {
+  if (!Array.isArray(result) && result !== undefined) {
+    throw new Error(
+      "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
+    );
+  }
 }
 
 function onVmInit(initProcess) {
