@@ -1,11 +1,3 @@
-defmodule Popcorn.RemoteObject do
-  @moduledoc """
-  Struct for JS side communication.
-  """
-  @type t :: %__MODULE__{ref: term()}
-  defstruct ref: nil
-end
-
 defmodule Popcorn.TrackedObject do
   @moduledoc """
   Used to interoperate with JS.
@@ -17,16 +9,9 @@ defmodule Popcorn.TrackedObject do
   defstruct ref: nil
 end
 
-defimpl Jason.Encoder, for: Popcorn.RemoteObject do
-  def encode(value, opts) when value.ref != nil do
-    key = :emscripten.from_remote_object(value.ref, :key)
-    Jason.Encode.map(%{popcorn_ref: key}, opts)
-  end
-end
-
 defimpl Jason.Encoder, for: Popcorn.TrackedObject do
   def encode(value, opts) when value.ref != nil do
-    key = :emscripten.from_remote_object(value.ref, :key)
+    key = :emscripten.get_tracked(value.ref, :key)
     Jason.Encode.map(%{popcorn_ref: key}, opts)
   end
 end
@@ -35,7 +20,6 @@ defmodule Popcorn.Wasm do
   @moduledoc """
   Functions for JS side communication.
   """
-  alias Popcorn.RemoteObject
   alias Popcorn.TrackedObject
 
   defguardp is_tagged_emscripten(msg) when elem(msg, 0) == :emscripten
@@ -81,12 +65,12 @@ defmodule Popcorn.Wasm do
   # TODO: remove args
   @type run_js_opts() :: [{:return, :ref | :value} | {:args, map()}]
 
-  @type run_js_return() :: RemoteObject.t() | term()
+  @type run_js_return() :: TrackedObject.t() | term()
   @type result(t) :: {:ok, t} | {:error, term()}
 
   @type register_event_listener_opts() :: [
           event_keys: [atom()],
-          target_node: RemoteObject.t(),
+          target_node: TrackedObject.t(),
           receiver_name: String.t(),
           custom_data: term()
         ]
@@ -151,74 +135,6 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Runs JS code in browser's main thread in the WASM iframe context. Takes a JS function as string. The JS function takes an object with following keys:
-  - `args`: the arguments passed from Elixir and deserialized for JS.
-  - `window`: the main window context. Use it instead of calling (implicitly or explicitly) iframe window in the function.
-
-  Value returned from function is saved in JS context. It's lifetime is tied to (possibly) returned RemoteObject's ref.
-  If this ref is garbage collected by Elixir VM, value is destroyed in JS.
-
-  `opts`:
-  - `args`: a map of serializable Elixir values passed to the function. Default: `%{}`
-  - `return`: an atom controlling if `run_js` should return a remote object with reference to JS return value or deserialized return value. Possible values: `:ref`, `:value`. Default: `:ref`
-
-  By default only RemoteObject is returned.
-  Passing args and returning value introduces overhead related to serializing and deserializing.
-  """
-  @spec run_js(js_function(), run_js_opts()) :: result(run_js_return())
-  @spec run_js(js_function()) :: result(run_js_return())
-  def run_js(function, opts \\ []) do
-    %{return: return_type, args: args} = opts_to_map(opts, return: :ref, args: %{})
-
-    with {:ok, wrapped_js_fn} <- with_wrapper(function, args) do
-      remote_object = run_js_fn(wrapped_js_fn)
-      # Lv. 17 magic ahead
-      # args _must_ not be GC'd until we execute JS function since it will remove the object from JS side.
-      # Call to any external function ensures that reference will outlive JS call and compiler won't optimize it.
-      __MODULE__.id(args)
-
-      case return_type do
-        :ref -> {:ok, remote_object}
-        :value -> get_remote_object_value(remote_object)
-      end
-    end
-  rescue
-    e -> {:error, e}
-  end
-
-  @doc false
-  def id(x), do: x
-
-  @doc """
-  Raises on error.
-  See `run_js/2`.
-  """
-  @spec run_js!(js_function(), run_js_opts()) :: run_js_return()
-  def run_js!(function, opts \\ []) do
-    {:ok, value} = run_js(function, opts)
-    value
-  end
-
-  @doc """
-  Returns Elixir term based on RemoteObject.
-  """
-  @spec get_remote_object_value(RemoteObject.t()) :: {:ok, term()} | {:error, term()}
-  def get_remote_object_value(%RemoteObject{ref: ref}) do
-    with {:ok, serialized} <- :emscripten.from_remote_object(ref, :value) do
-      deserialize(serialized)
-    end
-  end
-
-  @doc """
-  Raises on error. See `get_remote_object_value/1`.
-  """
-  @spec get_remote_object_value(RemoteObject.t()) :: term()
-  def get_remote_object_value!(remote_object) do
-    {:ok, value} = get_remote_object_value(remote_object)
-    value
-  end
-
-  @doc """
   Runs JS code in the WASM iframe context. Takes a JS function as a string.
   Returns list of `TrackedObject` (or values directly, see `return`) for each value in an array returned from JS function.
 
@@ -255,10 +171,10 @@ defmodule Popcorn.Wasm do
   #=> {:ok, [%TrackedObject{}, %TrackedObject{}, %TrackedObject{}]}
   ```
   """
-  @spec run_js2(js_function()) :: result(run_js_return())
-  @spec run_js2(js_function(), map()) :: result(run_js_return())
-  @spec run_js2(js_function(), map(), run_js_opts()) :: result(run_js_return())
-  def run_js2(function, args \\ %{}, opts \\ []) do
+  @spec run_js(js_function()) :: result(run_js_return())
+  @spec run_js(js_function(), map()) :: result(run_js_return())
+  @spec run_js(js_function(), map(), run_js_opts()) :: result(run_js_return())
+  def run_js(function, args \\ %{}, opts \\ []) do
     %{return: return_type} = opts_to_map(opts, return: :ref)
 
     with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
@@ -278,11 +194,11 @@ defmodule Popcorn.Wasm do
     e -> {:error, e}
   end
 
-  @spec run_js2!(js_function()) :: result(run_js_return())
-  @spec run_js2!(js_function(), map()) :: result(run_js_return())
-  @spec run_js2!(js_function(), map(), run_js_opts()) :: result(run_js_return())
-  def run_js2!(function, args \\ %{}, opts \\ []) do
-    {:ok, tracked} = run_js2(function, args, opts)
+  @spec run_js!(js_function()) :: result(run_js_return())
+  @spec run_js!(js_function(), map()) :: result(run_js_return())
+  @spec run_js!(js_function(), map(), run_js_opts()) :: result(run_js_return())
+  def run_js!(function, args \\ %{}, opts \\ []) do
+    {:ok, tracked} = run_js(function, args, opts)
     tracked
   end
 
@@ -309,7 +225,7 @@ defmodule Popcorn.Wasm do
   @doc """
   Raises on error. See `get_tracked_values/1`.
   """
-  @spec get_tracked_values([TrackedObject.t()]) :: [String.t()]
+  @spec get_tracked_values!([TrackedObject.t()]) :: [String.t()]
   def get_tracked_values!(refs) when is_list(refs) do
     refs
     |> get_tracked_values()
@@ -319,29 +235,13 @@ defmodule Popcorn.Wasm do
   @doc """
   Notifies JS that Elixir side finished initializing. Can be called only once.
   """
-  def register(main_process_name) when is_atom(main_process_name) do
-    register(Atom.to_string(main_process_name))
-  end
-
-  def register(main_process_name) when is_binary(main_process_name) do
-    {:ok, _} =
-      """
-      ({ wasm, args }) => {
-        wasm.onElixirReady?.(args.main);
-      }
-      """
-      |> run_js(args: %{main: main_process_name})
-
-    :ok
-  end
-
-  def register2(main_process_name) do
+  def register(main_process_name) do
     """
     ({ wasm, args }) => {
       wasm.onElixirReady?.(args.main);
     }
     """
-    |> run_js2(%{main: main_process_name})
+    |> run_js(%{main: main_process_name})
 
     :ok
   end
@@ -355,54 +255,6 @@ defmodule Popcorn.Wasm do
   @spec register_event_listener(atom(), register_event_listener_opts()) ::
           result(run_js_return())
   def register_event_listener(event_name, opts) do
-    %{
-      event_keys: event_keys,
-      target_node: target_node,
-      event_receiver: event_receiver,
-      custom_data: custom_data
-    } =
-      opts_to_map(opts, event_keys: [], target_node: nil, event_receiver: nil, custom_data: nil)
-
-    """
-    ({ wasm, args, window, key }) => {
-      const { event_receiver, event_name, target_node, event_keys, custom_data } = args;
-      const document = window.document;
-
-      const getEventData = (event) => {
-        const data = {};
-        for(const key of event_keys) {
-          data[key] = event[key];
-        }
-        return data;
-      };
-      const fn = (event) => {
-        wasm.cast(event_receiver, ["_popcorn_dom_event", event_name, getEventData(event), custom_data]);
-      };
-      const node = target_node;
-      node.addEventListener(event_name, fn);
-      const cleanupFn = () => {
-        node.removeEventListener(event_name, fn);
-        wasm.cleanupFunctions.delete(key);
-      };
-      wasm.cleanupFunctions.set(key, cleanupFn);
-
-      return cleanupFn;
-    }
-    """
-    |> run_js(
-      args: %{
-        event_name: event_name,
-        target_node: target_node,
-        event_receiver: event_receiver,
-        event_keys: event_keys,
-        custom_data: custom_data
-      }
-    )
-  end
-
-  @spec register_event_listener2(atom(), register_event_listener_opts()) ::
-          result(run_js_return())
-  def register_event_listener2(event_name, opts) do
     %{
       event_keys: event_keys,
       target_node: target_node,
@@ -425,7 +277,7 @@ defmodule Popcorn.Wasm do
       };
 
       node.addEventListener(event_name, fn);
-      const key = wasm.nextRemoteObjectKey();
+      const key = wasm.nextTrackedObjectKey();
       const cleanupFn = () => {
         node.removeEventListener(event_name, fn);
         wasm.cleanupFunctions.delete(key);
@@ -435,7 +287,7 @@ defmodule Popcorn.Wasm do
       return [new TrackedValue({key: key, value: cleanupFn})];
     }
     """
-    |> run_js2(%{
+    |> run_js(%{
       event_name: event_name,
       target_node: target_node,
       event_receiver: event_receiver,
@@ -453,20 +305,11 @@ defmodule Popcorn.Wasm do
       args.cleanupFn();
     }
     """
-    |> run_js(args: %{cleanupFn: ref})
+    |> run_js(%{cleanupFn: ref})
   end
 
-  @doc """
-  Unregister event listener. See `register_event_listener/2`.
-  """
-  def unregister_event_listener2(ref) do
-    """
-    ({ args }) => {
-      args.cleanupFn();
-    }
-    """
-    |> run_js2(%{cleanupFn: ref})
-  end
+  @doc false
+  def id(x), do: x
 
   defp with_wrapper(js_function, args) do
     with {:ok, serialized_args} <- serialize(args) do
@@ -493,11 +336,6 @@ defmodule Popcorn.Wasm do
 
   defp serialize(term) do
     Jason.encode(term, escape: :javascript_safe)
-  end
-
-  defp run_js_fn(code) do
-    {:ok, ref} = :emscripten.run_remote_object_fn_script(code, main_thread: true)
-    %RemoteObject{ref: ref}
   end
 
   defp opts_to_map(opts, values), do: opts |> Keyword.validate!(values) |> Map.new()
