@@ -14,6 +14,18 @@ const HEARTBEAT_INTERVAL_MS = 500;
 
 let Module = null;
 
+class TrackedValue {
+  constructor({ key, value }) {
+    if (typeof key !== "number") {
+      throw new Error("key property in TrackedValue must be a number");
+    }
+    this.key = key;
+    this.value = value;
+  }
+}
+
+globalThis.TrackedValue = TrackedValue;
+
 export async function initVm() {
   const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
 
@@ -55,12 +67,17 @@ export async function initVm() {
   };
 
   Module["onRunTrackedJs"] = (scriptString, isDebug) => {
-    const trackValue = (value) => {
+    const trackValue = (tracked) => {
       const getKey = Module["nextRemoteObjectKey"];
       const map = Module["remoteObjectsMap"];
 
+      if (tracked instanceof TrackedValue) {
+        map.set(tracked.key, tracked.value);
+        return tracked.key;
+      }
+
       const key = getKey();
-      map.set(key, value);
+      map.set(key, tracked);
       return key;
     };
 
@@ -68,7 +85,6 @@ export async function initVm() {
     try {
       const indirectEval = eval;
       fn = indirectEval(scriptString);
-      console.log({ scriptString, fn });
     } catch (e) {
       // TODO: send onEvalError for Popcorn object
       console.error(e);
