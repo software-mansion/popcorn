@@ -42,7 +42,7 @@ export async function initVm() {
   Module["serialize"] = JSON.stringify;
   Module["deserialize"] = deserialize;
   Module["cleanupFunctions"] = new Map();
-  Module["onRemoteObjectDelete"] = (key) => {
+  Module["onTrackedObjectDelete"] = (key) => {
     const fns = Module["cleanupFunctions"];
     const fn = fns.get(key);
     fns.delete(key);
@@ -51,7 +51,7 @@ export async function initVm() {
     } catch (e) {
       console.error(e);
     } finally {
-      Module["remoteObjectsMap"].delete(key);
+      Module["trackedObjectsMap"].delete(key);
     }
   };
   const origCast = Module["cast"];
@@ -68,8 +68,8 @@ export async function initVm() {
 
   Module["onRunTrackedJs"] = (scriptString, isDebug) => {
     const trackValue = (tracked) => {
-      const getKey = Module["nextRemoteObjectKey"];
-      const map = Module["remoteObjectsMap"];
+      const getKey = Module["nextTrackedObjectKey"];
+      const map = Module["trackedObjectsMap"];
 
       if (tracked instanceof TrackedValue) {
         map.set(tracked.key, tracked.value);
@@ -104,13 +104,13 @@ export async function initVm() {
     return result?.map(trackValue) ?? [];
   };
   Module["onGetTrackedObjects"] = (keys) => {
-    const getRemoteObject = (key) => {
+    const getTrackedObject = (key) => {
       const serialize = Module["serialize"];
-      const map = Module["remoteObjectsMap"];
+      const map = Module["trackedObjectsMap"];
 
       return serialize(map.get(key));
     };
-    return keys.map(getRemoteObject);
+    return keys.map(getTrackedObject);
   };
 
   Module["onElixirReady"] = (initProcess) => {
@@ -173,6 +173,6 @@ function deserialize(message) {
     if (!isRef) {
       return value;
     }
-    return Module.remoteObjectsMap.get(value.popcorn_ref);
+    return Module.trackedObjectsMap.get(value.popcorn_ref);
   });
 }
