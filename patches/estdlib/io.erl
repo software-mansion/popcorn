@@ -27,7 +27,7 @@
 %%-----------------------------------------------------------------------------
 -module(io).
 -compile({popcorn_patch_private, bc_req/3}).
--export([format/1, format/2, fwrite/1, fwrite/2, get_line/1, put_chars/1, put_chars/2]).
+-export([format/1, format/2, fwrite/1, fwrite/2, get_line/1, put_chars/1, put_chars/2, printable_range/0]).
 
 %%-----------------------------------------------------------------------------
 %% @doc     Equivalent to format(Format, []).
@@ -135,3 +135,6 @@ bc_req(_Pid, Req0, _MaybeConvert) ->
 %%                    {MaybeConvert,Req}
 %%            end
 %%    end.
+
+% Patch reason: NIF not available in AtomVM
+printable_range() -> unicode.

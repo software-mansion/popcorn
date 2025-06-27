@@ -12,14 +12,14 @@ on:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
   pull_request:
     # branches: [ "*" ]
     paths:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
 
 permissions:
   contents: read
