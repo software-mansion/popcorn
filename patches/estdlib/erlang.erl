@@ -2584,7 +2584,7 @@ binary_to_integer(_Binary, Base) ->
 binary_to_list(_Binary) ->
     erlang:nif_error(undefined).
 
-% Patch reason: NIF nor available in AtomVM
+% Patch reason: NIF not available in AtomVM
 -spec binary_to_list(Binary, Start, Stop) -> [byte()] when
       Binary :: binary(),
       Start :: pos_integer(),
