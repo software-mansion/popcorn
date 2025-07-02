@@ -3,13 +3,14 @@ defmodule Popcorn do
   Popcorn is a tool for running Elixir in the browser.
   """
 
+  alias Popcorn.Utils.FetchArtifacts
+
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
   @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
-  @mix_env Mix.env()
 
   defmodule CookingError do
     @moduledoc false
@@ -37,8 +38,8 @@ defmodule Popcorn do
           | {:compile_artifacts, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
-    ingredients(options)
-    bundle(options)
+    ingredients(Keyword.take(options, [:out_dir, :target]))
+    bundle(Keyword.take(options, [:out_dir, :start_module, :compile_artifacts]))
   end
 
   def bundle(options \\ []) do
@@ -150,17 +151,7 @@ defmodule Popcorn do
       File.cp_r!(wasm_template_dir, options.out_dir)
     end
 
-    atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
-
-    if not File.exists?(atomvm_artifacts_dir) do
-      raise CookingError, """
-      Couldn't find runtime artifacts for target `#{options.target}`. \
-      To build them from source, run \
-      `MIX_ENV=#{@mix_env} mix popcorn.build_runtime --target #{options.target}`.
-      """
-    end
-
-    File.cp_r!(atomvm_artifacts_dir, options.out_dir)
+    FetchArtifacts.fetch_artifacts(options.target, options.out_dir)
   end
 
   defp ensure_option_present(options, key, name) do

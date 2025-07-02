@@ -145,19 +145,7 @@ config :popcorn, runtime: [
 ]
 ```
 
-If you want to build from source, specify `runtime_source`, for example:
-
-```elixir
-config :popcorn, runtime_source: {:git, "git@github.com:atomvm/repo.git"}
-```
-
-or
-
-```elixir
-config :popcorn, runtime_source: {:path, "path/to/atomvm"}
-```
-
-and run `mix popcorn.build_runtime --target <unix|wasm>`.
+If you want to build the runtime from source, run `mix popcorn.build_runtime --target <unix|wasm>`.
 
 ## Development
 
