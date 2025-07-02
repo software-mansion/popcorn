@@ -1,61 +1,85 @@
 defmodule Popcorn.Utils.FetchArtifacts do
   @moduledoc false
 
+  alias Popcorn.Utils.Downloader
+
   @artifatcs %{
     wasm: ["AtomVM.wasm", "AtomVM.mjs"],
     unix: ["AtomVM"]
   }
 
-  alias Popcorn.Utils.Downloader
+  @targets Map.keys(@artifatcs)
 
-  def fetch_artifacts() do
-    runtime_specs =
+  @download_dir Path.join(Mix.Project.app_path(), "atomvm_artifacts")
+
+  @spec download_artifacts([{:force, boolean}]) :: :ok
+  def download_artifacts(opts \\ []) do
+    for %{type: :url} = config <- parse_config() do
+      out_dir = Path.join(@download_dir, "#{config.target}")
+      cache_file = "#{out_dir}.cache"
+      new_cache = config.location
+
+      if opts[:force] or File.read(cache_file) != {:ok, new_cache} do
+        File.rm(cache_file)
+        artifacts = Map.fetch!(@artifatcs, config.target)
+        File.rm_rf!(out_dir)
+        File.mkdir_p!(out_dir)
+
+        try do
+          Downloader.start_inets_profile()
+          Enum.each(artifacts, fn name -> download_artifact(config.location, out_dir, name) end)
+        after
+          Downloader.stop_inets_profile()
+        end
+
+        File.write!(cache_file, new_cache)
+      end
+    end
+  end
+
+  @spec fetch_artifacts(:unix | :wasm, String.t()) :: :ok
+  def fetch_artifacts(target, out_dir) do
+    config = Enum.find(parse_config(), &(&1.target == target))
+
+    src_dir =
+      case config.type do
+        :path -> config.location
+        :url -> Path.join(@download_dir, "#{config.target}")
+      end
+
+    for name <- Map.fetch!(@artifatcs, target) do
+      from = Path.join(src_dir, name)
+      to = Path.join(out_dir, name)
+
+      if not File.exists?(from) do
+        raise """
+        Couldn't find runtime artifact #{name} at #{from} for target `#{target}`. \
+        To build artifacts from source, run \
+        `mix popcorn.build_runtime --target #{target}`.
+        """
+      end
+
+      File.cp!(from, to)
+    end
+
+    :ok
+  end
+
+  @spec parse_config() :: [%{target: :unix | :wasm, location: String.t(), type: :path | :url}]
+  defp parse_config() do
+    config =
       Popcorn.Config.get(:runtime)
       |> List.wrap()
       |> Enum.map(fn
         {type, location} when type in [:path, :url] and is_binary(location) ->
-          {type, location, []}
+          %{type: type, location: location, target: @targets}
 
         {type, location, opts}
         when type in [:path, :url] and is_binary(location) and is_list(opts) ->
-          {type, location, opts}
+          %{type: type, location: location, target: List.wrap(opts[:target] || @targets)}
       end)
 
-    for {type, location, opts} <- runtime_specs,
-        target <- opts |> Keyword.get(:target, [:unix, :wasm]) |> List.wrap() do
-      dir = Path.join(Mix.Project.app_path(), "atomvm_artifacts/#{target}")
-      File.mkdir_p!(dir)
-      artifacts = Map.fetch!(@artifatcs, target)
-      paths = Enum.map(artifacts, &Path.join(dir, &1))
-
-      if not Enum.all?(paths, &File.exists?/1) do
-        do_fetch_artifacts(type, location, dir, artifacts)
-      end
-    end
-  end
-
-  defp do_fetch_artifacts(:url, url, dir, artifacts) do
-    try do
-      Downloader.start_inets_profile()
-      Enum.each(artifacts, fn name -> download_artifact(url, dir, name) end)
-    after
-      Downloader.stop_inets_profile()
-    end
-  end
-
-  defp do_fetch_artifacts(:path, location, dir, artifacts) do
-    Enum.each(artifacts, fn name ->
-      path = Path.join(location, name)
-
-      if File.exists?(path) do
-        File.cp!(path, Path.join(dir, name))
-      else
-        raise """
-        Couldn't find runtime file #{name} in #{location} \
-        please use mix popcorn.build_runtime to build from source.
-        """
-      end
-    end)
+    Enum.map(@targets, fn t -> %{Enum.find(config, &(t in &1.target)) | target: t} end)
   end
 
   defp download_artifact(url, dir, name) do
