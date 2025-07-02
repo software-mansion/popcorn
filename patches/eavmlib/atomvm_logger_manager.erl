@@ -19,12 +19,13 @@
 %
 
 %% @hidden
--module(logger_manager).
+-module(atomvm_logger_manager).
 
 -export([
     start_link/1,
     stop/0,
     get_handlers/0,
+    get_formatter/0,
     get_id/0,
     allow/2
 ]).
@@ -37,7 +38,8 @@
     log_level,
     default_handler,
     handlers,
-    module_levels
+    module_levels,
+    formatter = 'Elixir.Logger.Formatter':new()
 }).
 
 -type handler_id() :: atom().
@@ -73,6 +75,10 @@ stop() ->
 %% @hidden
 get_handlers() ->
     gen_server:call(?MODULE, get_handlers).
+
+%% @hidden
+get_formatter() ->
+    gen_server:call(?MODULE, get_formatter).
 
 %% @hidden
 get_id() ->
@@ -117,6 +123,8 @@ handle_call({allow, Level, Module}, _From, State) ->
     {reply, do_allow(Level, Module, State), State};
 handle_call(get_handlers, _From, State) ->
     {reply, {State#state.id, do_get_handlers(State)}, State};
+handle_call(get_formatter, _From, State) ->
+    {reply, State#state.formatter, State};
 handle_call(get_id, _From, State) ->
     {reply, State#state.id, State};
 handle_call(_Request, _From, State) ->
