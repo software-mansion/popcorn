@@ -9,6 +9,8 @@ defmodule EvalInWasm do
 
   @impl GenServer
   def init(_args) do
+    :application_controller.start(:kernel)
+    :application.ensure_all_started(:elixir)
     {:ok, nil}
   end
 
@@ -33,10 +35,6 @@ defmodule EvalInWasm do
   defp as_type("eval_erlang_module"), do: {:module, :erlang}
 
   defp eval(code, :elixir) do
-    unless Process.whereis(:elixir_config) do
-      :elixir.start([], [])
-    end
-
     {evaluated, _new_bindings} = Code.eval_string(code, [], __ENV__)
     evaluated
   end
