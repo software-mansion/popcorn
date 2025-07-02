@@ -262,9 +262,6 @@ defmodule Popcorn.Support.AtomVM do
 
   def ast_fragment(:eval_elixir) do
     quote do
-      :application_controller.start(:kernel)
-      :application.ensure_all_started(:elixir)
-
       args.code
       |> Code.eval_string([], __ENV__)
       |> elem(0)
@@ -357,7 +354,7 @@ defmodule Popcorn.Support.AtomVM do
   end
 
   defp module(code, :unix) do
-    quote location: :keep do
+    quote do
       defmodule RunExpr do
         @moduledoc false
         @compile autoload: false, no_warn_undefined: :atomvm

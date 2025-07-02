@@ -1,12 +1,11 @@
 defmodule Popcorn.CompilationTest do
   use ExUnit.Case, async: true
   require Popcorn.Support.AtomVM
-  import AsyncTest
   alias Popcorn.Support.AtomVM
 
   @moduletag :tmp_dir
 
-  async_test "code load module", %{tmp_dir: run_dir} do
+  test "code load module", %{tmp_dir: run_dir} do
     module_ast =
       quote do
         defmodule CodeTest.Foo do
@@ -25,18 +24,7 @@ defmodule Popcorn.CompilationTest do
     |> AtomVM.assert_result(3)
   end
 
-  test "app", %{tmp_dir: tmp_dir} do
-    quote do
-      :application_controller.start(:kernel)
-      :application.ensure_all_started(:elixir)
-      :ok
-    end
-    |> AtomVM.compile_quoted()
-    |> AtomVM.run(tmp_dir)
-    |> AtomVM.assert_result(:ok)
-  end
-
-  async_test "run simple expression", %{tmp_dir: tmp_dir} do
+  test "run simple expression", %{tmp_dir: tmp_dir} do
     quote do
       args.n + 3
     end
@@ -45,7 +33,7 @@ defmodule Popcorn.CompilationTest do
     |> AtomVM.assert_result(5)
   end
 
-  async_test "stacktrace", %{tmp_dir: run_dir} do
+  test "stacktrace", %{tmp_dir: run_dir} do
     info =
       quote do
         try do

@@ -198,7 +198,6 @@ defmodule Popcorn.EvalTest do
   end
 
   @tag skip_target: :wasm
-  @tag :mr
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
       """

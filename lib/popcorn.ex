@@ -202,10 +202,10 @@ defmodule Popcorn do
       )
     end
 
-    # TODO: Until separation of deps for tasks and runtime is solved, disable all apps from :popcorn
+    # TODO: Until separation of deps for tasks and runtime is solved, disable all extra apps from :popcorn
     specs =
       if Map.has_key?(specs, :popcorn) do
-        put_in(specs[:popcorn][:applications], [])
+        put_in(specs[:popcorn][:applications], [:kernel, :stdlib, :elixir])
       else
         specs
       end
@@ -235,9 +235,13 @@ defmodule Popcorn do
         end
       end
 
+    no_warn_undefined = [:atomvm | List.wrap(start_module)]
+
     # The module below tries to mimic BEAMs boot script, then start user's app
     contents =
       quote location: :keep do
+        @compile autoload: false, no_warn_undefined: unquote(no_warn_undefined)
+
         def start() do
           # TODO: Default boot script starts `:heart` process, but unless -heart flag is passed, it will return `:ignore`
           # :ignore = :heart.start()
