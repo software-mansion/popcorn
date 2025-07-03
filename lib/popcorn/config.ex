@@ -3,11 +3,9 @@ defmodule Popcorn.Config do
   @defaults %{
     erl_stdlib_beam_paths:
       Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam"),
-    # [:elixir, :eex, :iex, :logger]
     ex_stdlib_beam_paths:
-      [:elixir, :eex, :iex]
-      |> Enum.map(&"#{Application.app_dir(&1)}/ebin/**/*.beam")
-      |> Enum.flat_map(&Path.wildcard/1),
+      [:elixir, :eex, :logger, :iex]
+      |> Enum.flat_map(&Path.wildcard("#{Application.app_dir(&1)}/ebin/**/*.beam")),
     out_dir: nil,
     add_tracing: false,
     runtime: {:url, "https://popcorn.swmansion.com/simple_repl/wasm/", target: :wasm},
