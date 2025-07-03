@@ -22,7 +22,7 @@ RUN apt update && \
 # install mise
 RUN install -dm 755 /etc/apt/keyrings && \
     wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
     apt update && apt install -y mise
 
 # install Erlang & Elixir
@@ -57,7 +57,7 @@ RUN git clone https://github.com/software-mansion/popcorn.git /root/popcorn && \
     git clone https://github.com/software-mansion-labs/elixir-docs-wasm.git /root/elixir && \
     cd /root/elixir && git checkout jgonet/docs
 RUN cd /root/popcorn && \
-    git fetch && git checkout fkubis/deploy_iex && \
+    git fetch && git checkout "$COMMIT_REF" && \
     cp -r /root/popcorn/priv/static-template/wasm /root/
 
  #------------------------ Build static files
