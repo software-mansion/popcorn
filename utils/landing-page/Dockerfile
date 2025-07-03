@@ -3,10 +3,10 @@ FROM ubuntu:noble AS statics
 
 SHELL ["/bin/bash", "-c"]
 
-ENV ERLANG_VERSION "26.0.2"
-ENV ELIXIR_VERSION "1.17.3-otp-26"
-ENV MIX_ENV prod
-ENV LC_ALL C.UTF-8
+ENV ERLANG_VERSION="26.0.2"
+ENV ELIXIR_VERSION="1.17.3-otp-26"
+ENV MIX_ENV=prod
+ENV LC_ALL=C.UTF-8
 
 ## replace sh with bash
 # TODO: possibly not needed if using Docker instead of Podman that uses OCI images
@@ -53,29 +53,37 @@ RUN source /root/.env && \
     cp src/AtomVM.mjs src/AtomVM.wasm /root/wasm/
 
 ARG COMMIT_REF ''
-RUN git clone https://github.com/software-mansion/popcorn.git /root/elixir-wasm && \
+RUN git clone https://github.com/software-mansion/popcorn.git /root/popcorn && \
     git clone https://github.com/software-mansion-labs/elixir-docs-wasm.git /root/elixir && \
     cd /root/elixir && git checkout jgonet/docs
-RUN cd /root/elixir-wasm && \
+RUN cd /root/popcorn && \
     git fetch && git checkout "$COMMIT_REF" && \
-    cp -r /root/elixir-wasm/priv/static-template/wasm /root/
+    cp -r /root/popcorn/priv/static-template/wasm /root/
 
  #------------------------ Build static files
  RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
  RUN source /root/.env && \
-     cd /root/elixir-wasm/examples/eval_in_wasm && \
+     cd /root/popcorn/examples/eval_in_wasm && \
      mix deps.get && mix popcorn.cook && \
      cp -r /root/wasm static
 
  RUN source /root/.env && \
-     cd /root/elixir-wasm/examples/game_of_life && \
+     cd /root/popcorn/examples/game_of_life && \
      mix deps.get && mix popcorn.cook && \
      cp -r /root/wasm static
 
  RUN source /root/.env && \
-     cd /root/elixir-wasm/ && \
+     cd /root/popcorn/examples/iex_wasm && \
+     mkdir static/assets && \
+     npm install --prefix ./static/assets @xterm/xterm && \
+     mix deps.get && mix popcorn.cook && \
+     cp -r /root/wasm static
+
+ RUN source /root/.env && \
+     cd /root/popcorn/ && \
      cp -r examples/eval_in_wasm/static/ utils/landing-page/simple_repl && \
      cp -r examples/game_of_life/static/ utils/landing-page/game_of_life && \
+     cp -r examples/iex_wasm/static/ utils/landing-page/iex_wasm && \
      cp -r /root/elixir/generated-docs/ utils/landing-page/elixir_docs && \
      cp -r utils/landing-page /landing-page
 
