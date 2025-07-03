@@ -2,6 +2,7 @@ defmodule EvalInWasm.BrowserTest do
   use ExUnit.Case
 
   setup_all do
+    {:ok, _apps} = Application.ensure_all_started(:playwright)
     {_pid, browser} = Playwright.BrowserType.launch(:chromium)
 
     on_exit(fn ->
@@ -48,7 +49,7 @@ defmodule EvalInWasm.BrowserTest do
     example_button = Playwright.Page.get_by_text(page, "Example: #{name}")
     Playwright.Locator.click(example_button)
     Playwright.Page.click(page, ~s|button[id="eval"]|)
-    wait_for(fn -> assert Playwright.Page.text_content(page, ~s|[id="result"]|) == result end)
+    wait_for(fn -> assert Playwright.Page.text_content(page, ~s|[id="result"]|) == result end, 15_000)
   end
 
   defp wait_for(fun, timeout \\ 5_000)
