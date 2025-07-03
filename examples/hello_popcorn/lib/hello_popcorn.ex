@@ -4,7 +4,9 @@ defmodule HelloPopcorn do
     IO.puts("Hello console!")
 
     Popcorn.Wasm.run_js("""
-    ({window}) => {window.document.body.innerHTML = "Hello from WASM!"}
+    () => {
+      document.body.innerHTML = "Hello from WASM!";
+    }
     """)
 
     :ok
