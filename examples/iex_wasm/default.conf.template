@@ -1,0 +1,34 @@
+server {
+    port_in_redirect off;
+    listen       80;
+    listen  [::]:80;
+    server_name  popcorn;
+
+    root /var/www/html;
+    index index.html;
+
+    location / {
+        add_header Cross-Origin-Opener-Policy "same-origin";
+        add_header Cross-Origin-Embedder-Policy "require-corp";
+
+        location ~* \.mjs$ {
+            types {
+                application/javascript mjs;
+            }
+            try_files $uri =404;
+        }
+
+        location ~ \.html$ {
+            if ($request_uri ~ ^/(.*)/index\.html$) {
+                return 302 /$1/;
+            }
+            if ($request_uri ~ ^/(.*)\.html$) {
+                return 302 /$1;
+            }
+        }
+#        if ($request_uri ~ ^/(.*)?\.html(\?|$)) {
+#            return 302 /$1$is_args$args;
+#        }
+        try_files $uri $uri.html $uri/index.html $uri/ =404;
+    }
+}

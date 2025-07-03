@@ -22,7 +22,7 @@ RUN apt update && \
 # install mise
 RUN install -dm 755 /etc/apt/keyrings && \
     wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
     apt update && apt install -y mise
 
 # install Erlang & Elixir
@@ -52,42 +52,22 @@ RUN source /root/.env && \
     emmake make -j${nproc} && \
     cp src/AtomVM.mjs src/AtomVM.wasm /root/wasm/
 
-ARG COMMIT_REF ''
-RUN git clone https://github.com/software-mansion/popcorn.git /root/popcorn && \
-    git clone https://github.com/software-mansion-labs/elixir-docs-wasm.git /root/elixir && \
-    cd /root/elixir && git checkout jgonet/docs
-RUN cd /root/popcorn && \
-    git fetch && git checkout fkubis/deploy_iex && \
-    cp -r /root/popcorn/priv/static-template/wasm /root/
+RUN git clone https://github.com/software-mansion/popcorn.git /root/popcorn
 
  #------------------------ Build static files
- RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
- RUN source /root/.env && \
-     cd /root/popcorn/examples/eval_in_wasm && \
-     mix deps.get && mix popcorn.cook && \
-     cp -r /root/wasm static
-
- RUN source /root/.env && \
-     cd /root/popcorn/examples/game_of_life && \
-     mix deps.get && mix popcorn.cook && \
-     cp -r /root/wasm static
-
- RUN source /root/.env && \
-     cd /root/popcorn/examples/iex_wasm && \
-     mkdir static/assets && \
-     npm install --prefix ./static/assets @xterm/xterm && \
-     mix deps.get && mix popcorn.cook && \
-     cp -r /root/wasm static
+RUN echo 'export ERL_AFLAGS="+JMsingle true"' >> /root/.env
+RUN source /root/.env && \
+    cd /root/popcorn/examples/iex_wasm && \
+    mkdir static/assets && \
+    npm install --prefix ./static/assets @xterm/xterm && \
+    mix deps.get && mix popcorn.cook && \
+    cp -r /root/wasm static
 
  RUN source /root/.env && \
      cd /root/popcorn/ && \
-     cp -r examples/eval_in_wasm/static/ utils/landing-page/simple_repl && \
-     cp -r examples/game_of_life/static/ utils/landing-page/game_of_life && \
-     cp -r examples/iex_wasm/static/ utils/landing-page/iex_wasm && \
-     cp -r /root/elixir/generated-docs/ utils/landing-page/elixir_docs && \
-     cp -r utils/landing-page /landing-page
+     cp -r examples/iex_wasm/static/ /iex_wasm
 
 # ------------------------ Host static files
 FROM nginx:1.27.5-alpine-slim
-COPY --from=statics /landing-page /var/www/html
+COPY --from=statics /iex_wasm /var/www/html
 COPY default.conf.template /etc/nginx/conf.d/default.conf
