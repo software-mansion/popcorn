@@ -24,7 +24,6 @@ on:
 permissions:
   contents: read
 
-
 env:
   CI: true
   MIX_ENV: test
