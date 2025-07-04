@@ -72,8 +72,8 @@ export class Popcorn {
 
     this._debug = debug;
     this._bundlePath = bundlePath ?? "wasm/bundle.avm";
-    this.onStdout = onStdout ?? noop;
-    this.onStderr = onStderr ?? noop;
+    this.onStdout = onStdout ?? console.log;
+    this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
