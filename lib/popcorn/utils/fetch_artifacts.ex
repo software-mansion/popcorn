@@ -37,8 +37,8 @@ defmodule Popcorn.Utils.FetchArtifacts do
     end
   end
 
-  @spec fetch_artifacts(:unix | :wasm, String.t()) :: :ok
-  def fetch_artifacts(target, out_dir) do
+  @spec fetch_artifacts(:unix | :wasm) :: [path :: String.t()]
+  def fetch_artifacts(target) do
     config = Enum.find(parse_config(), &(&1.target == target))
 
     src_dir =
@@ -48,21 +48,8 @@ defmodule Popcorn.Utils.FetchArtifacts do
       end
 
     for name <- Map.fetch!(@artifatcs, target) do
-      from = Path.join(src_dir, name)
-      to = Path.join(out_dir, name)
-
-      if not File.exists?(from) do
-        raise """
-        Couldn't find runtime artifact #{name} at #{from} for target `#{target}`. \
-        To build artifacts from source, run \
-        `mix popcorn.build_runtime --target #{target}`.
-        """
-      end
-
-      File.cp!(from, to)
+      Path.join(src_dir, name)
     end
-
-    :ok
   end
 
   @spec parse_config() :: [%{target: :unix | :wasm, location: String.t(), type: :path | :url}]
