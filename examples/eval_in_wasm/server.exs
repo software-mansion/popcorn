@@ -9,7 +9,7 @@ defmodule Router do
 
   plug(Plug.Logger)
   plug(:add_headers)
-  plug(Plug.Static, from: @static_dir, at: "/")
+  plug(Plug.Static, from: @static_dir, at: "/", gzip: true)
   plug(:match)
   plug(:dispatch)
 
