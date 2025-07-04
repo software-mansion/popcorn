@@ -1,6 +1,8 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
+  @github "https://github.com/software-mansion/popcorn"
+
   def project do
     otp_version =
       "#{:code.root_dir()}/releases/#{System.otp_release()}/OTP_VERSION"
@@ -40,6 +42,7 @@ defmodule Popcorn.MixProject do
       # docs
       name: "Popcorn",
       docs: docs(),
+      source_url: @github,
       homepage_url: "https://popcorn.swmansion.com"
     ]
   end
@@ -57,7 +60,7 @@ defmodule Popcorn.MixProject do
       licenses: ["Apache-2.0"],
       files: ["lib", "priv", "patches", "mix.exs", "README.md", "LICENSE", "src"],
       links: %{
-        "GitHub" => "https://github.com/swmansion/popcorn",
+        "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"
       }
     ]
