@@ -284,9 +284,8 @@ defmodule Popcorn do
 
     new_specs =
       for app <- new_apps,
+          # Missing optional apps (`nil` spec) will be filtered out
           spec = Application.spec(app),
-          # Ignore missing optional apps
-          spec != nil,
           into: %{} do
         env = Application.get_all_env(app)
         {app, [env: env] ++ spec}
