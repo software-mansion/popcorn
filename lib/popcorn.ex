@@ -42,7 +42,7 @@ defmodule Popcorn do
   end
 
   def bundle(options \\ []) do
-    {module, filename} = Popcorn.create_boot_module(options[:start_module])
+    {module, filename} = create_boot_module(options[:start_module])
 
     try do
       all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
@@ -173,7 +173,7 @@ defmodule Popcorn do
     end
   end
 
-  def create_boot_module(start_module \\ nil) do
+  defp create_boot_module(start_module) do
     config = Mix.Project.config()
     app = Keyword.get(config, :app)
 
