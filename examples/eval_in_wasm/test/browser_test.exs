@@ -2,6 +2,7 @@ defmodule EvalInWasm.BrowserTest do
   use ExUnit.Case
 
   setup_all do
+    {:ok, _apps} = Application.ensure_all_started(:playwright)
     {_pid, browser} = Playwright.BrowserType.launch(:chromium)
 
     on_exit(fn ->

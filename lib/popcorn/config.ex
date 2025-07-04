@@ -1,7 +1,6 @@
 defmodule Popcorn.Config do
   @moduledoc false
   @defaults %{
-    start_module: nil,
     erl_stdlib_beam_paths:
       Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam"),
     ex_stdlib_beam_paths:

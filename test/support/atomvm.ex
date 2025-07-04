@@ -262,9 +262,6 @@ defmodule Popcorn.Support.AtomVM do
 
   def ast_fragment(:eval_elixir) do
     quote do
-      :application_controller.start(:kernel)
-      :application.ensure_all_started(:elixir)
-
       args.code
       |> Code.eval_string([], __ENV__)
       |> elem(0)
@@ -323,7 +320,7 @@ defmodule Popcorn.Support.AtomVM do
   defp to_ast_fragment_type(:erlang_expr), do: :eval_erlang_expr
 
   defp module(code, :wasm) do
-    quote do
+    quote location: :keep do
       defmodule RunExpr do
         @moduledoc false
         alias Popcorn.Wasm

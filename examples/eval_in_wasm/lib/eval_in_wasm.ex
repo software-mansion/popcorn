@@ -3,12 +3,15 @@ defmodule EvalInWasm do
   import Popcorn.Wasm, only: [is_wasm_message: 1]
   alias Popcorn.Wasm
 
+  @process_name :main
+
   def start_link(_) do
-    GenServer.start_link(__MODULE__, nil, name: :main)
+    GenServer.start_link(__MODULE__, nil, name: @process_name)
   end
 
   @impl GenServer
   def init(_args) do
+    Wasm.register(@process_name)
     {:ok, nil}
   end
 
@@ -33,10 +36,6 @@ defmodule EvalInWasm do
   defp as_type("eval_erlang_module"), do: {:module, :erlang}
 
   defp eval(code, :elixir) do
-    unless Process.whereis(:elixir_config) do
-      :elixir.start([], [])
-    end
-
     {evaluated, _new_bindings} = Code.eval_string(code, [], __ENV__)
     evaluated
   end

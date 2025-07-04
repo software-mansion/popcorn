@@ -69,4 +69,4 @@ jobs:
       - name: Cook
         run: mix popcorn.cook
       - name: Run tests
-        run: mix test
+        run: mix test --no-start

@@ -6,9 +6,9 @@
   <img alt="Popcorn" src="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/fallback-logo.svg">
 </picture>
 
-**Popcorn is a library that allows you to run client-side Elixir in browsers, with Javascript interoperability**
+**Popcorn is a library that allows you to run client-side Elixir in browsers, with JavaScript interoperability**
 
-Popcorn is early stages and may break. Please report an issue if it does. Contributions are very welcome, but please open an issue before commiting too much effort.
+Popcorn is early stages and may break. Please report an issue if it does. Contributions are very welcome, but please open an issue before committing too much effort.
 
 Under the hood, Popcorn runs [AtomVM](https://github.com/atomvm/AtomVM), a tiny Erlang VM.
 
@@ -20,35 +20,74 @@ The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com
 
 *Note: Popcorn currently only works OTP 26.0.2 and Elixir 1.17.3. We're working to lift this requirement.*
 
-Popcorn requires just a few short steps to setup. Firstly, add the project to dependencies:
+Popcorn requires just a few short steps to setup. Firstly, add the project to dependencies and ensure you have an application start callback:
 
 ```elixir
 # mix.exs
 
+def application do
+  [
+    extra_applications: [],
+    mod: {MyApp.Application, []}
+  ]
+end
+
 def deps do
-  {:popcorn, github: "software-mansion/popcorn"}
+  [
+    {:popcorn, github: "software-mansion/popcorn"}
+  ]
 end
 ```
 
-Create a startup module:
+The application should start a worker process:
 
 ```elixir
-# lib/my_app/start.ex
+# lib/my_app/application.ex
+defmodule MyApp.Application do
+  use Application
 
-defmodule MyApp.Start do
-  def start() do
-    Popcorn.Wasm.register("main")
-    IO.puts("Hello from WASM")
+  @impl true
+  def start(_type, _args) do
+    children = [
+      MyApp.Worker
+    ]
+
+    opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 end
 ```
 
-and register it in the config, along with the directory to output static artifacts:
+A minimal worker should register itself using `Popcorn.Wasm.register/1`:
+
+```elixir
+# lib/my_app/worker.ex
+
+defmodule MyApp.Worker do
+  use GenServer
+
+  @process_name :main
+
+  def start_link(args) do
+    GenServer.start_link(__MODULE__, args, name: @process_name)
+  end
+
+  @impl true
+  def init(_init_arg) do
+    Popcorn.Wasm.register(@process_name)
+    IO.puts("Hello from WASM!")
+    state = %{}
+    {:ok, state}
+  end
+end
+```
+
+Then, configure the directory to output static artifacts:
 
 ```elixir
 # config/config.exs
 import Config
-config :popcorn, start_module: MyApp.Start, out_dir: "static/wasm"
+config :popcorn, out_dir: "static/wasm"
 ```
 
 Run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
@@ -64,7 +103,7 @@ Run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifac
 </html>
  ```
 
-The easiest way to host the page is to generate a simple HTTP server script with `mix popcorn.simple_server` and run it with `elixir server.exs`. Then, at http://localhost:4000, you should see `Hello from WASM` printed in the console.
+The easiest way to host the page is to generate a simple HTTP server script with `mix popcorn.simple_server` and run it with `elixir server.exs`. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the console.
 
 The webpage can also be hosted with any HTTP static file server, but it must add the following HTTP headers:
 

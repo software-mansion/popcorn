@@ -5,12 +5,11 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   Accepts the following options:
   - `out_dir` - the directory to write artifacts to
-  - `start_module` - a module with `start/0` function, the application's entry point
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
 
-  `out_dir` and `start_module` are mandatory, unless provided
-  via `config.exs`, for example `config :popcorn, out_dir: "static/wasm, start_module: Start"`
+  `out_dir` is mandatory, unless provided via `config.exs`,
+  for example `config :popcorn, out_dir: "static/wasm"`
   """
   use Mix.Task
 
@@ -19,17 +18,11 @@ defmodule Mix.Tasks.Popcorn.Cook do
   @impl true
   def run(args) do
     parser_config = [
-      strict: [out_dir: :string, target: :string, start_module: :string],
-      aliases: [d: :out_dir, m: :start_module]
+      strict: [out_dir: :string, target: :string],
+      aliases: [d: :out_dir]
     ]
 
     {options, _rest} = OptionParser.parse!(args, parser_config)
-
-    options =
-      Enum.map(options, fn
-        {:start_module, module} -> {:start_module, Module.concat([module])}
-        entry -> entry
-      end)
 
     Popcorn.cook(options)
   end

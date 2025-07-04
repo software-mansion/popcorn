@@ -5,19 +5,25 @@ defmodule IexWasm do
 
   defguard is_language(language) when language in ["erlang", "elixir"]
 
+  @process_name :main
+
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args)
+    GenServer.start_link(__MODULE__, args, name: @process_name)
   end
 
   @impl GenServer
   def init(_args) do
+    Wasm.register(@process_name)
+    type = "elixir"
+    Shell.start_link(type: type)
+    :ok = ExTTY.send_text(:"#{type}_tty", ":ok\n")
     {:ok, nil}
   end
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, new_state}
+    state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    {:noreply, state}
   end
 
   defp handle_wasm({:wasm_call, %{"command" => "start", "language" => language}}, state)
