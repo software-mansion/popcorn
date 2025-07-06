@@ -246,7 +246,7 @@ defmodule Popcorn.Wasm do
       wasm.onElixirReady?.(args.main);
     }
     """
-    |> run_js(%{main: main_process_name})
+    |> run_js(%{main: to_string(main_process_name)})
 
     :ok
   end
