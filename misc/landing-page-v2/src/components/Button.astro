@@ -1,0 +1,23 @@
+---
+interface Props {
+    href: string;
+    title: string;
+    type: "primary" | "secondary";
+    newTab?: boolean;
+}
+const { href, title, type, newTab = false } = Astro.props;
+
+const primaryClasses = "bg-brown-70 text-light-30";
+const secondaryClasses = "text-brown-70 border border-brown-70";
+
+const classes = type === "primary" ? primaryClasses : secondaryClasses;
+
+export const buttonGroupClass = "flex gap-4 mt-12";
+---
+
+<a
+    {...newTab ? { target: "_blank", rel: "noopener noreferrer" } : {}}
+    href={href}
+    class=`${classes} w-[200px] text-center rounded-lg pt-4 pb-4 pr-6 pl-6`
+    >{title}</a
+>

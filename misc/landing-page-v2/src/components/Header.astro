@@ -1,0 +1,98 @@
+---
+import { Icon } from "astro-icon/components";
+
+const linkClass = "transition-colors duration-300 hover:text-orange-100";
+const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
+---
+
+<header
+    class="flex fixed gap-8 top-0 right-0 left-0 text-black backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max"
+>
+    <a href="/" class="flex-shrink-0">
+        <Icon
+            name="logo-text"
+            class="text-4xl text-brown-header transition-colors duration-300"
+            data-logo
+        />
+    </a>
+    <div class="flex gap-4">
+        <a class={linkClass} href="#features">Features</a>
+        <a class={linkClass} href="#examples">Examples</a>
+        <a class={linkClass} href="#live-demo">Live demo</a>
+        <a class={linkClass} href="#outtro">Contact us</a>
+    </div>
+    <div class="flex gap-4">
+        <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
+        <a
+            class={linkClass}
+            {...openNewTab}
+            href="https://github.com/software-mansion/popcorn/">Github →</a
+        >
+    </div>
+</header>
+
+<script>
+    function setupHeaderColorChange() {
+        const header = document.querySelector("header")!;
+        const logo = header.querySelector("[data-logo]");
+        const links = header.querySelectorAll("a");
+
+        function swapTextColor() {
+            const headerRect = header.getBoundingClientRect();
+            const headerCenter = {
+                x: headerRect.left + headerRect.width / 2,
+                y: headerRect.top + headerRect.height / 2,
+            };
+
+            // Temporarily hide header to check what's behind it
+            header.style.pointerEvents = "none";
+            const elementBehind = document.elementFromPoint(
+                headerCenter.x,
+                headerCenter.y,
+            );
+            header.style.pointerEvents = "";
+
+            if (!elementBehind) return;
+
+            // Check if we're over a dark section
+            const isDarkSection: boolean = !!elementBehind.closest(
+                '[data-background="dark"]',
+            );
+
+            // Toggle classes based on background
+            header.classList.toggle("text-orange-100", isDarkSection);
+            logo?.classList.toggle("text-orange-100", isDarkSection);
+
+            // Apply classes to links
+            for (const link of links) {
+                link.classList.toggle("text-orange-100", isDarkSection);
+                link.classList.toggle("hover:text-orange-100", !isDarkSection);
+                link.classList.toggle("hover:text-light-20", isDarkSection);
+            }
+        }
+
+        // Throttled scroll handler for performance
+        let ticking = false;
+        function onScroll() {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    swapTextColor();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }
+
+        // Set up event listeners
+        window.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", swapTextColor, {
+            passive: true,
+        });
+
+        // Initial check
+        swapTextColor();
+    }
+
+    document.addEventListener("DOMContentLoaded", setupHeaderColorChange);
+    document.addEventListener("astro:page-load", setupHeaderColorChange);
+</script>

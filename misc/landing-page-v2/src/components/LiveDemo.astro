@@ -1,0 +1,44 @@
+---
+import Button, { buttonGroupClass } from "./Button.astro";
+import Section, { fullWidthClass } from "./Section.astro";
+import LeadingElement from "./LeadingElement.astro";
+---
+
+<Section id="live-demo" background="light">
+    <h1
+        class:list={[
+            "text-[200px] font-handjet text-center font-semibold tracking-normal leading-none text-orange-100",
+            fullWidthClass,
+        ]}
+    >
+        Check out how simple it is to use Popcorn’s API
+    </h1>
+    <LeadingElement title="Live demo" color="light" />
+
+    <div class="flex justify-between gap-20 items-center">
+        <div class="max-w-96">
+            <p>
+                Elixir meets browser. Magic happens. This live demo showcases
+                Popcorn's intuitive API – where functional programming
+                principles create beautiful, interactive web experiences. Click
+                around, modify the code, and discover why developers are falling
+                in love with Elixir on the frontend.
+            </p>
+            <div class={buttonGroupClass}>
+                <Button
+                    title="Read the docs"
+                    type="primary"
+                    href="#"
+                    newTab={true}
+                />
+                <Button
+                    title="See the repo"
+                    type="secondary"
+                    href="https://github.com/software-mansion/popcorn/"
+                    newTab={true}
+                />
+            </div>
+        </div>
+        <div class="border-orange-100 border w-xl h-80"></div>
+    </div>
+</Section>

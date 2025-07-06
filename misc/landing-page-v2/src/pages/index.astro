@@ -1,0 +1,31 @@
+---
+import Header from "../components/Header.astro";
+import Intro from "../components/Intro.astro";
+import Steps from "../components/Steps.astro";
+import Examples from "../components/Examples.astro";
+import LiveDemo from "../components/LiveDemo.astro";
+import Info from "../components/Info.astro";
+import Outtro from "../components/Outtro.astro";
+
+import Layout from "../layouts/Layout.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Layout>
+    <main class="pt-24 gap-20 bg-light-20 font-inter">
+        <Header />
+        <Intro />
+        <Steps />
+        <Examples />
+        <LiveDemo />
+        <Info />
+        <Outtro />
+    </main>
+</Layout>
+
+<style>
+    html,
+    body {
+        scroll-behavior: smooth;
+    }
+</style>
