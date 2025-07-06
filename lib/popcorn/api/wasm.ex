@@ -139,7 +139,8 @@ defmodule Popcorn.Wasm do
   Returns list of `TrackedObject` (or values directly, see `return`) for each value in an array returned from JS function.
 
   ## Options
-  - `return`: an atom controlling if `run_js` should return tracked objects list or deserialized return value. Possible values: `:ref`, `:value`. Default: `:ref`
+  - `return`: an atom controlling if `run_js` should return tracked objects list or deserialized return value.
+    Possible values: `:ref`, `refs`, `:value`, `:values`. Default: `:ref`
 
   Passing args and returning values introduces overhead related to serializing and deserializing.
 
@@ -161,12 +162,12 @@ defmodule Popcorn.Wasm do
 
   ## Example
   ```
-  Popcorn.Wasm.run_js(\"\"\"
+  Popcorn.Wasm.run_js(\"""
   ({ args }) => {
     const n = args.n;
     return [n-1, n, n-1];
   }
-  \"\"\", %{n: 5})
+  \""", %{n: 5})
 
   #=> {:ok, [%TrackedObject{}, %TrackedObject{}, %TrackedObject{}]}
   ```
@@ -185,9 +186,13 @@ defmodule Popcorn.Wasm do
       # Call to any external function ensures that reference will outlive JS call and compiler won't optimize it.
       __MODULE__.id(args)
 
-      case return_type do
-        :ref -> {:ok, tracked_objects}
-        :value -> get_tracked_values(tracked_objects)
+      case {return_type, tracked_objects} do
+        {:refs, objs} -> {:ok, objs}
+        {:ref, [obj]} -> {:ok, obj}
+        {:ref, []} -> {:ok, nil}
+        {:values, objs} -> get_tracked_values(objs)
+        {:value, [obj]} -> [obj] |> get_tracked_values() |> hd()
+        {:value, []} -> {:ok, nil}
       end
     end
   rescue
@@ -287,13 +292,16 @@ defmodule Popcorn.Wasm do
       return [new TrackedValue({key: key, value: cleanupFn})];
     }
     """
-    |> run_js(%{
-      event_name: event_name,
-      target_node: target_node,
-      event_receiver: event_receiver,
-      event_keys: event_keys,
-      custom_data: custom_data
-    })
+    |> run_js(
+      %{
+        event_name: event_name,
+        target_node: target_node,
+        event_receiver: event_receiver,
+        event_keys: event_keys,
+        custom_data: custom_data
+      },
+      return: :ref
+    )
   end
 
   @doc """

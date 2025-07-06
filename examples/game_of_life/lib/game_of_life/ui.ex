@@ -129,7 +129,6 @@ defmodule GameOfLife.Ui do
     }
     """
     |> Wasm.run_js!(%{ms: ms, receiver: @receiver_name})
-    |> hd()
   end
 
   defp stop_timer(timer_ref) do
@@ -156,7 +155,7 @@ defmodule GameOfLife.Ui do
     Map.new(selectors, fn {key, selector} ->
       node_ref = query_selector(selector)
 
-      {:ok, [listener_ref]} =
+      {:ok, listener_ref} =
         Wasm.register_event_listener(:click,
           target_node: node_ref,
           event_receiver: @receiver_name,
@@ -230,6 +229,5 @@ defmodule GameOfLife.Ui do
     }
     """
     |> Wasm.run_js!(%{selector: selector})
-    |> hd()
   end
 end
