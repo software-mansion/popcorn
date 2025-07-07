@@ -1,0 +1,20 @@
+---
+const { n, title } = Astro.props;
+---
+
+<div
+    class="flex rounded-3xl pt-14 pb-14 pr-12 pl-12 bg-brown-90 border border-brown-gray justify-between gap-28"
+>
+    <div class="flex flex-col gap-24 w-80">
+        <div class="flex items-center gap-3">
+            <h3
+                class="inline-block p-2.5 rounded-sm bg-orange-weird text-orange-100 text-4xl font-handjet font-light"
+            >
+                {n}
+            </h3>
+            <h3 class="text-4xl">{title}</h3>
+        </div>
+        <p><slot name="description" /></p>
+    </div>
+    <img src="https://placehold.co/500x300" />
+</div>
