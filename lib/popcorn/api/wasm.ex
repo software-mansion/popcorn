@@ -179,8 +179,8 @@ defmodule Popcorn.Wasm do
     %{return: return_type} = opts_to_map(opts, return: :ref)
 
     with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
-         {:ok, refs} <- :emscripten.run_script_tracked(wrapped_js_fn),
-         tracked_objects = Enum.map(refs, &%TrackedObject{ref: &1}) do
+         {:ok, refs} <- :emscripten.run_script_tracked(wrapped_js_fn) do
+      tracked_objects = Enum.map(refs, &%TrackedObject{ref: &1})
       # Lv. 17 magic ahead
       # args _must_ not be GC'd until we execute JS function since it will remove the object from JS side.
       # Call to any external function ensures that reference will outlive JS call and compiler won't optimize it.

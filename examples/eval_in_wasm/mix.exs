@@ -10,7 +10,7 @@ defmodule EvalInWasm.MixProject do
       compilers: Mix.compilers(),
       deps: deps(),
       aliases: [
-        build_wasm: "popcorn.build_runtime --target wasm"
+        build_wasm: ["popcorn.build_runtime --target wasm", "popcorn.cook"]
       ]
     ]
   end

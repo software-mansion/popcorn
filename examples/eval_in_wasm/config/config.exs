@@ -15,6 +15,7 @@ include_tracing =
 
 config :popcorn,
   out_dir: "static/wasm",
+  runtime_source: {:git, "https://github.com/software-mansion-labs/FissionVM.git", ref: "jgonet/js-api-batch"},
   add_tracing: include_tracing
 
 if path = System.get_env("ATOMVM_SOURCE_PATH") do
