@@ -23,11 +23,11 @@ defmodule Shell do
   @impl GenServer
   def handle_info({:tty_data, code_output}, state) do
     """
-    ({ window, args }) => {
+    ({ args }) => {
       window.terminal.write(args.code_output)
     }
     """
-    |> Wasm.run_js(args: %{code_output: code_output})
+    |> Wasm.run_js(%{code_output: code_output})
 
     {:noreply, state}
   end
