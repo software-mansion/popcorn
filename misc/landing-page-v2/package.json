@@ -28,5 +28,8 @@
     "react-dom": "^19.1.0",
     "rehype-mermaid": "^3.0.0",
     "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "vite-plugin-devtools-json": "^0.2.1"
   }
 }

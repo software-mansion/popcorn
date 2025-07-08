@@ -8,6 +8,7 @@ import starlight from "@astrojs/starlight";
 // used for build-time generation of diagrams
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
+import devtoolsJson from "vite-plugin-devtools-json";
 import buildWasm from "./build-wasm.js";
 
 // https://astro.build/config
@@ -20,6 +21,9 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "require-corp",
       "Cross-Origin-Resource-Policy": "same-site",
     },
+  },
+  vite: {
+    plugins: [devtoolsJson()],
   },
   integrations: [
     react(),
