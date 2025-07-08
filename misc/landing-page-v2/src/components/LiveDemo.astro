@@ -60,17 +60,12 @@ import LeadingElement from "./LeadingElement.astro";
         </div>
     </div>
 </Section>
+
 <script>
     import { Terminal } from "@xterm/xterm";
     import { FitAddon } from "@xterm/addon-fit";
 
-    const popcorn = await Popcorn.init({
-        debug: true,
-        onStdout: (text) => displayLog(text, { term, isError: false }),
-        onStderr: (text) => displayLog(text, { term, isError: true }),
-    });
-
-    const term = new Terminal({
+    const XTERM_CONFIG = {
         allowTransparency: true,
         theme: {
             background: "#fffdf5",
@@ -79,55 +74,63 @@ import LeadingElement from "./LeadingElement.astro";
             cursorAccent: "#ef7c00",
             selectionBackground: "#ffe6cc",
         },
-    });
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    window.terminal = term;
-    term.open(document.getElementById("terminal"));
-    fitAddon.fit();
+    };
 
-    term.onKey(async (key) => {
-        const ARROW_UP_KEY_CODE = 38;
-        const ARROW_DOWN_KEY_CODE = 40;
-        let text = key.key;
-        const keyCode = key.domEvent.keyCode;
-        if (keyCode === ARROW_UP_KEY_CODE || keyCode === ARROW_DOWN_KEY_CODE) {
-            text = "";
-        }
-        try {
-            await write(text);
-        } catch (error) {
-            displayLog(error, { term, isError: true });
-        }
-    });
-
-    document
-        .getElementById("live-simple")
-        ?.addEventListener("click", async () => {
-            const textArea = document.querySelector(".xterm-helper-textarea");
-            if (textArea === null) return;
-
-            await write("Enum.sort([3, 2, 1])");
-            enter(textArea);
-        });
-    document
-        .getElementById("live-case")
-        ?.addEventListener("click", async () => {
-            const textArea = document.querySelector(".xterm-helper-textarea");
-            if (textArea === null) return;
-
-            const lines = [
+    const EXAMPLES = [
+        { id: "live-simple", lines: ["Enum.sort([3, 2, 1])"] },
+        {
+            id: "live-case",
+            lines: [
                 "hi = fn -> IO.inspect(self()) end",
                 "Enum.each(0..3, fn _ -> spawn(hi) end)",
-            ];
+            ],
+        },
+    ];
 
-            for (const line of lines) {
-                await write(line);
-                enter(textArea);
+    async function main() {
+        const terminalContainer = document.getElementById("terminal");
+        if (terminalContainer === null) {
+            throw new Error("Terminal container not found");
+        }
+        const { term, write } = xtermInit({
+            container: terminalContainer,
+        });
+
+        const POPCORN_CONFIG = {
+            debug: true,
+            onStdout: (text: string) =>
+                displayLog(text, { term, isError: false }),
+            onStderr: (text: string) =>
+                displayLog(text, { term, isError: true }),
+        };
+        const popcorn = await Popcorn.init(POPCORN_CONFIG);
+
+        term.onKey(async (event: any) => {
+            if (isUpOrDownArrowKeyEvent(event)) {
+                return;
+            }
+            let key = event.key as string;
+            try {
+                await write([key], popcorn, { withEnter: false });
+            } catch (error) {
+                displayLog(error as string, { term, isError: true });
             }
         });
 
-    function displayLog(log, { term, isError }) {
+        for (const { id, lines } of EXAMPLES) {
+            const node = document.getElementById(id);
+            if (node === null) {
+                throw new Error(`Element with ID ${id} not found`);
+            }
+
+            node.addEventListener("click", async () => {
+                await write(lines, popcorn);
+            });
+        }
+        return term;
+    }
+
+    function displayLog(log: string, { term, isError }) {
         const lineElement = document.createElement("span");
         lineElement.textContent = log;
         if (isError) {
@@ -136,30 +139,57 @@ import LeadingElement from "./LeadingElement.astro";
         term.write(log);
     }
 
-    async function write(text) {
-        await popcorn.call(
-            {
-                command: "code_data",
-                language: "elixir",
-                text,
-            },
-            {
-                timeoutMs: 10_000,
-            },
-        );
+    type XtermOpts = { container: Element };
+    function xtermInit({ container }: XtermOpts) {
+        const term = new Terminal(XTERM_CONFIG);
+        const fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(container);
+        fitAddon.fit();
+
+        async function write(
+            lines: string[],
+            popcorn: any,
+            { withEnter = true } = {},
+        ) {
+            const ENTER_EVENT = {
+                code: "Enter",
+                key: "Enter",
+                charCode: 13,
+                keyCode: 13,
+                view: window,
+            };
+
+            const textArea = document.querySelector(".xterm-helper-textarea");
+            if (textArea === null) throw new Error("Terminal not initialized");
+
+            for (const line of lines) {
+                await popcorn.call(
+                    { command: "code_data", language: "elixir", text: line },
+                    { timeoutMs: 10_000 },
+                );
+                if (!withEnter) {
+                    continue;
+                }
+                const keyboardEvent = new KeyboardEvent("keydown", ENTER_EVENT);
+                textArea.dispatchEvent(keyboardEvent);
+            }
+        }
+
+        return { term, write };
     }
 
-    function enter(textArea) {
-        const keyboardEvent = new KeyboardEvent("keydown", {
-            code: "Enter",
-            key: "Enter",
-            charCode: 13,
-            keyCode: 13,
-            view: window,
-        });
+    function isUpOrDownArrowKeyEvent(event: any) {
+        const keycode = event.domEvent.keyCode;
+        const ARROW_UP_KEY_CODE = 38;
+        const ARROW_DOWN_KEY_CODE = 40;
 
-        textArea.dispatchEvent(keyboardEvent);
+        return [ARROW_UP_KEY_CODE, ARROW_DOWN_KEY_CODE].includes(keycode);
     }
+
+    // Entrypoint
+    const term = await main();
+    window.terminal = term;
 </script>
 
 <style>

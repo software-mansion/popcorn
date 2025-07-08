@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [devtoolsJson()],
+    plugins: [devtoolsJson(), tailwindcss()],
   },
   integrations: [
     react(),
@@ -80,9 +80,5 @@ export default defineConfig({
     // syntaxHighlight: {
     //   excludeLangs: ["mermaid", "math"],
     // },
-  },
-
-  vite: {
-    plugins: [tailwindcss()],
   },
 });
