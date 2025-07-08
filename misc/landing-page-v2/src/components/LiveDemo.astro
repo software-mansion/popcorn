@@ -39,6 +39,131 @@ import LeadingElement from "./LeadingElement.astro";
                 />
             </div>
         </div>
-        <div class="border-orange-100 border w-xl h-80"></div>
+        <div class="flex flex-col gap-4">
+            <div
+                id="terminal"
+                class="border-orange-100 border w-xl h-80 overflow-auto live-demo-scroll"
+            >
+            </div>
+            <div class="flex flex-col gap-2">
+                <a
+                    id="live-simple"
+                    class="border-orange-100 border text-center p-1"
+                    >Example: sort</a
+                >
+                <a
+                    id="live-case"
+                    class="border-orange-100 border text-center p-1"
+                    >Example: processes</a
+                >
+            </div>
+        </div>
     </div>
 </Section>
+<script>
+    import { Terminal } from "@xterm/xterm";
+    import { FitAddon } from "@xterm/addon-fit";
+
+    const popcorn = await Popcorn.init({
+        debug: true,
+        onStdout: (text) => displayLog(text, { term, isError: false }),
+        onStderr: (text) => displayLog(text, { term, isError: true }),
+    });
+
+    const term = new Terminal({
+        allowTransparency: true,
+        theme: {
+            background: "#fffdf5",
+            foreground: "#36220d",
+            cursor: "#ef7c00",
+            cursorAccent: "#ef7c00",
+            selectionBackground: "#ffe6cc",
+        },
+    });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    window.terminal = term;
+    term.open(document.getElementById("terminal"));
+    fitAddon.fit();
+
+    term.onKey(async (key) => {
+        const ARROW_UP_KEY_CODE = 38;
+        const ARROW_DOWN_KEY_CODE = 40;
+        let text = key.key;
+        const keyCode = key.domEvent.keyCode;
+        if (keyCode === ARROW_UP_KEY_CODE || keyCode === ARROW_DOWN_KEY_CODE) {
+            text = "";
+        }
+        try {
+            await write(text);
+        } catch (error) {
+            displayLog(error, { term, isError: true });
+        }
+    });
+
+    document
+        .getElementById("live-simple")
+        ?.addEventListener("click", async () => {
+            const textArea = document.querySelector(".xterm-helper-textarea");
+            if (textArea === null) return;
+
+            await write("Enum.sort([3, 2, 1])");
+            enter(textArea);
+        });
+    document
+        .getElementById("live-case")
+        ?.addEventListener("click", async () => {
+            const textArea = document.querySelector(".xterm-helper-textarea");
+            if (textArea === null) return;
+
+            const lines = [
+                "hi = fn -> IO.inspect(self()) end",
+                "Enum.each(0..3, fn _ -> spawn(hi) end)",
+            ];
+
+            for (const line of lines) {
+                await write(line);
+                enter(textArea);
+            }
+        });
+
+    function displayLog(log, { term, isError }) {
+        const lineElement = document.createElement("span");
+        lineElement.textContent = log;
+        if (isError) {
+            log = "\x1b[31m" + log + "\x1b[0m\n\r";
+        }
+        term.write(log);
+    }
+
+    async function write(text) {
+        await popcorn.call(
+            {
+                command: "code_data",
+                language: "elixir",
+                text,
+            },
+            {
+                timeoutMs: 10_000,
+            },
+        );
+    }
+
+    function enter(textArea) {
+        const keyboardEvent = new KeyboardEvent("keydown", {
+            code: "Enter",
+            key: "Enter",
+            charCode: 13,
+            keyCode: 13,
+            view: window,
+        });
+
+        textArea.dispatchEvent(keyboardEvent);
+    }
+</script>
+
+<style>
+    .live-demo-scroll {
+        scrollbar-color: #ef7c00 #fffdf5;
+    }
+</style>

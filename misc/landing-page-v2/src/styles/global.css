@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@import "@xterm/xterm";
 @theme {
     --color-*: initial;
     --color-white: #fff;
