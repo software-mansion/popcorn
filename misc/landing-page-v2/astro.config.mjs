@@ -8,10 +8,23 @@ import starlight from "@astrojs/starlight";
 // used for build-time generation of diagrams
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
+import devtoolsJson from "vite-plugin-devtools-json";
+import buildWasm from "./build-wasm.js";
 
 // https://astro.build/config
 export default defineConfig({
   site: "https://stargazers.club",
+  server: {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+      "Cross-Origin-Resource-Policy": "same-site",
+    },
+  },
+  vite: {
+    plugins: [devtoolsJson(), tailwindcss()],
+  },
   integrations: [
     react(),
     icon(),
@@ -46,6 +59,7 @@ export default defineConfig({
         },
       ],
     }),
+    buildWasm({ dir: "../../examples/iex_wasm" }),
   ],
   markdown: {
     // used for build-time generation of diagrams
@@ -66,9 +80,5 @@ export default defineConfig({
     // syntaxHighlight: {
     //   excludeLangs: ["mermaid", "math"],
     // },
-  },
-
-  vite: {
-    plugins: [tailwindcss()],
   },
 });
