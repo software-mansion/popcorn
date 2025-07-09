@@ -141,22 +141,37 @@ config :popcorn, runtime_source: {:path, "path/to/atomvm"}
 
 and run `mix popcorn.build_runtime --target <unix|wasm>`.
 
-## Testing
+## Development
+
+We use [`mise`](https://mise.jdx.dev) to manage dependencies. [Install it](https://mise.jdx.dev/installing-mise.html) and install deps and dev tools with:
+
+```shell
+mise install
+```
+
+Then, you should setup pre-commit hooks using [lefthook](https://lefthook.dev):
+
+```shell
+lefthook install
+```
+
+### Testing
 
 Popcorn tests can be run either on WASM via Playwright or natively on UNIX. To run them on WASM, run
-```
+
+```shell
 TARGET=wasm mix test
 ```
 
 To run tests on UNIX, use
 
-```
+```shell
 MIX_ENV=test mix popcorn.build_runtime --target unix
 ```
 
 to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run
 
-```
+```shell
 mix test
 ```
 

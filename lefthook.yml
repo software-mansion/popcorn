@@ -1,0 +1,9 @@
+pre-push:
+  commands:
+    format:
+      run: mix format --check-formatted {push_files}
+      glob: "*.{ex,exs}"
+    lint:
+      run: mix credo
+    typecheck:
+      run: mix dialyzer

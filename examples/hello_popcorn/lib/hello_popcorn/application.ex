@@ -12,4 +12,4 @@ defmodule HelloPopcorn.Application do
     opts = [strategy: :one_for_one, name: HelloPopcorn.Supervisor]
     Supervisor.start_link(children, opts)
   end
-end 
+end
