@@ -114,6 +114,24 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Otherwise, browsers refuse to run WASM.
 
+### Live reloading
+
+Popcorn also ships with a server that supports like reloading. It can be generated with `mix popcorn.dev_server` which will replace the simple server above.
+
+The index.html requires an extra line to load the required JavaScript.
+
+```html
+<!-- index.html -->
+<html>
+  <script type="text/javascript" src="/dev_server.js"></script>
+  <script type="module">
+      import { Popcorn } from "./wasm/popcorn.js";
+      await Popcorn.init({ onStdout: console.log });
+  </script>
+  <body></body>
+</html>
+ ```
+
 ## Configuration of the runtime
 
 Popcorn runs AtomVM under the hood, and therefore it needs to either download precompied artifacts or compile it from source.
