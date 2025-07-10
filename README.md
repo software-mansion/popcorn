@@ -116,7 +116,7 @@ Otherwise, browsers refuse to run WASM.
 
 ### Live reloading
 
-Popcorn also ships with a server that supports like reloading. It can be generated with `mix popcorn.dev_server` which will replace the simple server above.
+Popcorn also ships with a server that supports live reloading. It can be generated with `mix popcorn.dev_server` and run with `elixir dev_server.exs`.
 
 The index.html requires an extra line to load the required JavaScript.
 
