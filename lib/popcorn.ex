@@ -3,13 +3,14 @@ defmodule Popcorn do
   Popcorn is a tool for running Elixir in the browser.
   """
 
+  alias Popcorn.Utils.FetchArtifacts
+
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
   @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
-  @mix_env Mix.env()
 
   defmodule CookingError do
     @moduledoc false
@@ -23,7 +24,7 @@ defmodule Popcorn do
 
   Options:
   - `out_dir` - the directory to write artifacts to
-  - `start_module` - a module with `start/0` function, used by AtomVM as starting point 
+  - `start_module` - a module with `start/0` function, used by AtomVM as starting point
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
   - `compile_artifacts` - compiled BEAMs and other artifacts that should be included
@@ -37,8 +38,8 @@ defmodule Popcorn do
           | {:compile_artifacts, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
-    ingredients(options)
-    bundle(options)
+    ingredients(Keyword.take(options, [:out_dir, :target]))
+    bundle(Keyword.take(options, [:out_dir, :start_module, :compile_artifacts]))
   end
 
   def bundle(options \\ []) do
@@ -104,6 +105,7 @@ defmodule Popcorn do
 
     try do
       :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
+      gzip(bundle_path)
     catch
       {:start_module_not_found, _module} ->
         raise CookingError, "Provided start module `#{inspect(start_module)}` has not been found"
@@ -146,21 +148,19 @@ defmodule Popcorn do
 
   defp copy_runtime_artifacts(options) do
     if options.target == :wasm do
-      wasm_template_dir = Path.join([@priv_dir, "static-template", "wasm"])
-      File.cp_r!(wasm_template_dir, options.out_dir)
+      wasm_template_files = Path.wildcard(Path.join(@priv_dir, "static-template/wasm/**"))
+      cp_gzip(wasm_template_files, options.out_dir)
     end
 
-    atomvm_artifacts_dir = Path.join([@popcorn_path, "atomvm_artifacts", "#{options.target}"])
+    paths = FetchArtifacts.fetch_artifacts(options.target)
 
-    if not File.exists?(atomvm_artifacts_dir) do
+    cp_gzip(paths, options.out_dir, fn path ->
       raise CookingError, """
-      Couldn't find runtime artifacts for target `#{options.target}`. \
-      To build them from source, run \
-      `MIX_ENV=#{@mix_env} mix popcorn.build_runtime --target #{options.target}`.
+      Couldn't find runtime artifact #{Path.basename(path)} at #{path} for target `#{options.target}`. \
+      To build artifacts from source, run \
+      `mix popcorn.build_runtime --target #{options.target}`.
       """
-    end
-
-    File.cp_r!(atomvm_artifacts_dir, options.out_dir)
+    end)
   end
 
   defp ensure_option_present(options, key, name) do
@@ -299,5 +299,20 @@ defmodule Popcorn do
       |> Enum.uniq()
 
     gather_app_specs(deps, Map.merge(specs, new_specs))
+  end
+
+  defp cp_gzip(paths, out_dir, handle_missing_file \\ fn _path -> :ok end) do
+    for path <- List.wrap(paths) do
+      dest = Path.join(out_dir, Path.basename(path))
+      if not File.exists?(path), do: handle_missing_file.(path)
+      File.cp!(path, dest)
+      gzip(dest)
+    end
+
+    :ok
+  end
+
+  defp gzip(path) do
+    File.read!(path) |> :zlib.gzip() |> then(&File.write!("#{path}.gz", &1))
   end
 end
