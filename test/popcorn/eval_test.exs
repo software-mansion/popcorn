@@ -674,7 +674,9 @@ defmodule Popcorn.EvalTest do
     assert %{exit_status: 0, output: output} = result
 
     assert [debug, info, warning, error] =
-             String.split(output, "\n", trim: true) |> Enum.reject(&String.starts_with?(&1, "\e"))
+             String.split(output, "\n", trim: true)
+             # reject color markers
+             |> Enum.reject(&String.starts_with?(&1, "\e"))
 
     assert debug =~ ~r/\[debug\].*foo/
     assert info =~ ~r/\[info\].*bar/
