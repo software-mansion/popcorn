@@ -111,6 +111,7 @@
     nif_error/1,
     bump_reductions/1,
     fun_info/1,
+    phash2/1,
     phash2/2,
     phash/2
 ]).
@@ -3183,6 +3184,10 @@ fun_info(Fun) ->
 %% Note: it inherits limitations of `erlang:term_to_binary`.
 %% Any term not supported by that function will break phash/phash2 as well
 %% Special case for N = 1 allows to escape that limitation in some cases
+phash2(Term) ->
+  % Default range is 0..2^27-1
+  phash2(Term, 134217728).
+
 phash2(_Term, 1) -> 0;
 
 phash2(Term, N) ->
