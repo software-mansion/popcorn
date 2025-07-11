@@ -143,6 +143,7 @@ EOF
 RUN just artifacts
 
 FROM nginx:alpine AS runtime
-COPY landing.nginx.conf /etc/nginx/nginx.conf
+
+COPY --from=build /build/popcorn/misc/landing.nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /build/docs /usr/share/nginx/html
 EXPOSE 8080
