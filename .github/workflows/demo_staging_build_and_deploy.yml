@@ -45,7 +45,7 @@ jobs:
           context: misc/landing-page
           build-args: |
             COMMIT_REF=${{ github.sha }}
-          file: misc/landing-page/Dockerfile
+          file: Dockerfile
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
