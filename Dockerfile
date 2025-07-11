@@ -131,7 +131,7 @@ _example dir: atomvm
     mix popcorn.cook && \
     cp -r /build/atomvm-out/* static/wasm
 
-[working-directory('/build/popcorn/misc/landing-page-v2')]
+[working-directory('/build/popcorn/misc/landing-page')]
 docs: example_iex
     npm install
     npm run build
