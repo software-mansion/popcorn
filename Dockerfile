@@ -8,7 +8,7 @@ ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
 
 WORKDIR /build/popcorn
-COPY --exclude=Dockerfile . .
+COPY . .
 
 # base deps
 RUN touch /build/.env && \
