@@ -59,7 +59,7 @@ _system_deps: _dirs
     # install mise
     install -dm 755 /etc/apt/keyrings
     wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
+    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
     apt update
     apt install -y mise
 
