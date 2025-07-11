@@ -42,10 +42,10 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
-          context: utils/landing-page
+          context: misc/landing-page
           build-args: |
             COMMIT_REF=${{ github.sha }}
-          file: utils/landing-page/Dockerfile
+          file: misc/landing-page/Dockerfile
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
