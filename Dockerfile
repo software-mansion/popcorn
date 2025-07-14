@@ -92,7 +92,8 @@ example_iex: atomvm
     npm install --prefix ./static/assets @xterm/xterm
     mix deps.get
     mix popcorn.cook
-    cp -r /build/atomvm-out/* static/wasm
+    cp /build/atomvm-out/AtomVM.mjs static/wasm/
+    cp /build/atomvm-out/AtomVM.wasm static/wasm/
 
 [group('examples')]
 _example dir: atomvm
@@ -100,19 +101,20 @@ _example dir: atomvm
     cd {{dir}} && \
     mix deps.get && \
     mix popcorn.cook && \
-    cp -r /build/atomvm-out/* static/wasm
+    cp /build/atomvm-out/AtomVM.mjs static/wasm/ && \
+    cp /build/atomvm-out/AtomVM.wasm static/wasm/
 
 [working-directory('/build/popcorn/misc/landing-page')]
 docs: example_iex
-    #!/usr/bin/env bash
     npm install
     npm run build
     # TODO: remove below copy (we popcorn.cook inside astro script which overwrites copied .wasm files in iex_wasm)
-    cp -r /build/atomvm-out/* dist/wasm
+    cp /build/atomvm-out/AtomVM.mjs dist/wasm/
+    cp /build/atomvm-out/AtomVM.wasm dist/wasm/
     cp -r dist/* /build/docs
 EOF
 
-RUN just atomvm
+RUN just docs
 
 FROM nginx:alpine AS runtime
 
