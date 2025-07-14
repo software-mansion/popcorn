@@ -18,7 +18,6 @@ RUN touch /build/.env && \
 
 RUN cat <<EOF > justfile
 # run .env script before running a command
-set shell := ["/usr/bin/env", "bash", "-c"]
 export ERL_AFLAGS := '+JMsingle true'
 export DEBIAN_FRONTEND := 'noninteractive'
 export PATH := "/build/emsdk:/build/emsdk/upstream/emscripten:${HOME}/.local/share/mise/shims:${PATH}"
