@@ -14,7 +14,7 @@ COPY . .
 RUN touch /build/.env && \
     apt update && \
     apt -y install git curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+    curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
 RUN cat <<EOF > justfile
 # run .env script before running a command
