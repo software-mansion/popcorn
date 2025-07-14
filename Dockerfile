@@ -119,6 +119,7 @@ example_game_of_life: (_example '/build/popcorn/examples/game_of_life')
 [group('examples')]
 [working-directory('/build/popcorn/examples/iex_wasm')]
 example_iex: atomvm
+    #!/usr/bin/env bash
     mkdir -p static/assets
     npm install --prefix ./static/assets @xterm/xterm
     mix deps.get
@@ -128,6 +129,7 @@ example_iex: atomvm
 
 [group('examples')]
 _example dir: atomvm
+    #!/usr/bin/env bash
     cd {{dir}} && \
     mix deps.get && \
     mix popcorn.cook && \
@@ -135,6 +137,7 @@ _example dir: atomvm
 
 [working-directory('/build/popcorn/misc/landing-page')]
 docs: example_iex
+    #!/usr/bin/env bash
     npm install
     npm run build
     # TODO: remove below copy (we popcorn.cook inside astro script which overwrites copied .wasm files in iex_wasm)
