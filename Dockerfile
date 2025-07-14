@@ -11,7 +11,7 @@ ARG COMMIT_REF
 WORKDIR /build/
 
 # fetch `just` to manage build steps
-RUN mkdir -p emsdk popcorn atomvm atomvm-wasm docs
+RUN mkdir -p emsdk popcorn atomvm atomvm-out docs
 RUN apt update && \
     apt -y install git curl && \
     curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
