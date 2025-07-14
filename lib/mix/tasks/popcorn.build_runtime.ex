@@ -100,7 +100,7 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     File.rm_rf!(output)
     IO.puts(:stderr, "Cloning AtomVM from #{addr}")
     cmd(["git", "clone", addr, "--", output])
-    if ref, do: cmd(["git", "checkout", ref])
+    if ref, do: cmd(["git", "checkout", ref], cd: output)
     output
   end
 

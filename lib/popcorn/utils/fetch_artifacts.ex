@@ -66,7 +66,11 @@ defmodule Popcorn.Utils.FetchArtifacts do
           %{type: type, location: location, target: List.wrap(opts[:target] || @targets)}
       end)
 
-    Enum.map(@targets, fn t -> %{Enum.find(config, &(t in &1.target)) | target: t} end)
+    Enum.map(@targets, fn target ->
+      config_entry = Enum.find(config, &(target in &1.target))
+      location = String.replace(config_entry.location, "$target", "#{target}")
+      %{config_entry | location: location, target: target}
+    end)
   end
 
   defp download_artifact(url, dir, name) do
