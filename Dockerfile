@@ -105,8 +105,12 @@ atomvm: deps
     emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
     emmake make -j$(nproc)
 
-    cp src/AtomVM.mjs /build/atomvm-out/
-    cp src/AtomVM.wasm /build/atomvm-out/
+    pwd
+    ls -hal
+    ls -hal src
+    ls -hal /build
+    # cp src/AtomVM.mjs /build/atomvm-out/
+    # cp src/AtomVM.wasm /build/atomvm-out/
 
 [group('examples')]
 example_hello_popcorn: (_example '/build/popcorn/examples/hello_popcorn')
@@ -149,7 +153,7 @@ docs: example_iex
     cp -r dist/* /build/docs
 EOF
 
-RUN just artifacts
+RUN just atomvm
 
 FROM nginx:alpine AS runtime
 
