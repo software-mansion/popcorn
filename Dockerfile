@@ -62,6 +62,7 @@ _system_deps: _dirs
     echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
     apt update
     apt install -y mise
+    eval "$(mise activate zsh)"
 
     # add elixir, erlang, node (and tools)
     mise use --global node@22
