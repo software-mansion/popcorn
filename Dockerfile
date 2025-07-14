@@ -32,7 +32,7 @@ artifacts: docs example_hello_popcorn example_eval example_game_of_life example_
 [group('dependencies')]
 [working-directory('/build')]
 _dirs:
-    cd popcorn && git clean -dfx --exclude='justfile'
+    # cd popcorn && git clean -dfx --exclude='justfile'
     rm -rf /build/atomvm
     rm -rf /build/emsdk
     rm -rf /build/atomvm-out
