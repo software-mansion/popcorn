@@ -75,7 +75,7 @@ defmodule Popcorn.MixProject do
   end
 
   defp download_artifacts(_args) do
-    Popcorn.Utils.FetchArtifacts.fetch_artifacts()
+    Popcorn.Utils.FetchArtifacts.download_artifacts(force: "--force" in System.argv())
   end
 
   defp patch(_args) do

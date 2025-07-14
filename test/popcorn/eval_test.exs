@@ -672,7 +672,12 @@ defmodule Popcorn.EvalTest do
       |> AtomVM.try_eval(:elixir, run_dir: dir)
 
     assert %{exit_status: 0, output: output} = result
-    assert [debug, info, warning, error] = String.split(output, "\n", trim: true)
+
+    assert [debug, info, warning, error] =
+             String.split(output, "\n", trim: true)
+             # reject color markers
+             |> Enum.reject(&String.starts_with?(&1, "\e"))
+
     assert debug =~ ~r/\[debug\].*foo/
     assert info =~ ~r/\[info\].*bar/
     assert warning =~ ~r/\[warning\].*baz/
