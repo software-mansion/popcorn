@@ -154,6 +154,7 @@ docs: example_iex
 EOF
 
 RUN just atomvm
+RUN cd /build/atomvm && cp src/AtomVM.mjs /build/atomvm-out/AtomVM.js && cp src/AtomVM.wasm /build/atomvm-out/AtomVM.wasm
 
 FROM nginx:alpine AS runtime
 
