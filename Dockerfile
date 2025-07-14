@@ -1,23 +1,22 @@
 FROM ubuntu:noble AS build
 
-SHELL ["/bin/bash", "-c"]
-
 ENV ERLANG_VERSION="26.0.2"
 ENV ELIXIR_VERSION="1.17.3-otp-26"
+ENV NODE_VERSION="22"
+ENV EMSDK_VERSION="4.0.8"
 ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
 
-WORKDIR /build/popcorn
-COPY . .
+ARG COMMIT_REF
+WORKDIR /build/
 
-# base deps
-RUN touch /build/.env && \
-    apt update && \
+# fetch `just` to manage build steps
+RUN mkdir -p emsdk popcorn atomvm atomvm-wasm docs
+RUN apt update && \
     apt -y install git curl && \
     curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
 RUN cat <<EOF > justfile
-# run .env script before running a command
 export ERL_AFLAGS := '+JMsingle true'
 export DEBIAN_FRONTEND := 'noninteractive'
 export PATH := "/build/emsdk:/build/emsdk/upstream/emscripten:${HOME}/.local/share/mise/shims:${PATH}"
@@ -25,30 +24,22 @@ export MISE_TRUSTED_CONFIG_PATHS := '/build/popcorn'
 export EMSDK_QUIET := '1'
 
 all: deps atomvm artifacts
-deps: _system_deps _emsdk
+deps: _fetch_repos _system_deps _languages _emsdk _atomvm
 artifacts: docs example_hello_popcorn example_eval example_game_of_life example_iex
 
 [group('dependencies')]
 [working-directory('/build')]
-_dirs:
-    # cd popcorn && git clean -dfx --exclude='justfile'
-    rm -rf /build/atomvm
-    rm -rf /build/emsdk
-    rm -rf /build/atomvm-out
-    rm -rf /build/docs
-
-    mkdir -p emsdk atomvm atomvm-out docs
+_fetch_repos:
+    git clone https://github.com/emscripten-core/emsdk.git /build/emsdk
+    git clone https://github.com/software-mansion/popcorn.git /build/popcorn
+    git clone https://github.com/software-mansion-labs/FissionVM.git /build/atomvm
+    cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
+    cd /build/atomvm && git fetch && git checkout swm
+    # prepare for cmake
+    cd /build/atomvm/src/platforms/emscripten && mkdir -p build
 
 [group('dependencies')]
-_system_deps: _dirs
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    if command -v elixir >/dev/null 2>&1; then
-        echo "Elixir already installed, skipping dependencies installation..."
-        exit 0
-    fi
-
+_system_deps:
     apt update
     apt install -y cmake gperf libmbedtls-dev zlib1g-dev git \
     automake make gcc g++ libssl-dev libncurses-dev \
@@ -58,59 +49,32 @@ _system_deps: _dirs
     # install mise
     install -dm 755 /etc/apt/keyrings
     wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
+    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64,arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
     apt update
     apt install -y mise
-    eval "$(mise activate zsh)"
 
-    # add elixir, erlang, node (and tools)
-    mise use --global node@22
-    mise use --global erlang@26.0.2
-    mise use --global elixir@1.17.3-otp-26
+[group('dependencies')]
+_languages: _system_deps
+    mise use --global node@"${NODE_VERSION}"
+    mise use --global erlang@"${ERLANG_VERSION}"
+    mise use --global elixir@"${ELIXIR_VERSION}"
     mise install
     mix local.rebar --force
     mix local.hex -if-missing --force
 
 [group('dependencies')]
 [working-directory('/build/emsdk')]
-_emsdk: _dirs _system_deps
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    if command -v emmake >/dev/null 2>&1; then
-        echo "Emsdk already installed, skipping..."
-        exit 0
-    fi
-
-    git clone https://github.com/emscripten-core/emsdk.git .
+_emsdk: _fetch_repos _system_deps
     git pull
-    ./emsdk install 4.0.8
-    ./emsdk activate 4.0.8
+    ./emsdk install "${EMSDK_VERSION}"
+    ./emsdk activate "${EMSDK_VERSION}"
 
-
-[working-directory('/build/atomvm')]
+[working-directory('/build/atomvm/src/platforms/emscripten/build')]
 atomvm: deps
-    #!/usr/bin/env bash
-    set -euo pipefail
-
-    if [[ -d ".git" ]]; then
-        echo "FissionVM already cloned, skipping clone..."
-    else
-        git clone https://github.com/software-mansion-labs/FissionVM.git .
-    fi
-
-    git pull
-    mkdir -p src/platforms/emscripten/build
-    cd src/platforms/emscripten/build
     emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
     emmake make -j$(nproc)
 
-    pwd
-    ls -hal
-    ls -hal src
-    ls -hal /build
-    # cp src/AtomVM.mjs /build/atomvm-out/
-    # cp src/AtomVM.wasm /build/atomvm-out/
+    cp src/AtomVM.mjs src/AtomVM.wasm /build/atomvm-out/
 
 [group('examples')]
 example_hello_popcorn: (_example '/build/popcorn/examples/hello_popcorn')
@@ -124,15 +88,10 @@ example_game_of_life: (_example '/build/popcorn/examples/game_of_life')
 [group('examples')]
 [working-directory('/build/popcorn/examples/iex_wasm')]
 example_iex: atomvm
-    #!/usr/bin/env bash
-    ls -hal .
     mkdir -p static/assets
-    ls -hal .
     npm install --prefix ./static/assets @xterm/xterm
-    ls -hal .
     mix deps.get
     mix popcorn.cook
-
     cp -r /build/atomvm-out/* static/wasm
 
 [group('examples')]
@@ -154,7 +113,6 @@ docs: example_iex
 EOF
 
 RUN just atomvm
-RUN cd /build/atomvm && cp src/AtomVM.mjs /build/atomvm-out/AtomVM.js && cp src/AtomVM.wasm /build/atomvm-out/AtomVM.wasm
 
 FROM nginx:alpine AS runtime
 
