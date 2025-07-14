@@ -105,7 +105,8 @@ atomvm: deps
     emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
     emmake make -j$(nproc)
 
-    cp /build/atomvm-out/ src/AtomVM.mjs src/AtomVM.wasm
+    cp src/AtomVM.mjs /build/atomvm-out/
+    cp src/AtomVM.wasm /build/atomvm-out/
 
 [group('examples')]
 example_hello_popcorn: (_example '/build/popcorn/examples/hello_popcorn')
