@@ -66,8 +66,9 @@ _system_deps: _dirs
 
     # add elixir, erlang, node (and tools)
     mise use --global node@22
-    mise trust && mise install
-    mise ls
+    mise use --global elixir@1.17.3-otp-26
+    mise use --global erlang@26.0.2
+    mise install
     mix local.rebar --force
     mix local.hex -if-missing --force
 
