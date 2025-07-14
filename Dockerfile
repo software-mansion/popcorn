@@ -120,8 +120,11 @@ example_game_of_life: (_example '/build/popcorn/examples/game_of_life')
 [working-directory('/build/popcorn/examples/iex_wasm')]
 example_iex: atomvm
     #!/usr/bin/env bash
+    ls -hal .
     mkdir -p static/assets
+    ls -hal .
     npm install --prefix ./static/assets @xterm/xterm
+    ls -hal .
     mix deps.get
     mix popcorn.cook
 
