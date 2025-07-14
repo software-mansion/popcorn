@@ -24,7 +24,7 @@ export MISE_TRUSTED_CONFIG_PATHS := '/build/popcorn'
 export EMSDK_QUIET := '1'
 
 all: deps atomvm artifacts
-deps: _fetch_repos _system_deps _languages _emsdk _atomvm
+deps: _fetch_repos _system_deps _languages _emsdk
 artifacts: docs example_hello_popcorn example_eval example_game_of_life example_iex
 
 [group('dependencies')]
