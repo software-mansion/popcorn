@@ -719,4 +719,17 @@ defmodule Popcorn.EvalTest do
     assert output =~ ~r/\[error\].*Generic server .* terminating/
     assert output =~ ~r/"foo"/
   end
+
+  @tag :random
+  async_test "random", %{tmp_dir: dir} do
+    result =
+      quote do
+        for _i <- 1..10, do: Enum.random(1..5)
+      end
+      |> Macro.to_string()
+      |> AtomVM.eval(:elixir, run_dir: dir)
+
+    assert length(result) == 10
+    Enum.each(result, &assert(&1 in 1..5))
+  end
 end

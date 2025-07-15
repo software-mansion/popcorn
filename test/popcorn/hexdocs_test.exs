@@ -1850,7 +1850,7 @@ defmodule Popcorn.HexdocsTest do
         }
       ]
     },
-    {":rand.uniform()", predicate: &is_float/1, skip: true},
+    {":rand.uniform()", predicate: &is_float/1},
     {
       """
       _ = :rand.seed(:exs1024, {123, 123534, 345345})
@@ -1858,7 +1858,7 @@ defmodule Popcorn.HexdocsTest do
       """,
       output: :todo, skip: true
     },
-    {":rand.uniform(6)", predicate: &is_integer/1, skip: true},
+    {":rand.uniform(6)", predicate: &is_integer/1},
     {
       """
       song = "
