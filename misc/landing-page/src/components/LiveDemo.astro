@@ -4,10 +4,10 @@ import Section, { fullWidthClass } from "./Section.astro";
 import LeadingElement from "./LeadingElement.astro";
 ---
 
-<Section id="live-demo" background="light">
+<Section id="live-demo" background="light" class="hidden lg:flex">
     <h1
         class:list={[
-            "text-[200px] font-handjet text-center font-semibold tracking-normal leading-none text-orange-100",
+            "header-title",
             fullWidthClass,
         ]}
     >

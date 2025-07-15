@@ -2,11 +2,12 @@
 import { Icon } from "astro-icon/components";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
+const mobileLinkClass = "";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
 <header
-    class="flex fixed gap-8 top-0 right-0 left-0 text-black backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max"
+    class="flex fixed gap-8 top-0 right-0 left-0 text-black backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max transition-colors duration-300"
 >
     <a href="/" class="flex-shrink-0">
         <Icon
@@ -15,13 +16,13 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
             data-logo
         />
     </a>
-    <div class="flex gap-4">
+    <div class="lg:flex gap-4 hidden">
         <a class={linkClass} href="#features">Features</a>
         <a class={linkClass} href="#examples">Examples</a>
         <a class={linkClass} href="#live-demo">Live demo</a>
         <a class={linkClass} href="#outtro">Contact us</a>
     </div>
-    <div class="flex gap-4">
+    <div class="lg:flex gap-4 hidden">
         <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
         <a
             class={linkClass}
@@ -29,13 +30,98 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
             href="https://github.com/software-mansion/popcorn/">Github →</a
         >
     </div>
+    <button
+        class="lg:hidden flex flex-col gap-1 w-6 h-6 justify-center items-center"
+        data-mobile-menu-toggle
+        aria-label="Toggle mobile menu"
+    >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" data-hamburger-icon>
+            <path d="M4 18H20M4 12H20M4 6H20" stroke="#5F4122" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg class="hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" data-close-icon>
+            <path d="M19 5L5 19M5.00001 5L19 19" stroke="#FFFDF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+
 </header>
+
+<nav 
+    class="fixed top-0 w-full h-full bg-brown-70 z-50 lg:hidden transform -translate-y-full transition-transform duration-300"
+    data-mobile-menu
+>
+    <div class="flex flex-col p-4 mt-5 text-light-20">
+        <div class="flex flex-col gap-10">
+            <a href="#features">Features</a>
+            <a href="#examples">Examples</a>
+            <a href="#live-demo">Live demo</a>
+            <a href="#outtro">Contact us</a>
+        </div>
+        <hr class="my-11.5">
+        <div class="flex flex-col gap-10">
+            <a href="/docs/">Documentation →</a>
+            <a href="https://github.com/software-mansion/popcorn/">Github →</a>
+        </div>
+    </div>
+</nav>
+
+
+
+
 
 <script>
     function setupHeaderColorChange() {
         const header = document.querySelector("header")!;
         const logo = header.querySelector("[data-logo]");
         const links = header.querySelectorAll("a");
+
+        // Mobile menu elements
+        const menuToggle = document.querySelector("[data-mobile-menu-toggle]")!;
+        const mobileMenu = document.querySelector("[data-mobile-menu]")!;
+        const mobileLinks = mobileMenu.querySelectorAll("a");
+        const hamburgerIcon = document.querySelector("[data-hamburger-icon]");
+        const closeIcon = document.querySelector("[data-close-icon]");
+
+        let isOpen = false;
+
+        const closeMenu = () => {
+            mobileMenu.classList.add("-translate-y-full");
+            hamburgerIcon?.classList.remove("hidden");
+            closeIcon?.classList.add("hidden");
+
+            mobileMenu.classList.remove("top-16")
+            header.classList.remove("bg-brown-70");
+            logo?.classList.remove("!text-light-20");
+        };
+
+        const openMenu = () => {
+            mobileMenu.classList.remove("-translate-y-full");
+            hamburgerIcon?.classList.add("hidden");
+            closeIcon?.classList.remove("hidden");
+
+            mobileMenu.classList.add("top-16")
+            header.classList.add("bg-brown-70");
+            logo?.classList.add("!text-light-20");
+        };
+
+        function toggleMenu() {
+            isOpen = !isOpen;
+            
+            if (isOpen) {
+                // Open menu
+                openMenu();
+            } else {
+                // Close menu
+                closeMenu(); 
+            }
+        }
+
+        menuToggle.addEventListener("click", toggleMenu);
+        mobileLinks.forEach(link => {
+            link.addEventListener("click", () => {
+                isOpen = false;
+                closeMenu();
+            });
+        });
 
         function swapTextColor() {
             const headerRect = header.getBoundingClientRect();
