@@ -5,35 +5,30 @@ import LeadingElement from "./LeadingElement.astro";
 ---
 
 <Section id="examples" background="dark">
-    <h1
-        class="header-title"
-    >
-        See what you can achieve with Popcorn
-    </h1>
-    <LeadingElement title="EXAMPLES" color="dark" />
+  <h1 class="header-title">See what you can achieve with Popcorn</h1>
+  <LeadingElement title="EXAMPLES" color="dark" />
 
-    <div class="flex flex-col gap-10">
-        <ExampleCard n="01" title="Elixir REPL">
-            <Fragment slot="description">
-                Remember the first time you fired up iex? Now imagine that same
-                thrill, but accessible to anyone with a browser. Share Elixir's
-                magic without asking for installations.
-            </Fragment>
-        </ExampleCard>
-        <ExampleCard n="02" title="Interactive docs">
-            <Fragment slot="description">
-                Static documentation is so yesterday. Our interactive docs let
-                readers become players, turning every code snippet into a
-                mini-playground where learning happens through doing.
-            </Fragment>
-        </ExampleCard>
-        <ExampleCard n="03" title="Game of life">
-            <Fragment slot="description">
-                From mathematical theory to browser reality in milliseconds.
-                This classic cellular automaton showcases how Elixir's
-                concurrent design patterns translate beautifully to visual,
-                interactive experiences.
-            </Fragment>
-        </ExampleCard>
-    </div>
+  <div class="flex flex-col gap-10">
+    <ExampleCard n="01" title="Elixir REPL">
+      <Fragment slot="description">
+        Remember the first time you fired up iex? Now imagine that same thrill,
+        but accessible to anyone with a browser. Share Elixir's magic without
+        asking for installations.
+      </Fragment>
+    </ExampleCard>
+    <ExampleCard n="02" title="Interactive docs">
+      <Fragment slot="description">
+        Static documentation is so yesterday. Our interactive docs let readers
+        become players, turning every code snippet into a mini-playground where
+        learning happens through doing.
+      </Fragment>
+    </ExampleCard>
+    <ExampleCard n="03" title="Game of life">
+      <Fragment slot="description">
+        From mathematical theory to browser reality in milliseconds. This
+        classic cellular automaton showcases how Elixir's concurrent design
+        patterns translate beautifully to visual, interactive experiences.
+      </Fragment>
+    </ExampleCard>
+  </div>
 </Section>

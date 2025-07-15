@@ -30,6 +30,7 @@
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
+    "prettier-plugin-astro": "^0.14.1",
     "vite-plugin-devtools-json": "^0.2.1"
   }
 }
