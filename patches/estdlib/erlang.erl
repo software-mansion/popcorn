@@ -59,6 +59,7 @@
     binary_to_integer/1,
     binary_to_integer/2,
     binary_to_list/1,
+    binary_to_list/3,
     atom_to_binary/1,
     atom_to_binary/2,
     atom_to_list/1,
@@ -110,6 +111,7 @@
     nif_error/1,
     bump_reductions/1,
     fun_info/1,
+    phash2/1,
     phash2/2,
     phash/2
 ]).
@@ -2583,6 +2585,15 @@ binary_to_integer(_Binary, Base) ->
 binary_to_list(_Binary) ->
     erlang:nif_error(undefined).
 
+% Patch reason: NIF not available in AtomVM
+-spec binary_to_list(Binary, Start, Stop) -> [byte()] when
+      Binary :: binary(),
+      Start :: pos_integer(),
+      Stop :: pos_integer().
+binary_to_list(Binary, Start, Stop) ->
+    Chunk = erlang:binary_part(Binary, Start - 1, Stop - Start + 1),
+    erlang:binary_to_list(Chunk).
+
 %%-----------------------------------------------------------------------------
 %% @param   Atom        Atom to convert
 %% @returns a binary with the atom's name
@@ -3173,6 +3184,10 @@ fun_info(Fun) ->
 %% Note: it inherits limitations of `erlang:term_to_binary`.
 %% Any term not supported by that function will break phash/phash2 as well
 %% Special case for N = 1 allows to escape that limitation in some cases
+phash2(Term) ->
+  % Default range is 0..2^27-1
+  phash2(Term, 134217728).
+
 phash2(_Term, 1) -> 0;
 
 phash2(Term, N) ->

@@ -7,14 +7,18 @@ defmodule HelloPopcorn.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: [
+        build_wasm: ["popcorn.build_runtime --target wasm", "popcorn.cook"]
+      ]
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [],
+      mod: {HelloPopcorn.Application, []}
     ]
   end
 
@@ -23,7 +27,9 @@ defmodule HelloPopcorn.MixProject do
     [
       # {:popcorn, github: "software-mansion/popcorn"}
       {:popcorn, path: "../.."},
-      {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
+      # playwright will be started manually
+      {:playwright,
+       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
     ]
   end
 end

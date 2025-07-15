@@ -12,14 +12,14 @@ on:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
   pull_request:
     # branches: [ "*" ]
     paths:
       - "*"
       - "!examples"
       - "!.github"
-      - ".github/workflows/popcorn_build_and_test.yml"
+      - ".github/workflows/popcorn_build_test.yml"
 
 permissions:
   contents: read
@@ -39,11 +39,16 @@ jobs:
         with:
           ssh-private-key: |
             ${{ secrets.ACCESS_TO_FISSIONVM }}
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.7
       - name: Set up Elixir
         uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
         with:
           elixir-version: "1.17.3"
           otp-version: "26.0.2"
+          rebar3-version: "3.18.0"
       - name: Restore dependencies cache
         uses: actions/cache@v3
         with:
@@ -57,9 +62,15 @@ jobs:
         run: mix deps.get
       - name: Lint
         run: mix lint
-      - name: Build AtomVM
+      - name: Build AtomVM Unix
         run: |
-          export PATH=$PATH:/home/runner/.mix/elixir/1-17/ # for rebar3 to be found
           mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+      - name: Build AtomVM WASM
+        run: |
+          mix popcorn.build_runtime --target wasm
+      - name: Install playwright deps
+        run: mix playwright.install
       - name: Run tests
         run: mix test
+      - name: Run WASM tests
+        run: TARGET=wasm mix test

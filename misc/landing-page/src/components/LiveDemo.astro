@@ -1,0 +1,199 @@
+---
+import Button, { buttonGroupClass } from "./Button.astro";
+import Section, { fullWidthClass } from "./Section.astro";
+import LeadingElement from "./LeadingElement.astro";
+---
+
+<Section id="live-demo" background="light">
+    <h1
+        class:list={[
+            "text-[200px] font-handjet text-center font-semibold tracking-normal leading-none text-orange-100",
+            fullWidthClass,
+        ]}
+    >
+        Check out how simple it is to use Popcorn’s API
+    </h1>
+    <LeadingElement title="Live demo" color="light" />
+
+    <div class="flex justify-between gap-20 items-center">
+        <div class="max-w-96">
+            <p>
+                Elixir meets browser. Magic happens. This live demo showcases
+                Popcorn's intuitive API – where functional programming
+                principles create beautiful, interactive web experiences. Click
+                around, modify the code, and discover why developers are falling
+                in love with Elixir on the frontend.
+            </p>
+            <div class={buttonGroupClass}>
+                <Button
+                    title="Read the docs"
+                    type="primary"
+                    href="#"
+                    newTab={true}
+                />
+                <Button
+                    title="See the repo"
+                    type="secondary"
+                    href="https://github.com/software-mansion/popcorn/"
+                    newTab={true}
+                />
+            </div>
+        </div>
+        <div class="flex flex-col gap-4">
+            <div
+                id="terminal"
+                class="border-orange-100 border w-xl h-80 overflow-auto live-demo-scroll"
+            >
+            </div>
+            <div class="flex flex-col gap-2">
+                <a
+                    id="live-simple"
+                    class="border-orange-100 border text-center p-1"
+                    >Example: sort</a
+                >
+                <a
+                    id="live-case"
+                    class="border-orange-100 border text-center p-1"
+                    >Example: processes</a
+                >
+            </div>
+        </div>
+    </div>
+</Section>
+
+<script>
+    import { Terminal } from "@xterm/xterm";
+    import { FitAddon } from "@xterm/addon-fit";
+
+    const XTERM_CONFIG = {
+        allowTransparency: true,
+        theme: {
+            background: "#fffdf5",
+            foreground: "#36220d",
+            cursor: "#ef7c00",
+            cursorAccent: "#ef7c00",
+            selectionBackground: "#ffe6cc",
+        },
+    };
+
+    const EXAMPLES = [
+        { id: "live-simple", lines: ["Enum.sort([3, 2, 1])"] },
+        {
+            id: "live-case",
+            lines: [
+                "hi = fn -> IO.inspect(self()) end",
+                "Enum.each(0..3, fn _ -> spawn(hi) end)",
+            ],
+        },
+    ];
+
+    async function main() {
+        const terminalContainer = document.getElementById("terminal");
+        if (terminalContainer === null) {
+            throw new Error("Terminal container not found");
+        }
+        const { term, write } = xtermInit({
+            container: terminalContainer,
+        });
+
+        const POPCORN_CONFIG = {
+            debug: true,
+            onStdout: (text: string) =>
+                displayLog(text, { term, isError: false }),
+            onStderr: (text: string) =>
+                displayLog(text, { term, isError: true }),
+        };
+        const popcorn = await Popcorn.init(POPCORN_CONFIG);
+
+        term.onKey(async (event: any) => {
+            if (isUpOrDownArrowKeyEvent(event)) {
+                return;
+            }
+            let key = event.key as string;
+            try {
+                await write([key], popcorn, { withEnter: false });
+            } catch (error) {
+                displayLog(error as string, { term, isError: true });
+            }
+        });
+
+        for (const { id, lines } of EXAMPLES) {
+            const node = document.getElementById(id);
+            if (node === null) {
+                throw new Error(`Element with ID ${id} not found`);
+            }
+
+            node.addEventListener("click", async () => {
+                await write(lines, popcorn);
+            });
+        }
+        return term;
+    }
+
+    function displayLog(log: string, { term, isError }) {
+        const lineElement = document.createElement("span");
+        lineElement.textContent = log;
+        if (isError) {
+            log = "\x1b[31m" + log + "\x1b[0m\n\r";
+        }
+        term.write(log);
+    }
+
+    type XtermOpts = { container: Element };
+    function xtermInit({ container }: XtermOpts) {
+        const term = new Terminal(XTERM_CONFIG);
+        const fitAddon = new FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(container);
+        fitAddon.fit();
+
+        async function write(
+            lines: string[],
+            popcorn: any,
+            { withEnter = true } = {},
+        ) {
+            const ENTER_EVENT = {
+                code: "Enter",
+                key: "Enter",
+                charCode: 13,
+                keyCode: 13,
+                view: window,
+            };
+
+            const textArea = document.querySelector(".xterm-helper-textarea");
+            if (textArea === null) throw new Error("Terminal not initialized");
+
+            for (const line of lines) {
+                await popcorn.call(
+                    { command: "code_data", language: "elixir", text: line },
+                    { timeoutMs: 10_000 },
+                );
+                if (!withEnter) {
+                    continue;
+                }
+                const keyboardEvent = new KeyboardEvent("keydown", ENTER_EVENT);
+                textArea.dispatchEvent(keyboardEvent);
+            }
+        }
+
+        return { term, write };
+    }
+
+    function isUpOrDownArrowKeyEvent(event: any) {
+        const keycode = event.domEvent.keyCode;
+        const ARROW_UP_KEY_CODE = 38;
+        const ARROW_DOWN_KEY_CODE = 40;
+
+        return [ARROW_UP_KEY_CODE, ARROW_DOWN_KEY_CODE].includes(keycode);
+    }
+
+    // Entrypoint
+    const term = await main();
+    window.terminal = term;
+</script>
+
+<style>
+    .live-demo-scroll {
+        scrollbar-color: #ef7c00 #fffdf5;
+    }
+</style>

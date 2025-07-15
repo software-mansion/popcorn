@@ -10,21 +10,23 @@ defmodule EvalInWasm.MixProject do
       compilers: Mix.compilers(),
       deps: deps(),
       aliases: [
-        build_wasm: "popcorn.build_runtime --target wasm"
+        build_wasm: ["popcorn.build_runtime --target wasm", "popcorn.cook"]
       ]
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [],
+      mod: {EvalInWasm.Application, []}
     ]
   end
 
   defp deps do
     [
       {:popcorn, path: "../../"},
-      {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
+      {:playwright,
+       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
     ]
   end
 end

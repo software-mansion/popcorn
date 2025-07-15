@@ -2,7 +2,7 @@ defmodule Popcorn.EvalTest do
   use ExUnit.Case, async: true
   require Logger
   require Popcorn.Support.AtomVM
-  import Popcorn.Support.AsyncTest
+  import AsyncTest
   alias Popcorn.Support.AtomVM
 
   @examples_path "./test/examples"
@@ -139,7 +139,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(55)
   end
 
-  async_test "Adder", %{tmp_dir: dir} do
+  async_test "Adder Elixir", %{tmp_dir: dir} do
     """
     defmodule Adder do
       def calc(a, b), do: a + b
@@ -197,7 +197,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :mr
+  @tag skip_target: :wasm
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
       """
@@ -224,7 +224,7 @@ defmodule Popcorn.EvalTest do
     # assert String.contains?(logs, "warning: {unused_var,a,false}")
   end
 
-  async_test "Adder", %{tmp_dir: dir} do
+  async_test "Adder Erlang", %{tmp_dir: dir} do
     """
     -module(adder).
     -export([add/2]).
@@ -491,7 +491,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(%SystemLimitError{})
   end
 
-  async_test "SystemLimitError", %{tmp_dir: dir} do
+  async_test "UndefinedFunctionError", %{tmp_dir: dir} do
     """
     Enum.doesnt_exist()
     """
@@ -537,13 +537,13 @@ defmodule Popcorn.EvalTest do
   end
 
   async_test ":os.type/0", %{tmp_dir: dir} do
-    os_type = :os.type()
+    os_type =
+      """
+      :os.type()
+      """
+      |> AtomVM.eval(:elixir, run_dir: dir)
 
-    """
-    :os.type()
-    """
-    |> AtomVM.eval(:elixir, run_dir: dir)
-    |> AtomVM.assert_result(^os_type)
+    assert os_type in [:os.type(), {:unix, :emscripten}]
   end
 
   async_test ":filename.split/1", %{tmp_dir: dir} do
@@ -608,6 +608,7 @@ defmodule Popcorn.EvalTest do
   end
 
   @tag timeout: :timer.minutes(5)
+  @tag skip_target: :wasm
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
@@ -653,5 +654,69 @@ defmodule Popcorn.EvalTest do
              {RunExpr.Reraiser, :reraise_error, 0, _} | _rest
            ] =
              stacktrace
+  end
+
+  @tag :logger
+  async_test "logger", %{tmp_dir: dir} do
+    result =
+      quote do
+        # TODO: move this to the Popcorn application
+        :atomvm_logger_manager.start_link(%{log_level: :debug})
+        require Logger
+        Logger.debug("foo")
+        Logger.info("bar")
+        Logger.warning("baz")
+        Logger.error("foobar")
+      end
+      |> Macro.to_string()
+      |> AtomVM.try_eval(:elixir, run_dir: dir)
+
+    assert %{exit_status: 0, output: output} = result
+
+    assert [debug, info, warning, error] =
+             String.split(output, "\n", trim: true)
+             # reject color markers
+             |> Enum.reject(&String.starts_with?(&1, "\e"))
+
+    assert debug =~ ~r/\[debug\].*foo/
+    assert info =~ ~r/\[info\].*bar/
+    assert warning =~ ~r/\[warning\].*baz/
+    assert error =~ ~r/\[error\].*foobar/
+  end
+
+  @tag :logger
+  async_test "GenServer crash handling", %{tmp_dir: dir} do
+    result =
+      quote do
+        # TODO: move this to the Popcorn application
+        :atomvm_logger_manager.start_link(%{log_level: :debug})
+
+        defmodule GS do
+          # FIXME: use GenServer generates 'Unknown external term type: 259'
+          # use GenServer
+
+          def init(_opts) do
+            {:ok, %{}}
+          end
+
+          def handle_info(:exit, _state) do
+            raise "foo"
+          end
+        end
+
+        {:ok, pid} = GenServer.start(GS, [])
+        Process.monitor(pid)
+        send(pid, :exit)
+
+        receive do
+          {:DOWN, _ref, :process, ^pid, _reason} -> :ok
+        end
+      end
+      |> Macro.to_string()
+      |> AtomVM.try_eval(:elixir, run_dir: dir)
+
+    assert %{result: :ok, exit_status: 0, output: output} = result
+    assert output =~ ~r/\[error\].*Generic server .* terminating/
+    assert output =~ ~r/"foo"/
   end
 end

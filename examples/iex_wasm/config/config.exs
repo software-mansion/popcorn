@@ -15,11 +15,10 @@ include_tracing =
 
 config :popcorn,
   out_dir: "static/wasm",
-  start_module: IexWasm.Application,
   add_tracing: include_tracing
 
-if path = System.get_env("ATOMVM_SOURCE_PATH") do
-  config :popcorn, runtime_source: {:path, path}
+if path = System.get_env("RUNTIME_PATH") do
+  config :popcorn, runtime: {:path, path}
 end
 
 if File.exists?("#{__DIR__}/config.secret.exs") do

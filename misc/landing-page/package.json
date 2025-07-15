@@ -1,0 +1,35 @@
+{
+  "name": "popcorn-landing",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/react": "^4.3.0",
+    "@astrojs/starlight": "^0.34.4",
+    "@fontsource-variable/handjet": "^5.2.6",
+    "@fontsource-variable/inter": "^5.2.6",
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "astro": "^5.10.1",
+    "astro-icon": "^1.1.5",
+    "astro-mermaid": "^1.0.3",
+    "chokidar": "^4.0.3",
+    "mermaid": "^11.7.0",
+    "playwright": "^1.53.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "rehype-mermaid": "^3.0.0",
+    "tailwindcss": "^4.1.11"
+  },
+  "devDependencies": {
+    "vite-plugin-devtools-json": "^0.2.1"
+  }
+}

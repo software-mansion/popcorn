@@ -1,6 +1,6 @@
 const INIT_TIMEOUT_MS = 30_000;
-const CALL_TIMEOUT_MS = 5_000;
-const HEARTBEAT_TIMEOUT_MS = 15_000;
+const CALL_TIMEOUT_MS = 60_000;
+const HEARTBEAT_TIMEOUT_MS = 60_000;
 
 // postMessage data:
 //  | { type: "stdout", value: string }
@@ -72,8 +72,8 @@ export class Popcorn {
 
     this._debug = debug;
     this._bundlePath = bundlePath ?? "wasm/bundle.avm";
-    this.onStdout = onStdout ?? noop;
-    this.onStderr = onStderr ?? noop;
+    this.onStdout = onStdout ?? console.log;
+    this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
@@ -124,7 +124,8 @@ export class Popcorn {
               initVm();
             </script>
         </html>`;
-      this._iframe.style = "visibility: hidden; width: 0px; height: 0px; border: none";
+      this._iframe.style =
+        "visibility: hidden; width: 0px; height: 0px; border: none";
 
       // TODO: handle multiple iframes
       this._listenerRef = this._iframeListener.bind(this);
@@ -306,7 +307,7 @@ export class Popcorn {
   }
 }
 
-function noop() { }
+function noop() {}
 
 async function withTimeout(promise, ms) {
   let timeout = null;

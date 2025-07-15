@@ -79,9 +79,9 @@ defmodule Exception do
   """
   def message(%module{__exception__: true} = exception) do
     try do
-#      for some reason, the `module.message(exception)` is crashing when invoked with FunctionClauseError
+      # for some reason, the `module.message(exception)` is crashing when invoked with FunctionClauseError
       "got #{inspect(exception.__struct__)} with message " <>
-      "Module: #{inspect(exception.module)} Function: #{inspect(exception.function)}/#{inspect(exception.arity)}"
+        "Module: #{inspect(exception.module)} Function: #{inspect(exception.function)}/#{inspect(exception.arity)}"
     rescue
       caught_exception ->
         "got #{inspect(caught_exception.__struct__)} with message " <>
