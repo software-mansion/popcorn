@@ -177,35 +177,12 @@ defmodule Popcorn do
     config = Mix.Project.config()
     app = Keyword.get(config, :app)
 
-    all_specs = gather_app_specs([:kernel, :stdlib, app], %{})
-
-    # FIXME: logger app is broken for now, skip it
-    specs =
-      all_specs
-      |> Map.delete(:logger)
-      |> Map.new(fn {app, spec} ->
-        spec =
-          Keyword.update(spec, :applications, [], &Enum.reject(&1, fn x -> x == :logger end))
-
-        {app, spec}
-      end)
-
-    if all_specs != specs do
-      env = __ENV__
-
-      # Intentionally omit line number and whole stacktrace plus ensure file is relative to popcorn root
-      IO.warn(
-        "Disabled unsupported :logger application, some calls may break at runtime",
-        file: Path.relative_to(env.file, Path.expand(__DIR__ <> "../../..")),
-        module: __MODULE__,
-        function: env.function
-      )
-    end
+    specs = gather_app_specs([:kernel, :stdlib, app], %{})
 
     # TODO: Until separation of deps for tasks and runtime is solved, disable all extra apps from :popcorn
     specs =
       if Map.has_key?(specs, :popcorn) do
-        put_in(specs[:popcorn][:applications], [:kernel, :stdlib, :elixir])
+        put_in(specs[:popcorn][:applications], [:kernel, :stdlib, :elixir, :logger])
       else
         specs
       end

@@ -7,14 +7,14 @@ name: Popcorn build & test
 
 on:
   push:
-    # branches: [ "*" ]
+    branches: ["*"]
     paths:
       - "*"
       - "!examples"
       - "!.github"
       - ".github/workflows/popcorn_build_test.yml"
   pull_request:
-    # branches: [ "*" ]
+    branches: ["*"]
     paths:
       - "*"
       - "!examples"

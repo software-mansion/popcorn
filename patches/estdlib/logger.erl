@@ -421,8 +421,16 @@ macro_log(Location, Level, StringOrReport) ->
 
 %% @hidden
 macro_log(Location, Level, FormatOrReport, ArgsOrMeta) ->
-    Args = if is_list(ArgsOrMeta) -> ArgsOrMeta; true -> [] end,
-    Meta = if is_map(ArgsOrMeta) -> ArgsOrMeta; true -> #{} end,
+    Args =
+        if
+            is_list(ArgsOrMeta) -> ArgsOrMeta;
+            true -> []
+        end,
+    Meta =
+        if
+            is_map(ArgsOrMeta) -> ArgsOrMeta;
+            true -> #{}
+        end,
     macro_log(Location, Level, FormatOrReport, Args, Meta).
 
 %% @hidden
@@ -450,7 +458,8 @@ format_log(Log) ->
                 LF = atomvm_logger_manager:get_formatter(),
                 erlang:put('$atomvm_logger_formatter', LF),
                 LF;
-            LF -> LF
+            LF ->
+                LF
         end,
     Formatter:format(Log, Config).
 
@@ -491,34 +500,40 @@ allow_handler(Level, HandlerLevel) ->
 
 %% @private
 do_log(Level, StringOrReport, Args, MetaData) when
-    (is_list(StringOrReport) orelse is_map(StringOrReport) orelse is_binary(StringOrReport)) andalso is_list(Args) andalso
+    (is_list(StringOrReport) orelse is_map(StringOrReport) orelse is_binary(StringOrReport)) andalso
+        is_list(Args) andalso
         is_map(MetaData)
 ->
-    LogEvent = create_event(Level, StringOrReport, Args, MetaData),
-    lists:foreach(
-        fun({Handler, HandlerConfig}) ->
-            case allow_handler(Level, maps:get(level, HandlerConfig)) of
-                true ->
-                    try
-                        Log = format_log(LogEvent),
-                        Handler:log(Log, HandlerConfig),
-                        ok
-                    catch
-                        T:E:S ->
-                            io:format(
-                                "An error occurred logging event ~p with config ~p.  type: ~p error=~p stacktrace=~p~n",
-                                [LogEvent, HandlerConfig, T, E, S]
-                            ),
-                            error
-                    end;
-                _ ->
-                    ok
-            end
-        end,
-        get_handlers()
-    );
+    case create_event(Level, StringOrReport, Args, MetaData) of
+        #{meta := #{domain := [otp, sasl]}} ->
+            % Ignore SASL logs
+            ok;
+        LogEvent ->
+            lists:foreach(
+                fun(Handler) -> call_handler(Handler, Level, LogEvent) end, get_handlers()
+            )
+    end;
 do_log(_Level, _StringOrReport, _Args, _MetaData) ->
     erlang:error(badarg).
+
+call_handler({Handler, HandlerConfig}, Level, LogEvent) ->
+    case allow_handler(Level, maps:get(level, HandlerConfig)) of
+        true ->
+            try
+                Log = format_log(LogEvent),
+                Handler:log(Log, HandlerConfig),
+                ok
+            catch
+                T:E:S ->
+                    io:format(
+                        "An error occurred logging event ~p with config ~p.  type: ~p error=~p stacktrace=~p~n",
+                        [LogEvent, HandlerConfig, T, E, S]
+                    ),
+                    error
+            end;
+        _ ->
+            ok
+    end.
 
 %% @private
 maybe_get_module(#{location := #{mfa := {Module, _FunctionName, _FunctionArity}}} = _MetaData) ->

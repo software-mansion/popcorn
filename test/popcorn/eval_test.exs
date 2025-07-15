@@ -660,8 +660,6 @@ defmodule Popcorn.EvalTest do
   async_test "logger", %{tmp_dir: dir} do
     result =
       quote do
-        # TODO: move this to the Popcorn application
-        :atomvm_logger_manager.start_link(%{log_level: :debug})
         require Logger
         Logger.debug("foo")
         Logger.info("bar")
@@ -688,9 +686,6 @@ defmodule Popcorn.EvalTest do
   async_test "GenServer crash handling", %{tmp_dir: dir} do
     result =
       quote do
-        # TODO: move this to the Popcorn application
-        :atomvm_logger_manager.start_link(%{log_level: :debug})
-
         defmodule GS do
           # FIXME: use GenServer generates 'Unknown external term type: 259'
           # use GenServer
