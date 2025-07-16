@@ -149,6 +149,11 @@ function onVmInit(initProcess) {
         const result = await Module.call(process, args);
         send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
       } catch (error) {
+        if(error == "noproc") {
+          send(MESSAGES.RELOAD, null);
+          console.error("Runtime VM crushed, popcorn iframe reloaded.");
+          return;
+        }
         send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
       }
     } else if (type.startsWith("popcorn")) {
