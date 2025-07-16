@@ -2,27 +2,26 @@
 import { Icon } from "astro-icon/components";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
-const mobileLinkClass = "";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
-<header
-  class="flex fixed gap-8 top-0 right-0 left-0 text-black lg:bg-transparent backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max transition-colors duration-300"
+<nav
+  class="fixed top-0 right-0 left-0 flex h-16 min-w-max items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 lg:bg-transparent"
 >
   <a href="/" class="flex-shrink-0">
     <Icon
       name="logo-text"
-      class="text-4xl lg:text-brown-header transition-colors duration-300"
+      class="lg:text-brown-header text-4xl transition-colors duration-300"
       data-logo
     />
   </a>
-  <div class="lg:flex gap-4 hidden">
+  <div class="hidden gap-4 lg:flex">
     <a class={linkClass} href="#features">Features</a>
     <a class={linkClass} href="#examples">Examples</a>
     <a class={linkClass} href="#live-demo">Live demo</a>
     <a class={linkClass} href="#outtro">Contact us</a>
   </div>
-  <div class="lg:flex gap-4 hidden">
+  <div class="hidden gap-4 lg:flex">
     <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
     <a
       class={linkClass}
@@ -31,28 +30,28 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     >
   </div>
   <button
-    class="lg:hidden flex flex-col gap-1 w-6 h-6 justify-center items-center"
+    class="flex h-6 w-6 flex-col items-center justify-center gap-1 lg:hidden"
     data-mobile-menu-toggle
     aria-label="Toggle mobile menu"
   >
     <Icon
       name="hamburger"
-      class="text-2xl text-brown-header transition-colors duration-300"
+      class="text-brown-header text-2xl transition-colors duration-300"
       data-hamburger-icon
     />
     <Icon
       name="close"
-      class="hidden text-2xl text-light-20 transition-colors duration-300"
+      class="text-light-20 hidden text-2xl transition-colors duration-300"
       data-close-icon
     />
   </button>
-</header>
+</nav>
 
 <nav
-  class="fixed top-0 w-full h-full bg-brown-70 z-50 lg:hidden transform -translate-y-full transition-transform duration-300"
+  class="bg-brown-70 fixed top-0 z-50 h-full w-full -translate-y-full transform transition-transform duration-300 lg:hidden"
   data-mobile-menu
 >
-  <div class="flex flex-col p-4 mt-5 text-light-20">
+  <div class="text-light-20 mt-5 flex flex-col p-4">
     <div class="flex flex-col gap-10">
       <a href="#features">Features</a>
       <a href="#examples">Examples</a>
@@ -69,7 +68,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
 <script>
   function setupHeaderColorChange() {
-    const header = document.querySelector("header")!;
+    const header = document.querySelector("nav")!;
     const logo = header.querySelector("[data-logo]");
     const links = header.querySelectorAll("a");
 

@@ -2,20 +2,20 @@
 const { n } = Astro.props;
 ---
 
-<div class="flex flex-col max-w-2xl">
-  <div class="flex items-center justify-between lg:gap-72 md:gap-36 gap-3">
-    <h2 class="md:text-6xl text-[40px] font-handjet text-black wrap-break-word">
+<div class="flex max-w-2xl flex-col">
+  <div class="flex items-center justify-between gap-3 md:gap-36 lg:gap-72">
+    <h2 class="font-handjet text-[40px] wrap-break-word text-black md:text-6xl">
       Start using Elixir on the frontend
     </h2>
     <h1
-      class="md:text-[180px] text-[120px] font-handjet text-orange-100 leading-none"
+      class="font-handjet text-[120px] leading-none text-orange-100 md:text-[180px]"
     >
       {n}
     </h1>
   </div>
   <hr class="mt-6 mb-6" />
-  <div class="flex md:gap-8 gap-4 content-stretch flex-col md:flex-row">
-    <h3 class="text-base md:text-2xl text-orange-100 flex-1/2">
+  <div class="flex flex-col content-stretch gap-4 md:flex-row md:gap-12">
+    <h3 class="flex-1/2 text-base text-orange-100 md:text-2xl">
       <slot name="title" />
     </h3>
     <p class="flex-1/2"><slot name="description" /></p>

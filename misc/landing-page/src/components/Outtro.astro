@@ -1,15 +1,16 @@
 ---
 import Button from "./Button.astro";
+import HeaderTitle from "./HeaderTitle.astro";
 import LeadingElement from "./LeadingElement.astro";
 import Section from "./Section.astro";
 ---
 
 <Section id="outtro" background="light">
-  <h1 class="header-title">Looking for more than just a library?</h1>
-  <LeadingElement title="CONTACT US" color="light" />
+  <HeaderTitle>Looking for more than just a library?</HeaderTitle>
+  <LeadingElement title="Contact us" color="light" />
   <Button title="Drop us a line" type="primary" href="#" />
 </Section>
 <div class="flex flex-col items-center pb-8">
   <p>Created by</p>
-  <p class="font-bold text-[20px]">Software Mansion</p>
+  <p class="text-[20px] font-bold">Software Mansion</p>
 </div>

@@ -39,13 +39,3 @@
     }
   }
 }
-
-@layer components {
-  .break {
-    @apply hidden md:block;
-  }
-
-  .header-title {
-    @apply max-w-5xl md:text-[200px] text-[80px] font-handjet font-semibold tracking-normal text-center leading-none text-orange-100;
-  }
-}

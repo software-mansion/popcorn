@@ -2,15 +2,16 @@
 import Button, { buttonGroupClass } from "./Button.astro";
 import Section, { fullWidthClass } from "./Section.astro";
 import LeadingElement from "./LeadingElement.astro";
+import HeaderTitle from "./HeaderTitle.astro";
 ---
 
 <Section id="live-demo" background="light" class="hidden lg:flex">
-  <h1 class:list={["header-title", fullWidthClass]}>
+  <HeaderTitle class={fullWidthClass}>
     Check out how simple it is to use Popcorn’s API
-  </h1>
+  </HeaderTitle>
   <LeadingElement title="Live demo" color="light" />
 
-  <div class="flex justify-between gap-20 items-center">
+  <div class="flex items-center justify-between gap-20">
     <div class="max-w-96">
       <p>
         Elixir meets browser. Magic happens. This live demo showcases Popcorn's
@@ -32,14 +33,14 @@ import LeadingElement from "./LeadingElement.astro";
     <div class="flex flex-col gap-4">
       <div
         id="terminal"
-        class="border-orange-100 border w-xl h-80 overflow-auto live-demo-scroll"
+        class="live-demo-scroll h-80 w-xl overflow-auto border border-orange-100"
       >
       </div>
       <div class="flex flex-col gap-2">
-        <a id="live-simple" class="border-orange-100 border text-center p-1"
+        <a id="live-simple" class="border border-orange-100 p-1 text-center"
           >Example: sort</a
         >
-        <a id="live-case" class="border-orange-100 border text-center p-1"
+        <a id="live-case" class="border border-orange-100 p-1 text-center"
           >Example: processes</a
         >
       </div>
