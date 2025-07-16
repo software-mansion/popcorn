@@ -35,37 +35,16 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     data-mobile-menu-toggle
     aria-label="Toggle mobile menu"
   >
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+    <Icon
+      name="hamburger"
+      class="text-2xl text-brown-header transition-colors duration-300"
       data-hamburger-icon
-    >
-      <path
-        d="M4 18H20M4 12H20M4 6H20"
-        stroke="#5F4122"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"></path>
-    </svg>
-    <svg
-      class="hidden"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+    />
+    <Icon
+      name="close"
+      class="hidden text-2xl text-light-20 transition-colors duration-300"
       data-close-icon
-    >
-      <path
-        d="M19 5L5 19M5.00001 5L19 19"
-        stroke="#FFFDF5"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"></path>
-    </svg>
+    />
   </button>
 </header>
 
@@ -168,6 +147,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       // Toggle classes based on background
       header.classList.toggle("text-orange-100", isDarkSection);
       logo?.classList.toggle("text-orange-100", isDarkSection);
+      hamburgerIcon?.classList.toggle("text-orange-100", isDarkSection);
 
       // Apply classes to links
       for (const link of links) {
