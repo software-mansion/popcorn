@@ -34,6 +34,7 @@ const INIT_TOKEN = Symbol();
  * @property {(text: string) => void} [onStderr=noop] onStderr
  * @property {(text: string) => void} [onStdout=noop] onStdout
  * @property {(text: string) => void} [heartbeatTimeoutMs=15_000] heartbeatTimeoutMs
+ * @property {string} [wasmDir="./wasm/"] wasmDir
  * @property {boolean} [debug=false] debug
  */
 
