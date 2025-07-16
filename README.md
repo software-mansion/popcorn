@@ -34,7 +34,7 @@ end
 
 def deps do
   [
-    {:popcorn, github: "software-mansion/popcorn"}
+    {:popcorn, "~> 0.1.0"}
   ]
 end
 ```
@@ -90,7 +90,7 @@ import Config
 config :popcorn, out_dir: "static/wasm"
 ```
 
-Run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
+Finally, run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
 
 ```html
 <!-- index.html -->
@@ -105,7 +105,7 @@ Run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifac
 
 The easiest way to host the page is to generate a simple HTTP server script with `mix popcorn.simple_server` and run it with `elixir server.exs`. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the console.
 
-The webpage can also be hosted with any HTTP static file server, but it must add the following HTTP headers:
+The webpage can also be hosted with any HTTP static file server, but **it must add the following HTTP headers**:
 
 ```
 Cross-Origin-Opener-Policy: same-origin
@@ -134,7 +134,7 @@ The index.html requires an extra line to load the required JavaScript.
 
 ## Configuration of the runtime
 
-Popcorn runs AtomVM under the hood, and therefore it needs to either download precompied artifacts or compile it from source.
+Popcorn runs AtomVM under the hood, and therefore it needs to either download precompied artifacts or compile it from source. The default configuration should work out of the box, but you can change it to use a different version of AtomVM.
 
 Precompiled artifacts are downloaded during Popcorn compilation, from the source specified with `runtime` config key, for example:
 
@@ -145,7 +145,11 @@ config :popcorn, runtime: [
 ]
 ```
 
-If you want to build the runtime from source, run `mix popcorn.build_runtime --target <unix|wasm>`.
+If you want to build the runtime from source, run `mix popcorn.build_runtime --target <unix|wasm>`. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, configure the runtime as follows:
+
+```elixir
+config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}
+```
 
 ## Development
 
@@ -172,7 +176,7 @@ TARGET=wasm mix test
 To run tests on UNIX, use
 
 ```shell
-MIX_ENV=test mix popcorn.build_runtime --target unix
+mix popcorn.build_runtime --target unix
 ```
 
 to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run

@@ -35,6 +35,8 @@ defmodule Popcorn.Utils.FetchArtifacts do
         File.write!(cache_file, new_cache)
       end
     end
+
+    :ok
   end
 
   @spec fetch_artifacts(:unix | :wasm) :: [path :: String.t()]
