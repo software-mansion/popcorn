@@ -7,12 +7,12 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
 <header
-  class="flex fixed gap-8 top-0 right-0 left-0 text-black backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max transition-colors duration-300"
+  class="flex fixed gap-8 top-0 right-0 left-0 text-black lg:bg-transparent backdrop-blur-xs h-16 pt-3 pb-3 px-4 items-center justify-between min-w-max transition-colors duration-300"
 >
   <a href="/" class="flex-shrink-0">
     <Icon
       name="logo-text"
-      class="text-4xl text-brown-header transition-colors duration-300"
+      class="text-4xl lg:text-brown-header transition-colors duration-300"
       data-logo
     />
   </a>
@@ -89,7 +89,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
       mobileMenu.classList.remove("top-16");
       header.classList.remove("bg-brown-70");
-      logo?.classList.remove("!text-light-20");
+      logo?.classList.remove("text-light-20");
     };
 
     const openMenu = () => {
@@ -99,7 +99,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
       mobileMenu.classList.add("top-16");
       header.classList.add("bg-brown-70");
-      logo?.classList.add("!text-light-20");
+      logo?.classList.add("text-light-20");
     };
 
     function toggleMenu() {
