@@ -226,6 +226,7 @@ export class Popcorn {
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
       [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),
+      [MESSAGES.RELOAD]: this._reloadIframe.bind(this),
     };
 
     const handler = handlers[data.type];
