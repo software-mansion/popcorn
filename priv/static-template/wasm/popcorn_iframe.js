@@ -151,7 +151,7 @@ function onVmInit(initProcess) {
       } catch (error) {
         if(error == "noproc") {
           send(MESSAGES.RELOAD, null);
-          console.error("Runtime VM crushed, popcorn iframe reloaded.");
+          console.error("Runtime VM crashed, popcorn iframe reloaded.");
           return;
         }
         send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
