@@ -3,6 +3,8 @@ import { Popcorn } from "./wasm/popcorn.js";
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const ARROW_UP_KEY_CODE = 38;
 const ARROW_DOWN_KEY_CODE = 40;
+const TAB_KEY_CODE = 9;
+const IGNORED_KEYS = [ARROW_UP_KEY_CODE, ARROW_DOWN_KEY_CODE, TAB_KEY_CODE]
 
 async function setup() {
   const term = new Terminal();
@@ -24,9 +26,9 @@ async function setup() {
   }
 
   window.terminal.onKey(async key => {
-    const text = key.key;
+    let text = key.key;
     const keyCode = key.domEvent.keyCode;
-    if (keyCode === ARROW_UP_KEY_CODE || keyCode === ARROW_DOWN_KEY_CODE) {
+    if (IGNORED_KEYS.includes(keyCode)) {
       text = '';
     }
     try {
