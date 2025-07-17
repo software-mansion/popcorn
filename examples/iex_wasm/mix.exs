@@ -24,7 +24,7 @@ defmodule IexWasm.MixProject do
 
   defp deps do
     [
-      {:popcorn, path: "../.."},
+      {:popcorn, "~> 0.1.0"},
       {:extty, "~> 0.2"}
     ]
   end
