@@ -36,6 +36,7 @@ const INIT_TOKEN = Symbol();
  * @property {(text: string) => void} [onStderr=noop] onStderr
  * @property {(text: string) => void} [onStdout=noop] onStdout
  * @property {(text: string) => void} [heartbeatTimeoutMs=15_000] heartbeatTimeoutMs
+ * @property {string} [wasmDir="./wasm/"] wasmDir
  * @property {boolean} [debug=false] debug
  */
 
@@ -53,6 +54,7 @@ export class Popcorn {
 
   _debug = false;
   _bundlePath = null;
+  _wasmDir = null;
   _initProcess = null;
 
   _requestId = 0;
@@ -69,7 +71,7 @@ export class Popcorn {
         "Don't construct the Popcorn object directly, use Popcorn.init() instead",
       );
     }
-    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
+    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug, wasmDir } =
       params;
 
     this._debug = debug;
@@ -77,6 +79,7 @@ export class Popcorn {
     this.onStdout = onStdout ?? console.log;
     this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+    this._wasmDir = wasmDir ?? "./wasm/";
   }
 
   /**
@@ -118,11 +121,11 @@ export class Popcorn {
             <head>
               <meta name="bundle-path" content="${"../" + this._bundlePath}" />
             </head>
-            <script type="module" src="./wasm/popcorn.js" defer></script>
-            <script type="module" src="./wasm/AtomVM.mjs" defer></script>
-            <script type="module" src="./wasm/popcorn_iframe.js" defer></script>
+            <script type="module" src="${this._wasmDir + "popcorn.js"}" defer></script>
+            <script type="module" src="${this._wasmDir + "AtomVM.mjs"}" defer></script>
+            <script type="module" src="${this._wasmDir + "popcorn_iframe.js"}" defer></script>
             <script type="module" defer>
-              import { initVm } from "./wasm/popcorn_iframe.js";
+              import { initVm } from "${this._wasmDir + "popcorn_iframe.js"}";
               initVm();
             </script>
         </html>`;
