@@ -20,16 +20,16 @@ defmodule Popcorn do
   @doc """
   Generates static artifacts to run the project in the browser.
 
-  `out_dir` and `start_module` are mandatory.
-
   Options:
-  - `out_dir` - the directory to write artifacts to
-  - `start_module` - a module with `start/0` function, used by AtomVM as starting point
+  - `out_dir` - The directory to write artifacts to. Required, unless provided via `config.exs`.
+  - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
-  - `compile_artifacts` - compiled BEAMs and other artifacts that should be included
+  - `compile_artifacts` - Compiled BEAMs and other artifacts that should be included
   in the generated bundle. Defaults to all the `.beam` and `.app` files for the application
   and dependencies.
+
+  Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
   @spec cook([
           {:out_dir, String.t()}
@@ -42,37 +42,46 @@ defmodule Popcorn do
     bundle(Keyword.take(options, [:out_dir, :start_module, :compile_artifacts]))
   end
 
+  @doc """
+  Bundles compiled project code into an `.avm` file.
+
+  Options have the same semantics as in `cook/1`.
+  """
+  @spec bundle([
+          {:out_dir, String.t()}
+          | {:start_module, module}
+          | {:compile_artifacts, [String.t()]}
+        ]) :: :ok
   def bundle(options \\ []) do
-    {module, filename} = create_boot_module(options[:start_module])
+    all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
+
+    default_options = [
+      out_dir: Popcorn.Config.get(:out_dir),
+      start_module: nil,
+      compile_artifacts: all_beams
+    ]
+
+    options = options |> Keyword.validate!(default_options) |> Map.new()
+    ensure_option_present(options, :out_dir, "Output directory")
+
+    File.mkdir_p!(options.out_dir)
+    {module, filename} = create_boot_module(options.start_module)
 
     try do
-      all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
-
-      default_options = [
-        out_dir: Popcorn.Config.get(:out_dir),
-        start_module: nil,
-        compile_artifacts: all_beams
-      ]
-
-      options = options |> Keyword.validate!(default_options) |> Map.new()
-      ensure_option_present(options, :out_dir, "Output directory")
-
-      File.mkdir_p!(options.out_dir)
-
       bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts])
-
-      pack_result = pack_bundle(options.out_dir, bundled_artifacts, module)
-
-      case pack_result do
-        :ok -> :ok
-        {:error, reason} -> raise CookingError, "Reason: #{inspect(reason)}"
-      end
+      pack_bundle(options.out_dir, bundled_artifacts, module)
     after
-      :ok = File.rm!(filename)
+      File.rm!(filename)
     end
   end
 
-  def ingredients(options) do
+  @doc """
+  Generates artifacts needed to run any Popcorn-based project.
+
+  Options have the same semantics as in `cook/1`.
+  """
+  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix}]) :: :ok
+  def ingredients(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       target: :wasm
@@ -103,13 +112,8 @@ defmodule Popcorn do
     bundle_path = to_charlist(bundle_path)
     beams = Enum.map(beams, &String.to_charlist/1)
 
-    try do
-      :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
-      gzip(bundle_path)
-    catch
-      {:start_module_not_found, _module} ->
-        raise CookingError, "Provided start module `#{inspect(start_module)}` has not been found"
-    end
+    :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
+    gzip(bundle_path)
   end
 
   defp maybe_rm(path) do

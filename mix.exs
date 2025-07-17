@@ -1,6 +1,7 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
   @github "https://github.com/software-mansion/popcorn"
 
   def project do
@@ -15,7 +16,7 @@ defmodule Popcorn.MixProject do
 
     [
       app: :popcorn,
-      version: "0.1.0-rc0",
+      version: @version,
       elixir: "1.17.3",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -70,7 +71,8 @@ defmodule Popcorn.MixProject do
     [
       main: "readme",
       extras: ["README.md", "LICENSE"],
-      formatters: ["html"]
+      formatters: ["html"],
+      source_ref: "v#{@version}"
     ]
   end
 

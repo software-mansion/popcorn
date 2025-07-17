@@ -8,7 +8,11 @@ defmodule Popcorn.Config do
       |> Enum.flat_map(&Path.wildcard("#{Application.app_dir(&1)}/ebin/**/*.beam")),
     out_dir: nil,
     add_tracing: false,
-    runtime: {:path, "popcorn_runtime_source/artifacts/$target"}
+    runtime: [
+      {:url, "https://github.com/software-mansion-labs/FissionVM/releases/download/popcorn-0.1/",
+       target: :wasm},
+      {:path, "popcorn_runtime_source/artifacts/$target"}
+    ]
   }
 
   def get(key) do
