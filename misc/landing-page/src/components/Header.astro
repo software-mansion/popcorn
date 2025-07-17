@@ -17,7 +17,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
   </a>
 
   <div
-    class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
+    class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
     data-mobile-menu
   >
     <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
@@ -29,7 +29,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       <a class={linkClass} href="#outtro">Contact us</a>
     </div>
 
-    <hr class="my-11.5 lg:hidden" />
+    <hr class="lg:hidden" />
     <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
       <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
       <a
@@ -66,9 +66,11 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     hamburgerIcon: Element | null;
   }
 
-  let isMenuOpen = false;
+  interface HeaderState {
+    isMenuOpen: boolean;
+  }
 
-  function setupMobileMenu(elements: HeaderElements) {
+  function setupMobileMenu(elements: HeaderElements, state: HeaderState) {
     const { nav, logo, links, hamburgerIcon } = elements;
 
     const closeIcon = document.querySelector("[data-close-icon]");
@@ -88,13 +90,13 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     }
 
     function closeMenu() {
-      isMenuOpen = false;
-      showMenu(isMenuOpen);
+      state.isMenuOpen = false;
+      showMenu(state.isMenuOpen);
     }
 
     function toggleMenu() {
-      isMenuOpen = !isMenuOpen;
-      showMenu(isMenuOpen);
+      state.isMenuOpen = !state.isMenuOpen;
+      showMenu(state.isMenuOpen);
     }
 
     links.forEach((link) => {
@@ -104,7 +106,10 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     menuToggle.addEventListener("click", toggleMenu);
   }
 
-  function setupHeaderColorChange(elements: HeaderElements) {
+  function setupHeaderColorChange(
+    elements: HeaderElements,
+    state: HeaderState,
+  ) {
     const { nav, logo, links, hamburgerIcon } = elements;
 
     function swapTextColor() {
@@ -132,7 +137,10 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
       // Toggle classes based on background
       nav.classList.toggle("text-orange-100", isDarkSection);
-      logo?.classList.toggle("text-orange-100", isDarkSection && !isMenuOpen);
+      logo?.classList.toggle(
+        "text-orange-100",
+        isDarkSection && !state.isMenuOpen,
+      );
       logo?.classList.toggle("lg:text-orange-100", isDarkSection);
 
       logo?.classList.toggle("lg:text-brown-header", !isDarkSection);
@@ -182,8 +190,12 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       hamburgerIcon,
     };
 
-    setupHeaderColorChange(elements);
-    setupMobileMenu(elements);
+    const state = {
+      isMenuOpen: false,
+    };
+
+    setupHeaderColorChange(elements, state);
+    setupMobileMenu(elements, state);
   }
 
   document.addEventListener("DOMContentLoaded", setup);
