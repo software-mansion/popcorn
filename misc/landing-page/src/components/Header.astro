@@ -15,20 +15,31 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       data-logo
     />
   </a>
-  <div class="hidden gap-4 lg:flex">
-    <a class={linkClass} href="#features">Features</a>
-    <a class={linkClass} href="#examples">Examples</a>
-    <a class={linkClass} href="#live-demo">Live demo</a>
-    <a class={linkClass} href="#outtro">Contact us</a>
+
+  <div
+    class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
+    data-mobile-menu
+  >
+    <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
+      <a class={linkClass} href="#features">Features</a>
+      <a class={linkClass} href="#examples">Examples</a>
+      <a class:list={["hidden lg:block", linkClass]} href="#live-demo"
+        >Live demo</a
+      >
+      <a class={linkClass} href="#outtro">Contact us</a>
+    </div>
+
+    <hr class="my-11.5 lg:hidden" />
+    <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
+      <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
+      <a
+        class={linkClass}
+        {...openNewTab}
+        href="https://github.com/software-mansion/popcorn/">Github →</a
+      >
+    </div>
   </div>
-  <div class="hidden gap-4 lg:flex">
-    <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
-    <a
-      class={linkClass}
-      {...openNewTab}
-      href="https://github.com/software-mansion/popcorn/">Github →</a
-    >
-  </div>
+
   <button
     class="flex h-6 w-6 flex-col items-center justify-center gap-1 lg:hidden"
     data-mobile-menu-toggle
@@ -47,94 +58,70 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
   </button>
 </nav>
 
-<nav
-  class="bg-brown-70 fixed top-0 z-50 h-full w-full -translate-y-full transform transition-transform duration-300 lg:hidden"
-  data-mobile-menu
->
-  <div class="text-light-20 mt-5 flex flex-col p-4">
-    <div class="flex flex-col gap-10">
-      <a href="#features">Features</a>
-      <a href="#examples">Examples</a>
-      <a href="#live-demo">Live demo</a>
-      <a href="#outtro">Contact us</a>
-    </div>
-    <hr class="my-11.5" />
-    <div class="flex flex-col gap-10">
-      <a href="/docs/">Documentation →</a>
-      <a href="https://github.com/software-mansion/popcorn/">Github →</a>
-    </div>
-  </div>
-</nav>
-
 <script>
-  function setupHeaderColorChange() {
-    const header = document.querySelector("nav")!;
-    const logo = header.querySelector("[data-logo]");
-    const links = header.querySelectorAll("a");
+  interface HeaderElements {
+    nav: HTMLElement;
+    logo: Element | null;
+    links: NodeListOf<HTMLAnchorElement>;
+    hamburgerIcon: Element | null;
+  }
 
-    // Mobile menu elements
-    const menuToggle = document.querySelector("[data-mobile-menu-toggle]")!;
-    const mobileMenu = document.querySelector("[data-mobile-menu]")!;
-    const mobileLinks = mobileMenu.querySelectorAll("a");
-    const hamburgerIcon = document.querySelector("[data-hamburger-icon]");
+  let isMenuOpen = false;
+
+  function setupMobileMenu(elements: HeaderElements) {
+    const { nav, logo, links, hamburgerIcon } = elements;
+
     const closeIcon = document.querySelector("[data-close-icon]");
+    const mobileMenu = document.querySelector("[data-mobile-menu]")!;
+    const menuToggle = document.querySelector("[data-mobile-menu-toggle]")!;
 
-    let isOpen = false;
+    function showMenu(open: boolean) {
+      mobileMenu.classList.toggle("-translate-y-full", !open);
+      mobileMenu.classList.toggle("flex", open);
+      mobileMenu.classList.toggle("top-16", open);
 
-    const closeMenu = () => {
-      mobileMenu.classList.add("-translate-y-full");
-      hamburgerIcon?.classList.remove("hidden");
-      closeIcon?.classList.add("hidden");
+      hamburgerIcon?.classList.toggle("hidden", open);
+      closeIcon?.classList.toggle("hidden", !open);
 
-      mobileMenu.classList.remove("top-16");
-      header.classList.remove("bg-brown-70");
-      logo?.classList.remove("text-light-20");
-    };
-
-    const openMenu = () => {
-      mobileMenu.classList.remove("-translate-y-full");
-      hamburgerIcon?.classList.add("hidden");
-      closeIcon?.classList.remove("hidden");
-
-      mobileMenu.classList.add("top-16");
-      header.classList.add("bg-brown-70");
-      logo?.classList.add("text-light-20");
-    };
-
-    function toggleMenu() {
-      isOpen = !isOpen;
-
-      if (isOpen) {
-        // Open menu
-        openMenu();
-      } else {
-        // Close menu
-        closeMenu();
-      }
+      nav.classList.toggle("bg-brown-70", open);
+      logo?.classList.toggle("text-light-20", open);
     }
 
-    menuToggle.addEventListener("click", toggleMenu);
-    mobileLinks.forEach((link) => {
-      link.addEventListener("click", () => {
-        isOpen = false;
-        closeMenu();
-      });
+    function closeMenu() {
+      isMenuOpen = false;
+      showMenu(isMenuOpen);
+    }
+
+    function toggleMenu() {
+      isMenuOpen = !isMenuOpen;
+      showMenu(isMenuOpen);
+    }
+
+    links.forEach((link) => {
+      link.addEventListener("click", closeMenu);
     });
 
+    menuToggle.addEventListener("click", toggleMenu);
+  }
+
+  function setupHeaderColorChange(elements: HeaderElements) {
+    const { nav, logo, links, hamburgerIcon } = elements;
+
     function swapTextColor() {
-      const headerRect = header.getBoundingClientRect();
+      const headerRect = nav.getBoundingClientRect();
       const headerCenter = {
         x: headerRect.left + headerRect.width / 2,
         y: headerRect.top + headerRect.height / 2,
       };
 
       // Temporarily hide header to check what's behind it
-      header.style.pointerEvents = "none";
+      nav.style.pointerEvents = "none";
       const elementBehind = document.elementFromPoint(
         headerCenter.x,
         headerCenter.y,
       );
-      header.style.pointerEvents = "";
+
+      nav.style.pointerEvents = "";
 
       if (!elementBehind) return;
 
@@ -144,15 +131,19 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       );
 
       // Toggle classes based on background
-      header.classList.toggle("text-orange-100", isDarkSection);
-      logo?.classList.toggle("text-orange-100", isDarkSection);
+      nav.classList.toggle("text-orange-100", isDarkSection);
+      logo?.classList.toggle("text-orange-100", isDarkSection && !isMenuOpen);
+      logo?.classList.toggle("lg:text-orange-100", isDarkSection);
+
+      logo?.classList.toggle("lg:text-brown-header", !isDarkSection);
+
       hamburgerIcon?.classList.toggle("text-orange-100", isDarkSection);
 
       // Apply classes to links
       for (const link of links) {
-        link.classList.toggle("text-orange-100", isDarkSection);
-        link.classList.toggle("hover:text-orange-100", !isDarkSection);
-        link.classList.toggle("hover:text-light-20", isDarkSection);
+        link.classList.toggle("lg:text-orange-100", isDarkSection);
+        link.classList.toggle("lg:hover:text-orange-100", !isDarkSection);
+        link.classList.toggle("lg:hover:text-light-20", isDarkSection);
       }
     }
 
@@ -178,6 +169,23 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     swapTextColor();
   }
 
-  document.addEventListener("DOMContentLoaded", setupHeaderColorChange);
-  document.addEventListener("astro:page-load", setupHeaderColorChange);
+  function setup() {
+    const nav = document.querySelector("nav")!;
+    const logo = nav.querySelector("[data-logo]");
+    const links = nav.querySelectorAll("a");
+    const hamburgerIcon = nav.querySelector("[data-hamburger-icon]");
+
+    const elements = {
+      nav,
+      logo,
+      links,
+      hamburgerIcon,
+    };
+
+    setupHeaderColorChange(elements);
+    setupMobileMenu(elements);
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
 </script>
