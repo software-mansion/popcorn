@@ -5,19 +5,23 @@ import Section from "./Section.astro";
 ---
 
 <Section id="intro" background="light">
-    <Icon name="logo" class="text-8xl text-brown-header" />
-    <h1
-        class="text-[200px] font-handjet font-semibold tracking-normal leading-none text-brown-70"
-    >
-        Popcorn it.
-    </h1>
-    <h2 class="text-[60px] font-handjet text-orange-100">Compile. Run. Pop.</h2>
-    <p class="mt-8 text-3xl text-black font-normal w-3xl text-center">
-        Bring Elixir to the browser — no hacks, no JS rewrites,<br />just pure
-        Popcorn power.
-    </p>
-    <div class={buttonGroupClass}>
-        <Button title="See it in action" type="primary" href="#examples" />
-        <Button title="Get started" type="secondary" href="#" />
-    </div>
+  <Icon name="logo" class="text-brown-header text-8xl" />
+  <h1
+    class="font-handjet text-brown-70 mb-7 text-[80px] leading-none font-semibold tracking-normal md:text-[120px] lg:text-[200px]"
+  >
+    Popcorn it.
+  </h1>
+  <h2 class="font-handjet text-3xl text-orange-100 md:text-4xl lg:text-6xl">
+    Compile. Run. Pop.
+  </h2>
+  <p
+    class="mt-8 max-w-3xl text-center text-base font-normal text-black md:text-2xl lg:text-3xl"
+  >
+    Bring Elixir to the browser — no hacks, no JS rewrites,<br />just pure
+    Popcorn power.
+  </p>
+  <div class={buttonGroupClass}>
+    <Button title="See it in action" type="primary" href="#examples" />
+    <Button title="Get started" type="secondary" href="#" />
+  </div>
 </Section>

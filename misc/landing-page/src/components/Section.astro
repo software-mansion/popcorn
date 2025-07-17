@@ -1,13 +1,13 @@
 ---
 interface Props {
-    background: "light" | "dark";
-    class?: string;
-    id?: string;
+  background: "light" | "dark";
+  class?: string;
+  id?: string;
 }
 const { background, class: className, id, ...rest } = Astro.props;
 
 const light = "bg-light-20 text-brown-100";
-const dark = "bg-brown-header text-white";
+const dark = "bg-brown-90 text-white";
 
 const backgroundClass = background === "light" ? light : dark;
 
@@ -15,17 +15,17 @@ export const fullWidthClass = "-ml-48 -mr-48";
 ---
 
 <div
-    class:list={["flex flex-col", backgroundClass]}
-    data-background={background}
-    {...rest}
+  class:list={["flex flex-col", backgroundClass]}
+  data-background={background}
+  {...rest}
 >
-    <section
-        {...{ id }}
-        class:list={[
-            "flex flex-col items-center font-inter ml-48 mr-48 mt-20 mb-20 scroll-mt-20",
-            className ?? "",
-        ]}
-    >
-        <slot />
-    </section>
+  <section
+    {...{ id }}
+    class:list={[
+      "font-inter mt-20 mr-4 mb-20 ml-4 flex scroll-mt-20 flex-col items-center md:mr-20 md:ml-20 lg:mr-48 lg:ml-48",
+      className ?? "",
+    ]}
+  >
+    <slot />
+  </section>
 </div>

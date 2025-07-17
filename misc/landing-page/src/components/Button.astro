@@ -1,9 +1,9 @@
 ---
 interface Props {
-    href: string;
-    title: string;
-    type: "primary" | "secondary";
-    newTab?: boolean;
+  href: string;
+  title: string;
+  type: "primary" | "secondary";
+  newTab?: boolean;
 }
 const { href, title, type, newTab = false } = Astro.props;
 
@@ -12,12 +12,13 @@ const secondaryClasses = "text-brown-70 border border-brown-70";
 
 const classes = type === "primary" ? primaryClasses : secondaryClasses;
 
-export const buttonGroupClass = "flex gap-4 mt-12";
+export const buttonGroupClass =
+  "flex items-center gap-4 mt-12 flex-col md:flex-row md:w-auto w-full";
 ---
 
 <a
-    {...newTab ? { target: "_blank", rel: "noopener noreferrer" } : {}}
-    href={href}
-    class=`${classes} w-[200px] text-center rounded-lg pt-4 pb-4 pr-6 pl-6`
-    >{title}</a
+  {...newTab ? { target: "_blank", rel: "noopener noreferrer" } : {}}
+  href={href}
+  class=`${classes} md:w-[200px] text-center rounded-lg pt-4 pb-4 pr-6 pl-6 w-full max-w-sm`
+  >{title}</a
 >

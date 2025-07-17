@@ -1,7 +1,7 @@
 ---
 interface Props {
-    color: "light" | "dark";
-    title: string;
+  color: "light" | "dark";
+  title: string;
 }
 
 const { color, title } = Astro.props;
@@ -10,7 +10,7 @@ const titleClass = color === "light" ? "text-black" : "text-white";
 const lineClass = color === "light" ? "bg-black" : "bg-white";
 ---
 
-<div class="flex flex-col items-center gap-6 mb-16 mt-8">
-    <h4 class={titleClass}>{title}</h4>
-    <div class:list={["h-[200px] w-px", lineClass]}></div>
+<div class="mt-8 mb-16 flex flex-col items-center gap-6">
+  <h4 class:list={["text-2xl uppercase", titleClass]}>{title}</h4>
+  <div class:list={["h-[200px] w-px", lineClass]}></div>
 </div>
