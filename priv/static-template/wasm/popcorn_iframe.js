@@ -8,6 +8,7 @@ const MESSAGES = {
   STDOUT: "popcorn-stdout",
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
+  RELOAD: "popcorn-reload",
 };
 
 const HEARTBEAT_INTERVAL_MS = 500;

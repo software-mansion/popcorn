@@ -10,6 +10,7 @@ const HEARTBEAT_TIMEOUT_MS = 60_000;
 //  | { type: "callAck", value: ElixirAck }
 //  | { type: "cast", value: ElixirRequest }
 //  | { type: "heartbeat", value: void }
+//  | { type: "reload", value: void }
 //
 // ElixirRequest: { requestId: number, process: string, action: string, args: any }
 // ElixirResponse: { requestId: number, error: string } | { requestId: number, data: any }
