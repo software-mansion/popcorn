@@ -84,6 +84,7 @@ import HeaderTitle from "./HeaderTitle.astro";
     });
 
     const POPCORN_CONFIG = {
+      bundlePath: "wasm/iex.avm",
       debug: true,
       onStdout: (text: string) => displayLog(text, { term, isError: false }),
       onStderr: (text: string) => displayLog(text, { term, isError: true }),

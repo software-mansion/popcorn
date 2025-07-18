@@ -1,5 +1,4 @@
 ---
-import Header from "../components/Header.astro";
 import Intro from "../components/Intro.astro";
 import Steps from "../components/Steps.astro";
 import Examples from "../components/Examples.astro";
@@ -12,15 +11,12 @@ import Footer from "../components/Footer.astro";
 ---
 
 <Layout>
-  <main class="bg-light-20 font-inter gap-20 pt-24">
-    <Header />
-    <Intro />
-    <Steps />
-    <Examples />
-    <LiveDemo />
-    <Info />
-    <Outtro />
-  </main>
+  <Intro />
+  <Steps />
+  <Examples />
+  <LiveDemo />
+  <Info />
+  <Outtro />
 </Layout>
 
 <style>
