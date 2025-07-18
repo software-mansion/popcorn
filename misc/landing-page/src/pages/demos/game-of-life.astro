@@ -3,27 +3,21 @@ import Layout from "../../layouts/Layout.astro";
 ---
 
 <Layout>
-  <div class="bg-light-20 min-h-screen pt-24">
-    <div class="container mx-auto px-4 py-8">
-      <div class="mx-auto max-w-4xl">
-        <div class="mb-8 text-center">
-          <h1
-            class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
-          >
-            Game of Life Demo
-          </h1>
-          <p class="text-brown-70 mx-auto max-w-2xl text-lg">
-            A cellular automaton simulation running in WebAssembly using Elixir
-            and AtomVM. The entire UI is controlled by Elixir processes with no
-            additional JavaScript. Click cells to toggle them, use the glider
-            preset, or start the simulation.
-          </p>
-        </div>
+  <header class="mb-8 text-center">
+    <h1
+      class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+    >
+      Game of Life Demo
+    </h1>
+    <p class="text-brown-70 mx-auto max-w-2xl text-lg">
+      A cellular automaton simulation running in WebAssembly using Elixir and
+      AtomVM. The entire UI is controlled by Elixir processes with no additional
+      JavaScript. Click cells to toggle them, use the glider preset, or start
+      the simulation.
+    </p>
+  </header>
 
-        <div id="root" class="game-container"></div>
-      </div>
-    </div>
-  </div>
+  <div id="root" class="game-container"></div>
 </Layout>
 
 <style is:global>
@@ -127,7 +121,6 @@ import Layout from "../../layouts/Layout.astro";
     border-color: #d66a00 !important;
   }
 
-  /* Responsive design */
   @media (max-width: 768px) {
     .cell {
       width: 1.5rem;
@@ -153,32 +146,9 @@ import Layout from "../../layouts/Layout.astro";
 </style>
 
 <script>
-  async function initGameOfLife() {
-    // Wait for DOM to be fully ready
-    await new Promise((resolve) => {
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", resolve);
-      } else {
-        resolve(null);
-      }
-    });
-
+  async function init() {
     try {
-      // Wait for Popcorn to be available with timeout
-      let attempts = 0;
-      const maxAttempts = 50;
-
-      while (!(window as any).Popcorn && attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!(window as any).Popcorn) {
-        throw new Error("Popcorn library not loaded after waiting");
-      }
-
-      // Use global Popcorn object with absolute wasmDir path
-      const popcorn = await (window as any).Popcorn.init({
+      await Popcorn.init({
         bundlePath: "/wasm/gol.avm",
         wasmDir: "/wasm/",
         debug: false,
@@ -194,9 +164,6 @@ import Layout from "../../layouts/Layout.astro";
     }
   }
 
-  // Initialize when DOM is ready
-  document.addEventListener("DOMContentLoaded", initGameOfLife);
-
-  // Also initialize on Astro page load for SPA navigation
-  document.addEventListener("astro:page-load", initGameOfLife);
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:page-load", init);
 </script>

@@ -1,5 +1,7 @@
 ---
-const { n, title, href } = Astro.props;
+import { Image } from "astro:assets";
+
+const { n, title, href, image } = Astro.props;
 ---
 
 <div
@@ -12,45 +14,25 @@ const { n, title, href } = Astro.props;
       >
         {n}
       </h3>
-      {
-        href ? (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-2xl transition-colors hover:text-orange-100 md:text-4xl"
-          >
-            {title}
-          </a>
-        ) : (
-          <h3 class="text-2xl md:text-4xl">{title}</h3>
-        )
-      }
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-2xl transition-colors hover:text-orange-100 md:text-4xl"
+      >
+        {title}
+      </a>
     </div>
     <p><slot name="description" /></p>
   </div>
   <div class="flex w-full items-center sm:min-w-sm">
-    {
-      href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="transition-opacity hover:opacity-80"
-        >
-          <img
-            src="https://placehold.co/500x300"
-            crossorigin="anonymous"
-            class="rounded"
-          />
-        </a>
-      ) : (
-        <img
-          src="https://placehold.co/500x300"
-          crossorigin="anonymous"
-          class="rounded"
-        />
-      )
-    }
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="transition-opacity hover:opacity-80"
+    >
+      <Image src={image} alt={title} class="rounded" width={500} height={300} />
+    </a>
   </div>
 </div>
