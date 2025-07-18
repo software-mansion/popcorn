@@ -47,6 +47,7 @@ RUN git clone https://github.com/software-mansion-labs/FissionVM.git /root/Fissi
 RUN source /root/.env && \
     mkdir -p /root/wasm && \
     cd /root/FissionVM/src/platforms/emscripten && \
+    git checkout ba6bd98 && \
     mkdir build && cd build && \
     emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web && \
     emmake make -j${nproc} && \
