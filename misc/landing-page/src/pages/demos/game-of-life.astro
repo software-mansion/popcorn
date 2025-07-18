@@ -1,0 +1,202 @@
+---
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout>
+  <div class="bg-light-20 min-h-screen pt-24">
+    <div class="container mx-auto px-4 py-8">
+      <div class="mx-auto max-w-4xl">
+        <div class="mb-8 text-center">
+          <h1
+            class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+          >
+            Game of Life Demo
+          </h1>
+          <p class="text-brown-70 mx-auto max-w-2xl text-lg">
+            A cellular automaton simulation running in WebAssembly using Elixir
+            and AtomVM. The entire UI is controlled by Elixir processes with no
+            additional JavaScript. Click cells to toggle them, use the glider
+            preset, or start the simulation.
+          </p>
+        </div>
+
+        <div id="root" class="game-container"></div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style is:global>
+  .game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  .controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .controls button {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 0.5rem;
+    font-family: "Inter Variable", sans-serif;
+    font-weight: 500;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .controls button:hover {
+    background: #58330c;
+    color: #fffdf5;
+  }
+
+  .controls button:disabled {
+    border-style: dashed;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .controls button:disabled:hover {
+    background: transparent;
+    color: #58330c;
+  }
+
+  .cell-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+    border-radius: 1rem;
+    margin-top: 1rem;
+    align-items: center;
+  }
+
+  .cell-row {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .cell {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    min-height: 2rem;
+    border: 1px solid #58330c;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #fffdf5;
+    display: inline-block;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  .cell::before {
+    content: "";
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .cell:hover {
+    border-color: #ef7c00;
+    transform: scale(1.05);
+  }
+
+  .cell-dead {
+    background: #fffdf5 !important;
+    border-color: #58330c !important;
+  }
+
+  .cell-alive {
+    background: #ef7c00 !important;
+    border-color: #ef7c00 !important;
+  }
+
+  .cell-alive:hover {
+    background: #d66a00 !important;
+    border-color: #d66a00 !important;
+  }
+
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .cell {
+      width: 1.5rem;
+      height: 1.5rem;
+      min-width: 1.5rem;
+      min-height: 1.5rem;
+    }
+
+    .cell-grid {
+      padding: 0.75rem;
+    }
+
+    .controls {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .controls button {
+      width: 100%;
+      max-width: 200px;
+    }
+  }
+</style>
+
+<script>
+  async function initGameOfLife() {
+    // Wait for DOM to be fully ready
+    await new Promise((resolve) => {
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", resolve);
+      } else {
+        resolve(null);
+      }
+    });
+
+    try {
+      // Wait for Popcorn to be available with timeout
+      let attempts = 0;
+      const maxAttempts = 50;
+
+      while (!(window as any).Popcorn && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      if (!(window as any).Popcorn) {
+        throw new Error("Popcorn library not loaded after waiting");
+      }
+
+      // Use global Popcorn object with absolute wasmDir path
+      const popcorn = await (window as any).Popcorn.init({
+        bundlePath: "/wasm/gol.avm",
+        wasmDir: "/wasm/",
+        debug: false,
+        onStdout: (text: string) => console.log(text),
+        onStderr: (text: string) => console.error(text),
+      });
+    } catch (error) {
+      const container = document.getElementById("root");
+      if (container) {
+        container.innerHTML =
+          '<div class="text-center p-8"><p class="text-red-600 text-lg">Failed to load Game of Life demo. Please refresh the page.</p></div>';
+      }
+    }
+  }
+
+  // Initialize when DOM is ready
+  document.addEventListener("DOMContentLoaded", initGameOfLife);
+
+  // Also initialize on Astro page load for SPA navigation
+  document.addEventListener("astro:page-load", initGameOfLife);
+</script>
