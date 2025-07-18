@@ -5,17 +5,119 @@ import Section from "./Section.astro";
 <Section
   id="info"
   background="dark"
-  class="flex max-w-3xl flex-col gap-4 text-2xl font-bold md:text-4xl"
+  class="text-brown-60 relative mt-50 mb-50 flex h-[1500px] max-w-3xl flex-col gap-4 text-2xl font-bold md:text-4xl"
 >
-  <p>
-    Popcorn is an open-source library distributed under the Apache License ver.
-    2.0, so feel free to use it in your projects. And if you want to create
-    something bigger – like introducing Popcorn to your enterprise-grade
-    solution – make sure to drop us a line.
-  </p>
-  <p>
-    Since 2012, we’ve been building web and mobile apps here at Software
-    Mansion, becoming core contributors of React Native and leading Elixir
-    experts. Hire us and we’ll build your next dream product together.
-  </p>
+  <div id="info-content" class="fixed-position flex flex-col gap-4">
+    <p>
+      Popcorn is an open-source library distributed under the Apache License
+      ver. 2.0, so feel free to use it in your projects. And if you want to
+      create something bigger – like introducing Popcorn to your
+      enterprise-grade solution – make sure to drop us a line.
+    </p>
+    <p>
+      Since 2012, we’ve been building web and mobile apps here at Software
+      Mansion, becoming core contributors of React Native and leading Elixir
+      experts. Hire us and we’ll build your next dream product together.
+    </p>
+  </div>
 </Section>
+
+<script>
+  interface Elements {
+    section: Element;
+    contentSection: Element;
+  }
+
+  function setupSplitText(elements: Elements) {
+    const { contentSection } = elements;
+
+    const paragraphs = [...contentSection.querySelectorAll("p")];
+
+    contentSection.innerHTML = ""; // Clear existing content
+
+    paragraphs.forEach((p) => {
+      const text = p.textContent;
+
+      const paragraph = document.createElement("p");
+
+      text?.split(/\s+/).forEach((word) => {
+        if (word.trim() === "") return; // Skip empty words
+
+        const span = document.createElement("span");
+        span.className = "text-scroll transition-colors duration-400 delay-100";
+        span.textContent = word + " ";
+        paragraph.appendChild(span);
+      });
+
+      contentSection.appendChild(paragraph);
+    });
+  }
+
+  function setupScrollAnimation(elements: Elements) {
+    const { section, contentSection } = elements;
+    const words = contentSection.querySelectorAll(".text-scroll");
+
+    const sectionHeight = section.clientHeight;
+    const contentHeight = contentSection.clientHeight;
+    const totalWords = words.length;
+
+    const scrollPerWord = sectionHeight / totalWords;
+
+    function handleScroll() {
+      const sectionRect = section.getBoundingClientRect();
+
+      const sectionTopPosition =
+        -1 * (sectionRect.top - 200 - 64) + contentHeight;
+
+      // Calculate which word should be colored based on scroll position
+      const targetIndex = Math.max(
+        Math.min(
+          Math.floor(sectionTopPosition / scrollPerWord),
+          totalWords - 1,
+        ),
+        0,
+      );
+
+      // Apply color to all words up to the target index
+      for (let i = 0; i <= targetIndex; i++) {
+        words[i].classList.add("text-light-20");
+      }
+
+      // Remove color from all words after the target index
+      for (let i = targetIndex + 1; i < totalWords; i++) {
+        words[i].classList.remove("text-light-20");
+      }
+
+      if (targetIndex === 0) {
+        words[0].classList.remove("text-light-20");
+      }
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+  }
+
+  function setup() {
+    const section = document.querySelector("#info")!;
+    const contentSection = document.querySelector("#info-content")!;
+
+    const elements = {
+      section,
+      contentSection,
+    };
+
+    setupSplitText(elements);
+    setupScrollAnimation(elements);
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
+
+<style>
+  .fixed-position {
+    position: sticky;
+    top: 30%;
+    z-index: 10;
+  }
+</style>
