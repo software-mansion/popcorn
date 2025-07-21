@@ -1,4 +1,5 @@
 declare var Popcorn: Popcorn;
+declare var terminal: object;
 
 type InitOpts = {
   bundlePath?: string;

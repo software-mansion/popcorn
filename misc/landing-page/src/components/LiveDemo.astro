@@ -7,18 +7,16 @@ import HeaderTitle from "./HeaderTitle.astro";
 
 <Section id="live-demo" background="light" class="hidden lg:flex">
   <HeaderTitle class={fullWidthClass}>
-    Check out how simple it is to use Popcorn’s API
+    Check out how simple it is to use Popcorn.
   </HeaderTitle>
   <LeadingElement title="Live demo" color="light" />
 
   <div class="flex items-center justify-between gap-20">
     <div class="max-w-96">
       <p>
-        Elixir meets browser. Magic happens. This live demo showcases Popcorn's
-        intuitive API – where functional programming principles create
-        beautiful, interactive web experiences. Click around, modify the code,
-        and discover why developers are falling in love with Elixir on the
-        frontend.
+        This live demo showcases Elixir’s IEx – running right here in the
+        browser. Write your own code and make it happen, or click on the buttons
+        to run examples that we’ve prepared for you.
       </p>
       <div class={buttonGroupClass}>
         <Button title="Read the docs" type="primary" href="#" newTab={true} />
@@ -125,7 +123,7 @@ import HeaderTitle from "./HeaderTitle.astro";
     term.write(log);
   }
 
-  type XtermOpts = { container: Element };
+  type XtermOpts = { container: HTMLElement };
   function xtermInit({ container }: XtermOpts) {
     const term = new Terminal(XTERM_CONFIG);
     const fitAddon = new FitAddon();

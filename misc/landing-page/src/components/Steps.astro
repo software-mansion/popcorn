@@ -4,32 +4,32 @@ import Section from "./Section.astro";
 ---
 
 <Section id="features" background="light" class="gap-20 md:gap-36">
-  <Step n="01">
-    <Fragment slot="title">Compile your Elixir to Wasm</Fragment>
+  <Step n="01" title="Elixir, meet WebAssembly.">
+    <Fragment slot="title">Compile your Elixir to Wasm.</Fragment>
     <Fragment slot="description">
-      One click compilation. Infinite possibilities. Turn your Elixir into
-      WebAssembly and unlock the browser's full potential.
+      Popcorn bridges your Elixir code with Wasm-compiled AtomVM runtime. No
+      need to learn a new language – just use the one you already love.
     </Fragment>
   </Step>
-  <Step n="02">
-    <Fragment slot="title">With no changes in the code</Fragment>
-    <Fragment slot="description">
-      Frontend meets functional. Your Elixir now speaks fluent browser with APIs
-      that make web development feel like home.
+  <Step n="02" title="Your code is great.">
+    <Fragment slot="title">Use your existing code without any changes.</Fragment
+    >
+    <Fragment slot="description"
+      >With Popcorn, you don’t need to rewrite or refactor your code. It runs
+      plain Elixir as-is (including OTP patterns and supervision trees) right
+      inside the browser.
     </Fragment>
   </Step>
-  <Step n="03">
-    <Fragment slot="title">Run it in the browser</Fragment>
-    <Fragment slot="description">
-      Your code. Unchanged. Unstoppable. Popcorn runs your existing Elixir
-      through AtomVM magic – no refactoring required.
-    </Fragment>
+  <Step n="03" title="No internet? No problem.">
+    <Fragment slot="title">Run everything in the browser</Fragment>
+    <Fragment slot="description"
+      >Popcorn runs fully in-browser, which makes it ideal for many use cases,
+      like offline, local-first applications. No servers or internet connection
+      required.</Fragment
+    >
   </Step>
-  <Step n="04">
-    <Fragment slot="title">Be sure it is stable</Fragment>
-    <Fragment slot="description">
-      Enterprise stability. Startup speed. Our reinforced Elixir-JS bridge
-      delivers rock-solid performance when it matters most.
-    </Fragment>
-  </Step>
+  <!-- <Step n="04">
+    <Fragment slot="title"></Fragment>
+    <Fragment slot="description"> </Fragment>
+  </Step> -->
 </Section>

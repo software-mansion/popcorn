@@ -1,11 +1,11 @@
 ---
-const { n } = Astro.props;
+const { title, n } = Astro.props;
 ---
 
 <div class="flex max-w-2xl flex-col">
   <div class="flex items-center justify-between gap-3 md:gap-36 lg:gap-72">
     <h2 class="font-handjet text-[40px] wrap-break-word text-black md:text-6xl">
-      Start using Elixir on the frontend
+      {title}
     </h2>
     <h1
       class="font-handjet text-[120px] leading-none text-orange-100 md:text-[180px]"
