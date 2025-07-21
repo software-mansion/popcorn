@@ -19,6 +19,8 @@ export const buttonGroupClass =
 <a
   {...newTab ? { target: "_blank", rel: "noopener noreferrer" } : {}}
   href={href}
-  class=`${classes} md:w-[200px] text-center rounded-lg pt-4 pb-4 pr-6 pl-6 w-full max-w-sm`
-  >{title}</a
+  class:list={[
+    classes,
+    "w-full max-w-sm rounded-lg pt-4 pr-6 pb-4 pl-6 text-center md:w-[200px]",
+  ]}>{title}</a
 >

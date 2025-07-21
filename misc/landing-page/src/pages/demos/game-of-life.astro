@@ -1,0 +1,157 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
+---
+
+<Layout>
+  <Section background="light">
+    <header class="mb-4 text-center">
+      <h1
+        class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+      >
+        Game of life demo
+      </h1>
+      <p class="mx-auto max-w-2xl">
+        A cellular automaton simulation written in Elixir. The entire UI is
+        controlled by Elixir with no additional JavaScript. Every cell is
+        distinct Elixir process. Click cells to toggle them, use the glider
+        preset, or start the simulation.
+      </p>
+    </header>
+
+    <div id="root" class="game-container"></div>
+  </Section>
+</Layout>
+
+<style is:global>
+  .game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .controls button {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .controls button:hover {
+    background: #58330c;
+    color: #fffdf5;
+  }
+
+  .controls button:disabled {
+    border-style: dashed;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .controls button:disabled:hover {
+    color: #58330c;
+  }
+
+  .cell-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  .cell-row {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .cell {
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    min-height: 2rem;
+    border: 1px solid #58330c;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #fffdf5;
+    box-sizing: border-box;
+    flex-shrink: 0;
+  }
+
+  .cell:hover {
+    border-color: #ef7c00;
+    transform: scale(1.05);
+  }
+
+  .cell-dead {
+    background: #fffdf5;
+    border-color: #58330c;
+  }
+
+  .cell-alive {
+    background: #ef7c00;
+    border-color: #ef7c00;
+  }
+
+  .cell-alive:hover {
+    background: #d66a00;
+    border-color: #d66a00;
+  }
+
+  @media (max-width: 768px) {
+    .cell {
+      width: 1.5rem;
+      height: 1.5rem;
+      min-width: 1.5rem;
+      min-height: 1.5rem;
+    }
+
+    .cell-grid {
+      padding: 0.75rem;
+    }
+
+    .controls {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .controls button {
+      width: 100%;
+      max-width: 200px;
+    }
+  }
+</style>
+
+<script>
+  async function init() {
+    try {
+      await Popcorn.init({
+        bundlePath: "/wasm/gol.avm",
+        wasmDir: "/wasm/",
+        debug: false,
+        onStdout: (text: string) => console.log(text),
+        onStderr: (text: string) => console.error(text),
+      });
+    } catch (error) {
+      const container = document.getElementById("root");
+      if (container) {
+        container.innerHTML =
+          '<div class="text-center p-8"><p class="text-red-600">Failed to load Game of Life demo. Please refresh the page.</p></div>';
+      }
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:page-load", init);
+</script>

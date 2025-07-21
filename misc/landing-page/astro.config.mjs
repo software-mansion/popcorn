@@ -9,7 +9,7 @@ import starlight from "@astrojs/starlight";
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
 import devtoolsJson from "vite-plugin-devtools-json";
-import buildWasm from "./build-wasm.js";
+import { buildBundle, buildWasm, cleanWasmDir } from "./build-wasm.js";
 
 // https://astro.build/config
 export default defineConfig({
@@ -59,7 +59,18 @@ export default defineConfig({
         },
       ],
     }),
-    buildWasm({ dir: "../../examples/iex_wasm" }),
+    cleanWasmDir(),
+    buildBundle({ dir: "../../examples/iex_wasm", newBundleName: "iex.avm" }),
+    buildBundle({
+      dir: "../../examples/game_of_life",
+      newBundleName: "gol.avm",
+    }),
+    buildBundle({
+      dir: "../../examples/eval_in_wasm",
+      newBundleName: "eval.avm",
+    }),
+    // take runtime from iex wasm
+    buildWasm({ dir: "../../examples/iex_wasm/static/wasm" }),
   ],
   markdown: {
     // used for build-time generation of diagrams

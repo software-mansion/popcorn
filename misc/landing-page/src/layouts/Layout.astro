@@ -4,6 +4,7 @@ import "@fontsource-variable/handjet";
 import "@fontsource-variable/inter";
 import interWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import handjetWoff2 from "@fontsource-variable/handjet/files/handjet-latin-wght-normal.woff2?url";
+import Header from "../components/Header.astro";
 ---
 
 <!doctype html>
@@ -32,7 +33,10 @@ import handjetWoff2 from "@fontsource-variable/handjet/files/handjet-latin-wght-
     <title>Popcorn</title>
   </head>
   <body>
-    <slot />
+    <main class="bg-light-20 font-inter min-h-dvh gap-20 pt-24">
+      <Header />
+      <slot />
+    </main>
   </body>
 </html>
 
