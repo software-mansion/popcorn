@@ -1,23 +1,26 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
 ---
 
 <Layout>
-  <header class="mb-8 text-center">
-    <h1
-      class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
-    >
-      Game of Life Demo
-    </h1>
-    <p class="text-brown-70 mx-auto max-w-2xl text-lg">
-      A cellular automaton simulation running in WebAssembly using Elixir and
-      AtomVM. The entire UI is controlled by Elixir processes with no additional
-      JavaScript. Click cells to toggle them, use the glider preset, or start
-      the simulation.
-    </p>
-  </header>
+  <Section background="light">
+    <header class="mb-4 text-center">
+      <h1
+        class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+      >
+        Game of life demo
+      </h1>
+      <p class="mx-auto max-w-2xl">
+        A cellular automaton simulation written in Elixir. The entire UI is
+        controlled by Elixir with no additional JavaScript. Every cell is
+        distinct Elixir process. Click cells to toggle them, use the glider
+        preset, or start the simulation.
+      </p>
+    </header>
 
-  <div id="root" class="game-container"></div>
+    <div id="root" class="game-container"></div>
+  </Section>
 </Layout>
 
 <style is:global>
@@ -25,7 +28,7 @@ import Layout from "../../layouts/Layout.astro";
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2rem;
+    gap: 1rem;
   }
 
   .controls {
@@ -37,13 +40,10 @@ import Layout from "../../layouts/Layout.astro";
 
   .controls button {
     padding: 0.75rem 1.5rem;
-    border: 2px solid #58330c;
+    border: 1px solid #58330c;
     background: transparent;
     color: #58330c;
     border-radius: 0.5rem;
-    font-family: "Inter Variable", sans-serif;
-    font-weight: 500;
-    font-size: 1rem;
     cursor: pointer;
     transition: all 0.2s ease;
   }
@@ -60,7 +60,6 @@ import Layout from "../../layouts/Layout.astro";
   }
 
   .controls button:disabled:hover {
-    background: transparent;
     color: #58330c;
   }
 
@@ -68,9 +67,6 @@ import Layout from "../../layouts/Layout.astro";
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    padding: 1rem;
-    border-radius: 1rem;
-    margin-top: 1rem;
     align-items: center;
   }
 
@@ -89,16 +85,8 @@ import Layout from "../../layouts/Layout.astro";
     cursor: pointer;
     transition: all 0.2s ease;
     background: #fffdf5;
-    display: inline-block;
     box-sizing: border-box;
     flex-shrink: 0;
-  }
-
-  .cell::before {
-    content: "";
-    display: block;
-    width: 100%;
-    height: 100%;
   }
 
   .cell:hover {
@@ -107,18 +95,18 @@ import Layout from "../../layouts/Layout.astro";
   }
 
   .cell-dead {
-    background: #fffdf5 !important;
-    border-color: #58330c !important;
+    background: #fffdf5;
+    border-color: #58330c;
   }
 
   .cell-alive {
-    background: #ef7c00 !important;
-    border-color: #ef7c00 !important;
+    background: #ef7c00;
+    border-color: #ef7c00;
   }
 
   .cell-alive:hover {
-    background: #d66a00 !important;
-    border-color: #d66a00 !important;
+    background: #d66a00;
+    border-color: #d66a00;
   }
 
   @media (max-width: 768px) {
@@ -159,7 +147,7 @@ import Layout from "../../layouts/Layout.astro";
       const container = document.getElementById("root");
       if (container) {
         container.innerHTML =
-          '<div class="text-center p-8"><p class="text-red-600 text-lg">Failed to load Game of Life demo. Please refresh the page.</p></div>';
+          '<div class="text-center p-8"><p class="text-red-600">Failed to load Game of Life demo. Please refresh the page.</p></div>';
       }
     }
   }
