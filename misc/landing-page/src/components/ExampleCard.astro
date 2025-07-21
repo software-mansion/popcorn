@@ -14,14 +14,16 @@ const { n, title, href, image } = Astro.props;
       >
         {n}
       </h3>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-2xl transition-colors hover:text-orange-100 md:text-4xl"
-      >
-        {title}
-      </a>
+      <h3>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-2xl transition-colors hover:text-orange-100 md:text-4xl"
+        >
+          {title}
+        </a>
+      </h3>
     </div>
     <p><slot name="description" /></p>
   </div>

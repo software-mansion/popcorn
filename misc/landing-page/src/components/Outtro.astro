@@ -6,11 +6,22 @@ import Section from "./Section.astro";
 ---
 
 <Section id="outtro" background="light">
-  <HeaderTitle>Looking for more than just a library?</HeaderTitle>
+  <HeaderTitle>Let us know about your needs.</HeaderTitle>
   <LeadingElement title="Contact us" color="light" />
-  <Button title="Drop us a line" type="primary" href="#" />
+  <Button
+    title="Drop us a line"
+    type="primary"
+    href="mailto:popcorn@swmansion.com"
+  />
 </Section>
 <div class="flex flex-col items-center pb-8">
   <p>Created by</p>
-  <p class="text-[20px] font-bold">Software Mansion</p>
+  <p class="text-[20px] font-bold">
+    <a
+      target="_blank"
+      rel="noopener noreferrer"
+      href="https://swmansion.com"
+      class="underline">Software Mansion</a
+    >
+  </p>
 </div>
