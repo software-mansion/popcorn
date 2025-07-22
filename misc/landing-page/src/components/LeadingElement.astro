@@ -10,7 +10,80 @@ const titleClass = color === "light" ? "text-black" : "text-white";
 const lineClass = color === "light" ? "bg-black" : "bg-white";
 ---
 
-<div class="mt-8 mb-16 flex flex-col items-center gap-6">
+<div class="leading-element mt-8 mb-16 flex flex-col items-center gap-6">
   <h4 class:list={["text-2xl uppercase", titleClass]}>{title}</h4>
-  <div class:list={["h-[200px] w-px", lineClass]}></div>
+  <div class="line-container h-[200px] w-px">
+    <div class:list={["line h-[10px]", lineClass]}></div>
+  </div>
 </div>
+
+<script>
+  function setupLeadingElementAnimation() {
+    const leadingElements = document.querySelectorAll(".leading-element");
+
+    leadingElements.forEach((element) => {
+      const line = element.querySelector<HTMLElement>(".line")!;
+      const container = element.querySelector<HTMLElement>(".line-container")!;
+
+      const minHeight = 10;
+      const maxHeight = 200;
+
+      let ticking = false;
+
+      function updateLineHeight() {
+        const rect = container.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+
+        const distanceToDocumentBottom =
+          documentHeight - (scrollY + windowHeight);
+        const isNearBottom = distanceToDocumentBottom <= 500;
+
+        let elementProgress = 0;
+
+        // Check if the element is in the bottom of the page
+        if (isNearBottom) {
+          const bottomProgress = 1 - distanceToDocumentBottom / 500;
+
+          elementProgress = Math.min(Math.max(bottomProgress, 0), 1);
+        } else {
+          const centerPosition = (windowHeight / 2 - rect.top) / rect.height;
+
+          elementProgress = Math.min(
+            Math.max((centerPosition + 0.3) / 1.5, 0),
+            1,
+          );
+        }
+
+        // Calculate height based on progress
+        const newHeight = minHeight + (maxHeight - minHeight) * elementProgress;
+
+        line.style.height = `${Math.max(minHeight, Math.min(maxHeight, newHeight))}px`;
+      }
+
+      function handleScroll() {
+        if (!ticking) {
+          requestAnimationFrame(() => {
+            updateLineHeight();
+            ticking = false;
+          });
+
+          ticking = true;
+        }
+      }
+
+      // Initialize on load
+      updateLineHeight();
+
+      window.addEventListener("scroll", handleScroll);
+      window.addEventListener("resize", handleScroll);
+    });
+  }
+
+  function setup() {
+    setupLeadingElementAnimation();
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
