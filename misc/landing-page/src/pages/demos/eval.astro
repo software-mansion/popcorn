@@ -1,0 +1,238 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
+import { Icon } from "astro-icon/components";
+---
+
+<Layout>
+  <Section background="light" class="max-w-2xl gap-4 self-center">
+    <h1 class="font-handjet text-brown-header mb-4 text-center text-6xl">
+      Elixir Eval Demo
+    </h1>
+    <p class="text-center">
+      Simple Elixir REPL. Write some code or use our examples and click
+      "Evaluate" (Ctrl+Enter) to see results. Entirely offline.
+    </p>
+
+    <h3 class="text-brown-header text-xl font-semibold">Code</h3>
+
+    <textarea
+      id="code"
+      class="border-brown-header bg-light-20 min-h-64 w-full rounded-lg border p-4 font-mono text-sm transition-colors duration-200 focus:border-orange-100 focus:outline-none"
+      placeholder="Type your Elixir code here..."></textarea>
+    <div class="flex flex-wrap gap-4">
+      <button
+        id="eval"
+        class="text-light-20 grow cursor-pointer rounded-lg border border-orange-100 bg-orange-100 px-6 py-3 text-sm outline-hidden transition-all duration-200 hover:brightness-90"
+        ><b>Evaluate</b></button
+      >
+      <div class="flex grow justify-between gap-4">
+        <button
+          class="border-brown-header text-brown-header hover:bg-brown-header hover:text-light-20 cursor-pointer rounded-lg border bg-transparent px-6 py-3 text-sm outline-hidden transition-all duration-200"
+          data-type="example"
+          data-value="case Enum.max([1, 2, 3]) do
+    3 -> {:ok, 3}
+    2 -> {:error, 2}
+end"
+          >Example: case</button
+        >
+        <button
+          class="border-brown-header text-brown-header hover:bg-brown-header hover:text-light-20 cursor-pointer rounded-lg border bg-transparent px-6 py-3 text-sm outline-hidden transition-all duration-200"
+          data-type="example"
+          data-value="[1, 2, 3, 4, 5]
+|> Enum.map(fn n -> n * 2 end)
+|> Enum.filter(fn n -> n > 2 end)"
+          >Example: pipes</button
+        >
+      </div>
+    </div>
+
+    <h3 class="text-brown-header text-xl font-semibold">Results</h3>
+
+    <div class="bg-brown-100 relative w-full rounded-lg border p-4">
+      <pre
+        id="result"
+        class="text-light-20 max-h-64 min-h-16 w-full overflow-x-auto font-mono text-sm whitespace-pre-wrap">
+      </pre>
+      <div class="text-light-20 flex items-center justify-end gap-2">
+        <span id="time" class="text-xs"></span>
+        <span id="state" class="text-2xl">○</span>
+      </div>
+    </div>
+
+    <details class="w-full rounded-lg border" open>
+      <summary
+        class="text-brown-header cursor-pointer rounded-lg p-4 font-semibold select-none hover:brightness-90"
+        >Logs</summary
+      >
+      <div class="text-light-20 bg-brown-100 flex flex-col gap-2 p-4">
+        <pre
+          id="logs"
+          class="scrollbar-color flex max-h-64 min-h-24 flex-col overflow-y-auto rounded-lg font-mono text-sm whitespace-pre-wrap">
+        </pre>
+        <Icon
+          id="clear"
+          class="self-end transition-colors duration-200 hover:text-orange-100"
+          name="material-symbols-light:delete-forever-outline-rounded"
+          width="24"
+          height="24"
+        />
+      </div>
+    </details>
+  </Section>
+</Layout>
+
+<style is:global>
+  .scrollbar-color {
+    scrollbar-color: #ef7c00 #301b05;
+  }
+</style>
+
+<script>
+  const LANGUAGE = "elixir";
+  const EVAL_ELIXIR = "eval_elixir";
+
+  let popcorn = null;
+
+  const Elements = {
+    get evalButton() {
+      return document.getElementById("eval");
+    },
+    get clearButton() {
+      return document.getElementById("clear");
+    },
+    get codeInput() {
+      return document.getElementById("code");
+    },
+    get exampleButtons() {
+      return document.querySelectorAll('button[data-type="example"]');
+    },
+    get stateDisplay() {
+      return document.getElementById("state");
+    },
+    get timeDisplay() {
+      return document.getElementById("time");
+    },
+    get resultDisplay() {
+      return document.getElementById("result");
+    },
+    get logsDisplay() {
+      return document.getElementById("logs");
+    },
+  };
+
+  const StateIcons = {
+    ready: "○",
+    loading: "↺",
+    success: "✓",
+    error: "✗",
+  };
+
+  async function setup() {
+    if (typeof window.Popcorn === "undefined") {
+      throw new Error("Popcorn not available after waiting");
+    }
+
+    try {
+      popcorn = await window.Popcorn.init({
+        bundlePath: "/wasm/eval.avm",
+        wasmDir: "/wasm/",
+        debug: true,
+        onStdout: (text) => displayLog(text, { isError: false }),
+        onStderr: (text) => displayLog(text, { isError: true }),
+      });
+
+      Elements.exampleButtons.forEach((button) => {
+        button.onclick = () => {
+          Elements.codeInput.value = button.getAttribute("data-value").trim();
+        };
+      });
+
+      Elements.clearButton.onclick = () => {
+        Elements.logsDisplay.innerHTML = "";
+      };
+
+      function evalCode() {
+        const code = Elements.codeInput.value.trim();
+        sendEvalRequest(popcorn, code);
+      }
+
+      Elements.evalButton.onclick = evalCode;
+      Elements.codeInput.addEventListener("keydown", onCmdEnter(evalCode));
+    } catch (error) {
+      console.error("Failed to initialize Popcorn:", error);
+      const container = document.getElementById("root");
+      if (container) {
+        container.innerHTML =
+          '<div class="text-center p-8"><p class="text-red-600">Failed to load Eval demo. Please refresh the page.</p></div>';
+      }
+    }
+  }
+
+  function onCmdEnter(fn) {
+    return (event) => {
+      const cmdEnter =
+        event.key === "Enter" && (event.metaKey || event.ctrlKey);
+      if (cmdEnter) {
+        event.preventDefault();
+        fn();
+      }
+    };
+  }
+
+  async function sendEvalRequest(popcorn, code) {
+    if (code === "") {
+      return;
+    }
+
+    Elements.stateDisplay.textContent = StateIcons.loading;
+    Elements.timeDisplay.textContent = "";
+    Elements.resultDisplay.textContent = "";
+
+    if (!popcorn) {
+      Elements.stateDisplay.textContent = StateIcons.error;
+      Elements.resultDisplay.textContent = "Popcorn not initialized!";
+      return;
+    }
+
+    try {
+      const { data, durationMs } = await popcorn.call([EVAL_ELIXIR, code], {
+        timeoutMs: 10_000,
+      });
+      Elements.stateDisplay.textContent = StateIcons.success;
+      Elements.timeDisplay.textContent = `${durationMs.toFixed(1)} ms`;
+      Elements.resultDisplay.textContent = data;
+    } catch (error) {
+      console.error("Evaluation error:", error);
+      Elements.stateDisplay.textContent = StateIcons.error;
+      Elements.timeDisplay.textContent = "";
+      Elements.resultDisplay.textContent =
+        error.message ?? "VM crashed, check logs output";
+    }
+  }
+
+  function displayLog(log, { isError }) {
+    const logsElement = document.getElementById("logs");
+
+    if (!logsElement) {
+      console.error("Logs element not found!");
+      return;
+    }
+
+    const lineElement = document.createElement("div");
+    lineElement.textContent = log;
+    lineElement.style.whiteSpace = "pre-wrap";
+
+    if (isError) {
+      lineElement.style.color = "#ff6b6b";
+    } else {
+      lineElement.style.color = "#fffdf5";
+    }
+
+    logsElement.appendChild(lineElement);
+    logsElement.scrollTop = logsElement.scrollHeight;
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>

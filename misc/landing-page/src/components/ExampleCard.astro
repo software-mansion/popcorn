@@ -1,5 +1,5 @@
 ---
-import { Image } from "astro:assets";
+import { Image, Picture } from "astro:assets";
 
 const { n, title, href, image } = Astro.props;
 ---
@@ -34,7 +34,14 @@ const { n, title, href, image } = Astro.props;
       rel="noopener noreferrer"
       class="transition-opacity hover:opacity-80"
     >
-      <Image src={image} alt={title} class="rounded" width={500} height={300} />
+      <Image
+        densities={[0.5, 1.5, 2]}
+        src={image}
+        alt={title}
+        class="rounded"
+        width={500}
+        height={300}
+      />
     </a>
   </div>
 </div>
