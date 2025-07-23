@@ -1,0 +1,130 @@
+---
+import { headerClass } from "./HeaderTitle.astro";
+const marqueeElementClass = "marquee-element flex flex-shrink-0";
+---
+
+<div id="marquee" class="marquee flex w-screen overflow-hidden">
+  <div class={marqueeElementClass} aria-hidden="true">
+    <h1 class:list={[headerClass, "max-w-none"]}>
+      <slot />
+    </h1>
+  </div>
+  <div class={marqueeElementClass}>
+    <h1 class:list={[headerClass, "max-w-none"]}>
+      <slot />
+    </h1>
+  </div>
+  <div class={marqueeElementClass} aria-hidden="true">
+    <h1 class:list={[headerClass, "max-w-none"]}>
+      <slot />
+    </h1>
+  </div>
+</div>
+
+<style>
+  .marquee {
+    gap: 200px;
+  }
+</style>
+
+<script>
+  function setupMarqueeAnimation() {
+    const marquee = document.querySelector<HTMLElement>("#marquee")!;
+    const marqueeElements =
+      document.querySelectorAll<HTMLElement>(".marquee-element");
+    const gap = 200;
+
+    marquee.style.gap = `${gap}px`;
+
+    let ticking = false;
+    let lastScrollY = window.scrollY;
+    let scrollPosition = 0;
+    let lastTimestamp = 0;
+
+    let isInViewport = false;
+
+    // Get the total width of a single marquee element including the gap
+    const elementWidth = marqueeElements[0].offsetWidth + gap;
+
+    // Start with the first element positioned off-screen to the left
+    let animationPosition = -elementWidth;
+
+    marqueeElements.forEach((el) => {
+      el.style.transform = `translateX(${elementWidth}}px)`;
+    });
+
+    function updatePositions(timestamp: number) {
+      if (!isInViewport) {
+        requestAnimationFrame(updatePositions);
+        return;
+      }
+
+      // Handle continuous animation
+      if (lastTimestamp) {
+        const elapsed = timestamp - lastTimestamp;
+
+        const speed = 0.05;
+        animationPosition -= elapsed * speed;
+
+        // Reset position when element has scrolled past
+        if (Math.abs(animationPosition) >= 2 * elementWidth) {
+          animationPosition += elementWidth;
+        }
+      }
+
+      lastTimestamp = timestamp;
+
+      // Apply combined transformation (scroll effect + continuous animation)
+      marqueeElements.forEach((el) => {
+        el.style.transform = `translateX(${animationPosition + scrollPosition}px)`;
+      });
+
+      requestAnimationFrame(updatePositions);
+    }
+
+    function handleScroll() {
+      if (!ticking && isInViewport) {
+        requestAnimationFrame(() => {
+          const scrollDelta = lastScrollY - window.scrollY;
+          const scrollFactor = 0.5; // sensitivity
+          const moveAmount = scrollDelta * scrollFactor;
+
+          scrollPosition += moveAmount;
+
+          lastScrollY = window.scrollY;
+          ticking = false;
+        });
+
+        ticking = true;
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isInViewport = entry.isIntersecting;
+
+          if (isInViewport) {
+            lastTimestamp = 0;
+            requestAnimationFrame(updatePositions);
+          }
+        });
+      },
+      {
+        threshold: 0,
+      },
+    );
+
+    observer.observe(marquee);
+
+    window.addEventListener("scroll", handleScroll);
+    requestAnimationFrame(updatePositions);
+  }
+
+  function setup() {
+    setupMarqueeAnimation();
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>

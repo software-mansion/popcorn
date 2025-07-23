@@ -1,18 +1,19 @@
 ---
 import Button, { buttonGroupClass } from "./Button.astro";
-import Section, { fullWidthClass } from "./Section.astro";
+import Section from "./Section.astro";
 import LeadingElement from "./LeadingElement.astro";
-import HeaderTitle from "./HeaderTitle.astro";
+import Marquee from "./Marquee.astro";
+
+const exampleButton =
+  "flex items-center gap-2 text-orange-100 cursor-pointer font-semibold";
 ---
 
 <Section id="live-demo" background="light" class="hidden lg:flex">
-  <HeaderTitle class={fullWidthClass}>
-    Check out how simple it is to use Popcorn.
-  </HeaderTitle>
+  <Marquee> Check out how simple it is to use Popcorn. </Marquee>
   <LeadingElement title="Live demo" color="light" />
 
-  <div class="flex items-center justify-between gap-20">
-    <div class="max-w-96">
+  <div class="flex flex-wrap items-center justify-between gap-20">
+    <div class="m-auto max-w-96">
       <p>
         This live demo showcases Elixir’s IEx – running right here in the
         browser. Write your own code and make it happen, or click on the buttons
@@ -33,19 +34,15 @@ import HeaderTitle from "./HeaderTitle.astro";
         />
       </div>
     </div>
-    <div class="flex flex-col gap-4">
-      <div
-        id="terminal"
-        class="live-demo-scroll h-80 w-xl overflow-auto border border-orange-100"
-      >
+    <div class="m-auto flex flex-col gap-7">
+      <div class="border-brown-60 rounded-lg border bg-[#373129] p-4 pr-0">
+        <div id="terminal" class="live-demo-scroll relative h-80 w-xl"></div>
       </div>
-      <div class="flex flex-col gap-2">
-        <a id="live-simple" class="border border-orange-100 p-1 text-center"
-          >Example: sort</a
-        >
-        <a id="live-case" class="border border-orange-100 p-1 text-center"
-          >Example: processes</a
-        >
+      <div class="flex w-full justify-evenly gap-2">
+        <button id="live-simple" class={exampleButton}>Example: Sort </button>
+        <button id="live-case" class={exampleButton}
+          >Example: Processes
+        </button>
       </div>
     </div>
   </div>
@@ -58,11 +55,20 @@ import HeaderTitle from "./HeaderTitle.astro";
   const XTERM_CONFIG = {
     allowTransparency: true,
     theme: {
-      background: "#fffdf5",
-      foreground: "#36220d",
+      background: "#373129",
+      foreground: "#fffdf5",
       cursor: "#ef7c00",
       cursorAccent: "#ef7c00",
-      selectionBackground: "#ffe6cc",
+
+      black: "#958B82",
+      blue: "#61AFEF",
+      green: "#98C379",
+      cyan: "#56B6C2",
+      magenta: "#C678DD",
+      red: "#E06C75",
+      yellow: "#E5C07B",
+
+      selectionBackground: "#55423d",
     },
   };
 
@@ -121,6 +127,7 @@ import HeaderTitle from "./HeaderTitle.astro";
 
   function displayLog(log: string, { term, isError }) {
     const lineElement = document.createElement("span");
+
     lineElement.textContent = log;
     if (isError) {
       log = "\x1b[31m" + log + "\x1b[0m\n\r";
@@ -183,6 +190,6 @@ import HeaderTitle from "./HeaderTitle.astro";
 
 <style>
   .live-demo-scroll {
-    scrollbar-color: #ef7c00 #fffdf5;
+    scrollbar-color: #ef7c00 #373129;
   }
 </style>
