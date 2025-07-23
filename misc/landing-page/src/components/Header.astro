@@ -130,10 +130,15 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
       if (!elementBehind) return;
 
+      const section = elementBehind.closest<HTMLElement>(".section-bg");
+
+      const sectionBackground = section?.dataset.background || "light";
+      const sectionAnimationProgress = Number(section?.dataset.progress);
+
       // Check if we're over a dark section
-      const isDarkSection: boolean = !!elementBehind.closest(
-        '[data-background="dark"]',
-      );
+      const isDarkSection =
+        (sectionBackground === "light" && sectionAnimationProgress < 0.4) ||
+        (sectionBackground === "dark" && sectionAnimationProgress >= 0.4);
 
       // Toggle classes based on background
       nav.classList.toggle("text-orange-100", isDarkSection);
