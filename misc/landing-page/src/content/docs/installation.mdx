@@ -5,6 +5,11 @@ description: How to setup Popcorn in new or existing Elixir project
 
 import { FileTree, Steps, Aside } from "@astrojs/starlight/components";
 
+<Aside>
+  Work in progress, check [Hex.pm](https://hexdocs.pm/popcorn/readme.html) docs
+  for more complete installation notes.
+</Aside>
+
 <Steps>
 
 1. **Add Popcorn to your dependencies**
@@ -27,7 +32,9 @@ import { FileTree, Steps, Aside } from "@astrojs/starlight/components";
      out_dir: "static/wasm"
    ```
 
-   <Aside>Currently Popcorn only supports having output files in `wasm/` directory.</Aside>
+   <Aside>
+     Currently Popcorn only supports having output files in `wasm/` directory.
+   </Aside>
 
 3. **Create your entrypoint module**
 
@@ -43,8 +50,11 @@ import { FileTree, Steps, Aside } from "@astrojs/starlight/components";
      end
    end
    ```
-   <Aside>In the future Popcorn will support OTP applications and there will be no need for additional entrypoint module.</Aside>
-  
+
+   <Aside>
+     In the future Popcorn will support OTP applications and there will be no
+     need for additional entrypoint module.
+   </Aside>
 
 4. **Initialize Popcorn in your HTML**
 
@@ -63,13 +73,8 @@ import { FileTree, Steps, Aside } from "@astrojs/starlight/components";
 ### Popcorn file structure
 
 <FileTree>
-- your-app/
-  - static/
-    - wasm/
-      - popcorn.js        Initializes Popcorn, allows Elixir communication
-      - popcorn-iframe.js Manages Wasm module, internal
-      - AtomVM.wasm       Compiled AtomVM runtime
-      - AtomVM.js         Runtime glue code for browser APIs
-      - app.avm           Bundled Elixir bytecode
-  - index.html
+  - your-app/ - static/ - wasm/ - popcorn.js Initializes Popcorn, allows Elixir
+  communication - popcorn-iframe.js Manages Wasm module, internal - AtomVM.wasm
+  Compiled AtomVM runtime - AtomVM.js Runtime glue code for browser APIs -
+  app.avm Bundled Elixir bytecode - index.html
 </FileTree>
