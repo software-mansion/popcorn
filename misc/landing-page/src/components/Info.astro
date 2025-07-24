@@ -16,15 +16,14 @@ import Section from "./Section.astro";
         target="_blank"
         rel="noopener noreferrer"
         href="https://github.com/software-mansion/popcorn/blob/main/LICENSE"
-        class="underline">Apache 2.0</a
+        >Apache 2.0</a
       >. You’re free to use it in personal and commercial projects.
     </p>
     <p>
       Need help with something bigger? We’re <a
         target="_blank"
         rel="noopener noreferrer"
-        href="https://swmansion.com"
-        class="underline">Software Mansion</a
+        href="https://swmansion.com">Software Mansion</a
       > – a software development company, React Native core contributors, and Elixir
       experts. Get in touch and let’s build your product together.
     </p>
@@ -66,6 +65,7 @@ import Section from "./Section.astro";
         span.className = "text-scroll transition-colors duration-300";
 
         if (typeof word === "object" && word.nodeType) {
+          span.classList.add("has-link");
           span.appendChild(word);
         } else {
           const previous = i - 1 >= 0 ? splitText[i - 1] : undefined;
@@ -128,13 +128,18 @@ import Section from "./Section.astro";
             // scrolling down
             if (targetIndex > lastTargetIndex) {
               for (let i = lastTargetIndex; i <= targetIndex; i++) {
-                words[i].classList.add("text-light-20");
+                if (words[i].classList.contains("has-link")) {
+                  words[i].classList.add("text-orange-100");
+                } else {
+                  words[i].classList.add("text-light-20");
+                }
               }
             }
             //scrolling up
             else {
               for (let i = targetIndex; i <= lastTargetIndex; i++) {
                 words[i].classList.remove("text-light-20");
+                words[i].classList.remove("text-orange-100");
               }
             }
 
