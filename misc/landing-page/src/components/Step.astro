@@ -1,11 +1,11 @@
 ---
-const { title, n } = Astro.props;
+const { n } = Astro.props;
 ---
 
 <div class="flex max-w-2xl flex-col">
   <div class="flex items-center justify-between gap-3 md:gap-36 lg:gap-48">
     <h2 class="font-handjet text-4xl wrap-break-word text-black md:text-6xl">
-      {title}
+      <slot name="header-title" />
     </h2>
     <h1
       class="font-handjet text-9xl leading-none text-orange-100 md:text-[11rem]"
@@ -15,7 +15,7 @@ const { title, n } = Astro.props;
   </div>
   <hr class="mt-6 mb-6" />
   <div class="flex flex-col content-stretch gap-4 md:flex-row md:gap-12">
-    <h3 class="flex-1/2 text-base text-orange-100 md:text-2xl">
+    <h3 class="flex-1/2 text-base text-orange-100 uppercase md:text-2xl">
       <slot name="title" />
     </h3>
     <p class="flex-1/2"><slot name="description" /></p>

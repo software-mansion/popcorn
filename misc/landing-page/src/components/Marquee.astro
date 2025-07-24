@@ -19,6 +19,11 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
       <slot />
     </h1>
   </div>
+  <div class={marqueeElementClass} aria-hidden="true">
+    <h1 class:list={[headerClass, "max-w-none"]}>
+      <slot />
+    </h1>
+  </div>
 </div>
 
 <style>

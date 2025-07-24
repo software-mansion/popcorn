@@ -3,15 +3,21 @@ import Step from "./Step.astro";
 import Section from "./Section.astro";
 ---
 
-<Section id="features" background="light" class="gap-20 md:gap-36">
-  <Step n="01" title="Elixir, meet WebAssembly.">
+<Section
+  id="features"
+  background="light"
+  class="mt-20 gap-20 md:gap-36 lg:mt-20"
+>
+  <Step n="01">
+    <Fragment slot="header-title">Elixir, meet <br /> WebAssembly.</Fragment>
     <Fragment slot="title">Compile your Elixir to Wasm.</Fragment>
     <Fragment slot="description">
       Popcorn bridges your Elixir code with Wasm-compiled AtomVM runtime. No
       need to learn a new language – just use the one you already love.
     </Fragment>
   </Step>
-  <Step n="02" title="Your code is great.">
+  <Step n="02">
+    <Fragment slot="header-title">Your code <br /> is great.</Fragment>
     <Fragment slot="title">Use your existing code without any changes.</Fragment
     >
     <Fragment slot="description"
@@ -20,7 +26,8 @@ import Section from "./Section.astro";
       inside the browser.
     </Fragment>
   </Step>
-  <Step n="03" title="No internet? No problem.">
+  <Step n="03">
+    <Fragment slot="header-title">No internet? <br /> No problem.</Fragment>
     <Fragment slot="title">Run everything in the browser</Fragment>
     <Fragment slot="description"
       >Popcorn runs fully in-browser, which makes it ideal for many use cases,
@@ -28,7 +35,8 @@ import Section from "./Section.astro";
       required.</Fragment
     >
   </Step>
-  <Step n="04" title="Built for stability.">
+  <Step n="04">
+    <Fragment slot="header-title">Built for <br /> stability.</Fragment>
     <Fragment slot="title">Don’t worry about the performance.</Fragment>
     <Fragment slot="description"
       >Compared to AtomVM, Popcorn enhances Elixir-JavaScript communication,
