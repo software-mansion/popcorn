@@ -4,10 +4,10 @@ import Button, { buttonGroupClass } from "./Button.astro";
 import Section from "./Section.astro";
 ---
 
-<Section id="intro" background="light">
+<Section id="intro" background="light" class="mt-20 mb-20 lg:mt-24 lg:mb-24">
   <Icon name="logo" class="text-brown-header text-8xl" />
   <h1
-    class="font-handjet text-brown-70 mb-7 text-[80px] leading-none font-semibold tracking-normal md:text-[120px] lg:text-[200px]"
+    class="font-handjet text-brown-70 mb-7 text-center text-[80px] leading-none font-semibold tracking-normal md:text-[120px] lg:text-[200px]"
   >
     Popcorn it.
   </h1>
@@ -20,7 +20,7 @@ import Section from "./Section.astro";
     Take your Elixir code from the backend to the browser.
   </h3>
   <div class={buttonGroupClass}>
-    <Button title="See it in action" type="primary" href="/#examples" />
     <Button title="Get started" type="secondary" href="/docs/" />
+    <Button title="See it in action" type="primary" href="/#examples" />
   </div>
 </Section>

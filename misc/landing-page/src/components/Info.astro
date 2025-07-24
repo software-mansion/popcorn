@@ -7,7 +7,10 @@ import Section from "./Section.astro";
   background="dark"
   class="text-brown-60 relative mt-50 mb-50 flex h-[2000px] max-w-3xl flex-col gap-4 text-2xl font-bold md:text-4xl"
 >
-  <div id="info-content" class="fixed-position mb-12 flex flex-col gap-4">
+  <div
+    id="info-content"
+    class="fixed-position mb-12 flex flex-col gap-8 leading-[140%] lg:gap-14"
+  >
     <p>
       Popcorn is open-source and licensed under <a
         target="_blank"
@@ -65,7 +68,6 @@ import Section from "./Section.astro";
         if (typeof word === "object" && word.nodeType) {
           span.appendChild(word);
         } else {
-          
           const previous = i - 1 >= 0 ? splitText[i - 1] : undefined;
           const isCurrentPunctuation = /^[.,;:!?]$/.test(String(word));
           const previousWasNode =
@@ -93,7 +95,8 @@ import Section from "./Section.astro";
 
     const navElement = document.querySelector("nav")!;
     const navHeight = navElement ? navElement.offsetHeight : 64;
-    const scrollOffset = 200;
+
+    const scrollOffset = 320;
     const visibleThreshold = 0.7;
 
     const sectionHeight = section.clientHeight;

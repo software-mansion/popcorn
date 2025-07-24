@@ -6,7 +6,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
 <nav
-  class="fixed top-0 right-0 left-0 z-50 flex h-16 min-w-max items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 lg:bg-transparent"
+  class="fixed top-0 right-0 left-0 z-50 flex h-16 min-w-max items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
 >
   <a href="/" class="flex-shrink-0">
     <Icon
@@ -20,7 +20,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
     data-mobile-menu
   >
-    <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
+    <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
       <a class={linkClass} href="/#features">Features</a>
       <a class={linkClass} href="/#examples">Examples</a>
       <a class:list={["hidden lg:block", linkClass]} href="/#live-demo"
@@ -30,7 +30,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     </div>
 
     <hr class="lg:hidden" />
-    <div class="flex flex-col gap-10 lg:flex-row lg:gap-4">
+    <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
       <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
       <a
         class={linkClass}
