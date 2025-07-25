@@ -7,8 +7,10 @@ interface Props {
 }
 const { href, title, type, newTab = false } = Astro.props;
 
-const primaryClasses = "bg-brown-70 text-light-30";
-const secondaryClasses = "text-brown-70 border border-brown-70";
+const primaryClasses =
+  "bg-brown-70 hover:bg-brown-80 focus:outline-orange-20 focus:border-orange-20 text-light-30";
+const secondaryClasses =
+  "text-brown-70 hover:bg-grey-20 focus:border-orange-100 focus:text-orange-100 focus:outline-orange-100 border border-brown-70";
 
 const classes = type === "primary" ? primaryClasses : secondaryClasses;
 
@@ -21,6 +23,6 @@ export const buttonGroupClass =
   href={href}
   class:list={[
     classes,
-    "w-full max-w-sm rounded-lg pt-4 pr-6 pb-4 pl-6 text-center md:w-[200px]",
+    "w-full max-w-sm rounded-lg pt-4 pr-6 pb-4 pl-6 text-center transition-colors duration-150 md:w-[200px]",
   ]}>{title}</a
 >
