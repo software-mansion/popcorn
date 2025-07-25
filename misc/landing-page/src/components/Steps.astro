@@ -45,3 +45,89 @@ import Section from "./Section.astro";
     >
   </Step>
 </Section>
+
+<script>
+  function setupStepAnimation() {
+    const section = document.querySelector("#features")!;
+    const steps = document.querySelectorAll<HTMLElement>("[data-step]");
+
+    const threshold = 50;
+    const duration = 400;
+
+    let currentStep = 0;
+    let isInViewport = false;
+    let ticking = false;
+
+    function updateVisibility() {
+      console.log("updateVisibility", currentStep);
+      const step = steps[currentStep];
+      const stepRect = step.getBoundingClientRect();
+      const nextStep = steps[currentStep + 1];
+      const nextStepRect = nextStep?.getBoundingClientRect();
+
+      if (!nextStepRect) return;
+
+      const distance = nextStepRect?.top - stepRect.top;
+
+      const opacity = Math.max(
+        Math.min((distance - threshold) / duration, 1),
+        0,
+      );
+
+      const isCurrentStepIsInBottomHalfOfViewport =
+        stepRect.top + stepRect.height / 2 - threshold * 2 >
+        window.innerHeight / 2;
+
+      step.style.opacity = String(opacity);
+
+      nextStep.style.opacity = String(1 - opacity);
+
+      if (Math.abs(distance) < threshold && currentStep < steps.length - 2) {
+        currentStep += 1;
+      }
+
+      if (isCurrentStepIsInBottomHalfOfViewport && currentStep > 0) {
+        currentStep -= 1;
+      }
+    }
+
+    function handleScroll() {
+      if (!ticking && isInViewport) {
+        requestAnimationFrame(() => {
+          updateVisibility();
+
+          ticking = false;
+        });
+
+        ticking = true;
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isInViewport = entry.isIntersecting;
+        });
+      },
+      {
+        threshold: 0,
+      },
+    );
+
+    observer.observe(section);
+
+    // Initial visibility update
+    steps.forEach((_) => {
+      updateVisibility();
+    });
+
+    window.addEventListener("scroll", handleScroll);
+  }
+
+  function setup() {
+    setupStepAnimation();
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>

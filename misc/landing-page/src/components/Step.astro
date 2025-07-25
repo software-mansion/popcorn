@@ -2,7 +2,10 @@
 const { n } = Astro.props;
 ---
 
-<div class="flex max-w-2xl flex-col">
+<div
+  class="sticky top-1/2 flex max-w-2xl -translate-y-1/2 flex-col opacity-0 transition-opacity"
+  data-step={n}
+>
   <div class="flex items-center justify-between gap-3 md:gap-36 lg:gap-48">
     <h2 class="font-handjet text-4xl wrap-break-word text-black md:text-6xl">
       <slot name="header-title" />
