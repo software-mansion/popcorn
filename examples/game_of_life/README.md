@@ -1,6 +1,6 @@
-# GameOfLife Pocporn demo
+# GameOfLife Popcorn demo
 
-Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Pocporn
+Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Popcorn
 
 ## Code usage
 
