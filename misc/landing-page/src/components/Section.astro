@@ -3,9 +3,8 @@ interface Props {
   background: "light" | "dark";
   class?: string;
   id?: string;
-  outerClass?: string;
 }
-const { background, class: className, id, outerClass, ...rest } = Astro.props;
+const { background, class: className, id, ...rest } = Astro.props;
 
 const light = "bg-light-20 text-brown-100";
 const dark = "bg-brown-90 text-white";
@@ -16,7 +15,7 @@ export const fullWidthClass = "-ml-48 -mr-48";
 ---
 
 <div
-  class:list={["flex flex-col", backgroundClass, outerClass ?? ""]}
+  class:list={["flex flex-col", backgroundClass]}
   data-background={background}
   {...rest}
 >

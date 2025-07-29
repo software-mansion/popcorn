@@ -78,7 +78,6 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
 
       lastTimestamp = timestamp;
 
-      // Apply transformation
       marqueeElements.forEach((el) => {
         el.style.transform = `translateX(${animationPosition}px)`;
       });
