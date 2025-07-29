@@ -20,19 +20,14 @@ defmodule GameOfLife.Ui do
     |> html()
     |> mount_at_root()
 
+    init_grid(size)
+
     listener_refs =
       add_click_listeners(%{start: "#start", stop: "#stop", reset: "#reset", glider: "#glider"})
 
-    # TODO: return list of refs from run_js!/2
     cell_listeners_refs =
-      0..(size * size - 1)
-      |> Map.new(fn i ->
-        x = rem(i, size)
-        y = div(i, size)
+      add_click_listener("#grid-root")
 
-        {[x, y], ".cell[data-coords='#{x},#{y}']"}
-      end)
-      |> add_click_listeners()
 
     {:ok,
      %{
@@ -94,6 +89,9 @@ defmodule GameOfLife.Ui do
           %{state | alive: new_alive}
 
         {:wasm_event, :click, _data, [x, y]} when not is_running(state) ->
+          x = String.to_integer(x)
+          y = String.to_integer(y)
+
           if [x, y] in state.alive do
             new_alive = List.delete(state.alive, [x, y])
 
@@ -123,8 +121,7 @@ defmodule GameOfLife.Ui do
         <button id="glider">Use glider preset</button>
       </div>
     </div>
-    <div class="cell-grid">
-      #{build_rows(size)}
+    <div id="grid-root" class="cell-grid">
     </div>
     """
   end
@@ -150,15 +147,6 @@ defmodule GameOfLife.Ui do
     )
   end
 
-  defp build_rows(size) do
-    0..(size * size - 1)
-    |> Enum.map(fn i ->
-      ~s|<div class="cell" data-coords="#{rem(i, size)},#{div(i, size)}"></div>|
-    end)
-    |> Enum.chunk_every(size)
-    |> Enum.map(&~s|<div class="cell-row">#{Enum.join(&1)}</div>|)
-  end
-
   def add_click_listeners(selectors) do
     Map.new(selectors, fn {key, selector} ->
       node_ref = query_selector(selector)
@@ -172,6 +160,41 @@ defmodule GameOfLife.Ui do
 
       {key, listener_ref}
     end)
+  end
+
+  def add_click_listener(selector) do
+    {:ok, listener_ref} =
+      """
+      ({ wasm, args }) => {
+        const event_name = "click";
+        const node = document.querySelector(args.selector);
+        const fn = (event) => {
+          console.log(event);
+          const x = event.target.getAttribute("data-coords-x");
+          const y = event.target.getAttribute("data-coords-y");
+          wasm.cast(args.event_receiver, ["_popcorn_dom_event", "click", {}, [x, y]]);
+        };
+
+        node.addEventListener(event_name, fn);
+        const key = wasm.nextTrackedObjectKey();
+        const cleanupFn = () => {
+          node.removeEventListener(event_name, fn);
+          wasm.cleanupFunctions.delete(key);
+        };
+        wasm.cleanupFunctions.set(key, cleanupFn);
+
+        return [new TrackedValue({key: key, value: cleanupFn})];
+      }
+      """
+      |> Wasm.run_js(
+        %{
+          selector: selector,
+          event_receiver: @receiver_name
+        },
+        return: :ref
+      )
+
+    [listener_ref]
   end
 
   defp grid_to_alive_list(grid) do
@@ -204,6 +227,30 @@ defmodule GameOfLife.Ui do
     )
   end
 
+  defp init_grid(size) do
+    Wasm.run_js!(
+      """
+      ({ args }) => {
+        const root = document.querySelector("#grid-root");
+        for (let x = 0; x < args.size; x++) {
+          const row = document.createElement("div");
+          row.classList.add("cell-row");
+          for (let y = 0; y < args.size; y++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.setAttribute("data-coords", `${x},${y}`);
+            cell.setAttribute("data-coords-x", x);
+            cell.setAttribute("data-coords-y", y);
+            row.append(cell);
+          }
+          root.append(row);
+        }
+      }
+      """,
+      %{size: size}
+    )
+  end
+
   defp mount_at_root(html) do
     Wasm.run_js!(
       """
@@ -222,7 +269,7 @@ defmodule GameOfLife.Ui do
         const alive = new Set(args.alive_coords.map(([x,y]) => `${x},${y}`));
 
         for (const cell of document.querySelectorAll(".cell")) {
-          const coords = cell.getAttribute("data-coords");
+          const coords = cell.getAttribute("data-coords-x") + ',' + cell.getAttribute("data-coords-y");
           cell.classList.toggle("cell-alive", alive.has(coords));
         }
       }
