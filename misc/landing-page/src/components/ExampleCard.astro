@@ -1,5 +1,5 @@
 ---
-import { Image, Picture } from "astro:assets";
+import { Image } from "astro:assets";
 
 const { n, title, href, image } = Astro.props;
 ---
@@ -10,7 +10,7 @@ const { n, title, href, image } = Astro.props;
   <div class="flex max-w-80 flex-col gap-8 md:gap-24">
     <div class="flex items-center gap-3">
       <h3
-        class="bg-orange-weird font-handjet inline-block rounded-sm px-1.5 py-0.5 text-2xl font-light text-orange-100 md:p-2.5 md:text-4xl"
+        class="bg-orange-20 font-handjet inline-block rounded-sm px-1.5 py-0.5 text-2xl font-light text-orange-100 md:p-2.5 md:text-4xl"
       >
         {n}
       </h3>

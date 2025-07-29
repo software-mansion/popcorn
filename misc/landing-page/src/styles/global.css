@@ -5,8 +5,9 @@
   --color-white: #fff;
   --color-light-20: #fffdf5;
   --color-light-30: #fffaf7;
+  --color-grey-20: #efecea;
+  --color-orange-20: #ffe6cc;
   --color-orange-100: #ef7c00;
-  --color-orange-weird: #ffe6cc;
   --color-brown-header: #58330c;
   --color-brown-100: #301b05;
   --color-brown-90: #36220d;
@@ -17,27 +18,4 @@
   --color-black: #301b05;
   --font-handjet: "Handjet Variable", system-ui;
   --font-inter: "Inter Variable", sans-serif;
-
-  --animate-marquee: marquee 12s linear infinite;
-  --animate-marquee-reset: marquee-reset;
-
-  @keyframes marquee {
-    0% {
-      transform: translate(0%, 0);
-    }
-    50% {
-      transform: translate(-100%, 0);
-    }
-    50.001% {
-      transform: translate(100%, 0);
-    }
-    100% {
-      transform: translate(0%, 0);
-    }
-  }
-  @keyframes marquee-reset {
-    0% {
-      transform: translate(0%, 0);
-    }
-  }
 }

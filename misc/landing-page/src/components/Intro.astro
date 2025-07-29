@@ -4,23 +4,25 @@ import Button, { buttonGroupClass } from "./Button.astro";
 import Section from "./Section.astro";
 ---
 
-<Section id="intro" background="light">
+<Section id="intro" background="light" class="mt-20 mb-20 lg:mt-24 lg:mb-24">
   <Icon name="logo" class="text-brown-header text-8xl" />
   <h1
-    class="font-handjet text-brown-70 mb-7 text-[80px] leading-none font-semibold tracking-normal md:text-[120px] lg:text-[200px]"
+    class="font-handjet text-brown-70 mb-8 text-center text-[80px] leading-none font-semibold tracking-normal md:text-[120px] lg:mt-4 lg:text-[200px]"
   >
     Popcorn it.
   </h1>
-  <h2 class="font-handjet text-3xl text-orange-100 md:text-4xl lg:text-6xl">
+  <h2
+    class="font-handjet mb-2 text-3xl text-orange-100 md:text-4xl lg:mb-4 lg:text-6xl"
+  >
     Elixir & Wasm.
   </h2>
   <h3
-    class="mt-8 max-w-3xl text-center text-base font-normal text-black md:text-2xl lg:text-3xl"
+    class="max-w-3xl text-center text-base font-normal text-black md:text-2xl lg:text-3xl"
   >
     Take your Elixir code from the backend to the browser.
   </h3>
   <div class={buttonGroupClass}>
-    <Button title="See it in action" type="primary" href="/#examples" />
     <Button title="Get started" type="secondary" href="/docs/" />
+    <Button title="See it in action" type="primary" href="/#examples" />
   </div>
 </Section>

@@ -3,13 +3,18 @@ import { headerClass } from "./HeaderTitle.astro";
 const marqueeElementClass = "marquee-element flex flex-shrink-0";
 ---
 
-<div id="marquee" class="marquee flex w-screen overflow-hidden">
+<div id="marquee" class="marquee flex w-screen">
   <div class={marqueeElementClass} aria-hidden="true">
     <h1 class:list={[headerClass, "max-w-none"]}>
       <slot />
     </h1>
   </div>
   <div class={marqueeElementClass}>
+    <h1 class:list={[headerClass, "max-w-none"]}>
+      <slot />
+    </h1>
+  </div>
+  <div class={marqueeElementClass} aria-hidden="true">
     <h1 class:list={[headerClass, "max-w-none"]}>
       <slot />
     </h1>
@@ -38,7 +43,6 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
 
     let ticking = false;
     let lastScrollY = window.scrollY;
-    let scrollPosition = 0;
     let lastTimestamp = 0;
 
     let isInViewport = false;
@@ -74,9 +78,8 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
 
       lastTimestamp = timestamp;
 
-      // Apply combined transformation (scroll effect + continuous animation)
       marqueeElements.forEach((el) => {
-        el.style.transform = `translateX(${animationPosition + scrollPosition}px)`;
+        el.style.transform = `translateX(${animationPosition}px)`;
       });
 
       requestAnimationFrame(updatePositions);
@@ -89,7 +92,7 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
           const scrollFactor = 0.5; // sensitivity
           const moveAmount = scrollDelta * scrollFactor;
 
-          scrollPosition += moveAmount;
+          animationPosition += moveAmount;
 
           lastScrollY = window.scrollY;
           ticking = false;
