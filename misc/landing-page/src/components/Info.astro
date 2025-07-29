@@ -1,5 +1,7 @@
 ---
 import Section from "./Section.astro";
+
+const linkClass = "underline decoration-2";
 ---
 
 <Section
@@ -16,14 +18,15 @@ import Section from "./Section.astro";
         target="_blank"
         rel="noopener noreferrer"
         href="https://github.com/software-mansion/popcorn/blob/main/LICENSE"
-        >Apache 2.0</a
+        class={linkClass}>Apache 2.0</a
       >. You’re free to use it in personal and commercial projects.
     </p>
     <p>
       Need help with something bigger? We’re <a
         target="_blank"
         rel="noopener noreferrer"
-        href="https://swmansion.com">Software Mansion</a
+        href="https://swmansion.com"
+        class={linkClass}>Software Mansion</a
       > – a software development company, React Native core contributors, and Elixir
       experts. Get in touch and let’s build your product together.
     </p>
@@ -132,6 +135,7 @@ import Section from "./Section.astro";
                   words[i].classList.add("text-orange-100");
                 } else {
                   words[i].classList.add("text-light-20");
+                  words[i].classList.add("decoration-orange-100");
                 }
               }
             }
@@ -140,6 +144,7 @@ import Section from "./Section.astro";
               for (let i = targetIndex; i <= lastTargetIndex; i++) {
                 words[i].classList.remove("text-light-20");
                 words[i].classList.remove("text-orange-100");
+                words[i].classList.remove("decoration-orange-100");
               }
             }
 
