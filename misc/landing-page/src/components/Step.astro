@@ -3,24 +3,35 @@ const { n } = Astro.props;
 ---
 
 <div
-  class="sticky top-1/2 flex max-w-2xl -translate-y-1/2 flex-col opacity-0 transition-opacity"
+  class="sticky top-1/2 flex max-w-2xl -translate-y-1/2 flex-col"
   data-step={n}
 >
   <div class="flex items-center justify-between gap-3 md:gap-36 lg:gap-48">
-    <h2 class="font-handjet text-4xl wrap-break-word text-black md:text-6xl">
+    <h2
+      class="header-title font-handjet text-4xl wrap-break-word text-black md:text-6xl"
+    >
       <slot name="header-title" />
     </h2>
     <h1
-      class="font-handjet text-9xl leading-none text-orange-100 md:text-[11rem]"
+      class="number font-handjet text-9xl leading-none text-orange-100 opacity-0 md:text-[11rem]"
     >
       {n}
     </h1>
   </div>
-  <hr class="mt-6 mb-6" />
+  <hr class="break mt-6 mb-6" />
   <div class="flex flex-col content-stretch gap-4 md:flex-row md:gap-12">
-    <h3 class="flex-1/2 text-base text-orange-100 uppercase md:text-2xl">
+    <h3 class="title flex-1/2 text-base text-orange-100 uppercase md:text-2xl">
       <slot name="title" />
     </h3>
-    <p class="flex-1/2"><slot name="description" /></p>
+    <p class="description flex-1/2"><slot name="description" /></p>
   </div>
 </div>
+
+<style>
+  .header-title,
+  .title,
+  .description,
+  .break {
+    opacity: 0;
+  }
+</style>
