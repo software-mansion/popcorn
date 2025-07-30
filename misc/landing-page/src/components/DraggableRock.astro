@@ -1,0 +1,261 @@
+---
+// No server-side props needed for this component
+---
+
+<div
+  id="rock-container"
+  class="pointer-events-none fixed top-0 left-0 z-10 h-screen w-full"
+>
+</div>
+
+<script>
+  async function initRock() {
+    console.log("Initializing rock component...");
+
+    try {
+      // Dynamic imports for Three.js
+      const [THREE, { GLTFLoader }, { DRACOLoader }] = await Promise.all([
+        import("three"),
+        import("three/examples/jsm/loaders/GLTFLoader.js"),
+        import("three/examples/jsm/loaders/DRACOLoader.js"),
+      ]);
+
+      console.log("Three.js loaded successfully");
+
+      // Scene setup
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      const container = document.getElementById("rock-container");
+
+      if (!container) {
+        console.error("Rock container not found");
+        return;
+      }
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      renderer.domElement.style.pointerEvents = "auto";
+      container.appendChild(renderer.domElement);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+      scene.add(ambientLight);
+
+      const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
+      directionalLight1.position.set(5, 5, 5);
+      scene.add(directionalLight1);
+
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight2.position.set(-5, -5, 2);
+      scene.add(directionalLight2);
+
+      const pointLight = new THREE.PointLight(0xffffff, 1.0, 100);
+      pointLight.position.set(0, 0, 8);
+      scene.add(pointLight);
+
+      // Camera position
+      camera.position.set(0, 0, 5);
+      camera.lookAt(0, 0, 0);
+
+      // Setup DRACO loader with CDN path (Three.js recommended)
+      const dracoLoader = new DRACOLoader();
+      dracoLoader.setDecoderPath(
+        "https://www.gstatic.com/draco/versioned/decoders/1.5.6/",
+      );
+
+      // Mouse/touch interaction variables
+      const mouse = new THREE.Vector2();
+      const previousMouse = new THREE.Vector2();
+      let isDragging = false;
+      let scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      let time = 0;
+      let rotationVelocity = { x: 0, y: 0 };
+      let lastMouse = new THREE.Vector2();
+      let modelScale = 0;
+      let isModelLoaded = false;
+      let baseScale = 1;
+
+      // Load rock model with promise wrapper
+      const loader = new GLTFLoader();
+      loader.setDRACOLoader(dracoLoader);
+      let rock = null;
+
+      console.log("Loading GLB model...");
+
+      const loadModel = () => {
+        return new Promise((resolve, reject) => {
+          loader.load(
+            "/test3.glb",
+            resolve,
+            (progress) => console.log("Loading progress:", progress),
+            reject,
+          );
+        });
+      };
+
+      try {
+        const gltf = await loadModel();
+        console.log("GLB model loaded successfully", gltf);
+        rock = gltf.scene;
+
+        // Add rock to scene
+        scene.add(rock);
+        rock.position.set(2, 0, 0);
+
+        // Scale the rock if needed
+        const box = new THREE.Box3().setFromObject(rock);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const targetScale = maxDim > 2 ? 2 / maxDim : 1;
+
+        // Start with scale 0 to animate in
+        rock.scale.setScalar(0);
+        isModelLoaded = true;
+        baseScale = targetScale;
+
+        console.log("Rock added to scene");
+      } catch (error) {
+        console.error("Error loading GLB model:", error);
+        return;
+      }
+
+      // Ease-in function
+      function easeInCubic(t) {
+        return t * t * t;
+      }
+
+      function onPointerDown(event) {
+        if (!rock) return;
+
+        event.preventDefault();
+        isDragging = true;
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        previousMouse.copy(mouse);
+        lastMouse.copy(mouse);
+        console.log("Started dragging (rotating)");
+      }
+
+      function onPointerMove(event) {
+        if (!isDragging || !rock) return;
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const deltaX = mouse.x - previousMouse.x;
+        const deltaY = mouse.y - previousMouse.y;
+
+        // Rotate the rock and set velocity
+        const rotationScale = 2;
+        rock.rotation.y += deltaX * rotationScale;
+        rock.rotation.x += deltaY * rotationScale;
+
+        // Update velocity for momentum
+        rotationVelocity.x = deltaY * rotationScale * 0.5;
+        rotationVelocity.y = deltaX * rotationScale * 0.5;
+
+        previousMouse.copy(mouse);
+      }
+
+      function onPointerUp() {
+        if (isDragging) {
+          console.log("Stopped dragging");
+        }
+        isDragging = false;
+      }
+
+      // Event listeners
+      renderer.domElement.addEventListener("pointerdown", onPointerDown);
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+
+      // Scroll handler
+      function handleScroll() {
+        scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      }
+      window.addEventListener("scroll", handleScroll, { passive: true });
+      document.addEventListener("scroll", handleScroll, { passive: true });
+
+      // Render loop
+      function animate() {
+        requestAnimationFrame(animate);
+        time += 0.01;
+
+        if (rock) {
+          // Follow scroll continuously with slower speed
+          const scrollOffset = scrollY * 0.0005;
+          rock.position.y = -scrollOffset;
+          // Keep rock on the right side
+          rock.position.x = 2;
+
+          // Animate scale from 0 to 1 when first loaded with ease-in curve
+          if (isModelLoaded && modelScale < 1) {
+            modelScale += 0.02;
+            if (modelScale > 1) modelScale = 1;
+          }
+
+          // Apply ease-in curve to scale animation
+          const easedScale = easeInCubic(modelScale);
+
+          // Pulsing scale (only after fully scaled in)
+          if (modelScale >= 1) {
+            const pulseScale = baseScale * (1 + Math.sin(time * 2) * 0.1);
+            rock.scale.setScalar(pulseScale);
+          } else {
+            rock.scale.setScalar(easedScale * baseScale);
+          }
+
+          if (!isDragging) {
+            // Apply momentum rotation with damping
+            rock.rotation.x += rotationVelocity.x;
+            rock.rotation.y += rotationVelocity.y;
+
+            // Apply damping to gradually stop rotation
+            rotationVelocity.x *= 0.98;
+            rotationVelocity.y *= 0.98;
+
+            // Slow base rotation when velocity is low
+            if (
+              Math.abs(rotationVelocity.x) < 0.001 &&
+              Math.abs(rotationVelocity.y) < 0.001
+            ) {
+              rock.rotation.y += 0.005;
+              rock.rotation.x += 0.002;
+            }
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // Handle resize
+      function handleResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      window.addEventListener("resize", handleResize);
+
+      console.log("Rock component initialized successfully");
+    } catch (error) {
+      console.error("Failed to load Three.js:", error);
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initRock);
+  } else {
+    initRock();
+  }
+</script>
