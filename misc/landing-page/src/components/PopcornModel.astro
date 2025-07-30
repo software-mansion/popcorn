@@ -1,0 +1,37 @@
+---
+
+---
+
+<div
+  id="3d-popcorn"
+  class="pointer-none: fixed top-0 left-0 z-0 h-screen w-full"
+>
+</div>
+
+<script>
+  import { initModel } from "../scripts/draggableModel";
+  import { onPageLoad } from "../scripts/utils";
+
+  await onPageLoad(async () => {
+    await initModel("/popcorn.glb", "3d-popcorn", {
+      scrollStages: [
+        { sectionId: "intro", position: { x: 1, y: 0 }, scale: 1 },
+        {
+          sectionId: "model-showcase",
+          position: { x: 0, y: 0 },
+          scale: 2,
+          offset: 0.5,
+        },
+        {
+          sectionId: "features",
+          position: { x: 2, y: 0 },
+          scale: 1.5,
+          offset: 0,
+        },
+        { sectionId: "examples", position: { x: 3, y: 0 }, scale: 1.2 },
+        { sectionId: "live-demo", position: { x: 3, y: 0 }, scale: 0.5 },
+        { sectionId: "info", position: { x: 2, y: 0 }, scale: 1.2 },
+      ],
+    });
+  });
+</script>
