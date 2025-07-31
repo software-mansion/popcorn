@@ -20,7 +20,8 @@ defmodule GameOfLife.Ui do
     |> html()
     |> mount_at_root()
 
-    listener_refs = add_click_listeners(%{start: "#start", glider: "#glider"})
+    listener_refs =
+      add_click_listeners(%{start: "#start", stop: "#stop", reset: "#reset", glider: "#glider"})
 
     # TODO: return list of refs from run_js!/2
     cell_listeners_refs =
@@ -55,8 +56,7 @@ defmodule GameOfLife.Ui do
           {:ok, sup, %{grid_pid: pid}} =
             GridSupervisor.start_simulation(state.size, state.size, alive)
 
-          remove_element("#glider")
-          set_text("#start", "Stop simulation")
+          set_element_visiblity(start: false, stop: true, reset: false, examples: false)
           timer = start_timer(@tick_speed_ms)
 
           %{state | sup_pid: sup, grid_pid: pid, timer: timer}
@@ -73,12 +73,16 @@ defmodule GameOfLife.Ui do
           set_alive_cells(new_alive)
           %{state | alive: new_alive}
 
-        {:wasm_event, :click, _data, "start"} ->
-          # TODO: allow starting/stopping
-          remove_element("#start")
+        {:wasm_event, :click, _data, "stop"} when is_running(state) ->
+          set_element_visiblity(start: true, stop: false, reset: true, examples: true)
           stop_timer(state.timer)
+          :ok = GridSupervisor.stop_simulation(state.sup_pid)
 
           %{state | timer: nil, sup_pid: nil, grid_pid: nil}
+
+        {:wasm_event, :click, _data, "reset"} when not is_running(state) ->
+          set_alive_cells([])
+          %{state | alive: []}
 
         {:wasm_cast, "tick"} ->
           new_alive =
@@ -113,7 +117,11 @@ defmodule GameOfLife.Ui do
     """
     <div class="controls">
       <button id="start">Start simulation</button>
-      <button id="glider">Use glider preset</button>
+      <button id="stop" hidden>Stop simulation</button>
+      <button id="reset">Reset</button>
+      <div id="examples">
+        <button id="glider">Use glider preset</button>
+      </div>
     </div>
     <div class="cell-grid">
       #{build_rows(size)}
@@ -173,25 +181,26 @@ defmodule GameOfLife.Ui do
     |> Enum.map(fn {{x, y}, true} -> [x, y] end)
   end
 
-  defp set_text(selector, text) do
-    Wasm.run_js!(
-      """
-      ({ args }) => {
-        args.node.innerText = args.text;
-      }
-      """,
-      %{node: query_selector(selector), text: text}
-    )
-  end
+  defp set_element_visiblity(visibility_by_id) do
+    visibility =
+      Enum.map(visibility_by_id, fn
+        {id, visible?} -> ["#" <> to_string(id), visible?]
+      end)
 
-  defp remove_element(selector) do
     Wasm.run_js!(
       """
       ({ args }) => {
-        args.node.remove();
+        for (let [id, isVisible] of args.visibility) {
+          const el = document.querySelector(id);
+          if (isVisible) {
+            el.removeAttribute('hidden');
+          } else {
+            el.setAttribute('hidden', '');
+          }
+        }
       }
       """,
-      %{node: query_selector(selector)}
+      %{visibility: visibility}
     )
   end
 
