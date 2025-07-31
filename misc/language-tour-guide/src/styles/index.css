@@ -1,0 +1,27 @@
+@import "tailwindcss";
+@theme {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-light-20: #fffdf5;
+  --color-light-30: #fffaf7;
+  --color-grey-20: #efecea;
+  --color-orange-20: #ffe6cc;
+  --color-orange-100: #ef7c00;
+  --color-brown-header: #58330c;
+  --color-brown-100: #301b05;
+  --color-brown-90: #36220d;
+  --color-brown-80: #423221;
+  --color-brown-70: #5f4122;
+  --color-brown-60: #696057;
+  --color-brown-gray: #696057;
+  --color-black: #301b05;
+  --font-handjet: "Handjet Variable", system-ui;
+  --font-inter: "Inter Variable", sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
