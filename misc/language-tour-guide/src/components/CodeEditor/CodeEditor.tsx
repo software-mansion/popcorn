@@ -1,6 +1,9 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { useState, useCallback } from "react";
 import { elixir } from "codemirror-lang-elixir";
+import { solarizedLight } from "@uiw/codemirror-theme-solarized";
+
+import "./CodeEditor.styles.css";
 
 function CodeEditor() {
   const [value, setValue] = useState(`
@@ -28,11 +31,11 @@ end
 
   return (
     <CodeMirror
+      className="h-full rounded-md border min-h-[500px] overflow-x-scroll border-orange-20 scrollbar"
       value={value}
-      height="200px"
-      width="50%"
       extensions={[elixir()]}
       onChange={onChange}
+      theme={solarizedLight}
     />
   );
 }
