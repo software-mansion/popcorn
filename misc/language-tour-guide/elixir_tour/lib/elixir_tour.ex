@@ -12,7 +12,6 @@ defmodule ElixirTour do
     Popcorn.Wasm.register(@process_name)
     IO.puts("Hello console!")
 
-    :ignore
+    :ok
   end
-
 end

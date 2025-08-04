@@ -29,18 +29,26 @@ export function runMixPopcornCookAndModify() {
       publicDir = config.publicDir;
     },
     async buildStart() {
-      await run("mix", ["deps.get"], "./elixir_tour");
-      await run("mix", ["popcorn.cook"], "./elixir_tour");
+      try {
+        await Promise.all([
+          run("mix", ["deps.get"], "./elixir_tour"),
+          run("mix", ["popcorn.cook"], "./elixir_tour"),
+        ]);
+      } catch (err) {
+        console.error("[run-mix-popcorn-cook-and-modify] Command failed:", err);
+        throw err; // Optionally rethrow to stop the build
+      }
 
       const popcornScriptPath = join(publicDir, "wasm", "popcorn.js");
       try {
         await appendFile(popcornScriptPath, "\nwindow.Popcorn = Popcorn;\n");
         console.log(`[modify-popcorn-script] Appended to ${popcornScriptPath}`);
       } catch (err) {
-        console.warn(
+        console.error(
           `[modify-popcorn-script] Could not append to ${popcornScriptPath}:`,
           err
         );
+        throw err;
       }
     },
   };

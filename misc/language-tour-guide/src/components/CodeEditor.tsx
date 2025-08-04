@@ -21,7 +21,7 @@ defmodule EmployeeApp do
 end
     `);
 
-  const onChange = useCallback((val, viewUpdate) => {
+  const onChange = useCallback((val: string) => {
     console.log("val:", val);
     setValue(val);
   }, []);
