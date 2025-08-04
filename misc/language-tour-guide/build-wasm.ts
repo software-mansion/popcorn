@@ -21,10 +21,10 @@ function run(cmd: string, args: string[], dir: string) {
   });
 }
 
-export function runMixPopcornCookAndModify() {
+export function updatePopcorn() {
   let publicDir: string;
   return {
-    name: "run-mix-popcorn-cook-and-modify",
+    name: "update-popcorn",
     configResolved(config: ResolvedConfig) {
       publicDir = config.publicDir;
     },
@@ -35,7 +35,7 @@ export function runMixPopcornCookAndModify() {
           run("mix", ["popcorn.cook"], "./elixir_tour"),
         ]);
       } catch (err) {
-        console.error("[run-mix-popcorn-cook-and-modify] Command failed:", err);
+        console.error("[update-popcorn] Command failed:", err);
         throw err; // Optionally rethrow to stop the build
       }
 
@@ -45,7 +45,7 @@ export function runMixPopcornCookAndModify() {
         console.log(`[modify-popcorn-script] Appended to ${popcornScriptPath}`);
       } catch (err) {
         console.error(
-          `[modify-popcorn-script] Could not append to ${popcornScriptPath}:`,
+          `[update-popcorn] Could not append to ${popcornScriptPath}:`,
           err
         );
         throw err;

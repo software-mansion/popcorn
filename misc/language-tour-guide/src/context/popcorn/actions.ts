@@ -1,23 +1,28 @@
+import { useCallback } from "react";
 import type { AnySerializable, CallOptions, CastOptions } from ".";
 import { usePopcornContext } from "../hooks";
 
-export const usePopcornActions = () => {
+export const usePopcorn = () => {
   const { instance } = usePopcornContext();
 
-  const call = async (args: AnySerializable, options: CallOptions) => {
-    if (!instance) {
-      throw new Error("Popcorn not initialized");
-    }
+  const ensureInstance = useCallback(() => {
+    if (!instance) throw new Error("Popcorn instance not initialized");
+    return instance;
+  }, [instance]);
 
-    return instance.call(args, options);
-  };
+  const call = useCallback(
+    async (args: AnySerializable, options: CallOptions) => {
+      return ensureInstance().call(args, options);
+    },
+    [ensureInstance]
+  );
 
-  const cast = (args: AnySerializable, options: CastOptions) => {
-    if (!instance) {
-      throw new Error("Popcorn not initialized");
-    }
-    return instance.cast(args, options);
-  };
+  const cast = useCallback(
+    (args: AnySerializable, options: CastOptions) => {
+      return ensureInstance().cast(args, options);
+    },
+    [ensureInstance]
+  );
 
   return {
     call,
