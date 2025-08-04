@@ -10,7 +10,7 @@ const secondaryClasses = "bg-grey-20 text-brown-90 hover:bg-grey-20/80";
 function Button({ title, type, onClick }: ButtonProps) {
   return (
     <button
-      className={`px-4 py-2 rounded font-inter text-sm transition-colors duration-150 cursor-pointer ${
+      className={`font-inter cursor-pointer rounded px-4 py-2 text-sm transition-colors duration-150 ${
         type === "primary" ? primaryClasses : secondaryClasses
       }`}
       onClick={onClick}

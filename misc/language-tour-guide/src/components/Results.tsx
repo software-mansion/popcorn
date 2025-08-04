@@ -22,8 +22,8 @@ function Results() {
   }, []);
 
   return (
-    <section className="min-h-60 bg-light-30 rounded-md border pb-6 border-grey-20">
-      <div className="flex flex-wrap gap-3 py-3 justify-end pr-6 border-b border-orange-100 w-full">
+    <section className="bg-light-30 border-grey-20 min-h-60 rounded-md border pb-6">
+      <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
         <Button title="Reset Code" type="secondary" />
         <Button title="Format Code" type="secondary" />
         <Button title="Run Code" type="primary" onClick={handleRunCode} />

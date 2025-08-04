@@ -8,7 +8,7 @@ interface ExampleLayoutProps {
 
 function ExampleLayout({ children }: ExampleLayoutProps) {
   return (
-    <div className="grid text-brown-100 gird-rows-[1fr_1fr_1fr] lg:grid-cols-2 lg:grid-rows-[70%_28%] gap-x-4 lg:gap-y-4 gap-y-3 grow bg-light-20 h-full lg:min-h-0">
+    <div className="text-brown-100 gird-rows-[1fr_1fr_1fr] bg-light-20 grid h-full grow gap-x-4 gap-y-3 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[70%_28%] lg:gap-y-4">
       <Description>{children}</Description>
       <CodeEditor />
       <Results />

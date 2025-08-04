@@ -4,7 +4,7 @@ import Header from "./Header";
 function Layout() {
   return (
     <>
-      <main className="pt-16 font-inter lg:min-h-dvh flex flex-col max-h-screen">
+      <main className="font-inter flex max-h-screen flex-col pt-16 lg:min-h-dvh">
         <Header />
         <Outlet />
       </main>

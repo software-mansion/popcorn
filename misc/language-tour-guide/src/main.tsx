@@ -18,5 +18,5 @@ createRoot(container).render(
         <AppRoutes />
       </BrowserRouter>
     </StrictMode>
-  </PopcornProvider>
+  </PopcornProvider>,
 );

@@ -4,7 +4,7 @@ interface DescriptionProps {
 
 function Description({ children }: DescriptionProps) {
   return (
-    <section className="lg:row-span-2 bg-light-30 p-4 lg:p-8 wrap-break-word lg:overflow-y-auto h-full border border-grey-20 scrollbar">
+    <section className="bg-light-30 border-grey-20 scrollbar h-full border p-4 wrap-break-word lg:row-span-2 lg:overflow-y-auto lg:p-8">
       {children}
     </section>
   );

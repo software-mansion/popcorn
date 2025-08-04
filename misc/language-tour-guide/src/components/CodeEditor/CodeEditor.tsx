@@ -31,7 +31,7 @@ end
 
   return (
     <CodeMirror
-      className="h-full rounded-md border min-h-[500px] overflow-x-scroll border-orange-20 scrollbar"
+      className="border-orange-20 scrollbar h-full min-h-[500px] overflow-x-scroll rounded-md border"
       value={value}
       extensions={[elixir()]}
       onChange={onChange}
