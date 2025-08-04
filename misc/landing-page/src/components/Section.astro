@@ -13,7 +13,7 @@ const backgroundClass = background === "light" ? light : dark;
 ---
 
 <div
-  class:list={["flex flex-col", backgroundClass]}
+  class:list={["section-bg flex flex-col", background]}
   data-background={background}
   {...rest}
 >
@@ -27,3 +27,98 @@ const backgroundClass = background === "light" ? light : dark;
     <slot />
   </section>
 </div>
+
+<style>
+  @reference "../styles/global.css";
+
+  .light {
+    @apply bg-light-20 text-brown-100;
+  }
+
+  .dark {
+    @apply bg-brown-90 text-white;
+  }
+</style>
+
+<script>
+  function setupSectionAnimation() {
+    // skip first section as it is the header
+    const sections = [
+      ...document.querySelectorAll<HTMLElement>(".section-bg"),
+    ].slice(1);
+
+    let ticking = false;
+
+    function updateSectionVisibility(sectionIndex: number) {
+      const section = sections[sectionIndex];
+      const nextSection = sections.slice(sectionIndex + 1).find((section) => {
+        return section.offsetHeight > 0;
+      });
+
+      if (!nextSection) {
+        return;
+      }
+
+      const sectionBackground = section.dataset.background;
+
+      const rect = section.getBoundingClientRect();
+
+      const isBottomVisible = rect.bottom - window.innerHeight < 0;
+
+      const windowHeight = window.innerHeight * 0.35;
+
+      if (!isBottomVisible || section.offsetHeight === 0) {
+        return;
+      }
+
+      const progress = Math.max(
+        Math.min((rect.bottom - windowHeight) / windowHeight, 1),
+        0,
+      );
+
+      if (nextSection.dataset.background === sectionBackground) {
+        return;
+      }
+
+      const fromColor =
+        sectionBackground === "light"
+          ? "var(--color-light-20)"
+          : "var(--color-brown-90)";
+      const toColor =
+        sectionBackground === "light"
+          ? "var(--color-brown-90)"
+          : "var(--color-light-20)";
+
+      section.dataset.progress = progress.toString();
+      section.style.backgroundColor = `color-mix(in oklab, ${fromColor} ${Math.round(progress * 100)}%, ${toColor})`;
+
+      nextSection.dataset.progress = (1 - progress).toString();
+      nextSection.style.backgroundColor = `color-mix(in oklab, ${toColor} ${Math.round((1 - progress) * 100)}%, ${fromColor})`;
+    }
+
+    function handleScroll() {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          sections.forEach((_, i) => {
+            updateSectionVisibility(i);
+          });
+
+          ticking = false;
+        });
+
+        ticking = true;
+      }
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll);
+  }
+
+  function setup() {
+    setupSectionAnimation();
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
