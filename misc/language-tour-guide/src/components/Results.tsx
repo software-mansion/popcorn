@@ -1,16 +1,19 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Button } from "./Button";
 
 export function Results() {
-  const handleRunCode = () => {
+  const handleRunCode = useCallback(() => {
     console.log("Run Code!");
-  };
+  }, []);
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      handleRunCode();
-    }
-  };
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        handleRunCode();
+      }
+    },
+    [handleRunCode]
+  );
 
   useEffect(() => {
     document.addEventListener("keydown", onKeyDown);
@@ -18,8 +21,7 @@ export function Results() {
     return () => {
       document.removeEventListener("keydown", onKeyDown);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onKeyDown]);
 
   return (
     <section className="bg-light-30 border-grey-20 min-h-60 rounded-md border pb-6">
