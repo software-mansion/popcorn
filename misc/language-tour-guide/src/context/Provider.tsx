@@ -2,7 +2,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import {
   PopcornContext,
   type Popcorn,
-  type PopcornContextValue,
+  type PopcornContextValue
 } from "./popcorn";
 
 interface PopcornProviderProps {
@@ -12,7 +12,7 @@ interface PopcornProviderProps {
 
 export const PopcornProvider = ({
   children,
-  debug = true,
+  debug = true
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
 
@@ -20,7 +20,7 @@ export const PopcornProvider = ({
     async function initializePopcorn() {
       try {
         const popcornInstance = await window.Popcorn.init({
-          debug,
+          debug
         });
         setInstance(popcornInstance);
       } catch (error) {
@@ -43,7 +43,7 @@ export const PopcornProvider = ({
   }, [debug]);
 
   const value: PopcornContextValue = {
-    instance,
+    instance
   };
 
   return (
