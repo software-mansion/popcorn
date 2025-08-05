@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import Button from "./Button";
+import { Button } from "./Button";
 
-function Results() {
+export function Results() {
   const handleRunCode = () => {
     console.log("Run Code!");
   };
@@ -32,5 +32,3 @@ function Results() {
     </section>
   );
 }
-
-export default Results;

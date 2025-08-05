@@ -5,7 +5,7 @@ import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
 import "./CodeEditor.styles.css";
 
-function CodeEditor() {
+export function CodeEditor() {
   const [value, setValue] = useState(`
 defmodule EmployeeApp do
   use Ecto.Schema
@@ -39,5 +39,3 @@ end
     />
   );
 }
-
-export default CodeEditor;

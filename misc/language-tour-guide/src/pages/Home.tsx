@@ -1,6 +1,6 @@
-import ExampleLayout from "../components/ExampleLayout";
+import { ExampleLayout } from "../components/ExampleLayout";
 
-function Home() {
+export function Home() {
   return (
     <>
       <ExampleLayout>
@@ -50,5 +50,3 @@ function Home() {
     </>
   );
 }
-
-export default Home;

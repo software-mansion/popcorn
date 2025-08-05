@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
 import "./styles/index.css";
-import AppRoutes from "./AppRoutes.tsx";
+import { AppRoutes } from "./AppRoutes.tsx";
 import { PopcornProvider } from "./context/Provider.tsx";
 
 const container = document.getElementById("root");

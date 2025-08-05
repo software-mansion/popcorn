@@ -1,8 +1,8 @@
 import { Route, Routes } from "react-router";
-import Home from "./pages/Home";
-import Layout from "./components/Layout";
+import { Home } from "./pages/Home";
+import { Layout } from "./components/Layout";
 
-function AppRoutes() {
+export function AppRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
@@ -11,5 +11,3 @@ function AppRoutes() {
     </Routes>
   );
 }
-
-export default AppRoutes;

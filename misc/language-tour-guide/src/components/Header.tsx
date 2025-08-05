@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import Logo from "../assets/logo.svg?react";
 
-function Header() {
+export function Header() {
   return (
     <nav className="text-brown-80 bg-light-20 fixed top-0 z-10 h-16 w-full border-b border-orange-100 px-4 py-4 lg:px-8">
       <Link
@@ -13,5 +13,3 @@ function Header() {
     </nav>
   );
 }
-
-export default Header;
