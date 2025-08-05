@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/handjet": "^5.2.6",
+    "@fontsource-variable/inter": "^5.2.6",
     "@mdx-js/rollup": "^3.1.0",
     "@tailwindcss/vite": "^4.1.11",
+    "@uiw/codemirror-theme-solarized": "^4.24.2",
     "@uiw/react-codemirror": "^4.24.2",
     "codemirror-lang-elixir": "^4.0.0",
     "react": "^19.1.0",
@@ -28,9 +31,11 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.6.14",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
     "vite": "^7.0.4",
-    "vite-plugin-copy": "^0.1.6"
+    "vite-plugin-svgr": "^4.3.0"
   }
 }

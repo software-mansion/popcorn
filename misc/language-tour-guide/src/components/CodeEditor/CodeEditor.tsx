@@ -1,8 +1,11 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { useState, useCallback } from "react";
 import { elixir } from "codemirror-lang-elixir";
+import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
-function CodeEditor() {
+import "./CodeEditor.styles.css";
+
+export function CodeEditor() {
   const [value, setValue] = useState(`
 defmodule EmployeeApp do
   use Ecto.Schema
@@ -28,13 +31,11 @@ end
 
   return (
     <CodeMirror
+      className="border-orange-20 scrollbar h-full min-h-[500px] overflow-x-scroll rounded-md border"
       value={value}
-      height="200px"
-      width="50%"
       extensions={[elixir()]}
       onChange={onChange}
+      theme={solarizedLight}
     />
   );
 }
-
-export default CodeEditor;
