@@ -28,7 +28,6 @@ defmodule GameOfLife.Ui do
     cell_listeners_refs =
       add_click_listener("#grid-root")
 
-
     {:ok,
      %{
        listener_refs: listener_refs,
@@ -79,7 +78,7 @@ defmodule GameOfLife.Ui do
           set_alive_cells([])
           %{state | alive: []}
 
-        {:wasm_cast, "tick"} ->
+        {:wasm_cast, "tick"} when is_running(state) ->
           new_alive =
             state.grid_pid
             |> Grid.tick()
@@ -87,6 +86,10 @@ defmodule GameOfLife.Ui do
 
           set_alive_cells(new_alive)
           %{state | alive: new_alive}
+
+        {:wasm_cast, "tick"} ->
+          # Stale tick, ignore
+          state
 
         {:wasm_event, :click, _data, [x, y]} when not is_running(state) ->
           x = String.to_integer(x)
@@ -169,7 +172,6 @@ defmodule GameOfLife.Ui do
         const event_name = "click";
         const node = document.querySelector(args.selector);
         const fn = (event) => {
-          console.log(event);
           const x = event.target.getAttribute("data-coords-x");
           const y = event.target.getAttribute("data-coords-y");
           wasm.cast(args.event_receiver, ["_popcorn_dom_event", "click", {}, [x, y]]);
