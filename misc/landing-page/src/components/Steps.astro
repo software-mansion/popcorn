@@ -6,7 +6,7 @@ import Section from "./Section.astro";
 <Section
   id="features"
   background="light"
-  class="mt-20 gap-20 md:gap-36 lg:mt-20"
+  class="gap-20 md:gap-36"
 >
   <Step n="01">
     <Fragment slot="header-title">Elixir, meet <br /> WebAssembly.</Fragment>
@@ -45,3 +45,48 @@ import Section from "./Section.astro";
     >
   </Step>
 </Section>
+
+<script>
+  import { setupStepVisibility } from "../utils/stepAnimation";
+
+  function setup() {
+    const steps = [...document.querySelectorAll<HTMLElement>("[data-step]")];
+
+    const stepElements = steps.map((step) => ({
+      number: step.querySelector<HTMLElement>(".number")!,
+      headerTitle: step.querySelector<HTMLElement>(".header-title")!,
+      title: step.querySelector<HTMLElement>(".title")!,
+      description: step.querySelector<HTMLElement>(".description")!,
+      break: step.querySelector<HTMLElement>(".break")!,
+    }));
+
+    setupStepVisibility({
+      sectionSelector: "#features",
+      stepSelector: "[data-step]",
+      onUpdate: (step, nextStep, scale, { currentStep }) => {
+        const contentOpacity = scale * 3;
+        const numberOpacity = scale;
+
+        stepElements[currentStep].number.style.opacity = String(numberOpacity);
+        stepElements[currentStep + 1].number.style.opacity = String(
+          1 - numberOpacity,
+        );
+
+        // Content group (shorter animation)
+        (["headerTitle", "title", "description", "break"] as const).forEach(
+          (key) => {
+            stepElements[currentStep][key].style.opacity =
+              String(contentOpacity);
+            stepElements[currentStep + 1][key].style.opacity = String(
+              1 - contentOpacity,
+            );
+          },
+        );
+      },
+      duration: 700,
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
