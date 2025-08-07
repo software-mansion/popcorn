@@ -70,13 +70,6 @@ defmodule Popcorn.Wasm do
   @type run_js_return() :: TrackedObject.t() | term()
   @type result(t) :: {:ok, t} | {:error, term()}
 
-  @type register_event_listener_opts() :: [
-          event_keys: [atom()],
-          target_node: TrackedObject.t(),
-          receiver_name: String.t(),
-          custom_data: term()
-        ]
-
   @doc """
   Deserializes raw message and calls handler with it. If the message was a :wasm_call, settles the promise with a value.
   Returns handler result.
@@ -254,39 +247,32 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Registers event listener for element with given `selector`. Events will be sent to the process registered under `target` name.
-  To get event data, specify needed keys in `event_keys` list.
+  Registers event listeners for elements matching given `selectors`.
+  Events will be sent to the process registered under `ex_receiver` name and contain the used `selector` and `HTMLElement.dataset`.
 
-  To unregister listener, use returned ref with `unregister_event_listener/1`
+  To unregister listener, use returned ref with `unregister_event_listeners/1`
   """
-  @spec register_event_listener(atom(), register_event_listener_opts()) ::
-          result(run_js_return())
-  def register_event_listener(event_name, opts) do
-    %{
-      event_keys: event_keys,
-      target_node: target_node,
-      event_receiver: event_receiver,
-      custom_data: custom_data
-    } = opts_to_map(opts, event_keys: [], target_node: nil, event_receiver: nil, custom_data: nil)
-
+  @spec register_event_listeners(String.t(), [String.t()], atom()) :: run_js_return()
+  def register_event_listeners(event_name, selectors, ex_receiver) do
     """
     ({ wasm, args }) => {
-      const { event_receiver, event_name, target_node: node, event_keys, custom_data } = args;
-      const getEventData = (event) => {
-        const data = {};
-        for(const key of event_keys) {
-          data[key] = event[key];
-        }
-        return data;
-      };
-      const fn = (event) => {
-        wasm.cast(event_receiver, ["_popcorn_dom_event", event_name, getEventData(event), custom_data]);
-      };
+      const { selectors, event_name, event_receiver } = args;
+      const removeListenersFunctions = [];
+      selectors.forEach((selector) => {
+        const nodes = document.querySelectorAll(selector);
+        const fn = (event) => {
+          wasm.cast(event_receiver, ["_popcorn_dom_event", event_name, selector, event.target.dataset]);
+        };
+        nodes.forEach((node) => node.addEventListener(event_name, fn));
 
-      node.addEventListener(event_name, fn);
+        removeListenersFunctions.push(() => {
+          nodes.forEach((node) => node.removeEventListener(event_name, fn));
+        });
+      });
+
       const key = wasm.nextTrackedObjectKey();
       const cleanupFn = () => {
-        node.removeEventListener(event_name, fn);
+        removeListenersFunctions.forEach((fn) => fn());
         wasm.cleanupFunctions.delete(key);
       };
       wasm.cleanupFunctions.set(key, cleanupFn);
@@ -294,22 +280,20 @@ defmodule Popcorn.Wasm do
       return [new TrackedValue({key: key, value: cleanupFn})];
     }
     """
-    |> run_js(
+    |> run_js!(
       %{
+        selectors: List.wrap(selectors),
         event_name: event_name,
-        target_node: target_node,
-        event_receiver: event_receiver,
-        event_keys: event_keys,
-        custom_data: custom_data
+        event_receiver: ex_receiver
       },
       return: :ref
     )
   end
 
   @doc """
-  Unregister event listener. See `register_event_listener/2`.
+  Unregister event listener. See `register_event_listeners/3`.
   """
-  def unregister_event_listener(ref) do
+  def unregister_event_listeners(ref) do
     """
     ({ args }) => {
       args.cleanupFn();
