@@ -1,8 +1,6 @@
 name: Build and deploy production demo
 
-on:
-  push:
-    tags: ["v*.*.*"]
+on: workflow_dispatch
 
 env:
   REGISTRY: ghcr.io
