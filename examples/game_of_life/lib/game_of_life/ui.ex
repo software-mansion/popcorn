@@ -189,7 +189,6 @@ defmodule GameOfLife.Ui do
           for (let y = 0; y < args.size; y++) {
             const cell = document.createElement("div");
             cell.classList.add("cell");
-            cell.setAttribute("data-coords", `${x},${y}`);
             cell.setAttribute("data-coords-x", x);
             cell.setAttribute("data-coords-y", y);
             row.append(cell);
