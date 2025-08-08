@@ -10,7 +10,7 @@ defmodule GameOfLife.Application do
     children = [
       {Registry, keys: :unique, name: GameOfLife.Simulation.registry()},
       GameOfLife.Supervisor,
-      {GameOfLife.Ui, %{size: 25}},
+      {GameOfLife.Ui, %{size: 20}},
       GameOfLife
     ]
 
