@@ -13,14 +13,14 @@ const backgroundClass = background === "light" ? light : dark;
 ---
 
 <div
-  class:list={["flex flex-col", backgroundClass]}
+  class:list={["-z-20 flex flex-col", backgroundClass]}
   data-background={background}
   {...rest}
 >
   <section
     {...{ id }}
     class:list={[
-      "font-inter my-44 mr-4 ml-4 flex scroll-mt-20 flex-col items-center md:mr-20 md:ml-20 lg:my-80 lg:mr-48 lg:ml-48",
+      "font-inter z-20 my-44 mr-4 ml-4 flex scroll-mt-20 flex-col items-center md:mr-20 md:ml-20 lg:my-80 lg:mr-48 lg:ml-48",
       className ?? "",
     ]}
   >

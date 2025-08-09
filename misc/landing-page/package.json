@@ -29,9 +29,11 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "rehype-mermaid": "^3.0.0",
-    "tailwindcss": "^4.1.11"
+    "tailwindcss": "^4.1.11",
+    "three": "^0.178.0"
   },
   "devDependencies": {
+    "@types/three": "^0.178.1",
     "prettier": "^3.6.2",
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.6.14",
