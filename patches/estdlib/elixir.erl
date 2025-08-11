@@ -92,7 +92,6 @@ eval_external_handler(Ann, FunOrModFun, Args) ->
     catch
         error:stacktrace:S -> S
     end,
-    erlang:display({"FK", Ann, FunOrModFun, Args}),
 
     try
     case FunOrModFun of
@@ -143,6 +142,5 @@ eval_external_handler(Ann, FunOrModFun, Args) ->
         end,
 
         Custom = lists:reverse(Bottom ++ Reversed, DroppedCaller),
-        erlang:display({"FK b4", Kind, Reason, Custom}),
         erlang:raise(Kind, Reason, Custom)
     end.
