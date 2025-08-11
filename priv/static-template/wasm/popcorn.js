@@ -10,7 +10,6 @@ const HEARTBEAT_TIMEOUT_MS = 60_000;
 //  | { type: "callAck", value: ElixirAck }
 //  | { type: "cast", value: ElixirRequest }
 //  | { type: "heartbeat", value: void }
-//  | { type: "reload", value: void }
 //
 // ElixirRequest: { requestId: number, process: string, action: string, args: any }
 // ElixirResponse: { requestId: number, error: string } | { requestId: number, data: any }
@@ -23,7 +22,6 @@ const MESSAGES = {
   STDOUT: "popcorn-stdout",
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
-  RELOAD: "popcorn-reload",
 };
 
 const INIT_TOKEN = Symbol();
