@@ -535,15 +535,13 @@ defmodule Popcorn.EvalTest do
           """
           |> Code.eval_string([], __ENV__)
         rescue
-          error -> error.message
+          e -> e
         end
       end
       |> AtomVM.compile_quoted()
       |> AtomVM.try_run(dir)
 
-    %{output: output} = result
-    File.write("./log_outside.txt", output)
-    assert "oops" = result.result
+    assert %RuntimeError{message: "oops"} = result.result
   end
 
   defp wrap_in_try(code) do
