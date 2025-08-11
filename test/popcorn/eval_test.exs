@@ -525,7 +525,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(%TryClauseError{})
   end
-  
+
   test "Error rescued outside of Code.eval_string/3", %{tmp_dir: dir} do
     result =
       quote do
@@ -545,7 +545,7 @@ defmodule Popcorn.EvalTest do
     File.write("./log_outside.txt", output)
     assert "oops" = result.result
   end
-  
+
   defp wrap_in_try(code) do
     """
     try do
