@@ -1,7 +1,7 @@
 import { getRoutePath, mdxModules } from ".";
 
 export type NavigationTreeItem = {
-  title?: string;
+  title: string;
   path?: string;
   children?: NavigationTree;
   order?: number;
