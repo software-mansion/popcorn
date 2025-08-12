@@ -1,0 +1,70 @@
+---
+
+---
+
+<div
+  id="3d-popcorn"
+  class="pointer-none: fixed top-0 left-0 z-0 h-screen w-full"
+>
+</div>
+
+<script>
+  import { initModel } from "../scripts/3dModel";
+  import { onPageLoad } from "../scripts/utils";
+
+  await onPageLoad(async () => {
+    const config = {
+      intro: {
+        position: { x: 0.33, y: 0 },
+        scale: 1,
+      },
+      "model-showcase": {
+        position: { x: 0, y: 0 },
+        scale: 1.5,
+      },
+      features: {
+        position: { x: 0.8, y: 0 },
+        scale: 1,
+      },
+      examples: {
+        position: { x: 0.8, y: 0 },
+        scale: 1,
+      },
+      "live-demo": {
+        position: { x: 0.6, y: 0 },
+        scale: 0.5,
+      },
+      info: {
+        position: { x: 0.8, y: 0 },
+        scale: 1,
+      },
+    };
+
+    const isMobile = window.innerWidth < 640;
+    if (isMobile) {
+      setValues(config, {
+        position: { x: 0.2, y: 0 },
+        scale: 0.3,
+      });
+
+      config["model-showcase"] = {
+        position: { x: 0, y: 0 },
+        scale: 1,
+      };
+    }
+
+    await initModel({
+      path: "/popcorn.glb",
+      containerId: "3d-popcorn",
+      sectionConfig: config,
+    });
+  });
+
+  function setValues<V>(obj: Record<string, V>, value: V): void {
+    const keys = Object.getOwnPropertyNames(obj);
+    for (const key of keys) {
+      // @ts-ignore: typical object key shenanigans
+      obj[key] = value;
+    }
+  }
+</script>
