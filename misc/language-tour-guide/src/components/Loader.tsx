@@ -1,6 +1,6 @@
-interface LoaderProps {
+type LoaderProps = {
   message?: string;
-}
+};
 
 export function Loader({ message = "Loading content..." }: LoaderProps) {
   return (

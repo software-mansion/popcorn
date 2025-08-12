@@ -8,7 +8,7 @@ import { NotFound } from "./pages/NotFound";
 
 export function AppRoutes() {
   useScrollToHash();
-  const contentRoutes = useMemo(() => createRouteComponents(), []);
+  const contentRoutes = useMemo(createRouteComponents, []);
 
   return (
     <Routes>
