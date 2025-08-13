@@ -15,7 +15,7 @@
   await onPageLoad(async () => {
     const config = {
       intro: {
-        position: { x: 0.33, y: 0 },
+        position: { x: 0, y: 0 },
         scale: 1,
       },
       "model-showcase": {
@@ -23,33 +23,29 @@
         scale: 1.5,
       },
       features: {
-        position: { x: 0.8, y: 0 },
-        scale: 1,
+        position: { x: 0.9, y: 0 },
+        scale: 0.8,
       },
       examples: {
-        position: { x: 0.8, y: 0 },
-        scale: 1,
-      },
-      "live-demo": {
-        position: { x: 0.6, y: 0 },
-        scale: 0.5,
-      },
-      info: {
-        position: { x: 0.8, y: 0 },
-        scale: 1,
+        position: { x: 0.9, y: 0 },
+        scale: 0,
       },
     };
 
     const isMobile = window.innerWidth < 640;
     if (isMobile) {
       setValues(config, {
-        position: { x: 0.2, y: 0 },
+        position: { x: 0, y: 0 },
         scale: 0.3,
       });
 
       config["model-showcase"] = {
         position: { x: 0, y: 0 },
-        scale: 1,
+        scale: 0.7,
+      };
+      config.examples = {
+        position: { x: 0, y: 0 },
+        scale: 0,
       };
     }
 
