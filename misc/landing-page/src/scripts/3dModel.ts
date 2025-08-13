@@ -50,7 +50,7 @@ const DECAY_COEF = 0.02;
 const NO_DECAY_COEF = 0;
 const AUTO_ROTATION_COEF = 0.2;
 // lower is slower
-const LERP_COEF = 0.02;
+const LERP_COEF = 0.1;
 // normalize to world positions
 const POSITION_COEF = 10;
 const DEFAULT_SECTION_PARAMS = {
@@ -62,17 +62,20 @@ export async function initModel(config: Config) {
   const sectionConfig = new Map(Object.entries(config.sectionConfig));
   validateSectionPositions(sectionConfig);
 
-  const firstSection = firstMapValue(sectionConfig) ?? DEFAULT_SECTION_PARAMS;
+  const initialSection = firstMapValue(sectionConfig) ?? DEFAULT_SECTION_PARAMS;
+  const initialScale = initialSection.scale;
+  const initialPosition = { ...initialSection.position };
+
   const state: State = {
     rotationVelocity: { x: 0, y: 0 },
     mouse: {
       isDragging: false,
       lastMousePosition: { x: 0, y: 0 },
     },
-    scale: firstSection.scale,
-    position: firstSection.position,
-    targetScale: firstSection.scale,
-    targetPosition: firstSection.position,
+    scale: 0,
+    position: initialPosition,
+    targetScale: initialScale,
+    targetPosition: initialPosition,
   };
 
   const loader = createLoader();
@@ -282,17 +285,27 @@ function validateSectionPositions(sectionConfig: SectionConfig) {
 }
 
 function setupSectionObserver(sectionConfig: SectionConfig, state: State) {
+  const previousRatios = new Map();
+
   function onIntersect(entries: IntersectionObserverEntry[]) {
     if (entries.length === 0) {
       return;
     }
 
-    const mostVisibleEntry = maxBy(entries, (e) => e.intersectionRatio)!;
-    if (!mostVisibleEntry.isIntersecting) {
+    const candidate = maxBy(entries, (e) => e.intersectionRatio)!;
+    if (!candidate.isIntersecting) {
+      return;
+    }
+    const candidateId = candidate.target.id;
+    const prevRatio = previousRatios.get(candidateId) ?? 0;
+    const ratio = candidate.intersectionRatio;
+
+    previousRatios.set(candidateId, ratio);
+    if (ratio < prevRatio) {
       return;
     }
 
-    const config = sectionConfig.get(mostVisibleEntry.target.id);
+    const config = sectionConfig.get(candidateId);
     if (config === undefined) {
       return;
     }
@@ -302,7 +315,7 @@ function setupSectionObserver(sectionConfig: SectionConfig, state: State) {
   }
 
   const observer = new IntersectionObserver(onIntersect, {
-    threshold: [0.3],
+    threshold: [0, 0.2, 0.4, 0.6, 0.8, 1],
   });
 
   sectionConfig
