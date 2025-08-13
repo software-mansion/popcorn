@@ -13,12 +13,12 @@
   import { onPageLoad } from "../scripts/utils";
 
   await onPageLoad(async () => {
-    const config = {
+    let config = {
       intro: {
         position: { x: 0, y: 0 },
         scale: 1,
       },
-      "model-showcase": {
+      "popcorn-showcase": {
         position: { x: 0, y: 0 },
         scale: 1.5,
       },
@@ -34,18 +34,23 @@
 
     const isMobile = window.innerWidth < 640;
     if (isMobile) {
-      setValues(config, {
-        position: { x: 0, y: 0 },
-        scale: 0.3,
-      });
-
-      config["model-showcase"] = {
-        position: { x: 0, y: 0 },
-        scale: 0.7,
-      };
-      config.examples = {
-        position: { x: 0, y: 0 },
-        scale: 0,
+      config = {
+        intro: {
+          position: { x: 0, y: 0 },
+          scale: 0.3,
+        },
+        "popcorn-showcase": {
+          position: { x: 0, y: 0 },
+          scale: 0.7,
+        },
+        features: {
+          position: { x: 0, y: 0 },
+          scale: 0.3,
+        },
+        examples: {
+          position: { x: 0, y: 0 },
+          scale: 0,
+        },
       };
     }
 
@@ -55,12 +60,4 @@
       sectionConfig: config,
     });
   });
-
-  function setValues<V>(obj: Record<string, V>, value: V): void {
-    const keys = Object.getOwnPropertyNames(obj);
-    for (const key of keys) {
-      // @ts-ignore: typical object key shenanigans
-      obj[key] = value;
-    }
-  }
 </script>

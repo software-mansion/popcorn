@@ -24,6 +24,8 @@ type Config = {
   path: string;
   containerId: string;
   sectionConfig: SectionConfigRaw;
+  cameraDistance?: number;
+  horizontalAutoRotate?: boolean;
 };
 
 type SectionConfigRaw = Record<string, SectionPosition>;
@@ -53,18 +55,10 @@ const AUTO_ROTATION_COEF = 0.2;
 const LERP_COEF = 0.1;
 // normalize to world positions
 const POSITION_COEF = 10;
-const DEFAULT_SECTION_PARAMS = {
-  scale: 1,
-  position: { x: 0, y: 0 },
-};
 
 export async function initModel(config: Config) {
   const sectionConfig = new Map(Object.entries(config.sectionConfig));
   validateSectionPositions(sectionConfig);
-
-  const initialSection = firstMapValue(sectionConfig) ?? DEFAULT_SECTION_PARAMS;
-  const initialScale = initialSection.scale;
-  const initialPosition = { ...initialSection.position };
 
   const state: State = {
     rotationVelocity: { x: 0, y: 0 },
@@ -73,9 +67,9 @@ export async function initModel(config: Config) {
       lastMousePosition: { x: 0, y: 0 },
     },
     scale: 0,
-    position: initialPosition,
-    targetScale: initialScale,
-    targetPosition: initialPosition,
+    position: { x: 0, y: 0 },
+    targetScale: 0,
+    targetPosition: { x: 0, y: 0 },
   };
 
   const loader = createLoader();
@@ -85,7 +79,7 @@ export async function initModel(config: Config) {
   const mixer = new THREE.AnimationMixer(model);
   const clock = new THREE.Clock();
   const scene = new THREE.Scene();
-  const camera = createCamera();
+  const camera = createCamera(config.cameraDistance ?? 15);
 
   for (const clip of gltf.animations) {
     runAnimation(clip, mixer, 0.3);
@@ -111,7 +105,10 @@ export async function initModel(config: Config) {
 
     // slow rotation to upper left
     const autoRotationX = AUTO_ROTATION_COEF * delta;
-    const autoRotationY = -AUTO_ROTATION_COEF * delta;
+    let autoRotationY = -AUTO_ROTATION_COEF * delta;
+    if (config.horizontalAutoRotate) {
+      autoRotationY = 0;
+    }
     updateRotation(autoRotationX, autoRotationY, NO_DECAY_COEF);
 
     // rotation velocity on mouse interaction
@@ -173,9 +170,9 @@ function runAnimation(
   action.play();
 }
 
-function createCamera() {
+function createCamera(cameraDistance: number) {
   const camera = new THREE.PerspectiveCamera();
-  camera.position.set(0, 0, 15);
+  camera.position.set(0, 0, cameraDistance);
   return camera;
 }
 
@@ -326,10 +323,6 @@ function setupSectionObserver(sectionConfig: SectionConfig, state: State) {
 
 function isTouchEvent(event: MouseEvent | TouchEvent): event is TouchEvent {
   return event.type.startsWith("touch");
-}
-
-function firstMapValue<T>(map: Map<unknown, T>): T | null {
-  return map.values().next().value ?? null;
 }
 
 function maxBy<T>(list: T[], getAttr: (element: T) => number): T | null {

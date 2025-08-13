@@ -1,5 +1,6 @@
 ---
 import Section from "./Section.astro";
+const { id } = Astro.props;
 ---
 
-<Section id="model-showcase" background="light" class="min-h-screen" />
+<Section id={id} background="light" class="min-h-1/2" />

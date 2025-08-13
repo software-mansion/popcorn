@@ -3,8 +3,9 @@ interface Props {
   background: "light" | "dark";
   class?: string;
   id?: string;
+  isAbove?: boolean;
 }
-const { background, class: className, id, ...rest } = Astro.props;
+const { background, class: className, id, isAbove, ...rest } = Astro.props;
 
 const light = "bg-light-20 text-brown-100";
 const dark = "bg-brown-90 text-white";
@@ -13,7 +14,11 @@ const backgroundClass = background === "light" ? light : dark;
 ---
 
 <div
-  class:list={["-z-20 flex flex-col", backgroundClass]}
+  class:list={[
+    "flex flex-col",
+    backgroundClass,
+    isAbove ? "relative z-50" : "-z-20",
+  ]}
   data-background={background}
   {...rest}
 >
