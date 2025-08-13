@@ -20,7 +20,8 @@ export const PopcornProvider = ({
     async function initializePopcorn() {
       try {
         const popcornInstance = await window.Popcorn.init({
-          debug
+          debug,
+          wasmDir: "/wasm/"
         });
         setInstance(popcornInstance);
       } catch (error) {

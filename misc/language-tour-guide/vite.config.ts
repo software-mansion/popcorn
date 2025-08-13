@@ -4,15 +4,27 @@ import mdx from "@mdx-js/rollup";
 import tailwindcss from "@tailwindcss/vite";
 import { updatePopcorn } from "./build-wasm";
 import svgr from "vite-plugin-svgr";
+import rehypeHighlight from "rehype-highlight";
+import elixir from "highlight.js/lib/languages/elixir";
+import rehypeSlug from "rehype-slug";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), mdx(), updatePopcorn(), svgr()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    mdx({
+      providerImportSource: "@mdx-js/react",
+      rehypePlugins: [rehypeSlug, [rehypeHighlight, { languages: { elixir } }]]
+    }),
+    updatePopcorn(),
+    svgr()
+  ],
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
-      "Access-Control-Allow-Origin": "*",
-    },
-  },
+      "Access-Control-Allow-Origin": "*"
+    }
+  }
 });

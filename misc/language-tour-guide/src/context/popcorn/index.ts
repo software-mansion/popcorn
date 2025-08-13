@@ -5,6 +5,7 @@ type InitParams = {
   bundlePath?: string;
   onStderr?: (text: string) => void;
   onStdout?: (text: string) => void;
+  wasmDir?: string;
   heartbeatTimeoutMs?: number;
   debug?: boolean;
 };
