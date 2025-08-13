@@ -12,7 +12,7 @@ import evalExample from "../assets/eval.png";
   <HeaderTitle>See what’s possible with Popcorn. </HeaderTitle>
   <LeadingElement title="Examples" color="dark" />
 
-  <div class="flex flex-col gap-10">
+  <div class="mt-60 flex flex-col" data-examples>
     <ExampleCard
       n="01"
       title="Elixir REPL"
@@ -49,3 +49,23 @@ import evalExample from "../assets/eval.png";
     </ExampleCard>
   </div>
 </Section>
+
+<script>
+  import { setupStepVisibility } from "../utils/stepAnimation";
+
+  function setup() {
+    setupStepVisibility({
+      sectionSelector: "[data-examples]",
+      stepSelector: "[data-example-card]",
+      onUpdate: (step, nextStep, scale) => {
+        step.style.opacity = String(scale);
+        nextStep.style.opacity = String(1 - scale);
+        step.style.scale = String(0.9 + 0.1 * scale);
+      },
+      duration: 500,
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
