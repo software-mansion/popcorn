@@ -3,11 +3,11 @@ defmodule Popcorn do
   Popcorn is a tool for running Elixir in the browser.
   """
 
+  alias Popcorn.Build
   alias Popcorn.Utils.FetchArtifacts
 
   @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
-  @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
@@ -65,10 +65,10 @@ defmodule Popcorn do
     ensure_option_present(options, :out_dir, "Output directory")
 
     File.mkdir_p!(options.out_dir)
-    {module, filename} = create_boot_module(options.start_module)
+    {module, filename, apps} = create_boot_module(options.start_module)
 
     try do
-      bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts])
+      bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts], apps)
       pack_bundle(options.out_dir, bundled_artifacts, module)
     after
       File.rm!(filename)
@@ -95,13 +95,18 @@ defmodule Popcorn do
     :ok
   end
 
-  defp bundled_artifacts(compile_artifacts) do
+  defp bundled_artifacts(compile_artifacts, applications) do
+    bundles = [:popcorn | applications]
+
+    # FIXME: take only supported apps
+    # FIXME: Exclude non-stdlib
+    popcorn_bundles = Enum.map(bundles, &Build.bundle_path/1)
     popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
     api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
-    [@popcorn_bundle_path | api_beams] ++ generated_beams ++ (compile_artifacts -- popcorn_files)
+    # include stdlib bundles, Popcorn.Wasm beam and filter other popcorn beams
+    popcorn_bundles ++ api_beams ++ generated_beams ++ (compile_artifacts -- popcorn_files)
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -255,7 +260,7 @@ defmodule Popcorn do
     File.mkdir_p!(@popcorn_generated_path)
     filename = Path.join(@popcorn_generated_path, "#{module_name}.beam")
     File.write!(filename, binary_content)
-    {module_name, filename}
+    {module_name, filename, Map.keys(specs)}
   end
 
   defp gather_app_specs([], specs), do: specs
