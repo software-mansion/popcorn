@@ -325,10 +325,6 @@ function isTouchEvent(event: MouseEvent | TouchEvent): event is TouchEvent {
   return event.type.startsWith("touch");
 }
 
-function firstMapValue<T>(map: Map<unknown, T>): T | null {
-  return map.values().next().value ?? null;
-}
-
 function maxBy<T>(list: T[], getAttr: (element: T) => number): T | null {
   if (list.length === 0) {
     return null;
