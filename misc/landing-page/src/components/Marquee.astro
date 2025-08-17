@@ -1,6 +1,7 @@
 ---
 import { headerClass } from "./HeaderTitle.astro";
-const marqueeElementClass = "marquee-element flex flex-shrink-0";
+
+const marqueeElementClass = "marquee-transform flex flex-shrink-0";
 ---
 
 <div id="marquee" class="marquee flex w-screen">
@@ -26,48 +27,57 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
   </div>
 </div>
 
+<style is: global>
+  :root {
+    --marquee-progress: 0px;
+  }
+</style>
+
 <style>
   .marquee {
     gap: 200px;
   }
+
+  .marquee-transform {
+    transform: translateX(var(--marquee-progress));
+  }
 </style>
 
 <script>
+  import { onPageLoad } from "../scripts/utils";
+
+  function setProgress(n: number) {
+    document.documentElement.style.setProperty("--marquee-progress", `${n}px`);
+  }
+
   function setupMarqueeAnimation() {
-    const marquee = document.querySelector<HTMLElement>("#marquee")!;
-    const marqueeElements =
-      document.querySelectorAll<HTMLElement>(".marquee-element");
     const gap = 200;
+    const marquee = document.querySelector<HTMLElement>("#marquee")!;
+    const parts = marquee.querySelectorAll<HTMLElement>("div");
+    const first = parts[0];
+    // Get the total width of a single marquee element including the gap
+    const elementWidth = first.offsetWidth + gap;
 
-    marquee.style.gap = `${gap}px`;
-
-    let ticking = false;
+    let animatingScroll = false;
     let lastScrollY = window.scrollY;
     let lastTimestamp = 0;
 
-    let isInViewport = false;
-
-    // Get the total width of a single marquee element including the gap
-    const elementWidth = marqueeElements[0].offsetWidth + gap;
+    let stopAnimation: null | (() => void) = null;
 
     // Start with the first element positioned off-screen to the left
     let animationPosition = -elementWidth;
 
-    marqueeElements.forEach((el) => {
-      el.style.transform = `translateX(${elementWidth}}px)`;
-    });
-
     function updatePositions(timestamp: number) {
-      if (!isInViewport) {
-        requestAnimationFrame(updatePositions);
+      const stopped = stopAnimation === null;
+      if (stopped) {
         return;
       }
 
       // Handle continuous animation
-      if (lastTimestamp) {
+      if (lastTimestamp > 0) {
         const elapsed = timestamp - lastTimestamp;
 
-        const speed = 0.05;
+        const speed = 0.2;
         animationPosition -= elapsed * speed;
 
         // Reset position when element has scrolled past
@@ -78,56 +88,53 @@ const marqueeElementClass = "marquee-element flex flex-shrink-0";
 
       lastTimestamp = timestamp;
 
-      marqueeElements.forEach((el) => {
-        el.style.transform = `translateX(${animationPosition}px)`;
-      });
-
+      setProgress(animationPosition);
       requestAnimationFrame(updatePositions);
     }
 
     function handleScroll() {
-      if (!ticking && isInViewport) {
+      if (!animatingScroll) {
+        animatingScroll = true;
+
         requestAnimationFrame(() => {
           const scrollDelta = lastScrollY - window.scrollY;
+          lastScrollY = window.scrollY;
+
           const scrollFactor = 0.5; // sensitivity
           const moveAmount = scrollDelta * scrollFactor;
-
           animationPosition += moveAmount;
 
-          lastScrollY = window.scrollY;
-          ticking = false;
+          animatingScroll = false;
         });
-
-        ticking = true;
       }
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          isInViewport = entry.isIntersecting;
+    function startAnimation() {
+      lastTimestamp = 0;
+      requestAnimationFrame(updatePositions);
+      window.addEventListener("scroll", handleScroll);
 
-          if (isInViewport) {
-            lastTimestamp = 0;
-            requestAnimationFrame(updatePositions);
-          }
-        });
+      return () => {
+        window.removeEventListener("scroll", handleScroll);
+        stopAnimation = null;
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (marquee) => {
+        const [{ isIntersecting: inView }] = marquee;
+        if (inView) {
+          stopAnimation = startAnimation();
+        } else {
+          stopAnimation?.();
+        }
       },
-      {
-        threshold: 0,
-      },
+      { threshold: 0 },
     );
 
     observer.observe(marquee);
-
-    window.addEventListener("scroll", handleScroll);
-    requestAnimationFrame(updatePositions);
+    setProgress(elementWidth);
   }
 
-  function setup() {
-    setupMarqueeAnimation();
-  }
-
-  document.addEventListener("DOMContentLoaded", setup);
-  document.addEventListener("astro:page-load", setup);
+  onPageLoad(async () => setupMarqueeAnimation());
 </script>
