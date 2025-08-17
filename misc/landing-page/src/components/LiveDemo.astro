@@ -4,8 +4,8 @@ import Section from "./Section.astro";
 import LeadingElement from "./LeadingElement.astro";
 import Marquee from "./Marquee.astro";
 
-const exampleButton =
-  "flex items-center gap-2 text-orange-100 cursor-pointer font-semibold";
+const exampleButtonClass =
+  "text-orange-100 cursor-pointer font-semibold hover:bg-grey-20 px-6 py-3 rounded-lg transition-colors duration-150";
 ---
 
 <Section id="live-demo" background="light" class="hidden lg:flex">
@@ -39,8 +39,10 @@ const exampleButton =
         <div id="terminal" class="live-demo-scroll relative h-80 w-xl"></div>
       </div>
       <div class="flex w-full justify-evenly gap-2">
-        <button id="live-simple" class={exampleButton}>Example: Sort </button>
-        <button id="live-case" class={exampleButton}
+        <button id="live-simple" class={exampleButtonClass}
+          >Example: Sort
+        </button>
+        <button id="live-case" class={exampleButtonClass}
           >Example: Processes
         </button>
       </div>
