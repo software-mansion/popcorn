@@ -62,12 +62,16 @@ defmodule Popcorn.Build do
 
     File.rm(@cache_path)
 
-    # TODO: Process in parallel
     new_cache =
-      for app <- @supported_apps, into: %{} do
-        app_cache = build_app(app, Map.get(cache, app, %{}))
-        {app, app_cache}
-      end
+      process_async(
+        @supported_apps,
+        fn app ->
+          app_cache = build_app(app, Map.get(cache, app, %{}))
+          {app, app_cache}
+        end,
+        timeout: 600_000
+      )
+      |> Map.new()
 
     popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
     new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
@@ -252,7 +256,7 @@ defmodule Popcorn.Build do
 
   defp process_async(enum, fun, opts \\ []) do
     enum
-    |> Task.async_stream(fun, [timeout: 30_000, ordered: false] ++ opts)
+    |> Task.async_stream(fun, Keyword.merge([timeout: 30_000, ordered: false], opts))
     |> Enum.map(fn {:ok, result} -> result end)
   end
 
