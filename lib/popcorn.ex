@@ -68,7 +68,7 @@ defmodule Popcorn do
     {module, filename, apps} = create_boot_module(options.start_module)
 
     try do
-      bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts], apps)
+      bundled_artifacts = bundled_artifacts(apps)
       pack_bundle(options.out_dir, bundled_artifacts, module)
     after
       File.rm!(filename)
@@ -95,18 +95,28 @@ defmodule Popcorn do
     :ok
   end
 
-  defp bundled_artifacts(compile_artifacts, applications) do
-    bundles = [:popcorn | applications]
+  defp bundled_artifacts(applications) do
+    bundles = [:erts, :popcorn_lib | applications]
 
-    # FIXME: take only supported apps
-    # FIXME: Exclude non-stdlib
-    popcorn_bundles = Enum.map(bundles, &Build.bundle_path/1)
-    popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
-    api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
+    {popcorn_bundles, dep_bundles} = Enum.split_with(bundles, &Build.available_bundles/1)
+
+    popcorn_bundles = Enum.map(popcorn_bundles, &Build.bundle_path/1)
+
+    dep_beams =
+      Enum.flat_map(dep_bundles, fn dep ->
+        beams = dep |> Application.app_dir("ebin/*.beam") |> Path.wildcard()
+
+        # TODO: Separate runtime and build modules to avoid such ugly filtering
+        if dep == :popcorn do
+          Enum.filter(beams, &beam_src_in_api_dir?/1)
+        else
+          beams
+        end
+      end)
+
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    # include stdlib bundles, Popcorn.Wasm beam and filter other popcorn beams
-    popcorn_bundles ++ api_beams ++ generated_beams ++ (compile_artifacts -- popcorn_files)
+    popcorn_bundles ++ dep_beams ++ generated_beams
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -128,17 +138,6 @@ defmodule Popcorn do
       error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
-
-  defp popcorn_api_beam?(path) do
-    in_popcorn_ebin_dir?(path) and beam?(path) and beam_src_in_api_dir?(path)
-  end
-
-  defp in_popcorn_ebin_dir?(path) do
-    dir = path |> Path.relative_to(@popcorn_path) |> Path.dirname()
-    dir == "ebin"
-  end
-
-  defp beam?(path), do: Path.extname(path) == ".beam"
 
   defp beam_src_in_api_dir?(beam_path) do
     module_name = Path.basename(beam_path, ".beam")
