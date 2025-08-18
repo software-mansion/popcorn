@@ -69,12 +69,16 @@ defmodule Popcorn.Build do
         {app, app_cache}
       end
 
-    popcorn_cache = build_popcorn(cache[:popcorn])
-    new_cache = Map.put(new_cache, :popcorn, popcorn_cache)
+    popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
+    new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
 
     File.write!(@cache_path, :erlang.term_to_binary(new_cache))
 
     :ok
+  end
+
+  def available_bundles(bundle) do
+    bundle in [:popcorn_lib | @supported_apps]
   end
 
   def bundle_path(bundle), do: Path.join([@patches_path, "#{bundle}.avm"])
@@ -115,16 +119,16 @@ defmodule Popcorn.Build do
   end
 
   defp build_popcorn(cache) do
-    bundle = :popcorn
+    bundle = :popcorn_lib
     build_dir = bundle_ebin_dir(bundle)
     File.mkdir_p!(build_dir)
-    srcs = Path.wildcard("patches/popcorn/**/*.{ex,erl,yrl,S}")
+    srcs = Path.wildcard("patches/#{bundle}/**/*.{ex,erl,yrl,S}")
 
     {modified_srcs, cache} = update_cache(srcs, cache)
 
-    popcorn_beams = patch([], modified_srcs, build_dir)
+    popcorn_lib_beams = patch([], modified_srcs, build_dir)
 
-    if popcorn_beams != [] do
+    if popcorn_lib_beams != [] do
       IO.puts(:stderr, "Bundling #{bundle}.avm")
       :packbeam_api.create(to_charlist(bundle_path(bundle)), bundle_beams(bundle))
     end
