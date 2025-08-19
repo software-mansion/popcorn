@@ -16,8 +16,7 @@ export const useCodeEditorStore = create<CodeEditorStore>((set) => ({
   code: "",
   stdoutResult: [],
   setCode: (code: string) => set({ code }),
-  setDefaultCode: (defaultCode: string) =>
-    set({ defaultCode, code: defaultCode }),
+  setDefaultCode: (defaultCode: string) => set({ defaultCode }),
   resetToDefault: () => set((state) => ({ code: state.defaultCode })),
   setStdoutResult: (stdoutResult: string) =>
     set((state) => ({

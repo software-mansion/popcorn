@@ -10,20 +10,13 @@ export function CodeEditor() {
   const code = useCodeEditorStore((state) => state.code);
   const setCode = useCodeEditorStore((state) => state.setCode);
 
-  const onChange = useCallback(
-    (val: string) => {
-      setCode(val);
-    },
-    [setCode]
-  );
-
   return (
     <CodeMirror
-      className="border-orange-20 scrollbar h-full min-h-[500px] overflow-x-scroll rounded-md border bg-[#FDF6E3]"
+      className="border-orange-20 scrollbar h-full min-h-[500px] overflow-scroll rounded-md border bg-[#FDF6E3] lg:min-h-0"
       autoFocus
       value={code}
       extensions={[elixir()]}
-      onChange={onChange}
+      onChange={setCode}
       theme={solarizedLight}
     />
   );
