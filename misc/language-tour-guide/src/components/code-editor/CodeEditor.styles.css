@@ -1,14 +1,5 @@
 .cm-editor {
   border-bottom-left-radius: 0.375rem;
-  min-height: 500px;
-}
-
-@media (width >= 64rem) {
-  .cm-editor {
-    height: calc(
-      100vh - 0.4 * (100vh - 68px - 48px - 17px) - 68px - 48px - 17px
-    );
-  }
 }
 
 .cm-gutters {
