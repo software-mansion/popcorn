@@ -28,7 +28,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="border-grey-20 bg-light-20 flex h-full items-center gap-6 border-b px-4 py-4 lg:px-8">
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-6 border-b px-4 py-4 lg:px-8">
       <button className="cursor-pointer" onClick={openMenu}>
         <span className="sr-only">Open menu</span>
         <Hamburger />

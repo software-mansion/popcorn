@@ -5,7 +5,9 @@
 
 @media (width >= 64rem) {
   .cm-editor {
-    height: calc(100vh - 0.3 * (100vh - 68px) - 68px);
+    height: calc(
+      100vh - 0.4 * (100vh - 68px - 48px - 17px) - 68px - 48px - 17px
+    );
   }
 }
 
