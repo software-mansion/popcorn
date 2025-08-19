@@ -4,6 +4,19 @@ import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
 import { useExecutionHistoryStore } from "../store/executionHistory";
 
+function formatTimeStamp(date: Date): string {
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function formatDuration(durationMs?: number): string {
+  if (durationMs === undefined) return "N/A";
+  return `${durationMs.toFixed(3)} ms`;
+}
+
 export function History() {
   const [showHistory, setShowHistory] = useState<boolean>(false);
 
@@ -12,14 +25,6 @@ export function History() {
 
   const toggleHistory = () => {
     setShowHistory((prev) => !prev);
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit"
-    });
   };
 
   return (
@@ -61,12 +66,10 @@ export function History() {
                 >
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-grey-70 text-xs font-medium">
-                      {formatTime(entry.timestamp)}
+                      {formatTimeStamp(entry.timestamp)}
                     </span>
                     <span className="text-grey-60 text-xs">
-                      {entry.durationMs
-                        ? `${entry.durationMs.toFixed(3)} ms`
-                        : ""}
+                      {formatDuration(entry.durationMs)}
                     </span>
                   </div>
                   <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
