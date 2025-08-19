@@ -15,21 +15,22 @@ type Position = {
  * When model position is in the middle of the section, it should have specified `position` and `scale`.
  * It should interpolate between sections.
  */
-type SectionPosition = {
+export type SectionConfig = {
   position: Position;
   scale: number;
+  hidden?: boolean;
 };
 
 type Config = {
   path: string;
   containerId: string;
-  sectionConfig: SectionConfigRaw;
+  sectionConfig: SectionsConfigRaw;
   cameraDistance?: number;
   horizontalAutoRotate?: boolean;
 };
 
-type SectionConfigRaw = Record<string, SectionPosition>;
-type SectionConfig = Map<string, SectionPosition>;
+export type SectionsConfigRaw = Record<string, SectionConfig>;
+type SectionsConfig = Map<string, SectionConfig>;
 
 type State = {
   mouse: {
@@ -52,7 +53,7 @@ const DECAY_COEF = 0.02;
 const NO_DECAY_COEF = 0;
 const AUTO_ROTATION_COEF = 0.2;
 // lower is slower
-const LERP_COEF = 0.1;
+const LERP_COEF = 0.05;
 // normalize to world positions
 const POSITION_COEF = 10;
 
@@ -96,7 +97,7 @@ export async function initModel(config: Config) {
 
   const updateRotation = createRotationCallback(model, state);
   setupDragging(updateRotation, state);
-  setupSectionObserver(sectionConfig, state);
+  setupSectionObserver(config.containerId, sectionConfig, state);
 
   function animate() {
     const delta = clock.getDelta();
@@ -270,7 +271,7 @@ function setupDragging(onRotate: RotateCallback, state: State) {
   window.addEventListener("touchcancel", end);
 }
 
-function validateSectionPositions(sectionConfig: SectionConfig) {
+function validateSectionPositions(sectionConfig: SectionsConfig) {
   const sectionIds = Array.from(sectionConfig.keys());
   const selectors = sectionIds.map((id) => `#${id}`).join(", ");
 
@@ -281,7 +282,11 @@ function validateSectionPositions(sectionConfig: SectionConfig) {
   }
 }
 
-function setupSectionObserver(sectionConfig: SectionConfig, state: State) {
+function setupSectionObserver(
+  containerId: string,
+  sectionConfig: SectionsConfig,
+  state: State,
+) {
   const previousRatios = new Map();
 
   function onIntersect(entries: IntersectionObserverEntry[]) {
@@ -304,11 +309,13 @@ function setupSectionObserver(sectionConfig: SectionConfig, state: State) {
 
     const config = sectionConfig.get(candidateId);
     if (config === undefined) {
-      return;
+      throw new Error("all sections should have config");
     }
 
+    const container = document.getElementById(containerId)!;
     state.targetPosition = config.position;
     state.targetScale = config.scale;
+    container.hidden = config.hidden ?? false;
   }
 
   const observer = new IntersectionObserver(onIntersect, {

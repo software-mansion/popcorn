@@ -9,11 +9,11 @@
 </div>
 
 <script>
-  import { initModel } from "../scripts/3dModel";
+  import { initModel, type SectionsConfigRaw } from "../scripts/3dModel";
   import { onPageLoad } from "../scripts/utils";
 
   await onPageLoad(async () => {
-    let config = {
+    let config: SectionsConfigRaw = {
       intro: {
         position: { x: 0, y: 0 },
         scale: 1,
@@ -28,8 +28,11 @@
       },
       examples: {
         position: { x: 0.9, y: 0 },
-        scale: 0,
+        scale: 0.8,
       },
+      "live-demo": { position: { x: 0.9, y: 0 }, scale: 0, hidden: true },
+      info: { position: { x: 0.9, y: 0 }, scale: 0, hidden: true },
+      outtro: { position: { x: 0.9, y: 0 }, scale: 0, hidden: true },
     };
 
     const isMobile = window.innerWidth < 640;
@@ -47,10 +50,10 @@
           position: { x: 0, y: 0 },
           scale: 0.3,
         },
-        examples: {
-          position: { x: 0, y: 0 },
-          scale: 0,
-        },
+        examples: { position: { x: 0, y: 0 }, scale: 0, hidden: true },
+        "live-demo": { position: { x: 0, y: 0 }, scale: 0, hidden: true },
+        info: { position: { x: 0, y: 0 }, scale: 0, hidden: true },
+        outtro: { position: { x: 0, y: 0 }, scale: 0, hidden: true },
       };
     }
 
