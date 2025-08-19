@@ -7,19 +7,21 @@ name: Hello Popcorn - Build & test
 
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
     paths:
-      - "*"
-      - "!examples"
+      - "**"
+      - "!examples/**"
       - "examples/hello_popcorn/**"
+      - "!.github/**"
       - ".github/workflows/hello_popcorn_build_test.yml"
 
   pull_request:
-    branches: ["*"]
+    branches: ["**"]
     paths:
-      - "*"
-      - "!examples"
+      - "**"
+      - "!examples/**"
       - "examples/hello_popcorn/**"
+      - "!.github/**"
       - ".github/workflows/hello_popcorn_build_test.yml"
 
 permissions:

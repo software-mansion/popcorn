@@ -7,13 +7,13 @@ name: Eval in WASM Build & test
 
 on:
   push:
-    branches: ["*"]
+    branches: ["**"]
     paths:
       - "examples/eval_in_wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
 
   pull_request:
-    branches: ["*"]
+    branches: ["**"]
     paths:
       - "examples/eval_in_wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
