@@ -1,5 +1,4 @@
 import CodeMirror from "@uiw/react-codemirror";
-import { useCallback } from "react";
 import { elixir } from "codemirror-lang-elixir";
 import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
