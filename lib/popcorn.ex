@@ -6,7 +6,6 @@ defmodule Popcorn do
   alias Popcorn.Build
   alias Popcorn.Utils.FetchArtifacts
 
-  @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
@@ -25,9 +24,7 @@ defmodule Popcorn do
   - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
-  - `compile_artifacts` - Compiled BEAMs and other artifacts that should be included
-  in the generated bundle. Defaults to all the `.beam` and `.app` files for the application
-  and dependencies.
+  - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
 
   Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
@@ -35,11 +32,11 @@ defmodule Popcorn do
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:target, :wasm | :unix}
-          | {:compile_artifacts, [String.t()]}
+          | {:extra_beams, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
     ingredients(Keyword.take(options, [:out_dir, :target]))
-    bundle(Keyword.take(options, [:out_dir, :start_module, :compile_artifacts]))
+    bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
   end
 
   @doc """
@@ -50,15 +47,13 @@ defmodule Popcorn do
   @spec bundle([
           {:out_dir, String.t()}
           | {:start_module, module}
-          | {:compile_artifacts, [String.t()]}
+          | {:extra_beams, [String.t()]}
         ]) :: :ok
   def bundle(options \\ []) do
-    all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
-
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       start_module: nil,
-      compile_artifacts: all_beams
+      extra_beams: []
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
@@ -68,8 +63,8 @@ defmodule Popcorn do
     {module, filename, apps} = create_boot_module(options.start_module)
 
     try do
-      bundled_artifacts = bundled_artifacts(apps)
-      pack_bundle(options.out_dir, bundled_artifacts, module)
+      beams = options.extra_beams ++ bundled_artifacts(apps)
+      pack_bundle(options.out_dir, beams, module)
     after
       File.rm!(filename)
     end
