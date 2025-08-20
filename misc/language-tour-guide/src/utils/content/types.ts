@@ -1,0 +1,38 @@
+import type { ComponentType } from "react";
+
+export type Frontmatter = {
+  order?: number;
+  subsections?: string[];
+  defaultCode?: string;
+};
+
+export type MdxWithProperties = {
+  default: ComponentType;
+  frontmatter?: Frontmatter;
+};
+
+export type Dir = string;
+
+export type DirEntry = {
+  path: string[];
+  children: DirTree;
+  frontmatter: Frontmatter;
+};
+
+export type LoadedEntry = {
+  path: string[];
+  frontmatter: Frontmatter;
+};
+
+export type UnresolvedEntry = [string, () => Promise<MdxWithProperties>];
+
+export type DirTree = Map<Dir, DirEntry>;
+
+export type NavigationTreeItem = {
+  title: string;
+  path: string;
+  children: NavigationTreeItem[];
+  type: "link" | "section";
+};
+
+export type NavigationTree = NavigationTreeItem[];

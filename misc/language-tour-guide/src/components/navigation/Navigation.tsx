@@ -42,9 +42,9 @@ export function Navigation() {
           <span className="sr-only">Close menu</span>
           <Close className="w-5" />
         </button>
-        {Object.entries(navigation).map(([key, item]) => {
-          return <NavigationItem key={key} item={item} onClick={closeMenu} />;
-        })}
+        {navigation.map((item) => (
+          <NavigationItem key={item.title} item={item} onClick={closeMenu} />
+        ))}
       </ul>
       <div
         className={`${isOpen ? "block" : "hidden"} absolute inset-0 z-20 h-full w-full bg-black/20`}

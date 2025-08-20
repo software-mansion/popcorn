@@ -1,7 +1,7 @@
 import { lazy, Suspense, type JSX } from "react";
 import { Route } from "react-router";
 import { Loader } from "../../components/Loader";
-import { getRoutePath, mdxModules } from ".";
+import { getRoutePath, mdxModules } from "./mdx-loader";
 
 export function createRouteComponents(): JSX.Element[] {
   return Object.entries(mdxModules).map(([path, component]) => {

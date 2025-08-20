@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { createNavigation, type NavigationTree } from "../content/navigation";
+import { createNavigation } from "../content/navigation-builder";
+import type { NavigationTree } from "../content/types";
 
 export function useNavigation() {
   const [navigation, setNavigation] = useState<NavigationTree | null>(null);
