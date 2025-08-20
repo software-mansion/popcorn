@@ -109,9 +109,10 @@ defmodule Popcorn do
         end
       end)
 
+    consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    popcorn_bundles ++ dep_beams ++ generated_beams
+    popcorn_bundles ++ dep_beams ++ consolidated_beams ++ generated_beams
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
