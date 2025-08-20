@@ -11,10 +11,10 @@ ARG COMMIT_REF
 WORKDIR /build/
 
 # fetch `just` to manage build steps
-RUN mkdir -p emsdk popcorn atomvm atomvm-out docs
+RUN mkdir -p emsdk popcorn atomvm atomvm-out docs language_tour_guide
 RUN apt update && \
-    apt -y install git curl && \
-    curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+  apt -y install git curl && \
+  curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
 RUN cat <<EOF > justfile
 export ERL_AFLAGS := '+JMsingle true'
@@ -25,7 +25,7 @@ export EMSDK_QUIET := '1'
 
 all: deps atomvm artifacts
 deps: _fetch_repos _system_deps _languages _emsdk
-artifacts: docs example_hello_popcorn example_eval example_game_of_life example_iex
+artifacts: docs language_tour_guide example_hello_popcorn example_eval example_game_of_life example_iex
 
 [group('dependencies')]
 [working-directory('/build')]
@@ -112,12 +112,21 @@ docs: example_iex
     cp /build/atomvm-out/AtomVM.mjs dist/wasm/
     cp /build/atomvm-out/AtomVM.wasm dist/wasm/
     cp -r dist/* /build/docs
+
+[working-directory('/build/popcorn/misc/language-tour-guide')]
+language_tour_guide: atomvm
+    npm install
+    cd elixir_tour && mix deps.get
+    npm run build
+    cp -r dist/* /build/language_tour_guide
+
 EOF
 
-RUN just docs
+RUN just docs language_tour_guide
 
 FROM nginx:alpine AS runtime
 
 COPY --from=build /build/popcorn/misc/landing.nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /build/docs /usr/share/nginx/html
+COPY --from=build /build/language_tour_guide /usr/share/nginx/html/language_tour_guide
 EXPOSE 8080
