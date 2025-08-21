@@ -28,11 +28,13 @@ export type UnresolvedEntry = [string, () => Promise<MdxWithProperties>];
 
 export type DirTree = Map<Dir, DirEntry>;
 
+type NavigationTreeItemType = "link" | "section" | "subsection";
+
 export type NavigationTreeItem = {
   title: string;
   path: string;
   children: NavigationTreeItem[];
-  type: "link" | "section";
+  type: NavigationTreeItemType;
 };
 
 export type NavigationTree = NavigationTreeItem[];

@@ -1,5 +1,5 @@
 import { load, mdxModules, sortPathLength } from "./mdx-loader";
-import type { DirTree } from "./types";
+import type { DirEntry, DirTree } from "./types";
 
 export async function getRawMdxTree() {
   const modules = Object.entries(mdxModules);
@@ -34,4 +34,21 @@ export async function getRawMdxTree() {
   }
 
   return tree;
+}
+
+export async function getNode(path: string[]): Promise<DirEntry | undefined> {
+  const tree = await getRawMdxTree();
+  const firstNode = tree.get(path[0]);
+
+  if (firstNode === undefined) return undefined;
+
+  let current: DirEntry = firstNode;
+
+  for (const segment of path.slice(1)) {
+    const entry = current?.children.get(segment);
+    if (!entry) return undefined;
+    current = entry;
+  }
+
+  return current;
 }

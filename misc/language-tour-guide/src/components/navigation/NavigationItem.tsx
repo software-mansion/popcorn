@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router";
 
 import ChevronDown from "../../assets/chevron-down.svg?react";
 import ChevronRight from "../../assets/chevron-right.svg?react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { NavigationTreeItem } from "../../utils/content/types";
 
 type NavigationItemProps = {
@@ -12,10 +12,13 @@ type NavigationItemProps = {
 
 export function NavigationItem({ item, onClick }: NavigationItemProps) {
   const { hash, pathname } = useLocation();
-
   const [isOpen, setIsOpen] = useState(
     `${pathname}${hash}`.includes(item.path)
   );
+
+  useEffect(() => {
+    setIsOpen(`${pathname}${hash}`.includes(item.path));
+  }, [pathname, hash, item.path]);
 
   const hasChildren = item.children.length > 0;
 
@@ -42,7 +45,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
             )}
           </span>
         )}
-        {item.type === "link" ? (
+        {item.type === "link" || item.type === "subsection" ? (
           <NavLink
             to={item.path}
             className={({ isActive }) =>

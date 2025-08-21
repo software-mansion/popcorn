@@ -24,7 +24,7 @@ function processNavigationLevel(mapTree: DirTree): NavigationTree {
 
     const item: NavigationTreeItem = {
       title: formatTitle(key),
-      path: entry.path.join("/"),
+      path: "/" + entry.path.join("/"),
       type: isLeafNode ? "link" : "section",
       children: isLeafNode
         ? createSubsections(entry)
@@ -49,9 +49,9 @@ function createSubsections(entry: DirEntry): NavigationTree {
 
   return entry.frontmatter.subsections.map((subsection) => ({
     title: formatTitle(subsection),
-    path: `${entry.path.join("/")}/#${subsection}`,
+    path: `/${entry.path.join("/")}/#${subsection}`,
     children: [],
-    type: "link" as const
+    type: "subsection" as const
   }));
 }
 
@@ -67,4 +67,38 @@ function compareEntriesByOrder(a: [Dir, DirEntry], b: [Dir, DirEntry]): number {
   }
 
   return (orderA || Infinity) - (orderB || Infinity);
+}
+
+export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
+  const flatNavigation: { title: string; path: string }[] = [];
+
+  const traverse = (items: NavigationTree) => {
+    for (const item of items) {
+      if (item.type === "link") {
+        flatNavigation.push({ title: item.title, path: item.path });
+      }
+
+      if (item.children.length > 0) {
+        traverse(item.children);
+      }
+    }
+  };
+
+  traverse(tree);
+
+  const navigationNodeIndex = flatNavigation.findIndex((item) =>
+    path.includes(item.path)
+  );
+
+  const nextNode =
+    navigationNodeIndex + 1 < flatNavigation.length
+      ? flatNavigation[navigationNodeIndex + 1]
+      : null;
+
+  const previousNode =
+    navigationNodeIndex - 1 >= 0
+      ? flatNavigation[navigationNodeIndex - 1]
+      : null;
+
+  return { previousNode, nextNode };
 }
