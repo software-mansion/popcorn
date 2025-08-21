@@ -11,6 +11,8 @@ import { rehypeRawCode } from "./src/plugins/rehypeRawCode";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // TODO: pass this by build args
+  base: "/language_tour_guide",
   plugins: [
     react(),
     tailwindcss(),
