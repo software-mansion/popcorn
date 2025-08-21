@@ -2,9 +2,7 @@ name: Build and deploy staging demo
 
 on:
   push:
-    branches:
-      - deploy
-      - "bb/lte-deployment"
+    branches: [deploy]
 
 env:
   REGISTRY: ghcr.io
