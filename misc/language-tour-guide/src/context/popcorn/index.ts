@@ -18,8 +18,8 @@ export type CastOptions = {
 };
 
 export type CallOptions = {
-  process: string;
-  timeoutMs: number;
+  process?: string;
+  timeoutMs?: number;
 };
 
 type PopcornCallResult = {

@@ -1,9 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
-import {
-  PopcornContext,
-  type Popcorn,
-  type PopcornContextValue
-} from "./popcorn";
+import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
+import { useCodeEditorStore } from "../../components/store/codeEditor";
 
 interface PopcornProviderProps {
   children: ReactNode;
@@ -12,17 +9,23 @@ interface PopcornProviderProps {
 
 export const PopcornProvider = ({
   children,
-  debug = true
+  debug = false
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
+  const setStdoutResult = useCodeEditorStore((state) => state.setStdoutResult);
 
   useEffect(() => {
     async function initializePopcorn() {
       try {
         const popcornInstance = await window.Popcorn.init({
           debug,
-          wasmDir: "/wasm/"
+          wasmDir: "/wasm/",
+          onStdout: (text) => {
+            console.log("Popcorn stdout:", text);
+            setStdoutResult(text);
+          }
         });
+
         setInstance(popcornInstance);
       } catch (error) {
         console.error("Failed to initialize Popcorn:", error);
