@@ -116,8 +116,9 @@ docs: example_iex
 [working-directory('/build/popcorn/misc/language-tour-guide')]
 language_tour_guide: atomvm
     npm install
-    cd elixir_tour && mix deps.get
     npm run build
+    cp /build/atomvm-out/AtomVM.mjs dist/wasm/
+    cp /build/atomvm-out/AtomVM.wasm dist/wasm/
     cp -r dist/* /build/language_tour_guide
 
 EOF
