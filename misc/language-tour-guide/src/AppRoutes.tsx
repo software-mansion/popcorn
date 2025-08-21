@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { ExampleLayout } from "./components/ExampleLayout";
 import { useMemo } from "react";
@@ -13,6 +13,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="*" element={<NotFound />} />
+      <Route path="/" element={<Navigate to="/introduction" />} />
 
       <Route element={<Layout />}>
         <Route element={<ExampleLayout />}>{contentRoutes}</Route>
