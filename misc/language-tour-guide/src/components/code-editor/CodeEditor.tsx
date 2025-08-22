@@ -4,10 +4,8 @@ import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
 import "./CodeEditor.styles.css";
 import { useCodeEditorStore } from "../store/codeEditor";
-import { useDefaultCode } from "../../utils/hooks/useDefaultCode";
 
 export function CodeEditor() {
-  useDefaultCode();
   const code = useCodeEditorStore((state) => state.code);
   const setCode = useCodeEditorStore((state) => state.setCode);
 

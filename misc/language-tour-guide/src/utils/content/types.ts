@@ -3,12 +3,12 @@ import type { ComponentType } from "react";
 export type Frontmatter = {
   order?: number;
   subsections?: string[];
-  defaultCode?: string;
 };
 
 export type MdxWithProperties = {
   default: ComponentType;
   frontmatter?: Frontmatter;
+  defaultCode?: string;
 };
 
 export type Dir = string;
