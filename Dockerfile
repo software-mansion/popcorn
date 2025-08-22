@@ -1,4 +1,4 @@
-FROM ubuntu:noble AS build
+FROM ubuntu:noble AS build_base
 
 ENV ERLANG_VERSION="26.0.2"
 ENV ELIXIR_VERSION="1.17.3-otp-26"
@@ -8,116 +8,69 @@ ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
 
 ARG COMMIT_REF
+
+ENV ERL_AFLAGS='+JMsingle true'
+ENV DEBIAN_FRONTEND='noninteractive'
+ENV PATH="/build/emsdk:/build/emsdk/upstream/emscripten:/root/.local/share/mise/shims:$PATH"
+ENV MISE_TRUSTED_CONFIG_PATHS='/build/popcorn'
+ENV EMSDK_QUIET='1'
+
+
 WORKDIR /build/
+RUN mkdir -p popcorn atomvm out
+RUN apt-get -y update && \
+  apt-get -y install git curl cmake gperf libmbedtls-dev zlib1g-dev git \
+  automake make gcc g++ libssl-dev libncurses-dev \
+  python3 xz-utils gpg wget
 
-# fetch `just` to manage build steps
-RUN mkdir -p emsdk popcorn atomvm atomvm-out docs
-RUN apt update && \
-    apt -y install git curl && \
-    curl -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+# install mise
+RUN install -dm 755 /etc/apt/keyrings && \
+  wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg && \
+  echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64,arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
+  apt update && \
+  apt install -y mise
 
-RUN cat <<EOF > justfile
-export ERL_AFLAGS := '+JMsingle true'
-export DEBIAN_FRONTEND := 'noninteractive'
-export PATH := "/build/emsdk:/build/emsdk/upstream/emscripten:${HOME}/.local/share/mise/shims:${PATH}"
-export MISE_TRUSTED_CONFIG_PATHS := '/build/popcorn'
-export EMSDK_QUIET := '1'
+RUN mise use --global node@"${NODE_VERSION}" && mise install
+RUN mise use --global erlang@"${ERLANG_VERSION}" && mise install
+RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
+  mise install && \
+  mix local.rebar --force && \
+  mix local.hex -if-missing --force
+RUN mise use --global emsdk@"${EMSDK_VERSION}" && mise install
 
-all: deps atomvm artifacts
-deps: _fetch_repos _system_deps _languages _emsdk
-artifacts: docs example_hello_popcorn example_eval example_game_of_life example_iex
+RUN git clone https://github.com/software-mansion-labs/FissionVM.git --branch=swm --depth=1 /build/atomvm
+RUN cd /build/atomvm/src/platforms/emscripten && mkdir -p build
+RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn
+RUN cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
 
-[group('dependencies')]
-[working-directory('/build')]
-_fetch_repos:
-    git clone https://github.com/emscripten-core/emsdk.git /build/emsdk
-    git clone https://github.com/software-mansion/popcorn.git /build/popcorn
-    git clone https://github.com/software-mansion-labs/FissionVM.git /build/atomvm
-    cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
-    cd /build/atomvm && git fetch && git checkout swm
-    # prepare for cmake
-    cd /build/atomvm/src/platforms/emscripten && mkdir -p build
+# Build AtomVM WASM
+FROM build_base AS build_wasm
+WORKDIR /build/atomvm/src/platforms/emscripten/build
+RUN emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
+RUN emmake make -j$(nproc)
+RUN cp src/AtomVM.mjs src/AtomVM.wasm /build/out/
 
-[group('dependencies')]
-_system_deps:
-    apt update
-    apt install -y cmake gperf libmbedtls-dev zlib1g-dev git \
-    automake make gcc g++ libssl-dev libncurses-dev \
-    python3 xz-utils \
-    gpg wget curl
+FROM build_base AS build_landing
+# Build iex_wasm
+WORKDIR /build/popcorn/examples/iex_wasm
+RUN mix deps.get
+RUN mix popcorn.cook
 
-    # install mise
-    install -dm 755 /etc/apt/keyrings
-    wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64,arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
-    apt update
-    apt install -y mise
+WORKDIR /build/popcorn/misc/landing-page
+RUN npm install
+RUN npm run build
+RUN cp -r dist/* /build/out
 
-[group('dependencies')]
-_languages: _system_deps
-    mise use --global node@"${NODE_VERSION}"
-    mise use --global erlang@"${ERLANG_VERSION}"
-    mise use --global elixir@"${ELIXIR_VERSION}"
-    mise install
-    mix local.rebar --force
-    mix local.hex -if-missing --force
-
-[group('dependencies')]
-[working-directory('/build/emsdk')]
-_emsdk: _fetch_repos _system_deps
-    git pull
-    ./emsdk install "${EMSDK_VERSION}"
-    ./emsdk activate "${EMSDK_VERSION}"
-
-[working-directory('/build/atomvm/src/platforms/emscripten/build')]
-atomvm: deps
-    emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
-    emmake make -j$(nproc)
-
-    cp src/AtomVM.mjs src/AtomVM.wasm /build/atomvm-out/
-
-[group('examples')]
-example_hello_popcorn: (_example '/build/popcorn/examples/hello_popcorn')
-
-[group('examples')]
-example_eval: (_example '/build/popcorn/examples/eval_in_wasm')
-
-[group('examples')]
-example_game_of_life: (_example '/build/popcorn/examples/game_of_life')
-
-[group('examples')]
-[working-directory('/build/popcorn/examples/iex_wasm')]
-example_iex: atomvm
-    mkdir -p static/assets
-    npm install --prefix ./static/assets @xterm/xterm
-    mix deps.get
-    mix popcorn.cook
-    cp /build/atomvm-out/AtomVM.mjs static/wasm/
-    cp /build/atomvm-out/AtomVM.wasm static/wasm/
-
-[group('examples')]
-_example dir: atomvm
-    #!/usr/bin/env bash
-    cd {{dir}} && \
-    mix deps.get && \
-    mix popcorn.cook && \
-    cp /build/atomvm-out/AtomVM.mjs static/wasm/ && \
-    cp /build/atomvm-out/AtomVM.wasm static/wasm/
-
-[working-directory('/build/popcorn/misc/landing-page')]
-docs: example_iex
-    npm install
-    npm run build
-    # TODO: remove below copy (we popcorn.cook inside astro script which overwrites copied .wasm files in iex_wasm)
-    cp /build/atomvm-out/AtomVM.mjs dist/wasm/
-    cp /build/atomvm-out/AtomVM.wasm dist/wasm/
-    cp -r dist/* /build/docs
-EOF
-
-RUN just docs
+FROM build_base AS build_lang_tour
+WORKDIR /build/popcorn/misc/language-tour-guide
+RUN npm install
+RUN npm run build
+RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
-
-COPY --from=build /build/popcorn/misc/landing.nginx.conf /etc/nginx/nginx.conf
-COPY --from=build /build/docs /usr/share/nginx/html
+COPY --from=build_base      /build/popcorn/misc/landing.nginx.conf /etc/nginx/nginx.conf
+COPY --from=build_landing   /build/out /usr/share/nginx/html
+COPY --from=build_lang_tour /build/out /usr/share/nginx/html/language_tour_guide
+COPY --from=build_wasm      /build/out /usr/share/nginx/html/wasm
+COPY --from=build_wasm      /build/out /usr/share/nginx/html/language_tour_guide/wasm
 EXPOSE 8080
