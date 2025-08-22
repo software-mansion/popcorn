@@ -10,6 +10,7 @@ on:
     branches: ["**"]
     paths:
       - "**"
+      - "!misc/**"
       - "!examples/**"
       - "examples/hello_popcorn/**"
       - "!.github/**"
@@ -19,6 +20,7 @@ on:
     branches: ["**"]
     paths:
       - "**"
+      - "!misc/**"
       - "!examples/**"
       - "examples/hello_popcorn/**"
       - "!.github/**"

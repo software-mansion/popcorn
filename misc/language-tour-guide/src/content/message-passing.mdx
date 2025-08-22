@@ -1,0 +1,68 @@
+export const frontmatter = {order: 24}
+
+# Message Passing
+
+Processes communicate through message passing using `send/2` and `receive` blocks.
+
+Messages are stored in a process mailbox and processed one at a time.
+
+Key concepts:
+
+- `send(pid, message)` - sends a message to a process
+- `receive` - waits for and handles messages
+- Messages are pattern matched
+- Unmatched messages stay in the mailbox
+
+export const defaultCode = `# Basic message passing
+defmodule Messenger do
+  def start do
+    spawn(fn -> listen() end)
+  end
+
+  defp listen do
+    receive do
+      {:hello, sender_pid} ->
+        send(sender_pid, {:reply, "Hello back!"})
+        # Continue listening
+        listen()
+
+      {:echo, sender_pid, message} ->
+        send(sender_pid, {:echoed, message})
+        listen()
+
+      :stop ->
+        IO.puts("Stopping messenger process")
+
+      # Process ends here
+      other ->
+        IO.puts("Received unknown message: #{inspect(other)}")
+        listen()
+    end
+  end
+end
+
+# Start the messenger
+messenger_pid = Messenger.start()
+
+# Send messages and receive replies
+send(messenger_pid, {:hello, self()})
+
+receive do
+  {:reply, msg} -> IO.puts("Got reply: #{msg}")
+after
+  1000 -> IO.puts("No reply received")
+end
+
+# Echo example
+send(messenger_pid, {:echo, self(), "Elixir is awesome!"})
+
+receive do
+  {:echoed, msg} -> IO.puts("Echoed: #{msg}")
+after
+  1000 -> IO.puts("No echo received")
+end
+
+# Stop the process
+send(messenger_pid, :stop)
+Process.sleep(100)
+IO.puts("Messenger alive? #{Process.alive?(messenger_pid)}")`

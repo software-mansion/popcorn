@@ -1,0 +1,89 @@
+export const frontmatter = {order: 26}
+
+# Tasks - Better Abstractions for Concurrency
+
+Tasks provide a better abstraction for spawning and awaiting concurrent computations.
+
+They're built on top of processes but provide:
+
+- Better error messages
+- Convenient APIs for common patterns
+- Integration with supervision trees
+
+Common patterns:
+
+- `Task.async/1` + `Task.await/2` - for concurrent computation
+- `Task.start/1` - fire and forget
+- `Task.async_stream/3` - parallel map over enumerable
+
+export const defaultCode = `# Basic Task usage
+defmodule TaskExamples do
+  def slow_operation(n) do
+    Process.sleep(1000)
+    n * 2
+  end
+
+  def run_sequential do
+    IO.puts("Running sequentially...")
+    start = System.monotonic_time(:millisecond)
+
+    result1 = slow_operation(5)
+    result2 = slow_operation(10)
+    result3 = slow_operation(15)
+
+    time = System.monotonic_time(:millisecond) - start
+    IO.puts("Sequential results: #{result1}, #{result2}, #{result3}")
+    IO.puts("Time taken: #{time}ms")
+  end
+
+  def run_concurrent do
+    IO.puts("
+    Running concurrently with Tasks...")
+    start = System.monotonic_time(:millisecond)
+
+    task1 = Task.async(fn -> slow_operation(5) end)
+    task2 = Task.async(fn -> slow_operation(10) end)
+    task3 = Task.async(fn -> slow_operation(15) end)
+
+    # Wait for all tasks (default timeout is 5000ms)
+    result1 = Task.await(task1)
+    result2 = Task.await(task2)
+    result3 = Task.await(task3)
+
+    time = System.monotonic_time(:millisecond) - start
+    IO.puts("Concurrent results: #{result1}, #{result2}, #{result3}")
+    IO.puts("Time taken: #{time}ms")
+  end
+
+  def run_async_stream do
+    IO.puts("
+    Running with async_stream...")
+    start = System.monotonic_time(:millisecond)
+
+    results =
+      [5, 10, 15, 20, 25]
+      |> Task.async_stream(&slow_operation/1, max_concurrency: 3)
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    time = System.monotonic_time(:millisecond) - start
+    IO.puts("Stream results: #{inspect(results)}")
+    IO.puts("Time taken: #{time}ms")
+  end
+end
+
+# Compare sequential vs concurrent
+
+TaskExamples.run_sequential()
+TaskExamples.run_concurrent()
+TaskExamples.run_async_stream()
+
+# Fire and forget task
+
+Task.start(fn ->
+  Process.sleep(500)
+  IO.puts("
+Fire-and-forget task completed!")
+end)
+
+# Wait for fire-and-forget task
+Process.sleep(1000)`

@@ -1,0 +1,108 @@
+export const frontmatter = {order: 28}
+
+# GenServer - The Generic Server
+
+GenServer is the foundation of OTP (Open Telecom Platform). It's a behavior module for implementing stateful server processes.
+
+GenServers provide:
+
+- Standard interface for stateful processes
+- Synchronous calls (call) and asynchronous casts (cast)
+- Built-in error handling and supervision support
+- Hot code swapping capabilities
+
+export const defaultCode = `defmodule Stack do
+  use GenServer
+
+  # Client API
+  def start_link(initial_stack \\\\ []) do
+    GenServer.start_link(__MODULE__, initial_stack, name: __MODULE__)
+  end
+
+  def push(element) do
+    GenServer.cast(__MODULE__, {:push, element})
+  end
+
+  def pop do
+    GenServer.call(__MODULE__, :pop)
+  end
+
+  def peek do
+    GenServer.call(__MODULE__, :peek)
+  end
+
+  def size do
+    GenServer.call(__MODULE__, :size)
+  end
+
+  # Server Callbacks
+
+  @impl true
+  def init(initial_stack) do
+    IO.puts("Starting Stack GenServer with: #{inspect(initial_stack)}")
+    {:ok, initial_stack}
+  end
+
+  @impl true
+  def handle_cast({:push, element}, state) do
+    new_state = [element | state]
+    IO.puts("Pushed #{element}. Stack: #{inspect(new_state)}")
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_call(:pop, _from, [head | tail]) do
+    IO.puts("Popped #{head}. Remaining: #{inspect(tail)}")
+    {:reply, {:ok, head}, tail}
+  end
+
+  @impl true
+  def handle_call(:pop, _from, []) do
+    {:reply, {:error, :empty_stack}, []}
+  end
+
+  @impl true
+  def handle_call(:peek, _from, [head | _tail] = state) do
+    {:reply, {:ok, head}, state}
+  end
+
+  @impl true
+  def handle_call(:peek, _from, []) do
+    {:reply, {:error, :empty_stack}, []}
+  end
+
+  @impl true
+  def handle_call(:size, _from, state) do
+    {:reply, length(state), state}
+  end
+end
+
+# Using the Stack GenServer
+{:ok, _pid} = Stack.start_link([1, 2, 3])
+
+Stack.push(4)
+Stack.push(5)
+
+IO.puts("
+Stack size: #{Stack.size()}")
+
+case Stack.pop() do
+  {:ok, value} -> IO.puts("Popped value: #{value}")
+  {:error, reason} -> IO.puts("Error: #{reason}")
+end
+
+case Stack.peek() do
+  {:ok, value} -> IO.puts("Top value: #{value}")
+  {:error, reason} -> IO.puts("Error: #{reason}")
+end
+
+# Pop everything
+IO.puts("
+Emptying stack...")
+
+for _ <- 1..10 do
+  case Stack.pop() do
+    {:ok, value} -> IO.puts("Removed: #{value}")
+    {:error, :empty_stack} -> IO.puts("Stack is empty!")
+  end
+end`

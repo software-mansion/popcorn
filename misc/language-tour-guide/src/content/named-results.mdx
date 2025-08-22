@@ -1,0 +1,29 @@
+export const frontmatter = { order: 8 };
+
+# Pattern Matching Return Values
+
+Elixir commonly uses tagged tuples like `{:ok, value}` or `{:error, reason}` for return values.
+
+This pattern is used throughout Elixir and Erlang for error handling.
+
+Pattern matching makes it easy to handle different return cases.
+
+export const defaultCode = `defmodule Division do
+  def divide(a, b) when b != 0 do
+    {:ok, a / b}
+  end
+
+  def divide(_, 0) do
+    {:error, "Cannot divide by zero"}
+  end
+end
+
+case Division.divide(10, 2) do
+  {:ok, result} -> IO.puts("Result: #{result}")
+  {:error, msg} -> IO.puts("Error: #{msg}")
+end
+
+case Division.divide(10, 0) do
+  {:ok, result} -> IO.puts("Result: #{result}")
+  {:error, msg} -> IO.puts("Error: #{msg}")
+end`

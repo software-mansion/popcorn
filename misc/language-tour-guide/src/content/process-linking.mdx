@@ -1,0 +1,77 @@
+export const frontmatter = {order: 25}
+
+# Process Linking and Monitoring
+
+Processes can be linked or monitored to handle failures gracefully.
+
+**Linking**: Bidirectional - if one process dies, the linked process dies too (unless it traps exits)
+
+**Monitoring**: Unidirectional - get notified when a process dies without dying yourself
+
+This is the foundation of Elixir's "Let it crash" philosophy.
+
+export const defaultCode = `# Process linking example
+defmodule LinkExample do
+  # spawn_link creates and links in one atomic operation
+  def start_linked do
+    spawn_link(fn ->
+      Process.sleep(500)
+      # Uncomment to see crash propagation: # raise "Oops, something went wrong!"
+      IO.puts("Linked process working...")
+    end)
+  end
+
+  def start_monitored do
+    pid =
+      spawn(fn ->
+        Process.sleep(500)
+        # This will crash:
+        IO.puts("Monitored process working...")
+        raise "Monitored process crashed!"
+      end)
+
+    # Monitor returns a reference
+    ref = Process.monitor(pid)
+    {pid, ref}
+  end
+end
+
+# Linking example - crashes propagate
+IO.puts("=== Linking Example ===")
+linked_pid = LinkExample.start_linked()
+IO.puts("Linked process: #{inspect(linked_pid)}")
+Process.sleep(600)
+
+# Monitoring example - get notifications
+IO.puts("
+=== Monitoring Example ===")
+{monitored_pid, ref} = LinkExample.start_monitored()
+IO.puts("Monitoring process: #{inspect(monitored_pid)}")
+
+# Wait for DOWN message
+receive do
+  {:DOWN, ^ref, :process, ^monitored_pid, reason} ->
+    IO.puts("Monitored process died with reason: #{inspect(reason)}")
+after
+  1000 ->
+    IO.puts("No crash detected")
+end
+
+# Trap exits to convert exit signals to messages
+IO.puts("
+=== Trapping Exits ===")
+Process.flag(:trap_exit, true)
+
+trapped_pid =
+  spawn_link(fn ->
+    Process.sleep(100)
+    exit(:boom)
+  end)
+
+receive do
+  {:EXIT, ^trapped_pid, reason} ->
+    IO.puts("Trapped exit from #{inspect(trapped_pid)}: #{inspect(reason)}")
+after
+  500 ->
+    IO.puts("No exit trapped")
+end`

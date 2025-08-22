@@ -1,0 +1,58 @@
+export const frontmatter = {order: 12}
+
+# Exercise: Advanced Pattern Matching
+
+Let's practice pattern matching with different data structures!
+
+## Your Task
+
+Create a `DataProcessor` module that processes different types of user data:
+
+1. Implement `process_user/1` that handles different user data formats
+2. Extract and format user information based on the input structure
+3. Handle maps, tuples, and lists
+4. Use guards to validate data types
+5. Provide sensible defaults for missing data
+
+## Expected Behaviors
+
+- Map with `:name` and `:age` → "Name: [name], Age: [age]"
+- Tuple `{name, age}` → "Name: [name], Age: [age]"
+- List `[name, age]` → "Name: [name], Age: [age]"
+- Map missing `:age` → "Name: [name], Age: unknown"
+- Invalid input → "Invalid user data"
+
+export const defaultCode = `defmodule DataProcessor do
+
+  # TODO: Handle map with both name and age
+  def process_user(%{name: name, age: age}) when is_binary(name) and is_integer(age) do
+    # Your code here
+  end
+
+  # TODO: Handle map with only name (age is missing)
+
+  # TODO: Handle tuple format {name, age}
+
+  # TODO: Handle list format [name, age]
+
+  # Hint: Make sure both elements are present
+
+  # TODO: Add a catch-all clause for invalid data
+
+  # Bonus: Implement extract_numbers/1 that extracts all numbers from a mixed list
+
+  def extract_numbers(list) when is_list(list) do 
+    # TODO: Use pattern matching and recursion or comprehension
+    # Should filter out only numbers from a mixed list
+  end
+end
+
+# Test process_user/1
+IO.puts(DataProcessor.process_user(%{name: "Alice", age: 30}))
+IO.puts(DataProcessor.process_user(%{name: "Bob"}))
+IO.puts(DataProcessor.process_user({"Charlie", 25}))
+IO.puts(DataProcessor.process_user(["David", 35]))
+IO.puts(DataProcessor.process_user("Invalid"))
+
+# Test extract_numbers/1 (Bonus)
+# IO.inspect(DataProcessor.extract_numbers([1, "hello", 3.14, :atom, 42, true, 99]))`

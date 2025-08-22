@@ -1,0 +1,104 @@
+export const frontmatter = {order: 27}
+
+# Agents - Simple State Management
+
+Agents provide a simple way to maintain state in a separate process.
+
+They're perfect for:
+
+- Storing configuration
+- Maintaining counters
+- Caching data
+- Any shared state that doesn't need complex logic
+
+Agents handle synchronous (`get`) and asynchronous (`cast`) updates.
+
+export const defaultCode = `defmodule Counter do
+  use Agent
+
+  def start_link(initial_value \\\\ 0) do
+    Agent.start_link(fn -> initial_value end, name: __MODULE__)
+  end
+
+  def value do
+    Agent.get(__MODULE__, & &1)
+  end
+
+  def increment do
+    Agent.update(__MODULE__, &(&1 + 1))
+  end
+
+  def add(amount) do
+    Agent.update(__MODULE__, &(&1 + amount))
+  end
+
+  def reset do
+    Agent.update(__MODULE__, fn _ -> 0 end)
+  end
+end
+
+# Using the Counter
+
+{:ok, _pid} = Counter.start_link(10)
+IO.puts("Initial value: #{Counter.value()}")
+
+Counter.increment()
+IO.puts("After increment: #{Counter.value()}")
+
+Counter.add(5)
+IO.puts("After adding 5: #{Counter.value()}")
+
+Counter.reset()
+IO.puts("After reset: #{Counter.value()}")
+
+# More complex Agent example - Shopping Cart
+
+defmodule ShoppingCart do
+  use Agent
+
+  def start_link do
+    Agent.start_link(fn -> %{items: [], total: 0} end)
+  end
+
+  def add_item(pid, item, price) do
+    Agent.update(pid, fn cart ->
+      %{
+        items: [{item, price} | cart.items],
+        total: cart.total + price
+      }
+    end)
+  end
+
+  def get_items(pid) do
+    Agent.get(pid, fn cart -> cart.items end)
+  end
+
+  def get_total(pid) do
+    Agent.get(pid, fn cart -> cart.total end)
+  end
+
+  def checkout(pid) do
+    Agent.get_and_update(pid, fn cart ->
+      {cart, %{items: [], total: 0}}
+    end)
+  end
+end
+
+# Using the shopping cart
+
+{:ok, cart} = ShoppingCart.start_link()
+
+ShoppingCart.add_item(cart, "Elixir Book", 45.00)
+ShoppingCart.add_item(cart, "Coffee", 5.00)
+ShoppingCart.add_item(cart, "Mechanical Keyboard", 120.00)
+
+IO.puts("
+Shopping Cart:")
+IO.inspect(ShoppingCart.get_items(cart))
+IO.puts("Total: $#{ShoppingCart.get_total(cart)}")
+
+checked_out = ShoppingCart.checkout(cart)
+IO.puts("
+Checked out:")
+IO.inspect(checked_out)
+IO.puts("Cart after checkout: #{inspect(ShoppingCart.get_items(cart))}")`

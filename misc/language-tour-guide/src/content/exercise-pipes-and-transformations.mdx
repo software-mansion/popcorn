@@ -1,0 +1,69 @@
+export const frontmatter = {order: 17}
+
+# Exercise: Pipe Operator and Data Transformations
+
+Master the pipe operator by building a text processing pipeline!
+
+## Your Task
+
+Create a `TextProcessor` module that:
+
+1. Implements a `process/1` function that cleans and analyzes text
+2. Uses the pipe operator to chain transformations
+3. Returns a map with text statistics
+
+## Required Transformations
+
+1. Trim whitespace
+2. Downcase the text  
+3. Split into words (using spaces)
+4. Filter out common words (the, a, an, is, are, of, in, to)
+5. Count total words and unique words
+6. Find the longest word
+7. Return results as a map
+
+export const defaultCode = `common_words = ["the", "a", "an", "is", "are", "of", "in", "to", "and", "it"]
+
+defmodule TextProcessor do
+  def process(text) do
+    words = text
+    |> String.trim()
+    |> String.downcase()
+
+    # TODO: Split into words 
+    # TODO: Filter out empty strings 
+    # TODO: Filter out common words (reject words in @common_words)
+
+    # TODO: Build the result map with:
+    # - total_words: count of words after filtering
+    # - unique_words: count of unique words
+    # - longest_word: the longest word (or nil if empty)
+    # - word_list: the processed list of words
+
+    %{
+      parsed: words,
+      total_words: 0,  # TODO: Calculate
+      unique_words: 0, # TODO: Calculate
+      longest_word: nil, # TODO: Find longest
+      word_list: []    # TODO: Add processed words
+    }
+  end
+
+  # TODO: Implement a helper function to find the longest word
+  defp find_longest_word([]), do: nil
+
+  defp find_longest_word(words) do 
+    # Your code here
+  end
+end
+
+# Test your implementation
+text = "The quick brown Fox jumps over the lazy dog! Is it quick? Yes, it is VERY quick."
+result = TextProcessor.process(text)
+IO.inspect(result)
+
+# Expected output should have:
+# - Filtered out "the", "is", "it"
+# - All lowercase
+# - No punctuation
+# - Correct counts`

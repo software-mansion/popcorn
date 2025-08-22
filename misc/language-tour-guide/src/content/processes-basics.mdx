@@ -1,0 +1,43 @@
+export const frontmatter = {order: 23}
+
+# Processes - The Heart of Elixir
+
+Processes are the fundamental unit of concurrency in Elixir. They're lightweight, isolated, and communicate through message passing.
+
+**Important**: Elixir processes are NOT operating system processes. They're much lighter - you can spawn millions of them!
+
+Each process:
+
+- Has its own memory (no shared state)
+- Runs concurrently with other processes
+- Communicates only through messages
+- Can fail without affecting other processes
+
+export const defaultCode = `# Spawning a simple process
+pid =
+  spawn(fn ->
+    IO.puts("Hello from process #{inspect(self())}")
+  end)
+
+IO.puts("Main process: #{inspect(self())}")
+IO.puts("Spawned process: #{inspect(pid)}")
+
+# Check if process is alive
+
+# Give it time to finish
+Process.sleep(100)
+IO.puts("Is spawned process alive? #{Process.alive?(pid)}")
+
+# Spawn a longer-running process
+
+long_pid =
+  spawn(fn ->
+    IO.puts("Starting long process...")
+    Process.sleep(2000)
+    IO.puts("Long process done!")
+  end)
+
+IO.puts("Long process alive? #{Process.alive?(long_pid)}")
+Process.sleep(100)
+IO.puts("Still alive after 100ms? #{Process.alive?(long_pid)}")
+`
