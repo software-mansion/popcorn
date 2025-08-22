@@ -78,9 +78,7 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
         flatNavigation.push({ title: item.title, path: item.path });
       }
 
-      if (item.children.length > 0) {
-        traverse(item.children);
-      }
+      traverse(item.children);
     }
   };
 

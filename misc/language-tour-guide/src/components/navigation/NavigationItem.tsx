@@ -70,7 +70,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
         >
           {item.children.map((childItem) => (
             <NavigationItem
-              key={childItem.title}
+              key={childItem.path}
               item={childItem}
               onClick={onClick}
             />

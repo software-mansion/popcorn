@@ -45,7 +45,7 @@ export function Navigation() {
           </NavLink>
         )}
         {siblingsNode.nextNode && (
-          <NavLink to={siblingsNode.nextNode?.path}>
+          <NavLink to={siblingsNode.nextNode.path}>
             <span className="sr-only">Next section</span>
             <ChevronRight className="w-4.5" />
           </NavLink>
@@ -60,7 +60,7 @@ export function Navigation() {
           <Close className="w-5" />
         </button>
         {navigation.map((item) => (
-          <NavigationItem key={item.title} item={item} onClick={closeMenu} />
+          <NavigationItem key={item.path} item={item} onClick={closeMenu} />
         ))}
       </ul>
       <div
