@@ -256,7 +256,7 @@ defmodule Popcorn.Build do
 
   defp process_async(enum, fun, opts \\ []) do
     enum
-    |> Task.async_stream(fun, Keyword.merge([timeout: 30_000, ordered: false], opts))
+    |> Task.async_stream(fun, Keyword.merge([timeout: 60_000, ordered: false], opts))
     |> Enum.map(fn {:ok, result} -> result end)
   end
 
