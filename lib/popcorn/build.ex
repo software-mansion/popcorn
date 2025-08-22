@@ -3,37 +3,34 @@ defmodule Popcorn.Build do
   require Popcorn.Config
   alias Popcorn.CoreErlangUtils
 
-  @config Popcorn.Config.compile([:add_tracing, :ex_stdlib_beam_paths, :erl_stdlib_beam_paths])
+  @config Popcorn.Config.compile([:add_tracing, :extra_apps])
 
   @app_path Mix.Project.app_path()
   @patches_path "#{@app_path}/popcorn_patches"
   @cache_path "#{@app_path}/popcorn_patch_cache"
 
-  @supported_apps [
+  # A minimal set of apps to start Popcorn-based app
+  @default_apps [
     # OTP
-    :asn1,
     :compiler,
-    :crypto,
     :erts,
-    :inets,
     :kernel,
-    :public_key,
     :stdlib,
-    :ssl,
     # Elixir
     :elixir,
-    :eex,
-    :logger,
-    :iex
+    :logger
   ]
+
+  @available_apps @default_apps ++ @config.extra_apps
 
   # When this module is recompiled, we need to
   # patch from scratch
   File.rm(@cache_path)
 
   @doc """
-  Runs `compile/2` and `patch/3`, then packs output beams
-  into a single *.avm file.
+  Applies patches and generates *.avm bundles for each (configured)
+  OTP and Elixir application, as well as `popcorn_lib.avm`
+  with all additional BEAMs
   """
   def build(opts \\ []) do
     opts =
@@ -64,7 +61,7 @@ defmodule Popcorn.Build do
 
     new_cache =
       process_async(
-        @supported_apps,
+        @available_apps,
         fn app ->
           app_cache = build_app(app, Map.get(cache, app, %{}))
           {app, app_cache}
@@ -81,10 +78,40 @@ defmodule Popcorn.Build do
     :ok
   end
 
-  def available_bundles(bundle) do
-    bundle in [:popcorn_lib | @supported_apps]
+  @doc """
+  Returns a list of names of applications shipped with Erlang/OTP and Elixir
+  """
+  @spec builtin_app_names() :: [String.t()]
+  def builtin_app_names() do
+    otp_apps =
+      :code.lib_dir()
+      |> IO.chardata_to_string()
+      |> File.ls!()
+      |> Enum.map(fn app_dir ->
+        app_dir
+        |> String.split("-")
+        |> hd()
+      end)
+
+    elixir_apps =
+      Path.expand("..", Application.app_dir(:elixir))
+      |> File.ls!()
+
+    otp_apps ++ elixir_apps
   end
 
+  @doc """
+  Returns a list of applicatons that were included during compilation
+  and their bundle is available at `bundle_path/0`
+  """
+  @spec available_apps() :: [atom()]
+  def available_apps() do
+    @available_apps
+  end
+
+  @doc """
+  Returns a path to an AVM bundle with the provided name
+  """
   def bundle_path(bundle), do: Path.join([@patches_path, "#{bundle}.avm"])
 
   defp bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])

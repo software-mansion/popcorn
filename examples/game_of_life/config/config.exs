@@ -4,6 +4,7 @@ root = "#{__DIR__}/../"
 
 config :popcorn,
   add_tracing: false,
+  extra_apps: [:eex],
   out_dir: "#{root}/static/wasm"
 
 if File.exists?("#{__DIR__}/config.secret.exs") do

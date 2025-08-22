@@ -91,14 +91,36 @@ defmodule Popcorn do
   end
 
   defp bundled_artifacts(applications) do
-    bundles = [:erts, :popcorn_lib | applications]
+    builtin_apps = Build.builtin_app_names() |> MapSet.new()
 
-    {popcorn_bundles, dep_bundles} = Enum.split_with(bundles, &Build.available_bundles/1)
+    {builtin_deps, dep_apps} =
+      Enum.split_with(applications, &MapSet.member?(builtin_apps, to_string(&1)))
 
-    popcorn_bundles = Enum.map(popcorn_bundles, &Build.bundle_path/1)
+    available_builtin_apps = Build.available_apps() |> MapSet.new()
+
+    builtin_deps
+    |> Enum.reject(&MapSet.member?(available_builtin_apps, &1))
+    |> case do
+      [] ->
+        :ok
+
+      missing ->
+        raise CookingError, """
+        Popcorn was built without the following apps: #{inspect(missing)}
+        Add them to :extra_apps in your config.exs:
+
+          config :popcorn, extra_apps: #{inspect(missing)}
+
+        and recompile the project
+        """
+    end
+
+    bundles = [:erts, :popcorn_lib | builtin_deps]
+
+    popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
 
     dep_beams =
-      Enum.flat_map(dep_bundles, fn dep ->
+      Enum.flat_map(dep_apps, fn dep ->
         beams = dep |> Application.app_dir("ebin/*.beam") |> Path.wildcard()
 
         # TODO: Separate runtime and build modules to avoid such ugly filtering
@@ -112,7 +134,7 @@ defmodule Popcorn do
     consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    popcorn_bundles ++ dep_beams ++ consolidated_beams ++ generated_beams
+    popcorn_avms ++ dep_beams ++ consolidated_beams ++ generated_beams
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -182,14 +204,6 @@ defmodule Popcorn do
     app = Keyword.get(config, :app)
 
     specs = gather_app_specs([:kernel, :stdlib, app], %{})
-
-    # TODO: Until separation of deps for tasks and runtime is solved, disable all extra apps from :popcorn
-    specs =
-      if Map.has_key?(specs, :popcorn) do
-        put_in(specs[:popcorn][:applications], [:kernel, :stdlib, :elixir, :logger])
-      else
-        specs
-      end
 
     # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
     specs = put_in(specs[:kernel][:env][:shell_history], :disabled)
@@ -275,6 +289,8 @@ defmodule Popcorn do
     deps =
       new_specs
       |> Enum.flat_map(fn
+        # TODO: Until separation of deps for tasks and runtime is solved, disable apps needed by Popcorn's tasks
+        {:popcorn, spec} -> spec[:applications] -- [:inets, :ssl, :public_key, :crypto]
         {_app, spec} -> spec[:applications]
       end)
       |> Enum.uniq()
