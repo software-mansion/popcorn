@@ -30,10 +30,8 @@ export function updatePopcorn() {
     },
     async buildStart() {
       try {
-        await Promise.all([
-          run("mix", ["deps.get"], "./elixir_tour"),
-          run("mix", ["popcorn.cook"], "./elixir_tour"),
-        ]);
+        await run("mix", ["deps.get"], "./elixir_tour");
+        await run("mix", ["popcorn.cook"], "./elixir_tour");
       } catch (err) {
         console.error("[update-popcorn] Command failed:", err);
         throw err; // Optionally rethrow to stop the build

@@ -1,4 +1,5 @@
-import { type ComponentProps } from "react";
+import { useCallback, type ComponentProps } from "react";
+import { useCodeEditorStore } from "../store/codeEditor";
 
 export const Heading1 = ({ children, ...props }: ComponentProps<"h1">) => (
   <h1 className="mb-6 text-3xl font-bold text-gray-900" {...props}>
@@ -63,14 +64,46 @@ export const BlockQuote = ({
   </blockquote>
 );
 
-export const CodeBlock = ({ children, ...props }: ComponentProps<"pre">) => (
-  <pre
-    className="text-brown-90 bg-grey-10 my-4 overflow-x-auto rounded p-4 font-mono text-sm"
-    {...props}
-  >
-    {children}
-  </pre>
-);
+type CodeBlockProps = ComponentProps<"pre"> & {
+  rawCode?: string;
+};
+
+export const CodeBlock = ({ children, rawCode, ...props }: CodeBlockProps) => {
+  const setCode = useCodeEditorStore((state) => state.setCode);
+
+  const handleUseInEditor = useCallback(() => {
+    if (rawCode) {
+      setCode(rawCode);
+    }
+  }, [rawCode, setCode]);
+
+  return (
+    <pre
+      className="text-brown-90 bg-grey-10 relative my-4 overflow-x-auto rounded p-4 font-mono text-sm"
+      {...props}
+    >
+      {children}
+
+      {rawCode && (
+        <button
+          onClick={handleUseInEditor}
+          className="text-brown-90 absolute right-0 bottom-0 m-2 flex cursor-pointer items-center rounded bg-orange-100/80 px-2 py-1 text-xs transition-colors duration-200 hover:bg-orange-100"
+          aria-label="Use in editor"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="mr-1 h-3.5 w-3.5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+          Try
+        </button>
+      )}
+    </pre>
+  );
+};
 
 export const Link = ({ children, ...props }: ComponentProps<"a">) => (
   <a className="text-blue-600 underline hover:text-blue-800" {...props}>

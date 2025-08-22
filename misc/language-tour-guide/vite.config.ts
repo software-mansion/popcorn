@@ -7,15 +7,22 @@ import svgr from "vite-plugin-svgr";
 import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import rehypeSlug from "rehype-slug";
+import { rehypeRawCode } from "./src/plugins/rehypeRawCode";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // TODO: pass this by build args
+  base: "/language_tour_guide",
   plugins: [
     react(),
     tailwindcss(),
     mdx({
       providerImportSource: "@mdx-js/react",
-      rehypePlugins: [rehypeSlug, [rehypeHighlight, { languages: { elixir } }]]
+      rehypePlugins: [
+        rehypeSlug,
+        rehypeRawCode,
+        [rehypeHighlight, { languages: { elixir } }]
+      ]
     }),
     updatePopcorn(),
     svgr()

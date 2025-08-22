@@ -1,0 +1,25 @@
+import { create } from "zustand";
+
+export type HistoryEntry = {
+  timestamp: Date;
+  code: string;
+  result?: string;
+  durationMs?: number;
+};
+
+type ExecutionHistoryStore = {
+  history: HistoryEntry[];
+  addHistoryEntry: (entry: HistoryEntry) => void;
+  clearHistory: () => void;
+};
+
+export const useExecutionHistoryStore = create<ExecutionHistoryStore>(
+  (set) => ({
+    history: [],
+    addHistoryEntry: (entry: HistoryEntry) =>
+      set((state) => ({
+        history: [...state.history, entry]
+      })),
+    clearHistory: () => set({ history: [] })
+  })
+);
