@@ -223,8 +223,7 @@ defmodule Popcorn.Support.AtomVM do
     beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
 
     Popcorn.bundle(
-      compile_artifacts:
-        beam_paths ++ Path.wildcard(Path.join(Mix.Project.build_path(), "**/*.{beam,app}")),
+      extra_beams: beam_paths,
       start_module: RunExpr,
       out_dir: build_dir
     )

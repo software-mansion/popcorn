@@ -15,6 +15,7 @@ include_tracing =
 
 config :popcorn,
   out_dir: "static/wasm",
+  extra_apps: [:iex],
   add_tracing: include_tracing
 
 if path = System.get_env("RUNTIME_PATH") do
