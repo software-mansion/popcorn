@@ -12,10 +12,10 @@ export function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="*" element={<NotFound />} />
       <Route path="/" element={<Navigate to="/introduction" />} />
 
       <Route element={<Layout />}>
+        <Route path="*" element={<NotFound />} />
         <Route element={<ExampleLayout />}>{contentRoutes}</Route>
       </Route>
     </Routes>

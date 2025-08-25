@@ -88,6 +88,10 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
     (item) => path === item.path
   );
 
+  if (navigationNodeIndex === -1) {
+    return { previousNode: null, nextNode: null };
+  }
+
   const nextNode =
     navigationNodeIndex + 1 < flatNavigation.length
       ? flatNavigation[navigationNodeIndex + 1]
