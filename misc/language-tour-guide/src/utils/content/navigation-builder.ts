@@ -84,8 +84,8 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
 
   traverse(tree);
 
-  const navigationNodeIndex = flatNavigation.findIndex((item) =>
-    path.includes(item.path)
+  const navigationNodeIndex = flatNavigation.findIndex(
+    (item) => path === item.path
   );
 
   const nextNode =
