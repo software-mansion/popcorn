@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import LogoText from "../assets/logo-text.svg?react";
 import Logo from "../assets/logo.svg?react";
 
 export function Header() {
@@ -8,7 +9,8 @@ export function Header() {
         to="/"
         className="font-handjet flex items-center gap-6 text-2xl lg:text-3xl"
       >
-        <Logo className="h-9 w-max" /> Language Tour Guide
+        <Logo className="h-9 w-max md:hidden" />
+        <LogoText className="hidden h-9 w-max md:block" /> Language Tour Guide
       </Link>
     </nav>
   );
