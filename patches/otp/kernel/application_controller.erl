@@ -2,6 +2,8 @@
 
 -export([handle_info/2]).
 
+-compile({popcorn_patch_private, make_appl/1}).
+
 -import(lists, [zf/2, map/2, foreach/2, foldl/3,
 		keyfind/3, keydelete/3, keyreplace/4]).
 
@@ -187,3 +189,13 @@ handle_info({'EXIT', Pid, Reason}, S) ->
   
 handle_info(_, S) ->
   {noreply, S}.
+
+%% Patch reason: we don't support code_server, nor dynamic application loading
+%% This patch avoid calls to code_server and returns enoent right away
+%% This ensures proper error is returned for missing optional applications
+make_appl(Name) when is_atom(Name) ->
+    FName = atom_to_list(Name) ++ ".app",
+    {error, {file:format_error(enoent), FName}};
+
+make_appl(Application) ->
+    {ok, popcorn_module:make_appl_i(Application)}.

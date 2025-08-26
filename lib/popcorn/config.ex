@@ -1,11 +1,7 @@
 defmodule Popcorn.Config do
   @moduledoc false
   @defaults %{
-    erl_stdlib_beam_paths:
-      Path.wildcard("#{:code.lib_dir()}/{compiler,erts,kernel,stdlib}*/**/*.beam"),
-    ex_stdlib_beam_paths:
-      [:elixir, :eex, :logger, :iex]
-      |> Enum.flat_map(&Path.wildcard("#{Application.app_dir(&1)}/ebin/**/*.beam")),
+    extra_apps: [],
     out_dir: nil,
     add_tracing: false,
     runtime: [

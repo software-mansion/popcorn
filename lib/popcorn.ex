@@ -3,11 +3,10 @@ defmodule Popcorn do
   Popcorn is a tool for running Elixir in the browser.
   """
 
+  alias Popcorn.Build
   alias Popcorn.Utils.FetchArtifacts
 
-  @app_build_root Mix.Project.build_path()
   @popcorn_path Mix.Project.app_path()
-  @popcorn_bundle_path Path.join(@popcorn_path, "popcorn.avm")
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
   @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
@@ -25,9 +24,7 @@ defmodule Popcorn do
   - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
-  - `compile_artifacts` - Compiled BEAMs and other artifacts that should be included
-  in the generated bundle. Defaults to all the `.beam` and `.app` files for the application
-  and dependencies.
+  - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
 
   Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
@@ -35,11 +32,11 @@ defmodule Popcorn do
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:target, :wasm | :unix}
-          | {:compile_artifacts, [String.t()]}
+          | {:extra_beams, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
     ingredients(Keyword.take(options, [:out_dir, :target]))
-    bundle(Keyword.take(options, [:out_dir, :start_module, :compile_artifacts]))
+    bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
   end
 
   @doc """
@@ -50,26 +47,24 @@ defmodule Popcorn do
   @spec bundle([
           {:out_dir, String.t()}
           | {:start_module, module}
-          | {:compile_artifacts, [String.t()]}
+          | {:extra_beams, [String.t()]}
         ]) :: :ok
   def bundle(options \\ []) do
-    all_beams = Path.wildcard(Path.join([@app_build_root, "**", "*.{beam,app}"]))
-
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       start_module: nil,
-      compile_artifacts: all_beams
+      extra_beams: []
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
     ensure_option_present(options, :out_dir, "Output directory")
 
     File.mkdir_p!(options.out_dir)
-    {module, filename} = create_boot_module(options.start_module)
+    {module, filename, apps} = create_boot_module(options.start_module)
 
     try do
-      bundled_artifacts = bundled_artifacts([filename | options.compile_artifacts])
-      pack_bundle(options.out_dir, bundled_artifacts, module)
+      beams = options.extra_beams ++ bundled_artifacts(apps)
+      pack_bundle(options.out_dir, beams, module)
     after
       File.rm!(filename)
     end
@@ -95,13 +90,51 @@ defmodule Popcorn do
     :ok
   end
 
-  defp bundled_artifacts(compile_artifacts) do
-    popcorn_files = Path.wildcard(Path.join([@popcorn_path, "**", "*"]))
-    api_beams = Enum.filter(popcorn_files, &popcorn_api_beam?/1)
+  defp bundled_artifacts(applications) do
+    builtin_apps = Build.builtin_app_names() |> MapSet.new()
+
+    {builtin_deps, dep_apps} =
+      Enum.split_with(applications, &MapSet.member?(builtin_apps, to_string(&1)))
+
+    available_builtin_apps = Build.available_apps() |> MapSet.new()
+
+    builtin_deps
+    |> Enum.reject(&MapSet.member?(available_builtin_apps, &1))
+    |> case do
+      [] ->
+        :ok
+
+      missing ->
+        raise CookingError, """
+        Popcorn was built without the following apps: #{inspect(missing)}
+        Add them to :extra_apps in your config.exs:
+
+          config :popcorn, extra_apps: #{inspect(missing)}
+
+        and recompile the project
+        """
+    end
+
+    bundles = [:erts, :popcorn_lib | builtin_deps]
+
+    popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
+
+    dep_beams =
+      Enum.flat_map(dep_apps, fn dep ->
+        beams = dep |> Application.app_dir("ebin/*.beam") |> Path.wildcard()
+
+        # TODO: Separate runtime and build modules to avoid such ugly filtering
+        if dep == :popcorn do
+          Enum.filter(beams, &beam_src_in_api_dir?/1)
+        else
+          beams
+        end
+      end)
+
+    consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    # include stdlib bundle, Popcorn.Wasm beam and filter other popcorn beams
-    [@popcorn_bundle_path | api_beams] ++ generated_beams ++ (compile_artifacts -- popcorn_files)
+    popcorn_avms ++ dep_beams ++ consolidated_beams ++ generated_beams
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -123,17 +156,6 @@ defmodule Popcorn do
       error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
-
-  defp popcorn_api_beam?(path) do
-    in_popcorn_ebin_dir?(path) and beam?(path) and beam_src_in_api_dir?(path)
-  end
-
-  defp in_popcorn_ebin_dir?(path) do
-    dir = path |> Path.relative_to(@popcorn_path) |> Path.dirname()
-    dir == "ebin"
-  end
-
-  defp beam?(path), do: Path.extname(path) == ".beam"
 
   defp beam_src_in_api_dir?(beam_path) do
     module_name = Path.basename(beam_path, ".beam")
@@ -182,14 +204,6 @@ defmodule Popcorn do
     app = Keyword.get(config, :app)
 
     specs = gather_app_specs([:kernel, :stdlib, app], %{})
-
-    # TODO: Until separation of deps for tasks and runtime is solved, disable all extra apps from :popcorn
-    specs =
-      if Map.has_key?(specs, :popcorn) do
-        put_in(specs[:popcorn][:applications], [:kernel, :stdlib, :elixir, :logger])
-      else
-        specs
-      end
 
     # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
     specs = put_in(specs[:kernel][:env][:shell_history], :disabled)
@@ -255,7 +269,7 @@ defmodule Popcorn do
     File.mkdir_p!(@popcorn_generated_path)
     filename = Path.join(@popcorn_generated_path, "#{module_name}.beam")
     File.write!(filename, binary_content)
-    {module_name, filename}
+    {module_name, filename, Map.keys(specs)}
   end
 
   defp gather_app_specs([], specs), do: specs
@@ -269,6 +283,18 @@ defmodule Popcorn do
           spec = Application.spec(app),
           into: %{} do
         env = Application.get_all_env(app)
+
+        # TODO: Until separation of deps for tasks and runtime API is solved, disable apps needed by Popcorn's tasks
+        spec =
+          case app do
+            :popcorn ->
+              non_api_deps = [:inets, :ssl, :public_key, :crypto, :async_test, :playwright]
+              Keyword.update!(spec, :applications, &(&1 -- non_api_deps))
+
+            _app ->
+              spec
+          end
+
         {app, [env: env] ++ spec}
       end
 
