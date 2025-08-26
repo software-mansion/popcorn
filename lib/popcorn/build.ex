@@ -44,11 +44,15 @@ defmodule Popcorn.Build do
       with false <- opts.force,
            {:ok, cache} <- File.read(@cache_path),
            cache = :erlang.binary_to_term(cache),
-           cached_files =
-             cache |> Map.values() |> Enum.reduce(&Map.merge/2) |> MapSet.new(&elem(&1, 0)),
+           all_cached_files =
+             (for {_bundle, file_hashes} <- cache,
+                  {file_path, _hash} <- file_hashes,
+                  into: MapSet.new() do
+                file_path
+              end),
            # If a patch was removed, we need to remove the old build
            # to avoid adding stale artifacts to the bundle
-           true <- MapSet.subset?(cached_files, patches_srcs) do
+           true <- MapSet.subset?(all_cached_files, patches_srcs) do
         cache
       else
         _cant_use_cache ->
@@ -101,7 +105,7 @@ defmodule Popcorn.Build do
   end
 
   @doc """
-  Returns a list of applicatons that were included during compilation
+  Returns a list of applications that were included during compilation
   and their bundle is available at `bundle_path/0`
   """
   @spec available_apps() :: [atom()]
