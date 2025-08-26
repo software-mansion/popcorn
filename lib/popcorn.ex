@@ -283,14 +283,24 @@ defmodule Popcorn do
           spec = Application.spec(app),
           into: %{} do
         env = Application.get_all_env(app)
+
+        # TODO: Until separation of deps for tasks and runtime API is solved, disable apps needed by Popcorn's tasks
+        spec =
+          case app do
+            :popcorn ->
+              non_api_deps = [:inets, :ssl, :public_key, :crypto, :async_test, :playwright]
+              Keyword.update!(spec, :applications, &(&1 -- non_api_deps))
+
+            _app ->
+              spec
+          end
+
         {app, [env: env] ++ spec}
       end
 
     deps =
       new_specs
       |> Enum.flat_map(fn
-        # TODO: Until separation of deps for tasks and runtime is solved, disable apps needed by Popcorn's tasks
-        {:popcorn, spec} -> spec[:applications] -- [:inets, :ssl, :public_key, :crypto]
         {_app, spec} -> spec[:applications]
       end)
       |> Enum.uniq()
