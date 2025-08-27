@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@astrojs/react": "^4.3.0",
-    "@astrojs/starlight": "^0.34.4",
     "@fontsource-variable/handjet": "^5.2.6",
     "@fontsource-variable/inter": "^5.2.6",
     "@iconify-json/material-symbols-light": "^1.2.30",
