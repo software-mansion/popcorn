@@ -118,6 +118,10 @@ export async function initVm() {
     onVmInit(initProcess);
     Module["onElixirReady"] = null;
   };
+  Module["onWorkerError"] = () => {
+    // Wait until errors are logged and reload
+    setTimeout(() => send(MESSAGES.RELOAD, null), 0);
+  }
 }
 
 function ensureFunctionEval(maybeFunction) {
@@ -150,7 +154,7 @@ function onVmInit(initProcess) {
         const result = await Module.call(process, args);
         send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
       } catch (error) {
-        if(error == "noproc") {
+        if (error == "noproc") {
           send(MESSAGES.RELOAD, null);
           console.error("Runtime VM crashed, popcorn iframe reloaded.");
           return;

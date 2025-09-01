@@ -249,6 +249,10 @@ export class Popcorn {
     this._iframe = null;
     this._mountPromise = null;
     this._listenerRef = null;
+    for (const [_id, callData] of this._calls) {
+      const durationMs = performance.now() - callData.startTimeMs;
+      callData.reject({ error: "PopcornDeinit", durationMs })
+    }
   }
 
   _iframeListener({ data }) {
