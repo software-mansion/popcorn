@@ -16,7 +16,6 @@ export async function load([
     frontmatter: frontmatter ?? {
       order: Infinity,
       subsections: [],
-      defaultCode: ""
     }
   };
 }

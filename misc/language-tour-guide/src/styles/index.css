@@ -69,4 +69,18 @@ pre code.hljs {
     scrollbar-color: var(--color-orange-100) var(--color-grey-20);
     scrollbar-width: thin;
   }
+
+  .orange-shadow {
+    @apply shadow-[0_4px_12px_rgba(239,124,0,0.3)] transition-shadow duration-300 hover:shadow-[0_6px_20px_rgba(239,124,0,0.4)];
+  }
+}
+
+@layer components {
+  .nav-arrow {
+    @apply border-brown-60 rounded-full border p-1 shadow-orange-100 transition-colors duration-300 hover:border-none hover:bg-orange-100 hover:text-white hover:shadow-md;
+  }
+
+  .nav-arrow-disabled {
+    @apply border-brown-60 rounded-full border p-1;
+  }
 }

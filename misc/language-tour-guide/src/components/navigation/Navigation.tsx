@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router";
+import { useLocation } from "react-router";
 
 import { NavigationItem } from "./NavigationItem";
 import { useNavigation } from "../../utils/hooks/useNavigation";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
-import ChevronRight from "../../assets/chevron-right.svg?react";
-import ChevronLeft from "../../assets/chevron-left.svg?react";
+import { NavigationButton } from "./NavigationButton";
 
 export function Navigation() {
   const location = useLocation();
@@ -31,27 +30,22 @@ export function Navigation() {
   }
 
   return (
-    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-6 border-b px-4 py-4 lg:px-8">
-      <button className="cursor-pointer" onClick={openMenu}>
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-8 border-b px-4 py-4 lg:px-8">
+      <button
+        className="orange-shadow cursor-pointer rounded-md bg-orange-100 p-0.5"
+        onClick={openMenu}
+      >
         <span className="sr-only">Open menu</span>
-        <Hamburger />
+        <Hamburger className="h-full w-5.5 text-white" />
       </button>
-      <span className="min-w-52">{location.pathname}</span>
       <div className="flex gap-4">
-        {siblingsNode.previousNode && (
-          <NavLink to={siblingsNode.previousNode.path}>
-            <span className="sr-only">Previous section</span>
-            <ChevronLeft className="w-4.5" />
-          </NavLink>
-        )}
-        {siblingsNode.nextNode && (
-          <NavLink to={siblingsNode.nextNode.path}>
-            <span className="sr-only">Next section</span>
-            <ChevronRight className="w-4.5" />
-          </NavLink>
-        )}
+        <NavigationButton
+          direction="previous"
+          path={siblingsNode.previousNode?.path}
+        />
+        <NavigationButton direction="next" path={siblingsNode.nextNode?.path} />
       </div>
-
+      <span className="ml-5">{location.pathname}</span>
       <ul
         className={`${isOpen ? "block" : "hidden"} scrollbar bg-light-20 absolute top-0 left-0 z-30 m-0 h-full list-none overflow-y-auto px-4 py-4 pr-12`}
       >
