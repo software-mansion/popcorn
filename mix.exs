@@ -151,7 +151,7 @@ defmodule Popcorn.MixProject do
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       # Docs
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false, warn_if_outdated: true},
+      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
       {:makeup_html, ">= 0.0.0", only: :dev, runtime: false, warn_if_outdated: true},
       {:makeup_syntect, ">= 0.0.0", only: :dev, runtime: false, warn_if_outdated: true},
       # Testing
