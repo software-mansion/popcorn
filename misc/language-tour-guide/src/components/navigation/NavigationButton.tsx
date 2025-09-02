@@ -15,11 +15,11 @@ export function NavigationButton({ direction, path }: NavigationButtonProps) {
   return path ? (
     <NavLink to={path}>
       <span className="sr-only">{label}</span>
-      <Icon className="nav-arrow w-5.5" />
+      <Icon className="orange-shadow w-8 rounded-full bg-orange-100 p-1 text-white transition-all duration-300 hover:bg-orange-200 lg:w-9" />
     </NavLink>
   ) : (
     <button disabled className="group cursor-not-allowed" aria-hidden="true">
-      <Icon className="nav-arrow-disabled w-5.5 group-disabled:opacity-50" />
+      <Icon className="border-brown-60 group-disabled:bg-grey-20 group-disabled:text-brown-60 w-8 rounded-full border p-1 shadow-md shadow-black/10 lg:w-9" />
     </button>
   );
 }
