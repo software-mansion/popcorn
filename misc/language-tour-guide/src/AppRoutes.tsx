@@ -1,10 +1,10 @@
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { Layout } from "./components/Layout";
 import { ExampleLayout } from "./components/ExampleLayout";
-import { createRouteComponents } from "./utils/content/content-routes";
 import { useMemo } from "react";
 import { useScrollToHash } from "./utils/hooks/useScrollToHash";
 import { NotFound } from "./pages/NotFound";
+import { createRouteComponents } from "./utils/content/route-builder";
 
 export function AppRoutes() {
   useScrollToHash();
@@ -12,9 +12,10 @@ export function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="*" element={<NotFound />} />
+      <Route path="/" element={<Navigate to="/introduction" />} />
 
       <Route element={<Layout />}>
+        <Route path="*" element={<NotFound />} />
         <Route element={<ExampleLayout />}>{contentRoutes}</Route>
       </Route>
     </Routes>

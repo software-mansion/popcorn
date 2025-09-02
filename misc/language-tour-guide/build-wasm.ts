@@ -8,7 +8,7 @@ function run(cmd: string, args: string[], dir: string) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd: dir,
-      stdio: "inherit",
+      stdio: "inherit"
     });
     child.on("close", (code) => {
       const ok = code === 0;
@@ -34,7 +34,7 @@ export function updatePopcorn() {
         await run("mix", ["popcorn.cook"], "./elixir_tour");
       } catch (err) {
         console.error("[update-popcorn] Command failed:", err);
-        throw err; // Optionally rethrow to stop the build
+        throw err;
       }
 
       const popcornScriptPath = join(publicDir, "wasm", "popcorn.js");
@@ -48,6 +48,6 @@ export function updatePopcorn() {
         );
         throw err;
       }
-    },
+    }
   };
 }

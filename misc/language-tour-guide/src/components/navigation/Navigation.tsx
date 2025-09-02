@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { useLocation } from "react-router";
+import { NavLink, useLocation } from "react-router";
 
 import { NavigationItem } from "./NavigationItem";
+import { useNavigation } from "../../utils/hooks/useNavigation";
+
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
-import { useNavigation } from "../../utils/hooks/useNavigation";
+import ChevronRight from "../../assets/chevron-right.svg?react";
+import ChevronLeft from "../../assets/chevron-left.svg?react";
 
 export function Navigation() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const { navigation, isLoading } = useNavigation();
+  const { navigation, isLoading, siblingsNode } = useNavigation();
 
   const openMenu = () => {
     setIsOpen(true);
@@ -33,7 +36,21 @@ export function Navigation() {
         <span className="sr-only">Open menu</span>
         <Hamburger />
       </button>
-      <span className="">{location.pathname}</span>
+      <span className="min-w-52">{location.pathname}</span>
+      <div className="flex gap-4">
+        {siblingsNode.previousNode && (
+          <NavLink to={siblingsNode.previousNode.path}>
+            <span className="sr-only">Previous section</span>
+            <ChevronLeft className="w-4.5" />
+          </NavLink>
+        )}
+        {siblingsNode.nextNode && (
+          <NavLink to={siblingsNode.nextNode.path}>
+            <span className="sr-only">Next section</span>
+            <ChevronRight className="w-4.5" />
+          </NavLink>
+        )}
+      </div>
 
       <ul
         className={`${isOpen ? "block" : "hidden"} scrollbar bg-light-20 absolute top-0 left-0 z-30 m-0 h-full list-none overflow-y-auto px-4 py-4 pr-12`}
@@ -42,9 +59,9 @@ export function Navigation() {
           <span className="sr-only">Close menu</span>
           <Close className="w-5" />
         </button>
-        {Object.entries(navigation).map(([key, item]) => {
-          return <NavigationItem key={key} item={item} onClick={closeMenu} />;
-        })}
+        {navigation.map((item) => (
+          <NavigationItem key={item.path} item={item} onClick={closeMenu} />
+        ))}
       </ul>
       <div
         className={`${isOpen ? "block" : "hidden"} absolute inset-0 z-20 h-full w-full bg-black/20`}

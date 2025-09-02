@@ -1,9 +1,9 @@
 import { NavLink, useLocation } from "react-router";
-import type { NavigationTreeItem } from "../../utils/content/navigation";
 
 import ChevronDown from "../../assets/chevron-down.svg?react";
 import ChevronRight from "../../assets/chevron-right.svg?react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { NavigationTreeItem } from "../../utils/content/types";
 
 type NavigationItemProps = {
   item: NavigationTreeItem;
@@ -12,12 +12,15 @@ type NavigationItemProps = {
 
 export function NavigationItem({ item, onClick }: NavigationItemProps) {
   const { hash, pathname } = useLocation();
-
   const [isOpen, setIsOpen] = useState(
-    `${pathname}${hash}`.includes(item.path ?? "")
+    `${pathname}${hash}`.includes(item.path)
   );
 
-  const hasChildren = item.children !== undefined;
+  useEffect(() => {
+    setIsOpen(`${pathname}${hash}`.includes(item.path));
+  }, [pathname, hash, item.path]);
+
+  const hasChildren = item.children.length > 0;
 
   const isSelected = (item: NavigationTreeItem) => {
     return item.path && item.path.includes(hash);
@@ -42,7 +45,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
             )}
           </span>
         )}
-        {item.path ? (
+        {item.type === "link" || item.type === "subsection" ? (
           <NavLink
             to={item.path}
             className={({ isActive }) =>
@@ -65,8 +68,12 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
         <ul
           className={`pl-5 transition-all duration-300 ${isOpen ? "block opacity-100" : "hidden opacity-0"}`}
         >
-          {Object.entries(item.children ?? {}).map(([key, childItem]) => (
-            <NavigationItem key={`${key}`} item={childItem} onClick={onClick} />
+          {item.children.map((childItem) => (
+            <NavigationItem
+              key={childItem.path}
+              item={childItem}
+              onClick={onClick}
+            />
           ))}
         </ul>
       )}
