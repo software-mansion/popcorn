@@ -38,6 +38,7 @@
   --color-grey-10: #f5f2f0;
   --color-orange-20: #ffe6cc;
   --color-orange-100: #ef7c00;
+  --color-orange-200: #d36e00;
   --color-brown-header: #58330c;
   --color-brown-100: #301b05;
   --color-brown-90: #36220d;
@@ -68,5 +69,9 @@ pre code.hljs {
   .scrollbar {
     scrollbar-color: var(--color-orange-100) var(--color-grey-20);
     scrollbar-width: thin;
+  }
+
+  .orange-shadow {
+    @apply shadow-[0_4px_12px_rgba(239,124,0,0.3)] hover:shadow-[0_6px_20px_rgba(239,124,0,0.4)];
   }
 }

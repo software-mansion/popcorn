@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router";
+import { useLocation } from "react-router";
 
 import { NavigationItem } from "./NavigationItem";
 import { useNavigation } from "../../utils/hooks/useNavigation";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
-import ChevronRight from "../../assets/chevron-right.svg?react";
-import ChevronLeft from "../../assets/chevron-left.svg?react";
+import { NavigationButton } from "./NavigationButton";
 
 export function Navigation() {
   const location = useLocation();
@@ -31,40 +30,44 @@ export function Navigation() {
   }
 
   return (
-    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-6 border-b px-4 py-4 lg:px-8">
-      <button className="cursor-pointer" onClick={openMenu}>
-        <span className="sr-only">Open menu</span>
-        <Hamburger />
-      </button>
-      <span className="min-w-52">{location.pathname}</span>
-      <div className="flex gap-4">
-        {siblingsNode.previousNode && (
-          <NavLink to={siblingsNode.previousNode.path}>
-            <span className="sr-only">Previous section</span>
-            <ChevronLeft className="w-4.5" />
-          </NavLink>
-        )}
-        {siblingsNode.nextNode && (
-          <NavLink to={siblingsNode.nextNode.path}>
-            <span className="sr-only">Next section</span>
-            <ChevronRight className="w-4.5" />
-          </NavLink>
-        )}
-      </div>
-
-      <ul
-        className={`${isOpen ? "block" : "hidden"} scrollbar bg-light-20 absolute top-0 left-0 z-30 m-0 h-full list-none overflow-y-auto px-4 py-4 pr-12`}
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-8 border-b px-4 py-3 lg:px-8">
+      <button
+        className="orange-shadow cursor-pointer rounded-md bg-orange-100 p-0.5"
+        onClick={openMenu}
       >
-        <button className="cursor-pointer" onClick={closeMenu}>
+        <span className="sr-only">Open menu</span>
+        <Hamburger className="h-full w-5.5 text-white" />
+      </button>
+      <div className="fixed bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-7 lg:absolute lg:left-1/4">
+        <NavigationButton
+          direction="previous"
+          path={siblingsNode.previousNode?.path}
+        />
+        <NavigationButton direction="next" path={siblingsNode.nextNode?.path} />
+      </div>
+      <span className="ml-5">{location.pathname}</span>
+      <ul
+        className={`scrollbar bg-light-20 absolute top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
+          isOpen
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none -translate-x-full opacity-0"
+        }`}
+      >
+        <button
+          className="orange-shadow mb-3 cursor-pointer rounded-md bg-orange-100 p-0.5 lg:ml-4"
+          onClick={closeMenu}
+        >
           <span className="sr-only">Close menu</span>
-          <Close className="w-5" />
+          <Close className="h-full w-5.5 text-white" />
         </button>
         {navigation.map((item) => (
           <NavigationItem key={item.path} item={item} onClick={closeMenu} />
         ))}
       </ul>
       <div
-        className={`${isOpen ? "block" : "hidden"} absolute inset-0 z-20 h-full w-full bg-black/20`}
+        className={`absolute inset-0 z-20 h-full w-full bg-black/20 transition-opacity duration-300 ease-in-out ${
+          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
         aria-hidden={!isOpen}
         onClick={closeMenu}
       ></div>

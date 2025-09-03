@@ -31,7 +31,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
       <div
         className={`flex items-center rounded-md px-3 py-0.5 text-sm ${
           hasChildren
-            ? "text-brown-header hover:bg-orange-20 mt-2 cursor-pointer font-semibold"
+            ? "text-brown-header mt-2 cursor-pointer font-semibold hover:bg-orange-100/10"
             : "text-brown-80"
         }`}
         onClick={() => hasChildren && setIsOpen((prev) => !prev)}
@@ -49,10 +49,10 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
           <NavLink
             to={item.path}
             className={({ isActive }) =>
-              `flex w-full items-center rounded-md px-3 py-0.5 text-sm transition-colors duration-200 ${
+              `flex w-full items-center rounded-md px-3 py-0.5 text-sm transition-colors duration-300 ${
                 isActive && isSelected(item)
-                  ? "bg-color-orange-20 text-color-orange-100 font-semibold"
-                  : "hover:bg-orange-20 text-color-brown-80 hover:text-color-brown-100"
+                  ? "bg-color-orange-20 text-color-orange-100 bg-orange-100/10 font-semibold"
+                  : "text-color-brown-80 hover:bg-orange-100/10"
               } ${hasChildren ? "pl-0" : "pl-5"}`
             }
             onClick={onClick}

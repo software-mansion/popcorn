@@ -1,0 +1,29 @@
+import { NavLink } from "react-router";
+import ChevronRight from "../../assets/chevron-right.svg?react";
+import ChevronLeft from "../../assets/chevron-left.svg?react";
+
+type Direction = "next" | "previous";
+type NavigationButtonProps = {
+  direction: Direction;
+  path?: string;
+};
+
+export function NavigationButton({ direction, path }: NavigationButtonProps) {
+  const Icon = direction === "next" ? ChevronRight : ChevronLeft;
+  const label = direction === "next" ? "Next section" : "Previous section";
+
+  if (path) {
+    return (
+      <NavLink to={path}>
+        <span className="sr-only">{label}</span>
+        <Icon className="orange-shadow w-8 rounded-full bg-orange-100 p-1 text-white transition-all duration-300 hover:bg-orange-200 lg:w-9" />
+      </NavLink>
+    );
+  }
+
+  return (
+    <button disabled className="group cursor-not-allowed" aria-hidden="true">
+      <Icon className="border-brown-60 group-disabled:bg-grey-20 group-disabled:text-brown-60 w-8 rounded-full border p-1 shadow-md shadow-black/10 lg:w-9" />
+    </button>
+  );
+}
