@@ -30,7 +30,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="border-grey-20 bg-light-20 h- flex h-12 items-center gap-8 border-b px-4 py-3 lg:px-8">
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-8 border-b px-4 py-3 lg:px-8">
       <button
         className="orange-shadow cursor-pointer rounded-md bg-orange-100 p-0.5"
         onClick={openMenu}
