@@ -23,7 +23,7 @@ defmodule Popcorn.Support.AtomVM do
 
   @unix_path "test/fixtures/unix/AtomVM"
 
-  defguardp is_ast(ast) when tuple_size(ast) == 3
+  # defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
   defmacro assert_result(result, expected) do
@@ -94,13 +94,13 @@ defmodule Popcorn.Support.AtomVM do
   def try_run(bundle_path, run_dir, args \\ []) do
     info = do_try_run(test_target(), bundle_path, run_dir, Map.new(args))
 
-    Logger.info("""
-    Evaluating code on AtomVM finished
-    exit status: #{inspect(info.exit_status)}
-    log path: "#{info.log_path}"
-    result: #{inspect(info.result, pretty: true)}
-    output: #{if String.trim(info.output) == "", do: "no output generated", else: info.output}\
-    """)
+    # Logger.info("""
+    # Evaluating code on AtomVM finished
+    # exit status: #{inspect(info.exit_status)}
+    # log path: "#{info.log_path}"
+    # result: #{inspect(info.result, pretty: true)}
+    # output: #{if String.trim(info.output) == "", do: "no output generated", else: info.output}\
+    # """)
 
     info
   end
@@ -206,7 +206,7 @@ defmodule Popcorn.Support.AtomVM do
   Appends passed ast to common code that reads input from args.bin and writing to result.bin.
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
-  def compile_quoted(ast) when is_ast(ast) do
+  def compile_quoted(ast) do
     bundle_path = bundle_path(ast)
     build_dir = Path.dirname(bundle_path)
     stale = not File.exists?(bundle_path)

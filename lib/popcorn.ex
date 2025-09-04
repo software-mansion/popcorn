@@ -243,10 +243,15 @@ defmodule Popcorn do
           # TODO: Default boot script starts :logger_server, uncomment line below when :logger app is supported
           # {:ok, _pid} = :logger_server.start_link()
 
+          # :erlang.display("apps starting")
           specs = unquote(Macro.escape(specs))
 
           {:ok, _ac} =
             :application_controller.start({:application, :kernel, specs[:kernel]})
+
+          # Process.sleep(1000)
+          # [{app, spec} | _specs] = Map.to_list(specs)
+          # :application.load({:application, app, spec})
 
           for {app, spec} <- specs, app != :kernel do
             :ok = :application.load({:application, app, spec})
@@ -256,6 +261,8 @@ defmodule Popcorn do
           :ok = :application.start_boot(:stdlib, :permanent)
 
           {:ok, _apps} = Application.ensure_all_started(unquote(app), :permanent)
+
+          # :erlang.display("apps started")
 
           unquote(run)
         end

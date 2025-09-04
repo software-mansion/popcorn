@@ -609,6 +609,7 @@ defmodule Popcorn.EvalTest do
 
   @tag timeout: :timer.minutes(5)
   @tag skip_target: :wasm
+  @tag :reraise
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
@@ -643,8 +644,11 @@ defmodule Popcorn.EvalTest do
           e -> {e, __STACKTRACE__}
         end
       end
-      |> Macro.to_string()
-      |> AtomVM.eval(:elixir, run_dir: dir)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.try_run(dir)
+
+    # |> Macro.to_string()
+    # |> AtomVM.eval(:elixir, run_dir: dir)
 
     assert error == %RuntimeError{message: "foo"}
 
