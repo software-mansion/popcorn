@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
@@ -26,6 +26,12 @@ export function History() {
   const toggleHistory = () => {
     setShowHistory((prev) => !prev);
   };
+
+  const sortedHistory = useMemo(() => {
+    return [...history].sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    );
+  }, [history]);
 
   return (
     <div className="mt-6">
@@ -59,7 +65,7 @@ export function History() {
                   Clear History
                 </button>
               </div>
-              {history.map((entry, index) => (
+              {sortedHistory.map((entry, index) => (
                 <div
                   key={index}
                   className="bg-light-40 border-grey-20 rounded border p-2"
@@ -73,8 +79,30 @@ export function History() {
                     </span>
                   </div>
                   <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
+                    <div className="mb-1">
+                      <span className="text-grey-70 text-xs font-medium">
+                        Result:
+                      </span>
+                    </div>
                     {entry.result || "No result"}
                   </div>
+                  {entry.stdoutResult && entry.stdoutResult.length > 0 && (
+                    <div className="mt-2 rounded border-l-2 border-blue-400 bg-gray-50 p-2 text-sm whitespace-pre-wrap">
+                      <div className="mb-1 flex flex-col gap-1">
+                        <span className="text-grey-70 text-xs font-medium">
+                          Console output:
+                        </span>
+                        {entry.stdoutResult.map((line, index) => (
+                          <span
+                            key={`stdout-${index}-${line}`}
+                            className="text-brown-90/70 text-xs font-medium"
+                          >
+                            {line}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </>

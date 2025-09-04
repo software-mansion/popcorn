@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../Button";
 import { usePopcorn } from "../../context/popcorn/actions";
 import { useCodeEditorStore } from "../../store/codeEditor";
 
+import { useShallow } from "zustand/react/shallow";
 import { History } from "./History";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
@@ -12,17 +13,28 @@ export function Results() {
   const [resultData, setResultData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
 
-  const code = useCodeEditorStore((state) => state.code);
-  const resetToDefault = useCodeEditorStore((state) => state.resetToDefault);
-  const stdoutResult = useCodeEditorStore((state) => state.stdoutResult);
-  const resetStdoutResult = useCodeEditorStore(
-    (state) => state.resetStdoutResult
-  );
+  const { code, resetToDefault, stdoutResult, resetStdoutResult } =
+    useCodeEditorStore(
+      useShallow((state) => ({
+        setCode: state.setCode,
+        code: state.code,
+        resetToDefault: state.resetToDefault,
+        stdoutResult: state.stdoutResult,
+        resetStdoutResult: state.resetStdoutResult
+      }))
+    );
+
   const addHistoryEntry = useExecutionHistoryStore(
     (state) => state.addHistoryEntry
   );
 
   const { call } = usePopcorn();
+
+  const stdoutRef = useRef<string[]>(stdoutResult);
+
+  useEffect(() => {
+    stdoutRef.current = stdoutResult;
+  }, [stdoutResult]);
 
   const callPopcorn = useCallback(
     async (code: string) => {
@@ -46,8 +58,8 @@ export function Results() {
 
         addHistoryEntry({
           timestamp: new Date(),
-          code,
           result: data,
+          stdoutResult: stdoutRef.current,
           durationMs
         });
       });
