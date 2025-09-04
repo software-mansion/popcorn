@@ -1,28 +1,47 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../Button";
 import { usePopcorn } from "../../context/popcorn/actions";
 import { useCodeEditorStore } from "../store/codeEditor";
 
+import { useShallow } from "zustand/react/shallow";
 import { History } from "./History";
 import { useExecutionHistoryStore } from "../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
+import { useLocation } from "react-router";
 
 export function Results() {
+  const { pathname } = useLocation();
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
+  const { call } = usePopcorn();
 
-  const code = useCodeEditorStore((state) => state.code);
-  const resetToDefault = useCodeEditorStore((state) => state.resetToDefault);
-  const stdoutResult = useCodeEditorStore((state) => state.stdoutResult);
-  const resetStdoutResult = useCodeEditorStore(
-    (state) => state.resetStdoutResult
-  );
+  const { code, resetToDefault, stdoutResult, resetStdoutResult } =
+    useCodeEditorStore(
+      useShallow((state) => ({
+        setCode: state.setCode,
+        code: state.code,
+        resetToDefault: state.resetToDefault,
+        stdoutResult: state.stdoutResult,
+        resetStdoutResult: state.resetStdoutResult
+      }))
+    );
+
+  const handleResetToDefault = () => {
+    localStorage.removeItem(`code-${pathname}`);
+
+    resetToDefault();
+  };
+
   const addHistoryEntry = useExecutionHistoryStore(
     (state) => state.addHistoryEntry
   );
 
-  const { call } = usePopcorn();
+  const stdoutRef = useRef<string[]>(stdoutResult);
+
+  useEffect(() => {
+    stdoutRef.current = stdoutResult;
+  }, [stdoutResult]);
 
   const callPopcorn = useCallback(
     async (code: string) => {
@@ -46,8 +65,8 @@ export function Results() {
 
         addHistoryEntry({
           timestamp: new Date(),
-          code,
           result: data,
+          stdoutResult: stdoutRef.current,
           durationMs
         });
       });
@@ -56,10 +75,12 @@ export function Results() {
   );
 
   const handleRunCode = useCallback(() => {
+    if (pending) return;
+
     resetStdoutResult();
     console.log("Run Code!");
     callPopcorn(code);
-  }, [callPopcorn, code, resetStdoutResult]);
+  }, [callPopcorn, code, resetStdoutResult, pending]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -69,6 +90,11 @@ export function Results() {
     },
     [handleRunCode]
   );
+
+  useEffect(() => {
+    setResultData(null);
+    setDurationMs(null);
+  }, [pathname]);
 
   useEffect(() => {
     document.addEventListener("keydown", onKeyDown);
@@ -81,8 +107,17 @@ export function Results() {
   return (
     <section className="bg-light-30 border-grey-20 scrollbar min-h-60 overflow-y-scroll rounded-md border pb-4">
       <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
-        <Button title="Reset Code" type="secondary" onClick={resetToDefault} />
-        <Button title="Run Code" type="primary" onClick={handleRunCode} />
+        <Button
+          title="Reset Code"
+          type="secondary"
+          onClick={handleResetToDefault}
+        />
+        <Button
+          title="Run Code"
+          type="primary"
+          disabled={pending}
+          onClick={handleRunCode}
+        />
       </div>
       <div className="font-inter text-brown-90 mt-4 flex flex-col gap-2 overflow-hidden px-6">
         {pending ? (
