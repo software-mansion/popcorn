@@ -570,7 +570,6 @@ defmodule Phoenix.LiveView.Diff do
   end
 
   defp traverse(iodata, _, pending, components, template, _changed?) do
-    IO.puts("IO DATA: #{inspect(iodata)}")
     iodata = to_string(iodata)
     {IO.iodata_to_binary(iodata), nil, pending, components, template}
   end
