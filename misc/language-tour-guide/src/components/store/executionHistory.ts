@@ -2,9 +2,9 @@ import { create } from "zustand";
 
 export type HistoryEntry = {
   timestamp: Date;
-  code: string;
   result?: string;
   durationMs?: number;
+  stdoutResult?: string[];
 };
 
 type ExecutionHistoryStore = {
