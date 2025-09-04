@@ -4,7 +4,6 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import icon from "astro-icon";
-import starlight from "@astrojs/starlight";
 // used for build-time generation of diagrams
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
@@ -13,7 +12,10 @@ import { buildBundle, buildWasm, cleanWasmDir } from "./build-wasm.js";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://stargazers.club",
+  site: "https://popcorn.swmansion.com",
+  redirects: {
+    "/docs": "https://hexdocs.pm/popcorn",
+  },
   server: {
     headers: {
       "Access-Control-Allow-Origin": "*",
@@ -35,29 +37,6 @@ export default defineConfig({
           mirrorActors: false,
         },
       },
-    }),
-    starlight({
-      title: "Popcorn docs",
-      logo: {
-        src: "/src/icons/logo-text-adaptive.svg",
-        replacesTitle: true,
-      },
-      customCss: ["/src/styles/docs.css"],
-      pagination: false,
-      sidebar: [
-        {
-          label: "Getting started",
-          items: ["docs", "installation"],
-        },
-        {
-          label: "Guides",
-          items: ["getting-started"],
-        },
-        {
-          label: "Reference",
-          items: ["js-api", "elixir-api", "limitations", "architecture"],
-        },
-      ],
     }),
     cleanWasmDir(),
     buildBundle({ dir: "../../examples/iex_wasm", newBundleName: "iex.avm" }),

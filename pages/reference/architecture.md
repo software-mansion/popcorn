@@ -1,7 +1,4 @@
----
-title: Popcorn's Architecture
-description: Understanding Popcorn's internal architecture and design decisions
----
+# Popcorn's Architecture
 
 ## Main Architecture
 

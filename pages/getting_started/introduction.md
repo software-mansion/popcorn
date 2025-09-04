@@ -1,14 +1,14 @@
----
-title: Introduction
-description: Complete guide to using Popcorn - run Elixir code in web browsers with WebAssembly
-tableOfContents: false
----
+# What is Popcorn?
 
-import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/dark-mode-logo-text.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/light-mode-logo-text.svg">
+  <img alt="Popcorn" src="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/fallback-logo-text.svg">
+</picture>
 
 **Popcorn** is a library that enables you to run Elixir code directly in web browsers using WebAssembly (Wasm). Your Elixir code executes in the client-side AtomVM runtime compiled to Wasm, bringing Elixir's powerful concurrency model and functional programming capabilities to the frontend.
 
-### What makes Popcorn different?
+## What makes Popcorn different?
 
 **Compared to JavaScript:**
 
@@ -24,20 +24,13 @@ import { LinkCard, CardGrid } from "@astrojs/starlight/components";
 
 Popcorn provides seamless APIs for communication between your Elixir and JavaScript code, handling serialization and ensuring browser responsiveness while your Elixir processes work in the background.
 
-## How Popcorn uses Wasm
+## How Popcorn uses WASM
 
 Popcorn takes a unique approach to Wasm in the Elixir ecosystem. Unlike [Wasmex](https://github.com/tessi/wasmex), which allows you to execute existing Wasm modules within Elixir on the _server_, Popcorn is run entirely in the _browser_.
 
 While [Orb](https://github.com/RoyalIcing/Orb) lets you write Wasm _instructions_ directly using Elixir syntax, Popcorn runs your existing Elixir code _unchanged_ in the browser through the AtomVM runtime compiled to Wasm.
 
 This means you can leverage your existing Elixir knowledge and patterns – GenServers, supervision trees, and OTP behaviors – directly in client-side applications without rewriting your logic.
-
-<CardGrid>
-  <LinkCard title="Installation" href="/installation" />
-  <LinkCard title="API reference" href="/api-reference" />
-  <LinkCard title="View live examples" href="/examples" />
-  <LinkCard title="Current limitations" href="/limitations" />
-</CardGrid>
 
 ---
 
