@@ -199,7 +199,6 @@ end
 ##  end
 ##  
 #  def to_iodata(%Phoenix.LiveView.Rendered{static: static, dynamic: dynamic}) do
-#    IO.puts("11222BLDVADFASDFQDFADSFAS")
 #    to_iodata(static, dynamic.(false), [])
 #  end
 #

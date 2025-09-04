@@ -247,26 +247,26 @@ defmodule LocalLiveView.Server do
 #    {deleted_cids, new_state} = delete_components(state, cids)
 #    {:noreply, reply(new_state, msg.ref, :ok, %{cids: deleted_cids})}
 #  end
-
-  def handle_info(%Message{topic: topic, event: "event"} = msg, %{topic: topic} = state) do
-    %{"value" => raw_val, "event" => event, "type" => type} = payload = msg.payload
-    val = decode_event_type(type, raw_val, msg.payload)
-
-    if cid = msg.payload["cid"] do
-      component_handle(state, cid, msg.ref, fn component_socket, component ->
-        component_socket
-        |> maybe_update_uploads(payload)
-        |> inner_component_handle_event(component, event, val)
-      end)
-    else
-      new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
-
-      new_state.socket
-      |> view_handle_event(event, val)
-      |> handle_result({:handle_event, 3, msg.ref}, new_state)
-    end
-  end
-
+#
+#  def handle_info(%Message{topic: topic, event: "event"} = msg, %{topic: topic} = state) do
+#    %{"value" => raw_val, "event" => event, "type" => type} = payload = msg.payload
+#    val = decode_event_type(type, raw_val, msg.payload)
+#
+#    if cid = msg.payload["cid"] do
+#      component_handle(state, cid, msg.ref, fn component_socket, component ->
+#        component_socket
+#        |> maybe_update_uploads(payload)
+#        |> inner_component_handle_event(component, event, val)
+#      end)
+#    else
+#      new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
+#
+#      new_state.socket
+#      |> view_handle_event(event, val)
+#      |> handle_result({:handle_event, 3, msg.ref}, new_state)
+#    end
+#  end
+#
 #  def handle_info({@prefix, :async_result, {kind, info}}, state) do
 #    {ref, cid, keys, result} = info
 #
@@ -1017,7 +1017,6 @@ defmodule LocalLiveView.Server do
 
             {diff, fingerprints, components} =
               Diff.render(socket, rendered, state.fingerprints, state.components)
-              |> IO.inspect(label: "DIFFS")
             socket =
               socket
 #              |> Lifecycle.after_render()
@@ -1401,7 +1400,6 @@ defmodule LocalLiveView.Server do
       {:ok, diff, :mount, new_state} ->
 #        diff = maybe_put_debug_pid(%{rendered: diff, liveview_version: lv_vsn})
         reply = put_container(session, nil, diff)
-        IO.puts "Reply: #{inspect(reply |> Diff.to_iodata)}"
         GenServer.reply(from, {:ok, reply})
         {:noreply, post_verified_mount(new_state)}
 
@@ -1435,7 +1433,6 @@ defmodule LocalLiveView.Server do
 #  end
 
   defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket) do
-    IO.puts "SFIEFADFMMM!!!!!!!!!!!!!!!!!1"
     %{
       join_ref: phx_socket.join_ref,
       serializer: phx_socket.serializer,

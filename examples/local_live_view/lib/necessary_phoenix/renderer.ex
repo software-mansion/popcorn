@@ -74,14 +74,10 @@ defmodule Phoenix.LiveView.Renderer do
           |> check_rendered!(render_with)
 
         %{} ->
-          IO.puts "b4 assign render #{inspect(view)}"
 #          if function_exported?(view, :render, 1) do
           assigns
-          |> IO.inspect()
           |> view.render()
-          |> IO.inspect()
           |> check_rendered!(view)
-          |> IO.inspect(label: "final")
 #          else
 #            template =
 #              view.__info__(:compile)[:source]

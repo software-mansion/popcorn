@@ -107,12 +107,10 @@ defmodule LocalLiveView do
     params = %{
       "session" => %Session{view: ThermostatLive}
     }
-    IO.inspect("LLV start1")
 #    with {:ok, pid} <- DynamicSupervisor.start_child(LocalLiveView.Server.Supervisor, LocalLiveView.Server.child_spec([])) do
     ref = make_ref()
     with {:ok, pid} <- LocalLiveView.Server.start_link([]) do
-      IO.inspect("LLV start2")
-      send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}}) |> IO.inspect(label: "ULALA")
+      send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
       receive do
         {^ref, {:ok, reply}} ->
           IO.inspect(reply, label: "RECEIVED")
@@ -147,7 +145,7 @@ defmodule LocalLiveView do
   
   @impl true
   def handle_info(any, state) do
-    IO.inspect(any, label: "HANDLE_INFO:")
+#    IO.inspect(any, label: "HANDLE_INFO:")
     {:no_reply, state}
   end
 

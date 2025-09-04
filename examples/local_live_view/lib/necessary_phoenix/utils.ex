@@ -336,7 +336,6 @@ defmodule Phoenix.LiveView.Utils do
   Calls the `c:Phoenix.LiveView.mount/3` callback, otherwise returns the socket as is.
   """
   def maybe_call_live_view_mount!(%Socket{} = socket, view, params, session, uri \\ nil) do
-    IO.puts("b4 any")
     %{any?: any?, exported?: exported?} = Lifecycle.stage_info(socket, view, :mount, 3)
 
     if any? do
@@ -345,7 +344,6 @@ defmodule Phoenix.LiveView.Utils do
 #        %{socket: socket, params: params, session: session, uri: uri},
 #        fn ->
 
-      IO.puts("if any true")
           socket =
 #            case Lifecycle.mount(params, session, socket) do
 #              {:cont, %Socket{} = socket} when exported? ->
@@ -361,7 +359,6 @@ defmodule Phoenix.LiveView.Utils do
 #        end
 #      )
     else
-      IO.puts("if any false")
       socket
     end
   end
