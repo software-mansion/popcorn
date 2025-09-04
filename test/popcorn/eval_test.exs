@@ -526,6 +526,25 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(%TryClauseError{})
   end
 
+  @tag skip_target: :wasm
+  test "Error rescued outside of Code.eval_string/3", %{tmp_dir: dir} do
+    result =
+      quote do
+        try do
+          """
+          raise("oops")
+          """
+          |> Code.eval_string([], __ENV__)
+        rescue
+          e -> e
+        end
+      end
+      |> AtomVM.compile_quoted()
+      |> AtomVM.try_run(dir)
+
+    assert %RuntimeError{message: "oops"} = result.result
+  end
+
   defp wrap_in_try(code) do
     """
     try do
