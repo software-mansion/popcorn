@@ -6,12 +6,11 @@ import { useNavigation } from "../../utils/hooks/useNavigation";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
-import { NavigationButton } from "./NavigationButton";
 
 export function Navigation() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const { navigation, isLoading, siblingsNode } = useNavigation();
+  const { navigation, isLoading } = useNavigation();
 
   const openMenu = () => {
     setIsOpen(true);
@@ -38,13 +37,6 @@ export function Navigation() {
         <span className="sr-only">Open menu</span>
         <Hamburger className="h-full w-5.5 text-white" />
       </button>
-      <div className="fixed bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-7 lg:absolute lg:left-1/4">
-        <NavigationButton
-          direction="previous"
-          path={siblingsNode.previousNode?.path}
-        />
-        <NavigationButton direction="next" path={siblingsNode.nextNode?.path} />
-      </div>
       <span className="ml-5">{location.pathname}</span>
       <ul
         className={`scrollbar bg-light-20 absolute top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
