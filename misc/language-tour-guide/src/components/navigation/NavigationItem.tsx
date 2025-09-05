@@ -45,7 +45,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
             )}
           </span>
         )}
-        {item.type === "link" || item.type === "subsection" ? (
+        {item.type === "link" ? (
           <NavLink
             to={item.path}
             className={({ isActive }) =>

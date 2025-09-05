@@ -18,7 +18,7 @@ export async function getRawMdxTree() {
         current.set(dir, {
           path: entry.path.slice(0, i + 1),
           children: new Map(),
-          frontmatter: { order: Infinity, subsections: [] }
+          frontmatter: { order: Infinity }
         });
       }
 
