@@ -3,7 +3,7 @@ import { elixir } from "codemirror-lang-elixir";
 import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
 import "./CodeEditor.styles.css";
-import { useCodeEditorStore } from "../store/codeEditor";
+import { useCodeEditorStore } from "../../store/codeEditor";
 
 export function CodeEditor() {
   const code = useCodeEditorStore((state) => state.code);

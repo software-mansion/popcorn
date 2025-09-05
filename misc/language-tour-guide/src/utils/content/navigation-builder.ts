@@ -84,6 +84,16 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
 
   traverse(tree);
 
+  const parentPath = path.split("/").slice(0, -1).join("/");
+
+  const children = flatNavigation.filter((item) => {
+    const itemParentPath = item.path.split("/").slice(0, -1).join("/");
+
+    return itemParentPath === parentPath;
+  });
+
+  const currentChildrenIndex = children.findIndex((item) => item.path === path);
+
   const navigationNodeIndex = flatNavigation.findIndex(
     (item) => path === item.path
   );
@@ -102,5 +112,12 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
       ? flatNavigation[navigationNodeIndex - 1]
       : null;
 
-  return { previousNode, nextNode };
+  return {
+    siblingsNode: {
+      previousNode,
+      nextNode
+    },
+    childrenCount: children.length,
+    currentIndex: currentChildrenIndex + 1
+  };
 }
