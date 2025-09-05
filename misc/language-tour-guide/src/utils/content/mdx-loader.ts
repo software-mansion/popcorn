@@ -14,8 +14,7 @@ export async function load([
   return {
     path,
     frontmatter: frontmatter ?? {
-      order: Infinity,
-      subsections: [],
+      order: Infinity
     }
   };
 }

@@ -2,7 +2,6 @@ import type { ComponentType } from "react";
 
 export type Frontmatter = {
   order?: number;
-  subsections?: string[];
 };
 
 export type MdxWithProperties = {
@@ -28,7 +27,7 @@ export type UnresolvedEntry = [string, () => Promise<MdxWithProperties>];
 
 export type DirTree = Map<Dir, DirEntry>;
 
-type NavigationTreeItemType = "link" | "section" | "subsection";
+type NavigationTreeItemType = "link" | "section";
 
 export type NavigationTreeItem = {
   title: string;
