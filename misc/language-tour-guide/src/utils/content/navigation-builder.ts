@@ -26,9 +26,7 @@ function processNavigationLevel(mapTree: DirTree): NavigationTree {
       title: formatTitle(key),
       path: "/" + entry.path.join("/"),
       type: isLeafNode ? "link" : "section",
-      children: isLeafNode
-        ? createSubsections(entry)
-        : processNavigationLevel(entry.children)
+      children: processNavigationLevel(entry.children)
     };
 
     result.push(item);
@@ -40,19 +38,6 @@ function processNavigationLevel(mapTree: DirTree): NavigationTree {
 function formatTitle(text: string): string {
   const formattedText = text.replaceAll("-", " ");
   return formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
-}
-
-function createSubsections(entry: DirEntry): NavigationTree {
-  if (!entry.frontmatter.subsections?.length) {
-    return [];
-  }
-
-  return entry.frontmatter.subsections.map((subsection) => ({
-    title: formatTitle(subsection),
-    path: `/${entry.path.join("/")}/#${subsection}`,
-    children: [],
-    type: "subsection" as const
-  }));
 }
 
 function compareEntriesByOrder(a: [Dir, DirEntry], b: [Dir, DirEntry]): number {
@@ -84,6 +69,16 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
 
   traverse(tree);
 
+  const parentPath = path.split("/").slice(0, -1).join("/");
+
+  const children = flatNavigation.filter((item) => {
+    const itemParentPath = item.path.split("/").slice(0, -1).join("/");
+
+    return itemParentPath === parentPath;
+  });
+
+  const currentChildrenIndex = children.findIndex((item) => item.path === path);
+
   const navigationNodeIndex = flatNavigation.findIndex(
     (item) => path === item.path
   );
@@ -102,5 +97,12 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
       ? flatNavigation[navigationNodeIndex - 1]
       : null;
 
-  return { previousNode, nextNode };
+  return {
+    siblingsNode: {
+      previousNode,
+      nextNode
+    },
+    childrenCount: children.length,
+    currentIndex: currentChildrenIndex + 1
+  };
 }

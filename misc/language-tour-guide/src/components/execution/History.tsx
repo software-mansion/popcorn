@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
-import { useExecutionHistoryStore } from "../store/executionHistory";
+import { useExecutionHistoryStore } from "../../store/executionHistory";
 
 function formatTimeStamp(date: Date): string {
   return date.toLocaleTimeString([], {

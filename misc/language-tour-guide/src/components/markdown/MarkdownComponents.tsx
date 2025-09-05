@@ -1,5 +1,5 @@
 import { useCallback, type ComponentProps } from "react";
-import { useCodeEditorStore } from "../store/codeEditor";
+import { useCodeEditorStore } from "../../store/codeEditor";
 
 export const Heading1 = ({ children, ...props }: ComponentProps<"h1">) => (
   <h1 className="mb-6 text-3xl font-bold text-gray-900" {...props}>

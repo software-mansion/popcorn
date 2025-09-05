@@ -6,7 +6,6 @@ import { updatePopcorn } from "./build-wasm";
 import svgr from "vite-plugin-svgr";
 import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
-import rehypeSlug from "rehype-slug";
 import { rehypeRawCode } from "./src/plugins/rehypeRawCode";
 
 // https://vite.dev/config/
@@ -19,7 +18,6 @@ export default defineConfig({
     mdx({
       providerImportSource: "@mdx-js/react",
       rehypePlugins: [
-        rehypeSlug,
         rehypeRawCode,
         [rehypeHighlight, { languages: { elixir } }]
       ]

@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
-import { useCodeEditorStore } from "../../components/store/codeEditor";
+import { useCodeEditorStore } from "../../store/codeEditor";
 
 interface PopcornProviderProps {
   children: ReactNode;
