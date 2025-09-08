@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useCodeEditorStore } from "../store/codeEditor";
+import { useCodeEditorStore } from "../../store/codeEditor";
 
 type MdxWrapperProps = {
   Component: React.ComponentType;

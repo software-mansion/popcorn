@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../Button";
 import { usePopcorn } from "../../context/popcorn/actions";
-import { useCodeEditorStore } from "../store/codeEditor";
+import { useCodeEditorStore } from "../../store/codeEditor";
 
 import { History } from "./History";
-import { useExecutionHistoryStore } from "../store/executionHistory";
+import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
 
 export function Results() {
@@ -79,7 +79,7 @@ export function Results() {
   }, [onKeyDown]);
 
   return (
-    <section className="bg-light-30 border-grey-20 scrollbar min-h-60 overflow-y-scroll rounded-md border pb-4">
+    <section className="bg-light-30 border-grey-20 scrollbar min-h-100 overflow-y-scroll rounded-md border pb-20 lg:min-h-60 lg:pb-4">
       <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
         <Button title="Reset Code" type="secondary" onClick={resetToDefault} />
         <Button title="Run Code" type="primary" onClick={handleRunCode} />
