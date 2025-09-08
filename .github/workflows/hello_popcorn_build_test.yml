@@ -26,6 +26,11 @@ on:
       - "!.github/**"
       - ".github/workflows/hello_popcorn_build_test.yml"
 
+# This ensures, that, except for the main branch, only one instance of workflow is executed on a branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref != 'refs/heads/main' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
