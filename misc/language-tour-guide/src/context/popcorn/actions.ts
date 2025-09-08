@@ -26,6 +26,6 @@ export const usePopcorn = () => {
 
   return {
     call,
-    cast,
+    cast
   };
 };
