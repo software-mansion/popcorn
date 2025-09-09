@@ -62,7 +62,8 @@
     usort/1, usort/2,
     sublist/2,
     splitwith/2,
-    unzip/1
+    unzip/1,
+    keysearch/3
 ]).
 
 %%-----------------------------------------------------------------------------
@@ -783,3 +784,9 @@ splitwith_1(Pred, [Hd | Tail], Taken) ->
     end;
 splitwith_1(_Pred, [], Taken) ->
     {?MODULE:reverse(Taken), []}.
+
+keysearch(K, I, L) ->
+    case keyfind(K, I, L) of
+        false -> false;
+        Value -> {value, Value}
+    end.

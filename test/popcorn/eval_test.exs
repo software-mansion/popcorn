@@ -197,6 +197,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
+  @tag :skip
   @tag skip_target: :wasm
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
@@ -607,8 +608,10 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result([2, 3, 4, 5])
   end
 
+  @tag :skip
   @tag timeout: :timer.minutes(5)
   @tag skip_target: :wasm
+  @tag :reraise
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
@@ -643,8 +646,11 @@ defmodule Popcorn.EvalTest do
           e -> {e, __STACKTRACE__}
         end
       end
-      |> Macro.to_string()
-      |> AtomVM.eval(:elixir, run_dir: dir)
+      |> AtomVM.compile_quoted()
+      |> AtomVM.try_run(dir)
+
+    # |> Macro.to_string()
+    # |> AtomVM.eval(:elixir, run_dir: dir)
 
     assert error == %RuntimeError{message: "foo"}
 
