@@ -9,7 +9,7 @@ export async function load([
   loader
 ]: UnresolvedEntry): Promise<LoadedEntry> {
   const { frontmatter } = await loader();
-  const path = getRoutePath(rawPath).split("/");
+  const path = getPath(rawPath).split("/");
 
   return {
     path,
@@ -19,8 +19,14 @@ export async function load([
   };
 }
 
-export function getRoutePath(path: string): string {
+function getPath(path: string): string {
   return path.replace("/src/content/", "").replace(/\.mdx$/, "");
+}
+
+export function getNavigationPath(path: string): string {
+  return getPath(path)
+    .replace(/\/\d+-/g, "/")
+    .replace(/^\d+-/, "");
 }
 
 export function sortPathLength(infoA: LoadedEntry, infoB: LoadedEntry) {

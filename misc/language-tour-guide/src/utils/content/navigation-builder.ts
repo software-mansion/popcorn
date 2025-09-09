@@ -37,6 +37,7 @@ function processNavigationLevel(mapTree: DirTree): NavigationTree {
 
 function formatTitle(text: string): string {
   const formattedText = text.replaceAll("-", " ");
+
   return formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
 }
 
