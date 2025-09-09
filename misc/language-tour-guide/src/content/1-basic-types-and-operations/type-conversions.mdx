@@ -1,0 +1,38 @@
+export const frontmatter = {order: 15}
+
+# Type Conversions
+
+Elixir provides functions to convert between types.
+
+Unlike statically typed languages, conversions happen at runtime and may fail if the conversion is not possible.
+
+Common conversion functions are in the `String`, `Integer`, `Float`, and `Atom` modules.
+
+export const defaultCode = `# String to integer
+string_num = "42"
+integer = String.to_integer(string_num)
+IO.puts("String '#{string_num}' to integer: #{integer}")
+
+# Integer to string
+
+num = 123
+string = Integer.to_string(num)
+IO.puts("Integer #{num} to string: '#{string}'")
+
+# String to atom (be careful with user input!)
+
+string_atom = "my_atom"
+atom = String.to_atom(string_atom)
+IO.puts("String '#{string_atom}' to atom: #{inspect(atom)}")
+
+# Float to integer (truncates)
+
+float_num = 3.14159
+int_from_float = trunc(float_num)
+IO.puts("Float #{float_num} truncated: #{int_from_float}")
+
+# Integer to float
+
+int_val = 42
+float_val = int_val / 1
+IO.puts("Integer #{int_val} to float: #{float_val}")`

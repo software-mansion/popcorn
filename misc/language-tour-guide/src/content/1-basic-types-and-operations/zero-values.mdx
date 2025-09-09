@@ -1,0 +1,38 @@
+export const frontmatter = {order: 14}
+
+# Nil and Truthiness
+
+In Elixir, `nil` represents the absence of a value.
+
+Only `nil` and `false` are considered falsy. Everything else is truthy, including `0` and `""`.
+
+The `||`, `&&`, and `!` operators work with truthy/falsy values.
+
+export const defaultCode = `# nil is falsy
+result = nil || "default"
+IO.puts("nil || 'default' = #{result}")
+
+# Only nil and false are falsy
+
+IO.puts("0 is truthy: #{!!0}")
+IO.puts("'' is truthy: #{!!\"\"}")
+IO.puts("[] is truthy: #{!![]}")
+
+# Pattern matching with nil
+
+value = nil
+
+case value do
+  nil -> IO.puts("Value is nil")
+  _ -> IO.puts("Value is not nil")
+end
+
+# Using guards with nil
+
+defmodule NilChecker do
+  def check(x) when is_nil(x), do: "It's nil!"
+  def check(x), do: "Not nil: #{inspect(x)}"
+end
+
+IO.puts(NilChecker.check(nil))
+IO.puts(NilChecker.check(0))`

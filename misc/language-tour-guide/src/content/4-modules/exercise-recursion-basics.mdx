@@ -1,0 +1,83 @@
+export const frontmatter = {order: 21}
+
+# Exercise: Recursion Fundamentals
+
+Since Elixir doesn't have traditional loops, recursion is essential. Let's practice!
+
+## Your Task
+
+Implement recursive functions for common algorithms without using Enum module functions.
+
+## Functions to Implement
+
+1. `sum_list/1` - Sum all numbers in a list
+2. `factorial/1` - Calculate factorial of n
+3. `reverse_list/1` - Reverse a list without using Enum.reverse
+4. `flatten_list/1` - Flatten nested lists
+5. `fibonacci/1` - Get nth Fibonacci number
+
+## Remember
+
+- Use pattern matching for base cases
+- Think about the recursive case
+- Accumulator pattern can help with tail recursion
+
+export const defaultCode = `defmodule Recursion do
+
+  # TODO: Sum all numbers in a list
+  def sum_list([]), do: 0
+  def sum_list([head | tail]) do
+    # Your code here
+  end
+
+  # TODO: Calculate factorial
+  # factorial(5) = 5 _ 4 _ 3 _ 2 _ 1 = 120
+  def factorial(0), do: 1
+  def factorial(n) when n > 0 do
+    # Your code here
+  end
+
+  # TODO: Reverse a list (hint: use accumulator)
+  def reverse_list(list), do: reverse_list(list, [])
+  defp reverse_list([], acc), do: acc
+  defp reverse_list([head | tail], acc) do
+    # Your code here
+  end
+
+  # TODO: Flatten nested lists
+  # flatten_list([1, [2, 3], [4, [5, 6]]]) => [1, 2, 3, 4, 5, 6]
+  def flatten_list([]), do: []
+  def flatten_list([head | tail]) when is_list(head) do 
+    # Your code here - handle when head is a list
+  end
+  def flatten_list([head | tail]) do
+    # Your code here - handle when head is not a list
+  end
+
+  # TODO: Calculate nth Fibonacci number
+  # fib(0) = 0, fib(1) = 1, fib(n) = fib(n-1) + fib(n-2)
+  def fibonacci(0), do: 0
+  def fibonacci(1), do: 1
+  def fibonacci(n) when n > 1 do
+    # Your code here 
+    # Note: This naive approach is slow for large n 
+    # Bonus: Can you implement a tail-recursive version?
+  end
+
+  # BONUS: Tail-recursive Fibonacci with accumulator
+  def fibonacci_fast(n), do: fibonacci_fast(n, 0, 1)
+  defp fibonacci_fast(0, acc1, \_acc2), do: acc1
+  defp fibonacci_fast(n, acc1, acc2) do
+    # Your code here
+  end
+end
+
+# Test your implementations
+
+IO.puts("Sum of [1,2,3,4,5]: #{Recursion.sum_list([1,2,3,4,5])}")
+IO.puts("Factorial of 5: #{Recursion.factorial(5)}")
+IO.puts("Reverse [1,2,3]: #{inspect(Recursion.reverse_list([1,2,3]))}")
+IO.puts("Flatten [[1,2],[3,[4,5]]]: #{inspect(Recursion.flatten_list([[1,2],[3,[4,5]]]))}")
+IO.puts("Fibonacci(10): #{Recursion.fibonacci(10)}")
+
+# IO.puts("Fast Fibonacci(40): #{Recursion.fibonacci_fast(40)}") # Uncomment after implementing`
