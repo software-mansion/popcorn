@@ -50,7 +50,7 @@ defmodule Popcorn.CompilationTest do
     assert %FunctionClauseError{module: :orddict, function: :take, arity: 2} = error
 
     assert [
-             {:orddict, :take, 2, [file: ~c"orddict", line: 118]},
+             {:orddict, :take, 2, [file: ~c"orddict.erl", line: 118]},
              {RunExpr, :run, 1, [file: code_file, line: run_line]}
              | rest
            ] = stacktrace

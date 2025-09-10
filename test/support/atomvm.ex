@@ -23,7 +23,6 @@ defmodule Popcorn.Support.AtomVM do
 
   @unix_path "test/fixtures/unix/AtomVM"
 
-  defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
   defmacro assert_result(result, expected) do
@@ -206,7 +205,7 @@ defmodule Popcorn.Support.AtomVM do
   Appends passed ast to common code that reads input from args.bin and writing to result.bin.
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
-  def compile_quoted(ast) when is_ast(ast) do
+  def compile_quoted(ast) do
     bundle_path = bundle_path(ast)
     build_dir = Path.dirname(bundle_path)
     stale = not File.exists?(bundle_path)

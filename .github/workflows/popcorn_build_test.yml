@@ -71,10 +71,10 @@ jobs:
         run: mix lint
       - name: Build AtomVM Unix
         run: |
-          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON" --git-ref mf/popcorn-nifs
       - name: Build AtomVM WASM
         run: |
-          mix popcorn.build_runtime --target wasm
+          mix popcorn.build_runtime --target wasm --git-ref mf/popcorn-nifs
       - name: Configure runtime source
         run: |
           echo 'config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}' >> config/config.exs

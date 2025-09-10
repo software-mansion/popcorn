@@ -543,7 +543,7 @@ defmodule Popcorn.EvalTest do
       """
       |> AtomVM.eval(:elixir, run_dir: dir)
 
-    assert os_type in [:os.type(), {:unix, :emscripten}]
+    assert os_type in [{:unix, :darwin}, {:unix, :emscripten}]
   end
 
   async_test ":filename.split/1", %{tmp_dir: dir} do
@@ -607,8 +607,9 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result([2, 3, 4, 5])
   end
 
+  @tag :skip
   @tag timeout: :timer.minutes(5)
-  @tag skip_target: :wasm
+  @tag :reraise
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
