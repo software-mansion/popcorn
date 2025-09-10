@@ -1,8 +1,15 @@
 name: Build and deploy staging demo
 
 on:
+  workflow_dispatch:
   push:
-    branches: [deploy]
+    branches:
+      - main
+    paths:
+      - "misc/landing-page/**"
+      - "misc/language-tour-guide/**"
+      - "misc/landing.nginx.conf"
+      - ".github/workflows/demo_staging_build_and_deploy.yml"
 
 env:
   REGISTRY: ghcr.io
