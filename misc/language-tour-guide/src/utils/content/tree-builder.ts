@@ -42,10 +42,9 @@ export async function getRawMdxTree() {
 }
 
 function getFormatDirWithOrder(name: string): [string, number] {
-  const orderMatch = name.match(/^(\d+)-/);
-  const order = orderMatch ? parseInt(orderMatch[1], 10) : Infinity;
-
-  const formatName = name.replace(/^\d+-/, "");
+  const result = name.match(/^(\d+)-(.*)/);
+  const order = result ? parseInt(result[1], 10) : Infinity;
+  const formatName = result ? result[2] : name;
 
   return [formatName, order];
 }

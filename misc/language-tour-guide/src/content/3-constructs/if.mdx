@@ -1,16 +1,15 @@
 export const frontmatter = {order: 1}
 
-# If and Unless - Simple Conditionals
+# If - Simple Conditionals
 
 ## Theory
 
-`if` and `unless` are Elixir's simplest conditional constructs. They evaluate a condition and return a value based on truthiness.
+`if` is Elixir's simplest conditional constructs. They evaluate a condition and return a value based on truthiness.
 
 **Key concepts:**
 - **Truthy/Falsy**: Only `nil` and `false` are falsy, everything else is truthy
 - **Expressions**: Everything returns a value
 - **No statements**: No imperative if statements, only expressions
-- **Unless**: Negative if (syntactic sugar)
 
 **When to use:**
 - Simple boolean checks
@@ -37,11 +36,6 @@ greeting =
   end
 
 IO.inspect(greeting, label: "No else clause")
-
-# Unless - opposite of if
-unless false do
-  IO.puts("This runs because condition is false")
-end
 
 # One-liner syntax
 status = if age >= 18, do: "Can vote", else: "Too young"
