@@ -1,0 +1,62 @@
+export const frontmatter = {order: 3}
+
+# With - Chaining Pattern Matches
+
+## Theory
+
+`with` chains pattern matches, executing the next step only if the previous match succeeds. It's perfect for handling sequences of operations that might fail, avoiding deeply nested case statements.
+
+**Key features:**
+- **Sequential matching**: Each clause must match to continue
+- **Early return**: First non-match returns that value
+- **else clause**: Handle non-matching cases
+- **Clean error handling**: Elegant `{:ok, _} / {:error, _}` chains
+
+**When to use:**
+- Multiple operations that can fail
+- Avoiding nested case statements
+- Pipeline of transformations with validation
+- Working with `{:ok, value}` patterns
+
+export const defaultCode = `# Basic with - all must match
+user_data = %{name: "Alice", email: "alice@example.com"}
+
+result =
+  with {:ok, name} <- Map.fetch(user_data, :name),
+       {:ok, email} <- Map.fetch(user_data, :email) do
+    "User: #{name} (#{email})"
+  else
+    :error -> "Missing required field"
+  end
+
+IO.puts(result)
+
+# Early return on non-match
+# Missing email
+data = %{name: "Bob"}
+
+result =
+  with {:ok, name} <- Map.fetch(data, :name),
+       {:ok, email} <- Map.fetch(data, :email) do
+    "User: #{name} (#{email})"
+  end
+
+# Returns :error because email is missing
+IO.inspect(result)
+
+# With can use guards and patterns
+numbers = [1, 2, 3, 4]
+
+result =
+  with [a, b | rest] <- numbers,
+       true <- a < b,
+       sum when sum > 5 <- a + b + hd(rest) do
+    "Success! Sum is #{sum}"
+  else
+    false -> "First not less than second"
+    sum -> "Sum #{sum} is not greater than 5"
+    _ -> "Pattern didn't match"
+  end
+
+IO.puts(result)
+`

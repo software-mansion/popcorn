@@ -1,0 +1,58 @@
+export const frontmatter = {order: 1}
+
+# If - Simple Conditionals
+
+## Theory
+
+`if` is Elixir's simplest conditional constructs. They evaluate a condition and return a value based on truthiness.
+
+**Key concepts:**
+- **Truthy/Falsy**: Only `nil` and `false` are falsy, everything else is truthy
+- **Expressions**: Everything returns a value
+- **No statements**: No imperative if statements, only expressions
+
+**When to use:**
+- Simple boolean checks
+- Guard clauses
+- Default values with `||`
+- Avoid for complex conditions (use `case` or `cond`)
+
+export const defaultCode = `# Basic if/else
+age = 18
+
+result =
+  if age >= 18 do
+    "Adult"
+  else
+    "Minor"
+  end
+
+IO.puts(result)
+
+# If without else returns nil
+greeting =
+  if false do
+    "Hello"
+  end
+
+IO.inspect(greeting, label: "No else clause")
+
+# One-liner syntax
+status = if age >= 18, do: "Can vote", else: "Too young"
+IO.puts(status)
+
+# Truthy and falsy values
+# Only nil and false are falsy
+if nil, do: IO.puts("Won't print")
+if false, do: IO.puts("Won't print")
+if 0, do: IO.puts("Zero is truthy!")
+if "", do: IO.puts("Empty string is truthy!")
+if [], do: IO.puts("Empty list is truthy!")
+
+# Common pattern: default values
+name = nil
+display_name = if name, do: name, else: "Anonymous"
+# Better written as:
+display_name = name || "Anonymous"
+IO.puts(display_name)
+`

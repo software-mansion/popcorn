@@ -1,0 +1,94 @@
+export const frontmatter = { order: 43 };
+
+# Maps - Key-Value Store
+
+Maps are Elixir's primary key-value data structure, offering efficient lookups and updates. Unlike keyword lists, maps have unique keys and no ordering guarantee.
+
+**Characteristics:**
+
+- **Unique keys**: Each key appears once
+- **Any key type**: Not limited to atoms
+- **O(log n) access**: Efficient for large datasets
+- **Pattern matching**: Powerful matching on structure
+- **Update syntax**: Special syntax for atom keys
+
+**When to use:**
+
+- Structured data (user profiles, configurations)
+- When you need unique keys
+- Large key-value datasets
+- JSON-like data structures
+
+export const defaultCode = `# Creating maps
+empty = %{}
+person = %{name: "Alice", age: 30, city: "NYC"}
+string_keys = %{"name" => "Bob", "age" => 25}
+mixed = %{:atom => "value", "string" => 123, 1 => "number key"}
+
+IO.inspect(person)
+
+# Accessing values
+# Dot notation (only for atom keys, crashes if key missing)
+name = person.name
+
+# Bracket notation (works for any key type)
+age = person[:age]
+city = person[:city]
+
+# Map.get with default
+country = Map.get(person, :country, "USA")
+
+IO.puts("#{name}, #{age}, from #{city}, #{country}")
+
+# Pattern matching
+%{name: extracted_name, age: extracted_age} = person
+IO.puts("Extracted: #{extracted_name}, #{extracted_age}")
+
+# Partial matching (don't need all keys)
+%{name: just_name} = person
+IO.puts("Just name: #{just_name}")
+
+# Updating maps
+# Pipe syntax (only updates existing atom keys!)
+updated = %{person | age: 31}
+
+# Map.put (adds or updates any key)
+with_email = Map.put(person, :email, "alice@example.com")
+
+# Multiple updates
+modified = Map.merge(person, %{age: 31, country: "Canada"})
+
+IO.inspect(updated)
+IO.inspect(with_email)
+
+# Nested maps and access
+user = %{
+  profile: %{
+    name: "Alice",
+    settings: %{
+      theme: "dark",
+      notifications: true
+    }
+  }
+}
+
+# Access nested values
+theme = user.profile.settings.theme
+
+# Update nested values
+updated_user = put_in(user.profile.settings.theme, "light")
+
+# Get nested with get_in
+notifications = get_in(user, [:profile, :settings, :notifications])
+
+IO.puts("Theme: #{theme}, Notifications: #{notifications}")
+
+# Map operations
+keys = Map.keys(person)
+values = Map.values(person)
+has_age = Map.has_key?(person, :age)
+without_city = Map.delete(person, :city)
+
+IO.inspect(keys, label: "Keys")
+IO.inspect(without_city, label: "Without city")
+`

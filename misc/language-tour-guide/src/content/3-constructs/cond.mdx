@@ -1,0 +1,93 @@
+export const frontmatter = {order: 4}
+
+# Cond - Multiple Conditions
+
+## Theory
+
+`cond` evaluates multiple conditions in order, executing the first branch where the condition is truthy. It's like a series of if-else if statements but cleaner.
+
+**Key features:**
+- **Sequential evaluation**: Tests conditions top to bottom
+- **First match wins**: Stops at first truthy condition
+- **Any expression**: Conditions can be any expression
+- **True catch-all**: Common to end with `true ->` as default
+
+**When to use:**
+- Multiple independent conditions
+- When `case` pattern matching isn't applicable
+- Replacing if-else if chains
+- Complex boolean logic
+
+export const defaultCode = `# Basic cond
+age = 25
+
+result =
+  cond do
+    age < 13 -> "Child"
+    age < 18 -> "Teenager"
+    age < 65 -> "Adult"
+    age >= 65 -> "Senior"
+    # Default case
+    true -> "Unknown"
+  end
+
+IO.puts("Age category: #{result}")
+
+# Multiple conditions
+score = 85
+
+grade =
+  cond do
+    score >= 90 -> "A"
+    score >= 80 -> "B"
+    score >= 70 -> "C"
+    score >= 60 -> "D"
+    true -> "F"
+  end
+
+IO.puts("Grade: #{grade}")
+
+# Complex conditions
+# 24-hour format
+time = 14
+
+greeting =
+  cond do
+    time >= 5 and time < 12 -> "Good morning"
+    time >= 12 and time < 17 -> "Good afternoon"
+    time >= 17 and time < 21 -> "Good evening"
+    true -> "Good night"
+  end
+
+IO.puts(greeting)
+
+# Comparison with if-else
+# Avoid this:
+status =
+  if score >= 90 do
+    "Excellent"
+  else
+    if score >= 70 do
+      "Good"
+    else
+      if score >= 50 do
+        "Pass"
+      else
+        "Fail"
+      end
+    end
+  end
+
+IO.puts("Status: #{status}")
+
+# Use cond instead:
+status =
+  cond do
+    score >= 90 -> "Excellent"
+    score >= 70 -> "Good"
+    score >= 50 -> "Pass"
+    true -> "Fail"
+  end
+
+IO.puts("Status: #{status}")
+`

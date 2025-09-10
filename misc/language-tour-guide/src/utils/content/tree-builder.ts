@@ -10,28 +10,41 @@ export async function getRawMdxTree() {
 
   for (const entry of loadedFlat) {
     let current = tree;
+    const formatPath = [];
 
     for (let i = 0; i < entry.path.length - 1; i++) {
       const dir = entry.path[i];
 
-      if (!current.has(dir)) {
-        current.set(dir, {
-          path: entry.path.slice(0, i + 1),
+      const [formatDir, dirOrder] = getFormatDirWithOrder(dir);
+
+      formatPath.push(formatDir);
+
+      if (!current.has(formatDir)) {
+        current.set(formatDir, {
+          path: formatPath,
           children: new Map(),
-          frontmatter: { order: Infinity }
+          frontmatter: { order: dirOrder }
         });
       }
 
-      current = current.get(dir)!.children;
+      current = current.get(formatDir)!.children;
     }
 
     const lastSegment = entry.path[entry.path.length - 1];
     current.set(lastSegment, {
-      path: entry.path,
+      path: [...formatPath, lastSegment],
       children: new Map(),
       frontmatter: entry.frontmatter
     });
   }
 
   return tree;
+}
+
+function getFormatDirWithOrder(name: string): [string, number] {
+  const result = name.match(/^(\d+)-(.*)/);
+  const order = result ? parseInt(result[1], 10) : Infinity;
+  const formatName = result ? result[2] : name;
+
+  return [formatName, order];
 }

@@ -1,0 +1,71 @@
+export const frontmatter = {order: 29}
+
+# Exercise: Process Communication
+
+Practice process spawning and message passing by building a process-based calculator that performs operations on demand!
+
+## Your Task: Calculator Server
+
+Create a calculator process that performs calculations based on messages it receives. This exercise will demonstrate how Elixir processes can be used for practical concurrent tasks through message passing.
+
+### Calculator Server Details:
+- Implement a long-running calculator process that waits for calculation requests
+- Support multiple operation types (addition, multiplication, division)
+- Handle error cases like division by zero
+- Implement proper process termination
+- Use timeouts to prevent hanging when a response isn't received
+
+## Requirements
+
+- Handle message pattern matching for different operations
+- Send appropriate responses back to the caller process
+- Implement a timeout mechanism to handle unresponsive processes
+- Properly handle error conditions
+- Maintain the calculator process state throughout multiple operations
+
+export const defaultCode = `defmodule ProcessExercises do
+  # Task 1: Calculator Server
+
+  # Create a calculator process that handles different operations
+
+  def start_calculator do
+    spawn(fn -> calculator_loop() end)
+  end
+
+  defp calculator_loop do
+    # TODO: Handle {:add, pid, a, b} - send back {:result, a + b}
+    receive do
+      # TODO: Handle {:multiply, pid, a, b}
+
+      # TODO: Handle {:divide, pid, a, b} - handle division by zero!
+
+      # TODO: Handle :stop to terminate the process
+
+      # TODO: Add a catch-all clause that continues the loop
+    end
+  end
+
+  # Helper function to send and receive with timeout
+
+  def calculate(calc_pid, operation, a, b) do
+    send(calc_pid, {operation, self(), a, b})
+
+    receive do
+      {:result, value} -> {:ok, value}
+      {:error, reason} -> {:error, reason}
+    after
+      1000 -> {:error, :timeout}
+    end
+  end
+end
+
+# Test Calculator Server
+
+IO.puts("=== Calculator Server ===")
+calc = ProcessExercises.start_calculator()
+
+IO.inspect(ProcessExercises.calculate(calc, :add, 10, 5))
+IO.inspect(ProcessExercises.calculate(calc, :multiply, 4, 7))
+IO.inspect(ProcessExercises.calculate(calc, :divide, 20, 4))
+IO.inspect(ProcessExercises.calculate(calc, :divide, 10, 0))
+`

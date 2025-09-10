@@ -1,0 +1,34 @@
+export const frontmatter = { order: 5 };
+
+# Comprehensions
+
+List comprehensions provide a concise way to generate lists based on existing enumerables.
+
+They support filters, multiple generators, and pattern matching.
+
+The `for` macro is powerful and can work with any enumerable.
+
+export const defaultCode = `# Basic comprehension
+squares = for n <- [1, 2, 3, 4, 5], do: n \* n
+IO.inspect(squares, label: "Squares")
+
+# With filter
+
+evens = for n <- 1..10, rem(n, 2) == 0, do: n
+IO.inspect(evens, label: "Even numbers")
+
+# Multiple generators
+
+pairs = for x <- [1, 2], y <- [3, 4], do: {x, y}
+IO.inspect(pairs, label: "All pairs")
+
+# Pattern matching in generators
+
+values = [{:ok, 1}, {:error, 2}, {:ok, 3}]
+ok_values = for {:ok, val} <- values, do: val
+IO.inspect(ok_values, label: "Only ok values")
+
+# Into different collection types
+
+map = for {key, val} <- [a: 1, b: 2, c: 3], into: %{}, do: {key, val \* 2}
+IO.inspect(map, label: "Into map")`

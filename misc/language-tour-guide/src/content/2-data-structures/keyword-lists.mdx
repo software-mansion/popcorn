@@ -1,0 +1,64 @@
+export const frontmatter = { order: 3 };
+
+# Keyword Lists - Ordered Options
+
+Keyword lists are special lists of 2-element tuples where the first element is an atom. They're Elixir's way of passing optional arguments and configuration.
+
+**Structure:** `[{:atom, value}, ...]` or `[atom: value, ...]`
+
+**Characteristics:**
+
+- **Ordered**: Maintains insertion order
+- **Duplicate keys**: Allowed and sometimes useful
+- **Syntactic sugar**: Special syntax for function calls
+- **Performance**: O(n) lookup (use maps for large datasets)
+
+**Common uses:**
+
+- Function options/configuration
+- DSL building (like Ecto queries)
+- Command-line arguments
+- Small ordered configurations
+
+export const defaultCode = `# Creating keyword lists - all equivalent
+kw1 = [{:name, "Alice"}, {:age, 30}]
+
+# Syntactic sugar
+kw2 = [name: "Alice", age: 30]
+IO.puts("Same? #{kw1 == kw2}")
+
+# Accessing values
+options = [timeout: 5000, retries: 3, async: true]
+timeout = options[:timeout]
+retries = Keyword.get(options, :retries)
+
+# With default value
+format = Keyword.get(options, :format, :json)
+IO.puts("Timeout: #{timeout}, Retries: #{retries}, Format: #{format}")
+
+# Duplicate keys are allowed!
+headers = [
+  content_type: "application/json",
+  authorization: "Bearer token123",
+  # Duplicate!
+  content_type: "text/html"
+]
+
+# Access returns first match
+first = headers[:content_type]
+
+# Get all values for key
+all = Keyword.get_values(headers, :content_type)
+IO.puts("First: #{first}")
+IO.inspect(all, label: "All content_type values")
+
+
+# Keyword operations
+opts = [a: 1, b: 2]
+updated = Keyword.put(opts, :c, 3)
+replaced = Keyword.put(opts, :a, 10)
+deleted = Keyword.delete(opts, :b)
+merged = Keyword.merge(opts, b: 20, c: 30)
+
+IO.inspect(updated)
+IO.inspect(merged)`
