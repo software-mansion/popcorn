@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
+import StdoutResults from "./StdoutResults";
 
 function formatTimeStamp(date: Date): string {
   return date.toLocaleTimeString([], {
@@ -34,9 +35,9 @@ export function History() {
   }, [history]);
 
   return (
-    <div className="mt-6">
+    <div className="border-t border-orange-100">
       <div
-        className="flex cursor-pointer items-center justify-between border-t border-orange-100 pt-3"
+        className="mt-3 flex cursor-pointer items-center justify-between px-6"
         onClick={toggleHistory}
       >
         <h3 className="text-brown-90 text-sm font-medium">Execution History</h3>
@@ -50,7 +51,7 @@ export function History() {
       </div>
 
       {showHistory && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-2 px-6">
           {history.length === 0 ? (
             <p className="text-grey-60 text-xs italic">
               No execution history yet
@@ -86,23 +87,7 @@ export function History() {
                     </div>
                     {entry.result || "No result"}
                   </div>
-                  {entry.stdoutResult && entry.stdoutResult.length > 0 && (
-                    <div className="mt-2 rounded border-l-2 border-blue-400 bg-gray-50 p-2 text-sm whitespace-pre-wrap">
-                      <div className="mb-1 flex flex-col gap-1">
-                        <span className="text-grey-70 text-xs font-medium">
-                          Console output:
-                        </span>
-                        {entry.stdoutResult.map((line, index) => (
-                          <span
-                            key={`stdout-${index}-${line}`}
-                            className="text-brown-90/70 text-xs font-medium"
-                          >
-                            {line}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <StdoutResults stdout={entry.stdoutResult} />
                 </div>
               ))}
             </>

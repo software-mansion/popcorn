@@ -4,10 +4,10 @@ import { usePopcorn } from "../../context/popcorn/actions";
 import { useCodeEditorStore } from "../../store/codeEditor";
 
 import { useShallow } from "zustand/react/shallow";
-import { History } from "./History";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
 import { useLocation } from "react-router";
+import StdoutResults from "./StdoutResults";
 
 export function Results() {
   const { pathname } = useLocation();
@@ -105,7 +105,7 @@ export function Results() {
   }, [onKeyDown]);
 
   return (
-    <section className="bg-light-30 border-grey-20 scrollbar min-h-100 overflow-y-scroll rounded-md border pb-20 lg:min-h-60 lg:pb-4">
+    <>
       <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
         <Button
           title="Reset Code"
@@ -119,7 +119,7 @@ export function Results() {
           onClick={handleRunCode}
         />
       </div>
-      <div className="font-inter text-brown-90 mt-4 flex flex-col gap-2 overflow-hidden px-6">
+      <div className="font-inter text-brown-90 flex flex-col gap-2 px-6">
         {pending ? (
           <span className="text-grey-60 text-xs"> (pending...)</span>
         ) : (
@@ -127,20 +127,19 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
-            {stdoutResult.map((line, index) => (
+            <StdoutResults stdout={stdoutResult} />
+            {/* {stdoutResult.map((line, index) => (
               <span
                 key={`stdout-${index}-${line}`}
                 className="text-brown-90/70 text-xs font-medium"
               >
                 {line}
               </span>
-            ))}
+            ))} */}
             <span>{resultData}</span>
           </>
         )}
-
-        <History />
       </div>
-    </section>
+    </>
   );
 }
