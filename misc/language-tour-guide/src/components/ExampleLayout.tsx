@@ -1,6 +1,6 @@
 import { CodeEditor } from "./code-editor/CodeEditor";
 import { Description } from "./Description";
-import { Results } from "./execution/Results";
+import Execution from "./execution/Execution";
 import { Outlet } from "react-router";
 
 export function ExampleLayout() {
@@ -10,7 +10,7 @@ export function ExampleLayout() {
         <Outlet />
       </Description>
       <CodeEditor />
-      <Results />
+      <Execution />
     </div>
   );
 }

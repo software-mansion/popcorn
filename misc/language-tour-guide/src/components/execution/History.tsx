@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
+import StdoutResults from "./StdoutResults";
 
 function formatTimeStamp(date: Date): string {
   return date.toLocaleTimeString([], {
@@ -27,10 +28,16 @@ export function History() {
     setShowHistory((prev) => !prev);
   };
 
+  const sortedHistory = useMemo(() => {
+    return [...history].sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    );
+  }, [history]);
+
   return (
-    <div className="mt-6">
+    <div className="border-t border-orange-100">
       <div
-        className="flex cursor-pointer items-center justify-between border-t border-orange-100 pt-3"
+        className="mt-3 flex cursor-pointer items-center justify-between px-6"
         onClick={toggleHistory}
       >
         <h3 className="text-brown-90 text-sm font-medium">Execution History</h3>
@@ -44,7 +51,7 @@ export function History() {
       </div>
 
       {showHistory && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-2 px-6">
           {history.length === 0 ? (
             <p className="text-grey-60 text-xs italic">
               No execution history yet
@@ -59,7 +66,7 @@ export function History() {
                   Clear History
                 </button>
               </div>
-              {history.map((entry, index) => (
+              {sortedHistory.map((entry, index) => (
                 <div
                   key={index}
                   className="bg-light-40 border-grey-20 rounded border p-2"
@@ -73,8 +80,14 @@ export function History() {
                     </span>
                   </div>
                   <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
+                    <div className="mb-1">
+                      <span className="text-grey-70 text-xs font-medium">
+                        Result:
+                      </span>
+                    </div>
                     {entry.result || "No result"}
                   </div>
+                  <StdoutResults stdout={entry.stdoutResult} />
                 </div>
               ))}
             </>
