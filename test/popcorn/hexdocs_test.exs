@@ -66,8 +66,6 @@ defmodule Popcorn.HexdocsTestHelper do
           {:ok, stdout} -> assert info.output == stdout
           :error -> :ok
         end
-
-        # IO.inspect({unquote(category), input}, label: :passed)
       end
     end
   end
