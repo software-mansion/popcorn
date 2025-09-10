@@ -45,6 +45,7 @@
     keyreplace/4,
     keystore/4,
     keytake/3,
+    keysearch/3,
     foldl/3,
     foldr/3,
     mapfoldl/3,
@@ -783,3 +784,10 @@ splitwith_1(Pred, [Hd | Tail], Taken) ->
     end;
 splitwith_1(_Pred, [], Taken) ->
     {?MODULE:reverse(Taken), []}.
+
+% Patch reason: NIF missing in AtomVM
+keysearch(Key, N, TupleList) ->
+    case lists:keyfind(Key, N, TupleList) of
+        false -> false;
+        Result -> {value, Result}
+    end.
