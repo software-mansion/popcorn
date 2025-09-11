@@ -292,7 +292,8 @@ defmodule Phoenix.HTML do
     |> Enum.join(" ")
   end
 
-  defp key_escape(value) when is_atom(value), do: String.replace(Atom.to_string(value), "_", "-")
+  #  defp key_escape(value) when is_atom(value), do: String.replace(Atom.to_string(value), "_", "-")
+  defp key_escape(value) when is_atom(value), do: Atom.to_string(value)
   defp key_escape(value), do: attr_escape(value)
 
   defp attr_escape({:safe, data}), do: data

@@ -1,3 +1,7 @@
+defmodule LocalLiveView.Message do
+  defstruct topic: nil, event: nil, payload: nil, ref: nil, join_ref: nil
+end
+
 defmodule LocalLiveView.Server do
   @moduledoc false
   use GenServer, restart: :temporary
@@ -18,8 +22,12 @@ defmodule LocalLiveView.Server do
   alias Phoenix.LiveView.Socket
   alias Phoenix.LiveView.Diff
 
-  alias Phoenix.Socket.{Broadcast, Message}
+  alias Phoenix.Socket.Broadcast
+  alias LocalLiveView.Message
 
+  import Popcorn.Wasm
+  alias Popcorn.Wasm
+  
   @prefix :phoenix
   @not_mounted_at_router :not_mounted_at_router
   @max_host_size 253
@@ -248,10 +256,10 @@ defmodule LocalLiveView.Server do
 #    {:noreply, reply(new_state, msg.ref, :ok, %{cids: deleted_cids})}
 #  end
 #
-#  def handle_info(%Message{topic: topic, event: "event"} = msg, %{topic: topic} = state) do
-#    %{"value" => raw_val, "event" => event, "type" => type} = payload = msg.payload
+  def handle_info(%Message{event: "event"} = msg, state) do
+    %{"value" => raw_val, "event" => event, "type" => type} = payload = msg.payload
 #    val = decode_event_type(type, raw_val, msg.payload)
-#
+
 #    if cid = msg.payload["cid"] do
 #      component_handle(state, cid, msg.ref, fn component_socket, component ->
 #        component_socket
@@ -259,13 +267,14 @@ defmodule LocalLiveView.Server do
 #        |> inner_component_handle_event(component, event, val)
 #      end)
 #    else
-#      new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
-#
-#      new_state.socket
-#      |> view_handle_event(event, val)
-#      |> handle_result({:handle_event, 3, msg.ref}, new_state)
+      new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
+#      new_state = Map.put(new_state, :dispatcher_pid, pid)
+      val = %{}
+      new_state.socket
+      |> view_handle_event(event, val)
+      |> handle_result({:handle_event, 3, msg.ref}, new_state)
 #    end
-#  end
+  end
 #
 #  def handle_info({@prefix, :async_result, {kind, info}}, state) do
 #    {ref, cid, keys, result} = info
@@ -503,21 +512,21 @@ defmodule LocalLiveView.Server do
 #    end
 #  end
 #
-#  defp view_handle_event(%Socket{} = socket, "lv:clear-flash", val) do
-#    case val do
-#      %{"key" => key} -> {:noreply, Utils.clear_flash(socket, key)}
-#      _ -> {:noreply, Utils.clear_flash(socket)}
-#    end
-#  end
-#
-#  defp view_handle_event(%Socket{}, "lv:" <> _ = bad_event, _val) do
-#    raise ArgumentError, """
-#    received unknown LiveView event #{inspect(bad_event)}.
-#    The following LiveView events are supported: lv:clear-flash.
-#    """
-#  end
-#
-#  defp view_handle_event(%Socket{} = socket, event, val) do
+  defp view_handle_event(%Socket{} = socket, "lv:clear-flash", val) do
+    case val do
+      %{"key" => key} -> {:noreply, Utils.clear_flash(socket, key)}
+      _ -> {:noreply, Utils.clear_flash(socket)}
+    end
+  end
+
+  defp view_handle_event(%Socket{}, "lv:" <> _ = bad_event, _val) do
+    raise ArgumentError, """
+    received unknown LiveView event #{inspect(bad_event)}.
+    The following LiveView events are supported: lv:clear-flash.
+    """
+  end
+
+  defp view_handle_event(%Socket{} = socket, event, val) do
 #    :telemetry.span(
 #      [:phoenix, :live_view, :handle_event],
 #      %{socket: socket, event: event, params: val},
@@ -530,20 +539,20 @@ defmodule LocalLiveView.Server do
 #            {{:reply, reply, socket}, %{socket: socket, event: event, params: val}}
 #
 #          {:cont, %Socket{} = socket} ->
-#            case socket.view.handle_event(event, val, socket) do
-#              {:noreply, %Socket{} = socket} ->
-#                {{:noreply, socket}, %{socket: socket, event: event, params: val}}
-#
-#              {:reply, reply, %Socket{} = socket} ->
-#                {{:reply, reply, socket}, %{socket: socket, event: event, params: val}}
-#
-#              other ->
-#                raise_bad_callback_response!(other, socket.view, :handle_event, 3)
-#            end
+            case socket.view.handle_event(event, val, socket) do
+              {:noreply, %Socket{} = socket} ->
+                {:noreply, socket}
+
+              {:reply, reply, %Socket{} = socket} ->
+                {:reply, reply, socket}
+
+              other ->
+                raise_bad_callback_response!(other, socket.view, :handle_event, 3)
+            end
 #        end
 #      end
 #    )
-#  end
+  end
 #
 #  defp view_handle_info(msg, %{view: view} = socket) do
 #    exported? = exported?(view, :handle_info, 2)
@@ -623,59 +632,59 @@ defmodule LocalLiveView.Server do
     end
   end
 
-#  defp handle_result(
-#         {:reply, %{} = reply, %Socket{} = new_socket},
-#         {:handle_event, 3, ref},
-#         state
-#       ) do
-#    handle_changed(state, Utils.put_reply(new_socket, reply), ref)
-#  end
-#
-#  defp handle_result({:noreply, %Socket{} = new_socket}, {_from, _arity, ref}, state) do
-#    handle_changed(state, new_socket, ref)
-#  end
-#
-#  defp handle_result(result, {name, arity, _ref}, state) do
-#    raise_bad_callback_response!(result, state.socket.view, name, arity)
-#  end
-#
-#  defp raise_bad_callback_response!(result, view, :handle_call, 3) do
-#    raise ArgumentError, """
-#    invalid noreply from #{inspect(view)}.handle_call/3 callback.
-#
-#    Expected one of:
-#
-#        {:noreply, %Socket{}}
-#        {:reply, map, %Socket{}}
-#
-#    Got: #{inspect(result)}
-#    """
-#  end
-#
-#  defp raise_bad_callback_response!(result, view, :handle_event, arity) do
-#    raise ArgumentError, """
-#    invalid return from #{inspect(view)}.handle_event/#{arity} callback.
-#
-#    Expected one of:
-#
-#        {:noreply, %Socket{}}
-#        {:reply, map, %Socket{}}
-#
-#    Got: #{inspect(result)}
-#    """
-#  end
-#
-#  defp raise_bad_callback_response!(result, view, name, arity) do
-#    raise ArgumentError, """
-#    invalid noreply from #{inspect(view)}.#{name}/#{arity} callback.
-#
-#    Expected one of:
-#
-#        {:noreply, %Socket{}}
-#
-#    Got: #{inspect(result)}
-#    """
-#  end
+  defp handle_result(
+         {:reply, %{} = reply, %Socket{} = new_socket},
+         {:handle_event, 3, ref},
+         state
+       ) do
+    handle_changed(state, Utils.put_reply(new_socket, reply), ref)
+  end
+
+  defp handle_result({:noreply, %Socket{} = new_socket}, {_from, _arity, ref}, state) do
+    handle_changed(state, new_socket, ref)
+  end
+
+  defp handle_result(result, {name, arity, _ref}, state) do
+    raise_bad_callback_response!(result, state.socket.view, name, arity)
+  end
+
+  defp raise_bad_callback_response!(result, view, :handle_call, 3) do
+    raise ArgumentError, """
+    invalid noreply from #{inspect(view)}.handle_call/3 callback.
+
+    Expected one of:
+
+        {:noreply, %Socket{}}
+        {:reply, map, %Socket{}}
+
+    Got: #{inspect(result)}
+    """
+  end
+
+  defp raise_bad_callback_response!(result, view, :handle_event, arity) do
+    raise ArgumentError, """
+    invalid return from #{inspect(view)}.handle_event/#{arity} callback.
+
+    Expected one of:
+
+        {:noreply, %Socket{}}
+        {:reply, map, %Socket{}}
+
+    Got: #{inspect(result)}
+    """
+  end
+
+  defp raise_bad_callback_response!(result, view, name, arity) do
+    raise ArgumentError, """
+    invalid noreply from #{inspect(view)}.#{name}/#{arity} callback.
+
+    Expected one of:
+
+        {:noreply, %Socket{}}
+
+    Got: #{inspect(result)}
+    """
+  end
 #
 #  defp component_handle(state, cid, ref, fun) do
 #    %{socket: socket, components: components} = state
@@ -836,21 +845,21 @@ defmodule LocalLiveView.Server do
 #  defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
 #  defp gather_keys(_, acc), do: acc
 #
-#  defp handle_changed(state, %Socket{} = new_socket, ref, pending_live_patch \\ nil) do
-#    new_state = %{state | socket: new_socket}
-#
-#    case maybe_diff(new_state, false) do
-#      {:diff, diff, new_state} ->
-#        {:noreply,
-#          new_state
-#          |> clear_live_patch_counter()
-#          |> push_live_patch(pending_live_patch)
-#          |> push_diff(diff, ref)}
-#
-#      result ->
+  defp handle_changed(state, %Socket{} = new_socket, ref, pending_live_patch \\ nil) do
+    new_state = %{state | socket: new_socket}
+    case maybe_diff(new_state, false) do
+      {:diff, diff, new_state} ->
+        {:noreply,
+          new_state
+          |> clear_live_patch_counter()
+          |> push_live_patch(pending_live_patch)
+          |> push_diff(diff, ref)}
+
+      result ->
 #        handle_redirect(new_state, result, Utils.changed_flash(new_socket), ref)
-#    end
-#  end
+        state
+    end
+  end
 #
 #  defp check_patch_redirect_limit!(state) do
 #    current = state.redirect_count
@@ -866,9 +875,9 @@ defmodule LocalLiveView.Server do
 #    end
 #  end
 #
-#  defp clear_live_patch_counter(state) do
-#    %{state | redirect_count: 0}
-#  end
+  defp clear_live_patch_counter(state) do
+    %{state | redirect_count: 0}
+  end
 #
 #  defp handle_redirect(new_state, result, flash, ref) do
 #    %{socket: new_socket} = new_state
@@ -968,8 +977,8 @@ defmodule LocalLiveView.Server do
 #    handle_changed(state, new_socket, ref, opts)
 #  end
 #
-#  defp push_live_patch(state, nil), do: state
-#  defp push_live_patch(state, opts), do: push(state, "live_patch", opts)
+  defp push_live_patch(state, nil), do: state
+  defp push_live_patch(state, opts), do: push(state, "live_patch", opts)
 #
 #  defp push_redirect(state, opts, nil = _ref) do
 #    push(state, "redirect", opts)
@@ -986,14 +995,14 @@ defmodule LocalLiveView.Server do
 #  defp push_live_redirect(state, opts, ref) do
 #    reply(state, ref, :ok, %{live_redirect: opts})
 #  end
-#
-#  defp push_noop(state, nil = _ref), do: state
-#  defp push_noop(state, ref), do: reply(state, ref, :ok, %{})
-#
-#  defp push_diff(state, diff, ref) when diff == %{}, do: push_noop(state, ref)
-#  defp push_diff(state, diff, nil = _ref), do: push(state, "diff", diff)
-#  defp push_diff(state, diff, ref), do: reply(state, ref, :ok, %{diff: diff})
-#
+
+  defp push_noop(state, nil = _ref), do: state
+  defp push_noop(state, ref), do: reply(state, ref, :ok, %{})
+
+  defp push_diff(state, diff, ref) when diff == %{}, do: push_noop(state, ref)
+  defp push_diff(state, diff, nil = _ref), do: push(state, "diff", diff)
+  defp push_diff(state, diff, ref), do: reply(state, ref, :ok, %{diff: diff})
+
 #  defp copy_flash(_state, flash, opts) when flash == %{},
 #       do: opts
 #
@@ -1006,17 +1015,22 @@ defmodule LocalLiveView.Server do
 
   defp render_diff(state, socket, force?) do
     changed? = Utils.changed?(socket)
-
     {socket, diff, fingerprints, components} =
       if force? or changed? do
 #        :telemetry.span(
 #          [:phoenix, :live_view, :render],
 #          %{socket: socket, force?: force?, changed?: changed?},
 #          fn ->
-            rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
-
+            rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view) |> IO.inspect()
+            
+            rendered
+            |> Phoenix.HTML.Safe.to_iodata()
+            |> LocalLiveView.rendered_iodata_to_binary()
+            |> LocalLiveView.JS.rerender(socket.view)
+            
             {diff, fingerprints, components} =
               Diff.render(socket, rendered, state.fingerprints, state.components)
+              |> IO.inspect()
             socket =
               socket
 #              |> Lifecycle.after_render()
@@ -1038,28 +1052,29 @@ defmodule LocalLiveView.Server do
       %{state | socket: new_socket, fingerprints: fingerprints, components: components}}
   end
 
-#  defp reply(state, {ref, extra}, status, payload) do
-#    reply(state, ref, status, Map.merge(payload, extra))
-#  end
-#
-#  defp reply(state, ref, status, payload) when is_binary(ref) do
+  defp reply(state, {ref, extra}, status, payload) do
+    reply(state, ref, status, Map.merge(payload, extra))
+  end
+
+  defp reply(state, ref, status, payload) when is_binary(ref) do
 #    reply_ref = {state.socket.transport_pid, state.serializer, state.topic, ref, state.join_ref}
 #    Phoenix.Channel.reply(reply_ref, {status, payload})
-#    state
-#  end
-#
-#  defp push(state, event, payload) do
+    state
+  end
+
+  defp push(state, event, payload) do
 #    message = %Message{
 #      topic: state.topic,
 #      event: event,
 #      payload: payload,
 #      join_ref: state.join_ref
 #    }
-#
+    view = state.socket.view
 #    send(state.socket.transport_pid, state.serializer.encode!(message))
-#    state
-#  end
-#
+    
+    state
+  end
+
 #  ## Mount
 #
   defp mount(%{"session" => session} = params, from, phx_socket) do
@@ -1470,9 +1485,9 @@ defmodule LocalLiveView.Server do
 #      end
 #    end)
 #  end
-#
-#  defp maybe_update_uploads(%Socket{} = socket, %{} = _payload), do: socket
-#
+
+  defp maybe_update_uploads(%Socket{} = socket, %{} = _payload), do: socket
+
 #  defp register_entry_upload(state, from, info) do
 #    %{channel_pid: pid, ref: ref, entry_ref: entry_ref, cid: cid} = info
 #

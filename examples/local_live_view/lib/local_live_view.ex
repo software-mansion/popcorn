@@ -3,6 +3,10 @@ defmodule LocalLiveView do
   @process_name :main
   alias Phoenix.LiveView.Session
   alias Phoenix.LiveView.Diff
+  import Popcorn.Wasm
+  alias Popcorn.Wasm
+  alias Phoenix.LiveView.Static
+  alias LocalLiveView.Message
   
   defmacro __using__(opts) do
     # Expand layout if possible to avoid compile-time dependencies
@@ -23,6 +27,8 @@ defmodule LocalLiveView do
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
       @before_compile LocalLiveView
+
+      alias LocalLiveView.Message
 #
 #      # Phoenix.Component must come last so its @before_compile runs last
       use LocalComponent, Keyword.take(opts, [:global_prefixes])
@@ -93,9 +99,6 @@ defmodule LocalLiveView do
       log: log
     }
   end
-  
-  
-  
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: @process_name)
@@ -104,26 +107,29 @@ defmodule LocalLiveView do
   @impl true
   def init(_init_arg) do
     Popcorn.Wasm.register(@process_name)
+    view = ThermostatLive
     params = %{
-      "session" => %Session{view: ThermostatLive}
+      "session" => %Session{view: view}
     }
 #    with {:ok, pid} <- DynamicSupervisor.start_child(LocalLiveView.Server.Supervisor, LocalLiveView.Server.child_spec([])) do
+    rendered =
+      Static.render(view)
+      |> then(fn {:ok, {:safe, content}, assigns} -> diff_iodata_to_binary(content) end)
+    Popcorn.Wasm.run_js("""
+    ({ args }) => {
+      document.body.innerHTML = args.rendered;
+    }
+    """, %{rendered: rendered})
     ref = make_ref()
     with {:ok, pid} <- LocalLiveView.Server.start_link([]) do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
       receive do
         {^ref, {:ok, reply}} ->
-          IO.inspect(reply, label: "RECEIVED")
-          rendered = 
-            reply
-            |> Diff.to_iodata()
-            |> iodata_to_binary()
-          Popcorn.Wasm.run_js("""
-          ({ args }) => {
-            document.body.innerHTML = args.rendered;
-          }
-          """, %{rendered: rendered})
-          {:ok, reply, pid}
+          reply
+          |> Diff.to_iodata()
+          |> diff_iodata_to_binary()
+          |> LocalLiveView.JS.rerender(view)
+          {:ok, %{view => pid}}
 
         {^ref, {:error, reply}} ->
           {:error, reply}
@@ -139,19 +145,41 @@ defmodule LocalLiveView do
 #      document.body.innerHTML = args.rendered;
 #    }
 #    """, %{rendered: rendered})
+#    {:ok, %{view => pid}}
+  end
 
-    :ignore
+  @impl GenServer
+  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
+    state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    {:noreply, state}
   end
   
-  @impl true
   def handle_info(any, state) do
-#    IO.inspect(any, label: "HANDLE_INFO:")
-    {:no_reply, state}
+    IO.inspect(any, label: "HANDLE_INFO:")
+    {:noreply, state}
   end
 
-  def iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
-    Enum.reduce(list_of_binaries, "", fn binary, acc ->
-      acc <> to_string(binary) 
+  defp handle_wasm({:wasm_call, %{"event" => type, "view" => view, "payload" => payload}}, state) do
+    view = String.to_existing_atom(view)
+    payload = payload |> Map.merge(%{"type" => %{}, "value" => %{}})
+    Map.get(state, view)
+    |> send(%Message{payload: payload, event: "event"})
+    {:resolve, :ok, state}
+  end
+
+  def diff_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
+    Enum.reduce(list_of_binaries, "", fn
+      integer, acc when is_integer(integer) -> acc <> List.to_string([integer])
+      list, acc when is_list(list) -> acc <> diff_iodata_to_binary(list)
+      binary, acc -> acc <> to_string(binary)
+    end)
+  end
+
+  def rendered_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
+    Enum.reduce(list_of_binaries, "", fn
+      integer, acc when is_integer(integer) -> acc <> to_string(integer)
+      list, acc when is_list(list) -> acc <> rendered_iodata_to_binary(list)
+      binary, acc -> acc <> to_string(binary)
     end)
   end
   
