@@ -65,7 +65,6 @@ defmodule Phoenix.LiveView.Renderer do
   """
   def to_rendered(socket, view) do
     assigns = render_assigns(socket)
-
     inner_content =
       case socket do
         %{private: %{render_with: render_with}} ->
