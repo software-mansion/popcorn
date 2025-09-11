@@ -128,14 +128,6 @@ export function Results() {
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
             <StdoutResults stdout={stdoutResult} />
-            {/* {stdoutResult.map((line, index) => (
-              <span
-                key={`stdout-${index}-${line}`}
-                className="text-brown-90/70 text-xs font-medium"
-              >
-                {line}
-              </span>
-            ))} */}
             <span>{resultData}</span>
           </>
         )}
