@@ -39,7 +39,7 @@ export function Navigation() {
       </button>
       <span className="ml-5">{location.pathname}</span>
       <ul
-        className={`scrollbar bg-light-20 absolute top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
+        className={`scrollbar bg-light-20 fixed top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
           isOpen
             ? "translate-x-0 opacity-100"
             : "pointer-events-none -translate-x-full opacity-0"
@@ -57,7 +57,7 @@ export function Navigation() {
         ))}
       </ul>
       <div
-        className={`absolute inset-0 z-20 h-full w-full bg-black/20 transition-opacity duration-300 ease-in-out ${
+        className={`fixed inset-0 z-20 h-full w-full bg-black/20 transition-opacity duration-300 ease-in-out ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         aria-hidden={!isOpen}
