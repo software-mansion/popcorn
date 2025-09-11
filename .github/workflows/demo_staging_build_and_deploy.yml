@@ -9,6 +9,7 @@ on:
       - "misc/landing-page/**"
       - "misc/language-tour-guide/**"
       - "misc/landing.nginx.conf"
+      - "Dockerfile"
       - ".github/workflows/demo_staging_build_and_deploy.yml"
 
 env:
