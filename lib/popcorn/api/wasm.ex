@@ -240,16 +240,16 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Notifies JS that Elixir side finished initializing. Can be called only once.
+  Registers the main process and notifies JS that Elixir side finished initializing. Can be called only once.
+
+  ## Examples
+
+      Popcorn.Wasm.register(:my_main_process)
+
   """
   def register(main_process_name) do
-    """
-    ({ wasm, args }) => {
-      wasm.onElixirReady?.(args.main);
-    }
-    """
-    |> run_js(%{main: to_string(main_process_name)})
-
+    register_receiver(to_string(main_process_name))
+    send_elixir_ready()
     :ok
   end
 
@@ -316,6 +316,56 @@ defmodule Popcorn.Wasm do
     }
     """
     |> run_js(%{cleanupFn: ref})
+  end
+
+  @doc """
+  Sends an event to the JavaScript side.
+
+  Events are queued if sent before `send_elixir_ready/0` is called.
+
+  ## Examples
+
+      Popcorn.Wasm.sendEvent("processing_finished", %{id: 123})
+      Popcorn.Wasm.sendEvent("user_logged_in", %{user: "john", timestamp: DateTime.utc_now()})
+
+  """
+  @spec send_event(String.t()) :: :ok
+  @spec send_event(String.t(), term()) :: :ok
+  def send_event(event_name, payload \\ nil) when is_binary(event_name) do
+    """
+    ({ wasm, args }) => {
+      wasm.sendEvent(args.eventName, args.payload)
+    }
+    """
+    |> run_js(%{eventName: event_name, payload: payload}, return: :ref)
+
+    :ok
+  end
+
+  @doc """
+  Registers a process as a receiver and sends the registration event to JavaScript.
+
+  This should be called before `send_elixir_ready/0` to establish the default process
+  for handling JavaScript calls.
+
+  """
+  @spec register_receiver(String.t()) :: :ok
+  def register_receiver(name) when is_binary(name) do
+    send_event("popcorn_register_receiver", %{name: name})
+    :ok
+  end
+
+  @doc """
+  Sends the Elixir ready event to JavaScript, indicating that the Elixir side
+  has finished initialization.
+
+  After this is called, any queued events will be processed and new events will
+  be sent immediately.
+  """
+  @spec send_elixir_ready() :: :ok
+  def send_elixir_ready() do
+    send_event("popcorn_elixir_ready")
+    :ok
   end
 
   @doc false
