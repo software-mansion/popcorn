@@ -5,21 +5,22 @@ const HEARTBEAT_TIMEOUT_MS = 60_000;
 // postMessage data:
 //  | { type: "stdout", value: string }
 //  | { type: "stderr", value: string }
-//  | { type: "init", value: string }
 //  | { type: "call", value: ElixirRequest | ElixirResponse}
 //  | { type: "callAck", value: ElixirAck }
 //  | { type: "cast", value: ElixirRequest }
+//  | { type: "event", value: ElixirEvent }
 //  | { type: "heartbeat", value: void }
 //  | { type: "reload", value: void }
 //
 // ElixirRequest: { requestId: number, process: string, action: string, args: any }
 // ElixirResponse: { requestId: number, error: string } | { requestId: number, data: any }
 // ElixirAck: { requestId: number }
+// ElixirEvent: { eventName: string, payload: any }
 const MESSAGES = {
-  INIT: "popcorn-init",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
+  EVENT: "popcorn-event",
   STDOUT: "popcorn-stdout",
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
@@ -48,6 +49,7 @@ export class Popcorn {
   onStdout = null;
   onStderr = null;
   heartbeatTimeoutMs = null;
+  defaultReceiver = null;
 
   _debug = false;
   _bundlePath = null;
@@ -61,6 +63,10 @@ export class Popcorn {
   _iframe = null;
   _mountPromise = null;
   _heartbeatTimeout = null;
+
+  _eventHandlers = new Map();
+  _eventQueue = [];
+  _elixirReady = false;
 
   /** @hideconstructor */
   constructor(params, token) {
@@ -238,6 +244,29 @@ export class Popcorn {
   }
 
   /**
+   * Registers an event handler for a specific event name.
+   *
+   * @param {string} eventName - The name of the event to listen for
+   * @param {function(any): void} handler - The handler function to call when the event is received
+   */
+  onMessage(eventName, handler) {
+    if (!this._eventHandlers.has(eventName)) {
+      this._eventHandlers.set(eventName, []);
+    }
+    this._eventHandlers.get(eventName).push(handler);
+  }
+
+  /**
+   * Sets the default receiver process name for subsequent calls.
+   *
+   * @param {string} processName - The name of the process to use as default receiver
+   */
+  setDefaultReceiver(processName) {
+    this.defaultReceiver = processName;
+    this._initProcess = processName;
+  }
+
+  /**
    * Destroys an iframe and resets the instance.
    */
   deinit() {
@@ -261,9 +290,9 @@ export class Popcorn {
     const handlers = {
       [MESSAGES.STDOUT]: this.onStdout.bind(this),
       [MESSAGES.STDERR]: this.onStderr.bind(this),
-      [MESSAGES.INIT]: this._onInit.bind(this),
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
+      [MESSAGES.EVENT]: this._onEvent.bind(this),
       [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),
       [MESSAGES.RELOAD]: this._reloadIframe.bind(this),
     };
@@ -278,10 +307,60 @@ export class Popcorn {
     }
   }
 
-  _onInit(initProcess) {
-    this._trace("Main: onInit, main process: ", initProcess);
-    this._mountPromise();
-    this._initProcess = initProcess;
+  _onEvent({ eventName, payload }) {
+    this._trace("Main: onEvent: ", { eventName, payload });
+
+    if (eventName === "popcorn_register_receiver") {
+      if (this.defaultReceiver === null) {
+        this.setDefaultReceiver(payload.name);
+      }
+
+      if (this._mountPromise !== null) {
+        this._mountPromise();
+        this._mountPromise = null;
+      }
+      return;
+    }
+
+    if (eventName === "popcorn_elixir_ready") {
+      this._elixirReady = true;
+      this._processEventQueue();
+      this._dispatchEvent(eventName, payload);
+      return;
+    }
+
+    if (!this._elixirReady) {
+      this._eventQueue.push({ eventName, payload });
+      return;
+    }
+
+    this._dispatchEvent(eventName, payload);
+  }
+
+  _processEventQueue() {
+    this._trace(
+      "Main: processing event queue, length: ",
+      this._eventQueue.length
+    );
+    const events = [...this._eventQueue];
+    this._eventQueue = [];
+
+    for (const { eventName, payload } of events) {
+      this._dispatchEvent(eventName, payload);
+    }
+  }
+
+  _dispatchEvent(eventName, payload) {
+    this._trace("Main: dispatching event: ", { eventName, payload });
+
+    const handlers = this._eventHandlers.get(eventName) || [];
+    for (const handler of handlers) {
+      try {
+        handler(payload);
+      } catch (error) {
+        console.error(`Error in event handler for '${eventName}':`, error);
+      }
+    }
   }
 
   _onCallAck({ requestId }) {
@@ -347,7 +426,7 @@ export class Popcorn {
   }
 }
 
-function noop() { }
+function noop() {}
 
 async function withTimeout(promise, ms) {
   let timeout = null;
