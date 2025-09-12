@@ -62,6 +62,10 @@ RUN npm run build
 RUN cp -r dist/* /build/out
 
 FROM build_base AS build_lang_tour
+WORKDIR /build/popcorn/misc/language-tour-guide/elixir_tour
+RUN mix deps.get
+RUN mix popcorn.cook
+
 WORKDIR /build/popcorn/misc/language-tour-guide
 RUN npm install
 RUN npm run build

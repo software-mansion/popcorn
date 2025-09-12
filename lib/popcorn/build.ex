@@ -70,7 +70,8 @@ defmodule Popcorn.Build do
           app_cache = build_app(app, Map.get(cache, app, %{}))
           {app, app_cache}
         end,
-        timeout: 600_000
+        timeout: 600_000,
+        max_concurrency: 2
       )
       |> Map.new()
 
@@ -287,7 +288,7 @@ defmodule Popcorn.Build do
 
   defp process_async(enum, fun, opts \\ []) do
     enum
-    |> Task.async_stream(fun, Keyword.merge([timeout: 60_000, ordered: false], opts))
+    |> Task.async_stream(fun, Keyword.merge([timeout: 120_000, ordered: false], opts))
     |> Enum.map(fn {:ok, result} -> result end)
   end
 
