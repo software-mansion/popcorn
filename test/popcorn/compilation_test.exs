@@ -4,6 +4,7 @@ defmodule Popcorn.CompilationTest do
   alias Popcorn.Support.AtomVM
 
   @moduletag :tmp_dir
+  # @moduletag :skip
 
   test "code load module", %{tmp_dir: run_dir} do
     module_ast =
@@ -50,7 +51,7 @@ defmodule Popcorn.CompilationTest do
     assert %FunctionClauseError{module: :orddict, function: :take, arity: 2} = error
 
     assert [
-             {:orddict, :take, 2, [file: ~c"orddict", line: 118]},
+             {:orddict, :take, 2, [file: ~c"orddict.erl", line: 118]},
              {RunExpr, :run, 1, [file: code_file, line: run_line]}
              | rest
            ] = stacktrace
