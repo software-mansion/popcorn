@@ -1,10 +1,10 @@
 import init from "./AtomVM.mjs";
 
 const MESSAGES = {
-  INIT: "popcorn-init",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
+  EVENT: "popcorn-event",
   STDOUT: "popcorn-stdout",
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
@@ -66,7 +66,14 @@ export async function initVm() {
     const serialized = Module.serialize(args);
     return origCall(process, serialized);
   };
+  Module["sendEvent"] = (eventName, payload) => {
+    if (eventName === "popcorn_register_receiver" && !Module._vmInitialized) {
+      Module._vmInitialized = true;
+      onVmInit();
+    }
 
+    send(MESSAGES.EVENT, { eventName, payload });
+  };
   Module["onRunTrackedJs"] = (scriptString, isDebug) => {
     const trackValue = (tracked) => {
       const getKey = Module["nextTrackedObjectKey"];
@@ -113,11 +120,6 @@ export async function initVm() {
     };
     return keys.map(getTrackedObject);
   };
-
-  Module["onElixirReady"] = (initProcess) => {
-    onVmInit(initProcess);
-    Module["onElixirReady"] = null;
-  };
 }
 
 function ensureFunctionEval(maybeFunction) {
@@ -136,7 +138,7 @@ function ensureResultKeyList(result) {
   }
 }
 
-function onVmInit(initProcess) {
+function onVmInit() {
   setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
 
   window.addEventListener("message", async ({ data }) => {
@@ -150,7 +152,7 @@ function onVmInit(initProcess) {
         const result = await Module.call(process, args);
         send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
       } catch (error) {
-        if(error == "noproc") {
+        if (error == "noproc") {
           send(MESSAGES.RELOAD, null);
           console.error("Runtime VM crashed, popcorn iframe reloaded.");
           return;
@@ -161,7 +163,6 @@ function onVmInit(initProcess) {
       `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`;
     }
   });
-  send(MESSAGES.INIT, initProcess);
 }
 
 function send(type, data) {
