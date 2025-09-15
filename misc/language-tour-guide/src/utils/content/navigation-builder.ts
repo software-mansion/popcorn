@@ -25,6 +25,7 @@ function processNavigationLevel(mapTree: DirTree): NavigationTree {
     const item: NavigationTreeItem = {
       title: formatTitle(key),
       path: "/" + entry.path.join("/"),
+      parentPath: "/" + entry.path.slice(0, -1).join("/"),
       type: isLeafNode ? "link" : "section",
       children: processNavigationLevel(entry.children)
     };
@@ -39,6 +40,12 @@ function formatTitle(text: string): string {
   const formattedText = text.replaceAll("-", " ");
 
   return formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
+}
+
+function getParentPath(path: string): string {
+  const cleanPath = path.split("?")[0];
+
+  return cleanPath.split("/").slice(0, -1).join("/");
 }
 
 function compareEntriesByOrder(a: [Dir, DirEntry], b: [Dir, DirEntry]): number {
@@ -56,12 +63,17 @@ function compareEntriesByOrder(a: [Dir, DirEntry], b: [Dir, DirEntry]): number {
 }
 
 export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
-  const flatNavigation: { title: string; path: string }[] = [];
+  const flatNavigation: { title: string; path: string; parentPath: string }[] =
+    [];
 
   const traverse = (items: NavigationTree) => {
     for (const item of items) {
       if (item.type === "link") {
-        flatNavigation.push({ title: item.title, path: item.path });
+        flatNavigation.push({
+          title: item.title,
+          path: item.path,
+          parentPath: item.parentPath
+        });
       }
 
       traverse(item.children);
@@ -70,12 +82,10 @@ export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
 
   traverse(tree);
 
-  const parentPath = path.split("/").slice(0, -1).join("/");
+  const parentPath = getParentPath(path);
 
   const children = flatNavigation.filter((item) => {
-    const itemParentPath = item.path.split("/").slice(0, -1).join("/");
-
-    return itemParentPath === parentPath;
+    return item.parentPath === parentPath;
   });
 
   const currentChildrenIndex = children.findIndex((item) => item.path === path);
