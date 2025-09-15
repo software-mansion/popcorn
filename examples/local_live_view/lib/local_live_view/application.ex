@@ -6,7 +6,7 @@ defmodule LocalLiveView.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      LocalLiveView,
+      LocalLiveView.Dispatcher,
       {DynamicSupervisor, name: LocalLiveView.Server.Supervisor, strategy: :one_for_one}
     ]
     
