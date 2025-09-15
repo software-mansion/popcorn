@@ -369,11 +369,11 @@ defmodule LocalLiveView.Server do
 #    handle_changed(state, new_socket, nil)
 #  end
 #
-#  def handle_info(msg, %{socket: socket} = state) do
-#    msg
-#    |> view_handle_info(socket)
-#    |> handle_result({:handle_info, 2, nil}, state)
-#  end
+  def handle_info(msg, %{socket: socket} = state) do
+    msg
+    |> view_handle_info(socket)
+    |> handle_result({:handle_info, 2, nil}, state)
+  end
 #
 #  defp handle_noop({%Phoenix.LiveComponent.CID{cid: cid}, _}) do
 #    # Only a warning, because there can be race conditions where a component is removed before a `send_update` happens.
@@ -554,13 +554,13 @@ defmodule LocalLiveView.Server do
 #    )
   end
 #
-#  defp view_handle_info(msg, %{view: view} = socket) do
+  defp view_handle_info(msg, %{view: view} = socket) do
 #    exported? = exported?(view, :handle_info, 2)
 #
 #    case Lifecycle.handle_info(msg, socket) do
 #      {:cont, %Socket{} = socket} when exported? ->
-#        view.handle_info(msg, socket)
-#
+        view.handle_info(msg, socket)
+
 #      {:cont, %Socket{} = socket} when not exported? ->
 #        Logger.debug(
 #          "warning: undefined handle_info in #{inspect(view)}. Unhandled message: #{inspect(msg)}"
@@ -571,7 +571,7 @@ defmodule LocalLiveView.Server do
 #      {_, %Socket{} = socket} ->
 #        {:noreply, socket}
 #    end
-#  end
+  end
 #
 #  defp exported?(m, f, a) do
 #    function_exported?(m, f, a) or (Code.ensure_loaded?(m) and function_exported?(m, f, a))
@@ -1027,7 +1027,7 @@ defmodule LocalLiveView.Server do
             |> Phoenix.HTML.Safe.to_iodata()
             |> LocalLiveView.rendered_iodata_to_binary()
             |> LocalLiveView.JS.rerender(socket.view)
-            
+            IO.inspect(socket.view, label: "SOOOOOOOOOOOOOOOOCKET")
             {diff, fingerprints, components} =
               Diff.render(socket, rendered, state.fingerprints, state.components)
               |> IO.inspect()

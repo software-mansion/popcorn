@@ -126,7 +126,7 @@ defmodule Phoenix.LiveView.Static do
     case call_mount_and_handle_params!(socket, view, %Phoenix.LiveView.Session{view: view}, %{}) do
       {:ok, socket} ->
         data_attrs = [
-          "pop-view": to_string(view)
+          "pop-view": view |> Module.split() |> List.last()
 #          phx_session: sign_root_session(socket, router, view, to_sign_session, live_session),
 #          phx_static: sign_static_token(socket)
         ]
