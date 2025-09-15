@@ -12,6 +12,26 @@ import Header from "../components/Header.astro";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <title>Popcorn: Elixir & Wasm</title>
+    <meta
+      name="description"
+      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
+    />
+
+    <meta property="og:title" content="Popcorn: Elixir & Wasm" />
+    <meta
+      property="og:description"
+      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Popcorn" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Popcorn: Elixir & Wasm" />
+    <meta
+      name="twitter:description"
+      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="49x80" />
     <link
@@ -30,7 +50,6 @@ import Header from "../components/Header.astro";
     />
     <script is:inline type="module" src="/wasm/popcorn.js"></script>
     <meta name="generator" content={Astro.generator} />
-    <title>Popcorn</title>
   </head>
   <body>
     <main class="bg-light-20 font-inter min-h-dvh gap-20 overflow-x-clip pt-24">
