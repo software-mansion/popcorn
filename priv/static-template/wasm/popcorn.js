@@ -39,6 +39,8 @@ const INIT_TOKEN = Symbol();
 
 /** @typedef {any} AnySerializable */
 
+class PopcornDeinitializedError extends Error { }
+
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
  */
@@ -251,7 +253,7 @@ export class Popcorn {
     this._listenerRef = null;
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
-      callData.reject({ error: new Error("Call cancelled due to instance deinit"), durationMs })
+      callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })
     }
   }
 
