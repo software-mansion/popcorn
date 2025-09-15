@@ -1,23 +1,19 @@
 import { Popcorn } from "./wasm/popcorn.js";
 
-var popRender = new CustomEvent('popRender', {});
-
-function clickHandler(event) {
-}
-
 async function setup() {
   const popcorn = await Popcorn.init({
     debug: true
   })
 
-  var afterRenderBind = async () => {
-    const elements = document.querySelectorAll('[pop-click]');
+  var afterRenderBind = async (event) => {
+    var view = event.detail.view
+    var view_element = find_element(event.detail.view)
+    const elements = view_element.querySelectorAll('[pop-click]');
     elements.forEach(el => {
       if (el.hasAttribute('pop-click')) {
         el.addEventListener('click', async (e) => {
           try {
-            console.log(e)
-            var view = find_view(el)
+            console.log({ "view": view, "event": "click", payload: {"event": el.getAttribute('pop-click')} })
             const { data, durationMs } = await popcorn.call({ "view": view, "event": "click", 
               payload: {"event": el.getAttribute('pop-click')} }, {
               timeoutMs: 10_000,
@@ -29,7 +25,17 @@ async function setup() {
       }
     });
   }
-  document.addEventListener("popRender", () => afterRenderBind());
+  document.addEventListener("popRender", afterRenderBind);
+  const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {
+    timeoutMs: 10_000,
+  });
+}
+
+// TODO this is a mock for heex templating inside index.html file
+function find_predefined_views() {
+  let elements = document.querySelectorAll('[data-pre-pop-view]');
+  elements = Array.from(elements)
+  return elements.map(el => el.getAttribute("data-pre-pop-view"))
 }
 
 function find_view(element) {
