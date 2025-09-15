@@ -39,6 +39,8 @@ export async function initVm() {
       send(MESSAGES.STDERR, text);
     },
     onAbort() {
+      // Timeout so that error logs are (hopefully) printed
+      // before we terminate
       setTimeout(() => send(MESSAGES.RELOAD, null), 100);
     }
   });

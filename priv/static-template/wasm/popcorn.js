@@ -251,7 +251,7 @@ export class Popcorn {
     this._listenerRef = null;
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
-      callData.reject({ error: "PopcornDeinit", durationMs })
+      callData.reject({ error: new Error("Call cancelled due to instance deinit"), durationMs })
     }
   }
 
