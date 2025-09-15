@@ -38,6 +38,9 @@ export async function initVm() {
     printErr(text) {
       send(MESSAGES.STDERR, text);
     },
+    onAbort() {
+      setTimeout(() => send(MESSAGES.RELOAD, null), 100);
+    }
   });
 
   Module["serialize"] = JSON.stringify;
@@ -118,10 +121,6 @@ export async function initVm() {
     onVmInit(initProcess);
     Module["onElixirReady"] = null;
   };
-  Module["onWorkerError"] = () => {
-    // Wait until errors are logged and reload
-    setTimeout(() => send(MESSAGES.RELOAD, null), 0);
-  }
 }
 
 function ensureFunctionEval(maybeFunction) {
