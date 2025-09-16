@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode, useCallback } from "react";
 import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
 import { useCodeEditorStore } from "../../store/codeEditor";
 
@@ -14,24 +14,35 @@ export const PopcornProvider = ({
   const [instance, setInstance] = useState<Popcorn | null>(null);
   const setStdoutResult = useCodeEditorStore((state) => state.setStdoutResult);
 
-  useEffect(() => {
-    async function initializePopcorn() {
-      try {
-        const popcornInstance = await window.Popcorn.init({
-          debug,
-          wasmDir: import.meta.env.BASE_URL + "/wasm/",
-          onStdout: (text) => {
-            console.log("Popcorn stdout:", text);
-            setStdoutResult(text);
-          }
-        });
+  const initializePopcorn = useCallback(async () => {
+    try {
+      const popcornInstance = await window.Popcorn.init({
+        debug,
+        wasmDir: import.meta.env.BASE_URL + "/wasm/",
+        onStdout: (text) => {
+          console.log("Popcorn stdout:", text);
+          setStdoutResult(text);
+        }
+      });
 
-        setInstance(popcornInstance);
-      } catch (error) {
-        console.error("Failed to initialize Popcorn:", error);
+      setInstance(popcornInstance);
+    } catch (error) {
+      console.error("Failed to initialize Popcorn:", error);
+    }
+  }, [debug, setStdoutResult]);
+
+  const reinitializePopcorn = useCallback(() => {
+    if (instance) {
+      try {
+        instance.deinit();
+        initializePopcorn();
+      } catch (e) {
+        console.error("Error during Popcorn reinitialization:", e);
       }
     }
+  }, [instance, initializePopcorn]);
 
+  useEffect(() => {
     initializePopcorn();
 
     return () => {
@@ -47,7 +58,8 @@ export const PopcornProvider = ({
   }, [debug]);
 
   const value: PopcornContextValue = {
-    instance
+    instance,
+    reinitializePopcorn
   };
 
   return (

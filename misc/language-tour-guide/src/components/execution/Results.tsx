@@ -13,7 +13,8 @@ export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
-  const { call } = usePopcorn();
+  const { call, reinitializePopcorn } = usePopcorn();
+  const [longRunning, setLongRunning] = useState(false);
 
   const { code, resetCodeToDefault, stdoutResult, resetStdoutResult } =
     useCodeEditorStore(
@@ -25,6 +26,15 @@ export function Results() {
         resetStdoutResult: state.resetStdoutResult
       }))
     );
+
+  const handleCancelRunning = () => {
+    try {
+      reinitializePopcorn();
+      console.log("Cancel running code");
+    } catch (e) {
+      console.error("Error during Popcorn reinitialization:", e);
+    }
+  };
 
   const addHistoryEntry = useExecutionHistoryStore(
     (state) => state.addHistoryEntry
@@ -41,17 +51,22 @@ export function Results() {
       await withPending(async () => {
         let result: { data: string; durationMs: number } | null = null;
 
+        const timeoutId = setTimeout(() => {
+          setLongRunning(true);
+        }, 500);
+
         try {
           result = await call(["eval_elixir", code], {
             timeoutMs: 10_000
           });
         } catch (error) {
-          console.error("failed to initialize elixir tour:", error);
+          console.error("Error executing Elixir code:", error);
           return;
         }
 
         if (result === null) return;
 
+        clearTimeout(timeoutId);
         const { data, durationMs } = result;
         setResultData(data);
         setDurationMs(durationMs);
@@ -102,6 +117,13 @@ export function Results() {
   return (
     <>
       <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit py-3 pr-6">
+        {pending && longRunning && (
+          <Button
+            title="Cancel"
+            type="secondary"
+            onClick={handleCancelRunning}
+          />
+        )}
         <Button
           title="Reset Code"
           type="secondary"
