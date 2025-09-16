@@ -38,6 +38,11 @@ export async function initVm() {
     printErr(text) {
       send(MESSAGES.STDERR, text);
     },
+    onAbort() {
+      // Timeout so that error logs are (hopefully) printed
+      // before we terminate
+      setTimeout(() => send(MESSAGES.RELOAD, null), 100);
+    }
   });
 
   Module["serialize"] = JSON.stringify;
@@ -150,7 +155,7 @@ function onVmInit(initProcess) {
         const result = await Module.call(process, args);
         send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
       } catch (error) {
-        if(error == "noproc") {
+        if (error == "noproc") {
           send(MESSAGES.RELOAD, null);
           console.error("Runtime VM crashed, popcorn iframe reloaded.");
           return;
