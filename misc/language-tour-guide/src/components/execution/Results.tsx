@@ -6,32 +6,25 @@ import { useCodeEditorStore } from "../../store/codeEditor";
 import { useShallow } from "zustand/react/shallow";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
-import { useLocation } from "react-router";
 import StdoutResults from "./StdoutResults";
+import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
 
 export function Results() {
-  const { pathname } = useLocation();
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
   const { call } = usePopcorn();
 
-  const { code, resetToDefault, stdoutResult, resetStdoutResult } =
+  const { code, resetCodeToDefault, stdoutResult, resetStdoutResult } =
     useCodeEditorStore(
       useShallow((state) => ({
         setCode: state.setCode,
         code: state.code,
-        resetToDefault: state.resetToDefault,
+        resetCodeToDefault: state.resetCodeToDefault,
         stdoutResult: state.stdoutResult,
         resetStdoutResult: state.resetStdoutResult
       }))
     );
-
-  const handleResetToDefault = () => {
-    localStorage.removeItem(`code-${pathname}`);
-
-    resetToDefault();
-  };
 
   const addHistoryEntry = useExecutionHistoryStore(
     (state) => state.addHistoryEntry
@@ -92,11 +85,6 @@ export function Results() {
   );
 
   useEffect(() => {
-    setResultData(null);
-    setDurationMs(null);
-  }, [pathname]);
-
-  useEffect(() => {
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
@@ -104,13 +92,20 @@ export function Results() {
     };
   }, [onKeyDown]);
 
+  const resetToDefault = useCallback(() => {
+    setResultData(null);
+    setDurationMs(null);
+  }, []);
+
+  useOnNavigationChange(resetToDefault);
+
   return (
     <>
-      <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
+      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit py-3 pr-6">
         <Button
           title="Reset Code"
           type="secondary"
-          onClick={handleResetToDefault}
+          onClick={resetCodeToDefault}
         />
         <Button
           title="Run Code"
