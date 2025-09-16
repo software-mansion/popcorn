@@ -127,7 +127,9 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
-            <StdoutResults stdout={stdoutResult} />
+            {stdoutResult && stdoutResult.length > 0 && (
+              <StdoutResults stdout={stdoutResult} />
+            )}
             <span>{resultData}</span>
           </>
         )}
