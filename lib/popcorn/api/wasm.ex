@@ -240,20 +240,6 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Registers the main process and notifies JS that Elixir side finished initializing. Can be called only once.
-
-  ## Examples
-
-      Popcorn.Wasm.register(:my_main_process)
-
-  """
-  def register(main_process_name) do
-    register_receiver(to_string(main_process_name))
-    send_elixir_ready()
-    :ok
-  end
-
-  @doc """
   Registers event listener for element with given `selector`. Events will be sent to the process registered under `target` name.
   To get event data, specify needed keys in `event_keys` list.
 
@@ -343,28 +329,17 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Registers a process as a receiver and sends the registration event to JavaScript.
-
-  This should be called before `send_elixir_ready/0` to establish the default process
-  for handling JavaScript calls.
-
+  Registers a process as a default receiver and sends the registration event to JavaScript.
   """
-  @spec register_receiver(String.t()) :: :ok
-  def register_receiver(name) when is_binary(name) do
-    send_event("popcorn_register_receiver", %{name: name})
-    :ok
-  end
+  @spec register_default_receiver(pid(), atom()) :: :ok
+  def register_default_receiver(pid, name) do
+    case Process.whereis(name) do
+      nil -> Process.register(pid, name)
+      ^pid -> :ok
+      _other_pid -> raise "Name #{name} already taken"
+    end
 
-  @doc """
-  Sends the Elixir ready event to JavaScript, indicating that the Elixir side
-  has finished initialization.
-
-  After this is called, any queued events will be processed and new events will
-  be sent immediately.
-  """
-  @spec send_elixir_ready() :: :ok
-  def send_elixir_ready() do
-    send_event("popcorn_elixir_ready")
+    send_event("popcorn_set_default_receiver", %{name: name})
     :ok
   end
 

@@ -27,6 +27,11 @@ const MESSAGES = {
   RELOAD: "popcorn-reload",
 };
 
+const EVENT_NAMES = {
+  ELIXIR_READY: "popcorn_elixir_ready",
+  SET_DEFAULT_RECEIVER: "popcorn_set_default_receiver",
+};
+
 const INIT_TOKEN = Symbol();
 
 /** @module popcorn */
@@ -40,7 +45,7 @@ const INIT_TOKEN = Symbol();
 
 /** @typedef {any} AnySerializable */
 
-class PopcornDeinitializedError extends Error { }
+class PopcornDeinitializedError extends Error {}
 
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
@@ -49,12 +54,10 @@ export class Popcorn {
   onStdout = null;
   onStderr = null;
   heartbeatTimeoutMs = null;
-  defaultReceiver = null;
 
   _debug = false;
   _bundlePath = null;
   _wasmDir = null;
-  _initProcess = null;
 
   _requestId = 0;
   _calls = new Map();
@@ -64,19 +67,26 @@ export class Popcorn {
   _mountPromise = null;
   _heartbeatTimeout = null;
 
-  _eventHandlers = new Map();
-  _eventQueue = [];
-  _elixirReady = false;
+  _onEventCallback = null;
+  _preMountEvents = [];
+  _defaultReceiver = null;
 
   /** @hideconstructor */
   constructor(params, token) {
     if (token !== INIT_TOKEN) {
       throw new Error(
-        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
+        "Don't construct the Popcorn object directly, use Popcorn.init() instead"
       );
     }
-    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug, wasmDir } =
-      params;
+    const {
+      bundlePath,
+      onStderr,
+      onStdout,
+      heartbeatTimeoutMs,
+      debug,
+      wasmDir,
+      onEvent,
+    } = params;
 
     this._debug = debug;
     this._bundlePath = bundlePath ?? "wasm/bundle.avm";
@@ -84,11 +94,12 @@ export class Popcorn {
     this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
     this._wasmDir = wasmDir ?? "./wasm/";
+    this._onEventCallback = onEvent;
   }
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after Elixir code calls `Popcorn.Wasm.register/1`.
+   * Returns after Elixir code calls `Popcorn.Wasm.send_elixir_ready/0`.
    *
    * @param {object} options used to set timeouts, event handlers, path to bundle, etc.
    * @param {HTMLElement} [options.container=document.body] DOM element to mount an iframe
@@ -98,6 +109,7 @@ export class Popcorn {
    * @param {number} [options.heartbeatTimeoutMs=15_000] Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded.
    * @param {string} [options.wasmDir="./wasm/"] - Directory containing Wasm and scripts used inside iframe.
    * @param {boolean} [options.debug=false] Enable debug logging.
+   * @param {function(string, any): void} [options.onEvent] Global event handler that receives all events, called immediately when events arrive.
    * @example
    * import { Popcorn } from "./wasm/popcorn.js";
 
@@ -123,7 +135,8 @@ export class Popcorn {
 
     this._trace("Main: mount, container: ", container);
     const mountPromise = new Promise((resolve) => {
-      // will be resolved on init message from iframe
+      // will be resolved on elixir ready event
+
       this._mountPromise = resolve;
 
       // // example pathname: "/wasm/popcorn.js"
@@ -140,9 +153,15 @@ export class Popcorn {
             <head>
               <meta name="bundle-path" content="${"../" + this._bundlePath}" />
             </head>
-            <script type="module" src="${this._wasmDir + "popcorn.js"}" defer></script>
-            <script type="module" src="${this._wasmDir + "AtomVM.mjs"}" defer></script>
-            <script type="module" src="${this._wasmDir + "popcorn_iframe.js"}" defer></script>
+            <script type="module" src="${
+              this._wasmDir + "popcorn.js"
+            }" defer></script>
+            <script type="module" src="${
+              this._wasmDir + "AtomVM.mjs"
+            }" defer></script>
+            <script type="module" src="${
+              this._wasmDir + "popcorn_iframe.js"
+            }" defer></script>
             <script type="module" defer>
               import { initVm } from "${this._wasmDir + "popcorn_iframe.js"}";
               initVm();
@@ -158,7 +177,7 @@ export class Popcorn {
     });
 
     await withTimeout(mountPromise, INIT_TIMEOUT_MS);
-    // sucessfully mounted, kick-off heartbeat listener
+    // successfully mounted, kick-off heartbeat listener
     this._trace("Main: mount");
     this._onHeartbeat();
   }
@@ -168,7 +187,7 @@ export class Popcorn {
    *
    * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
+   * Unless passed via options, the default receiver registered via `Popcorn.Wasm.register_receiver/3` is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @param {AnySerializable} args serializable data sent to Elixir process.
@@ -185,7 +204,7 @@ export class Popcorn {
    * @returns {Promise<CallResult>} A promise resolved with {@link CallResult} or rejected on timeout
    */
   async call(args, { process, timeoutMs }) {
-    const targetProcess = process ?? this._initProcess;
+    const targetProcess = process ?? this._defaultReceiver;
     if (this._iframe === null) {
       throw new Error("WASM iframe not mounted");
     }
@@ -218,7 +237,7 @@ export class Popcorn {
   /**
    * Sends a message to an Elixir process (default or from options) and returns immediately.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
+   * Unless passed via options, the default receiver registered via `Popcorn.Wasm.register_default_receiver/2` is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @param {AnySerializable} args sent to Elixir process.
@@ -226,7 +245,7 @@ export class Popcorn {
    * @param {string} [options.process] receiver process name.
    */
   cast(args, { process }) {
-    const targetProcess = process ?? this._initProcess;
+    const targetProcess = process ?? this._defaultReceiver;
     if (this._iframe === null) {
       throw new Error("WASM iframe not mounted");
     }
@@ -244,26 +263,12 @@ export class Popcorn {
   }
 
   /**
-   * Registers an event handler for a specific event name.
-   *
-   * @param {string} eventName - The name of the event to listen for
-   * @param {function(any): void} handler - The handler function to call when the event is received
-   */
-  onMessage(eventName, handler) {
-    if (!this._eventHandlers.has(eventName)) {
-      this._eventHandlers.set(eventName, []);
-    }
-    this._eventHandlers.get(eventName).push(handler);
-  }
-
-  /**
    * Sets the default receiver process name for subsequent calls.
    *
    * @param {string} processName - The name of the process to use as default receiver
    */
   setDefaultReceiver(processName) {
-    this.defaultReceiver = processName;
-    this._initProcess = processName;
+    this._defaultReceiver = processName;
   }
 
   /**
@@ -282,7 +287,12 @@ export class Popcorn {
     this._listenerRef = null;
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
-      callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })
+      callData.reject({
+        error: new PopcornDeinitializedError(
+          "Call cancelled due to instance deinit"
+        ),
+        durationMs,
+      });
     }
   }
 
@@ -302,65 +312,72 @@ export class Popcorn {
       handler(data.value);
     } else if (data.type?.startsWith("popcorn")) {
       console.warn(
-        `Received unhandled event: ${JSON.stringify(data, null, 4)}`,
+        `Received unhandled event: ${JSON.stringify(data, null, 4)}`
       );
+    }
+  }
+
+  _dispatchPopcornEvent(eventName, payload) {
+    switch (eventName) {
+      case EVENT_NAMES.ELIXIR_READY:
+        if (this._mountPromise) {
+          this._mountPromise();
+          this._mountPromise = null;
+        }
+        this._dispatchEvent(eventName, payload);
+        this._processPreMountEvents();
+        break;
+      case EVENT_NAMES.SET_DEFAULT_RECEIVER:
+        this.setDefaultReceiver(payload.name);
+        break;
+      default:
+        console.warn(`Received unhandled popcorn event: ${eventName}`);
     }
   }
 
   _onEvent({ eventName, payload }) {
     this._trace("Main: onEvent: ", { eventName, payload });
 
-    if (eventName === "popcorn_register_receiver") {
-      if (this.defaultReceiver === null) {
-        this.setDefaultReceiver(payload.name);
-      }
-
-      if (this._mountPromise !== null) {
-        this._mountPromise();
-        this._mountPromise = null;
-      }
+    if (eventName.startsWith("popcorn")) {
+      this._dispatchPopcornEvent(eventName, payload);
       return;
     }
 
-    if (eventName === "popcorn_elixir_ready") {
-      this._elixirReady = true;
-      this._processEventQueue();
-      this._dispatchEvent(eventName, payload);
-      return;
-    }
-
-    if (!this._elixirReady) {
-      this._eventQueue.push({ eventName, payload });
+    if (this._mountPromise !== null) {
+      this._preMountEvents.push({ eventName, payload });
       return;
     }
 
     this._dispatchEvent(eventName, payload);
   }
 
-  _processEventQueue() {
-    this._trace(
-      "Main: processing event queue, length: ",
-      this._eventQueue.length
-    );
-    const events = [...this._eventQueue];
-    this._eventQueue = [];
-
-    for (const { eventName, payload } of events) {
-      this._dispatchEvent(eventName, payload);
-    }
-  }
-
   _dispatchEvent(eventName, payload) {
     this._trace("Main: dispatching event: ", { eventName, payload });
 
-    const handlers = this._eventHandlers.get(eventName) || [];
-    for (const handler of handlers) {
+    // Call global onEvent callback first if available
+    if (this._onEventCallback) {
       try {
-        handler(payload);
+        this._onEventCallback(eventName, payload);
       } catch (error) {
-        console.error(`Error in event handler for '${eventName}':`, error);
+        console.error(
+          `Error in global event handler for '${eventName}':`,
+          error
+        );
       }
     }
+  }
+
+  _processPreMountEvents() {
+    this._trace(
+      "Main: processing event queue, length: ",
+      this._preMountEvents.length
+    );
+
+    for (const { eventName, payload } of this._preMountEvents) {
+      this._dispatchEvent(eventName, payload);
+    }
+
+    this._preMountEvents = [];
   }
 
   _onCallAck({ requestId }) {
