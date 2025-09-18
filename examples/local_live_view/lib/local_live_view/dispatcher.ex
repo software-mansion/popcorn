@@ -30,7 +30,6 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm({:wasm_call, %{"event" => type, "view" => view_string, "payload" => payload}}, state) do
-    IO.inspect(state, label: "OLD_STATE")
     view = String.to_existing_atom("Elixir."<>view_string)
     payload = payload |> Map.merge(%{"type" => %{}, "value" => %{}})
     Map.get(state.views, view)
@@ -39,7 +38,7 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm({:wasm_call, %{"views" => views}}, state) do
-    views = 
+    views =
       views
       |> Enum.map(fn view_string -> "Elixir."<>view_string end)
       |> Enum.map(&String.to_existing_atom/1)
