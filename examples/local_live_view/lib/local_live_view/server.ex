@@ -1021,13 +1021,12 @@ defmodule LocalLiveView.Server do
 #          [:phoenix, :live_view, :render],
 #          %{socket: socket, force?: force?, changed?: changed?},
 #          fn ->
-            rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view) |> IO.inspect()
+            rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
             
             rendered
             |> Phoenix.HTML.Safe.to_iodata()
             |> LocalLiveView.rendered_iodata_to_binary()
             |> LocalLiveView.JS.rerender(socket.view)
-            IO.inspect(socket.view, label: "SOOOOOOOOOOOOOOOOCKET")
             {diff, fingerprints, components} =
               Diff.render(socket, rendered, state.fingerprints, state.components)
               |> IO.inspect()
@@ -1238,12 +1237,14 @@ defmodule LocalLiveView.Server do
 
 #    merged_session = Map.merge(socket_session, verified_user_session)
 #    lifecycle = load_lifecycle(config, route)
-#
+    lifecycle = load_lifecycle(config, nil)
 #    case mount_private(verified, connect_params, connect_info, lifecycle) do
-#      {:ok, mount_priv} ->
+    case mount_private(verified, connect_params, nil, lifecycle) do
+      {:ok, mount_priv} ->
 #        socket = Utils.configure_socket(socket, mount_priv, action, flash, host_uri)
+        socket = Utils.configure_socket(socket, mount_priv, nil, nil, :not_mounted_at_router) |> IO.inspect()
         try do
-          %Socket{view: view}
+          %Socket{socket | view: view}
 #          |> load_layout(route)
           |> Utils.maybe_call_live_view_mount!(view, params, verified)
           |> build_state(phx_socket)
@@ -1279,10 +1280,10 @@ defmodule LocalLiveView.Server do
 #            end
         end
 
-#      {:error, :noproc} ->
-#        GenServer.reply(from, {:error, %{reason: "stale"}})
-#        {:stop, :shutdown, :no_state}
-#    end
+      {:error, :noproc} ->
+        GenServer.reply(from, {:error, %{reason: "stale"}})
+        {:stop, :shutdown, :no_state}
+    end
   end
 #
 #  defp verify_flash(endpoint, %Session{} = verified, flash_token, connect_params) do
@@ -1315,11 +1316,11 @@ defmodule LocalLiveView.Server do
 #       ) do
 #    update_in(lifecycle.mount, &(on_mount ++ &1))
 #  end
-#
-#  defp load_lifecycle(%{lifecycle: lifecycle}, _) do
-#    lifecycle
-#  end
-#
+
+  defp load_lifecycle(%{lifecycle: lifecycle}, _) do
+    lifecycle
+  end
+
 #  defp load_layout(socket, %Route{live_session: %{extra: %{layout: layout}}}) do
 #    put_in(socket.private[:live_layout], layout)
 #  end
@@ -1327,26 +1328,26 @@ defmodule LocalLiveView.Server do
 #  defp load_layout(socket, _route) do
 #    socket
 #  end
-#
-#  defp mount_private(%Session{parent_pid: nil} = session, connect_params, connect_info, lifecycle) do
-#    %{
-#      root_view: root_view,
-#      assign_new: assign_new,
-#      live_session_name: live_session_name
-#    } = session
-#
-#    {:ok,
-#      %{
-#        connect_params: connect_params,
-#        connect_info: connect_info,
-#        assign_new: {%{}, assign_new},
-#        lifecycle: lifecycle,
-#        root_view: root_view,
-#        live_temp: %{},
-#        live_session_name: live_session_name
-#      }}
-#  end
-#
+
+  defp mount_private(%Session{parent_pid: nil} = session, connect_params, connect_info, lifecycle) do
+    %{
+      root_view: root_view,
+      assign_new: assign_new,
+      live_session_name: live_session_name
+    } = session
+
+    {:ok,
+      %{
+        connect_params: connect_params,
+        connect_info: connect_info,
+        assign_new: {%{}, assign_new},
+        lifecycle: lifecycle,
+        root_view: root_view,
+        live_temp: %{},
+        live_session_name: live_session_name
+      }}
+  end
+
 #  defp mount_private(
 #         %Session{parent_pid: parent} = session,
 #         connect_params,
@@ -1378,7 +1379,7 @@ defmodule LocalLiveView.Server do
 #        {:error, :noproc}
 #    end
 #  end
-#
+
 #  defp sync_with_parent(parent, assign_new) do
 #    try do
 #      GenServer.call(parent, {@prefix, :child_mount, self(), assign_new})
