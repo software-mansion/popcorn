@@ -1,0 +1,21 @@
+<html>
+    <style>
+        body {
+            font-size: 1.5em;
+            font-family: sans-serif;
+            max-width: 800px;
+            padding: 1em;
+            background-color: #161616;
+            color: #fcfcfc;
+        }
+    </style>
+    <script type="module">
+        import { Popcorn } from "./wasm/popcorn.js";
+    </script>
+    <script type="module" src="local_live_view.js" defer></script>
+    <body>
+    <div data-pop-view="ThermostatLive"></div>
+    <div data-pop-view="ThermostatLive2"></div>
+    <div data-pop-view="ClockLive"></div>
+    </body>
+</html>
