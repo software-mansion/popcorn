@@ -1,9 +1,5 @@
 defmodule LocalLiveView.JS do
   
-  def render_predefined(rendered, view) do
-    rerender(rendered, view, "data-pre-pop-view")
-  end
-
   def rerender(rendered, view, attribute \\ "data-pop-view") do
     IO.puts "RENDER #{inspect({rendered, view, attribute})}"
     view = view |> Module.split() |> List.last()
