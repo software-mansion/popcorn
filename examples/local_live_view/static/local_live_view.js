@@ -33,9 +33,9 @@ async function setup() {
 
 // TODO this is a mock for heex templating inside index.html file
 function find_predefined_views() {
-  let elements = document.querySelectorAll('[data-pre-pop-view]');
+  let elements = document.querySelectorAll('[data-pop-view]');
   elements = Array.from(elements)
-  return elements.map(el => el.getAttribute("data-pre-pop-view"))
+  return elements.map(el => el.getAttribute("data-pop-view"))
 }
 
 function find_view(element) {

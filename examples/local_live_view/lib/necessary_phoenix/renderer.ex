@@ -65,6 +65,7 @@ defmodule Phoenix.LiveView.Renderer do
   """
   def to_rendered(socket, view) do
     assigns = render_assigns(socket)
+
     inner_content =
       case socket do
         %{private: %{render_with: render_with}} ->
@@ -73,34 +74,34 @@ defmodule Phoenix.LiveView.Renderer do
           |> check_rendered!(render_with)
 
         %{} ->
-#          if function_exported?(view, :render, 1) do
+          if function_exported?(view, :render, 1) do
           assigns
           |> view.render()
           |> check_rendered!(view)
-#          else
-#            template =
-#              view.__info__(:compile)[:source]
-#              |> Path.dirname()
-#              |> Path.join(template_filename(view) <> ".heex")
-#
-#            raise ~s'''
-#            render/1 was not implemented for #{inspect(view)}.
-#
-#            In order to render templates in LiveView/LiveComponent, you must either:
-#
-#            1. Define a render/1 function that receives assigns and uses the ~H sigil:
-#
-#                def render(assigns) do
-#                  ~H"""
-#                  <div>...</div>
-#                  """
-#                end
-#
-#            2. Create a file at #{inspect(template)} with template contents
-#
-#            3. Call Phoenix.LiveView.render_with/2 with a custom rendering function
-#            '''
-#          end
+          else
+            template =
+              view.__info__(:compile)[:source]
+              |> Path.dirname()
+              |> Path.join(template_filename(view) <> ".heex")
+
+            raise ~s'''
+            render/1 was not implemented for #{inspect(view)}.
+
+            In order to render templates in LiveView/LiveComponent, you must either:
+
+            1. Define a render/1 function that receives assigns and uses the ~H sigil:
+
+                def render(assigns) do
+                  ~H"""
+                  <div>...</div>
+                  """
+                end
+
+            2. Create a file at #{inspect(template)} with template contents
+
+            3. Call Phoenix.LiveView.render_with/2 with a custom rendering function
+            '''
+          end
       end
 
     case layout(socket, view) do
@@ -138,10 +139,9 @@ defmodule Phoenix.LiveView.Renderer do
   end
 
   defp layout(socket, view) do
-#    case socket.private do
-#      %{live_layout: layout} -> layout
-#      %{} -> view.__live__()[:layout]
-#    end
-    false
+    case socket.private do
+      %{live_layout: layout} -> layout
+      %{} -> view.__live__()[:layout]
+    end
   end
 end

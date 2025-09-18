@@ -53,10 +53,6 @@ defmodule LocalLiveView.Dispatcher do
       "session" => %Session{view: view}
     }
     {:ok, pid} = DynamicSupervisor.start_child(LocalLiveView.Server.Supervisor, LocalLiveView.Server.child_spec([]))
-    rendered =
-      Static.render(view)
-      |> then(fn {:ok, {:safe, content}, assigns} -> diff_iodata_to_binary(content) end)
-    LocalLiveView.JS.render_predefined(rendered, view)
     ref = make_ref()
     with {:ok, pid} <- start_llv_process() do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
