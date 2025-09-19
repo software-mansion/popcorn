@@ -328,7 +328,7 @@ defmodule Popcorn.Support.AtomVM do
 
         def start() do
           Process.register(self(), :main)
-          Wasm.register("main")
+          Wasm.register_default_receiver(self(), "main")
 
           receive do
             wasm_msg -> Wasm.handle_message!(wasm_msg, &handle_wasm_msg/1)
