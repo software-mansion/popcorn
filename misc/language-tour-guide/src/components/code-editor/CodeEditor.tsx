@@ -4,17 +4,10 @@ import { solarizedLight } from "@uiw/codemirror-theme-solarized";
 
 import "./CodeEditor.styles.css";
 import { useCodeEditorStore } from "../../store/codeEditor";
-import { useLocation } from "react-router";
 
 export function CodeEditor() {
-  const { pathname } = useLocation();
   const code = useCodeEditorStore((state) => state.code);
   const setCode = useCodeEditorStore((state) => state.setCode);
-
-  const handleChangeCode = (value: string) => {
-    localStorage.setItem(`code-${pathname}`, value);
-    setCode(value);
-  };
 
   return (
     <CodeMirror
@@ -22,7 +15,7 @@ export function CodeEditor() {
       autoFocus
       value={code}
       extensions={[elixir()]}
-      onChange={handleChangeCode}
+      onChange={setCode}
       theme={solarizedLight}
     />
   );

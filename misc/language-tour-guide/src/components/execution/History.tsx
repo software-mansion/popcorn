@@ -85,9 +85,11 @@ export function History() {
                         Result:
                       </span>
                     </div>
-                    {entry.result || "No result"}
+                    {entry.result ?? "No result"}
                   </div>
-                  <StdoutResults stdout={entry.stdoutResult} />
+                  {entry.stdoutResult && entry.stdoutResult.length > 0 && (
+                    <StdoutResults stdout={entry.stdoutResult} />
+                  )}
                 </div>
               ))}
             </>

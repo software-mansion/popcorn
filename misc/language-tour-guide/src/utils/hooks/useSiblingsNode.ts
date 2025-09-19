@@ -15,8 +15,7 @@ export function useSiblingsNode() {
         currentIndex: 0
       };
     }
-    const result = getNodeNavigationSiblings(navigation, pathname);
-    return result;
+    return getNodeNavigationSiblings(navigation, pathname);
   }, [navigation, pathname]);
 
   return navigationProperty;

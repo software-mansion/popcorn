@@ -6,31 +6,34 @@ import { useCodeEditorStore } from "../../store/codeEditor";
 import { useShallow } from "zustand/react/shallow";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
-import { useLocation } from "react-router";
 import StdoutResults from "./StdoutResults";
+import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
 
 export function Results() {
-  const { pathname } = useLocation();
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
-  const { call } = usePopcorn();
+  const { call, reinitializePopcorn } = usePopcorn();
+  const [longRunning, setLongRunning] = useState(false);
 
-  const { code, resetToDefault, stdoutResult, resetStdoutResult } =
+  const { code, resetCodeToDefault, stdoutResult, resetStdoutResult } =
     useCodeEditorStore(
       useShallow((state) => ({
         setCode: state.setCode,
         code: state.code,
-        resetToDefault: state.resetToDefault,
+        resetCodeToDefault: state.resetCodeToDefault,
         stdoutResult: state.stdoutResult,
         resetStdoutResult: state.resetStdoutResult
       }))
     );
 
-  const handleResetToDefault = () => {
-    localStorage.removeItem(`code-${pathname}`);
-
-    resetToDefault();
+  const handleCancelRunning = () => {
+    try {
+      reinitializePopcorn();
+      console.log("Cancel running code");
+    } catch (e) {
+      console.error("Error during Popcorn reinitialization:", e);
+    }
   };
 
   const addHistoryEntry = useExecutionHistoryStore(
@@ -48,17 +51,22 @@ export function Results() {
       await withPending(async () => {
         let result: { data: string; durationMs: number } | null = null;
 
+        const timeoutId = setTimeout(() => {
+          setLongRunning(true);
+        }, 500);
+
         try {
           result = await call(["eval_elixir", code], {
             timeoutMs: 10_000
           });
         } catch (error) {
-          console.error("failed to initialize elixir tour:", error);
+          console.error("Error executing Elixir code:", error);
           return;
         }
 
         if (result === null) return;
 
+        clearTimeout(timeoutId);
         const { data, durationMs } = result;
         setResultData(data);
         setDurationMs(durationMs);
@@ -92,11 +100,6 @@ export function Results() {
   );
 
   useEffect(() => {
-    setResultData(null);
-    setDurationMs(null);
-  }, [pathname]);
-
-  useEffect(() => {
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
@@ -104,13 +107,27 @@ export function Results() {
     };
   }, [onKeyDown]);
 
+  const resetToDefault = useCallback(() => {
+    setResultData(null);
+    setDurationMs(null);
+  }, []);
+
+  useOnNavigationChange(resetToDefault);
+
   return (
     <>
-      <div className="flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 py-3 pr-6">
+      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit py-3 pr-6">
+        {pending && longRunning && (
+          <Button
+            title="Cancel"
+            type="secondary"
+            onClick={handleCancelRunning}
+          />
+        )}
         <Button
           title="Reset Code"
           type="secondary"
-          onClick={handleResetToDefault}
+          onClick={resetCodeToDefault}
         />
         <Button
           title="Run Code"
@@ -127,15 +144,9 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
-            <StdoutResults stdout={stdoutResult} />
-            {/* {stdoutResult.map((line, index) => (
-              <span
-                key={`stdout-${index}-${line}`}
-                className="text-brown-90/70 text-xs font-medium"
-              >
-                {line}
-              </span>
-            ))} */}
+            {stdoutResult && stdoutResult.length > 0 && (
+              <StdoutResults stdout={stdoutResult} />
+            )}
             <span>{resultData}</span>
           </>
         )}

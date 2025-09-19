@@ -32,6 +32,7 @@ type NavigationTreeItemType = "link" | "section";
 export type NavigationTreeItem = {
   title: string;
   path: string;
+  parentPath: string;
   children: NavigationTreeItem[];
   type: NavigationTreeItemType;
 };
