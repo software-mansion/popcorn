@@ -67,7 +67,7 @@ export class Popcorn {
   _mountPromise = null;
   _heartbeatTimeout = null;
 
-  _onEventCallback = null;
+  _eventHandlers = [];
   _preMountEvents = [];
   _defaultReceiver = null;
 
@@ -85,7 +85,6 @@ export class Popcorn {
       heartbeatTimeoutMs,
       debug,
       wasmDir,
-      onEvent,
     } = params;
 
     this._debug = debug;
@@ -94,7 +93,6 @@ export class Popcorn {
     this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
     this._wasmDir = wasmDir ?? "./wasm/";
-    this._onEventCallback = onEvent;
   }
 
   /**
@@ -109,7 +107,6 @@ export class Popcorn {
    * @param {number} [options.heartbeatTimeoutMs=15_000] Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded.
    * @param {string} [options.wasmDir="./wasm/"] - Directory containing Wasm and scripts used inside iframe.
    * @param {boolean} [options.debug=false] Enable debug logging.
-   * @param {function(string, any): void} [options.onEvent] Global event handler that receives all events, called immediately when events arrive.
    * @example
    * import { Popcorn } from "./wasm/popcorn.js";
 
@@ -187,7 +184,7 @@ export class Popcorn {
    *
    * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
    *
-   * Unless passed via options, the default receiver registered via `Popcorn.Wasm.register_receiver/3` is used.
+   * Unless passed via options, the default receiver registered via `Popcorn.Wasm.register_default_receiver/2` is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @param {AnySerializable} args serializable data sent to Elixir process.
@@ -232,6 +229,30 @@ export class Popcorn {
     const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
     this._calls.delete(requestId);
     return result;
+  }
+
+  /**
+   * Registers an event handler function to receive events from Elixir.
+   *
+   * If this is the first handler registered, it will immediately process any events
+   * that were received before any handlers were registered.
+   *
+   * @param {function(string, AnySerializable): void} handler - Function that receives event name and payload
+   * @example
+   * popcorn.registerEventHandler((eventName, payload) => {
+   *   console.log(`Received event: ${eventName}`, payload);
+   *   if (eventName === "user_logged_in") {
+   *     updateUI(payload.user);
+   *   }
+   * });
+   */
+  registerEventHandler(handler) {
+    const firstRegister = this._eventHandlers.length === 0;
+    this._eventHandlers.push(handler);
+
+    if (firstRegister) {
+      this._processPreMountEvents();
+    }
   }
 
   /**
@@ -324,8 +345,7 @@ export class Popcorn {
           this._mountPromise();
           this._mountPromise = null;
         }
-        this._dispatchEvent(eventName, payload);
-        this._processPreMountEvents();
+        this._preMountEvents.push({ eventName, payload });
         break;
       case EVENT_NAMES.SET_DEFAULT_RECEIVER:
         this.setDefaultReceiver(payload.name);
@@ -354,10 +374,9 @@ export class Popcorn {
   _dispatchEvent(eventName, payload) {
     this._trace("Main: dispatching event: ", { eventName, payload });
 
-    // Call global onEvent callback first if available
-    if (this._onEventCallback) {
+    for (const eventHandler of this._eventHandlers) {
       try {
-        this._onEventCallback(eventName, payload);
+        eventHandler(eventName, payload);
       } catch (error) {
         console.error(
           `Error in global event handler for '${eventName}':`,
