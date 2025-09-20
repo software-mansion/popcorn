@@ -3,12 +3,17 @@
 -export([handle_info/2]).
 
 -compile({popcorn_patch_private, make_appl/1}).
+-compile({popcorn_patch_private, init_starter/4}).
 
 -import(lists, [zf/2, map/2, foreach/2, foldl/3,
 		keyfind/3, keydelete/3, keyreplace/4]).
 
 -record(state, {loading = [], starting = [], start_p_false = [], running = [],
 		control = [], started = [], start_req = [], conf_data}).
+
+-record(appl, {name, appl_data, descr, id, vsn, restart_type, inc_apps, opt_apps, apps}).
+
+-define(AC, ?MODULE).
 
 % Patch reason: in the `{'EXIT', Pid, Reason}` clause ets:match_delete
 % (missing in AtomVM) is replaced with ets:delete. That clause is not
@@ -199,3 +204,13 @@ make_appl(Name) when is_atom(Name) ->
 
 make_appl(Application) ->
     {ok, popcorn_module:make_appl_i(Application)}.
+
+init_starter(_From, Appl, S, Type) ->
+    process_flag(trap_exit, true),
+    AppName = Appl#appl.name,
+	% erlang:display({s, S}),
+	% Resp = catch start_appl(Appl, S, Type),
+	Resp = popcorn_module:start_appl(Appl, S, Type),
+	% erlang:display({result, Resp}),
+    gen_server:cast(?AC, {application_started, AppName, 
+			  Resp}).
