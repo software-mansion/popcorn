@@ -93,6 +93,20 @@ get_line(Prompt) ->
 %%-----------------------------------------------------------------------------
 -spec put_chars(Chars :: list() | binary()) -> ok.
 put_chars(Chars) ->
+    put_chars(standard_io, Chars).
+
+%%-----------------------------------------------------------------------------
+%% @param   Chars  character(s) to write.
+%% @param   Device IO device to write to. Currently, only user, standard_io and standard_error are supported
+%% @returns ok
+%% @doc     Writes the given character(s) to passed device.
+%% @end
+%%-----------------------------------------------------------------------------
+-spec put_chars(Device :: standard_io | standard_error | user, Chars :: list() | binary()) -> ok.
+put_chars(user, Chars) ->
+  put_chars(standard_io, Chars);
+
+put_chars(standard_io, Chars) ->
     Self = self(),
     case erlang:group_leader() of
         Self ->
@@ -103,17 +117,16 @@ put_chars(Chars) ->
             receive
                 {io_reply, Ref, Line} -> Line
             end
-    end.
+    end;
 
-%%-----------------------------------------------------------------------------
-%% @param   Chars character(s) to write to console
-%% @returns ok
-%% @doc     Writes the given character(s) to the console.
-%% @end
-%%-----------------------------------------------------------------------------
--spec put_chars(Device :: any(), Chars :: list() | binary()) -> ok.
-put_chars(_Device, Chars) ->
-    put_chars(Chars).
+put_chars(standard_error, Chars) ->
+    % display_string only supports binaries and flat charlists - not iodata
+    Bin = erlang:iolist_to_binary(Chars),
+    % Until we have a separate process for stderr, just print directly
+    erlang:display_string(stderr, Bin);
+
+put_chars(Device, _Chars) ->
+    erlang:error({not_implemented, put_chars, Device}).
 
 bc_req(_Pid, Req0, _MaybeConvert) ->
     {false,Req0}.
