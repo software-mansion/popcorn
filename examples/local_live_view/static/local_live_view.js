@@ -13,7 +13,6 @@ async function setup() {
       if (el.hasAttribute('pop-click')) {
         el.addEventListener('click', async (e) => {
           try {
-            console.log({ "view": view, "event": "click", payload: {"event": el.getAttribute('pop-click')} })
             const { data, durationMs } = await popcorn.call({ "view": view, "event": "click", 
               payload: {"event": el.getAttribute('pop-click')} }, {
               timeoutMs: 10_000,
@@ -51,7 +50,6 @@ function find_view(element) {
 function find_element(view) {
   let elements = document.querySelectorAll('[data-pop-view]');
   elements = Array.from(elements)
-  console.log(elements)
   const found = elements.find((element) => element.getAttribute("data-pop-view") == view);
   return found
 }

@@ -65,7 +65,6 @@ defmodule LocalLiveView.Dispatcher do
           {view, pid}
 
         {^ref, {:error, reply}} ->
-          IO.puts "ERROR!"
           nil
       end
     end
