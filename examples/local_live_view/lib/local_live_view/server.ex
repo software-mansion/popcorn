@@ -1029,7 +1029,6 @@ defmodule LocalLiveView.Server do
             |> LocalLiveView.JS.rerender(socket.view)
             {diff, fingerprints, components} =
               Diff.render(socket, rendered, state.fingerprints, state.components)
-              |> IO.inspect()
             socket =
               socket
 #              |> Lifecycle.after_render()
@@ -1242,7 +1241,7 @@ defmodule LocalLiveView.Server do
     case mount_private(verified, connect_params, nil, lifecycle) do
       {:ok, mount_priv} ->
 #        socket = Utils.configure_socket(socket, mount_priv, action, flash, host_uri)
-        socket = Utils.configure_socket(socket, mount_priv, nil, nil, :not_mounted_at_router) |> IO.inspect()
+        socket = Utils.configure_socket(socket, mount_priv, nil, nil, :not_mounted_at_router)
         try do
           %Socket{socket | view: view}
 #          |> load_layout(route)
