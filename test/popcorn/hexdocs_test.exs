@@ -591,7 +591,7 @@ defmodule Popcorn.HexdocsTest do
       output: 6
     },
     {~s|String.codepoints("👩‍🚒")|, output: ["👩", "‍", "🚒"]},
-    {~s|String.graphemes("👩‍🚒")|, output: ["👩‍🚒"], skip: true},
+    {~s|String.graphemes("👩‍🚒")|, output: ["👩‍🚒"]},
     {~s|String.length("👩‍🚒")|, output: 1},
     {~s|"hełło" <> <<0>>|, output: <<104, 101, 197, 130, 197, 130, 111, 0>>},
     {
@@ -689,7 +689,7 @@ defmodule Popcorn.HexdocsTest do
       output: "[99, 97, 116]"
     },
     {~s|to_charlist("hełło")|, output: [104, 101, 322, 322, 111]},
-    {~s|to_string(~c"hełło")|, output: "hełło", skip: true},
+    {~s|to_string(~c"hełło")|, output: "hełło"},
     {"to_string(1)", output: "1"},
     {~s|~c"this " <> ~c"fails"|, raises: ArgumentError, skip: true},
     {~s|~c"this " ++ ~c"works"|, output: ~c"this works"},
@@ -970,7 +970,7 @@ defmodule Popcorn.HexdocsTest do
       """
       Enum.reduce(1..3, 0, &+/2)
       """,
-      output: 6, skip: true
+      output: 6
     },
     {
       """
@@ -1283,7 +1283,7 @@ defmodule Popcorn.HexdocsTest do
         # Can still access it as `Bar`
       end
       """,
-      predicate: &AtomVM.assert_is_module/1, skip: true
+      predicate: &AtomVM.assert_is_module/1
     },
     {
       """
@@ -1514,7 +1514,7 @@ defmodule Popcorn.HexdocsTest do
       """,
       output: "tuple: {1, 2, 3}"
     },
-    {"inspect &(&1+2)", predicate: &(&1 =~ "#Function"), skip: true}
+    {"inspect &(&1+2)", predicate: &(&1 =~ "#Function")}
   ]
   |> create_tests(category: :protocols)
 
@@ -1591,7 +1591,7 @@ defmodule Popcorn.HexdocsTest do
     },
     {~s|"HELLO" =~ ~r/hello/|, output: false, skip: true},
     {~s|~r/hello/|, output: ~r/hello/, skip: true},
-    {"~w(foo bar bat)a", output: [:foo, :bar, :bat], skip: true},
+    {"~w(foo bar bat)a", output: [:foo, :bar, :bat]},
     {
       ~s|~s(String with escape codes \x26 \#{"inter" <> "polation"})|,
       output: "String with escape codes & interpolation"
@@ -1945,23 +1945,20 @@ defmodule Popcorn.HexdocsTest do
         {~s|%{fruit: "apple", count: 3} in cart|, output: true},
         {":something_else in cart", output: false},
         {"Enum.empty?(cart)", output: false},
-        {~s|Enum.filter(cart, &(&1.fruit =~ "o"))|,
-         output: [%{fruit: "orange", count: 6}], skip: true},
+        {~s|Enum.filter(cart, &(&1.fruit =~ "o"))|, output: [%{fruit: "orange", count: 6}]},
         {
           ~s|Enum.filter(cart, &(&1.fruit =~ "e"))|,
           output: [
             %{fruit: "apple", count: 3},
             %{fruit: "orange", count: 6}
-          ],
-          skip: true
+          ]
         },
         {
           ~s|Enum.reject(cart, &(&1.fruit =~ "o"))|,
           output: [
             %{fruit: "apple", count: 3},
             %{fruit: "banana", count: 1}
-          ],
-          skip: true
+          ]
         },
         {
           """
@@ -1980,8 +1977,7 @@ defmodule Popcorn.HexdocsTest do
           output: [
             %{fruit: "apple", count: 3},
             %{fruit: "orange", count: 6}
-          ],
-          skip: true
+          ]
         },
         {
           """
@@ -2030,7 +2026,7 @@ defmodule Popcorn.HexdocsTest do
             item.fruit
           end
           """,
-          output: ["apple", "orange"], skip: true
+          output: ["apple", "orange"]
         },
         {
           "Enum.each(cart, &IO.puts(&1.fruit))",
@@ -2091,7 +2087,7 @@ defmodule Popcorn.HexdocsTest do
             acc -> item.count + acc
           end
           """,
-          output: 9, skip: true
+          output: 9
         },
         {"Enum.count(cart)", output: 3},
         {
@@ -2099,8 +2095,8 @@ defmodule Popcorn.HexdocsTest do
           output: %{"apple" => 2, "banana" => 1, "orange" => 1}
         },
         {"Enum.frequencies_by(cart, &String.last(&1.fruit))", output: %{"a" => 1, "e" => 2}},
-        {~s|Enum.count(cart, &(&1.fruit =~ "e"))|, output: 2, skip: true},
-        {~s|Enum.count(cart, &(&1.fruit =~ "y"))|, output: 0, skip: true},
+        {~s|Enum.count(cart, &(&1.fruit =~ "e"))|, output: 2},
+        {~s|Enum.count(cart, &(&1.fruit =~ "y"))|, output: 0},
         {"cart |> Enum.map(& &1.count) |> Enum.sum()", output: 10},
         {"Enum.sum_by(cart, & &1.count)", output: :todo, skip: true},
         {"cart |> Enum.map(& &1.count) |> Enum.product()", output: 18},
@@ -2211,7 +2207,7 @@ defmodule Popcorn.HexdocsTest do
         },
         {
           ~s|Enum.dedup_by(cart, & &1.fruit =~ "a")|,
-          output: [%{fruit: "apple", count: 3}], skip: true
+          output: [%{fruit: "apple", count: 3}]
         },
         {
           "Enum.dedup_by(cart, & &1.count < 5)",
@@ -2256,23 +2252,23 @@ defmodule Popcorn.HexdocsTest do
         },
         {
           ~s|Enum.find(cart, &(&1.fruit =~ "o"))|,
-          output: %{fruit: "orange", count: 6}, skip: true
+          output: %{fruit: "orange", count: 6}
         },
         {
           ~s|Enum.find(cart, &(&1.fruit =~ "y"))|,
-          output: nil, skip: true
+          output: nil
         },
         {
           ~s|Enum.find(cart, :none, &(&1.fruit =~ "y"))|,
-          output: :none, skip: true
+          output: :none
         },
         {
           ~s|Enum.find_index(cart, &(&1.fruit =~ "o"))|,
-          output: 2, skip: true
+          output: 2
         },
         {
           ~s|Enum.find_index(cart, &(&1.fruit =~ "y"))|,
-          output: nil, skip: true
+          output: nil
         },
         {
           """
@@ -2378,16 +2374,14 @@ defmodule Popcorn.HexdocsTest do
           output: {
             [%{fruit: "apple", count: 3}],
             [%{fruit: "banana", count: 1}, %{fruit: "orange", count: 6}]
-          },
-          skip: true
+          }
         },
         {
           ~s|Enum.split_with(cart, &(&1.fruit =~ "e"))|,
           output: {
             [%{fruit: "apple", count: 3}, %{fruit: "orange", count: 6}],
             [%{fruit: "banana", count: 1}]
-          },
-          skip: true
+          }
         },
         {
           "Enum.drop(cart, 1)",
@@ -2412,8 +2406,7 @@ defmodule Popcorn.HexdocsTest do
           output: [
             %{fruit: "banana", count: 1},
             %{fruit: "orange", count: 6}
-          ],
-          skip: true
+          ]
         },
         {"Enum.take(cart, 1)", output: [%{fruit: "apple", count: 3}]},
         {"Enum.take(cart, -1)", output: [%{fruit: "orange", count: 6}]},
@@ -2426,7 +2419,7 @@ defmodule Popcorn.HexdocsTest do
         },
         {
           ~s|Enum.take_while(cart, &(&1.fruit =~ "e"))|,
-          output: [%{fruit: "apple", count: 3}], skip: true
+          output: [%{fruit: "apple", count: 3}]
         },
         {
           "Enum.chunk_by(cart, &String.length(&1.fruit))",
@@ -2469,11 +2462,11 @@ defmodule Popcorn.HexdocsTest do
       cases: [
         {
           "Enum.slide(fruits, 2, 0)",
-          output: ["grape", "apple", "banana", "orange", "pear"], skip: true
+          output: ["grape", "apple", "banana", "orange", "pear"]
         },
         {
           "Enum.slide(fruits, 2, 4)",
-          output: ["apple", "banana", "orange", "pear", "grape"], skip: true
+          output: ["apple", "banana", "orange", "pear", "grape"]
         },
         {"Enum.slide(fruits, 1..3, 0)", output: ["banana", "grape", "orange", "apple", "pear"]},
         {"Enum.slide(fruits, 1..3, 4)", output: ["apple", "pear", "banana", "grape", "orange"]}
@@ -2505,7 +2498,7 @@ defmodule Popcorn.HexdocsTest do
             acc + price
           end)
           """,
-          output: 19, skip: true
+          output: 19
         }
       ]
     },
