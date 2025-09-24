@@ -15,40 +15,40 @@ defmodule Phoenix.LiveView.Component do
           assigns: map()
         }
 
-#  defimpl Phoenix.HTML.Safe do
-#    def to_iodata(%{id: id, component: component}) do
-#      raise ArgumentError, """
-#      cannot convert component #{inspect(component)} with id #{inspect(id)} to HTML.
-#
-#      A component must always be returned directly as part of a LiveView template.
-#
-#      For example, this is not allowed:
-#
-#          <%= content_tag :div do %>
-#            <.live_component module={SomeComponent} id="myid" />
-#          <% end %>
-#
-#      That's because the component is inside `content_tag`. However, this works:
-#
-#          <div>
-#            <.live_component module={SomeComponent} id="myid" />
-#          </div>
-#
-#      Components are also allowed inside Elixir's special forms, such as
-#      `if`, `for`, `case`, and friends.
-#
-#          <%= for item <- items do %>
-#            <.live_component module={SomeComponent} id={item} />
-#          <% end %>
-#
-#      However, using other module functions such as `Enum`, will not work:
-#
-#          <%= Enum.map(items, fn item -> %>
-#            <.live_component module={SomeComponent} id={item} />
-#          <% end %>
-#      """
-#    end
-#  end
+  #  defimpl Phoenix.HTML.Safe do
+  #    def to_iodata(%{id: id, component: component}) do
+  #      raise ArgumentError, """
+  #      cannot convert component #{inspect(component)} with id #{inspect(id)} to HTML.
+  #
+  #      A component must always be returned directly as part of a LiveView template.
+  #
+  #      For example, this is not allowed:
+  #
+  #          <%= content_tag :div do %>
+  #            <.live_component module={SomeComponent} id="myid" />
+  #          <% end %>
+  #
+  #      That's because the component is inside `content_tag`. However, this works:
+  #
+  #          <div>
+  #            <.live_component module={SomeComponent} id="myid" />
+  #          </div>
+  #
+  #      Components are also allowed inside Elixir's special forms, such as
+  #      `if`, `for`, `case`, and friends.
+  #
+  #          <%= for item <- items do %>
+  #            <.live_component module={SomeComponent} id={item} />
+  #          <% end %>
+  #
+  #      However, using other module functions such as `Enum`, will not work:
+  #
+  #          <%= Enum.map(items, fn item -> %>
+  #            <.live_component module={SomeComponent} id={item} />
+  #          <% end %>
+  #      """
+  #    end
+  #  end
 end
 
 defmodule Phoenix.LiveView.Comprehension do
@@ -77,24 +77,24 @@ defmodule Phoenix.LiveView.Comprehension do
           stream: list() | nil
         }
 
-#  defimpl Phoenix.HTML.Safe do
-#    def to_iodata(%Phoenix.LiveView.Comprehension{static: static, entries: entries}) do
-#      for {_key, _vars, render} <- entries, do: to_iodata(static, render.(%{}, false))
-#    end
-#
-#    defp to_iodata([static_head | static_tail], [%_{} = struct | dynamic_tail]) do
-#      dynamic_head = Phoenix.HTML.Safe.to_iodata(struct)
-#      [static_head, dynamic_head | to_iodata(static_tail, dynamic_tail)]
-#    end
-#
-#    defp to_iodata([static_head | static_tail], [dynamic_head | dynamic_tail]) do
-#      [static_head, dynamic_head | to_iodata(static_tail, dynamic_tail)]
-#    end
-#
-#    defp to_iodata([static_head], []) do
-#      [static_head]
-#    end
-#  end
+  #  defimpl Phoenix.HTML.Safe do
+  #    def to_iodata(%Phoenix.LiveView.Comprehension{static: static, entries: entries}) do
+  #      for {_key, _vars, render} <- entries, do: to_iodata(static, render.(%{}, false))
+  #    end
+  #
+  #    defp to_iodata([static_head | static_tail], [%_{} = struct | dynamic_tail]) do
+  #      dynamic_head = Phoenix.HTML.Safe.to_iodata(struct)
+  #      [static_head, dynamic_head | to_iodata(static_tail, dynamic_tail)]
+  #    end
+  #
+  #    defp to_iodata([static_head | static_tail], [dynamic_head | dynamic_tail]) do
+  #      [static_head, dynamic_head | to_iodata(static_tail, dynamic_tail)]
+  #    end
+  #
+  #    defp to_iodata([static_head], []) do
+  #      [static_head]
+  #    end
+  #  end
 end
 
 defmodule Phoenix.LiveView.Rendered do
@@ -125,31 +125,31 @@ defmodule Phoenix.LiveView.Rendered do
                line :: pos_integer()}
         }
 
-#  defimpl Phoenix.HTML.Safe do
-#    def to_iodata(%Phoenix.LiveView.Rendered{static: static, dynamic: dynamic}) do
-#      to_iodata(static, dynamic.(false), [])
-#    end
-#
-#    def to_iodata(%_{} = struct) do
-#      Phoenix.HTML.Safe.to_iodata(struct)
-#    end
-#
-#    def to_iodata(other) do
-#      other
-#    end
-#
-#    defp to_iodata([static_head | static_tail], [dynamic_head | dynamic_tail], acc) do
-#      to_iodata(static_tail, dynamic_tail, [to_iodata(dynamic_head), static_head | acc])
-#    end
-#
-#    defp to_iodata([static_head], [], acc) do
-#      Enum.reverse([static_head | acc])
-#    end
-#  end
+  #  defimpl Phoenix.HTML.Safe do
+  #    def to_iodata(%Phoenix.LiveView.Rendered{static: static, dynamic: dynamic}) do
+  #      to_iodata(static, dynamic.(false), [])
+  #    end
+  #
+  #    def to_iodata(%_{} = struct) do
+  #      Phoenix.HTML.Safe.to_iodata(struct)
+  #    end
+  #
+  #    def to_iodata(other) do
+  #      other
+  #    end
+  #
+  #    defp to_iodata([static_head | static_tail], [dynamic_head | dynamic_tail], acc) do
+  #      to_iodata(static_tail, dynamic_tail, [to_iodata(dynamic_head), static_head | acc])
+  #    end
+  #
+  #    defp to_iodata([static_head], [], acc) do
+  #      Enum.reverse([static_head | acc])
+  #    end
+  #  end
 end
 
-#defmodule Phoenix.HTML.Safe do
-##def to_iodata(%{id: id, component: component}) do
+# defmodule Phoenix.HTML.Safe do
+## def to_iodata(%{id: id, component: component}) do
 ##      raise ArgumentError, """
 ##      cannot convert component #{inspect(component)} with id #{inspect(id)} to HTML.
 ##
@@ -217,7 +217,7 @@ end
 #  defp to_iodata([static_head], [], acc) do
 #    Enum.reverse([static_head | acc])
 #  end
-#end
+# end
 
 defmodule Phoenix.LiveView.Engine do
   @moduledoc ~S"""
@@ -360,9 +360,9 @@ defmodule Phoenix.LiveView.Engine do
   """
 
   alias Phoenix.HTML.Form
-#  @behaviour Phoenix.Template.Engine
+  #  @behaviour Phoenix.Template.Engine
 
-#  @impl true
+  #  @impl true
   def compile(path, _name) do
     trim = Application.get_env(:phoenix, :trim_on_html_eex_engine, true)
     EEx.compile_file(path, engine: __MODULE__, line: 1, trim: trim)
@@ -371,7 +371,7 @@ defmodule Phoenix.LiveView.Engine do
   @behaviour EEx.Engine
   @assigns_var Macro.var(:assigns, nil)
 
- # @impl true
+  # @impl true
   def init(opts) do
     # Phoenix.LiveView.TagEngine calls this engine in a non-linear order
     # to evaluate slots, which can lead to variable conflicts. Therefore we
@@ -384,12 +384,12 @@ defmodule Phoenix.LiveView.Engine do
     }
   end
 
- # @impl true
+  # @impl true
   def handle_begin(state) do
     %{state | static: [], dynamic: []}
   end
 
- # @impl true
+  # @impl true
   def handle_end(state, opts \\ []) do
     %{static: static, dynamic: dynamic} = state
     safe = {:safe, Enum.reverse(static)}
@@ -397,7 +397,7 @@ defmodule Phoenix.LiveView.Engine do
     {:__block__, meta, Enum.reverse([safe | dynamic])}
   end
 
- # @impl true
+  # @impl true
   def handle_body(state, opts \\ []) do
     {:ok, rendered} =
       state
@@ -411,13 +411,13 @@ defmodule Phoenix.LiveView.Engine do
     end
   end
 
- # @impl true
+  # @impl true
   def handle_text(state, _meta, text) do
     %{static: static} = state
     %{state | static: [text | static]}
   end
 
- # @impl true
+  # @impl true
   def handle_expr(state, "=", ast) do
     %{static: static, dynamic: dynamic, counter: counter} = state
     i = :counters.get(counter, 1)
@@ -455,7 +455,8 @@ defmodule Phoenix.LiveView.Engine do
               [first | rest] ->
                 last = List.last(rest) <> to_string(aft)
                 List.replace_at([to_string(before) <> first | rest], -1, last)
-#                List.update_at([to_string(before) <> first | rest], -1, &(&1 <> to_string(aft)))
+
+                #                List.update_at([to_string(before) <> first | rest], -1, &(&1 <> to_string(aft)))
             end
 
           :error ->
@@ -1397,13 +1398,13 @@ defmodule Phoenix.LiveView.Engine do
     # The fingerprint must be unique and we don’t check for collisions in the
     # Diff module as doing so would be expensive. Therefore it is important
     # that the algorithm we use here has a low number of collisions.
-#   TODO fingerprint is mocked for now (>64 bits integer not supported in AtomVM)
-#    <<fingerprint::8*16>> =
-#      [block | static]
-#      |> :erlang.term_to_binary()
-#      |> :erlang.md5()
-#
-#    fingerprint
+    #   TODO fingerprint is mocked for now (>64 bits integer not supported in AtomVM)
+    #    <<fingerprint::8*16>> =
+    #      [block | static]
+    #      |> :erlang.term_to_binary()
+    #      |> :erlang.md5()
+    #
+    #    fingerprint
     0
   end
 
@@ -1448,7 +1449,8 @@ defmodule Phoenix.LiveView.Engine do
   def safe_to_iodata(expr) do
     case expr do
       {:safe, data} -> data
-      bin when is_binary(bin) -> bin #Plug.HTML.html_escape_to_iodata(bin)
+      # Plug.HTML.html_escape_to_iodata(bin)
+      bin when is_binary(bin) -> bin
       other -> Phoenix.HTML.Safe.to_iodata(other)
     end
   end
@@ -1470,8 +1472,10 @@ defmodule Phoenix.LiveView.Engine do
     case changed do
       %{^name => _} ->
         true
+
       %{} ->
         false
+
       nil ->
         true
     end
@@ -1512,9 +1516,11 @@ defmodule Phoenix.LiveView.Engine do
   defp recur_changed_assign([{:access, head}], %Form{} = form1, %Form{} = form2) do
     # Phoenix.HTML does not know about LiveView's _unused_ input tracking,
     # therefore we also need to check if the input's unused state changed
-#    TODO POP
-    Form.input_changed?(form1, form2, head) # or
-#      Phoenix.Component.used_input?(form1[head]) !== Phoenix.Component.used_input?(form2[head])
+    #    TODO POP
+    # or
+    Form.input_changed?(form1, form2, head)
+
+    #      Phoenix.Component.used_input?(form1[head]) !== Phoenix.Component.used_input?(form2[head])
   end
 
   defp recur_changed_assign([{:access, head} | tail], assigns, changed) do

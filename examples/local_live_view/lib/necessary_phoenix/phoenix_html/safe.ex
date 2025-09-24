@@ -1,4 +1,4 @@
-#defprotocol Phoenix.HTML.Safe do
+# defprotocol Phoenix.HTML.Safe do
 #  @moduledoc """
 #  Defines the HTML safe protocol.
 #
@@ -13,10 +13,10 @@
 #  """
 #
 #  def to_iodata(data)
-#end
+# end
 
 defmodule Phoenix.HTML.Safe do
-  #def to_iodata(%{id: id, component: component}) do
+  # def to_iodata(%{id: id, component: component}) do
   #      raise ArgumentError, """
   #      cannot convert component #{inspect(component)} with id #{inspect(id)} to HTML.
   #
@@ -91,35 +91,35 @@ defmodule Phoenix.HTML.Safe.Atom do
   def to_iodata(atom), do: Phoenix.HTML.Engine.html_escape(Atom.to_string(atom))
 end
 
-#defimpl Phoenix.HTML.Safe, for: BitString do
+# defimpl Phoenix.HTML.Safe, for: BitString do
 #  defdelegate to_iodata(data), to: Phoenix.HTML.Engine, as: :html_escape
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: Time do
+# defimpl Phoenix.HTML.Safe, for: Time do
 #  defdelegate to_iodata(data), to: Time, as: :to_iso8601
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: Date do
+# defimpl Phoenix.HTML.Safe, for: Date do
 #  defdelegate to_iodata(data), to: Date, as: :to_iso8601
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: NaiveDateTime do
+# defimpl Phoenix.HTML.Safe, for: NaiveDateTime do
 #  defdelegate to_iodata(data), to: NaiveDateTime, as: :to_iso8601
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: DateTime do
+# defimpl Phoenix.HTML.Safe, for: DateTime do
 #  def to_iodata(data) do
 #    # Call escape in case someone can inject reserved
 #    # characters in the timezone or its abbreviation
 #    Phoenix.HTML.Engine.html_escape(DateTime.to_iso8601(data))
 #  end
-#end
+# end
 
-#if Code.ensure_loaded?(Duration) do
+# if Code.ensure_loaded?(Duration) do
 #  defimpl Phoenix.HTML.Safe, for: Duration do
 #    defdelegate to_iodata(data), to: Duration, as: :to_iso8601
 #  end
-#end
+# end
 
 defmodule Phoenix.HTML.Safe.List do
   def to_iodata(list), do: recur(list)
@@ -158,19 +158,19 @@ defmodule Phoenix.HTML.Safe.List do
   end
 end
 
-#defimpl Phoenix.HTML.Safe, for: Integer do
+# defimpl Phoenix.HTML.Safe, for: Integer do
 #  defdelegate to_iodata(data), to: Integer, as: :to_string
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: Float do
+# defimpl Phoenix.HTML.Safe, for: Float do
 #  defdelegate to_iodata(data), to: Float, as: :to_string
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: Tuple do
+# defimpl Phoenix.HTML.Safe, for: Tuple do
 #  def to_iodata({:safe, data}), do: data
 #  def to_iodata(value), do: raise(Protocol.UndefinedError, protocol: @protocol, value: value)
-#end
+# end
 #
-#defimpl Phoenix.HTML.Safe, for: URI do
+# defimpl Phoenix.HTML.Safe, for: URI do
 #  def to_iodata(data), do: Phoenix.HTML.Engine.html_escape(URI.to_string(data))
-#end
+# end

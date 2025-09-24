@@ -18,13 +18,13 @@ defmodule Phoenix.LiveView.Static do
   # Max session age in seconds. Equivalent to 2 weeks.
   @max_session_age 1_209_600
 
-#  @doc """
-#  Acts as a view via put_view to maintain the
-#  controller render + instrumentation stack.
-#  """
-#  def render(_, %{content: content}) do
-#    content
-#  end
+  #  @doc """
+  #  Acts as a view via put_view to maintain the
+  #  controller render + instrumentation stack.
+  #  """
+  #  def render(_, %{content: content}) do
+  #    content
+  #  end
 
   @doc """
   Verifies a LiveView token.
@@ -38,12 +38,12 @@ defmodule Phoenix.LiveView.Static do
     end
   end
 
-#  defp live_session(%Plug.Conn{} = conn) do
-#    case conn.private[:phoenix_live_view] do
-#      {_view, _opts, %{name: _name, extra: _extra} = lv_session} -> lv_session
-#      nil -> nil
-#    end
-#  end
+  #  defp live_session(%Plug.Conn{} = conn) do
+  #    case conn.private[:phoenix_live_view] do
+  #      {_view, _opts, %{name: _name, extra: _extra} = lv_session} -> lv_session
+  #      nil -> nil
+  #    end
+  #  end
 
   defp load_session(conn_or_socket_session, opts) do
     user_session = Keyword.get(opts, :session, %{})
@@ -87,48 +87,48 @@ defmodule Phoenix.LiveView.Static do
     * `:session` - the required map of session data
     * `:container` - the optional tuple for the HTML tag and DOM attributes
   """
-#  def render(%Plug.Conn{} = conn, view, opts) do
+  #  def render(%Plug.Conn{} = conn, view, opts) do
   def render(view, opts \\ []) do
     do_render(view, opts)
   end
 
   defp do_render(view, opts) do
-#    conn_session = maybe_get_session(conn)
-#    {to_sign_session, mount_session} = load_session(conn_session, opts)
-#    live_session = live_session(conn)
+    #    conn_session = maybe_get_session(conn)
+    #    {to_sign_session, mount_session} = load_session(conn_session, opts)
+    #    live_session = live_session(conn)
     config = load_live!(view, :view)
-#    lifecycle = lifecycle(config, live_session)
+    #    lifecycle = lifecycle(config, live_session)
     {tag, extended_attrs} = container(config, opts)
     router = Keyword.get(opts, :router)
     action = Keyword.get(opts, :action)
-#    flash = Map.get(conn.assigns, :flash) || Map.get(conn.private, :phoenix_flash, %{})
-#    request_url = Plug.Conn.request_url(conn)
-#    host_uri = URI.parse(request_url)
+    #    flash = Map.get(conn.assigns, :flash) || Map.get(conn.private, :phoenix_flash, %{})
+    #    request_url = Plug.Conn.request_url(conn)
+    #    host_uri = URI.parse(request_url)
 
     socket = %Socket{view: view}
-#      Utils.configure_socket(
-#        %Socket{view: view, router: router},
-#        %{
-#          assign_new: {conn.assigns, []},
-#          connect_params: %{},
-#          connect_info: conn,
-#          conn_session: conn_session,
-#          lifecycle: lifecycle,
-#          root_view: view,
-#          live_temp: %{}
-#        }
-#        |> maybe_put_live_layout(live_session),
-#        action,
-#        flash,
-#        host_uri
-#      )
+    #      Utils.configure_socket(
+    #        %Socket{view: view, router: router},
+    #        %{
+    #          assign_new: {conn.assigns, []},
+    #          connect_params: %{},
+    #          connect_info: conn,
+    #          conn_session: conn_session,
+    #          lifecycle: lifecycle,
+    #          root_view: view,
+    #          live_temp: %{}
+    #        }
+    #        |> maybe_put_live_layout(live_session),
+    #        action,
+    #        flash,
+    #        host_uri
+    #      )
 
     case call_mount_and_handle_params!(socket, view, %Phoenix.LiveView.Session{view: view}, %{}) do
       {:ok, socket} ->
         data_attrs = [
           "pop-view": view |> Module.split() |> List.last()
-#          phx_session: sign_root_session(socket, router, view, to_sign_session, live_session),
-#          phx_static: sign_static_token(socket)
+          #          phx_session: sign_root_session(socket, router, view, to_sign_session, live_session),
+          #          phx_static: sign_static_token(socket)
         ]
 
         data_attrs = if(router, do: [phx_main: true], else: []) ++ data_attrs
@@ -317,9 +317,9 @@ defmodule Phoenix.LiveView.Static do
       not lifecycle.any? ->
         {:noreply, socket}
 
-#      is_nil(socket.router) ->
-#        # Let the callback fail for the usual reasons
-#        Route.live_link_info!(socket, view, uri)
+      #      is_nil(socket.router) ->
+      #        # Let the callback fail for the usual reasons
+      #        Route.live_link_info!(socket, view, uri)
 
       true ->
         Utils.call_handle_params!(socket, view, lifecycle.exported?, params, uri)

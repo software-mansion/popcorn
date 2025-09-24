@@ -138,11 +138,11 @@ defmodule Phoenix.LiveView.Utils do
   def changed?(%{__changed__: nil}, _assign), do: true
   def changed?(%{__changed__: changed}, assign), do: Map.has_key?(changed, assign)
 
-#  @doc """
-#  Returns the CID of the given socket.
-#  """
-#  def cid(%Socket{assigns: %{myself: %Phoenix.LiveComponent.CID{} = cid}}), do: cid
-#  def cid(%Socket{}), do: nil
+  #  @doc """
+  #  Returns the CID of the given socket.
+  #  """
+  #  def cid(%Socket{assigns: %{myself: %Phoenix.LiveComponent.CID{} = cid}}), do: cid
+  #  def cid(%Socket{}), do: nil
 
   @doc """
   Configures the socket for use.
@@ -183,8 +183,8 @@ defmodule Phoenix.LiveView.Utils do
   """
   def random_id do
     "phx-"
-#    |> Kernel.<>(random_encoded_bytes())
-#    |> String.replace(["/", "+"], "-")
+    #    |> Kernel.<>(random_encoded_bytes())
+    #    |> String.replace(["/", "+"], "-")
   end
 
   @doc """
@@ -338,23 +338,24 @@ defmodule Phoenix.LiveView.Utils do
     %{any?: any?, exported?: exported?} = Lifecycle.stage_info(socket, view, :mount, 3)
 
     if any? do
-#      :telemetry.span(
-#        [:phoenix, :live_view, :mount],
-#        %{socket: socket, params: params, session: session, uri: uri},
-#        fn ->
-          socket =
-            case Lifecycle.mount(params, session, socket) do
-              {:cont, %Socket{} = socket} when exported? ->
-                view.mount(params, session, socket)
+      #      :telemetry.span(
+      #        [:phoenix, :live_view, :mount],
+      #        %{socket: socket, params: params, session: session, uri: uri},
+      #        fn ->
+      socket =
+        case Lifecycle.mount(params, session, socket) do
+          {:cont, %Socket{} = socket} when exported? ->
+            view.mount(params, session, socket)
 
-              {_, %Socket{} = socket} ->
-                {:ok, socket}
-            end
-            |> handle_mount_result!({view, :mount, 3})
-          socket
-#          {socket, %{socket: socket, params: params, session: session, uri: uri}}
-#        end
-#      )
+          {_, %Socket{} = socket} ->
+            {:ok, socket}
+        end
+        |> handle_mount_result!({view, :mount, 3})
+
+      socket
+      #          {socket, %{socket: socket, params: params, session: session, uri: uri}}
+      #        end
+      #      )
     else
       socket
     end
@@ -447,10 +448,10 @@ defmodule Phoenix.LiveView.Utils do
   """
   def call_handle_params!(%Socket{} = socket, view, exported? \\ true, params, uri)
       when is_boolean(exported?) do
-#    :telemetry.span(
-#      [:phoenix, :live_view, :handle_params],
-#      %{socket: socket, params: params, uri: uri},
-#      fn ->
+    #    :telemetry.span(
+    #      [:phoenix, :live_view, :handle_params],
+    #      %{socket: socket, params: params, uri: uri},
+    #      fn ->
     case Lifecycle.handle_params(params, uri, socket) do
       {:cont, %Socket{} = socket} when exported? ->
         case view.handle_params(params, uri, socket) do
@@ -468,8 +469,9 @@ defmodule Phoenix.LiveView.Utils do
       {_, %Socket{} = socket} ->
         {{:noreply, socket}, %{socket: socket, params: params, uri: uri}}
     end
-#      end
-#    )
+
+    #      end
+    #    )
   end
 
   @doc """

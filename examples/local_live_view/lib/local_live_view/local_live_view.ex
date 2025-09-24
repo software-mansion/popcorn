@@ -5,32 +5,17 @@ defmodule LocalLiveView do
   alias Popcorn.Wasm
   alias Phoenix.LiveView.Static
   alias LocalLiveView.Message
-  
-  defmacro __using__(opts) do
-    # Expand layout if possible to avoid compile-time dependencies
-#    opts =
-#      with true <- Keyword.keyword?(opts),
-#           {layout, template} <- Keyword.get(opts, :layout) do
-#        layout = Macro.expand(layout, %{__CALLER__ | function: {:__live__, 0}})
-#        Keyword.replace!(opts, :layout, {layout, template})
-#      else
-#        _ -> opts
-#      end
 
+  defmacro __using__(opts) do
     quote bind_quoted: [opts: []] do
       import LocalLiveView
-#      @behaviour Phoenix.LiveView
       @before_compile Phoenix.LiveView.Renderer
-#
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
       @before_compile LocalLiveView
 
       alias LocalLiveView.Message
-#
-#      # Phoenix.Component must come last so its @before_compile runs last
       use LocalComponent, Keyword.take(opts, [:global_prefixes])
-      
     end
   end
 
@@ -52,27 +37,6 @@ defmodule LocalLiveView do
     end
   end
 
-  @doc """
-  Defines metadata for a LiveView.
-
-  This must be returned from the `__live__` callback.
-
-  It accepts:
-
-    * `:container` - an optional tuple for the HTML tag and DOM attributes to
-      be used for the LiveView container. For example: `{:li, style: "color: blue;"}`.
-
-    * `:layout` - configures the layout the LiveView will be rendered in.
-      This layout can be overridden by on `c:mount/3` or via the `:layout`
-      option in `Phoenix.LiveView.Router.live_session/2`
-
-    * `:log` - configures the log level for the LiveView, either `false`
-      or a log level
-
-    * `:on_mount` - a list of tuples with module names and argument to be invoked
-      as `on_mount` hooks
-
-  """
   def __live__(opts \\ []) do
     on_mount = opts[:on_mount] || []
 
@@ -106,7 +70,7 @@ defmodule LocalLiveView do
       binary, acc -> acc <> to_string(binary)
     end)
   end
-  
+
   def render(assigns) do
     :ok
   end

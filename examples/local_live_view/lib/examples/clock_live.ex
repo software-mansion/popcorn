@@ -11,8 +11,7 @@ defmodule ClockLive do
     send(self(), :tick)
     {:ok, Phoenix.LiveView.Utils.assign(socket, :date, format_now())}
   end
-  
-  
+
   def handle_info(:tick, socket) do
     send(self(), :tick)
     :timer.sleep(1000)
@@ -20,10 +19,10 @@ defmodule ClockLive do
   end
 
   defp format_now() do
-    {{y,m,d},{h,mm,ss}} = :calendar.local_time()
+    {{y, m, d}, {h, mm, ss}} = :calendar.local_time()
     date = "#{f(y, 4)}-#{f(m)}-#{f(d)}  #{f(h)}:#{f(mm)}:#{f(ss)}"
   end
-  
+
   defp f(n, p \\ 2) do
     n
     |> inspect
