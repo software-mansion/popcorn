@@ -16,17 +16,17 @@ defmodule Phoenix.LiveView.Session do
 
   def main?(%Session{} = session), do: session.router != nil and session.parent_pid == nil
 
-#  def authorize_root_redirect(%Session{} = session, %Route{} = route) do
-#    %Session{live_session_name: session_name} = session
-#
-#    case route.live_session do
-#      %{name: ^session_name} ->
-#        {:ok, replace_root(session, route.view, self())}
-#
-#      %{} ->
-#        :error
-#    end
-#  end
+  #  def authorize_root_redirect(%Session{} = session, %Route{} = route) do
+  #    %Session{live_session_name: session_name} = session
+  #
+  #    case route.live_session do
+  #      %{name: ^session_name} ->
+  #        {:ok, replace_root(session, route.view, self())}
+  #
+  #      %{} ->
+  #        :error
+  #    end
+  #  end
 
   defp replace_root(%Session{} = session, new_root_view, root_pid) when is_pid(root_pid) do
     %{

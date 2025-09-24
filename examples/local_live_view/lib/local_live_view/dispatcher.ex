@@ -29,22 +29,28 @@ defmodule LocalLiveView.Dispatcher do
     {:noreply, state}
   end
 
-  defp handle_wasm({:wasm_call, %{"event" => type, "view" => view_string, "payload" => payload}}, state) do
-    view = String.to_existing_atom("Elixir."<>view_string)
+  defp handle_wasm(
+         {:wasm_call, %{"event" => type, "view" => view_string, "payload" => payload}},
+         state
+       ) do
+    view = String.to_existing_atom("Elixir." <> view_string)
     payload = payload |> Map.merge(%{"type" => %{}, "value" => %{}})
+
     Map.get(state.views, view)
     |> send(%Message{payload: payload, event: "event"})
+
     {:resolve, :ok, state}
   end
 
   defp handle_wasm({:wasm_call, %{"views" => views}}, state) do
     views =
       views
-      |> Enum.map(fn view_string -> "Elixir."<>view_string end)
+      |> Enum.map(fn view_string -> "Elixir." <> view_string end)
       |> Enum.map(&String.to_existing_atom/1)
       |> Enum.map(&start_local_live_view/1)
       |> Enum.filter(fn result -> result != nil end)
       |> Map.new()
+
     {:resolve, :ok, %{state | views: views}}
   end
 
@@ -52,16 +58,25 @@ defmodule LocalLiveView.Dispatcher do
     params = %{
       "session" => %Session{view: view}
     }
-    {:ok, pid} = DynamicSupervisor.start_child(LocalLiveView.Server.Supervisor, LocalLiveView.Server.child_spec([]))
+
+    {:ok, pid} =
+      DynamicSupervisor.start_child(
+        LocalLiveView.Server.Supervisor,
+        LocalLiveView.Server.child_spec([])
+      )
+
     ref = make_ref()
+
     with {:ok, pid} <- start_llv_process() do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
+
       receive do
         {^ref, {:ok, reply}} ->
           reply
           |> Diff.to_iodata()
           |> diff_iodata_to_binary()
           |> LocalLiveView.JS.rerender(view)
+
           {view, pid}
 
         {^ref, {:error, reply}} ->
@@ -69,11 +84,14 @@ defmodule LocalLiveView.Dispatcher do
       end
     end
   end
-  
+
   def start_llv_process() do
-    DynamicSupervisor.start_child(LocalLiveView.Server.Supervisor, LocalLiveView.Server.child_spec([]))
+    DynamicSupervisor.start_child(
+      LocalLiveView.Server.Supervisor,
+      LocalLiveView.Server.child_spec([])
+    )
   end
-  
+
   def diff_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
     Enum.reduce(list_of_binaries, "", fn
       integer, acc when is_integer(integer) -> acc <> List.to_string([integer])

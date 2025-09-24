@@ -807,71 +807,71 @@ defmodule Phoenix.LiveView.Diff do
     {diffs, components}
   end
 
-#  defp render_pending_components(socket, pending, seen_ids, cids, diffs, components) do
-#    acc = {{%{}, diffs, components}, seen_ids}
-#
-#    {{pending, diffs, components}, seen_ids} =
-#      Enum.reduce(pending, acc, fn {component, entries}, acc ->
-#        {{pending, diffs, components}, seen_ids} = acc
-#        update_many? = function_exported?(component, :update_many, 1)
-#        entries = maybe_preload_components(component, Enum.reverse(entries))
-#
-#        {assigns_sockets, metadata, components, seen_ids} =
-#          Enum.reduce(entries, {[], [], components, seen_ids}, fn
-#            {cid, id, new?, new_assigns}, {assigns_sockets, metadata, components, seen_ids} ->
-#              if Map.has_key?(seen_ids, [component | id]) do
-#                raise "found duplicate ID #{inspect(id)} " <>
-#                        "for component #{inspect(component)} when rendering template"
-#              end
-#
-#              {socket, components, prints} =
-#                case cids do
-#                  %{^cid => {_component, _id, assigns, private, prints}} ->
-#                    {private, components} = unmark_for_deletion(private, components)
-#                    {configure_socket_for_component(socket, assigns, private), components, prints}
-#
-#                  %{} ->
-#                    myself_assigns = %{myself: %Phoenix.LiveComponent.CID{cid: cid}}
-#
-#                    {mount_component(socket, component, myself_assigns),
-#                     put_cid(components, component, id, cid), new_fingerprints()}
-#                end
-#
-#              assigns_sockets = [{new_assigns, socket} | assigns_sockets]
-#              metadata = [{cid, id, prints, new?} | metadata]
-#              seen_ids = Map.put(seen_ids, [component | id], true)
-#              {assigns_sockets, metadata, components, seen_ids}
-#          end)
-#
-#        assigns_sockets = Enum.reverse(assigns_sockets)
-#
-#        telemetry_metadata = %{
-#          socket: socket,
-#          component: component,
-#          assigns_sockets: assigns_sockets
-#        }
-#
-#        sockets =
-#          :telemetry.span([:phoenix, :live_component, :update], telemetry_metadata, fn ->
-#            sockets =
-#              if update_many? do
-#                component.update_many(assigns_sockets)
-#              else
-#                Enum.map(assigns_sockets, fn {assigns, socket} ->
-#                  Utils.maybe_call_update!(socket, component, assigns)
-#                end)
-#              end
-#
-#            {sockets, Map.put(telemetry_metadata, :sockets, sockets)}
-#          end)
-#
-#        metadata = Enum.reverse(metadata)
-#        triplet = zip_components(sockets, metadata, component, cids, {pending, diffs, components})
-#        {triplet, seen_ids}
-#      end)
-#
-#    render_pending_components(socket, pending, seen_ids, cids, diffs, components)
-#  end
+  #  defp render_pending_components(socket, pending, seen_ids, cids, diffs, components) do
+  #    acc = {{%{}, diffs, components}, seen_ids}
+  #
+  #    {{pending, diffs, components}, seen_ids} =
+  #      Enum.reduce(pending, acc, fn {component, entries}, acc ->
+  #        {{pending, diffs, components}, seen_ids} = acc
+  #        update_many? = function_exported?(component, :update_many, 1)
+  #        entries = maybe_preload_components(component, Enum.reverse(entries))
+  #
+  #        {assigns_sockets, metadata, components, seen_ids} =
+  #          Enum.reduce(entries, {[], [], components, seen_ids}, fn
+  #            {cid, id, new?, new_assigns}, {assigns_sockets, metadata, components, seen_ids} ->
+  #              if Map.has_key?(seen_ids, [component | id]) do
+  #                raise "found duplicate ID #{inspect(id)} " <>
+  #                        "for component #{inspect(component)} when rendering template"
+  #              end
+  #
+  #              {socket, components, prints} =
+  #                case cids do
+  #                  %{^cid => {_component, _id, assigns, private, prints}} ->
+  #                    {private, components} = unmark_for_deletion(private, components)
+  #                    {configure_socket_for_component(socket, assigns, private), components, prints}
+  #
+  #                  %{} ->
+  #                    myself_assigns = %{myself: %Phoenix.LiveComponent.CID{cid: cid}}
+  #
+  #                    {mount_component(socket, component, myself_assigns),
+  #                     put_cid(components, component, id, cid), new_fingerprints()}
+  #                end
+  #
+  #              assigns_sockets = [{new_assigns, socket} | assigns_sockets]
+  #              metadata = [{cid, id, prints, new?} | metadata]
+  #              seen_ids = Map.put(seen_ids, [component | id], true)
+  #              {assigns_sockets, metadata, components, seen_ids}
+  #          end)
+  #
+  #        assigns_sockets = Enum.reverse(assigns_sockets)
+  #
+  #        telemetry_metadata = %{
+  #          socket: socket,
+  #          component: component,
+  #          assigns_sockets: assigns_sockets
+  #        }
+  #
+  #        sockets =
+  #          :telemetry.span([:phoenix, :live_component, :update], telemetry_metadata, fn ->
+  #            sockets =
+  #              if update_many? do
+  #                component.update_many(assigns_sockets)
+  #              else
+  #                Enum.map(assigns_sockets, fn {assigns, socket} ->
+  #                  Utils.maybe_call_update!(socket, component, assigns)
+  #                end)
+  #              end
+  #
+  #            {sockets, Map.put(telemetry_metadata, :sockets, sockets)}
+  #          end)
+  #
+  #        metadata = Enum.reverse(metadata)
+  #        triplet = zip_components(sockets, metadata, component, cids, {pending, diffs, components})
+  #        {triplet, seen_ids}
+  #      end)
+  #
+  #    render_pending_components(socket, pending, seen_ids, cids, diffs, components)
+  #  end
 
   defp zip_components(
          [%{__struct__: Phoenix.LiveView.Socket} = socket | sockets],
@@ -1065,15 +1065,15 @@ defmodule Phoenix.LiveView.Diff do
     {id_to_components, Map.put(id_to_cid, component, Map.put(inner, id, cid)), uuids}
   end
 
-#  defp fetch_cid(
-#         %Phoenix.LiveComponent.CID{cid: cid},
-#         {cid_to_components, _id_to_cid, _} = _components
-#       ) do
-#    case cid_to_components do
-#      %{^cid => {component, _id, _assigns, _private, _fingerprints}} -> {:ok, {cid, component}}
-#      %{} -> :error
-#    end
-#  end
+  #  defp fetch_cid(
+  #         %Phoenix.LiveComponent.CID{cid: cid},
+  #         {cid_to_components, _id_to_cid, _} = _components
+  #       ) do
+  #    case cid_to_components do
+  #      %{^cid => {component, _id, _assigns, _private, _fingerprints}} -> {:ok, {cid, component}}
+  #      %{} -> :error
+  #    end
+  #  end
 
   defp fetch_cid({component, id}, {_cid_to_components, id_to_cid, _} = _components) do
     case id_to_cid do

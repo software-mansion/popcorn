@@ -75,9 +75,9 @@ defmodule Phoenix.LiveView.Renderer do
 
         %{} ->
           if function_exported?(view, :render, 1) do
-          assigns
-          |> view.render()
-          |> check_rendered!(view)
+            assigns
+            |> view.render()
+            |> check_rendered!(view)
           else
             template =
               view.__info__(:compile)[:source]

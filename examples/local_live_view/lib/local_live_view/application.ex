@@ -1,6 +1,4 @@
 defmodule LocalLiveView.Application do
-  @moduledoc false
-
   use Application
 
   @impl true
@@ -9,9 +7,8 @@ defmodule LocalLiveView.Application do
       LocalLiveView.Dispatcher,
       {DynamicSupervisor, name: LocalLiveView.Server.Supervisor, strategy: :one_for_one}
     ]
-    
+
     opts = [strategy: :one_for_one, name: LocalLiveView.Supervisor]
     Supervisor.start_link(children, opts)
   end
-
 end

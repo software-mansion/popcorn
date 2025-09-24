@@ -22,8 +22,8 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-#      {:phoenix_template, "~> 1.0"},
-#      {:phoenix_html, "~> 3.3 or ~> 4.0 or ~> 4.1"},
+      #      {:phoenix_template, "~> 1.0"},
+      #      {:phoenix_html, "~> 3.3 or ~> 4.0 or ~> 4.1"},
       {:popcorn, path: "../.."}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
