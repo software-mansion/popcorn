@@ -5,7 +5,7 @@ defmodule Popcorn.Config do
     out_dir: nil,
     add_tracing: false,
     runtime: [
-      {:url, "https://github.com/software-mansion-labs/FissionVM/releases/download/popcorn-0.1/",
+      {:url, "https://github.com/software-mansion-labs/FissionVM/releases/latest/download/",
        target: :wasm},
       {:path, "popcorn_runtime_source/artifacts/$target"}
     ]
