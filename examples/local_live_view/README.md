@@ -68,5 +68,3 @@ elixir server.exs
 ```
 
 and visit [localhost:4000](http://localhost:4000)
-
-See `examples` directory for LocalLiveView examples.

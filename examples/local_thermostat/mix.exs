@@ -1,28 +1,28 @@
-defmodule LocalLiveView.MixProject do
+defmodule LocalThermostat.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :local_live_view,
+      app: :local_thermostat,
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      compilers: Mix.compilers() ++ [:local_live_view]
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
-      mod: {LocalLiveView.Application, []}
+      extra_applications: [:logger]
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, path: "../.."}
+      {:local_live_view, path: "../local_live_view"}
     ]
   end
 end

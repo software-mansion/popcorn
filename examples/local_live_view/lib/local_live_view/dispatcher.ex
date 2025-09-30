@@ -15,17 +15,21 @@ defmodule LocalLiveView.Dispatcher do
 
   @impl true
   def init(_init_arg) do
+    IO.inspect(self(), label: "PID dispatcher")
     Popcorn.Wasm.register(@process_name)
     {:ok, %{views: []}}
   end
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
+    IO.inspect(self(), label: "info")
+    :erlang.display(raw_msg)
     state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
     {:noreply, state}
   end
 
   def handle_info(any, state) do
+    IO.inspect(self(), label: "info2")
     {:noreply, state}
   end
 

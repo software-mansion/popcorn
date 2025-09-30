@@ -39,6 +39,7 @@ defmodule LocalLiveView.Server do
 
   @impl true
   def init([]) do
+    IO.inspect(self(), label: "PID server")
     {:ok, []}
   end
 
