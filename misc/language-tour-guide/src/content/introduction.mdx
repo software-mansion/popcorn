@@ -1,0 +1,38 @@
+export const frontmatter = { order: 1 };
+
+# Welcome to the Elixir Language Tour 🚀
+
+This guide is your first step into the world of Elixir, a modern,
+functional programming language designed for building scalable
+and maintainable applications.
+
+### Navigation
+
+You can navigate between steps using buttons below or using menu accessible with
+a button below Popcorn logo in the top-left content.
+
+### Code editor
+
+This tour will walk you through Elixir's core concepts with interactive examples.
+You can edit them, run them and the code you write is persisted.
+Click "Reset code" to bring back the original code
+if your experiments go a bit too far.
+
+## Hello, Elixir!
+
+As with every language, the first example is printing something. This is something you will often see in this guide:
+`IO.puts` prints a string, while `IO.inspect` prints a representation of any value (in Elixir called `term`) and returns it.
+Click "Run code" to see them in action!
+
+After executing the code, below the editor you'll see execution time, what was printed to the standard output
+and a result of the execution, which is the value returned from last expression.
+
+export const defaultCode = `IO.puts("Hello, Elixir!")
+IO.inspect(1 + 2)`;
+
+## It runs in your browser! 🍿
+
+The code is executed inside your browser via WebAssembly, thanks to the [Popcorn project](https://popcorn.swmansion.com/).
+It is still under development and has some limitations.
+If you encounter any problems or have suggestions regarding the tour content, let us know by filing an issue
+in the [project's repo](https://github.com/software-mansion/popcorn/issues)
