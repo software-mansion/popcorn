@@ -23,8 +23,9 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
 
   setCode: (code: string) =>
     set((state) => {
-      if (state.pathHash) {
-        localStorage.setItem(`code-${state.pathHash}`, code);
+      const pathHashForStorage = state.pathHash;
+      if (pathHashForStorage) {
+        localStorage.setItem(`code-${pathHashForStorage}`, code);
       }
 
       return { code: code };
