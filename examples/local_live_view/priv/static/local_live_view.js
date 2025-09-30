@@ -1,4 +1,4 @@
-import { Popcorn } from "./wasm/popcorn.js";
+import { Popcorn } from "../wasm/popcorn.js";
 
 async function setup() {
   const popcorn = await Popcorn.init({
