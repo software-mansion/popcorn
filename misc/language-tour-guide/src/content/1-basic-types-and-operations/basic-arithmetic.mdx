@@ -1,0 +1,17 @@
+export const frontmatter = { order: 14 };
+
+# Basic Arithmetic
+
+Let's run the snippet and play with basic arithmetic operations. Notice, that `10 / 2` returned `5.0`. Division in Elixir always returns a float. For integer division, use `rem`. For float to integer conversion, you can use `round` or `trunc`. There are also `is_integer` and `is_float` to check the type of a number.
+
+export const defaultCode = `IO.inspect 1 + 2, label: "sum 1 and 2"
+IO.inspect 5 * 6, label: "multiply 5 by 6"
+# IO.inspect 10 / 2, label: :division
+IO.inspect div(10, 2), label: "integer division of 10 and 2"
+IO.inspect rem(10, 3), label: "remainder of integer division of 10 and 3"
+IO.inspect round(3.58), label: "round 3.58"
+IO.inspect trunc(3.58), label: "integer part of 3.58"
+IO.inspect is_integer(123), label: "is 123 an integer"
+IO.inspect is_integer(4.5), label: "is 4.5 an integer"
+IO.inspect is_float(4.5), label: "is 4.5 a float"
+`

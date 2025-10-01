@@ -1,0 +1,14 @@
+export const frontmatter = { order: 20 };
+
+# Structural comparison
+
+Elixir also provides `==`, `!=`, `<=`, `>=`, `<` and `>` as comparison operators. We can compare numbers, atoms, strings, booleans, etc. Integers and floats compare the same if they have the same value, but you can use the strict comparison operator `===` and `!==` if you want to distinguish between integers and floats.
+
+
+
+export const defaultCode = `IO.inspect 1 == 1, label: "is 1 equal to 1"
+IO.inspect 1 == 2.0, label: "is 1 equal to 2.0"
+IO.inspect "foo" == "foo", label: "is 'foo' string equal to another 'foo' string"
+IO.inspect "foo" == "bar", label: "is 'foo' string equal to 'bar' string"
+IO.inspect 1 === 1.0, label: "is 1 integer strictly equal to 1.0 float"
+`
