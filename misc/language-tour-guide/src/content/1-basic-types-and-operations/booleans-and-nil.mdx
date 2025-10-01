@@ -1,4 +1,4 @@
-export const frontmatter = { order: 16 };
+export const frontmatter = { order: 4 };
 
 # Booleans and nil
 
@@ -7,7 +7,9 @@ Elixir supports `true` and `false` as booleans, and provides logical `and`, `or`
 Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||/2`, `&&/2`, and `!/1`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
 
 
-export const defaultCode = `IO.inspect true, label: "true"
+<EditorCode>
+```elixir
+IO.inspect true, label: "true"
 IO.inspect false, label: "false"
 IO.inspect true == false, label: "is true equal to false"
 
@@ -25,4 +27,5 @@ IO.inspect true && 17, label: "true && 17"
 IO.inspect !true, label: "!true"
 IO.inspect !1, label: "!1"
 IO.inspect !nil, label: "!nil"
-`
+```
+</EditorCode>

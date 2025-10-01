@@ -1,4 +1,5 @@
-export const frontmatter = { order: 17 };
+export const frontmatter = { order: 5 };
+
 
 # Atoms
 
@@ -6,10 +7,13 @@ An atom is a constant whose value is its own name. Some other languages call the
 
 `true`, `false` and `nil` are also atoms - Elixir allows to skip the colon for them.
 
-export const defaultCode = `IO.inspect :apple == :apple, label: "atoms with the same name are equal"
+<EditorCode>
+```elixir
+IO.inspect :apple == :apple, label: "atoms with the same name are equal"
 IO.inspect :apple != :orange, label: "atoms with different names are distinct"
 
 IO.inspect is_atom(true), label: "true is an atom"
 IO.inspect is_boolean(:false), label: ":false is a boolean"
 IO.inspect true == :true, label: "true and :true are the same"
-`
+```
+</EditorCode>
