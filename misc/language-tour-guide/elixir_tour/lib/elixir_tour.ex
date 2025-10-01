@@ -11,7 +11,7 @@ defmodule ElixirTour do
 
   @impl GenServer
   def init(_init_arg) do
-    Wasm.register(@process_name)
+    Wasm.register_default_receiver(self(), @process_name)
     {:ok, nil}
   end
 
