@@ -4,12 +4,19 @@ defmodule Popcorn.Build do
   require Logger
   alias Popcorn.CoreErlangUtils
   alias Popcorn.BuildLogFormatter
+  alias Popcorn.ArtifactsCache
+
+  @after_compile __MODULE__
+  def __after_compile__(_env, _bytecode) do
+    # When this module is recompiled, we need to
+    # patch from scratch
+    ArtifactsCache.drop_cache!()
+  end
 
   @config Popcorn.Config.compile([:add_tracing, :extra_apps])
 
   @app_path Mix.Project.app_path()
   @patches_path "#{@app_path}/popcorn_patches"
-  @cache_path "#{@app_path}/popcorn_patch_cache"
 
   # A minimal set of apps to start Popcorn-based app
   @default_apps [
@@ -25,49 +32,29 @@ defmodule Popcorn.Build do
 
   @available_apps @default_apps ++ @config.extra_apps
 
-  # When this module is recompiled, we need to
-  # patch from scratch
-  File.rm(@cache_path)
-
   @doc """
   Applies patches and generates *.avm bundles for each (configured)
   OTP and Elixir application, as well as `popcorn_lib.avm`
   with all additional BEAMs
   """
-  def build(opts \\ []) do
+  def build() do
     Logger.info("Bundling started")
     start_time = DateTime.utc_now()
     original_formatter = BuildLogFormatter.enable()
 
-    opts =
-      opts
-      |> Keyword.validate!(force: false)
-      |> Map.new()
-
     patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
+    cache = ArtifactsCache.read_from_disk!()
 
     cache =
-      with false <- opts.force,
-           {:ok, cache} <- File.read(@cache_path),
-           cache = :erlang.binary_to_term(cache),
-           all_cached_files =
-             (for {_bundle, file_hashes} <- cache,
-                  {file_path, _hash} <- file_hashes,
-                  into: MapSet.new() do
-                file_path
-              end),
-           # If a patch was removed, we need to remove the old build
-           # to avoid adding stale artifacts to the bundle
-           true <- MapSet.subset?(all_cached_files, patches_srcs) do
-        cache
+      if not ArtifactsCache.subset_of_sources?(cache, patches_srcs) do
+        File.rm_rf!(@patches_path)
+        File.mkdir_p!(@patches_path)
+        %{}
       else
-        _cant_use_cache ->
-          File.rm_rf!(@patches_path)
-          File.mkdir_p!(@patches_path)
-          %{}
+        cache
       end
 
-    File.rm(@cache_path)
+    ArtifactsCache.drop_cache!()
 
     new_cache =
       process_async(
@@ -84,7 +71,7 @@ defmodule Popcorn.Build do
     popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
     new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
 
-    File.write!(@cache_path, :erlang.term_to_binary(new_cache))
+    ArtifactsCache.write_to_disk!(new_cache)
 
     :ok
     BuildLogFormatter.disable(original_formatter)
