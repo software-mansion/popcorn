@@ -6,6 +6,7 @@ export default function NavigationBar() {
 
   const isAtFirstInChapter = currentIndex === 1 || childrenCount === 0;
   const isAtLastInChapter = currentIndex === childrenCount;
+  const isTopLevelChapter = childrenCount !== 0 || currentIndex !== 0;
 
   return (
     <div className="bg-light-20 fixed bottom-0 left-0 z-10 flex w-full items-center justify-center gap-7 border-t border-t-orange-100 p-2 lg:sticky lg:p-3">
@@ -14,7 +15,7 @@ export default function NavigationBar() {
         path={siblingsNode?.previousNode?.path}
         isChapterNavigation={isAtFirstInChapter}
       />
-      {(currentIndex !== 0 || childrenCount !== 0) && (
+      {isTopLevelChapter && (
         <span>
           {currentIndex}/{childrenCount}
         </span>
