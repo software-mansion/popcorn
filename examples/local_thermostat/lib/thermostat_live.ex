@@ -23,16 +23,10 @@ defmodule ThermostatLive do
   end
 
   def handle_event("inc_temperature", _params, socket) do
-    temperature = socket.assigns.temperature
-    socket = Phoenix.LiveView.Utils.assign(socket, :temperature, temperature + 1)
-    #    {:noreply, update(socket, :temperature, &(&1 + 1))}
-    {:noreply, socket}
+    {:noreply, update(socket, :temperature, &(&1 + 1))}
   end
 
   def handle_event("dec_temperature", _params, socket) do
-    temperature = socket.assigns.temperature
-    socket = Phoenix.LiveView.Utils.assign(socket, :temperature, temperature - 1)
-    #    {:noreply, update(socket, :temperature, &(&1 + 1))}
-    {:noreply, socket}
+    {:noreply, update(socket, :temperature, &(&1 - 1))}
   end
 end

@@ -15,21 +15,13 @@ defmodule LocalLiveView.Dispatcher do
 
   @impl true
   def init(_init_arg) do
-    IO.inspect(self(), label: "PID dispatcher")
     Popcorn.Wasm.register(@process_name)
     {:ok, %{views: []}}
   end
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    IO.inspect(self(), label: "info")
-    :erlang.display(raw_msg)
     state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, state}
-  end
-
-  def handle_info(any, state) do
-    IO.inspect(self(), label: "info2")
     {:noreply, state}
   end
 
@@ -37,7 +29,7 @@ defmodule LocalLiveView.Dispatcher do
          {:wasm_call, %{"event" => type, "view" => view_string, "payload" => payload}},
          state
        ) do
-    view = String.to_existing_atom("Elixir." <> view_string)
+    view = Module.safe_concat([view_string])
     payload = payload |> Map.merge(%{"type" => %{}, "value" => %{}})
 
     Map.get(state.views, view)
@@ -62,16 +54,10 @@ defmodule LocalLiveView.Dispatcher do
     params = %{
       "session" => %Session{view: view}
     }
-
-    {:ok, pid} =
-      DynamicSupervisor.start_child(
-        LocalLiveView.Server.Supervisor,
-        LocalLiveView.Server.child_spec([])
-      )
-
+    
     ref = make_ref()
 
-    with {:ok, pid} <- start_llv_process() do
+    with {:ok, pid} <- LocalLiveView.Server.start_llv_process() do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
 
       receive do
@@ -87,13 +73,6 @@ defmodule LocalLiveView.Dispatcher do
           nil
       end
     end
-  end
-
-  def start_llv_process() do
-    DynamicSupervisor.start_child(
-      LocalLiveView.Server.Supervisor,
-      LocalLiveView.Server.child_spec([])
-    )
   end
 
   def diff_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
