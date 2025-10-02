@@ -1,6 +1,8 @@
 defmodule Popcorn.Build do
   @moduledoc false
+  import Popcorn.BuildLogFormatter, only: [with_build_logger: 1]
   require Popcorn.Config
+  require Logger
   alias Popcorn.CoreErlangUtils
 
   @config Popcorn.Config.compile([:add_tracing, :extra_apps])
@@ -33,54 +35,60 @@ defmodule Popcorn.Build do
   with all additional BEAMs
   """
   def build(opts \\ []) do
-    opts =
-      opts
-      |> Keyword.validate!(force: false)
-      |> Map.new()
+    Logger.info("Bundling started")
 
-    patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
+    with_build_logger(fn ->
+      opts =
+        opts
+        |> Keyword.validate!(force: false)
+        |> Map.new()
 
-    cache =
-      with false <- opts.force,
-           {:ok, cache} <- File.read(@cache_path),
-           cache = :erlang.binary_to_term(cache),
-           all_cached_files =
-             (for {_bundle, file_hashes} <- cache,
-                  {file_path, _hash} <- file_hashes,
-                  into: MapSet.new() do
-                file_path
-              end),
-           # If a patch was removed, we need to remove the old build
-           # to avoid adding stale artifacts to the bundle
-           true <- MapSet.subset?(all_cached_files, patches_srcs) do
-        cache
-      else
-        _cant_use_cache ->
-          File.rm_rf!(@patches_path)
-          File.mkdir_p!(@patches_path)
-          %{}
-      end
+      patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
 
-    File.rm(@cache_path)
+      cache =
+        with false <- opts.force,
+             {:ok, cache} <- File.read(@cache_path),
+             cache = :erlang.binary_to_term(cache),
+             all_cached_files =
+               (for {_bundle, file_hashes} <- cache,
+                    {file_path, _hash} <- file_hashes,
+                    into: MapSet.new() do
+                  file_path
+                end),
+             # If a patch was removed, we need to remove the old build
+             # to avoid adding stale artifacts to the bundle
+             true <- MapSet.subset?(all_cached_files, patches_srcs) do
+          cache
+        else
+          _cant_use_cache ->
+            File.rm_rf!(@patches_path)
+            File.mkdir_p!(@patches_path)
+            %{}
+        end
 
-    new_cache =
-      process_async(
-        @available_apps,
-        fn app ->
-          app_cache = build_app(app, Map.get(cache, app, %{}))
-          {app, app_cache}
-        end,
-        timeout: 600_000,
-        max_concurrency: 2
-      )
-      |> Map.new()
+      File.rm(@cache_path)
 
-    popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
-    new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
+      new_cache =
+        process_async(
+          @available_apps,
+          fn app ->
+            app_cache = build_app(app, Map.get(cache, app, %{}))
+            {app, app_cache}
+          end,
+          timeout: 600_000,
+          max_concurrency: 2
+        )
+        |> Map.new()
 
-    File.write!(@cache_path, :erlang.term_to_binary(new_cache))
+      popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
+      new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
 
-    :ok
+      File.write!(@cache_path, :erlang.term_to_binary(new_cache))
+
+      :ok
+    end)
+
+    Logger.info("Bundling finished")
   end
 
   @doc """
@@ -142,12 +150,12 @@ defmodule Popcorn.Build do
 
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
-    patched_beams = patch(app_beams, modified_srcs, build_dir)
+    patched_beams = patch(application, app_beams, modified_srcs, build_dir)
 
-    transferred_beams = transfer_stdlib(app_beams, build_dir)
+    transferred_beams = transfer_stdlib(application, app_beams, build_dir)
 
     if patched_beams != [] or transferred_beams != [] do
-      IO.puts(:stderr, "Bundling #{application}.avm")
+      Logger.info("Bundling #{application}.avm", app_name: application)
       :packbeam_api.create(to_charlist(bundle_path(application)), bundle_beams(application))
     end
 
@@ -162,10 +170,10 @@ defmodule Popcorn.Build do
 
     {modified_srcs, cache} = update_cache(srcs, cache)
 
-    popcorn_lib_beams = patch([], modified_srcs, build_dir)
+    popcorn_lib_beams = patch(bundle, [], modified_srcs, build_dir)
 
     if popcorn_lib_beams != [] do
-      IO.puts(:stderr, "Bundling #{bundle}.avm")
+      Logger.info("Bundling #{bundle}.avm", app_name: bundle)
       :packbeam_api.create(to_charlist(bundle_path(bundle)), bundle_beams(bundle))
     end
 
@@ -191,7 +199,7 @@ defmodule Popcorn.Build do
   # The patching works by replacing original functions implementations
   # with custom ones.
   # The sources of the patches reside in the `patches` directory.
-  defp patch(stdlib_beams, patch_srcs, out_dir) do
+  defp patch(app, stdlib_beams, patch_srcs, out_dir) do
     stdlib_beams_by_name = Map.new(stdlib_beams, &{Path.basename(&1), &1})
 
     # Compiling each file separately, like AtomVM does it.
@@ -201,13 +209,13 @@ defmodule Popcorn.Build do
       tmp_dir = setup_tmp_dir(out_dir)
 
       try do
-        IO.puts(:stderr, "Compiling #{src}")
+        Logger.info("Compiling #{src}", app_name: app)
         compile_patch(src, tmp_dir)
 
         Path.wildcard("#{tmp_dir}/*")
         |> Enum.map(fn path ->
           name = Path.basename(path)
-          do_patch(name, stdlib_beams_by_name[name], path, out_dir)
+          do_patch(app, name, stdlib_beams_by_name[name], path, out_dir)
           name
         end)
       after
@@ -238,23 +246,25 @@ defmodule Popcorn.Build do
 
   # prim_eval fails to be parsed, probably because it's compiled from an asm (*.S) file
   # so we just copy it
-  defp do_patch("prim_eval.beam" = name, _stdlib, patch, out_dir) do
+  defp do_patch(app_name, "prim_eval.beam" = name, _stdlib, patch, out_dir) do
+    Logger.info("Patching #{name}", app_name: app_name)
+
     File.cp!(patch, Path.join(out_dir, name))
   end
 
   # This is only needed to add tracing
   # but we execute it always for consistency
   # To be replaced with File.cp when we improve tracing in AtomVM
-  defp do_patch(name, nil, patch, out_dir) do
-    IO.puts(:stderr, "Patching #{name}")
+  defp do_patch(app_name, name, nil, patch, out_dir) do
+    Logger.info("Patching #{name}", app_name: app_name)
     ast = File.read!(patch) |> CoreErlangUtils.parse()
     ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
     beam = CoreErlangUtils.serialize(ast)
     File.write!(Path.join(out_dir, name), beam)
   end
 
-  defp do_patch(name, stdlib, patch, out_dir) do
-    IO.puts(:stderr, "Patching #{name}")
+  defp do_patch(app_name, name, stdlib, patch, out_dir) do
+    Logger.info("Patching #{name}", app_name: app_name)
 
     ast =
       CoreErlangUtils.merge_modules(
@@ -270,14 +280,14 @@ defmodule Popcorn.Build do
   # This is only needed to add tracing
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
-  defp transfer_stdlib(stdlib_beams, out_dir) do
+  defp transfer_stdlib(app_name, stdlib_beams, out_dir) do
     already_transferred = MapSet.new(File.ls!(out_dir))
 
     stdlib_beams
     |> Enum.reject(&(Path.basename(&1) in already_transferred))
     |> process_async(fn path ->
       name = Path.basename(path)
-      IO.puts(:stderr, "Transferring #{name}")
+      Logger.info("Transferring #{name}", app_name: app_name)
       ast = File.read!(path) |> CoreErlangUtils.parse()
       ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
       beam = CoreErlangUtils.serialize(ast)
