@@ -3,12 +3,9 @@ defmodule LocalComponent do
 
   @doc false
   defmacro __using__(opts \\ []) do
-    imports =
-      quote bind_quoted: [opts: opts] do
-        import LocalComponent
-      end
-
-    [imports]
+    quote bind_quoted: [opts: opts] do
+      import LocalComponent
+    end
   end
 
   @doc type: :macro
@@ -147,5 +144,33 @@ defmodule LocalComponent do
 
   defp validate_assign_key!(key) do
     raise ArgumentError, "assigns in LiveView must be atoms, got: #{inspect(key)}"
+  end
+  
+  def update(socket_or_assigns, key, fun)
+
+  def update(%Socket{assigns: assigns} = socket, key, fun) when is_function(fun, 2) do
+    update(socket, key, &fun.(&1, assigns))
+  end
+
+  def update(%Socket{assigns: assigns} = socket, key, fun) when is_function(fun, 1) do
+    case assigns do
+      %{^key => val} -> Phoenix.LiveView.Utils.assign(socket, key, fun.(val))
+      %{} -> raise KeyError, key: key, term: assigns
+    end
+  end
+
+  def update(assigns, key, fun) when is_function(fun, 2) do
+    update(assigns, key, &fun.(&1, assigns))
+  end
+
+  def update(assigns, key, fun) when is_function(fun, 1) do
+    case assigns do
+      %{^key => val} -> assign(assigns, key, fun.(val))
+      %{} -> raise KeyError, key: key, term: assigns
+    end
+  end
+
+  def update(assigns, _key, fun) when is_function(fun, 1) or is_function(fun, 2) do
+    raise_bad_socket_or_assign!("update/3", assigns)
   end
 end

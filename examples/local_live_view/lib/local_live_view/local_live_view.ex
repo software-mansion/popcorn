@@ -62,7 +62,6 @@ defmodule LocalLiveView do
     }
   end
 
-  #  POPCORN: new fun
   def rendered_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
     Enum.reduce(list_of_binaries, "", fn
       integer, acc when is_integer(integer) -> acc <> to_string(integer)

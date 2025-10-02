@@ -8,7 +8,6 @@ defmodule LocalLiveView.Application do
       {DynamicSupervisor, name: LocalLiveView.Server.Supervisor, strategy: :one_for_one}
     ]
 
-    IO.inspect(self(), label: "PID application")
     opts = [strategy: :one_for_one, name: LocalLiveView.Supervisor]
     Supervisor.start_link(children, opts)
   end
