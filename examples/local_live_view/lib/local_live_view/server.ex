@@ -32,14 +32,14 @@ defmodule LocalLiveView.Server do
   @prefix :phoenix
   @not_mounted_at_router :not_mounted_at_router
   @max_host_size 253
-  
+
   def start_llv_process() do
     DynamicSupervisor.start_child(
       LocalLiveView.Server.Supervisor,
       __MODULE__.child_spec([])
     )
   end
-  
+
   def start_link(arg) do
     GenServer.start_link(__MODULE__, [])
   end
