@@ -7,6 +7,7 @@ import svgr from "vite-plugin-svgr";
 import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import { rehypeRawCode } from "./src/plugins/rehypeRawCode";
+import { remarkCollectCode } from "./src/plugins/remarkCollectCode";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -17,6 +18,7 @@ export default defineConfig({
     tailwindcss(),
     mdx({
       providerImportSource: "@mdx-js/react",
+      remarkPlugins: [remarkCollectCode],
       rehypePlugins: [
         rehypeRawCode,
         [rehypeHighlight, { languages: { elixir } }]
