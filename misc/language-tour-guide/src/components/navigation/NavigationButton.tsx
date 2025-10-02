@@ -6,13 +6,35 @@ type Direction = "next" | "previous";
 type NavigationButtonProps = {
   direction: Direction;
   path?: string;
+  isChapterNavigation?: boolean;
 };
 
-export function NavigationButton({ direction, path }: NavigationButtonProps) {
+export function NavigationButton({
+  direction,
+  path,
+  isChapterNavigation
+}: NavigationButtonProps) {
   const Icon = direction === "next" ? ChevronRight : ChevronLeft;
   const label = direction === "next" ? "Next section" : "Previous section";
+  const chapterLabel =
+    direction === "next" ? "Next chapter" : "Previous chapter";
 
   if (path) {
+    if (isChapterNavigation) {
+      return (
+        <NavLink
+          to={path}
+          className="transition-color flex items-center gap-1 rounded-full bg-orange-100 text-sm font-medium text-white duration-300 hover:bg-orange-200"
+        >
+          {direction === "previous" && <Icon className="w-8 p-1 lg:w-9" />}
+          <span className={direction === "next" ? "pl-4" : "pr-4"}>
+            {chapterLabel}
+          </span>
+          {direction === "next" && <Icon className="w-8 p-1 lg:w-9" />}
+        </NavLink>
+      );
+    }
+
     return (
       <NavLink to={path}>
         <span className="sr-only">{label}</span>
