@@ -54,7 +54,7 @@ defmodule LocalLiveView.Dispatcher do
     params = %{
       "session" => %Session{view: view}
     }
-    
+
     ref = make_ref()
 
     with {:ok, pid} <- LocalLiveView.Server.start_llv_process() do

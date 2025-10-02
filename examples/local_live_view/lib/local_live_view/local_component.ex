@@ -145,7 +145,7 @@ defmodule LocalComponent do
   defp validate_assign_key!(key) do
     raise ArgumentError, "assigns in LiveView must be atoms, got: #{inspect(key)}"
   end
-  
+
   def update(socket_or_assigns, key, fun)
 
   def update(%Socket{assigns: assigns} = socket, key, fun) when is_function(fun, 2) do
