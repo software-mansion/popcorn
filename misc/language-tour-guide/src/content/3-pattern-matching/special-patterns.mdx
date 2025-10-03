@@ -1,0 +1,69 @@
+export const frontmatter = { order: 3 };
+
+# Special patterns
+
+There some additional constructs you may use when building patterns:
+
+## The pin operator
+
+In Elixir, variables can be rebound, i.e. assigned to a new value.
+If you want to avoid that in pattern and match against the actual value assigned to that variable
+you must use the pin `^` operator.
+It can be a part of more complex patterns.
+
+<EditorCode>
+
+```elixir
+x = 1
+x = 2
+IO.inspect x, label: "rebound x"
+
+# See what will happen if you change the value to 3
+^x = 2
+# This is the equivalent of
+2 = 2
+
+{y, ^x} = {3, 2}
+IO.inspect {y, x}, label: "y and x"
+```
+
+</EditorCode>
+
+## Repeated variables
+
+If a variable is occurs more than once in the pattern, it must bind to the same value.
+Otherwise, the match will fail.
+
+<EditorCode>
+
+```elixir
+# Try changing one of the values in tuple on the right
+{z, z} = {3, 3}
+IO.inspect z, label: "z"
+```
+
+</EditorCode>
+
+## Ignore pattern
+
+If you only want to extract some of the values, you may use the ignore pattern: `_`.
+It is a special variable, that can never be read from.
+Optionally, for readability, you may use variable with `_` prefix, e.g. `_ignored`.
+
+<EditorCode>
+
+```elixir
+[head | _] = [1, 2, 3]
+IO.inspect head, label: "head"
+
+# Let's try using the underscore
+# IO.inspect _, label: "read underscore?"
+
+{:error, _reason} = {:error, :enoent}
+# Named ignore is slightly different, but yields a warning
+# IO.inspect _reason, label: "read underscore prefix?"
+
+:ok
+```
+
+</EditorCode>

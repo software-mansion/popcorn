@@ -1,0 +1,25 @@
+export const frontmatter = { order: 1 };
+
+# Match operator
+
+Going through this guide, you have seen the `=` operator a lot, used to assign a value to the variable.
+Turns out, it's not just an assignment! `=` in Elixir is called _the match operator_.
+
+Check out the example - after the `1` is assigned to `x`, it can be used for matching.
+Line `1 = x` is legal and means "match x against pattern 1", that is succesful.
+
+Test out what happens if the pattern becomes `2` or when you try to match the variable before an assignment.
+Spoiler alert - you'll see some errors. Notice the difference between them - one occurs in runtime,
+while the other - during compilation.
+
+<EditorCode>
+
+```elixir
+1 = 1
+x = 1
+1 = x
+# 2 = x # What will happen?
+# 2 = new_variable # What will happen?
+```
+
+</EditorCode>

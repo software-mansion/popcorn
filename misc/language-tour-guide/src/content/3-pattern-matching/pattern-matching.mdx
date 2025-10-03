@@ -1,0 +1,92 @@
+export const frontmatter = { order: 2 };
+
+# Pattern Matching
+
+The match operator can also be used to destructure data types by matching against more complex patterns.
+
+The pattern may consist of any number of variables, ignore patterns, literal values and patterns for specific data types.
+
+## Tuples
+
+Thanks to pattern matching, you can "extract" each tuple element into a variable.
+The pattern must be of the same size for the match to succeed.
+
+In Elixir, it is common to return a tuple `{:ok, result}` on success and either `:error` atom
+or `{:error, reason}` tuple in case of failure.
+You can use atoms in the pattern as well to match on such results.
+
+<EditorCode>
+
+```elixir
+# Tuples
+{x, y, z} = {:hello, "world", 42}
+IO.inspect(x, label: "x")
+IO.inspect(y, label: "y")
+IO.inspect(z, label: "z")
+
+# Uncomment to see the match error
+# {a, b} = {:hello, "world", 42}
+
+{a, b, c} = {:hello, "world", 42}
+IO.inspect(a, label: "a")
+IO.inspect(b, label: "b")
+IO.inspect(c, label: "c")
+
+# {:ok, decoded} = Base.decode64("Tm9pY2Uh")
+# {:ok, decoded} = JSON.decode("{answer: 42}")
+{:ok, answer} = Map.fetch(%{answer: 42}, :answer)
+IO.inspect(answer, label: "answer")
+```
+
+</EditorCode>
+
+## Lists
+
+List matching works similarly to tuples - you can extract every element of the list.
+There is however a special pattern related to how a list is built:
+since it's either an empty list (`[]`) or the so-called "cons" with a value (called "head")
+and a reference to the rest of the list (being itself a list, called "tail"),
+you can match on them using the `[head | tail]` format.
+
+<EditorCode>
+
+```elixir
+# Lists
+[j, k, l] = [1, 2, 3]
+IO.inspect(j, label: "j")
+IO.inspect(k, label: "k")
+IO.inspect(l, label: "l")
+
+# Try to match empty (`[]`) or single element list (`[1]`)
+[head | tail] = [1, 2, 3]
+IO.inspect(head, label: "head")
+IO.inspect(tail, label: "tail")
+
+# | is also used for prepending to the list
+IO.inspect([0 | tail], label: "list with new head")
+```
+
+</EditorCode>
+
+## Maps
+
+Patterns for maps can extract value of any key or ensure specified key has provided value.
+The pattern doesn't have to be exhausting.
+
+<EditorCode>
+
+```elixir
+# Maps
+map = %{"a" => 1, :b => 2, :c => "c"}
+%{"a" => one} = map
+IO.inspect(one, label: "one")
+
+# Enforcing specific value for :c, try changing it and see the result
+%{:b => two, :c => "c"} = map
+IO.inspect(two, label: "two")
+# For atom keys, a special syntax is available
+%{c: cee} = map
+IO.inspect(cee, label: "cee")
+```
+
+</EditorCode>
