@@ -58,7 +58,9 @@ defmodule Popcorn.Build do
       process_async(
         modified,
         fn {modified_app, modified_paths} ->
-          build_app(modified_app, modified_paths)
+          build_dir = bundle_ebin_dir(modified_app)
+          File.mkdir_p!(build_dir)
+          build_app(modified_app, modified_paths, build_dir)
         end,
         timeout: 600_000,
         max_concurrency: 2
@@ -148,13 +150,10 @@ defmodule Popcorn.Build do
     |> Path.wildcard()
   end
 
-  defp build_app(application, modified_srcs) do
-    build_dir = bundle_ebin_dir(application)
-    File.mkdir_p!(build_dir)
-
+  defp build_app(application, modified_srcs, out_dir) do
     app_beams = patchable_app_beams(application)
-    {any_patched, remaining_beams} = patch(application, app_beams, modified_srcs, build_dir)
-    any_copied = copy_beams(application, remaining_beams, build_dir)
+    {any_patched, remaining_beams} = patch(application, app_beams, modified_srcs, out_dir)
+    any_copied = copy_beams(application, remaining_beams, out_dir)
 
     if any_patched or any_copied do
       Logger.info("Bundling #{application}.avm", app_name: application)
