@@ -139,9 +139,9 @@ defmodule Popcorn.Build do
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
     patched_beams = patch(application, app_beams, modified_srcs, build_dir)
-    transferred_beams = transfer_stdlib(application, app_beams, build_dir)
+    copied_beams = copy_beams(application, app_beams, build_dir)
 
-    if patched_beams != [] or transferred_beams != [] do
+    if patched_beams != [] or copied_beams != [] do
       Logger.info("Bundling #{application}.avm", app_name: application)
       create_bundle!(application)
     end
@@ -262,10 +262,10 @@ defmodule Popcorn.Build do
   # This is only needed to add tracing
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
-  defp transfer_stdlib(app_name, stdlib_beams, out_dir) do
+  defp copy_beams(app_name, beams, out_dir) do
     already_transferred = MapSet.new(File.ls!(out_dir))
 
-    stdlib_beams
+    beams
     |> Enum.reject(&(Path.basename(&1) in already_transferred))
     |> process_async(fn path ->
       name = Path.basename(path)
