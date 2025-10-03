@@ -110,17 +110,14 @@ defmodule Popcorn.Build do
   def builtin_app_names() do
     otp_apps =
       :code.lib_dir()
-      |> IO.chardata_to_string()
+      |> to_string()
       |> File.ls!()
       |> Enum.map(fn app_dir ->
-        app_dir
-        |> String.split("-")
-        |> hd()
+        [app_name, _version] = String.split(app_dir, "-", parts: 2)
+        app_name
       end)
 
-    elixir_apps =
-      Path.expand("..", Application.app_dir(:elixir))
-      |> File.ls!()
+    elixir_apps = Path.expand("..", Application.app_dir(:elixir)) |> File.ls!()
 
     otp_apps ++ elixir_apps
   end
@@ -173,7 +170,6 @@ defmodule Popcorn.Build do
           |> Enum.map(fn patch_beam_path ->
             name = Path.basename(patch_beam_path)
             do_patch(app, name, beams_by_name[name], patch_beam_path, out_dir)
-            name
           end)
         end)
       end)
