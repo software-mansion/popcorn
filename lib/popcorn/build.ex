@@ -140,10 +140,10 @@ defmodule Popcorn.Build do
     patches_srcs = patches_source(application)
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
-    patched_beams = patch(application, app_beams, modified_srcs, build_dir)
-    copied_beams = copy_beams(application, app_beams, build_dir)
+    {any_patched, remaining_beams} = patch(application, app_beams, modified_srcs, build_dir)
+    any_copied = copy_beams(application, remaining_beams, build_dir)
 
-    if patched_beams != [] or copied_beams != [] do
+    if any_patched or any_copied do
       Logger.info("Bundling #{application}.avm", app_name: application)
       create_bundle!(application)
     end
@@ -183,45 +183,55 @@ defmodule Popcorn.Build do
   # The patching works by replacing original functions implementations
   # with custom ones.
   # The sources of the patches reside in the `patches` directory.
-  defp patch(app, beams, patch_srcs, out_dir) do
-    beams_by_name = Map.new(beams, &{Path.basename(&1), &1})
+  defp patch(app, beam_paths, patch_paths, out_dir) do
+    beams_by_name = Map.new(beam_paths, &{Path.basename(&1), &1})
 
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
     # will override stdlib modules.
-    process_async(patch_srcs, fn src ->
-      with_tmp_dir(out_dir, fn tmp_dir ->
-        Logger.info("Compiling #{src}", app_name: app)
-        compile_patch(src, tmp_dir)
+    none_patched =
+      process_async(patch_paths, fn patch_path ->
+        with_tmp_dir(out_dir, fn tmp_dir ->
+          Logger.info("Compiling #{patch_path}", app_name: app)
 
-        Path.wildcard("#{tmp_dir}/*")
-        |> Enum.map(fn path ->
-          name = Path.basename(path)
-          do_patch(app, name, beams_by_name[name], path, out_dir)
-          name
+          patch_path
+          |> compile_patch(tmp_dir)
+          |> Enum.map(fn patch_beam_path ->
+            name = Path.basename(patch_beam_path)
+            do_patch(app, name, beams_by_name[name], patch_beam_path, out_dir)
+            name
+          end)
         end)
       end)
-      |> List.flatten()
-    end)
+      |> Enum.empty?()
+
+    # patch files may produce multiple beams
+    # the easiest way to get full set is to diff input beams and beams already in out_dir
+    out_dir_beams = Path.wildcard("#{out_dir}/*.beam") |> MapSet.new(&Path.basename/1)
+    path_present? = fn path -> Path.basename(path) in out_dir_beams end
+    remaining_beams = Enum.reject(beam_paths, path_present?)
+
+    some_patched = not none_patched
+    {some_patched, remaining_beams}
   end
 
-  defp compile_patch(path, tmp_dir) do
+  defp compile_patch(path, out_dir) do
     cmd =
       case Path.extname(path) do
         ".ex" ->
-          "elixirc --ignore-module-conflict -o #{tmp_dir} #{path}"
+          "elixirc --ignore-module-conflict -o #{out_dir} #{path}"
 
         ".yrl" ->
-          erl_path = "#{tmp_dir}/#{Path.basename(path, ".yrl")}.erl"
+          erl_path = "#{out_dir}/#{Path.basename(path, ".yrl")}.erl"
 
-          "erlc -o #{tmp_dir} #{path} && erlc +debug_info -o #{tmp_dir} #{erl_path} && rm #{erl_path}"
+          "erlc -o #{out_dir} #{path} && erlc +debug_info -o #{out_dir} #{erl_path} && rm #{erl_path}"
 
         ext when ext in [".erl", ".S"] ->
-          "erlc +debug_info -o #{tmp_dir} #{path}"
+          "erlc +debug_info -o #{out_dir} #{path}"
       end
 
     {_out, 0} = System.shell(cmd)
-    :ok
+    Path.wildcard("#{out_dir}/*")
   end
 
   # prim_eval fails to be parsed, probably because it's compiled from an asm (*.S) file
@@ -257,20 +267,22 @@ defmodule Popcorn.Build do
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
   defp copy_beams(app_name, beams, out_dir) do
-    already_transferred = MapSet.new(File.ls!(out_dir))
+    none_copied =
+      beams
+      |> process_async(fn path ->
+        name = Path.basename(path)
+        Logger.info("Transferring #{name}", app_name: app_name)
 
-    beams
-    |> Enum.reject(&(Path.basename(&1) in already_transferred))
-    |> process_async(fn path ->
-      name = Path.basename(path)
-      Logger.info("Transferring #{name}", app_name: app_name)
+        transform_beam_ast(path, out_dir, fn ast ->
+          maybe_add_tracing(ast, @config.add_tracing)
+        end)
 
-      transform_beam_ast(path, out_dir, fn ast ->
-        maybe_add_tracing(ast, @config.add_tracing)
+        name
       end)
+      |> Enum.empty?()
 
-      name
-    end)
+    some_copied = not none_copied
+    some_copied
   end
 
   defp transform_beam_ast(beam_path, out_dir, transform) do
