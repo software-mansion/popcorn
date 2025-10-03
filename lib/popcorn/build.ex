@@ -139,9 +139,9 @@ defmodule Popcorn.Build do
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
     patched_beams = patch(application, app_beams, modified_srcs, build_dir)
-    transferred_beams = transfer_stdlib(application, app_beams, build_dir)
+    copied_beams = copy_beams(application, app_beams, build_dir)
 
-    if patched_beams != [] or transferred_beams != [] do
+    if patched_beams != [] or copied_beams != [] do
       Logger.info("Bundling #{application}.avm", app_name: application)
       create_bundle!(application)
     end
@@ -181,8 +181,8 @@ defmodule Popcorn.Build do
   # The patching works by replacing original functions implementations
   # with custom ones.
   # The sources of the patches reside in the `patches` directory.
-  defp patch(app, stdlib_beams, patch_srcs, out_dir) do
-    stdlib_beams_by_name = Map.new(stdlib_beams, &{Path.basename(&1), &1})
+  defp patch(app, beams, patch_srcs, out_dir) do
+    beams_by_name = Map.new(beams, &{Path.basename(&1), &1})
 
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
@@ -195,7 +195,7 @@ defmodule Popcorn.Build do
         Path.wildcard("#{tmp_dir}/*")
         |> Enum.map(fn path ->
           name = Path.basename(path)
-          do_patch(app, name, stdlib_beams_by_name[name], path, out_dir)
+          do_patch(app, name, beams_by_name[name], path, out_dir)
           name
         end)
       end)
@@ -224,7 +224,7 @@ defmodule Popcorn.Build do
 
   # prim_eval fails to be parsed, probably because it's compiled from an asm (*.S) file
   # so we just copy it
-  defp do_patch(app_name, "prim_eval.beam" = name, _stdlib, patch, out_dir) do
+  defp do_patch(app_name, "prim_eval.beam" = name, _beam, patch, out_dir) do
     Logger.info("Patching #{name}", app_name: app_name)
 
     File.cp!(patch, Path.join(out_dir, name))
@@ -241,12 +241,12 @@ defmodule Popcorn.Build do
     end)
   end
 
-  defp do_patch(app_name, name, stdlib, patch, out_dir) do
+  defp do_patch(app_name, name, beam, patch, out_dir) do
     Logger.info("Patching #{name}", app_name: app_name)
     patch_ast = CoreErlangUtils.parse(File.read!(patch))
 
-    transform_beam_ast(stdlib, out_dir, fn stdlib_ast ->
-      CoreErlangUtils.merge_modules(stdlib_ast, patch_ast)
+    transform_beam_ast(beam, out_dir, fn ast ->
+      CoreErlangUtils.merge_modules(ast, patch_ast)
       |> maybe_add_tracing(@config.add_tracing)
     end)
   end
@@ -254,10 +254,10 @@ defmodule Popcorn.Build do
   # This is only needed to add tracing
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
-  defp transfer_stdlib(app_name, stdlib_beams, out_dir) do
+  defp copy_beams(app_name, beams, out_dir) do
     already_transferred = MapSet.new(File.ls!(out_dir))
 
-    stdlib_beams
+    beams
     |> Enum.reject(&(Path.basename(&1) in already_transferred))
     |> process_async(fn path ->
       name = Path.basename(path)
