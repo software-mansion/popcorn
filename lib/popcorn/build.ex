@@ -113,13 +113,6 @@ defmodule Popcorn.Build do
 
   defp bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])
 
-  defp bundle_beams(bundle) do
-    bundle_ebin_dir(bundle)
-    |> Path.join("*.beam")
-    |> Path.wildcard()
-    |> Enum.map(&String.to_charlist/1)
-  end
-
   defp patchable_app_beams(:popcorn_lib), do: []
 
   defp patchable_app_beams(app) do
@@ -150,10 +143,23 @@ defmodule Popcorn.Build do
 
     if patched_beams != [] or transferred_beams != [] do
       Logger.info("Bundling #{application}.avm", app_name: application)
-      :packbeam_api.create(to_charlist(bundle_path(application)), bundle_beams(application))
+      create_bundle!(application)
     end
 
     cache
+  end
+
+  defp create_bundle!(app) do
+    out_path = app |> bundle_path() |> to_charlist()
+    beams = app |> bundle_beams() |> Enum.map(&String.to_charlist/1)
+
+    :ok = :packbeam_api.create(out_path, beams)
+  end
+
+  defp bundle_beams(bundle) do
+    bundle_ebin_dir(bundle)
+    |> Path.join("*.beam")
+    |> Path.wildcard()
   end
 
   # Updates hash of each patch and returns only paths that have different hash
