@@ -138,10 +138,10 @@ defmodule Popcorn.Build do
     patches_srcs = patches_source(application)
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
-    patched_beams = patch(application, app_beams, modified_srcs, build_dir)
-    copied_beams = copy_beams(application, app_beams, build_dir)
+    {any_patched, remaining_beams} = patch(application, app_beams, modified_srcs, build_dir)
+    any_copied = copy_beams(application, remaining_beams, build_dir)
 
-    if patched_beams != [] or copied_beams != [] do
+    if any_patched or any_copied do
       Logger.info("Bundling #{application}.avm", app_name: application)
       create_bundle!(application)
     end
@@ -187,20 +187,28 @@ defmodule Popcorn.Build do
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
     # will override stdlib modules.
-    process_async(patch_srcs, fn src ->
-      with_tmp_dir(out_dir, fn tmp_dir ->
-        Logger.info("Compiling #{src}", app_name: app)
-        compile_patch(src, tmp_dir)
+    none_patched =
+      process_async(patch_srcs, fn src ->
+        with_tmp_dir(out_dir, fn tmp_dir ->
+          Logger.info("Compiling #{src}", app_name: app)
+          compile_patch(src, tmp_dir)
 
-        Path.wildcard("#{tmp_dir}/*")
-        |> Enum.map(fn path ->
-          name = Path.basename(path)
-          do_patch(app, name, beams_by_name[name], path, out_dir)
-          name
+          Path.wildcard("#{tmp_dir}/*")
+          |> Enum.map(fn path ->
+            name = Path.basename(path)
+            do_patch(app, name, beams_by_name[name], path, out_dir)
+            name
+          end)
         end)
       end)
-      |> List.flatten()
-    end)
+      |> Enum.empty?()
+
+    # patch files may produce multiple beams
+    # the easiest way to get full set is to diff input beams and beams already in out_dir
+    out_dir_beams = Path.wildcard("#{out_dir}/*.beam") |> MapSet.new()
+    remaining_beams = Enum.reject(beams, fn path -> path in out_dir_beams end)
+
+    {not none_patched, remaining_beams}
   end
 
   defp compile_patch(path, tmp_dir) do
@@ -257,18 +265,22 @@ defmodule Popcorn.Build do
   defp copy_beams(app_name, beams, out_dir) do
     already_transferred = MapSet.new(File.ls!(out_dir))
 
-    beams
-    |> Enum.reject(&(Path.basename(&1) in already_transferred))
-    |> process_async(fn path ->
-      name = Path.basename(path)
-      Logger.info("Transferring #{name}", app_name: app_name)
+    none_copied =
+      beams
+      |> Enum.reject(&(Path.basename(&1) in already_transferred))
+      |> process_async(fn path ->
+        name = Path.basename(path)
+        Logger.info("Transferring #{name}", app_name: app_name)
 
-      transform_beam_ast(path, out_dir, fn ast ->
-        maybe_add_tracing(ast, @config.add_tracing)
+        transform_beam_ast(path, out_dir, fn ast ->
+          maybe_add_tracing(ast, @config.add_tracing)
+        end)
+
+        name
       end)
+      |> Enum.empty?()
 
-      name
-    end)
+    not none_copied
   end
 
   defp transform_beam_ast(beam_path, out_dir, transform) do
