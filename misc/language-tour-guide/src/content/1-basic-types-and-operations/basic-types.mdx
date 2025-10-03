@@ -1,41 +1,15 @@
-export const frontmatter = { order: 13 };
+export const frontmatter = { order: 1 };
 
 # Basic Types
 
-Elixir's basic types include:
-
-- Integers: `1`, `0xFF`, `0b1010`
-- Floats: `3.14`, `1.0e-10`
-- Booleans: `true`, `false`
-- Atoms: `:ok`, `:error`, `:my_atom`
-- Strings: `"hello"` (UTF-8 encoded binaries)
-- Lists: `[1, 2, 3]`
-- Tuples: `{:ok, "value"}`
-- Maps: `%{key: "value"}`
-
-Elixir is dynamically typed but you can check types at runtime.
+In this chapter we will learn more about Elixir basic types: integers, floats, booleans, atoms, and strings. Let's see the code snippet for some examples of them.
 
 <EditorCode>
 ```elixir
-`# Different types
-integer = 42
-float = 3.14159
-boolean = true
-atom = :elixir
-string = "Hello, Elixir!"
-list = [1, 2, 3]
-tuple = {:ok, "success"}
-map = %{name: "Alice", age: 30}
-
-# Type checking
-
-IO.puts("integer is_integer: #{is_integer(integer)}")
-IO.puts("float is_float: #{is_float(float)}")
-IO.puts("boolean is_boolean: #{is_boolean(boolean)}")
-IO.puts("atom is_atom: #{is_atom(atom)}")
-IO.puts("string is_binary: #{is_binary(string)}")
-IO.puts("list is_list: #{is_list(list)}")
-IO.puts("tuple is_tuple: #{is_tuple(tuple)}")
-IO.puts("map is_map: #{is_map(map)}")`
+IO.inspect 42, label: "integer"
+IO.inspect 3.14159, label: "float"
+IO.inspect true, label: "boolean"
+IO.inspect :elixir, label: "atom"
+IO.inspect "Hello, Elixir!", label: "string"
 ```
 </EditorCode>

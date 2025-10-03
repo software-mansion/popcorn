@@ -1,0 +1,16 @@
+export const frontmatter = { order: 7 };
+
+# Strings
+
+Strings in Elixir are represented internally by contiguous sequences of bytes, known as binaries. Thus, we can use functions such as `byte_size` on strings. Functions specific to strings are in the `String` module.
+
+<EditorCode>
+```elixir
+IO.inspect is_binary("cześć"), label: "string is a binary"
+
+# Note that in UTF-8, 'ś' and 'ć' take two bytes each. Let's try changing 'byte_size' to 'String.length'
+IO.inspect byte_size("cześć"), label: "cześć takes this many bytes"
+
+IO.inspect String.upcase("cześć"), label: "upcase of cześć"
+```
+</EditorCode>
