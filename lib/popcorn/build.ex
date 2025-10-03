@@ -5,6 +5,7 @@ defmodule Popcorn.Build do
   require Logger
   alias Popcorn.CoreErlangUtils
   alias Popcorn.ArtifactsCache
+  alias Popcorn.BuildArtifacts
 
   @after_compile __MODULE__
   def __after_compile__(_env, _bytecode) do
@@ -14,9 +15,6 @@ defmodule Popcorn.Build do
   end
 
   @config Popcorn.Config.compile([:add_tracing, :extra_apps])
-
-  @app_path Mix.Project.app_path()
-  @patches_path "#{@app_path}/popcorn_patches"
 
   # A minimal set of apps to start Popcorn-based app
   @default_apps [
@@ -31,6 +29,18 @@ defmodule Popcorn.Build do
   ]
 
   @available_apps @default_apps ++ @config.extra_apps
+
+  @doc """
+  Returns a list of applications that were included during compilation
+  and their bundle is available at `bundle_path/0`
+  """
+  @spec available_apps() :: [atom()]
+  def available_apps(), do: @available_apps
+
+  @doc """
+  Returns a path to an AVM bundle with the provided name
+  """
+  def bundle_path(app), do: BuildArtifacts.bundle_path(app)
 
   @doc """
   Applies patches and generates *.avm bundles for each (configured)
@@ -49,17 +59,16 @@ defmodule Popcorn.Build do
       # we possibly have corrupted cache and want to start all over
       ArtifactsCache.drop_cache!()
 
-      File.mkdir_p!(@patches_path)
       # ensure that we start with clean state for modified apps
       modified
       |> Map.keys()
-      |> process_async(&delete_built_artifacts/1)
+      |> tap(&BuildArtifacts.delete!/1)
+      |> tap(&BuildArtifacts.create_build_dirs!/1)
 
       process_async(
         modified,
         fn {modified_app, modified_paths} ->
-          build_dir = bundle_ebin_dir(modified_app)
-          File.mkdir_p!(build_dir)
+          build_dir = BuildArtifacts.beams_dir(modified_app)
           build_app(modified_app, modified_paths, build_dir)
         end,
         timeout: 600_000,
@@ -94,15 +103,6 @@ defmodule Popcorn.Build do
     |> Map.new()
   end
 
-  defp delete_built_artifacts(app) do
-    build_dir = bundle_ebin_dir(app)
-    bundle_path = bundle_path(app)
-
-    # we don't care about failure
-    Enum.each([build_dir, bundle_path], &File.rm/1)
-    File.mkdir_p!(build_dir)
-  end
-
   @doc """
   Returns a list of names of applications shipped with Erlang/OTP and Elixir
   """
@@ -125,22 +125,6 @@ defmodule Popcorn.Build do
     otp_apps ++ elixir_apps
   end
 
-  @doc """
-  Returns a list of applications that were included during compilation
-  and their bundle is available at `bundle_path/0`
-  """
-  @spec available_apps() :: [atom()]
-  def available_apps() do
-    @available_apps
-  end
-
-  @doc """
-  Returns a path to an AVM bundle with the provided name
-  """
-  def bundle_path(bundle), do: Path.join([@patches_path, "#{bundle}.avm"])
-
-  defp bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])
-
   defp patchable_app_beams(:popcorn_lib), do: []
 
   defp patchable_app_beams(app) do
@@ -162,16 +146,10 @@ defmodule Popcorn.Build do
   end
 
   defp create_bundle!(app) do
-    out_path = app |> bundle_path() |> to_charlist()
-    beams = app |> bundle_beams() |> Enum.map(&String.to_charlist/1)
+    out_path = app |> BuildArtifacts.bundle_path() |> to_charlist()
+    beams = app |> BuildArtifacts.beam_paths() |> Enum.map(&String.to_charlist/1)
 
     :ok = :packbeam_api.create(out_path, beams)
-  end
-
-  defp bundle_beams(bundle) do
-    bundle_ebin_dir(bundle)
-    |> Path.join("*.beam")
-    |> Path.wildcard()
   end
 
   # Compiles and applies patches to Erlang and Elixir standard libraries,
