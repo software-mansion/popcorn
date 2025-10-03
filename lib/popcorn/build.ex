@@ -113,13 +113,6 @@ defmodule Popcorn.Build do
 
   defp bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])
 
-  defp bundle_beams(bundle) do
-    bundle_ebin_dir(bundle)
-    |> Path.join("*.beam")
-    |> Path.wildcard()
-    |> Enum.map(&String.to_charlist/1)
-  end
-
   defp patchable_app_beams(:popcorn_lib), do: []
 
   defp patchable_app_beams(app) do
@@ -150,10 +143,23 @@ defmodule Popcorn.Build do
 
     if patched_beams != [] or transferred_beams != [] do
       Logger.info("Bundling #{application}.avm", app_name: application)
-      :packbeam_api.create(to_charlist(bundle_path(application)), bundle_beams(application))
+      create_bundle!(application)
     end
 
     cache
+  end
+
+  defp create_bundle!(app) do
+    out_path = app |> bundle_path() |> to_charlist()
+    beams = app |> bundle_beams() |> Enum.map(&String.to_charlist/1)
+
+    :ok = :packbeam_api.create(out_path, beams)
+  end
+
+  defp bundle_beams(bundle) do
+    bundle_ebin_dir(bundle)
+    |> Path.join("*.beam")
+    |> Path.wildcard()
   end
 
   # Updates hash of each patch and returns only paths that have different hash
@@ -182,9 +188,7 @@ defmodule Popcorn.Build do
     # Compiling together may break something, as these modules
     # will override stdlib modules.
     process_async(patch_srcs, fn src ->
-      tmp_dir = setup_tmp_dir(out_dir)
-
-      try do
+      with_tmp_dir(out_dir, fn tmp_dir ->
         Logger.info("Compiling #{src}", app_name: app)
         compile_patch(src, tmp_dir)
 
@@ -194,11 +198,9 @@ defmodule Popcorn.Build do
           do_patch(app, name, stdlib_beams_by_name[name], path, out_dir)
           name
         end)
-      after
-        File.rm_rf!(tmp_dir)
-      end
+      end)
+      |> List.flatten()
     end)
-    |> List.flatten()
   end
 
   defp compile_patch(path, tmp_dir) do
@@ -233,24 +235,20 @@ defmodule Popcorn.Build do
   # To be replaced with File.cp when we improve tracing in AtomVM
   defp do_patch(app_name, name, nil, patch, out_dir) do
     Logger.info("Patching #{name}", app_name: app_name)
-    ast = File.read!(patch) |> CoreErlangUtils.parse()
-    ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
-    beam = CoreErlangUtils.serialize(ast)
-    File.write!(Path.join(out_dir, name), beam)
+
+    transform_beam_ast(patch, out_dir, fn patch_ast ->
+      maybe_add_tracing(patch_ast, @config.add_tracing)
+    end)
   end
 
   defp do_patch(app_name, name, stdlib, patch, out_dir) do
     Logger.info("Patching #{name}", app_name: app_name)
+    patch_ast = CoreErlangUtils.parse(File.read!(patch))
 
-    ast =
-      CoreErlangUtils.merge_modules(
-        CoreErlangUtils.parse(File.read!(stdlib)),
-        CoreErlangUtils.parse(File.read!(patch))
-      )
-
-    ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
-    beam = CoreErlangUtils.serialize(ast)
-    File.write!(Path.join(out_dir, name), beam)
+    transform_beam_ast(stdlib, out_dir, fn stdlib_ast ->
+      CoreErlangUtils.merge_modules(stdlib_ast, patch_ast)
+      |> maybe_add_tracing(@config.add_tracing)
+    end)
   end
 
   # This is only needed to add tracing
@@ -264,13 +262,29 @@ defmodule Popcorn.Build do
     |> process_async(fn path ->
       name = Path.basename(path)
       Logger.info("Transferring #{name}", app_name: app_name)
-      ast = File.read!(path) |> CoreErlangUtils.parse()
-      ast = if @config.add_tracing, do: CoreErlangUtils.add_simple_tracing(ast), else: ast
-      beam = CoreErlangUtils.serialize(ast)
-      File.write!(Path.join(out_dir, name), beam)
+
+      transform_beam_ast(path, out_dir, fn ast ->
+        maybe_add_tracing(ast, @config.add_tracing)
+      end)
+
       name
     end)
   end
+
+  defp transform_beam_ast(beam_path, out_dir, transform) do
+    name = Path.basename(beam_path)
+    out_path = Path.join(out_dir, name)
+
+    beam_path
+    |> File.read!()
+    |> CoreErlangUtils.parse()
+    |> transform.()
+    |> CoreErlangUtils.serialize()
+    |> then(&File.write!(out_path, &1))
+  end
+
+  defp maybe_add_tracing(ast, true), do: CoreErlangUtils.add_simple_tracing(ast)
+  defp maybe_add_tracing(ast, false), do: ast
 
   defp process_async(enum, fun, opts \\ []) do
     enum
@@ -278,10 +292,15 @@ defmodule Popcorn.Build do
     |> Enum.map(fn {:ok, result} -> result end)
   end
 
-  defp setup_tmp_dir(path) do
+  defp with_tmp_dir(path, f) do
     tmp_dir = Path.join(path, "tmp_#{:erlang.unique_integer([:positive])}")
     File.rm_rf!(tmp_dir)
     File.mkdir!(tmp_dir)
-    tmp_dir
+
+    try do
+      f.(tmp_dir)
+    after
+      File.rm_rf!(tmp_dir)
+    end
   end
 end
