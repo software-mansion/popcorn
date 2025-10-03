@@ -6,6 +6,8 @@ Elixir supports `true` and `false` as booleans, and provides logical `and`, `or`
 
 Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||/2`, `&&/2`, and `!/1`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
 
+As a rule of thumb, use and, or and not when you are expecting booleans. If any of the arguments are non-boolean, use &&, || and !.
+
 
 <EditorCode>
 ```elixir
@@ -17,15 +19,14 @@ IO.inspect true and true, label: "logical and of true and true"
 IO.inspect false or is_boolean(true), label: "logical or of false and is_boolean(true)"
 IO.inspect not true, label: "logical not of true"
 
+# Let's change 'true' to IO.inspect("foo"). Is the right-hand side of `||` evaluated if left-hand is truthy?
 IO.inspect 1 || true, label: "1 || true"
 IO.inspect false || 11, label: "false || 11"
 
 IO.inspect nil && 13, label: "nil && 13"
 IO.inspect true && 17, label: "true && 17"
 
-
+# Let's try !1 and !nil
 IO.inspect !true, label: "!true"
-IO.inspect !1, label: "!1"
-IO.inspect !nil, label: "!nil"
 ```
 </EditorCode>
