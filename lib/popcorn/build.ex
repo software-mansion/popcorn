@@ -204,8 +204,8 @@ defmodule Popcorn.Build do
 
     # patch files may produce multiple beams
     # the easiest way to get full set is to diff input beams and beams already in out_dir
-    out_dir_beams = Path.wildcard("#{out_dir}/*.beam") |> MapSet.new()
-    remaining_beams = Enum.reject(beams, fn path -> path in out_dir_beams end)
+    out_dir_beams = Path.wildcard("#{out_dir}/*.beam") |> MapSet.new(&Path.basename/1)
+    remaining_beams = Enum.reject(beams, fn path -> Path.basename(path) in out_dir_beams end)
 
     {not none_patched, remaining_beams}
   end
@@ -262,11 +262,8 @@ defmodule Popcorn.Build do
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
   defp copy_beams(app_name, beams, out_dir) do
-    already_transferred = MapSet.new(File.ls!(out_dir))
-
     none_copied =
       beams
-      |> Enum.reject(&(Path.basename(&1) in already_transferred))
       |> process_async(fn path ->
         name = Path.basename(path)
         Logger.info("Transferring #{name}", app_name: app_name)
