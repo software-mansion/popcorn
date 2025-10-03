@@ -57,7 +57,7 @@ defmodule Popcorn.Build do
 
     new_cache =
       process_async(
-        @available_apps,
+        [:popcorn_lib | @available_apps],
         fn app ->
           app_cache = build_app(app, Map.get(cache, app, %{}))
           {app, app_cache}
@@ -66,9 +66,6 @@ defmodule Popcorn.Build do
         max_concurrency: 2
       )
       |> Map.new()
-
-    popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
-    new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
 
     ArtifactsCache.write_to_disk!(new_cache)
 
@@ -123,45 +120,37 @@ defmodule Popcorn.Build do
     |> Enum.map(&String.to_charlist/1)
   end
 
+  defp patchable_app_beams(:popcorn_lib), do: []
+
+  defp patchable_app_beams(app) do
+    app
+    |> Application.app_dir()
+    |> Path.join("ebin/**/*.beam")
+    |> Path.wildcard()
+  end
+
+  defp patches_source(:popcorn_lib), do: Path.wildcard("patches/popcorn_lib/**/*.{ex,erl,yrl,S}")
+
+  defp patches_source(app) do
+    Path.wildcard("patches/{otp,elixir}/#{app}/*.{ex,erl,yrl,S}")
+  end
+
   defp build_app(application, cache) do
     build_dir = bundle_ebin_dir(application)
     File.mkdir_p!(build_dir)
 
-    app_beams =
-      application
-      |> Application.app_dir()
-      |> Path.join("ebin/**/*.beam")
-      |> Path.wildcard()
+    app_beams = patchable_app_beams(application)
 
-    patches_srcs = Path.wildcard("patches/{otp,elixir}/#{application}/*.{ex,erl,yrl,S}")
-
+    # update cache hashes
+    patches_srcs = patches_source(application)
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
     patched_beams = patch(application, app_beams, modified_srcs, build_dir)
-
     transferred_beams = transfer_stdlib(application, app_beams, build_dir)
 
     if patched_beams != [] or transferred_beams != [] do
       Logger.info("Bundling #{application}.avm", app_name: application)
       :packbeam_api.create(to_charlist(bundle_path(application)), bundle_beams(application))
-    end
-
-    cache
-  end
-
-  defp build_popcorn(cache) do
-    bundle = :popcorn_lib
-    build_dir = bundle_ebin_dir(bundle)
-    File.mkdir_p!(build_dir)
-    srcs = Path.wildcard("patches/#{bundle}/**/*.{ex,erl,yrl,S}")
-
-    {modified_srcs, cache} = update_cache(srcs, cache)
-
-    popcorn_lib_beams = patch(bundle, [], modified_srcs, build_dir)
-
-    if popcorn_lib_beams != [] do
-      Logger.info("Bundling #{bundle}.avm", app_name: bundle)
-      :packbeam_api.create(to_charlist(bundle_path(bundle)), bundle_beams(bundle))
     end
 
     cache
