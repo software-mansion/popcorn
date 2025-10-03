@@ -21,21 +21,6 @@ defmodule Popcorn.ArtifactsCache do
   @cache_path "#{@app_path}/popcorn_patch_cache"
 
   @doc """
-  Checks if cache is a subset of files to build.
-
-  This is used to quickly check if cache is viable to use – if any cached file was deleted, we treat cache as invalidated.
-  """
-  def subset_of_sources?(cache, source_paths) do
-    all_cached_paths =
-      cache
-      |> Map.values()
-      |> Enum.flat_map(&Map.keys/1)
-      |> MapSet.new()
-
-    MapSet.subset?(all_cached_paths, source_paths)
-  end
-
-  @doc """
   Returns a map of apps from new cache with files changed compared to current cache.
   If app's files did not change, the app is not included.
 

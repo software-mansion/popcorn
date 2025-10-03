@@ -44,38 +44,64 @@ defmodule Popcorn.Build do
     Logger.info("Bundling started")
     original_formatter = BuildLogFormatter.enable()
 
-    patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
     cache = ArtifactsCache.read_from_disk!()
+    new_cache = create_new_cache([:popcorn_lib | @available_apps])
+    modified = ArtifactsCache.get_modified_apps(cache, new_cache)
 
-    cache =
-      if not ArtifactsCache.subset_of_sources?(cache, patches_srcs) do
-        File.rm_rf!(@patches_path)
-        File.mkdir_p!(@patches_path)
-        %{}
-      else
-        cache
-      end
-
+    # in case of any raise later
+    # we possibly have corrupted cache and want to start all over
     ArtifactsCache.drop_cache!()
 
-    new_cache =
-      process_async(
-        [:popcorn_lib | @available_apps],
-        fn app ->
-          app_cache = build_app(app, Map.get(cache, app, %{}))
-          {app, app_cache}
-        end,
-        timeout: 600_000,
-        max_concurrency: 2
-      )
-      |> Map.new()
+    File.mkdir_p!(@patches_path)
+    # ensure that we start with clean state for modified apps
+    modified
+    |> Map.keys()
+    |> process_async(&delete_built_artifacts/1)
 
-    ArtifactsCache.write_to_disk!(new_cache)
+    process_async(
+      modified,
+      fn {modified_app, modified_paths} ->
+        build_app(modified_app, modified_paths)
+      end,
+      timeout: 600_000,
+      max_concurrency: 2
+    )
 
-    :ok
+    updated_cache = Map.merge(cache, new_cache)
+    ArtifactsCache.write_to_disk!(updated_cache)
 
     BuildLogFormatter.disable(original_formatter)
     Logger.info("Bundling finished")
+    :ok
+  end
+
+  defp create_new_cache(apps) do
+    apps
+    |> process_async(fn app -> {app, compute_file_hashes(app)} end)
+    |> Map.new()
+  end
+
+  defp compute_file_hashes(app) do
+    case app do
+      :popcorn_lib -> "patches/popcorn_lib/**/*.{ex,erl,yrl,S}"
+      app -> "patches/{otp,elixir}/#{app}/*.{ex,erl,yrl,S}"
+    end
+    |> Path.wildcard()
+    |> process_async(fn path ->
+      hash = path |> File.read!() |> :erlang.md5()
+
+      {path, hash}
+    end)
+    |> Map.new()
+  end
+
+  defp delete_built_artifacts(app) do
+    build_dir = bundle_ebin_dir(app)
+    bundle_path = bundle_path(app)
+
+    # we don't care about failure
+    Enum.each([build_dir, bundle_path], &File.rm/1)
+    File.mkdir_p!(build_dir)
   end
 
   @doc """
@@ -122,22 +148,11 @@ defmodule Popcorn.Build do
     |> Path.wildcard()
   end
 
-  defp patches_source(:popcorn_lib), do: Path.wildcard("patches/popcorn_lib/**/*.{ex,erl,yrl,S}")
-
-  defp patches_source(app) do
-    Path.wildcard("patches/{otp,elixir}/#{app}/*.{ex,erl,yrl,S}")
-  end
-
-  defp build_app(application, cache) do
+  defp build_app(application, modified_srcs) do
     build_dir = bundle_ebin_dir(application)
     File.mkdir_p!(build_dir)
 
     app_beams = patchable_app_beams(application)
-
-    # update cache hashes
-    patches_srcs = patches_source(application)
-    {modified_srcs, cache} = update_cache(patches_srcs, cache)
-
     {any_patched, remaining_beams} = patch(application, app_beams, modified_srcs, build_dir)
     any_copied = copy_beams(application, remaining_beams, build_dir)
 
@@ -145,8 +160,6 @@ defmodule Popcorn.Build do
       Logger.info("Bundling #{application}.avm", app_name: application)
       create_bundle!(application)
     end
-
-    cache
   end
 
   defp create_bundle!(app) do
@@ -160,20 +173,6 @@ defmodule Popcorn.Build do
     bundle_ebin_dir(bundle)
     |> Path.join("*.beam")
     |> Path.wildcard()
-  end
-
-  # Updates hash of each patch and returns only paths that have different hash
-  defp update_cache(paths, cache) do
-    Enum.flat_map_reduce(paths, %{}, fn path, new_cache ->
-      hash = path |> File.read!() |> :erlang.md5()
-      new_cache = Map.put(new_cache, path, hash)
-
-      if hash == cache[path] do
-        {[], new_cache}
-      else
-        {[path], new_cache}
-      end
-    end)
   end
 
   # Compiles and applies patches to Erlang and Elixir standard libraries,
