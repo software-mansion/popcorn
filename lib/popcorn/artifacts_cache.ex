@@ -13,6 +13,8 @@ defmodule Popcorn.ArtifactsCache do
       ...
     }
   }
+
+  See `Popcorn.Build`.
   """
 
   @app_path Mix.Project.app_path()
