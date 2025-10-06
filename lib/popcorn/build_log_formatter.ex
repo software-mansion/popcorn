@@ -11,12 +11,15 @@ defmodule Popcorn.BuildLogFormatter do
     metadata: [:app_name]
   ]
 
-  def with_build_logger(f) do
+  def enable() do
     original_formatter = Logger.default_formatter()
     formatter = Logger.default_formatter(@overrides)
     :logger.update_handler_config(:default, :formatter, formatter)
-    f.()
-    :logger.update_handler_config(:default, :formatter, original_formatter)
+    original_formatter
+  end
+
+  def disable(config) do
+    :logger.update_handler_config(:default, :formatter, config)
   end
 
   @spec format(Logger.level(), Logger.message(), Logger.Formatter.date_time_ms(), keyword()) ::

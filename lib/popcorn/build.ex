@@ -1,9 +1,9 @@
 defmodule Popcorn.Build do
   @moduledoc false
-  import Popcorn.BuildLogFormatter, only: [with_build_logger: 1]
   require Popcorn.Config
   require Logger
   alias Popcorn.CoreErlangUtils
+  alias Popcorn.BuildLogFormatter
 
   @config Popcorn.Config.compile([:add_tracing, :extra_apps])
 
@@ -36,58 +36,58 @@ defmodule Popcorn.Build do
   """
   def build(opts \\ []) do
     Logger.info("Bundling started")
+    original_formatter = BuildLogFormatter.enable()
 
-    with_build_logger(fn ->
-      opts =
-        opts
-        |> Keyword.validate!(force: false)
-        |> Map.new()
+    opts =
+      opts
+      |> Keyword.validate!(force: false)
+      |> Map.new()
 
-      patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
+    patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
 
-      cache =
-        with false <- opts.force,
-             {:ok, cache} <- File.read(@cache_path),
-             cache = :erlang.binary_to_term(cache),
-             all_cached_files =
-               (for {_bundle, file_hashes} <- cache,
-                    {file_path, _hash} <- file_hashes,
-                    into: MapSet.new() do
-                  file_path
-                end),
-             # If a patch was removed, we need to remove the old build
-             # to avoid adding stale artifacts to the bundle
-             true <- MapSet.subset?(all_cached_files, patches_srcs) do
-          cache
-        else
-          _cant_use_cache ->
-            File.rm_rf!(@patches_path)
-            File.mkdir_p!(@patches_path)
-            %{}
-        end
+    cache =
+      with false <- opts.force,
+           {:ok, cache} <- File.read(@cache_path),
+           cache = :erlang.binary_to_term(cache),
+           all_cached_files =
+             (for {_bundle, file_hashes} <- cache,
+                  {file_path, _hash} <- file_hashes,
+                  into: MapSet.new() do
+                file_path
+              end),
+           # If a patch was removed, we need to remove the old build
+           # to avoid adding stale artifacts to the bundle
+           true <- MapSet.subset?(all_cached_files, patches_srcs) do
+        cache
+      else
+        _cant_use_cache ->
+          File.rm_rf!(@patches_path)
+          File.mkdir_p!(@patches_path)
+          %{}
+      end
 
-      File.rm(@cache_path)
+    File.rm(@cache_path)
 
-      new_cache =
-        process_async(
-          @available_apps,
-          fn app ->
-            app_cache = build_app(app, Map.get(cache, app, %{}))
-            {app, app_cache}
-          end,
-          timeout: 600_000,
-          max_concurrency: 2
-        )
-        |> Map.new()
+    new_cache =
+      process_async(
+        @available_apps,
+        fn app ->
+          app_cache = build_app(app, Map.get(cache, app, %{}))
+          {app, app_cache}
+        end,
+        timeout: 600_000,
+        max_concurrency: 2
+      )
+      |> Map.new()
 
-      popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
-      new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
+    popcorn_lib_cache = build_popcorn(cache[:popcorn_lib])
+    new_cache = Map.put(new_cache, :popcorn_lib, popcorn_lib_cache)
 
-      File.write!(@cache_path, :erlang.term_to_binary(new_cache))
+    File.write!(@cache_path, :erlang.term_to_binary(new_cache))
 
-      :ok
-    end)
+    :ok
 
+    BuildLogFormatter.disable(original_formatter)
     Logger.info("Bundling finished")
   end
 
