@@ -3,12 +3,17 @@
 -export([handle_info/2]).
 
 -compile({popcorn_patch_private, make_appl/1}).
+-compile({popcorn_patch_private, init_starter/4}).
 
 -import(lists, [zf/2, map/2, foreach/2, foldl/3,
 		keyfind/3, keydelete/3, keyreplace/4]).
 
 -record(state, {loading = [], starting = [], start_p_false = [], running = [],
 		control = [], started = [], start_req = [], conf_data}).
+
+-record(appl, {name, appl_data, descr, id, vsn, restart_type, inc_apps, opt_apps, apps}).
+
+-define(AC, ?MODULE).
 
 % Patch reason: in the `{'EXIT', Pid, Reason}` clause ets:match_delete
 % (missing in AtomVM) is replaced with ets:delete. That clause is not
@@ -199,3 +204,16 @@ make_appl(Name) when is_atom(Name) ->
 
 make_appl(Application) ->
     {ok, popcorn_module:make_appl_i(Application)}.
+
+
+% Patch reason: originally this function calls `catch start_appl(Appl, S, Type)`.
+% It triggers a bug in AtomVM that sometimes, undeterministically makes `start_appl`
+% return the current process' state instead of what it actually returns.
+% In this patch, start_appl isn't wrapped in a `catch`, what prevents the bug
+% from being triggered.
+init_starter(_From, Appl, S, Type) ->
+  process_flag(trap_exit, true),
+  AppName = Appl#appl.name,
+	Resp = popcorn_module:start_appl(Appl, S, Type),
+  gen_server:cast(?AC, {application_started, AppName,
+      Resp}).
