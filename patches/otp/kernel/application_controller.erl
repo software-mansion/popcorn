@@ -209,11 +209,15 @@ make_appl(Application) ->
 % Patch reason: originally this function calls `catch start_appl(Appl, S, Type)`.
 % It triggers a bug in AtomVM that sometimes, undeterministically makes `start_appl`
 % return the current process' state instead of what it actually returns.
-% In this patch, start_appl isn't wrapped in a `catch`, what prevents the bug
-% from being triggered.
+% In this patch, start_appl is wrapped in a `try catch` equivalent of a `catch`,
+% what prevents the bug from being triggered.
 init_starter(_From, Appl, S, Type) ->
   process_flag(trap_exit, true),
   AppName = Appl#appl.name,
-	Resp = popcorn_module:start_appl(Appl, S, Type),
-  gen_server:cast(?AC, {application_started, AppName,
-      Resp}).
+	Resp = try
+    popcorn_module:start_appl(Appl, S, Type)
+  catch
+    throw:Reason -> Reason;
+    _Error:Reason:Stacktrace -> {'EXIT', {Reason, Stacktrace}}
+  end,
+  gen_server:cast(?AC, {application_started, AppName, Resp}).
