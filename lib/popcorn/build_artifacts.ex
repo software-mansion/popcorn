@@ -1,4 +1,9 @@
 defmodule Popcorn.BuildArtifacts do
+  @moduledoc """
+  Manages output directories of building process.
+
+  See `Popcorn.Build`.
+  """
   @app_path Mix.Project.app_path()
   @patches_path "#{@app_path}/popcorn_patches"
 
