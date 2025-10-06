@@ -1,3 +1,4 @@
+import { hashDefaultCode } from "../storage";
 import type { LoadedEntry, MdxWithProperties, UnresolvedEntry } from "./types";
 
 export const mdxModules = import.meta.glob<MdxWithProperties>(
@@ -8,14 +9,16 @@ export async function load([
   rawPath,
   loader
 ]: UnresolvedEntry): Promise<LoadedEntry> {
-  const { frontmatter } = await loader();
+  const { frontmatter, defaultCode } = await loader();
+
   const path = getPath(rawPath).split("/");
 
   return {
     path,
     frontmatter: frontmatter ?? {
       order: Infinity
-    }
+    },
+    hashDefaultCode: defaultCode ? hashDefaultCode(defaultCode) : ""
   };
 }
 
