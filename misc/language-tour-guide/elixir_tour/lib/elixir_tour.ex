@@ -23,12 +23,16 @@ defmodule ElixirTour do
 
   defp handle_wasm({:wasm_call, ["eval_elixir", code]}, state) do
     try do
-      result = eval(code)
-      {:resolve, inspect(result), state}
+      case eval(code) do
+        {:error, error_message} ->
+          {:reject, inspect(error_message), state}
+
+        result ->
+          {:resolve, inspect(result), state}
+      end
     rescue
       e ->
-        error_message = "Caught an error: #{inspect(e)}"
-        {:reject, error_message, state}
+        {:reject, inspect(e), state}
     end
   end
 
@@ -38,8 +42,7 @@ defmodule ElixirTour do
       evaluated
     rescue
       e ->
-        error_message = "Caught an error: #{inspect(e)}"
-        {:error, error_message}
+        {:error, e}
     end
   end
 end

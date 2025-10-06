@@ -8,10 +8,12 @@ import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
 import StdoutResults from "./StdoutResults";
 import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
+import XCircleIcon from "../../assets/x-circle.svg?react";
 
 export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
+  const [errorData, setErrorData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
   const { call, reinitializePopcorn } = usePopcorn();
   const [longRunning, setLongRunning] = useState(false);
@@ -55,18 +57,31 @@ export function Results() {
           setLongRunning(true);
         }, 500);
 
+        setErrorData(null);
+        setResultData(null);
+        setDurationMs(null);
+
         try {
           result = await call(["eval_elixir", code], {
             timeoutMs: 10_000
           });
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error executing Elixir code:", error);
+
+          if (error.error) {
+            setErrorData(error.error);
+            setDurationMs(error.durationMs || null);
+          } else {
+            setErrorData("Unknown error");
+          }
+
           return;
         }
 
         if (result === null) return;
 
         clearTimeout(timeoutId);
+
         const { data, durationMs } = result;
         setResultData(data);
         setDurationMs(durationMs);
@@ -109,6 +124,7 @@ export function Results() {
 
   const resetToDefault = useCallback(() => {
     setResultData(null);
+    setErrorData(null);
     setDurationMs(null);
   }, []);
 
@@ -144,6 +160,18 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
+
+            {errorData && (
+              <div className="my-2 flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3">
+                <div className="flex items-center gap-2">
+                  <XCircleIcon className="h-4 w-4 text-red-700" />
+                  <p className="text-sm font-medium text-red-700">Error</p>
+                </div>
+                <pre className="mt-1 text-xs break-words whitespace-pre-wrap text-red-600">
+                  {errorData}
+                </pre>
+              </div>
+            )}
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
