@@ -1,10 +1,10 @@
 import init from "./AtomVM.mjs";
 
 const MESSAGES = {
-  INIT: "popcorn-init",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
+  EVENT: "popcorn-event",
   STDOUT: "popcorn-stdout",
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
@@ -42,7 +42,7 @@ export async function initVm() {
       // Timeout so that error logs are (hopefully) printed
       // before we terminate
       setTimeout(() => send(MESSAGES.RELOAD, null), 100);
-    }
+    },
   });
 
   Module["serialize"] = JSON.stringify;
@@ -71,7 +71,14 @@ export async function initVm() {
     const serialized = Module.serialize(args);
     return origCall(process, serialized);
   };
+  Module["sendEvent"] = (eventName, payload) => {
+    if (!Module._vmInitialized) {
+      Module._vmInitialized = true;
+      initHeartbeat();
+    }
 
+    send(MESSAGES.EVENT, { eventName, payload });
+  };
   Module["onRunTrackedJs"] = (scriptString, isDebug) => {
     const trackValue = (tracked) => {
       const getKey = Module["nextTrackedObjectKey"];
@@ -119,16 +126,13 @@ export async function initVm() {
     return keys.map(getTrackedObject);
   };
 
-  Module["onElixirReady"] = (initProcess) => {
-    onVmInit(initProcess);
-    Module["onElixirReady"] = null;
-  };
+  initListener();
 }
 
 function ensureFunctionEval(maybeFunction) {
   if (typeof maybeFunction !== "function") {
     throw new Error(
-      "Script passed to onRunTrackedJs() is not wrapped in a function",
+      "Script passed to onRunTrackedJs() is not wrapped in a function"
     );
   }
 }
@@ -136,14 +140,16 @@ function ensureFunctionEval(maybeFunction) {
 function ensureResultKeyList(result) {
   if (!Array.isArray(result) && result !== undefined) {
     throw new Error(
-      "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
+      "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined"
     );
   }
 }
 
-function onVmInit(initProcess) {
+function initHeartbeat() {
   setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
+}
 
+function initListener() {
   window.addEventListener("message", async ({ data }) => {
     const type = data.type;
 
@@ -163,10 +169,13 @@ function onVmInit(initProcess) {
         send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
       }
     } else if (type.startsWith("popcorn")) {
-      `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`;
+      `Iframe: received unhandled popcorn event: ${JSON.stringify(
+        data,
+        null,
+        4
+      )}`;
     }
   });
-  send(MESSAGES.INIT, initProcess);
 }
 
 function send(type, data) {
