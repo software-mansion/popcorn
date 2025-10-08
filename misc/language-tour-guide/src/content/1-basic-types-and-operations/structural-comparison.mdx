@@ -19,5 +19,8 @@ IO.inspect "foo" == "bar", label: "is 'foo' string equal to 'bar' string"
 IO.inspect 1 === 1.0, label: "is 1 integer strictly equal to 1.0 float"
 
 IO.inspect "abc" > 1, label: "is a string greater than a number?"
+
+# Try changing the atom name
+IO.inspect :infinity > 1, label: "is an atom greater than one?"
 ```
 </EditorCode>
