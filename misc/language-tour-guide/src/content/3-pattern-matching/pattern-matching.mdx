@@ -4,7 +4,7 @@ export const frontmatter = { order: 2 };
 
 The match operator can also be used to destructure data types by matching against more complex patterns.
 
-The pattern may consist of any number of variables, ignore patterns, literal values and patterns for specific data types.
+The pattern may consist of any number of variables, ignore patterns, literal values, and patterns for specific data types.
 
 ## Tuples
 
@@ -13,7 +13,7 @@ The pattern must be of the same size for the match to succeed.
 
 In Elixir, it is common to return a tuple `{:ok, result}` on success and either `:error` atom
 or `{:error, reason}` tuple in case of failure.
-You can use atoms in the pattern as well to match on such results.
+You can also use atoms in the pattern to match on such results.
 
 <EditorCode>
 
@@ -43,7 +43,7 @@ IO.inspect(answer, label: "answer")
 ## Lists
 
 List matching works similarly to tuples - you can extract every element of the list.
-There is however a special pattern related to how a list is built:
+There is, however, a special pattern related to how a list is built:
 since it's either an empty list (`[]`) or the so-called "cons" with a value (called "head")
 and a reference to the rest of the list (being itself a list, called "tail"),
 you can match on them using the `[head | tail]` format.
@@ -70,7 +70,7 @@ IO.inspect([0 | tail], label: "list with new head")
 
 ## Maps
 
-Patterns for maps can extract value of any key or ensure specified key has provided value.
+Patterns for maps can extract the value of any key or ensure that a specified key has a provided value.
 The pattern doesn't have to be exhausting.
 
 <EditorCode>
