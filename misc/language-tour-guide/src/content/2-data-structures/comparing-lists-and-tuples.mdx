@@ -1,0 +1,20 @@
+export const frontmatter = { order: 7 };
+
+# Comparing Lists and Tuples
+
+What is the difference between lists and tuples? Lists are stored as linked lists, which means accessing the length of a list is a linear operation. Tuples, on the other hand, are stored contiguously in memory, making size retrievals and element access fast but updates or additions costly.
+
+<EditorCode>
+```elixir
+list = [1, 2, 3]
+fast_prepend = [0] ++ list
+slow_append = list ++ [4]
+tuple = {:a, :b, :c, :d}
+updated_tuple = put_elem(tuple, 2, :e)
+IO.inspect(fast_prepend, label: "Fast prepend")
+IO.inspect(slow_append, label: "Slow append")
+IO.inspect(updated_tuple, label: "Updated tuple with new element")
+```
+</EditorCode>
+
+These changed snippets now include debuggable outputs with the `IO.inspect` function to enhance code readability and understanding during execution in an Elixir environment.

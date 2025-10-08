@@ -1,0 +1,18 @@
+export const frontmatter = { order: 4 };
+
+# Error Handling and Charlists
+
+Getting the head or the tail of an empty list throws an error. When Elixir sees a list of printable ASCII numbers, it will print that as a charlist (a list of characters).
+
+<EditorCode>
+```elixir
+try do
+  hd([])
+rescue
+  ArgumentError -> IO.puts("Error: Empty list has no head")
+end
+
+IO.inspect([11, 12, 13], label: "Charlist with control characters")
+IO.inspect([104, 101, 108, 108, 110], label: "Charlist representing hello")
+```
+</EditorCode>

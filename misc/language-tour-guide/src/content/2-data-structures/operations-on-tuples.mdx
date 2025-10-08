@@ -1,0 +1,14 @@
+export const frontmatter = { order: 6 };
+
+# Operations on Tuples
+
+It is possible to put an element at a particular index in a tuple with `put_elem`. Notice that `put_elem` returned a new tuple. The original tuple stored in the `tuple` variable was not modified. Like lists, tuples are also immutable.
+
+<EditorCode>
+```elixir
+tuple = {:ok, "hello"}
+updated_tuple = put_elem(tuple, 1, "world")
+IO.inspect(updated_tuple, label: "Updated tuple")
+IO.inspect(tuple, label: "Original tuple")
+```
+</EditorCode>
