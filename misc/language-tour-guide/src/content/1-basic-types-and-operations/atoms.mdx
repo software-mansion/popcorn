@@ -1,20 +1,23 @@
-export const frontmatter = { order: 5 };
-
+export const frontmatter = { order: 8 };
 
 # Atoms
 
 An atom is a constant whose value is its own name. Some other languages call these symbols.
 
-`true`, `false` and `nil` are also atoms - Elixir allows to skip the colon for them.
+Atoms can be created using a preceding colon, like `:apple` or `:orange`. However, `true`, `false` and `nil` are also atoms - Elixir allows to skip the colon for them.
+
+Other commonly used atoms are `:ok` and `:error`. They usually denote a success or a failure of some operation. For example, `IO.puts` always returns `:ok`.
 
 <EditorCode>
 ```elixir
-IO.inspect :apple == :apple, label: "atoms with the same name are equal"
-IO.inspect :apple != :orange, label: "atoms with different names are distinct"
+IO.inspect :apple == :apple, label: "are atoms with the same name equal?"
+IO.inspect :apple == :orange, label: "are atoms with different names equal?"
 
 # Let's use is_boolean to check if atom :false is a boolean.
-IO.inspect is_atom(true), label: "true is an atom"
+IO.inspect is_atom(true), label: "is true an atom?"
 
-IO.inspect true == :true, label: "true and :true are the same"
+IO.inspect true == :true, label: "are true and :true the same?"
+
+IO.inspect IO.puts("foo"), label: "IO.puts returns"
 ```
 </EditorCode>

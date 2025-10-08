@@ -12,11 +12,9 @@ IO.inspect 10 / 2, label: "division"
 IO.inspect div(10, 2), label: "integer division of 10 and 2"
 IO.inspect rem(10, 3), label: "remainder of integer division of 10 and 3"
 
-# Let's change 'round' to 'trunc'. How does the result change?
 IO.inspect round(3.58), label: "round 3.58"
 
-# Try changing 'is_integer' to 'is_float'
-IO.inspect is_integer(123), label: "is 123 an integer"
-IO.inspect is_integer(4.5), label: "is 4.5 an integer"
+# Let's change 'trunc' to 'ceil'. How does the result change?
+IO.inspect trunc(3.58), label: "trunc 3.58"
 ```
 </EditorCode>

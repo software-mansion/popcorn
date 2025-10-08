@@ -1,0 +1,24 @@
+export const frontmatter = { order: 4 };
+
+# Booleans
+
+Elixir supports `true` and `false` as booleans, and provides logical `and`, `or` and `not` operators to work on them.
+
+Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when doing side effects.
+
+<EditorCode>
+```elixir
+IO.inspect true, label: "true"
+IO.inspect false, label: "false"
+IO.inspect true == false, label: "is true equal to false?"
+
+IO.inspect true and true, label: "logical and of true and true"
+
+# Let's change 'true' to IO.inspect(true). Is "true" printed out?
+IO.inspect false and true, label: "logical and of false and true"
+
+IO.inspect false or is_boolean(true), label: "logical or of false and is_boolean(true)"
+
+IO.inspect not true, label: "logical not of true"
+```
+</EditorCode>
