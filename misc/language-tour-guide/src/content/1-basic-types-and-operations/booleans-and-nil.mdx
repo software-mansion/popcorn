@@ -1,0 +1,23 @@
+export const frontmatter = { order: 5 };
+
+# Booleans and nil
+
+Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||/2`, `&&/2`, and `!/1`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
+
+As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.
+
+<EditorCode>
+```elixir
+IO.inspect true && false, label: "true && false"
+IO.inspect nil && 13, label: "nil && 13"
+IO.inspect true && 17, label: "true && 17"
+
+# Let's change 'true' to IO.inspect("foo"). Is "foo" printed out?
+IO.inspect 1 || true, label: "1 || true"
+
+IO.inspect false || 11, label: "false || 11"
+
+# Let's try !1 and !nil
+IO.inspect !true, label: "!true"
+```
+</EditorCode>
