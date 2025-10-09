@@ -71,7 +71,7 @@ IO.inspect([0 | tail], label: "list with new head")
 ## Maps
 
 Patterns for maps can extract the value of any key or ensure that a specified key has a provided value.
-The pattern doesn't have to be exhausting.
+The pattern doesn't have to be exhaustive and cover every entry stored inside the map.
 
 <EditorCode>
 
@@ -80,6 +80,10 @@ The pattern doesn't have to be exhausting.
 map = %{"a" => 1, :b => 2, :c => "c"}
 %{"a" => one} = map
 IO.inspect(one, label: "one")
+
+# An empty map pattern matches any map
+%{} = %{}
+%{} = map
 
 # Enforcing specific value for :c, try changing it and see the result
 %{:b => two, :c => "c"} = map
