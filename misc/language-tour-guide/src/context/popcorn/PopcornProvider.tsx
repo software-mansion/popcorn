@@ -22,6 +22,9 @@ export const PopcornProvider = ({
         onStdout: (text) => {
           console.log("Popcorn stdout:", text);
           setStdoutResult(text);
+        },
+        onStderr: (text) => {
+          console.error("Popcorn stderr:", text);
         }
       });
 

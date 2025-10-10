@@ -1,3 +1,4 @@
+import { hash64 } from "../storage";
 import type { LoadedEntry, MdxWithProperties, UnresolvedEntry } from "./types";
 
 export const mdxModules = import.meta.glob<MdxWithProperties>(
@@ -8,14 +9,17 @@ export async function load([
   rawPath,
   loader
 ]: UnresolvedEntry): Promise<LoadedEntry> {
-  const { frontmatter } = await loader();
+  const { frontmatter, defaultCode } = await loader();
+
   const path = getPath(rawPath).split("/");
 
   return {
     path,
     frontmatter: frontmatter ?? {
       order: Infinity
-    }
+    },
+    // We use hash64 for defaultCode to generate a unique content identifier with strong collision resistanc
+    hash64: defaultCode ? hash64(defaultCode) : ""
   };
 }
 
