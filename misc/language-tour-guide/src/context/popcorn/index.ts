@@ -47,6 +47,7 @@ declare global {
 export type PopcornContextValue = {
   instance: Popcorn | null;
   reinitializePopcorn: () => void;
+  clearCollectedOutput: () => void;
 };
 
 export const PopcornContext = createContext<PopcornContextValue | undefined>(
