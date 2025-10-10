@@ -19,9 +19,15 @@ export function NavigationButton({
   const chapterLabel =
     direction === "next" ? "Next chapter" : "Previous chapter";
 
+  const className = `w-44 ${direction === "previous" ? "flex justify-end" : ""}`;
+
   if (!path) {
     return (
-      <button disabled className="group cursor-not-allowed" aria-hidden="true">
+      <button
+        disabled
+        className={`group cursor-not-allowed ${className}`}
+        aria-hidden="true"
+      >
         <Icon className="border-brown-60 group-disabled:bg-grey-20 group-disabled:text-brown-60 w-8 rounded-full border p-1 shadow-md shadow-black/10 lg:w-9" />
       </button>
     );
@@ -29,21 +35,23 @@ export function NavigationButton({
 
   if (isChapterNavigation) {
     return (
-      <NavLink
-        to={path}
-        className="transition-color flex items-center gap-1 rounded-full bg-orange-100 text-sm font-medium text-white duration-300 hover:bg-orange-200"
-      >
-        {direction === "previous" && <Icon className="w-8 p-1 lg:w-9" />}
-        <span className={direction === "next" ? "pl-4" : "pr-4"}>
-          {chapterLabel}
-        </span>
-        {direction === "next" && <Icon className="w-8 p-1 lg:w-9" />}
-      </NavLink>
+      <div className="w-44">
+        <NavLink
+          to={path}
+          className={`flex w-fit items-center gap-1 rounded-full bg-orange-100 py-1 text-sm font-medium text-white transition-colors duration-300 hover:bg-orange-200 lg:py-0`}
+        >
+          {direction === "previous" && <Icon className="w-8 p-1 lg:w-9" />}
+          <span className={direction === "next" ? "pl-4" : "pr-4"}>
+            {chapterLabel}
+          </span>
+          {direction === "next" && <Icon className="w-8 p-1 lg:w-9" />}
+        </NavLink>
+      </div>
     );
   }
 
   return (
-    <NavLink to={path}>
+    <NavLink to={path} className={className}>
       <span className="sr-only">{label}</span>
       <Icon className="orange-shadow w-8 rounded-full bg-orange-100 p-1 text-white transition-all duration-300 hover:bg-orange-200 lg:w-9" />
     </NavLink>
