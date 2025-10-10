@@ -23,3 +23,5 @@ wasm/
 *.njsproj
 *.sln
 *.sw?
+
+.env

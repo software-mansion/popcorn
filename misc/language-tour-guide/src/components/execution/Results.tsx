@@ -9,6 +9,7 @@ import { usePending } from "../../utils/hooks/usePending";
 import StdoutResults from "./StdoutResults";
 import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
 import XCircleIcon from "../../assets/x-circle.svg?react";
+import { captureCodeException } from "../../utils/sentry";
 
 interface PopcornError {
   error: string;
@@ -19,12 +20,21 @@ function isPopcornError(error: unknown): error is PopcornError {
   return typeof error === "object" && error !== null && "error" in error;
 }
 
+function isDeinitializedError(error: unknown): error is { error: Error } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "error" in error &&
+    error?.error instanceof Error
+  );
+}
+
 export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
   const [errorData, setErrorData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
-  const { call, reinitializePopcorn } = usePopcorn();
+  const { call, reinitializePopcorn, clearCollectedOutput } = usePopcorn();
   const [longRunning, setLongRunning] = useState(false);
 
   const { code, resetCodeToDefault, stdoutResult, resetStdoutResult } =
@@ -77,15 +87,23 @@ export function Results() {
         } catch (error: unknown) {
           console.error("Error executing Elixir code:", error);
 
+          if (isDeinitializedError(error)) {
+            setErrorData(error.error.message);
+            captureCodeException(error.error.message, code);
+            return;
+          }
+
           if (isPopcornError(error)) {
+            captureCodeException(error.error, code);
+
             setErrorData(error.error);
             setDurationMs(error.durationMs || null);
           } else {
             setErrorData("Unknown error");
           }
-
-          return;
         }
+
+        clearCollectedOutput();
 
         if (result === null) return;
 
@@ -103,7 +121,7 @@ export function Results() {
         });
       });
     },
-    [call, addHistoryEntry, withPending]
+    [call, addHistoryEntry, withPending, clearCollectedOutput]
   );
 
   const handleRunCode = useCallback(() => {
