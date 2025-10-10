@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { hashPathname } from "../utils/storage";
+import { hash32 } from "../utils/storage";
 
 type CodeEditorStore = {
   defaultCode: string;
@@ -30,7 +30,7 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
 
       return { code: code };
     }),
-  setPathHash: (path: string) => set({ pathHash: hashPathname(path) }),
+  setPathHash: (path: string) => set({ pathHash: hash32(path) }),
   getCodeFromStorage: () => {
     const { pathHash } = get();
     return localStorage.getItem(`code-${pathHash}`);

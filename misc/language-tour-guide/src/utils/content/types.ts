@@ -21,7 +21,7 @@ export type DirEntry = {
 export type LoadedEntry = {
   path: string[];
   frontmatter: Frontmatter;
-  hashDefaultCode: string;
+  hash64: string;
 };
 
 export type UnresolvedEntry = [string, () => Promise<MdxWithProperties>];

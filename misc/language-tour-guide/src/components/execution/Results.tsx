@@ -10,6 +10,15 @@ import StdoutResults from "./StdoutResults";
 import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
 import XCircleIcon from "../../assets/x-circle.svg?react";
 
+interface PopcornError {
+  error: string;
+  durationMs?: number;
+}
+
+function isPopcornError(error: unknown): error is PopcornError {
+  return typeof error === "object" && error !== null && "error" in error;
+}
+
 export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [resultData, setResultData] = useState<string | null>(null);
@@ -65,10 +74,10 @@ export function Results() {
           result = await call(["eval_elixir", code], {
             timeoutMs: 10_000
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Error executing Elixir code:", error);
 
-          if (error.error) {
+          if (isPopcornError(error)) {
             setErrorData(error.error);
             setDurationMs(error.durationMs || null);
           } else {

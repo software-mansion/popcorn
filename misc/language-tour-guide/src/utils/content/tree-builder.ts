@@ -1,16 +1,29 @@
-import { manageDefaultCodeStorage } from "../storage";
+import { hash64 } from "../storage";
 import { load, mdxModules, sortPathLength } from "./mdx-loader";
 import type { DirTree } from "./types";
+
+function manageDefaultCodeStorage(concatenatedDefaultCodeHash: string) {
+  // Use hash64 to generate a unique identifier for the concatenated default code hashes
+  const hash = hash64(concatenatedDefaultCodeHash);
+  const previousHash = localStorage.getItem("defaultCodeHash");
+
+  if (previousHash === hash) {
+    return;
+  }
+
+  localStorage.clear();
+  localStorage.setItem("defaultCodeHash", hash);
+}
 
 export async function getRawMdxTree() {
   const modules = Object.entries(mdxModules);
   const loadedFlat = await Promise.all(modules.map(load));
   loadedFlat.sort(sortPathLength);
 
-  const defaultCodeConcatenated = loadedFlat.reduce((acc: string, entry) => {
-    acc += entry.hashDefaultCode ?? "";
-    return acc;
-  }, "");
+  const defaultCodeConcatenated = loadedFlat.reduce(
+    (acc: string, entry) => acc + (entry.hash64 ?? ""),
+    ""
+  );
 
   manageDefaultCodeStorage(defaultCodeConcatenated);
 

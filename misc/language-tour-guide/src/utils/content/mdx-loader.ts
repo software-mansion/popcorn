@@ -1,4 +1,4 @@
-import { hashDefaultCode } from "../storage";
+import { hash64 } from "../storage";
 import type { LoadedEntry, MdxWithProperties, UnresolvedEntry } from "./types";
 
 export const mdxModules = import.meta.glob<MdxWithProperties>(
@@ -18,7 +18,8 @@ export async function load([
     frontmatter: frontmatter ?? {
       order: Infinity
     },
-    hashDefaultCode: defaultCode ? hashDefaultCode(defaultCode) : ""
+    // We use hash64 for defaultCode to generate a unique content identifier with strong collision resistanc
+    hash64: defaultCode ? hash64(defaultCode) : ""
   };
 }
 
