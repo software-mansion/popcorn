@@ -1,0 +1,28 @@
+export const frontmatter = { order: 23 };
+
+# Matching Maps
+
+Patterns for maps can extract the value of any key or ensure that a specified key has a provided value.
+The pattern doesn't have to be exhaustive and cover every entry stored inside the map.
+
+<EditorCode>
+
+```elixir
+# Maps
+map = %{"a" => 1, :b => 2, :c => "c"}
+%{"a" => one} = map
+IO.inspect(one, label: "one")
+
+# An empty map pattern matches any map
+%{} = %{}
+%{} = map
+
+# Enforcing specific value for :c, try changing it and see the result
+%{:b => two, :c => "c"} = map
+IO.inspect(two, label: "two")
+# For atom keys, a special syntax is available
+%{c: cee} = map
+IO.inspect(cee, label: "cee")
+```
+
+</EditorCode>

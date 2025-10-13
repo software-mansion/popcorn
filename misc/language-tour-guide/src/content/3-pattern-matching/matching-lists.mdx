@@ -1,0 +1,35 @@
+export const frontmatter = { order: 22 };
+
+# Matching Lists
+
+List matching works similarly to tuples - you can extract every element of the list,
+and the sizes of pattern and and the value should match.
+
+There is, however, a special pattern using the "cons" operator (`|`, see [the lists section](../data-structures/lists-basics)).
+It allows matching on the first element of the list (called "head")
+and the rest of the list (called "tail")
+
+<EditorCode>
+
+```elixir
+# Lists
+[j, k, l] = [1, 2, 3]
+IO.inspect(j, label: "j")
+IO.inspect(k, label: "k")
+IO.inspect(l, label: "l")
+
+# Try to match empty (`[]`) or single element list (`[1]`)
+[head | tail] = [1, 2, 3]
+# [head | tail] = [1]
+# [head | tail] = []
+IO.inspect(head, label: "head")
+IO.inspect(tail, label: "tail")
+
+# | is used for both prepending and destructuring the list
+[head | tail] = [1 | [2 | [3 | []]]]
+IO.inspect(head, label: "new_head")
+IO.inspect(tail, label: "new_tail")
+IO.inspect([0 | tail], label: "list with new head")
+```
+
+</EditorCode>
