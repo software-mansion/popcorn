@@ -46,7 +46,7 @@ export const PopcornProvider = ({
     try {
       const popcornInstance = await window.Popcorn.init({
         debug,
-        wasmDir: import.meta.env.BASE_URL + "/wasm/",
+        wasmDir: import.meta.env.BASE_URL + "wasm/",
         onStdout: (text) => {
           collectedStdout.current.push(text);
 

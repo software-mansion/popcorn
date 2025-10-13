@@ -1,4 +1,4 @@
-name: Build and deploy production demo
+name: Build and deploy production landing page and language tour
 
 on: workflow_dispatch
 
@@ -7,7 +7,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build_landing_page:
+  build_docker_images:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,25 +34,59 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
 
-      - name: Build and push Docker image
-        id: build-and-push
+      - name: Build base Docker image
+        id: build-base
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./base.Dockerfile
           build-args: |
             COMMIT_REF=${{ github.sha }}
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:latest"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build landing Docker image
+        id: build-and-push-landing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./landing.Dockerfile
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build language tour Docker image
+        id: build-and-push-langtour
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./langtour.Dockerfile
+          # Sentry DSN is embedded in built JS, not really a secret
+          build-args: |
+            SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
+            SENTRY_MODE=production
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   deploy_production:
     runs-on: ubuntu-latest
-    needs: build_landing_page
+    needs: build_docker_images
     steps:
       - name: Deploy to production
         uses: appleboy/ssh-action@v1
@@ -61,4 +95,6 @@ jobs:
           username: ${{ secrets.POPCORN_USER }}
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ secrets.POPCORN_PORT }}
-          script: docker compose up -d
+          script: |
+            docker compose -f popcorn-landing.yml -p landing up -d
+            docker compose -f elixir-langtour.yml -p langtour up -d
