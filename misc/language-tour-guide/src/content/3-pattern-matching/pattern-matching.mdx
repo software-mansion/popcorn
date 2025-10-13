@@ -42,11 +42,12 @@ IO.inspect(answer, label: "answer")
 
 ## Lists
 
-List matching works similarly to tuples - you can extract every element of the list.
-There is, however, a special pattern related to how a list is built:
-since it's either an empty list (`[]`) or the so-called "cons" with a value (called "head")
-and a reference to the rest of the list (being itself a list, called "tail"),
-you can match on them using the `[head | tail]` format.
+List matching works similarly to tuples - you can extract every element of the list,
+and the sizes of pattern and and the value should match.
+
+There is, however, a special pattern using the "cons" operator (`|`, see [the lists section](../data-structures/lists-basics)).
+It allows matching on the first element of the list (called "head")
+and the rest of the list (called "tail")
 
 <EditorCode>
 
@@ -59,10 +60,15 @@ IO.inspect(l, label: "l")
 
 # Try to match empty (`[]`) or single element list (`[1]`)
 [head | tail] = [1, 2, 3]
+# [head | tail] = [1]
+# [head | tail] = []
 IO.inspect(head, label: "head")
 IO.inspect(tail, label: "tail")
 
-# | is also used for prepending to the list
+# | is used for both prepending and destructuring the list
+[head | tail] = [1 | [2 | [3 | []]]]
+IO.inspect(head, label: "new_head")
+IO.inspect(tail, label: "new_tail")
 IO.inspect([0 | tail], label: "list with new head")
 ```
 
