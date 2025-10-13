@@ -1,0 +1,13 @@
+export const frontmatter = { order: 4 };
+
+# Accessing List Elements
+
+Throughout the tutorial, we will talk a lot about the head and tail of a list. The head is the first element of a list and the tail is the remainder of the list. They can be retrieved with the functions `hd` and `tl`.
+
+<EditorCode>
+```elixir
+# Try changing the list to an empty list
+IO.inspect hd([1, 2, 3]), label: "Head of the list"
+IO.inspect tl([1, 2, 3]), label: "Tail of the list"
+```
+</EditorCode>

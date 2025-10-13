@@ -1,0 +1,13 @@
+export const frontmatter = { order: 6 };
+
+# Tuples in Elixir
+
+Elixir uses curly brackets to define tuples. Like lists, tuples can hold any value. Tuples store elements contiguously in memory which means accessing a tuple element by index or getting the tuple size is a fast operation.
+
+<EditorCode>
+```elixir
+IO.inspect {:ok, "hello"}, label: "Tuple example"
+IO.inspect elem({:ok, "hello"}, 1), label: "Second element of a tuple"
+IO.inspect tuple_size({:ok, "hello"}), label: "Size of the tuple"
+```
+</EditorCode>
