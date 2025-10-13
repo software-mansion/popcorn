@@ -27,6 +27,7 @@ export const PopcornProvider = ({
   const collectedStdout = useRef<string[]>([]);
   const collectedStderr = useRef<string[]>([]);
 
+  // TODO: use bounded buffer for collection to avoid memory issues
   const clearCollectedOutput = useCallback(() => {
     collectedStdout.current = [];
     collectedStderr.current = [];

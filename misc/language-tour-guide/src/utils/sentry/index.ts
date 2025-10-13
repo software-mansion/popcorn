@@ -47,6 +47,7 @@ export function wrapPopcornReloadIframe(
 ) {
   const originalReloadIframe = popcornInstance.__proto__._reloadIframe;
 
+  // TODO: not overwriting prototype method
   popcornInstance.__proto__._reloadIframe = function () {
     originalReloadIframe.call(this);
 

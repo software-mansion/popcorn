@@ -25,7 +25,7 @@ function isDeinitializedError(error: unknown): error is { error: Error } {
     typeof error === "object" &&
     error !== null &&
     "error" in error &&
-    error?.error instanceof Error
+    error.error instanceof Error
   );
 }
 
