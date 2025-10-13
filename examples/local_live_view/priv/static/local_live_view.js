@@ -1,10 +1,12 @@
-import { Popcorn } from "../wasm/popcorn.js";
+import { Popcorn } from "./wasm/popcorn.js";
 
 async function setup() {
   const popcorn = await Popcorn.init({
-    debug: true
+    debug: true,
+    bundlePath: "../local_live_view/wasm/bundle.avm",
+    wasmDir: "./local_live_view/wasm/"
   })
-
+  
   var afterRenderBind = async (event) => {
     var view = event.detail.view
     var view_element = find_element(event.detail.view)

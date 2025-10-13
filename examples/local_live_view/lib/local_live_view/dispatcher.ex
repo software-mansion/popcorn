@@ -61,15 +61,10 @@ defmodule LocalLiveView.Dispatcher do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
 
       receive do
-        {^ref, {:ok, reply}} ->
-          reply
-          |> Diff.to_iodata()
-          |> diff_iodata_to_binary()
-          |> LocalLiveView.JS.rerender(view)
-
+        {^ref, {:ok, _reply}} ->
           {view, pid}
 
-        {^ref, {:error, reply}} ->
+        {^ref, {:error, _reply}} ->
           nil
       end
     end
