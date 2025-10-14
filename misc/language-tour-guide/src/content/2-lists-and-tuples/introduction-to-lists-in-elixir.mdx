@@ -2,12 +2,14 @@ export const frontmatter = { order: 1 };
 
 # Introduction to Lists in Elixir
 
-In this chapter we will learn two of the most used collection data-types in Elixir: lists and tuples. Let's start with lists. Elixir uses square brackets to specify a list of values. Values can be of any type.
+In this chapter we will learn two of the most used collection data-types in Elixir: lists and tuples. Let's start with lists.
+
+Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list.
 
 <EditorCode>
 ```elixir
-# Try changing '3' to 'true'
-IO.inspect [1, 2, 3, 4], label: "List of integers"
+# Try nesting another list within the list
+IO.inspect [1, true, 3, "hello"], label: "List of various elements"
 
 IO.inspect length([1, 2, 3]), label: "Length of the list"
 ```
