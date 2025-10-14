@@ -5,7 +5,9 @@ export function initSentry() {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     sendDefaultPii: true,
-    environment: import.meta.env.MODE
+    environment: import.meta.env.MODE,
+    integrations: (integrations) =>
+      integrations.filter((integration) => integration.name !== "Dedupe")
   });
 }
 
