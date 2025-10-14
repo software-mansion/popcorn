@@ -6,4 +6,3 @@ config :popcorn,
 
 config :local_live_view,
   out_dir: "../static/local_live_view"
-  

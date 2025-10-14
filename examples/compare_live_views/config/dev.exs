@@ -43,7 +43,7 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
 # different ports.
 
 # Watch static and templates for browser reloading.
-#config :compare_live_views, CompareLiveViewsWeb.Endpoint,
+# config :compare_live_views, CompareLiveViewsWeb.Endpoint,
 #  live_reload: [
 #    web_console_logger: true,
 #    patterns: [

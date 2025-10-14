@@ -29,7 +29,7 @@ defmodule CompareLiveViewsWeb.Endpoint do
       {"Cross-Origin-Opener-Policy", "same-origin"},
       {"Cross-Origin-Embedder-Policy", "require-corp"}
     ]
-       
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
@@ -53,10 +53,11 @@ defmodule CompareLiveViewsWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+
   plug CompareLiveViewsWeb.Router,
-       headers: [
-         {"Access-Control-Allow-Origin", "*"},
-         {"Cross-Origin-Opener-Policy", "same-origin"},
-         {"Cross-Origin-Embedder-Policy", "require-corp"}
-       ]
+    headers: [
+      {"Access-Control-Allow-Origin", "*"},
+      {"Cross-Origin-Opener-Policy", "same-origin"},
+      {"Cross-Origin-Embedder-Policy", "require-corp"}
+    ]
 end

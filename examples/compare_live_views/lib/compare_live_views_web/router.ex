@@ -15,7 +15,7 @@ defmodule CompareLiveViewsWeb.Router do
     plug :accepts, ["json"]
     plug :add_headers
   end
-  
+
   def add_headers(conn, _opts) do
     Plug.Conn.merge_resp_headers(
       conn,
@@ -26,7 +26,7 @@ defmodule CompareLiveViewsWeb.Router do
       ]
     )
   end
-  
+
   scope "/", CompareLiveViewsWeb do
     pipe_through :browser
     get "/", PageController, :home

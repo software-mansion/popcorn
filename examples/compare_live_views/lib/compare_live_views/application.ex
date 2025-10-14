@@ -9,7 +9,8 @@ defmodule CompareLiveViews.Application do
   def start(_type, _args) do
     children = [
       CompareLiveViewsWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:compare_live_views, :dns_cluster_query) || :ignore},
+      {DNSCluster,
+       query: Application.get_env(:compare_live_views, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: CompareLiveViews.PubSub},
       # Start a worker by calling: CompareLiveViews.Worker.start_link(arg)
       # {CompareLiveViews.Worker, arg},

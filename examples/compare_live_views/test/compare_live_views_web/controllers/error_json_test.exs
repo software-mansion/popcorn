@@ -2,7 +2,9 @@ defmodule CompareLiveViewsWeb.ErrorJSONTest do
   use CompareLiveViewsWeb.ConnCase, async: true
 
   test "renders 404" do
-    assert CompareLiveViewsWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
+    assert CompareLiveViewsWeb.ErrorJSON.render("404.json", %{}) == %{
+             errors: %{detail: "Not Found"}
+           }
   end
 
   test "renders 500" do

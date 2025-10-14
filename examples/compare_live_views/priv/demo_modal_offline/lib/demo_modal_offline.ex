@@ -23,5 +23,4 @@ defmodule DemoModalOffline do
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, show_modal: false)}
   end
-  
 end
