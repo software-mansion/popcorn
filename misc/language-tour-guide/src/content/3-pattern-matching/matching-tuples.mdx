@@ -1,4 +1,4 @@
-export const frontmatter = { order: 21 };
+export const frontmatter = { order: 2 };
 
 # Matching Tuples
 
@@ -12,19 +12,17 @@ You can also use atoms in the pattern to match on such results.
 <EditorCode>
 
 ```elixir
-{x, y, z} = {:hello, "world", 42}
+{a, b} = {:hello, "world"}
+IO.inspect(a, label: "a")
+IO.inspect(b, label: "b")
+
+# Modify the pattern on the left to fix the error
+{x, y} = {:hello, "world", 42}
 IO.inspect(x, label: "x")
 IO.inspect(y, label: "y")
 IO.inspect(z, label: "z")
 
-# Uncomment to see the match error
-# {a, b} = {:hello, "world", 42}
-
-{a, b, c} = {:hello, "world", 42}
-IO.inspect(a, label: "a")
-IO.inspect(b, label: "b")
-IO.inspect(c, label: "c")
-
+# Find out what happens if you replace `:answer` with different atom
 {:ok, answer} = Map.fetch(%{answer: 42}, :answer)
 IO.inspect(answer, label: "answer")
 ```
