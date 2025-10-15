@@ -1,4 +1,4 @@
-export const frontmatter = {order: 14}
+export const frontmatter = { order: 3 };
 
 # Nil and Truthiness
 
@@ -8,7 +8,10 @@ Only `nil` and `false` are considered falsy. Everything else is truthy, includin
 
 The `||`, `&&`, and `!` operators work with truthy/falsy values.
 
-export const defaultCode = `# nil is falsy
+<EditorCode>
+
+```elixir
+# nil is falsy
 result = nil || "default"
 IO.puts("nil || 'default' = #{result}")
 
@@ -35,4 +38,7 @@ defmodule NilChecker do
 end
 
 IO.puts(NilChecker.check(nil))
-IO.puts(NilChecker.check(0))`
+IO.puts(NilChecker.check(0))
+```
+
+</EditorCode>

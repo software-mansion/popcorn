@@ -1,29 +1,30 @@
-export const frontmatter = {order: 9}
+export const frontmatter = { order: 1 };
 
 # Variables and Immutability
 
-In Elixir, all data is immutable. Variables are bound to values, not containers that can be mutated.
+Similarily to many other languages, you may define a new variable
+by assigning a value to an identifier using `=` sign.
 
-When you "change" a variable, you're actually rebinding it to a new value.
+In Elixir, all data is immutable.
+However, you may re-assign the variable name to a different value,
+even of a different type.
 
-Variables follow snake_case convention and must start with a lowercase letter or underscore.
+Variables must start with a lowercase letter or an underscore.
+By convention, the variable names are written in `snake_case`.
+Leading underscore has a special meaning, but we'll get back to that later.
 
-export const defaultCode = `# Binding a variable
-x = 42
-IO.puts("x is #{x}")
+<EditorCode>
 
-# Rebinding creates a new value
+```elixir
+x = "value"
+IO.inspect(x, label: "x")
 
-x = x + 1
-IO.puts("x is now #{x}")
+y = x
+IO.inspect(y, label: "y")
 
-# Pattern matching with variables
+x = :ok
+IO.inspect(x, label: "new x")
+IO.inspect(y, label: "y again")
+```
 
-{status, message} = {:ok, "Success!"}
-IO.puts("Status: #{status}, Message: #{message}")
-
-# The pin operator ^ matches existing values
-
-y = 10
-{^y, z} = {10, 20}
-IO.puts("z is #{z}")`
+</EditorCode>
