@@ -1,0 +1,30 @@
+export const frontmatter = { order: 10 };
+
+# Variables and Immutability
+
+Similarily to many other languages, you may define a new variable
+by assigning a value to an identifier using `=` sign.
+
+In Elixir, all data is immutable.
+However, you may re-assign the variable name to a different value,
+even of a different type.
+
+Variables must start with a lowercase letter or an underscore.
+By convention, the variable names are written in `snake_case`.
+Leading underscore has a special meaning, but we'll get back to that later.
+
+<EditorCode>
+
+```elixir
+x = "value"
+IO.inspect(x, label: "x")
+
+y = x
+IO.inspect(y, label: "y")
+
+x = :ok
+IO.inspect(x, label: "new x")
+IO.inspect(y, label: "y again")
+```
+
+</EditorCode>
