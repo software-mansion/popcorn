@@ -1,0 +1,25 @@
+export const frontmatter = { order: 3 };
+
+# Numbers
+
+As you can see, numbers in Elixir are either integers or floats. You can use `is_integer`, `is_float` and `is_number` to check what a value is.
+
+Elixir allows expressing numbers in decimal, binary, octal, hexadecimal and exponential notation.
+
+Normally, integers can be arbitrairly big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
+
+<EditorCode>
+```elixir
+# Try changing 'is_integer' to 'is_float' or 'is_number' and vice versa
+IO.inspect is_integer(123), label: "is 123 an integer?"
+IO.inspect is_float(4.5), label: "is 4.5 a float?"
+IO.inspect is_number("hello"), label: "is a string an integer?"
+
+IO.inspect 123, label: "decimal notation"
+IO.inspect 0b1010, label: "binary notation"
+IO.inspect 0o777, label: "octal notation"
+IO.inspect 0x1F, label: "hexadecimal notation"
+IO.inspect 1.0, label: "decimal notation"
+IO.inspect 1.0e-10, label: "exponential notation"
+```
+</EditorCode>

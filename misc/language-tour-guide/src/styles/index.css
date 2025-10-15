@@ -47,6 +47,10 @@
   --color-brown-60: #696057;
   --color-brown-gray: #696057;
   --color-black: #301b05;
+  --color-red-50: #fff5f5;
+  --color-red-200: #fbbcbc;
+  --color-red-600: #cf3f3f;
+  --color-red-700: #b52e2e;
   --font-handjet: "Handjet Variable", system-ui;
   --font-inter: "Inter Variable", sans-serif;
 }

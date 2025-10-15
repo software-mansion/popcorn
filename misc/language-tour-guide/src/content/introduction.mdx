@@ -27,8 +27,21 @@ Click "Run code" to see them in action!
 After executing the code, below the editor you'll see execution time, what was printed to the standard output
 and a result of the execution, which is the value returned from the last expression.
 
-export const defaultCode = `IO.puts("Hello, Elixir!")
-IO.inspect(1 + 2)`;
+<EditorCode>
+```elixir
+# A line that starts with # is a comment
+# We'll use comments for short explanations and small excercises
+
+IO.puts("Hello, Elixir!")
+IO.inspect(1 + 2)
+
+# You can specify a 'label' to include additional info:
+IO.inspect(1 + 2, label: "Added 1 to 2")
+
+# You can also omit braces:
+IO.inspect 1 + 2, label: "Added 1 to 2"
+```
+</EditorCode>
 
 ## It runs in your browser! 🍿
 
