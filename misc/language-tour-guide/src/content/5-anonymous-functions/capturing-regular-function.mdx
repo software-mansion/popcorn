@@ -1,0 +1,21 @@
+export const frontmatter = { order: 5 };
+
+# Capturing regular function
+
+Sometimes we may want to convert a regular function to an anonymous one, for example to pass it as an argument.
+
+We could write it as `&function(&1, &2, ...)`, but there's a shorthand for that: `&function/arity`.
+
+<EditorCode>
+```elixir
+# Try also &String.contains?/2
+string_split = &String.split/2
+
+IO.inspect string_split, label: "Inspecting stream_split shows what it captured"
+
+IO.inspect is_function(string_split), label: "Is string_split a function?"
+
+IO.inspect string_split.("hello world", " "), label: "Call to string_split returns"
+```
+</EditorCode>
+
