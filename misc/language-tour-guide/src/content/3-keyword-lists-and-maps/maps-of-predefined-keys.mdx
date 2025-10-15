@@ -1,0 +1,19 @@
+export const frontmatter = { order: 6 };
+
+# Maps of predefined keys
+
+In the previous section, we have used maps as a key-value data structure where keys can be added or removed at any time.
+
+However, it is also common to create maps with a predefined set of keys. Their values may be updated, but new keys are never added nor removed.
+
+This is useful when we know the shape of the data we are working with and, if we get a different key, it likely means a mistake was done elsewhere.
+
+In such cases, the keys are most often atoms. Thus, there's a syntax sugar for that: `%{key1: value1, key2: value2}`.
+
+<EditorCode>
+```elixir
+IO.inspect %{:name => "John", :age => 23}, label: "A map representing a user"
+
+IO.inspect %{name: "John", age: 23}, label: "The same user"
+```
+</EditorCode>

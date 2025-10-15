@@ -1,0 +1,29 @@
+export const frontmatter = { order: 3 };
+
+# Keyword lists
+
+Keyword lists are commonly used to pass options to functions.
+
+Let's take `String.split` as an example. It takes two arguments: the string to be split, and the pattern to split on.
+
+But it can also take the third argument: a keyword list, with two possible keys:
+- `:parts` - the string is split into at most as many parts as this option specifies
+- `:trim` - boolean, if true, empty strings are removed from the resulting list.
+
+Check the example to see how it works!
+
+<EditorCode>
+```elixir
+IO.inspect String.split("1 2 3 4", " "), label: "Split the string of numbers on space"
+
+# Let's add some more spaces between 1 and 2. What's the result?
+IO.inspect String.split("1 2 3 4", " ", [parts: 3]), label: "Split the string on space, at most 3 times"
+
+# Let's add some more spaces between 1 and 2. What's the result?
+# Try changing the order of parts: 3 and trim: true. Try removing any of them.
+IO.inspect String.split("1 2 3 4", " ", [parts: 3, trim: true]), label: "Split the string on space, at most 3 times, and trim the result"
+
+# If the keyword list is passed as the last argument, you can omit braces:
+IO.inspect String.split("1 2 3 4", " ", parts: 3, trim: true), label: "Split the string on space, at most 3 times, and trim the result"
+```
+</EditorCode>

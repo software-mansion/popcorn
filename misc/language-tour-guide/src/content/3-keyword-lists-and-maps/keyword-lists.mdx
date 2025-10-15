@@ -1,0 +1,27 @@
+export const frontmatter = { order: 2 };
+
+# Keyword lists
+
+You can operate on keyword lists just like on regular lists.
+
+Additionally, `Keyword` module contains functions specific to keyword lists.
+
+<EditorCode>
+```elixir
+IO.inspect [a: 1, b: 2] ++ [c: 3, d: 4], label: "Concatenating two keyword lists"
+
+IO.inspect Keyword.keyword?([a: 1, b: 2]), label: "Is [a: 1, b: 2] a keyword list?"
+
+# Try changing :a to "a". Is it still a keyword list?
+IO.inspect Keyword.keyword?([{:a, 1}, {:b, 2}]), label: "Is [{:a, 1}, {:b, 2}] a keyword list?"
+
+# Let's change Keyword.get to Keyword.delete
+IO.inspect Keyword.get([a: 1, b: 2], :a), label: "Value under the key :a is"
+
+# To get a value from a keyword list, you can also use keyword[key] syntax
+keyword = [a: 1, b: 2]
+IO.inspect keyword[:a], label: "Value under the key :a is"
+
+IO.inspect Keyword.put([a: 1, b: 2], :c, 3), label: "Keyword list with a new key-value pair"
+```
+</EditorCode>
