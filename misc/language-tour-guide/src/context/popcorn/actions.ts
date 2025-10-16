@@ -3,7 +3,8 @@ import type { AnySerializable, CallOptions, CastOptions } from ".";
 import { usePopcornContext } from "../hooks";
 
 export const usePopcorn = () => {
-  const { instance, reinitializePopcorn } = usePopcornContext();
+  const { instance, reinitializePopcorn, clearCollectedOutput } =
+    usePopcornContext();
 
   const ensureInstance = useCallback(() => {
     if (!instance) throw new Error("Popcorn instance not initialized");
@@ -27,6 +28,7 @@ export const usePopcorn = () => {
   return {
     call,
     cast,
-    reinitializePopcorn
+    reinitializePopcorn,
+    clearCollectedOutput
   };
 };
