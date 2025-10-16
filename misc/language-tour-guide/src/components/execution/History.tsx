@@ -4,6 +4,7 @@ import ChevronDownIcon from "../../assets/chevron-down.svg?react";
 import ChevronUpIcon from "../../assets/chevron-right.svg?react";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 import StdoutResults from "./StdoutResults";
+import { ErrorMessage } from "./ErrorMessage";
 
 function formatTimeStamp(date: Date): string {
   return date.toLocaleTimeString([], {
@@ -79,6 +80,9 @@ export function History() {
                       {formatDuration(entry.durationMs)}
                     </span>
                   </div>
+                  {entry.errorMessage && (
+                    <ErrorMessage errorData={entry.errorMessage} />
+                  )}
                   <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
                     <div className="mb-1">
                       <span className="text-grey-70 text-xs font-medium">

@@ -5,6 +5,7 @@ export type HistoryEntry = {
   result?: string;
   durationMs?: number;
   stdoutResult?: string[];
+  errorMessage?: string;
 };
 
 type ExecutionHistoryStore = {
