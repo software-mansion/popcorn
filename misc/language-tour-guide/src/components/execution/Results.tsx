@@ -195,7 +195,7 @@ export function Results() {
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
 
-            {errorData && <ErrorMessage errorData={errorData} />}
+            {errorData && <ErrorMessage message={errorData} />}
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}

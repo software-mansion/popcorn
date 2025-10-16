@@ -81,7 +81,7 @@ export function History() {
                     </span>
                   </div>
                   {entry.errorMessage && (
-                    <ErrorMessage errorData={entry.errorMessage} />
+                    <ErrorMessage message={entry.errorMessage} />
                   )}
                   <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
                     <div className="mb-1">
