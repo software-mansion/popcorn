@@ -1,10 +1,10 @@
 import XCircleIcon from "../../assets/x-circle.svg?react";
 
 type ErrorMessageProps = {
-  errorData: string;
+  message: string;
 };
 
-export function ErrorMessage({ errorData }: ErrorMessageProps) {
+export function ErrorMessage({ message }: ErrorMessageProps) {
   return (
     <div className="my-2 flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3">
       <div className="flex items-center gap-2">
@@ -12,7 +12,7 @@ export function ErrorMessage({ errorData }: ErrorMessageProps) {
         <p className="text-sm font-medium text-red-700">Error</p>
       </div>
       <pre className="mt-1 text-xs break-words whitespace-pre-wrap text-red-600">
-        {errorData}
+        {message}
       </pre>
     </div>
   );
