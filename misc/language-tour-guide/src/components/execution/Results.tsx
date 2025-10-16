@@ -8,7 +8,7 @@ import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
 import StdoutResults from "./StdoutResults";
 import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
-import XCircleIcon from "../../assets/x-circle.svg?react";
+import { ErrorMessage } from "./ErrorMessage";
 import { captureCodeException } from "../../utils/sentry";
 
 interface PopcornError {
@@ -98,6 +98,13 @@ export function Results() {
 
             setErrorData(error.error);
             setDurationMs(error.durationMs || null);
+
+            addHistoryEntry({
+              timestamp: new Date(),
+              stdoutResult: stdoutRef.current,
+              durationMs: error.durationMs,
+              errorMessage: error.error
+            });
           } else {
             setErrorData("Unknown error");
           }
@@ -188,17 +195,7 @@ export function Results() {
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
 
-            {errorData && (
-              <div className="my-2 flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3">
-                <div className="flex items-center gap-2">
-                  <XCircleIcon className="h-4 w-4 text-red-700" />
-                  <p className="text-sm font-medium text-red-700">Error</p>
-                </div>
-                <pre className="mt-1 text-xs break-words whitespace-pre-wrap text-red-600">
-                  {errorData}
-                </pre>
-              </div>
-            )}
+            {errorData && <ErrorMessage errorData={errorData} />}
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
