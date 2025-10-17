@@ -1,0 +1,19 @@
+export const frontmatter = { order: 3 };
+
+# Self
+
+All Elixir code runs in processes.
+
+The code evaluator we use to run examples also spawns a process. We can tell that by calling `self`, which returns the PID of the current process.
+
+<EditorCode>
+```elixir
+IO.inspect self(), label: "This code runs in a process and its PID is"
+
+spawn(fn ->
+  IO.inspect self(), label: "This code runs in another process"
+end)
+
+# Let's run this code a few times. How do the PIDs change?
+```
+</EditorCode>
