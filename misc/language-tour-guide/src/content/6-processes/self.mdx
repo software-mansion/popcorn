@@ -9,7 +9,9 @@ The code evaluator we use to run examples also spawns a process. We can tell tha
 <EditorCode>
 ```elixir
 pid = self()
+
 IO.inspect pid, label: "This code runs in a process and its PID is"
+
 IO.inspect Process.alive?(pid), label: "Is code runner alive?"
 
 spawn(fn ->
