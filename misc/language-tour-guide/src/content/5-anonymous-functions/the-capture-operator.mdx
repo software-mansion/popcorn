@@ -1,0 +1,21 @@
+export const frontmatter = { order: 5 };
+
+# The capture operator
+
+For creating short, simple functions, we can also use the capture operator `&`.
+
+Then, we can use `&1`, `&2`, `&3` etc to refer to the first, second, third argument etc - see the example.
+
+<EditorCode>
+```elixir
+# This is equivalent to fn a, b -> a + b end
+add = & &1 + &2
+
+IO.inspect add.(2, 3), label: "Call to add returns"
+
+split_by_comma = &String.split(&1, ",")
+
+IO.inspect split_by_comma.("1,2,3"),
+  label: "Call to split_by_comma returns"
+```
+</EditorCode>

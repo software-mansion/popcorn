@@ -1,0 +1,20 @@
+export const frontmatter = { order: 4 };
+
+# Clauses and guards
+
+Similar to `case/2`, we can pattern match on the arguments of anonymous functions as well as define multiple clauses and guards - see the example.
+
+The number of arguments in each anonymous function clause needs to be the same, otherwise an error is raised.
+
+<EditorCode>
+```elixir
+# Try adding another clause with three arguments: x, y and z
+f = fn
+  x, y when x > 0 -> x + y
+  a, b -> a * b
+end
+
+# Let's change 1 to -1
+IO.inspect f.(1, 3), label: "Call to f returns"
+```
+</EditorCode>

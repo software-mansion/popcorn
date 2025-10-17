@@ -1,0 +1,29 @@
+export const frontmatter = { order: 1 };
+
+# Anonymous functions
+
+Anonymous functions allow us to store and pass executable code around as if it was an integer or a string.
+
+To define an anonymous function, you can use `fn arguments -> body end` syntax, where 'arguments' are comma-separated and 'body' is regular Elixir code.
+
+Such function can be assigned to a variable, passed as an argument to another function, etc.
+
+If an anonymous function is assigned to a variable `f`, we can invoke it with `f.(arguments)`. Notice the dot before the opening bracket - it's to differenciate calling an anonymous function from a regular one.
+
+The reason for that distinction is to avoid ambiguity and reduce mental overhead when reading a code. For example, when you see a call to `is_atom(:foo)`, you can be sure that `Kernel.is_atom` is called, not an anonymous function assigned to `is_atom` variable.
+
+<EditorCode>
+```elixir
+add = fn a, b -> a + b end
+
+IO.inspect add, label: "A function adding two numbers"
+
+IO.inspect add.(2, 3), label: "Result of calling add with 2 and 3"
+
+IO.inspect is_function(add), label: "Is add a function?"
+
+# Try changing 2 to a different number
+IO.inspect is_function(add, 2),
+  label: "Is add a function accepting two arguments?"
+```
+</EditorCode>
