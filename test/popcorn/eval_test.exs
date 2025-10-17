@@ -733,7 +733,8 @@ defmodule Popcorn.EvalTest do
     result =
       quote do
         try do
-          raise "foo"
+          # Trigger FunctionClauseError
+          String.length(:foo)
         rescue
           e -> Exception.format(:error, e, __STACKTRACE__)
         end
@@ -741,6 +742,6 @@ defmodule Popcorn.EvalTest do
       |> Macro.to_string()
       |> AtomVM.eval(:elixir, run_dir: dir)
 
-    assert "** (RuntimeError) foo\n" <> _stacktrace = result
+    assert "** (FunctionClauseError)" <> _rest = result
   end
 end
