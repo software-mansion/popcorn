@@ -49,7 +49,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
           <NavLink
             to={item.path}
             className={({ isActive }) =>
-              `flex w-full items-center rounded-md px-3 py-0.5 text-sm transition-colors duration-300 ${
+              `navigation-link ${
                 isActive && isSelected(item)
                   ? "bg-color-orange-20 text-color-orange-100 bg-orange-100/10 font-semibold"
                   : "text-color-brown-80 hover:bg-orange-100/10"
