@@ -1,0 +1,21 @@
+export const frontmatter = { order: 8 };
+
+# Maps of predefined keys
+
+When key is an atom, there's dedicated syntax for accessing the map: `map.key` and updating it: `%{map | key: value}`.
+
+When a map has predefined, atom keys, it's best to use this syntax over `Map` module, because it raises when the key is not already there. Thus, if you accidentally use a wrong key, you get feedback early on, sometimes even in the compile time.
+
+This is also the syntax used to power another Elixir feature called "Structs", which we will learn later on.
+
+<EditorCode>
+```elixir
+user = %{name: "John", age: 23}
+
+# What happens if you try to get user's surname, which is not there?
+IO.inspect user.name, label: "User's name"
+
+# Try replacing age with a non-existent key
+IO.inspect %{user | age: 24}, label: "Happy birthday, John"
+```
+</EditorCode>

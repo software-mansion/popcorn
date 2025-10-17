@@ -1,0 +1,26 @@
+export const frontmatter = { order: 6 };
+
+# Maps
+
+The [`Map`](https://hexdocs.pm/elixir/Map.html) module provides a very similar API to the `Keyword` module with convenience functions to add, remove, and update maps keys:
+
+<EditorCode>
+```elixir
+map = %{:a => 1, 2 => :b}
+
+# Try changing Map.get to Map.delete
+IO.inspect Map.get(map, :a), label: "Get value from map"
+
+# To get a value from a map, you can also use map[key] syntax
+# Try changing :a to :x
+IO.inspect map[:a], label: "Get value from map"
+
+# Try changing "c" to 2, which is already in the map. What happens?
+IO.inspect Map.put(%{:a => 1, 2 => :b}, "c", 3),
+  label: "Map with a new key-value pair"
+
+# Let's change the map, so that Map.to_list returns a keyword list
+IO.inspect Map.to_list(%{:a => 1, 2 => :b}),
+  label: "Map converted to a list of tuples"
+```
+</EditorCode>

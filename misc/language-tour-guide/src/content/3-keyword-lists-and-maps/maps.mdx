@@ -1,0 +1,23 @@
+export const frontmatter = { order: 5 };
+
+# Maps
+
+Apart from keyword lists, Elixir allows storing key-value pairs in maps. A map is created using the `%{}` syntax.
+
+Compared to keyword lists, maps:
+- allow any value as a key
+- don't allow duplicate keys
+- aren't ordered - you shouldn't rely on their internal ordering
+- are faster to operate on, especially with big number of keys
+
+<EditorCode>
+```elixir
+IO.inspect %{}, label: "Empty map"
+
+IO.inspect %{1 => "a", :b => 10},
+  label: "Map with keys and values of different types"
+
+IO.inspect %{1 => "a", :b => 10} == %{:b => 10, 1 => "a"},
+  label: "In maps, order doesn't matter"
+```
+</EditorCode>
