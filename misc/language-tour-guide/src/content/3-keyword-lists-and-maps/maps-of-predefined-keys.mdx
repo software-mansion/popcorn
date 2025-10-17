@@ -1,4 +1,4 @@
-export const frontmatter = { order: 6 };
+export const frontmatter = { order: 7 };
 
 # Maps of predefined keys
 
@@ -12,7 +12,8 @@ In such cases, the keys are most often atoms. Thus, there's a syntax sugar for t
 
 <EditorCode>
 ```elixir
-IO.inspect %{:name => "John", :age => 23}, label: "A map representing a user"
+IO.inspect %{:name => "John", :age => 23},
+  label: "A map representing a user"
 
 IO.inspect %{name: "John", age: 23}, label: "The same user"
 ```

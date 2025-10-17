@@ -1,0 +1,34 @@
+export const frontmatter = { order: 4 };
+
+# Keyword lists
+
+Keyword lists are commonly used to pass options to functions.
+
+Actually, we're using them all the time with `IO.inspect`!
+
+The second argument of `IO.inspect` is actually a keyword list. We only pass the `label` key, but others are possible, such as `pretty`.
+
+It may be not obvious, because there are no square braces - we can omit them when a keyword list is the last argument of a function.
+
+Check the example to see how it works!
+
+<EditorCode>
+```elixir
+
+# Equivalents of IO.inspect :hello, label: "Print hello"
+IO.inspect("hello", [{:label, "Print hello"}])
+IO.inspect("hello", [label: "Print hello"])
+
+# Try removing the label, try changing order of keys
+# Try using 'printable_limit' key to limit printed characters
+IO.inspect [{1, 2, 3}, "hello world"],
+  label: "Print a list", pretty: true, width: 15
+
+# String.split can also accept a keyword list
+# Try removing square braces from [parts: 3]
+IO.inspect String.split("1 2 3 4", " "),
+    label: "Split the string of numbers on space"
+IO.inspect String.split("1 2 3 4", " ", [parts: 3]),
+    label: "Split the string on space, at most 3 times"
+```
+</EditorCode>

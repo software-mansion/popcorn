@@ -1,4 +1,4 @@
-export const frontmatter = { order: 4 };
+export const frontmatter = { order: 5 };
 
 # Maps
 
@@ -14,8 +14,10 @@ Compared to keyword lists, maps:
 ```elixir
 IO.inspect %{}, label: "Empty map"
 
-IO.inspect %{1 => "a", :b => 10}, label: "Map with keys and values of different types"
+IO.inspect %{1 => "a", :b => 10},
+  label: "Map with keys and values of different types"
 
-IO.inspect %{1 => "a", :b => 10} == %{:b => 10, 1 => "a"}, label: "In maps, order doesn't matter"
+IO.inspect %{1 => "a", :b => 10} == %{:b => 10, 1 => "a"},
+  label: "In maps, order doesn't matter"
 ```
 </EditorCode>
