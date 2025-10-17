@@ -1,0 +1,15 @@
+export const frontmatter = { order: 4 };
+
+# Errors in guards
+
+Errors in guards do not leak but simply make the guard fail. It makes the code simpler, as some checks can be skipped - in the example, we don't have to check if `x` is a number. However, you won't be notified about a guard failure - it just won't match.
+
+<EditorCode>
+```elixir
+# Try calling "a" + 1 outside of the guard
+case "a" do
+  x when x + 1 == 3 -> IO.puts "Won't match"
+  x -> IO.puts "Got #{x}"
+end
+```
+</EditorCode>

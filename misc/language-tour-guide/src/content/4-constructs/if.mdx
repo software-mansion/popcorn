@@ -1,58 +1,29 @@
-export const frontmatter = {order: 1}
+export const frontmatter = { order: 5 };
 
-# If - Simple Conditionals
+# if
 
-## Theory
+`case` builds on pattern matching and guards to destructure and match on certain conditions.
 
-`if` is Elixir's simplest conditional constructs. They evaluate a condition and return a value based on truthiness.
+However, patterns and guards are limited only to certain expressions which are optimized by the compiler. In many situations, you need to write conditions that go beyond what can be expressed with `case`. For those, `if` is a useful alternative.
 
-**Key concepts:**
-- **Truthy/Falsy**: Only `nil` and `false` are falsy, everything else is truthy
-- **Expressions**: Everything returns a value
-- **No statements**: No imperative if statements, only expressions
+`if` accepts an expression, then a `do` block, and optionally an `else` block. If the expression evaluates to a truthy value (anything except `false` and `nil`), then the `do` block is evaluated. Otherwise - the `else` block, if present.
 
-**When to use:**
-- Simple boolean checks
-- Guard clauses
-- Default values with `||`
-- Avoid for complex conditions (use `case` or `cond`)
+<EditorCode>
+```elixir
+# Try changing true to IO.puts("hello")
+if true do
+  IO.puts "This works!"
+end
 
-export const defaultCode = `# Basic if/else
-age = 18
+# Try changing false to nil
+if false do
+  IO.puts "This will never be seen"
+end
 
-result =
-  if age >= 18 do
-    "Adult"
-  else
-    "Minor"
-  end
-
-IO.puts(result)
-
-# If without else returns nil
-greeting =
-  if false do
-    "Hello"
-  end
-
-IO.inspect(greeting, label: "No else clause")
-
-# One-liner syntax
-status = if age >= 18, do: "Can vote", else: "Too young"
-IO.puts(status)
-
-# Truthy and falsy values
-# Only nil and false are falsy
-if nil, do: IO.puts("Won't print")
-if false, do: IO.puts("Won't print")
-if 0, do: IO.puts("Zero is truthy!")
-if "", do: IO.puts("Empty string is truthy!")
-if [], do: IO.puts("Empty list is truthy!")
-
-# Common pattern: default values
-name = nil
-display_name = if name, do: name, else: "Anonymous"
-# Better written as:
-display_name = name || "Anonymous"
-IO.puts(display_name)
-`
+if 4 > 5 do
+  IO.puts "This won't be seen"
+else
+  IO.puts "This will"
+end
+```
+</EditorCode>

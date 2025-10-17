@@ -1,0 +1,26 @@
+export const frontmatter = { order: 6 };
+
+# Variable scoping
+
+This is a good opportunity to talk about variable scoping in Elixir. If any variable is declared or changed inside `if`, `case`, and similar constructs, the declaration and change will only be visible inside the construct.
+
+In said cases, if you want to change a value, you must return the value from the `if`.
+
+<EditorCode>
+```elixir
+x = 1
+if true do
+  x = x + 1
+end
+
+IO.inspect x, label: "x remains unchanged"
+
+x = if true do
+  x + 1
+else
+  x
+end
+
+IO.inspect x, label: "x is reassigned to"
+```
+</EditorCode>

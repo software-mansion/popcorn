@@ -1,0 +1,19 @@
+export const frontmatter = { order: 8 };
+
+# cond
+
+If all of the conditions in `cond` return `nil` or `false`, an error (`CondClauseError`) is raised. For this reason, it may be necessary to add a final condition, equal to `true`, which will always match.
+
+<EditorCode>
+```elixir
+# Try removing the last condition (true -> ...). What happens?
+cond do
+  2 + 2 == 5 ->
+    IO.puts "This is never true"
+  2 * 2 == 3 ->
+   IO.puts "Nor this"
+  true ->
+    IO.puts "This is always true (equivalent to else)"
+end
+```
+</EditorCode>

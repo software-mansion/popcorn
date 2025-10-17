@@ -1,79 +1,26 @@
-export const frontmatter = {order: 2}
+export const frontmatter = { order: 1 };
 
-# Case - Pattern Matching Control Flow
+# case
 
-## Theory
+In this chapter, we will learn about the `case`, `if`, and `cond` control flow structures. Let's start with `case`.
 
-`case` is pattern matching in action - it compares a value against multiple patterns until one matches. It's one of Elixir's most powerful control structures.
+`case` allows you to compare a value against many patterns until there is a matching one. You can use `_` as the last, catch-all pattern, that would match any value. Without it, if no pattern matches, an error is raised.
 
-**Key features:**
-- **Pattern matching**: Each clause is a pattern
-- **Guards**: Additional conditions with `when`
-- **Variable binding**: Patterns can bind variables
-- **Exhaustive**: Should handle all cases (use `_` for catch-all)
-
-**When to use:**
-- Multiple patterns to match
-- Destructuring data while branching
-- Replacing switch/case from other languages
-- Complex conditional logic with pattern matching
-
-export const defaultCode = `# Basic case statement
-value = {:ok, "Success!"}
-
-result =
-  case value do
-    {:ok, msg} -> "It worked: #{msg}"
-    {:error, reason} -> "Failed: #{reason}"
-    _ -> "Unknown response"
-  end
-
-IO.puts(result)
-
-# Pattern matching with variable binding
-user_role = {:admin, "Alice"}
-
-case user_role do
-  {:admin, name} ->
-    IO.puts("Admin user: #{name}")
-
-  {:user, name} ->
-    IO.puts("Regular user: #{name}")
-
-  {:guest, _} ->
-    IO.puts("Guest user")
-
-  nil ->
-    IO.puts("No user")
+<EditorCode>
+```elixir
+# Try changing {1, 2, 3} to other values and see what matches!
+case {1, 2, 3} do
+  {4, 5, 6} ->
+    IO.puts "This clause won't match"
+  {1, x, 3} ->
+    IO.puts "This clause will match and bind x to #{x} in this clause"
+  _ ->
+    IO.puts "This clause would match any value"
 end
 
-# Using guards
-number = 15
-
-case number do
-  n when n < 0 -> IO.puts("Negative")
-  0 -> IO.puts("Zero")
-  n when n > 0 and n <= 10 -> IO.puts("Small positive")
-  n when n > 10 -> IO.puts("Large positive")
+# Let's change :ok to :error. What happens?
+case :ok do
+  :ok -> IO.puts "ok!"
 end
-
-# Pattern matching lists
-list = [1, 2, 3]
-
-case list do
-  [] -> "Empty list"
-  [single] -> "One element: #{single}"
-  [first, second] -> "Two elements: #{first}, #{second}"
-  [head | tail] -> "Head: #{head}, Tail length: #{length(tail)}"
-end
-|> IO.puts()
-
-# Pin operator in case
-expected = 42
-value = 42
-
-case value do
-  ^expected -> IO.puts("Matches pinned value!")
-  other -> IO.puts("Got #{other}, expected #{expected}")
-end
-`
+```
+</EditorCode>
