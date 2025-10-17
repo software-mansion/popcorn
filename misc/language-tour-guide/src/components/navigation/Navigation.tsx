@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "react-router";
+import { NavLink, useLocation } from "react-router";
 
 import { NavigationItem } from "./NavigationItem";
 import { useNavigation } from "../../utils/hooks/useNavigation";
@@ -57,7 +57,17 @@ export function Navigation() {
         {navigation.map((item) => (
           <NavigationItem key={item.path} item={item} onClick={closeMenu} />
         ))}
+        <li className="mt-8">
+          <NavLink
+            to="https://popcorn.swmansion.com/privacy-policy.html"
+            className="navigation-link underline"
+            target="_blank"
+          >
+            Privacy Policy
+          </NavLink>
+        </li>
       </ul>
+
       <div
         className={`fixed inset-0 z-20 h-full w-full bg-black/20 transition-opacity duration-300 ease-in-out ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"

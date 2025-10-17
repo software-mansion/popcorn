@@ -79,3 +79,9 @@ pre code.hljs {
     @apply shadow-[0_4px_12px_rgba(239,124,0,0.3)] hover:shadow-[0_6px_20px_rgba(239,124,0,0.4)];
   }
 }
+
+@layer components {
+  .navigation-link {
+    @apply flex w-full items-center rounded-md px-3 py-0.5 text-sm transition-colors duration-300;
+  }
+}
