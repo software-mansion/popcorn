@@ -11,8 +11,7 @@ import { remarkCollectCode } from "./src/plugins/remarkCollectCode";
 
 // https://vite.dev/config/
 export default defineConfig({
-  // TODO: pass this by build args
-  base: "/language_tour_guide",
+  base: "/",
   plugins: [
     react(),
     tailwindcss(),
