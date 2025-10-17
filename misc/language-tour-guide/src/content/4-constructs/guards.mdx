@@ -1,0 +1,23 @@
+export const frontmatter = { order: 3 };
+
+# Guards
+
+Case also allows extra conditions to be specified via guards.
+
+Guards are expressions that can be added to a pattern using the `when` keyword. In the example code, the first clause will only match when `x` is positive.
+
+Not any code can be put as a guard - you can perform arithmetic expressions, comparisons, type checking (`is_integer`, `is_atom` etc) and call several other functions. They are all listed in the documentation for the [Kernel](https://hexdocs.pm/elixir/Kernel.html) module, in the `Guards` section of sidebar. You can also consult the complete [Patterns and Guards reference](https://hexdocs.pm/elixir/patterns-and-guards.html#guards) for in-depth documentation.
+
+
+<EditorCode>
+```elixir
+# Try changing {1, 2, 3} to {1, -2, 3}
+case {1, 2, 3} do
+  {1, x, 3} when x > 0 ->
+    IO.puts "Will match"
+
+  _ ->
+    IO.puts "Would match, if guard condition were not satisfied"
+end
+```
+</EditorCode>

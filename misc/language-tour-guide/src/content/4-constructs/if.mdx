@@ -1,0 +1,29 @@
+export const frontmatter = { order: 5 };
+
+# if
+
+`case` builds on pattern matching and guards to destructure and match on certain conditions.
+
+However, patterns and guards are limited only to certain expressions which are optimized by the compiler. In many situations, you need to write conditions that go beyond what can be expressed with `case`. For those, `if` is a useful alternative.
+
+`if` accepts an expression, then a `do` block, and optionally an `else` block. If the expression evaluates to a truthy value (anything except `false` and `nil`), then the `do` block is evaluated. Otherwise - the `else` block, if present.
+
+<EditorCode>
+```elixir
+# Try changing true to IO.puts("hello")
+if true do
+  IO.puts "This works!"
+end
+
+# Try changing false to nil
+if false do
+  IO.puts "This will never be seen"
+end
+
+if 4 > 5 do
+  IO.puts "This won't be seen"
+else
+  IO.puts "This will"
+end
+```
+</EditorCode>

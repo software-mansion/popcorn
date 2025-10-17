@@ -1,0 +1,26 @@
+export const frontmatter = { order: 1 };
+
+# case
+
+In this chapter, we will learn about the `case`, `if`, and `cond` control flow structures. Let's start with `case`.
+
+`case` allows you to compare a value against many patterns until there is a matching one. You can use `_` as the last, catch-all pattern, that would match any value. Without it, if no pattern matches, an error is raised.
+
+<EditorCode>
+```elixir
+# Try changing {1, 2, 3} to other values and see what matches!
+case {1, 2, 3} do
+  {4, 5, 6} ->
+    IO.puts "This clause won't match"
+  {1, x, 3} ->
+    IO.puts "This clause will match and bind x to #{x} in this clause"
+  _ ->
+    IO.puts "This clause would match any value"
+end
+
+# Let's change :ok to :error. What happens?
+case :ok do
+  :ok -> IO.puts "ok!"
+end
+```
+</EditorCode>
