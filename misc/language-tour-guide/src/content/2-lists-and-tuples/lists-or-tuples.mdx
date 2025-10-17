@@ -1,0 +1,21 @@
+export const frontmatter = { order: 8 };
+
+# Lists or tuples?
+
+Due to their performance characteristics, lists are frequently used for storing dynamically growing, possibly large, collections.
+
+Tuples, on the other hand, are most useful for grouping a small, fixed number of values, for example to return them from a function.
+
+A common pattern is to use 'tagged tuples', which consist of an atom and a value, for example `{:ok, "result"}`.
+
+<EditorCode>
+```elixir
+# Let's add another word to "hello world"
+IO.inspect String.split("hello world", " "), label: "String.split returns a list"
+
+IO.inspect String.split_at("hello world", 3), label: "String.split_at returns a 2-element tuple"
+
+# Try changing the input so it contains an invalid character, such as 'z'
+IO.inspect Base.decode16("666F6F626172"), label: "Base.decode16 returns a tagged tuple"
+```
+</EditorCode>
