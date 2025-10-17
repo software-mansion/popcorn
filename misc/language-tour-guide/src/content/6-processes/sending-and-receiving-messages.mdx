@@ -1,0 +1,36 @@
+export const frontmatter = { order: 4 };
+
+# Sending and receiving messages
+
+Processes get much more interesting when we are able to send and receive messages.
+
+We can send messages to a process with `send` and receive them with `receive`.
+
+`send` accepts the PID of the target process and a message which can be any value.
+
+When a message is sent from a process A to a process B, it's enqueued in B's mailbox. Mailbox is a special queue that each process has.
+
+To pop a message from the mailbox, you can use `receive do ... end`.
+
+
+<EditorCode>
+```elixir
+# First, spawn the receiver and get it's PID
+receiver_pid = spawn(fn ->
+  receive do
+    message -> IO.inspect message, label: "Received a message"
+  end
+end)
+
+# Then, send a message to the receiver
+# Try spawning another process and sending a message from there
+send(receiver_pid, {:hello, "world"})
+
+# A process can send a message to itself
+send(self(), "message to self")
+
+receive do
+  message -> IO.inspect message, label: "Received a message from self"
+end
+```
+</EditorCode>

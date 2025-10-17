@@ -17,8 +17,15 @@ defmodule ElixirTour do
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, new_state}
+    state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(_msg, state) do
+    # Ignoring unknown message, as it may've been sent
+    # by the evaluated code
+    {:noreply, state}
   end
 
   defp handle_wasm({:wasm_call, ["eval_elixir", code]}, state) do

@@ -1,0 +1,22 @@
+export const frontmatter = { order: 2 };
+
+# Spawning processes
+
+The basic mechanism for spawning new processes is the auto-imported `spawn` function. 
+
+`spawn` takes a function which it will execute in another process, and returns a PID (process identifier), that can be used to interact and communicate with the process.
+
+After executing the function, the process exits immediately. We can check whether a process is alive with `Process.alive?` function.
+
+<EditorCode>
+```elixir
+pid = spawn(fn -> 1 + 2 end)
+
+IO.inspect pid, label: "Spawn returns a PID"
+
+# Since the process only performed addition, it's most likely dead at this point
+# Try replacing the function passed to spawn with 'fn -> Process.sleep(1000) end'.
+# Is the process alive?
+IO.inspect Process.alive?(pid), label: "Is the process alive?"
+```
+</EditorCode>
