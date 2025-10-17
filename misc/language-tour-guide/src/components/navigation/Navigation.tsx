@@ -6,6 +6,7 @@ import { useNavigation } from "../../utils/hooks/useNavigation";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
+import { FeedbackButton } from "./FeedbackButton";
 
 export function Navigation() {
   const location = useLocation();
@@ -38,6 +39,7 @@ export function Navigation() {
         <Hamburger className="h-full w-5.5 text-white" />
       </button>
       <span className="ml-5">{location.pathname}</span>
+      <FeedbackButton className="hidden lg:block" />
       <ul
         className={`scrollbar bg-light-20 fixed top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
           isOpen

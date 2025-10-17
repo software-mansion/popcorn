@@ -19,7 +19,7 @@ export function NavigationButton({
   const chapterLabel =
     direction === "next" ? "Next chapter" : "Previous chapter";
 
-  const className = `w-44 ${direction === "previous" ? "flex justify-end" : ""}`;
+  const className = `w-44 flex ${direction === "previous" ? "flex justify-end" : ""}`;
 
   if (!path) {
     return (
@@ -41,7 +41,9 @@ export function NavigationButton({
           className={`flex w-fit items-center gap-1 rounded-full bg-orange-100 py-1 text-sm font-medium text-white transition-colors duration-300 hover:bg-orange-200 lg:py-0`}
         >
           {direction === "previous" && <Icon className="w-8 p-1 lg:w-9" />}
-          <span className={direction === "next" ? "pl-4" : "pr-4"}>
+          <span
+            className={`${direction === "next" ? "pl-4" : "pr-4"} @max-md/main:text-[0.625rem]`}
+          >
             {chapterLabel}
           </span>
           {direction === "next" && <Icon className="w-8 p-1 lg:w-9" />}
@@ -51,9 +53,11 @@ export function NavigationButton({
   }
 
   return (
-    <NavLink to={path} className={className}>
-      <span className="sr-only">{label}</span>
-      <Icon className="orange-shadow w-8 rounded-full bg-orange-100 p-1 text-white transition-all duration-300 hover:bg-orange-200 lg:w-9" />
-    </NavLink>
+    <div className={className}>
+      <NavLink to={path} className="w-min">
+        <span className="sr-only">{label}</span>
+        <Icon className="orange-shadow w-8 rounded-full bg-orange-100 p-1 text-white transition-all duration-300 hover:bg-orange-200 lg:w-9" />
+      </NavLink>
+    </div>
   );
 }
