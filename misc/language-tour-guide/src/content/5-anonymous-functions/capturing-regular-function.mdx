@@ -1,4 +1,4 @@
-export const frontmatter = { order: 5 };
+export const frontmatter = { order: 6 };
 
 # Capturing regular function
 
@@ -11,11 +11,14 @@ We could write it as `&function(&1, &2, ...)`, but there's a shorthand for that:
 # Try also &String.contains?/2
 string_split = &String.split/2
 
-IO.inspect string_split, label: "Inspecting stream_split shows what it captured"
+IO.inspect string_split,
+  label: "Inspecting stream_split shows what it captured"
 
-IO.inspect is_function(string_split), label: "Is string_split a function?"
+IO.inspect is_function(string_split),
+  label: "Is string_split a function?"
 
-IO.inspect string_split.("hello world", " "), label: "Call to string_split returns"
+IO.inspect string_split.("hello world", " "),
+  label: "Call to string_split returns"
 ```
 </EditorCode>
 

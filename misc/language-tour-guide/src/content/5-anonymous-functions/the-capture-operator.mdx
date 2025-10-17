@@ -1,4 +1,4 @@
-export const frontmatter = { order: 4 };
+export const frontmatter = { order: 5 };
 
 # The capture operator
 
@@ -15,6 +15,7 @@ IO.inspect add.(2, 3), label: "Call to add returns"
 
 split_by_comma = &String.split(&1, ",")
 
-IO.inspect split_by_comma.("1,2,3"), label: "Call to split_by_comma returns"
+IO.inspect split_by_comma.("1,2,3"),
+  label: "Call to split_by_comma returns"
 ```
 </EditorCode>
