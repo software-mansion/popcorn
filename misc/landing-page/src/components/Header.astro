@@ -1,65 +1,70 @@
 ---
 import { Icon } from "astro-icon/components";
+import Banner from "../components/Banner.astro";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 ---
 
-<nav
-  class="fixed top-0 right-0 left-0 z-50 flex h-16 min-w-max items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
->
-  <a href="/" class="flex-shrink-0">
-    <Icon
-      name="logo-text"
-      class="text-brown-100 text-4xl transition-colors duration-300"
-      data-logo
-    />
-  </a>
-
-  <div
-    class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
-    data-mobile-menu
+<div class="pointer-events-auto fixed top-0 right-0 left-0 z-50 min-w-max">
+  <nav
+    class="flex h-16 items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
   >
-    <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
-      <a class={linkClass} href="/#features">Features</a>
-      <a class={linkClass} href="/#examples">Examples</a>
-      <a class:list={["hidden lg:block", linkClass]} href="/#live-demo"
-        >Live demo</a
-      >
-      <a class={linkClass} href="/#outtro">Contact us</a>
+    <a href="/" class="flex-shrink-0">
+      <Icon
+        name="logo-text"
+        class="text-brown-100 text-4xl transition-colors duration-300"
+        data-logo
+      />
+    </a>
+
+    <div
+      class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
+      data-mobile-menu
+    >
+      <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
+        <a class={linkClass} href="/#features">Features</a>
+        <a class={linkClass} href="/#examples">Examples</a>
+        <a class:list={["hidden lg:block", linkClass]} href="/#live-demo"
+          >Live demo</a
+        >
+        <a class={linkClass} href="/#outtro">Contact us</a>
+      </div>
+
+      <hr class="lg:hidden" />
+      <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
+        <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
+        <a
+          class={linkClass}
+          {...openNewTab}
+          href="https://github.com/software-mansion/popcorn/">Github →</a
+        >
+      </div>
     </div>
 
-    <hr class="lg:hidden" />
-    <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
-      <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
-      <a
-        class={linkClass}
-        {...openNewTab}
-        href="https://github.com/software-mansion/popcorn/">Github →</a
-      >
-    </div>
-  </div>
-
-  <button
-    class="flex h-6 w-6 flex-col items-center justify-center gap-1 lg:hidden"
-    data-mobile-menu-toggle
-    aria-label="Toggle mobile menu"
-  >
-    <Icon
-      name="hamburger"
-      class="text-brown-header text-2xl transition-colors duration-300"
-      data-hamburger-icon
-    />
-    <Icon
-      name="close"
-      class="text-light-20 hidden text-2xl transition-colors duration-300"
-      data-close-icon
-    />
-  </button>
-</nav>
+    <button
+      class="flex h-6 w-6 flex-col items-center justify-center gap-1 lg:hidden"
+      data-mobile-menu-toggle
+      aria-label="Toggle mobile menu"
+    >
+      <Icon
+        name="hamburger"
+        class="text-brown-header text-2xl transition-colors duration-300"
+        data-hamburger-icon
+      />
+      <Icon
+        name="close"
+        class="text-light-20 hidden text-2xl transition-colors duration-300"
+        data-close-icon
+      />
+    </button>
+  </nav>
+  <Banner />
+</div>
 
 <script>
   interface HeaderElements {
+    container: HTMLElement;
     nav: HTMLElement;
     logo: Element | null;
     links: NodeListOf<HTMLAnchorElement>;
@@ -80,7 +85,8 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     function showMenu(open: boolean) {
       mobileMenu.classList.toggle("-translate-y-full", !open);
       mobileMenu.classList.toggle("flex", open);
-      mobileMenu.classList.toggle("top-16", open);
+      // 14 instead of 16 to slightly overlap (pixels glitch)
+      mobileMenu.classList.toggle("top-14", open);
 
       hamburgerIcon?.classList.toggle("hidden", open);
       closeIcon?.classList.toggle("hidden", !open);
@@ -110,7 +116,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     elements: HeaderElements,
     state: HeaderState,
   ) {
-    const { nav, logo, links, hamburgerIcon } = elements;
+    const { container, nav, logo, links, hamburgerIcon } = elements;
 
     function swapTextColor() {
       const headerRect = nav.getBoundingClientRect();
@@ -120,13 +126,13 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       };
 
       // Temporarily hide header to check what's behind it
-      nav.style.pointerEvents = "none";
+      container.style.pointerEvents = "none";
       const elementBehind = document.elementFromPoint(
         headerCenter.x,
         headerCenter.y,
       );
 
-      nav.style.pointerEvents = "";
+      container.style.pointerEvents = "";
 
       if (!elementBehind) return;
 
@@ -179,11 +185,13 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
   function setup() {
     const nav = document.querySelector("nav")!;
+    const container = nav.parentElement!;
     const logo = nav.querySelector("[data-logo]");
     const links = nav.querySelectorAll("a");
     const hamburgerIcon = nav.querySelector("[data-hamburger-icon]");
 
     const elements = {
+      container,
       nav,
       logo,
       links,
