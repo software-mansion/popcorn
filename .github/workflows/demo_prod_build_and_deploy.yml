@@ -4,7 +4,8 @@ on: workflow_dispatch
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  ORG_NAME: software-mansion
+  REPO_NAME: ${{ github.repository }}
 
 jobs:
   build_docker_images:
