@@ -1,5 +1,7 @@
 import Config
 
+config :logger, :default_formatter, metadata: [:app_name]
+
 if File.exists?("#{__DIR__}/config.secret.exs") do
   # Put the following configuration in config.secret.exs:
   # config :popcorn, runtime_path: ...
