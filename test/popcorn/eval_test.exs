@@ -727,4 +727,21 @@ defmodule Popcorn.EvalTest do
     assert length(result) == 10
     Enum.each(result, &assert(&1 in 1..5))
   end
+
+  @tag :format_error
+  async_test "Exception.format_error", %{tmp_dir: dir} do
+    result =
+      quote do
+        try do
+          # Trigger FunctionClauseError
+          String.length(:foo)
+        rescue
+          e -> Exception.format(:error, e, __STACKTRACE__)
+        end
+      end
+      |> Macro.to_string()
+      |> AtomVM.eval(:elixir, run_dir: dir)
+
+    assert "** (FunctionClauseError)" <> _rest = result
+  end
 end
