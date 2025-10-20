@@ -240,20 +240,6 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Notifies JS that Elixir side finished initializing. Can be called only once.
-  """
-  def register(main_process_name) do
-    """
-    ({ wasm, args }) => {
-      wasm.onElixirReady?.(args.main);
-    }
-    """
-    |> run_js(%{main: to_string(main_process_name)})
-
-    :ok
-  end
-
-  @doc """
   Registers event listener for element with given `selector`. Events will be sent to the process registered under `target` name.
   To get event data, specify needed keys in `event_keys` list.
 
@@ -316,6 +302,45 @@ defmodule Popcorn.Wasm do
     }
     """
     |> run_js(%{cleanupFn: ref})
+  end
+
+  @doc """
+  Sends an event to the JavaScript side.
+
+  Events are queued if sent before `send_elixir_ready/0` is called.
+
+  ## Examples
+
+      Popcorn.Wasm.sendEvent("processing_finished", %{id: 123})
+      Popcorn.Wasm.sendEvent("user_logged_in", %{user: "john", timestamp: DateTime.utc_now()})
+
+  """
+  @spec send_event(String.t()) :: :ok
+  @spec send_event(String.t(), term()) :: :ok
+  def send_event(event_name, payload \\ nil) when is_binary(event_name) do
+    """
+    ({ wasm, args }) => {
+      wasm.sendEvent(args.eventName, args.payload)
+    }
+    """
+    |> run_js(%{eventName: event_name, payload: payload}, return: :ref)
+
+    :ok
+  end
+
+  @doc """
+  Registers a process as a default receiver and sends the registration event to JavaScript.
+  """
+  @spec register_default_receiver(pid(), atom()) :: :ok
+  def register_default_receiver(pid, name) do
+    case Process.whereis(name) do
+      nil -> Process.register(pid, name)
+      ^pid -> :ok
+      _other_pid -> raise "Name #{name} already taken"
+    end
+
+    send_event("popcorn_set_default_receiver", %{name: name})
+    :ok
   end
 
   @doc false
