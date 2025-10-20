@@ -35,11 +35,12 @@ defmodule ElixirTour do
           {:resolve, inspect(result), state}
 
         {:error, error_message} ->
-          {:reject, inspect(error_message), state}
+          {:reject, error_message, state}
       end
     rescue
       e ->
-        {:reject, inspect(e), state}
+        error_message = Exception.format(:error, e)
+        {:reject, error_message, state}
     end
   end
 
@@ -49,7 +50,8 @@ defmodule ElixirTour do
       {:ok, evaluated}
     rescue
       e ->
-        {:error, e}
+        error_message = Exception.format(:error, e)
+        {:error, error_message}
     end
   end
 end

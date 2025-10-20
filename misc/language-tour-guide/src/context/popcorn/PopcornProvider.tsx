@@ -23,6 +23,7 @@ export const PopcornProvider = ({
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
   const setStdoutResult = useCodeEditorStore((state) => state.setStdoutResult);
+  const setStderrResult = useCodeEditorStore((state) => state.setStderrResult);
 
   const collectedStdout = useRef<string[]>([]);
   const collectedStderr = useRef<string[]>([]);
@@ -57,6 +58,8 @@ export const PopcornProvider = ({
           collectedStderr.current.push(text);
 
           console.error("Popcorn stderr:", text);
+          // TODO: remove escape sequences from stderr
+          setStderrResult(text);
         }
       });
 
@@ -68,7 +71,7 @@ export const PopcornProvider = ({
     } catch (error) {
       console.error("Failed to initialize Popcorn:", error);
     }
-  }, [debug, setStdoutResult, processCollectedOutput]);
+  }, [debug, setStdoutResult, setStderrResult, processCollectedOutput]);
 
   const reinitializePopcorn = useCallback(() => {
     if (instance) {
