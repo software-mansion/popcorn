@@ -63,7 +63,7 @@ export async function initModel(config: Config) {
   validateSectionPositions(sectionConfig);
 
   const initialSection = firstMapValue(sectionConfig) ?? DEFAULT_SECTION_PARAMS;
-  const initialScale = initialSection.scale;
+
   const initialPosition = { ...initialSection.position };
 
   const state: State = {
@@ -74,7 +74,7 @@ export async function initModel(config: Config) {
     },
     scale: 0,
     position: initialPosition,
-    targetScale: initialScale,
+    targetScale: 0,
     targetPosition: initialPosition,
   };
 
