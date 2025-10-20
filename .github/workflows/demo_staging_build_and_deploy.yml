@@ -90,7 +90,7 @@ jobs:
           # Sentry DSN is embedded in built JS, not really a secret
           build-args: |
             SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
-            SENTRY_MODE=production
+            SENTRY_MODE=staging
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
