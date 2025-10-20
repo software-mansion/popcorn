@@ -14,18 +14,17 @@ Check the example to see how it works!
 
 <EditorCode>
 ```elixir
-
 # Equivalents of IO.inspect :hello, label: "Print hello"
 IO.inspect("hello", [{:label, "Print hello"}])
 IO.inspect("hello", [label: "Print hello"])
 
-# Try removing the label, try changing order of keys
-# Try using 'printable_limit' key to limit printed characters
+#💡 Try removing the label, try changing order of keys
+#💡 Try using 'printable_limit' key to limit printed characters
 IO.inspect [{1, 2, 3}, "hello world"],
   label: "Print a list", pretty: true, width: 15
 
 # String.split can also accept a keyword list
-# Try removing square braces from [parts: 3]
+#💡 Try removing square braces from [parts: 3]
 IO.inspect String.split("1 2 3 4", " "),
     label: "Split the string of numbers on space"
 IO.inspect String.split("1 2 3 4", " ", [parts: 3]),

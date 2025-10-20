@@ -15,7 +15,7 @@ user = %{name: "John", age: 23}
 # What happens if you try to get user's surname, which is not there?
 IO.inspect user.name, label: "User's name"
 
-# Try replacing age with a non-existent key
+#💡 Try replacing age with a non-existent key
 IO.inspect %{user | age: 24}, label: "Happy birthday, John"
 ```
 </EditorCode>

@@ -15,7 +15,7 @@ pid = spawn(fn -> 1 + 2 end)
 IO.inspect pid, label: "Spawn returns a PID"
 
 # Since the process only performed addition, it's most likely dead at this point
-# Try replacing the function passed to spawn with 'fn -> Process.sleep(1000) end'.
+#💡 Try replacing the function passed to spawn with 'fn -> Process.sleep(1000) end'.
 # Is the process alive?
 IO.inspect Process.alive?(pid), label: "Is the process alive?"
 ```

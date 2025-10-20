@@ -17,7 +17,7 @@ receive do
   {:hello, addressee} -> IO.inspect addressee, label: "Received hello to"
 end
 
-# Try changing :bye to {:hello, "world"}
+#💡 Try changing :bye to {:hello, "world"}
 send(self(), :bye)
 
 receive do

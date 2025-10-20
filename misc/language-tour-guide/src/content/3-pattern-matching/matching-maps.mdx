@@ -16,7 +16,8 @@ IO.inspect(one, label: "one")
 %{} = %{}
 %{} = map
 
-# Enforcing specific value for :c, try changing it and see the result
+# Enforcing specific value for :c
+#💡 Try changing "c" to something else and see the result
 %{:b => two, :c => "c"} = map
 IO.inspect(two, label: "two")
 
