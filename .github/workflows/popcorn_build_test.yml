@@ -71,10 +71,10 @@ jobs:
         run: mix lint
       - name: Build AtomVM Unix
         run: |
-          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+          mix popcorn.build_runtime --target unix --cmake-opts "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON" --git-ref "fkubis/reraise-not-caught-fix"
       - name: Build AtomVM WASM
         run: |
-          mix popcorn.build_runtime --target wasm
+          mix popcorn.build_runtime --target wasm --git-ref "fkubis/reraise-not-caught-fix"
       - name: Install playwright deps
         run: mix playwright.install
       - name: Run tests
