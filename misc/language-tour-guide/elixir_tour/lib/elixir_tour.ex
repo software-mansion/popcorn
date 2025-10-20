@@ -34,12 +34,12 @@ defmodule ElixirTour do
         {:ok, result} ->
           {:resolve, inspect(result), state}
 
-        {:error, error_message} ->
-          {:reject, inspect(error_message), state}
+        {:error, error, stacktrace} ->
+          {:reject, print_error(error, stacktrace), state}
       end
     rescue
-      e ->
-        {:reject, inspect(e), state}
+      error ->
+        {:reject, print_error(error, __STACKTRACE__), state}
     end
   end
 
@@ -48,8 +48,11 @@ defmodule ElixirTour do
       {evaluated, _new_bindings} = Code.eval_string(code, [], __ENV__)
       {:ok, evaluated}
     rescue
-      e ->
-        {:error, e}
+      error -> {:error, error, __STACKTRACE__}
     end
+  end
+
+  defp print_error(error, stacktrace) do
+    Exception.format(:error, error, stacktrace)
   end
 end
