@@ -14,11 +14,11 @@ IO.inspect [a: 1, b: 2] ++ [c: 3, d: 4],
 IO.inspect Keyword.keyword?([a: 1, b: 2]),
   label: "Is [a: 1, b: 2] a keyword list?"
 
-# Try changing :a to "a". Is it still a keyword list?
+#💡 Try changing :a to "a". Is it still a keyword list?
 IO.inspect Keyword.keyword?([{:a, 1}, {:b, 2}]),
   label: "Is [{:a, 1}, {:b, 2}] a keyword list?"
 
-# Let's change Keyword.get to Keyword.delete
+#💡 Let's change Keyword.get to Keyword.delete
 IO.inspect Keyword.get([a: 1, b: 2], :a),
   label: "Value under the key :a is"
 

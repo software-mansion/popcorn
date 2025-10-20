@@ -15,7 +15,7 @@ To pop a message from the mailbox, you can use `receive do ... end`.
 
 <EditorCode>
 ```elixir
-# First, spawn the receiver and get it's PID
+# First, spawn the receiver and get its PID
 receiver_pid = spawn(fn ->
   receive do
     message -> IO.inspect message, label: "Received a message"
@@ -23,7 +23,7 @@ receiver_pid = spawn(fn ->
 end)
 
 # Then, send a message to the receiver
-# Try spawning another process and sending a message from there
+#💡 Try spawning another process and sending a message from there
 send(receiver_pid, {:hello, "world"})
 
 # A process can send a message to itself

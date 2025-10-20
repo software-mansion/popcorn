@@ -18,7 +18,7 @@ x = 1
 x = 2
 IO.inspect x, label: "rebound x"
 
-# See what will happen if you change the value to 3
+#💡 Let's see what will happen if you change the value to 3
 ^x = 2
 # This is the equivalent of
 2 = 2
@@ -37,7 +37,7 @@ Otherwise, the match will fail.
 <EditorCode>
 
 ```elixir
-# Try changing one of the values in tuple on the right
+#💡 Try changing one of the values in tuple on the right
 {z, z} = {3, 3}
 IO.inspect z, label: "z"
 ```
@@ -56,11 +56,12 @@ Optionally, for readability, you may use a variable with `_` prefix, e.g. `_igno
 [head | _] = [1, 2, 3]
 IO.inspect head, label: "head"
 
-# Let's try using the underscore
+#💡 Let's try using the underscore:
 # IO.inspect _, label: "read underscore?"
 
 {:error, _reason} = {:error, :enoent}
 # Named ignore is slightly different, but yields a warning
+#💡 Let's try it:
 # IO.inspect _reason, label: "read underscore prefix?"
 
 :ok

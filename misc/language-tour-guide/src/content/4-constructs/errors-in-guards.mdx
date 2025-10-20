@@ -6,7 +6,7 @@ Errors in guards do not leak but simply make the guard fail. It makes the code s
 
 <EditorCode>
 ```elixir
-# Try calling "a" + 1 outside of the guard
+#💡 Try calling "a" + 1 outside of the guard
 case "a" do
   x when x + 1 == 3 -> IO.puts "Won't match"
   x -> IO.puts "Got #{x}"

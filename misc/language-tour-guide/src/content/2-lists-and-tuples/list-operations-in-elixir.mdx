@@ -12,7 +12,7 @@ One advantage of immutability is that it leads to clearer code. You can freely p
 ```elixir
 list = [1, 2, 3]
 
-# Let's print the 'list' variable after concatenating. Did it change?
+#💡 Let's print the 'list' variable after concatenating. Did it change?
 IO.inspect list ++ [4, 5, 6], label: "Concatenated list"
 
 IO.inspect [1, true, 2, false, 3, true] -- [true, false], label: "Subtracted list"

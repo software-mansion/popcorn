@@ -14,8 +14,8 @@ This rule applies to most data structures in Elixir. Such approach reduces the a
 ```elixir
 tuple = {:ok, "hello"}
 
-# Let's print the 'tuple' variable after the update - did it change?
-# Try changing 1 to an out-of-bound index, such as 3. What happens?
+#💡 Let's print the 'tuple' variable after the update - did it change?
+#💡 Try changing 1 to an out-of-bound index, such as 3. What happens?
 IO.inspect put_elem(tuple, 1, "world"), label: "Updated tuple"
 ```
 </EditorCode>

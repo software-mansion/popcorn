@@ -16,13 +16,14 @@ You can also use atoms in the pattern to match on such results.
 IO.inspect(a, label: "a")
 IO.inspect(b, label: "b")
 
-# Modify the pattern on the left to fix the error
+#❗️ This code raises an error!
+#💡 Let's modify the pattern on the left to fix the error
 {x, y} = {:hello, "world", 42}
 IO.inspect(x, label: "x")
 IO.inspect(y, label: "y")
-IO.inspect(z, label: "z")
+# IO.inspect(z, label: "z")
 
-# Find out what happens if you replace `:answer` with different atom
+#💡 Find out what happens if you replace `:answer` with a different atom
 {:ok, answer} = Map.fetch(%{answer: 42}, :answer)
 IO.inspect(answer, label: "answer")
 ```

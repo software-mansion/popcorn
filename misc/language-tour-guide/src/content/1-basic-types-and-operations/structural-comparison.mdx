@@ -10,18 +10,18 @@ The comparison operators in Elixir can compare across any data type. It means yo
 ```elixir
 IO.inspect 1 == 1, label: "is 1 equal to 1"
 
-# Let's change 2.0 to 1.0. Are they equal now?
+#💡 Let's change 2.0 to 1.0. Are they equal now?
 IO.inspect 1 == 2.0, label: "is 1 equal to 2.0"
 
-# Let's change "bar" to "foo". Are the strings equal if they have the same contents?
+#💡 Let's change "bar" to "foo". Are the strings equal if they have the same contents?
 IO.inspect "foo" == "bar", label: "is 'foo' string equal to 'bar' string"
 
-# Try changing '===' to '=='. Does the result change?
+#💡 Try changing '===' to '=='. Does the result change?
 IO.inspect 1 === 1.0, label: "is 1 integer strictly equal to 1.0 float"
 
 IO.inspect "abc" > 1, label: "is a string greater than a number?"
 
-# Try changing the atom name
+#💡 Try changing the atom name
 IO.inspect :infinity > 1, label: "is an atom greater than one?"
 ```
 </EditorCode>
