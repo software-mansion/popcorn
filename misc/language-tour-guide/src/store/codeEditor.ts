@@ -5,8 +5,11 @@ type CodeEditorStore = {
   defaultCode: string;
   code: string;
   stdoutResult: string[];
+  stderrResult: string[];
   setStdoutResult: (stdoutResult: string) => void;
+  setStderrResult: (stderrResult: string) => void;
   resetStdoutResult: () => void;
+  resetStderrResult: () => void;
   setCode: (code: string) => void;
   pathHash: string | null;
   setDefaultCode: (code: string) => void;
@@ -19,6 +22,7 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
   defaultCode: "",
   code: "",
   stdoutResult: [],
+  stderrResult: [],
   pathHash: null,
 
   setCode: (code: string) =>
@@ -45,5 +49,10 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
     set((state) => ({
       stdoutResult: [...state.stdoutResult, stdoutResult]
     })),
-  resetStdoutResult: () => set({ stdoutResult: [] })
+  setStderrResult: (stderrResult: string) =>
+    set((state) => ({
+      stderrResult: [...state.stderrResult, stderrResult]
+    })),
+  resetStdoutResult: () => set({ stdoutResult: [] }),
+  resetStderrResult: () => set({ stderrResult: [] })
 }));

@@ -37,16 +37,24 @@ export function Results() {
   const { call, reinitializePopcorn, clearCollectedOutput } = usePopcorn();
   const [longRunning, setLongRunning] = useState(false);
 
-  const { code, resetCodeToDefault, stdoutResult, resetStdoutResult } =
-    useCodeEditorStore(
-      useShallow((state) => ({
-        setCode: state.setCode,
-        code: state.code,
-        resetCodeToDefault: state.resetCodeToDefault,
-        stdoutResult: state.stdoutResult,
-        resetStdoutResult: state.resetStdoutResult
-      }))
-    );
+  const {
+    code,
+    resetCodeToDefault,
+    stdoutResult,
+    stderrResult,
+    resetStdoutResult,
+    resetStderrResult
+  } = useCodeEditorStore(
+    useShallow((state) => ({
+      setCode: state.setCode,
+      code: state.code,
+      resetCodeToDefault: state.resetCodeToDefault,
+      stdoutResult: state.stdoutResult,
+      stderrResult: state.stderrResult,
+      resetStdoutResult: state.resetStdoutResult,
+      resetStderrResult: state.resetStderrResult
+    }))
+  );
 
   const handleCancelRunning = () => {
     try {
@@ -62,10 +70,15 @@ export function Results() {
   );
 
   const stdoutRef = useRef<string[]>(stdoutResult);
+  const stderrRef = useRef<string[]>(stderrResult);
 
   useEffect(() => {
     stdoutRef.current = stdoutResult;
   }, [stdoutResult]);
+
+  useEffect(() => {
+    stderrRef.current = stderrResult;
+  }, [stderrResult]);
 
   const callPopcorn = useCallback(
     async (code: string) => {
@@ -102,6 +115,7 @@ export function Results() {
             addHistoryEntry({
               timestamp: new Date(),
               stdoutResult: stdoutRef.current,
+              stderrResult: stderrRef.current,
               durationMs: error.durationMs,
               errorMessage: error.error
             });
@@ -117,6 +131,8 @@ export function Results() {
         clearTimeout(timeoutId);
 
         const { data, durationMs } = result;
+
+        // TODO: remove escape sequences from stderr
         setResultData(data);
         setDurationMs(durationMs);
 
@@ -124,6 +140,7 @@ export function Results() {
           timestamp: new Date(),
           result: data,
           stdoutResult: stdoutRef.current,
+          stderrResult: stderrRef.current,
           durationMs
         });
       });
@@ -135,9 +152,10 @@ export function Results() {
     if (pending) return;
 
     resetStdoutResult();
+    resetStderrResult();
     console.log("Run Code!");
     callPopcorn(code);
-  }, [callPopcorn, code, resetStdoutResult, pending]);
+  }, [callPopcorn, code, resetStdoutResult, resetStderrResult, pending]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -194,8 +212,7 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
-
-            {errorData && <ErrorMessage message={errorData} />}
+            <ErrorMessage message={errorData} stderr={stderrResult} />
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
