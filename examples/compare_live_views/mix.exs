@@ -74,7 +74,7 @@ defmodule CompareLiveViews.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "compile", "assets.setup", "assets.build", &build_local/1],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind compare_live_views", "esbuild compare_live_views"],
       "assets.deploy": [
@@ -84,5 +84,13 @@ defmodule CompareLiveViews.MixProject do
       ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
     ]
+  end
+  
+  defp build_local(_) do
+    Mix.shell().cmd("""
+    cd local/compare_live_views_local
+    mix deps.get
+    mix compile
+    """)
   end
 end

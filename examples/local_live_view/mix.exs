@@ -23,6 +23,7 @@ defmodule LocalLiveView.MixProject do
   defp deps do
     [
       {:popcorn, path: "../.."}
+#      {:phoenix_html, "~> 4.1"}
     ]
   end
 end

@@ -1,6 +1,6 @@
 # LocalLiveView
 
-**This is a POC of LocalLiveView the LiveView that implements LiveView functionality 
+**This is a POC of LocalLiveView, a project that implements LiveView functionality 
 in the browser using Popcorn**
 
 Usage:
@@ -22,16 +22,11 @@ defmodule ThermostatLive do
 
   def mount(_params, _session, socket) do
     temperature = 65
-    socket =
-      socket
-      |> assign(:temperature, temperature)
-    {:ok, socket}
+    {:ok, assign(socket, :temperature, temperature)}
   end
 
   def handle_event("inc_temperature", _params, socket) do
-    temperature = socket.assigns.temperature
-    socket = Phoenix.LiveView.Utils.assign(socket, :temperature, temperature+1)
-    {:noreply, socket}
+    {:noreply, update(socket, :temperature, &(&1 + 1))}
   end
 end
 ```
@@ -50,9 +45,6 @@ example (index.html):
             color: #fcfcfc;
         }
     </style>
-    <script type="module">
-        import { Popcorn } from "./wasm/popcorn.js";
-    </script>
     <script type="module" src="local_live_view.js" defer></script>
     <body>
     <div data-pop-view="ThermostatLive"></div>

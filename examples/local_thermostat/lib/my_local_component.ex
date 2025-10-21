@@ -1,6 +1,6 @@
 defmodule MyLocalComponent do
   # In Phoenix apps, the line is typically: use MyAppWeb, :html
-  use LocalComponent
+  use Phoenix.Component
 
   def greet(assigns) do
     ~H"""

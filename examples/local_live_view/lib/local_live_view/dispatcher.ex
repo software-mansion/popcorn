@@ -70,14 +70,6 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  def diff_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
-    Enum.reduce(list_of_binaries, "", fn
-      integer, acc when is_integer(integer) -> acc <> List.to_string([integer])
-      list, acc when is_list(list) -> acc <> diff_iodata_to_binary(list)
-      binary, acc -> acc <> to_string(binary)
-    end)
-  end
-
   def render(assigns) do
     :ok
   end

@@ -6,11 +6,9 @@ defmodule LocalLiveView.JS do
       Popcorn.Wasm.run_js(
         """
         ({ args }) => {
-          let elements = document.querySelectorAll('[#{attribute}]');
-          elements = Array.from(elements)
-          const found = elements.find((element) => element.getAttribute("#{attribute}") == args.view);
-          if(found) {
-            found.innerHTML = args.rendered;
+          const view_nodes = document.querySelectorAll(`[#{attribute}=${args.view}]`);
+          if(view_nodes.length == 1) {
+            view_nodes[0].innerHTML = args.rendered;
             document.dispatchEvent(new CustomEvent('popRender', {detail: {view: args.view}}));
           }
         }

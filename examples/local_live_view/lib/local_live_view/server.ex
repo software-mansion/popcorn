@@ -4,6 +4,15 @@ end
 
 defmodule LocalLiveView.Server do
   @moduledoc false
+#  A LocalLiveView is a process that receives events, updates
+#  its state, and renders updates to a page as diffs.
+#  
+#  LocalLiveView.Server is a instance of GenServer that handles 
+#  events for LocalLiveView, just like a Phoenix.Channel.
+#
+#  One LocalLiveView.Server will be created per every LocalLiveView
+#  used on the page.
+
   use GenServer, restart: :temporary
 
   require Logger
@@ -231,7 +240,7 @@ defmodule LocalLiveView.Server do
 
         rendered
         |> Phoenix.HTML.Safe.to_iodata()
-        |> LocalLiveView.rendered_iodata_to_binary()
+        |> IO.iodata_to_binary()
         |> LocalLiveView.JS.rerender(socket.view)
 
         {diff, fingerprints, components} =

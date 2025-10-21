@@ -1,4 +1,28 @@
 defmodule LocalLiveView do
+  @moduledoc ~S'''
+  LocalLiveView is a module that implements functionality of Phoenix.LiveView inside the browser in  
+  Popcorn runtime.
+  LocalLiveView should be used exactly like its Phoenix equivalent:
+  
+      defmodule MyAppWeb.DemoLive do
+        use Phoenix.LiveView
+
+        def render(assigns) do
+          ~H"""
+          Hello world!
+          """
+        end
+      end
+  
+  The LocalLiveView can be added to a page with:
+  ```
+  <div data-pop-view="DemoLive"></div>
+  ```
+  
+  During application runtime a LocalLiveView.Dispatcher will create a process that will handle a LocalLiveView state,
+  by storing and modifying its assigns.
+  '''
+  
   alias Phoenix.LiveView.Session
   alias Phoenix.LiveView.Diff
   import Popcorn.Wasm
@@ -15,7 +39,7 @@ defmodule LocalLiveView do
       @before_compile LocalLiveView
 
       alias LocalLiveView.Message
-      use LocalComponent, Keyword.take(opts, [:global_prefixes])
+      use Phoenix.Component, Keyword.take(opts, [:global_prefixes])
     end
   end
 
@@ -60,14 +84,6 @@ defmodule LocalLiveView do
       lifecycle: Phoenix.LiveView.Lifecycle.build(on_mount),
       log: log
     }
-  end
-
-  def rendered_iodata_to_binary(list_of_binaries) when is_list(list_of_binaries) do
-    Enum.reduce(list_of_binaries, "", fn
-      integer, acc when is_integer(integer) -> acc <> to_string(integer)
-      list, acc when is_list(list) -> acc <> rendered_iodata_to_binary(list)
-      binary, acc -> acc <> to_string(binary)
-    end)
   end
 
   def render(assigns) do

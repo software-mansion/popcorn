@@ -183,6 +183,7 @@ defmodule Phoenix.LiveView.Utils do
   """
   def random_id do
     "phx-"
+    # Patch reason: random_encoded_bytes() function is using bitstrings not supported in AtomVM
     #    |> Kernel.<>(random_encoded_bytes())
     #    |> String.replace(["/", "+"], "-")
   end
@@ -336,7 +337,7 @@ defmodule Phoenix.LiveView.Utils do
   """
   def maybe_call_live_view_mount!(%Socket{} = socket, view, params, session, uri \\ nil) do
     %{any?: any?, exported?: exported?} = Lifecycle.stage_info(socket, view, :mount, 3)
-
+    # Patch reason: We do not use telemetry as it is not fully working in AtomVM
     if any? do
       #      :telemetry.span(
       #        [:phoenix, :live_view, :mount],
@@ -448,6 +449,7 @@ defmodule Phoenix.LiveView.Utils do
   """
   def call_handle_params!(%Socket{} = socket, view, exported? \\ true, params, uri)
       when is_boolean(exported?) do
+    # Patch reason: We do not use telemetry as it is not fully working in AtomVM
     #    :telemetry.span(
     #      [:phoenix, :live_view, :handle_params],
     #      %{socket: socket, params: params, uri: uri},
