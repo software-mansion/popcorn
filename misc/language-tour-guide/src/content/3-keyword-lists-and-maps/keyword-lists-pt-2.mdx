@@ -11,6 +11,9 @@ Additionally, [`Keyword`](https://hexdocs.pm/elixir/Keyword.html) module contain
 IO.inspect [a: 1, b: 2] ++ [c: 3, d: 4],
   label: "Concatenating two keyword lists"
 
+# Note the trailing ? sign in 'keyword?' - it's just a part
+# of the function name. However, the convention is to use it
+# for functions returning booleans.
 IO.inspect Keyword.keyword?([a: 1, b: 2]),
   label: "Is [a: 1, b: 2] a keyword list?"
 
@@ -22,7 +25,8 @@ IO.inspect Keyword.keyword?([{:a, 1}, {:b, 2}]),
 IO.inspect Keyword.get([a: 1, b: 2], :a),
   label: "Value under the key :a is"
 
-# To get a value from a keyword list, you can also use keyword[key] syntax
+# To get a value from a keyword list, you can also use
+# keyword[key] syntax
 keyword = [a: 1, b: 2]
 IO.inspect keyword[:a], label: "Value under the key :a is"
 

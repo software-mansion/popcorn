@@ -11,6 +11,7 @@ list = [1, 2, 3]
 #💡 Try expressing it using the ++ operator
 IO.inspect [0 | list], label: "List with prepended element"
 
-IO.inspect [0 | [1 | [2 | [3 | []]]]], label: "List constructed only with [head | tail]"
+IO.inspect [0 | [1 | [2 | [3 | []]]]],
+  label: "List constructed only with [head | tail]"
 ```
 </EditorCode>

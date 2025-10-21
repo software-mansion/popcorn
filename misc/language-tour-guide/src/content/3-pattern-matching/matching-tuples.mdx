@@ -23,7 +23,8 @@ IO.inspect(x, label: "x")
 IO.inspect(y, label: "y")
 # IO.inspect(z, label: "z")
 
-#💡 Find out what happens if you replace `:answer` with a different atom
+#💡 Find out what happens if you replace `:answer`
+# with a different atom
 {:ok, answer} = Map.fetch(%{answer: 42}, :answer)
 IO.inspect(answer, label: "answer")
 ```

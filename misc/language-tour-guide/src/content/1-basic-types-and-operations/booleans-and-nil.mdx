@@ -2,7 +2,7 @@ export const frontmatter = { order: 5 };
 
 # Booleans and nil
 
-Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||/2`, `&&/2`, and `!/1`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
+Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||`, `&&`, and `!`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
 
 As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.
 
