@@ -1,5 +1,15 @@
 .cm-editor {
   border-bottom-left-radius: 0.375rem;
+  height: 100%;
+  min-height: 500px;
+}
+
+.cm-scroller {
+  flex-grow: 1;
+}
+
+.cm-focused {
+  outline: none !important;
 }
 
 .cm-gutters {
