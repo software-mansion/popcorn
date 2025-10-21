@@ -10,7 +10,7 @@ export default function StdoutResults({ stdout }: StdoutResultsProps) {
         {stdout.map((line, index) => (
           <span
             key={`stdout-${index}-${line}`}
-            className="text-brown-90/70 text-xs font-medium"
+            className="text-brown-90/70 font-mono text-xs font-medium"
           >
             {line}
           </span>
