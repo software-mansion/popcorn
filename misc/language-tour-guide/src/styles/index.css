@@ -51,6 +51,10 @@
   --color-red-200: #fbbcbc;
   --color-red-600: #cf3f3f;
   --color-red-700: #b52e2e;
+  --color-yellow-50: #fffbf0;
+  --color-yellow-200: #ffe2a8;
+  --color-yellow-600: #d48f00;
+  --color-yellow-700: #b26f00;
   --font-handjet: "Handjet Variable", system-ui;
   --font-inter: "Inter Variable", sans-serif;
 }

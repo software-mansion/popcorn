@@ -8,8 +8,9 @@ import { useExecutionHistoryStore } from "../../store/executionHistory";
 import { usePending } from "../../utils/hooks/usePending";
 import StdoutResults from "./StdoutResults";
 import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
-import { ErrorMessage } from "./ErrorMessage";
 import { captureCodeException } from "../../utils/sentry";
+import { CompilerError } from "./CompilerError";
+import { WarningOutput } from "./WarningOutput";
 
 interface PopcornError {
   error: string;
@@ -212,7 +213,10 @@ export function Results() {
             <span className="text-grey-60 text-xs">
               {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
             </span>
-            <ErrorMessage message={errorData} stderr={stderrResult} />
+            {errorData && <CompilerError message={errorData} />}
+            {stderrResult && stderrResult.length > 0 && (
+              <WarningOutput stderr={stderrResult} />
+            )}
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
