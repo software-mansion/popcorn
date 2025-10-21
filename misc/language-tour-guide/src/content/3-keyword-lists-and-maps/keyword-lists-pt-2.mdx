@@ -11,6 +11,9 @@ Additionally, [`Keyword`](https://hexdocs.pm/elixir/Keyword.html) module contain
 IO.inspect [a: 1, b: 2] ++ [c: 3, d: 4],
   label: "Concatenating two keyword lists"
 
+# Note the trailing ? sign in 'keyword?' - it's just a part
+# of the function name. However, the convention is to use it
+# for functions returning booleans.
 IO.inspect Keyword.keyword?([a: 1, b: 2]),
   label: "Is [a: 1, b: 2] a keyword list?"
 
