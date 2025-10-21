@@ -745,7 +745,7 @@ defmodule Popcorn.EvalTest do
     assert "** (FunctionClauseError)" <> _rest = result
   end
 
-  async_test "binary:matches" do
+  async_test "binary:matches", %{tmp_dir: dir} do
     """
     :binary.matches("abbc", "b")
     """
