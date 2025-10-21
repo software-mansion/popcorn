@@ -25,7 +25,8 @@ IO.inspect Keyword.keyword?([{:a, 1}, {:b, 2}]),
 IO.inspect Keyword.get([a: 1, b: 2], :a),
   label: "Value under the key :a is"
 
-# To get a value from a keyword list, you can also use keyword[key] syntax
+# To get a value from a keyword list, you can also use
+# keyword[key] syntax
 keyword = [a: 1, b: 2]
 IO.inspect keyword[:a], label: "Value under the key :a is"
 

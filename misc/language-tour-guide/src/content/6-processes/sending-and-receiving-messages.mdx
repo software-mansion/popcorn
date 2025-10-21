@@ -30,7 +30,8 @@ send(receiver_pid, {:hello, "world"})
 send(self(), "message to self")
 
 receive do
-  message -> IO.inspect message, label: "Received a message from self"
+  message -> IO.inspect message,
+              label: "Received a message from self"
 end
 ```
 </EditorCode>

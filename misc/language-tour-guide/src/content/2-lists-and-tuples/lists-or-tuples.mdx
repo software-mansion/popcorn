@@ -11,20 +11,28 @@ A common pattern is to use 'tagged tuples', which consist of an atom and a value
 <EditorCode>
 ```elixir
 #💡 Let's add another word to "hello world"
-IO.inspect String.split("hello world", " "), label: "String.split returns a list"
+IO.inspect String.split("hello world", " "),
+  label: "String.split returns a list"
 
-IO.inspect String.split_at("hello world", 3), label: "String.split_at returns a 2-element tuple"
+IO.inspect String.split_at("hello world", 3),
+  label: "String.split_at returns a 2-element tuple"
 
-#💡 Try changing the input so it contains an invalid character, such as 'z'
-IO.inspect Base.decode16("666F6F626172"), label: "Base.decode16 returns a tagged tuple"
+#💡 Try changing the input so it contains an invalid character,
+# such as 'z'
+IO.inspect Base.decode16("666F6F626172"),
+  label: "Base.decode16 returns a tagged tuple"
 
-# Note that there's also Base.decode16! (with a trailing ! sign),
-# that raises an error on invalid input instead of returning a tuple.
-# It's a convention to define two versions of a function like these -
-# one that returns a tagged tuple, the other that raises (marked with a
-# trailing !) - for different usage scenarios.
+# Note that there's also Base.decode16! (with a trailing !
+# sign), that raises an error on invalid input instead of
+# returning a tuple.
+# It's a convention to define two versions of a function
+# like these - one that returns a tagged tuple, the other
+# that raises (marked with a trailing !) - for different
+# usage scenarios.
 #
-#💡 Try changing the input so it contains an invalid character, such as 'z'
-IO.inspect Base.decode16!("666F6F626172"), label: "Base.decode16! just returns result"
+#💡 Try changing the input so it contains an invalid character,
+# such as 'z'
+IO.inspect Base.decode16!("666F6F626172"),
+  label: "Base.decode16! just returns result"
 ```
 </EditorCode>

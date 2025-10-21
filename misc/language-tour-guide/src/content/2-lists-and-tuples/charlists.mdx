@@ -9,8 +9,12 @@ When Elixir sees a list of printable ASCII numbers, it will print that as a char
 <EditorCode>
 ```elixir
 #💡 Try appending '0' to the lists below
+
 IO.inspect [11, 12, 13], label: "Charlist with control characters"
-IO.inspect [104, 101, 108, 108, 111], label: "Charlist representing hello"
+
+IO.inspect [104, 101, 108, 108, 111],
+  label: "Charlist representing hello"
+
 IO.inspect ~c"hello", label: "Also a charlist representing hello"
 ```
 </EditorCode>

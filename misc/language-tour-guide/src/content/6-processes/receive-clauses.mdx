@@ -13,15 +13,19 @@ If there is no message in the mailbox matching any of the patterns, the current 
 send(self(), {:hello, "world"})
 
 receive do
-  x when is_integer(x) -> IO.inspect x, label: "This won't match"
-  {:hello, addressee} -> IO.inspect addressee, label: "Received hello to"
+  x when is_integer(x) ->
+    IO.inspect x, label: "This won't match"
+
+  {:hello, addressee} ->
+    IO.inspect addressee, label: "Received hello to"
 end
 
 #💡 Try changing :bye to {:hello, "world"}
 send(self(), :bye)
 
 receive do
-  {:hello, addressee}  -> IO.inspect addressee, label: "This won't be received"
+  {:hello, addressee} ->
+    IO.inspect addressee, label: "This won't be received"
 after
   1_000 -> IO.puts "Nothing after 1s"
 end
