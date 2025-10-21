@@ -744,4 +744,12 @@ defmodule Popcorn.EvalTest do
 
     assert "** (FunctionClauseError)" <> _rest = result
   end
+
+  async_test "binary:matches", %{tmp_dir: dir} do
+    """
+    :binary.matches("abbc", "b")
+    """
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result([{1, 1}, {2, 1}])
+  end
 end
