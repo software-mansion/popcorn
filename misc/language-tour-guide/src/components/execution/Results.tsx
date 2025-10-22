@@ -179,7 +179,16 @@ export function Results() {
 
   return (
     <>
-      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit py-3 pr-6">
+      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit px-6 py-3">
+        <div className="mr-auto flex items-center">
+          {pending ? (
+            <span className="text-grey-60 text-xs"> (pending...)</span>
+          ) : (
+            <span className="text-grey-60 text-xs">
+              {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
+            </span>
+          )}
+        </div>
         {pending && longRunning && (
           <Button
             title="Cancel"
@@ -200,13 +209,8 @@ export function Results() {
         />
       </div>
       <div className="font-inter text-brown-90 flex flex-col gap-2 px-6">
-        {pending ? (
-          <span className="text-grey-60 text-xs"> (pending...)</span>
-        ) : (
+        {!pending && (
           <>
-            <span className="text-grey-60 text-xs">
-              {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
-            </span>
             {errorData && <CompilerError message={errorData} />}
             {stderrResult && stderrResult.length > 0 && (
               <WarningOutput stderr={stderrResult} />
