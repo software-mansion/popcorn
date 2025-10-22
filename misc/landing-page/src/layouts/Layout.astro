@@ -53,6 +53,28 @@ import Header from "../components/Header.astro";
       name="google-site-verification"
       content="MrHmopnx2sLR0JbXEt14AR86iBeYXaxklQA2tLiMoXE"
     />
+    <!-- Google tag (gtag.js) -->
+    <script
+      is:inline
+      crossorigin="anonymous"
+      src="https://www.googletagmanager.com/gtag/js?id=G-F5YLN616Z2"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+
+      gtag("config", "G-F5YLN616Z2");
+    </script>
+    <script
+      is:inline
+      async
+      crossorigin="anonymous"
+      type="text/javascript"
+      charset="UTF-8"
+      src="https://cdn.cookie-script.com/s/19b5b47f7a8f2606f861864571339358.js"
+    ></script>
     <meta name="generator" content={Astro.generator} />
   </head>
   <body>
