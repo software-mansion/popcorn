@@ -32,7 +32,6 @@ function isDeinitializedError(error: unknown): error is { error: Error } {
 
 export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
-  const [resultData, setResultData] = useState<string | null>(null);
   const [errorData, setErrorData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
   const { call, reinitializePopcorn, clearCollectedOutput } = usePopcorn();
@@ -91,7 +90,6 @@ export function Results() {
         }, 500);
 
         setErrorData(null);
-        setResultData(null);
         setDurationMs(null);
 
         try {
@@ -131,15 +129,12 @@ export function Results() {
 
         clearTimeout(timeoutId);
 
-        const { data, durationMs } = result;
+        const { durationMs } = result;
 
-        // TODO: remove escape sequences from stderr
-        setResultData(data);
         setDurationMs(durationMs);
 
         addHistoryEntry({
           timestamp: new Date(),
-          result: data,
           stdoutResult: stdoutRef.current,
           stderrResult: stderrRef.current,
           durationMs
@@ -176,7 +171,6 @@ export function Results() {
   }, [onKeyDown]);
 
   const resetToDefault = useCallback(() => {
-    setResultData(null);
     setErrorData(null);
     setDurationMs(null);
   }, []);
@@ -220,7 +214,6 @@ export function Results() {
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
-            <span>{resultData}</span>
           </>
         )}
       </div>

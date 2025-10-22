@@ -87,14 +87,6 @@ export function History() {
                   {entry.stderrResult && entry.stderrResult.length > 0 && (
                     <WarningOutput stderr={entry.stderrResult} />
                   )}
-                  <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
-                    <div className="mb-1">
-                      <span className="text-grey-70 text-xs font-medium">
-                        Result:
-                      </span>
-                    </div>
-                    {entry.result ?? "No result"}
-                  </div>
                   {entry.stdoutResult && entry.stdoutResult.length > 0 && (
                     <StdoutResults stdout={entry.stdoutResult} />
                   )}
