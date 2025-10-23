@@ -271,7 +271,10 @@ export class Popcorn {
     const handler = handlers[data.type];
     if (handler !== undefined) {
       handler(data.value);
-    } else if (data.type?.startsWith("popcorn")) {
+    } else if (
+      typeof data.type === "string" &&
+      data.type?.startsWith("popcorn")
+    ) {
       console.warn(
         `Received unhandled event: ${JSON.stringify(data, null, 4)}`,
       );
