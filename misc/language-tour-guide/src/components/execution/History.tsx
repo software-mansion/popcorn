@@ -6,6 +6,7 @@ import { useExecutionHistoryStore } from "../../store/executionHistory";
 import StdoutResults from "./StdoutResults";
 import { CompilerError } from "./CompilerError";
 import { WarningOutput } from "./WarningOutput";
+import { Button } from "../Button";
 
 function formatTimeStamp(date: Date): string {
   return date.toLocaleTimeString([], {
@@ -38,19 +39,17 @@ export function History() {
 
   return (
     <div className="border-t border-orange-100">
-      <div
-        className="mt-3 flex cursor-pointer items-center justify-between px-6"
+      <button
+        className="mt-3 flex cursor-pointer items-center gap-5 px-6"
         onClick={toggleHistory}
       >
         <h3 className="text-brown-90 text-sm font-medium">Execution History</h3>
-        <button className="text-orange-500">
-          {showHistory ? (
-            <ChevronUpIcon className="h-4 w-4" />
-          ) : (
-            <ChevronDownIcon className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+        {showHistory ? (
+          <ChevronUpIcon className="h-4 w-4" />
+        ) : (
+          <ChevronDownIcon className="h-4 w-4" />
+        )}
+      </button>
 
       {showHistory && (
         <div className="mt-2 space-y-2 px-6">
@@ -61,12 +60,12 @@ export function History() {
           ) : (
             <>
               <div className="flex justify-end">
-                <button
+                <Button
+                  type="tertiary"
                   onClick={clearHistory}
-                  className="text-xs text-orange-500 hover:text-orange-600"
-                >
-                  Clear History
-                </button>
+                  className="cursor-pointer text-xs font-medium text-orange-500 hover:text-orange-600"
+                  title="Clear History"
+                />
               </div>
               {sortedHistory.map((entry, index) => (
                 <div
@@ -87,14 +86,6 @@ export function History() {
                   {entry.stderrResult && entry.stderrResult.length > 0 && (
                     <WarningOutput stderr={entry.stderrResult} />
                   )}
-                  <div className="rounded bg-white p-2 text-sm whitespace-pre-wrap">
-                    <div className="mb-1">
-                      <span className="text-grey-70 text-xs font-medium">
-                        Result:
-                      </span>
-                    </div>
-                    {entry.result ?? "No result"}
-                  </div>
                   {entry.stdoutResult && entry.stdoutResult.length > 0 && (
                     <StdoutResults stdout={entry.stdoutResult} />
                   )}

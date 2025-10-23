@@ -2,7 +2,6 @@ import { create } from "zustand";
 
 export type HistoryEntry = {
   timestamp: Date;
-  result?: string;
   durationMs?: number;
   stdoutResult?: string[];
   stderrResult?: string[];

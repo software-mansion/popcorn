@@ -32,7 +32,6 @@ function isDeinitializedError(error: unknown): error is { error: Error } {
 
 export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
-  const [resultData, setResultData] = useState<string | null>(null);
   const [errorData, setErrorData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
   const { call, reinitializePopcorn, clearCollectedOutput } = usePopcorn();
@@ -44,7 +43,8 @@ export function Results() {
     stdoutResult,
     stderrResult,
     resetStdoutResult,
-    resetStderrResult
+    resetStderrResult,
+    isCodeChanged
   } = useCodeEditorStore(
     useShallow((state) => ({
       setCode: state.setCode,
@@ -53,7 +53,8 @@ export function Results() {
       stdoutResult: state.stdoutResult,
       stderrResult: state.stderrResult,
       resetStdoutResult: state.resetStdoutResult,
-      resetStderrResult: state.resetStderrResult
+      resetStderrResult: state.resetStderrResult,
+      isCodeChanged: state.isCodeChanged
     }))
   );
 
@@ -91,7 +92,6 @@ export function Results() {
         }, 500);
 
         setErrorData(null);
-        setResultData(null);
         setDurationMs(null);
 
         try {
@@ -131,15 +131,12 @@ export function Results() {
 
         clearTimeout(timeoutId);
 
-        const { data, durationMs } = result;
+        const { durationMs } = result;
 
-        // TODO: remove escape sequences from stderr
-        setResultData(data);
         setDurationMs(durationMs);
 
         addHistoryEntry({
           timestamp: new Date(),
-          result: data,
           stdoutResult: stdoutRef.current,
           stderrResult: stderrRef.current,
           durationMs
@@ -176,7 +173,6 @@ export function Results() {
   }, [onKeyDown]);
 
   const resetToDefault = useCallback(() => {
-    setResultData(null);
     setErrorData(null);
     setDurationMs(null);
   }, []);
@@ -185,7 +181,16 @@ export function Results() {
 
   return (
     <>
-      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit py-3 pr-6">
+      <div className="sticky top-0 flex w-full flex-wrap justify-end gap-3 border-b border-orange-100 bg-inherit px-6 py-3">
+        <div className="mr-auto flex items-center">
+          {pending ? (
+            <span className="text-grey-60 text-xs"> (pending...)</span>
+          ) : (
+            <span className="text-grey-60 text-xs">
+              {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
+            </span>
+          )}
+        </div>
         {pending && longRunning && (
           <Button
             title="Cancel"
@@ -193,11 +198,13 @@ export function Results() {
             onClick={handleCancelRunning}
           />
         )}
-        <Button
-          title="Reset Code"
-          type="secondary"
-          onClick={resetCodeToDefault}
-        />
+        {isCodeChanged() && (
+          <Button
+            title="Reset Code"
+            type="secondary"
+            onClick={resetCodeToDefault}
+          />
+        )}
         <Button
           title="Run Code"
           type="primary"
@@ -206,13 +213,8 @@ export function Results() {
         />
       </div>
       <div className="font-inter text-brown-90 flex flex-col gap-2 px-6">
-        {pending ? (
-          <span className="text-grey-60 text-xs"> (pending...)</span>
-        ) : (
+        {!pending && (
           <>
-            <span className="text-grey-60 text-xs">
-              {durationMs ? ` (${durationMs.toFixed(3)} ms)` : ""}
-            </span>
             {errorData && <CompilerError message={errorData} />}
             {stderrResult && stderrResult.length > 0 && (
               <WarningOutput stderr={stderrResult} />
@@ -220,7 +222,6 @@ export function Results() {
             {stdoutResult && stdoutResult.length > 0 && (
               <StdoutResults stdout={stdoutResult} />
             )}
-            <span>{resultData}</span>
           </>
         )}
       </div>
