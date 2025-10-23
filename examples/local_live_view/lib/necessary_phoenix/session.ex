@@ -28,16 +28,16 @@ defmodule Phoenix.LiveView.Session do
     end
   end
 
-defp replace_root(%Session{} = session, new_root_view, root_pid) when is_pid(root_pid) do
-  %{
-    session
-    | view: new_root_view,
-      root_view: new_root_view,
-      root_pid: root_pid,
-      assign_new: [],
-      redirected?: true
-  }
-end
+  defp replace_root(%Session{} = session, new_root_view, root_pid) when is_pid(root_pid) do
+    %{
+      session
+      | view: new_root_view,
+        root_view: new_root_view,
+        root_pid: root_pid,
+        assign_new: [],
+        redirected?: true
+    }
+  end
 
   @doc """
   Verifies the session token.

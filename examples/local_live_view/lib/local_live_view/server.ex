@@ -30,7 +30,6 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
-
   def start_llv_process() do
     DynamicSupervisor.start_child(
       LocalLiveView.Server.Supervisor,
@@ -262,7 +261,7 @@ defmodule LocalLiveView.Server do
     state
   end
 
-## Mount
+  ## Mount
 
   defp mount(%{"session" => session} = params, from, phx_socket) do
     with %Phoenix.LiveView.Session{view: view} <- session,

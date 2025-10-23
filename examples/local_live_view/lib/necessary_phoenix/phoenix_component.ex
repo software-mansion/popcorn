@@ -1186,58 +1186,58 @@ defmodule Phoenix.Component do
 
   def live_flash(%{} = flash, key), do: Map.get(flash, to_string(key))
 
-#  @doc """
-#  Returns errors for the upload as a whole.
-#
-#  For errors that apply to a specific upload entry, use `upload_errors/2`.
-#
-#  The output is a list. The following error may be returned:
-#
-#  * `:too_many_files` - The number of selected files exceeds the `:max_entries` constraint
-#
-#  ## Examples
-#
-#      def upload_error_to_string(:too_many_files), do: "You have selected too many files"
-#
-#  ```heex
-#  <div :for={err <- upload_errors(@uploads.avatar)} class="alert alert-danger">
-#    {upload_error_to_string(err)}
-#  </div>
-#  ```
-#  """
+  #  @doc """
+  #  Returns errors for the upload as a whole.
+  #
+  #  For errors that apply to a specific upload entry, use `upload_errors/2`.
+  #
+  #  The output is a list. The following error may be returned:
+  #
+  #  * `:too_many_files` - The number of selected files exceeds the `:max_entries` constraint
+  #
+  #  ## Examples
+  #
+  #      def upload_error_to_string(:too_many_files), do: "You have selected too many files"
+  #
+  #  ```heex
+  #  <div :for={err <- upload_errors(@uploads.avatar)} class="alert alert-danger">
+  #    {upload_error_to_string(err)}
+  #  </div>
+  #  ```
+  #  """
 
   #  def upload_errors(%Phoenix.LiveView.UploadConfig{} = conf) do
   #    for {ref, error} <- conf.errors, ref == conf.ref, do: error
   #  end
 
-#  @doc """
-#  Returns errors for the upload entry.
-#
-#  For errors that apply to the upload as a whole, use `upload_errors/1`.
-#
-#  The output is a list. The following errors may be returned:
-#
-#  * `:too_large` - The entry exceeds the `:max_file_size` constraint
-#  * `:not_accepted` - The entry does not match the `:accept` MIME types
-#  * `:external_client_failure` - When external upload fails
-#  * `{:writer_failure, reason}` - When the custom writer fails with `reason`
-#
-#  ## Examples
-#
-#  ```elixir
-#  defp upload_error_to_string(:too_large), do: "The file is too large"
-#  defp upload_error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
-#  defp upload_error_to_string(:external_client_failure), do: "Something went terribly wrong"
-#  ```
-#
-#  ```heex
-#  <%= for entry <- @uploads.avatar.entries do %>
-#    <div :for={err <- upload_errors(@uploads.avatar, entry)} class="alert alert-danger">
-#      {upload_error_to_string(err)}
-#    </div>
-#  <% end %>
-#  ```
-#  """
+  #  @doc """
+  #  Returns errors for the upload entry.
+  #
+  #  For errors that apply to the upload as a whole, use `upload_errors/1`.
+  #
+  #  The output is a list. The following errors may be returned:
+  #
+  #  * `:too_large` - The entry exceeds the `:max_file_size` constraint
+  #  * `:not_accepted` - The entry does not match the `:accept` MIME types
+  #  * `:external_client_failure` - When external upload fails
+  #  * `{:writer_failure, reason}` - When the custom writer fails with `reason`
+  #
+  #  ## Examples
+  #
+  #  ```elixir
+  #  defp upload_error_to_string(:too_large), do: "The file is too large"
+  #  defp upload_error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
+  #  defp upload_error_to_string(:external_client_failure), do: "Something went terribly wrong"
+  #  ```
+  #
+  #  ```heex
+  #  <%= for entry <- @uploads.avatar.entries do %>
+  #    <div :for={err <- upload_errors(@uploads.avatar, entry)} class="alert alert-danger">
+  #      {upload_error_to_string(err)}
+  #    </div>
+  #  <% end %>
+  #  ```
+  #  """
 
   #  def upload_errors(
   #        %Phoenix.LiveView.UploadConfig{} = conf,

@@ -223,7 +223,7 @@ defmodule Phoenix.LiveView.Static do
         raise "expected #{inspect(view_or_component)} to be a #{kind}, but it is a #{other}"
     end
   end
-  
+
   defp call_mount_and_handle_params!(socket, view, session, params, uri \\ nil) do
     mount_params = if socket.router, do: params, else: :not_mounted_at_router
 
