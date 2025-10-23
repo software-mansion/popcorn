@@ -9,7 +9,7 @@ defmodule CompareLiveViewsWeb.Layouts do
   # The default root.html.heex file contains the HTML
   # skeleton of your application, namely HTML headers
   # and other static content.
-  embed_templates "layouts/*"
+  embed_templates("layouts/*")
 
   @doc """
   Renders your app layout.
@@ -25,13 +25,14 @@ defmodule CompareLiveViewsWeb.Layouts do
       </Layouts.app>
 
   """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr(:flash, :map, required: true, doc: "the map of flash messages")
 
-  attr :current_scope, :map,
+  attr(:current_scope, :map,
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
+  )
 
-  slot :inner_block, required: true
+  slot(:inner_block, required: true)
 
   def app(assigns) do
     ~H"""
@@ -79,8 +80,8 @@ defmodule CompareLiveViewsWeb.Layouts do
 
       <.flash_group flash={@flash} />
   """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
+  attr(:flash, :map, required: true, doc: "the map of flash messages")
+  attr(:id, :string, default: "flash-group", doc: "the optional id of flash container")
 
   def flash_group(assigns) do
     ~H"""

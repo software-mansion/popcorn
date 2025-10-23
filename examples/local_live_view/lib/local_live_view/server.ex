@@ -4,14 +4,14 @@ end
 
 defmodule LocalLiveView.Server do
   @moduledoc false
-#  A LocalLiveView is a process that receives events, updates
-#  its state, and renders updates to a page as diffs.
-#  
-#  LocalLiveView.Server is a instance of GenServer that handles 
-#  events for LocalLiveView, just like a Phoenix.Channel.
-#
-#  One LocalLiveView.Server will be created per every LocalLiveView
-#  used on the page.
+  #  A LocalLiveView is a process that receives events, updates
+  #  its state, and renders updates to a page as diffs.
+  #  
+  #  LocalLiveView.Server is a instance of GenServer that handles 
+  #  events for LocalLiveView, just like a Phoenix.Channel.
+  #
+  #  One LocalLiveView.Server will be created per every LocalLiveView
+  #  used on the page.
 
   use GenServer, restart: :temporary
 
@@ -21,26 +21,15 @@ defmodule LocalLiveView.Server do
     Socket,
     Utils,
     Diff,
-    Upload,
-    UploadConfig,
-    Route,
     Session,
-    Lifecycle,
-    Async
+    Lifecycle
   }
 
   alias Phoenix.LiveView.Socket
   alias Phoenix.LiveView.Diff
 
-  alias Phoenix.Socket.Broadcast
   alias LocalLiveView.Message
 
-  import Popcorn.Wasm
-  alias Popcorn.Wasm
-
-  @prefix :phoenix
-  @not_mounted_at_router :not_mounted_at_router
-  @max_host_size 253
 
   def start_llv_process() do
     DynamicSupervisor.start_child(
@@ -49,7 +38,7 @@ defmodule LocalLiveView.Server do
     )
   end
 
-  def start_link(arg) do
+  def start_link(_arg) do
     GenServer.start_link(__MODULE__, [])
   end
 
@@ -59,7 +48,7 @@ defmodule LocalLiveView.Server do
   end
 
   @impl true
-  def handle_info({LocalLiveView.Server, params, from, phx_socket}, ref) do
+  def handle_info({LocalLiveView.Server, params, from, phx_socket}, _ref) do
     try do
       mount(params, from, phx_socket)
     rescue
@@ -69,7 +58,7 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "event"} = msg, state) do
-    %{"value" => raw_val, "event" => event, "type" => type} = payload = msg.payload
+    %{"value" => _raw_val, "event" => event, "type" => _type} = msg.payload
     new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
     val = %{}
 
@@ -115,7 +104,7 @@ defmodule LocalLiveView.Server do
     view.handle_info(msg, socket)
   end
 
-  defp maybe_call_mount_handle_params(%{socket: socket} = state, router, url, params) do
+  defp maybe_call_mount_handle_params(%{socket: socket} = state, params) do
     %{view: view, redirected: mount_redirect} = socket
     lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
 
@@ -129,7 +118,7 @@ defmodule LocalLiveView.Server do
 
       true ->
         socket
-        |> Utils.call_handle_params!(view, lifecycle.exported?, params, url)
+        |> Utils.call_handle_params!(view, lifecycle.exported?, params)
         |> mount_handle_params_result(state, :mount)
     end
   end
@@ -208,7 +197,7 @@ defmodule LocalLiveView.Server do
          |> push_live_patch(pending_live_patch)
          |> push_diff(diff, ref)}
 
-      result ->
+      _result ->
         state
     end
   end
@@ -265,17 +254,16 @@ defmodule LocalLiveView.Server do
     reply(state, ref, status, Map.merge(payload, extra))
   end
 
-  defp reply(state, ref, status, payload) when is_binary(ref) do
+  defp reply(state, ref, _status, _payload) when is_binary(ref) do
     state
   end
 
-  defp push(state, event, payload) do
-    view = state.socket.view
+  defp push(state, _event, _payload) do
     state
   end
 
-  #  ## Mount
-  #
+## Mount
+
   defp mount(%{"session" => session} = params, from, phx_socket) do
     with %Phoenix.LiveView.Session{view: view} <- session,
          {:ok, config} <- load_live_view(view) do
@@ -339,8 +327,8 @@ defmodule LocalLiveView.Server do
           %Socket{socket | view: view}
           |> Utils.maybe_call_live_view_mount!(view, params, verified)
           |> build_state(phx_socket)
-          |> maybe_call_mount_handle_params(nil, nil, params)
-          |> reply_mount(from, verified, nil)
+          |> maybe_call_mount_handle_params(params)
+          |> reply_mount(from, verified)
         rescue
           exception ->
             reraise(exception, __STACKTRACE__)
@@ -377,7 +365,7 @@ defmodule LocalLiveView.Server do
 
   defp put_container(%Session{}, nil = _route, %{} = diff), do: diff
 
-  defp reply_mount(result, from, %Session{} = session, route) do
+  defp reply_mount(result, from, %Session{} = session) do
     lv_vsn = to_string(Application.spec(:phoenix_live_view)[:vsn])
 
     case result do
@@ -423,10 +411,6 @@ defmodule LocalLiveView.Server do
 
   defp post_verified_mount(%{socket: socket} = state) do
     %{state | socket: Utils.post_mount_prune(socket)}
-  end
-
-  defp assign_action(socket, action) do
-    Phoenix.LiveView.Utils.assign(socket, :live_action, action)
   end
 
   defp maybe_update_uploads(%Socket{} = socket, %{} = _payload), do: socket

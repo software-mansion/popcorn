@@ -6,18 +6,15 @@ defmodule Phoenix.LiveView.Static do
   # Holds the logic for static rendering.
   @moduledoc false
 
-  alias Phoenix.LiveView.{Socket, Utils, Diff, Route, Lifecycle}
-  alias Phoenix.LiveView.Route
+  alias Phoenix.LiveView.{Socket, Utils, Diff, Lifecycle}
 
   # Token version. Should be changed whenever new data is stored.
   @token_vsn 6
-  @phoenix_reload_status "__phoenix_reload_status__"
 
   def token_vsn, do: @token_vsn
 
   # Max session age in seconds. Equivalent to 2 weeks.
   @max_session_age 1_209_600
-
 
   @doc """
   Verifies a LiveView token.
@@ -30,7 +27,6 @@ defmodule Phoenix.LiveView.Static do
       {:error, reason} when reason in [:expired, :invalid] -> {:error, reason}
     end
   end
-
 
   defp load_session(conn_or_socket_session, opts) do
     user_session = Keyword.get(opts, :session, %{})
@@ -47,20 +43,6 @@ defmodule Phoenix.LiveView.Static do
     end
   end
 
-  defp maybe_get_session(conn) do
-    Plug.Conn.get_session(conn)
-  rescue
-    _ -> %{}
-  end
-
-  defp maybe_put_live_layout(private, %{extra: %{layout: layout}}) do
-    Map.put(private, :live_layout, layout)
-  end
-
-  defp maybe_put_live_layout(private, _live_session) do
-    private
-  end
-
   @doc """
   Renders a live view without spawning a LiveView server.
 
@@ -74,8 +56,8 @@ defmodule Phoenix.LiveView.Static do
     * `:session` - the required map of session data
     * `:container` - the optional tuple for the HTML tag and DOM attributes
   """
-# Patch reason: render/2 function was changed because LocalLiveView does not use Plug.Conn and
-# need to create its Lifecycle differently.
+  # Patch reason: render/2 function was changed because LocalLiveView does not use Plug.Conn and
+  # need to create its Lifecycle differently.
   def render(view, opts \\ []) do
     do_render(view, opts)
   end
@@ -84,8 +66,6 @@ defmodule Phoenix.LiveView.Static do
     config = load_live!(view, :view)
     {tag, extended_attrs} = container(config, opts)
     router = Keyword.get(opts, :router)
-    action = Keyword.get(opts, :action)
-
     socket = %Socket{view: view}
 
     case call_mount_and_handle_params!(socket, view, %Phoenix.LiveView.Session{view: view}, %{}) do
@@ -243,15 +223,7 @@ defmodule Phoenix.LiveView.Static do
         raise "expected #{inspect(view_or_component)} to be a #{kind}, but it is a #{other}"
     end
   end
-
-  defp lifecycle(%{lifecycle: lifecycle}, %{extra: %{on_mount: on_mount}}) do
-    %{lifecycle | mount: on_mount ++ lifecycle.mount}
-  end
-
-  defp lifecycle(%{lifecycle: lifecycle}, _) do
-    lifecycle
-  end
-
+  
   defp call_mount_and_handle_params!(socket, view, session, params, uri \\ nil) do
     mount_params = if socket.router, do: params, else: :not_mounted_at_router
 
@@ -279,7 +251,8 @@ defmodule Phoenix.LiveView.Static do
 
       not lifecycle.any? ->
         {:noreply, socket}
-# Patch reason: in LocalLiveView socket.router is always nil
+
+      # Patch reason: in LocalLiveView socket.router is always nil
       #      is_nil(socket.router) ->
       #        # Let the callback fail for the usual reasons
       #        Route.live_link_info!(socket, view, uri)
@@ -287,26 +260,6 @@ defmodule Phoenix.LiveView.Static do
       true ->
         Utils.call_handle_params!(socket, view, lifecycle.exported?, params, uri)
     end
-  end
-
-  defp sign_root_session(%Socket{} = socket, router, view, session, live_session) do
-    live_session_name =
-      case live_session do
-        %{name: name} -> name
-        nil -> nil
-      end
-
-    # IMPORTANT: If you change the second argument, @token_vsn has to be bumped.
-    sign_token(socket.endpoint, %{
-      id: socket.id,
-      view: view,
-      root_view: view,
-      router: router,
-      live_session_name: live_session_name,
-      parent_pid: nil,
-      root_pid: nil,
-      session: session
-    })
   end
 
   defp sign_nested_session(%Socket{} = parent, %Socket{} = child, view, session, sticky?) do

@@ -2,18 +2,18 @@ defmodule CompareLiveViewsWeb.Router do
   use CompareLiveViewsWeb, :router
 
   pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_live_flash
-    plug :put_root_layout, html: {CompareLiveViewsWeb.Layouts, :root}
-    plug :protect_from_forgery
-    plug :put_secure_browser_headers
-    plug :add_headers
+    plug(:accepts, ["html"])
+    plug(:fetch_session)
+    plug(:fetch_live_flash)
+    plug(:put_root_layout, html: {CompareLiveViewsWeb.Layouts, :root})
+    plug(:protect_from_forgery)
+    plug(:put_secure_browser_headers)
+    plug(:add_headers)
   end
 
   pipeline :api do
-    plug :accepts, ["json"]
-    plug :add_headers
+    plug(:accepts, ["json"])
+    plug(:add_headers)
   end
 
   def add_headers(conn, _opts) do
@@ -28,8 +28,8 @@ defmodule CompareLiveViewsWeb.Router do
   end
 
   scope "/", CompareLiveViewsWeb do
-    pipe_through :browser
-    get "/", PageController, :home
+    pipe_through(:browser)
+    get("/", PageController, :home)
   end
 
   # Other scopes may use custom stacks.
@@ -47,10 +47,10 @@ defmodule CompareLiveViewsWeb.Router do
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
-      pipe_through :browser
+      pipe_through(:browser)
 
-      live_dashboard "/dashboard", metrics: CompareLiveViewsWeb.Telemetry
-      forward "/mailbox", Plug.Swoosh.MailboxPreview
+      live_dashboard("/dashboard", metrics: CompareLiveViewsWeb.Telemetry)
+      forward("/mailbox", Plug.Swoosh.MailboxPreview)
     end
   end
 end

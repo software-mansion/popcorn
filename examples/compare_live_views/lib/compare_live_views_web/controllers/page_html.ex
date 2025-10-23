@@ -6,5 +6,5 @@ defmodule CompareLiveViewsWeb.PageHTML do
   """
   use CompareLiveViewsWeb, :html
 
-  embed_templates "page_html/*"
+  embed_templates("page_html/*")
 end

@@ -10,10 +10,10 @@ defmodule Phoenix.LiveView.Component do
   defstruct [:id, :component, :assigns]
 
   @type t :: %__MODULE__{
-               id: binary(),
-               component: module(),
-               assigns: map()
-             }
+          id: binary(),
+          component: module(),
+          assigns: map()
+        }
 
   defimpl Phoenix.HTML.Safe do
     def to_iodata(%{id: id, component: component}) do
@@ -61,21 +61,21 @@ defmodule Phoenix.LiveView.Comprehension do
   @type keyed_render_fun :: (map(), boolean() -> [Phoenix.LiveView.Rendered.dyn()])
 
   @type t :: %__MODULE__{
-               static: [String.t()] | non_neg_integer(),
-               has_key?: boolean(),
-               # Each entry is a three-element tuple.
-               #
-               #   The first element is the evaluated key (or nil if there is none).
-               #
-               #   The second element is a map of variables to be change-tracked.
-               #
-               #   The third element is the keyed render function that receives the vars_changed map,
-               #   and a boolean to enable or disable change tracking.
-               #
-               entries: [{key(), map(), keyed_render_fun()}],
-               fingerprint: term(),
-               stream: list() | nil
-             }
+          static: [String.t()] | non_neg_integer(),
+          has_key?: boolean(),
+          # Each entry is a three-element tuple.
+          #
+          #   The first element is the evaluated key (or nil if there is none).
+          #
+          #   The second element is a map of variables to be change-tracked.
+          #
+          #   The third element is the keyed render function that receives the vars_changed map,
+          #   and a boolean to enable or disable change tracking.
+          #
+          entries: [{key(), map(), keyed_render_fun()}],
+          fingerprint: term(),
+          stream: list() | nil
+        }
 
   defimpl Phoenix.HTML.Safe do
     def to_iodata(%Phoenix.LiveView.Comprehension{static: static, entries: entries}) do
@@ -1324,7 +1324,7 @@ defmodule Phoenix.LiveView.Engine do
     end
   end
 
-  defp fingerprint(block, static) do
+  defp fingerprint(_block, _static) do
     # The fingerprint must be unique and we don’t check for collisions in the
     # Diff module as doing so would be expensive. Therefore it is important
     # that the algorithm we use here has a low number of collisions.

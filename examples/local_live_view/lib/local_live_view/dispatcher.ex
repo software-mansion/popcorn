@@ -2,10 +2,8 @@ defmodule LocalLiveView.Dispatcher do
   @moduledoc false
   use GenServer
   alias Phoenix.LiveView.Session
-  alias Phoenix.LiveView.Diff
   import Popcorn.Wasm
   alias Popcorn.Wasm
-  alias Phoenix.LiveView.Static
   alias LocalLiveView.Message
   @process_name :main
 
@@ -26,7 +24,7 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"event" => type, "view" => view_string, "payload" => payload}},
+         {:wasm_call, %{"event" => _type, "view" => view_string, "payload" => payload}},
          state
        ) do
     view = Module.safe_concat([view_string])
@@ -68,9 +66,5 @@ defmodule LocalLiveView.Dispatcher do
           nil
       end
     end
-  end
-
-  def render(assigns) do
-    :ok
   end
 end

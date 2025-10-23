@@ -633,7 +633,7 @@ defmodule Phoenix.Component do
 
   ## Functions
 
-  alias Phoenix.LiveView.{Static, Socket, AsyncResult}
+  alias Phoenix.LiveView.{Static, Socket}
   @reserved_assigns Phoenix.Component.Declarative.__reserved__()
   # Note we allow live_action as it may be passed down to a component, so it is not listed
   @non_assignables [:uploads, :streams, :socket, :myself]
@@ -1065,15 +1065,15 @@ defmodule Phoenix.Component do
   """
   def live_render(conn_or_socket, view, opts \\ [])
 
-#  def live_render(%Plug.Conn{} = conn, view, opts) do
-#    case Static.render(conn, view, opts) do
-#      {:ok, content, _assigns} ->
-#        content
-#
-#      {:stop, _} ->
-#        raise RuntimeError, "cannot redirect from a child LiveView"
-#    end
-#  end
+  #  def live_render(%Plug.Conn{} = conn, view, opts) do
+  #    case Static.render(conn, view, opts) do
+  #      {:ok, content, _assigns} ->
+  #        content
+  #
+  #      {:stop, _} ->
+  #        raise RuntimeError, "cannot redirect from a child LiveView"
+  #    end
+  #  end
 
   def live_render(%Socket{} = parent, view, opts) do
     Static.nested_render(parent, view, opts)
@@ -1186,63 +1186,65 @@ defmodule Phoenix.Component do
 
   def live_flash(%{} = flash, key), do: Map.get(flash, to_string(key))
 
-  @doc """
-  Returns errors for the upload as a whole.
+#  @doc """
+#  Returns errors for the upload as a whole.
+#
+#  For errors that apply to a specific upload entry, use `upload_errors/2`.
+#
+#  The output is a list. The following error may be returned:
+#
+#  * `:too_many_files` - The number of selected files exceeds the `:max_entries` constraint
+#
+#  ## Examples
+#
+#      def upload_error_to_string(:too_many_files), do: "You have selected too many files"
+#
+#  ```heex
+#  <div :for={err <- upload_errors(@uploads.avatar)} class="alert alert-danger">
+#    {upload_error_to_string(err)}
+#  </div>
+#  ```
+#  """
 
-  For errors that apply to a specific upload entry, use `upload_errors/2`.
+  #  def upload_errors(%Phoenix.LiveView.UploadConfig{} = conf) do
+  #    for {ref, error} <- conf.errors, ref == conf.ref, do: error
+  #  end
 
-  The output is a list. The following error may be returned:
+#  @doc """
+#  Returns errors for the upload entry.
+#
+#  For errors that apply to the upload as a whole, use `upload_errors/1`.
+#
+#  The output is a list. The following errors may be returned:
+#
+#  * `:too_large` - The entry exceeds the `:max_file_size` constraint
+#  * `:not_accepted` - The entry does not match the `:accept` MIME types
+#  * `:external_client_failure` - When external upload fails
+#  * `{:writer_failure, reason}` - When the custom writer fails with `reason`
+#
+#  ## Examples
+#
+#  ```elixir
+#  defp upload_error_to_string(:too_large), do: "The file is too large"
+#  defp upload_error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
+#  defp upload_error_to_string(:external_client_failure), do: "Something went terribly wrong"
+#  ```
+#
+#  ```heex
+#  <%= for entry <- @uploads.avatar.entries do %>
+#    <div :for={err <- upload_errors(@uploads.avatar, entry)} class="alert alert-danger">
+#      {upload_error_to_string(err)}
+#    </div>
+#  <% end %>
+#  ```
+#  """
 
-  * `:too_many_files` - The number of selected files exceeds the `:max_entries` constraint
-
-  ## Examples
-
-      def upload_error_to_string(:too_many_files), do: "You have selected too many files"
-
-  ```heex
-  <div :for={err <- upload_errors(@uploads.avatar)} class="alert alert-danger">
-    {upload_error_to_string(err)}
-  </div>
-  ```
-  """
-#  def upload_errors(%Phoenix.LiveView.UploadConfig{} = conf) do
-#    for {ref, error} <- conf.errors, ref == conf.ref, do: error
-#  end
-
-  @doc """
-  Returns errors for the upload entry.
-
-  For errors that apply to the upload as a whole, use `upload_errors/1`.
-
-  The output is a list. The following errors may be returned:
-
-  * `:too_large` - The entry exceeds the `:max_file_size` constraint
-  * `:not_accepted` - The entry does not match the `:accept` MIME types
-  * `:external_client_failure` - When external upload fails
-  * `{:writer_failure, reason}` - When the custom writer fails with `reason`
-
-  ## Examples
-
-  ```elixir
-  defp upload_error_to_string(:too_large), do: "The file is too large"
-  defp upload_error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
-  defp upload_error_to_string(:external_client_failure), do: "Something went terribly wrong"
-  ```
-
-  ```heex
-  <%= for entry <- @uploads.avatar.entries do %>
-    <div :for={err <- upload_errors(@uploads.avatar, entry)} class="alert alert-danger">
-      {upload_error_to_string(err)}
-    </div>
-  <% end %>
-  ```
-  """
-#  def upload_errors(
-#        %Phoenix.LiveView.UploadConfig{} = conf,
-#        %Phoenix.LiveView.UploadEntry{} = entry
-#      ) do
-#    for {ref, error} <- conf.errors, ref == entry.ref, do: error
-#  end
+  #  def upload_errors(
+  #        %Phoenix.LiveView.UploadConfig{} = conf,
+  #        %Phoenix.LiveView.UploadEntry{} = entry
+  #      ) do
+  #    for {ref, error} <- conf.errors, ref == entry.ref, do: error
+  #  end
 
   @doc ~S'''
   Assigns the given `key` with value from `fun` into `socket_or_assigns` if one does not yet exist.
@@ -3308,10 +3310,10 @@ defmodule Phoenix.Component do
   """
   @doc type: :component
 
-#  attr.(:upload, Phoenix.LiveView.UploadConfig,
-#    required: true,
-#    doc: "The `Phoenix.LiveView.UploadConfig` struct"
-#  )
+  #  attr.(:upload, Phoenix.LiveView.UploadConfig,
+  #    required: true,
+  #    doc: "The `Phoenix.LiveView.UploadConfig` struct"
+  #  )
 
   attr.(:accept, :string,
     doc:
@@ -3366,10 +3368,10 @@ defmodule Phoenix.Component do
   """
   @doc type: :component
 
-#  attr.(:entry, Phoenix.LiveView.UploadEntry,
-#    required: true,
-#    doc: "The `Phoenix.LiveView.UploadEntry` struct"
-#  )
+  #  attr.(:entry, Phoenix.LiveView.UploadEntry,
+  #    required: true,
+  #    doc: "The `Phoenix.LiveView.UploadEntry` struct"
+  #  )
 
   attr.(:id, :string,
     default: nil,
@@ -3481,7 +3483,7 @@ defmodule Phoenix.Component do
   ```
   """
   @doc type: :component
-#  attr.(:assign, AsyncResult, required: true)
+  #  attr.(:assign, AsyncResult, required: true)
   slot.(:loading, doc: "rendered while the assign is loading for the first time")
 
   slot.(:failed,

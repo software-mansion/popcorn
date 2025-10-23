@@ -10,7 +10,6 @@ on:
     branches: ["**"]
     paths:
       - "**"
-      - "!examples/**"
       - "!misc/**"
       - "!.github/**"
       - ".github/workflows/popcorn_build_test.yml"
@@ -18,7 +17,6 @@ on:
     branches: ["**"]
     paths:
       - "**"
-      - "!examples/**"
       - "!misc/**"
       - "!.github/**"
       - ".github/workflows/popcorn_build_test.yml"

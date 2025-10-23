@@ -335,7 +335,7 @@ defmodule Phoenix.LiveView.Utils do
   @doc """
   Calls the `c:Phoenix.LiveView.mount/3` callback, otherwise returns the socket as is.
   """
-  def maybe_call_live_view_mount!(%Socket{} = socket, view, params, session, uri \\ nil) do
+  def maybe_call_live_view_mount!(%Socket{} = socket, view, params, session, _uri \\ nil) do
     %{any?: any?, exported?: exported?} = Lifecycle.stage_info(socket, view, :mount, 3)
     # Patch reason: We do not use telemetry as it is not fully working in AtomVM
     if any? do

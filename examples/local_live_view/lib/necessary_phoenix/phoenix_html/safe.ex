@@ -69,7 +69,7 @@ defimpl Phoenix.HTML.Safe, for: List do
   defp recur(h) when is_integer(h) do
     raise ArgumentError,
           "lists in Phoenix.HTML templates only support iodata, and not chardata. Integers may only represent bytes. " <>
-          "It's likely you meant to pass a string with double quotes instead of a char list with single quotes."
+            "It's likely you meant to pass a string with double quotes instead of a char list with single quotes."
   end
 
   defp recur(h) when is_binary(h) do
@@ -83,7 +83,7 @@ defimpl Phoenix.HTML.Safe, for: List do
   defp recur(other) do
     raise ArgumentError,
           "lists in Phoenix.HTML and templates may only contain integers representing bytes, binaries or other lists, " <>
-          "got invalid entry: #{inspect(other)}"
+            "got invalid entry: #{inspect(other)}"
   end
 end
 

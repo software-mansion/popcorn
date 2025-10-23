@@ -3,7 +3,7 @@ defmodule LocalLiveView do
   LocalLiveView is a module that implements functionality of Phoenix.LiveView inside the browser in  
   Popcorn runtime.
   LocalLiveView should be used exactly like its Phoenix equivalent:
-  
+
       defmodule MyAppWeb.DemoLive do
         use Phoenix.LiveView
 
@@ -13,24 +13,17 @@ defmodule LocalLiveView do
           """
         end
       end
-  
+
   The LocalLiveView can be added to a page with:
   ```
   <div data-pop-view="DemoLive"></div>
   ```
-  
+
   During application runtime a LocalLiveView.Dispatcher will create a process that will handle a LocalLiveView state,
   by storing and modifying its assigns.
   '''
-  
-  alias Phoenix.LiveView.Session
-  alias Phoenix.LiveView.Diff
-  import Popcorn.Wasm
-  alias Popcorn.Wasm
-  alias Phoenix.LiveView.Static
-  alias LocalLiveView.Message
 
-  defmacro __using__(opts) do
+  defmacro __using__(_opts) do
     quote bind_quoted: [opts: []] do
       import LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
@@ -86,7 +79,7 @@ defmodule LocalLiveView do
     }
   end
 
-  def render(assigns) do
+  def render(_assigns) do
     :ok
   end
 end

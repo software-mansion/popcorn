@@ -22,10 +22,4 @@ defmodule ClockLive do
     NaiveDateTime.local_now()
     |> Calendar.strftime("%c")
   end
-
-  defp f(n, p \\ 2) do
-    n
-    |> inspect
-    |> String.pad_leading(p, "0")
-  end
 end

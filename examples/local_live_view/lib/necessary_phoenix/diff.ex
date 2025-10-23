@@ -1064,15 +1064,15 @@ defmodule Phoenix.LiveView.Diff do
     {id_to_components, Map.put(id_to_cid, component, Map.put(inner, id, cid)), uuids}
   end
 
-    defp fetch_cid(
-           %Phoenix.LiveComponent.CID{cid: cid},
-           {cid_to_components, _id_to_cid, _} = _components
-         ) do
-      case cid_to_components do
-        %{^cid => {component, _id, _assigns, _private, _fingerprints}} -> {:ok, {cid, component}}
-        %{} -> :error
-      end
+  defp fetch_cid(
+         %Phoenix.LiveComponent.CID{cid: cid},
+         {cid_to_components, _id_to_cid, _} = _components
+       ) do
+    case cid_to_components do
+      %{^cid => {component, _id, _assigns, _private, _fingerprints}} -> {:ok, {cid, component}}
+      %{} -> :error
     end
+  end
 
   defp fetch_cid({component, id}, {_cid_to_components, id_to_cid, _} = _components) do
     case id_to_cid do
