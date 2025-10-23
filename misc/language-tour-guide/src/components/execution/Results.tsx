@@ -43,7 +43,8 @@ export function Results() {
     stdoutResult,
     stderrResult,
     resetStdoutResult,
-    resetStderrResult
+    resetStderrResult,
+    isCodeChanged
   } = useCodeEditorStore(
     useShallow((state) => ({
       setCode: state.setCode,
@@ -52,7 +53,8 @@ export function Results() {
       stdoutResult: state.stdoutResult,
       stderrResult: state.stderrResult,
       resetStdoutResult: state.resetStdoutResult,
-      resetStderrResult: state.resetStderrResult
+      resetStderrResult: state.resetStderrResult,
+      isCodeChanged: state.isCodeChanged
     }))
   );
 
@@ -196,11 +198,13 @@ export function Results() {
             onClick={handleCancelRunning}
           />
         )}
-        <Button
-          title="Reset Code"
-          type="secondary"
-          onClick={resetCodeToDefault}
-        />
+        {isCodeChanged() && (
+          <Button
+            title="Reset Code"
+            type="secondary"
+            onClick={resetCodeToDefault}
+          />
+        )}
         <Button
           title="Run Code"
           type="primary"

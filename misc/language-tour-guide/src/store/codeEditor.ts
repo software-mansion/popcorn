@@ -13,6 +13,7 @@ type CodeEditorStore = {
   setCode: (code: string) => void;
   pathHash: string | null;
   setDefaultCode: (code: string) => void;
+  isCodeChanged: () => boolean;
   resetCodeToDefault: () => void;
   setPathHash: (path: string) => void;
   getCodeFromStorage: () => void;
@@ -45,6 +46,10 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
       localStorage.removeItem(`code-${state.pathHash}`);
       return { code: state.defaultCode };
     }),
+  isCodeChanged: () => {
+    const { code, defaultCode } = get();
+    return code !== defaultCode;
+  },
   setStdoutResult: (stdoutResult: string) =>
     set((state) => ({
       stdoutResult: [...state.stdoutResult, stdoutResult]
