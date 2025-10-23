@@ -46,7 +46,9 @@ IO.inspect(1 + 2)
 # You can specify a 'label' to include additional info:
 IO.inspect(1 + 2, label: "Added 1 to 2")
 
-# You can also omit braces:
+# You can also omit braces. Elixir developers usually prefer
+# to use braces, but here we'll skip them just for calls
+# to IO.inspect, for better readability.
 IO.inspect 1 + 2, label: "Added 1 to 2"
 ```
 </EditorCode>
