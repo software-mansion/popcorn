@@ -10,7 +10,7 @@ defmodule IEx.Server do
     #     {:popcorn_module.prompt_mode(status, :default), :popcorn_module.default_prefix(status, prefix)}
     #   end
 
-    prompt = "avm_iex(#{to_string(counter)})>"
+    prompt = "browser_iex(#{to_string(counter)})>"
     # apply(IEx.Config, mode, [])
     # |> String.replace("%counter", to_string(counter))
     # |> String.replace("%prefix", to_string(prefix))
