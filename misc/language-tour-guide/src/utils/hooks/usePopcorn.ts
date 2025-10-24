@@ -1,15 +1,25 @@
 import { useCallback } from "react";
-import type { AnySerializable, CallOptions, CastOptions } from ".";
-import { usePopcornContext } from "../hooks";
+import type {
+  AnySerializable,
+  CallOptions,
+  CastOptions
+} from "../../context/popcorn";
+import { usePopcornContext } from "./usePopcornContext";
 
 export const usePopcorn = () => {
-  const { instance, reinitializePopcorn, clearCollectedOutput } =
+  // TODO: Popcorn should maybe have `instance.addLogListener`?
+  const { instance, registerLogSink, clearCollectedOutput } =
     usePopcornContext();
 
   const ensureInstance = useCallback(() => {
     if (!instance) throw new Error("Popcorn instance not initialized");
     return instance;
   }, [instance]);
+
+  const startLogCapture = () => {
+    ensureInstance().registerLogSink();
+    return stopLogCapture;
+  };
 
   const call = useCallback(
     async (args: AnySerializable, options: CallOptions) => {
@@ -25,10 +35,5 @@ export const usePopcorn = () => {
     [ensureInstance]
   );
 
-  return {
-    call,
-    cast,
-    reinitializePopcorn,
-    clearCollectedOutput
-  };
+  return { call, cast, startLogCapture };
 };

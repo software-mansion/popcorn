@@ -11,6 +11,7 @@ import { useOnNavigationChange } from "../../utils/hooks/useOnNavigationChange";
 import { captureCodeException } from "../../utils/sentry";
 import { CompilerError } from "./CompilerError";
 import { WarningOutput } from "./WarningOutput";
+import { usePopcornEval } from "../../utils/hooks/usePopcornEval";
 
 interface PopcornError {
   error: string;
@@ -34,7 +35,7 @@ export function Results() {
   const [durationMs, setDurationMs] = useState<number | null>(null);
   const [errorData, setErrorData] = useState<string | null>(null);
   const [pending, withPending] = usePending();
-  const { call, reinitializePopcorn, clearCollectedOutput } = usePopcorn();
+  const evalCode = usePopcornEval();
   const [longRunning, setLongRunning] = useState(false);
 
   const {
@@ -59,12 +60,7 @@ export function Results() {
   );
 
   const handleCancelRunning = () => {
-    try {
-      reinitializePopcorn();
-      console.log("Cancel running code");
-    } catch (e) {
-      console.error("Error during Popcorn reinitialization:", e);
-    }
+    // TODO: implement call cancellation in Popcorn
   };
 
   const addHistoryEntry = useExecutionHistoryStore(
@@ -125,8 +121,6 @@ export function Results() {
           }
         }
 
-        clearCollectedOutput();
-
         if (result === null) return;
 
         clearTimeout(timeoutId);
@@ -143,17 +137,41 @@ export function Results() {
         });
       });
     },
-    [call, addHistoryEntry, withPending, clearCollectedOutput]
+    [call, addHistoryEntry, withPending]
   );
 
-  const handleRunCode = useCallback(() => {
+  const handleRunCode = useCallback(async () => {
     if (pending) return;
 
-    resetStdoutResult();
-    resetStderrResult();
-    console.log("Run Code!");
-    callPopcorn(code);
-  }, [callPopcorn, code, resetStdoutResult, resetStderrResult, pending]);
+    setErrorData(null);
+    setDurationMs(null);
+
+    const opts = { onLongRunning: () => setLongRunning(true) };
+    const result = await evalCode(code, opts);
+    const { data, durationMs, stderr, stdout, error } = result;
+    const ok = error === null;
+
+    if (ok) {
+      setDurationMs(durationMs);
+      addHistoryEntry({
+        timestamp: new Date(),
+        data,
+        stdout,
+        stderr,
+        durationMs: durationMs
+      });
+    } else {
+      setErrorData(error.error);
+      setDurationMs(error.durationMs || null);
+      addHistoryEntry({
+        timestamp: new Date(),
+        stdout,
+        stderr,
+        durationMs: error.durationMs,
+        errorMessage: error.message
+      });
+    }
+  }, [addHistoryEntry, code, evalCode, pending]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {

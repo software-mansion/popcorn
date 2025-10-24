@@ -43,6 +43,31 @@ export function captureAtomVmCrash(stdout: string, stderr: string) {
   });
 }
 
+export type LogSink = {
+  onStdout: (text: string) => void;
+  onStderr: (text: string) => void;
+  onCrash: () => void;
+};
+export function createLogSink() {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  return {
+    onStdout: (text: string) => {
+      stdout.push(text);
+    },
+    onStderr: (text: string) => {
+      stderr.push(text);
+    },
+    onCrash: () => {
+      captureAtomVmCrash(stdout.join("\n"), stderr.join("\n"));
+      // preserve ref to arrays, could also use stable object and change properties
+      stdout.length = 0;
+      stderr.length = 0;
+    }
+  };
+}
+
 export function wrapPopcornReloadIframe(
   popcornInstance: any,
   customReloadCallback: () => void
