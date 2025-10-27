@@ -30,7 +30,7 @@ export function CodeEditor() {
 
   return (
     <CodeMirror
-      className="border-orange-20 scrollbar overflow-scroll rounded-md border bg-[#FDF6E3]"
+      className="border-orange-20 h-full rounded-md border bg-[#FDF6E3]"
       autoFocus
       value={code}
       extensions={[elixir(), keymapExtension]}
