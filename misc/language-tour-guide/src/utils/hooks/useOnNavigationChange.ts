@@ -1,6 +1,6 @@
 import { useLocation } from "react-router";
 import { useCodeEditorStore } from "../../store/codeEditor";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useExecutionHistoryStore } from "../../store/executionHistory";
 
 export function useOnNavigationChange(callback: () => void) {
@@ -13,11 +13,17 @@ export function useOnNavigationChange(callback: () => void) {
   );
   const clearHistory = useExecutionHistoryStore((state) => state.clearHistory);
 
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
   useEffect(() => {
     resetStdoutResult();
     resetStderrResult();
     clearHistory();
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    callback();
-  }, [pathname, callback, resetStdoutResult, resetStderrResult, clearHistory]);
+    callbackRef.current();
+  }, [pathname, resetStdoutResult, resetStderrResult, clearHistory]);
 }

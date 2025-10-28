@@ -16,7 +16,6 @@ export function ExampleLayout() {
     setIsLargeScreen(mediaQuery.matches);
 
     const handleChange = (e: MediaQueryListEvent) => {
-      console.log("e: ", e);
       setIsLargeScreen(e.matches);
     };
 
