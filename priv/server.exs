@@ -26,6 +26,7 @@ defmodule Router do
       conn,
       [
         {"Access-Control-Allow-Origin", "*"},
+        {"Cache-Control", "public no-cache"},
         {"Cross-Origin-Opener-Policy", "same-origin"},
         {"Cross-Origin-Embedder-Policy", "require-corp"}
       ]
