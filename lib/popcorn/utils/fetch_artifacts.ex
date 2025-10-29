@@ -43,6 +43,13 @@ defmodule Popcorn.Utils.FetchArtifacts do
   def fetch_artifacts(target) do
     config = Enum.find(parse_config(), &(&1.target == target))
 
+    if config == nil do
+      raise """
+      Runtime not configured for target #{target}. \
+      Check your `config :popcorn, runtime: ...` configuration in `config.exs`.
+      """
+    end
+
     src_dir =
       case config.type do
         :path -> config.location
@@ -68,10 +75,15 @@ defmodule Popcorn.Utils.FetchArtifacts do
           %{type: type, location: location, target: List.wrap(opts[:target] || @targets)}
       end)
 
-    Enum.map(@targets, fn target ->
-      config_entry = Enum.find(config, &(target in &1.target))
-      location = String.replace(config_entry.location, "$target", "#{target}")
-      %{config_entry | location: location, target: target}
+    Enum.flat_map(@targets, fn target ->
+      case Enum.find(config, &(target in &1.target)) do
+        nil ->
+          []
+
+        config_entry ->
+          location = String.replace(config_entry.location, "$target", "#{target}")
+          [%{config_entry | location: location, target: target}]
+      end
     end)
   end
 
