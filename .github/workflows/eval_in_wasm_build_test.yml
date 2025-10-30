@@ -71,7 +71,7 @@ jobs:
         run: mix playwright.install
       - name: Build AtomVM
         run: |
-          mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF" --git-ref "mf/enable-fs"
+          mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
           echo 'config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}' >> config/config.exs
       - name: Cook
         run: mix popcorn.cook

@@ -48,14 +48,14 @@ export async function runIFrame() {
   send(MESSAGES.START_VM, initProcess);
 }
 
-async function startVm(avm_bundle) {
-  let resolve_result_promise = null;
-  const result_promise = new Promise((resolve) => { resolve_result_promise = resolve; });
+async function startVm(avmBundle) {
+  let resolveResultPromise = null;
+  const resultPromise = new Promise((resolve) => { resolveResultPromise = resolve; });
   Module = await init({
     preRun: [
       function ({ FS }) {
         FS.mkdir("/data");
-        FS.writeFile("/data/bundle.avm", avm_bundle);
+        FS.writeFile("/data/bundle.avm", avmBundle);
       }
     ],
     arguments: ["/data/bundle.avm"],
@@ -148,10 +148,10 @@ async function startVm(avm_bundle) {
 
   Module["onElixirReady"] = (initProcess) => {
     Module["onElixirReady"] = null;
-    resolve_result_promise(initProcess);
+    resolveResultPromise(initProcess);
   };
 
-  return result_promise;
+  return resultPromise;
 }
 
 async function handleCall(data) {
