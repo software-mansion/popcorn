@@ -4,8 +4,15 @@
   min-height: 500px;
 }
 
+@media screen and (min-width: 1024px) {
+  .cm-editor {
+    min-height: 0;
+  }
+}
+
 .cm-scroller {
   flex-grow: 1;
+  scrollbar-width: thin;
 }
 
 .cm-focused {
