@@ -1,5 +1,12 @@
 defmodule LocalLiveView.JS do
-  def rerender(rendered, view, attribute \\ "data-pop-view") do
+  @moduledoc """
+  Module responsible for running JS in the browser.
+  """
+
+  @doc """
+  Updates the LocalLiveView content by rendering new data inside the div with data-pop-view attribute.
+  """
+  def rerender(content, view, attribute \\ "data-pop-view") do
     view = view |> Module.split() |> List.last()
 
     Popcorn.Wasm.run_js(
@@ -12,7 +19,7 @@ defmodule LocalLiveView.JS do
         }
       }
       """,
-      %{rendered: rendered, view: view}
+      %{rendered: content, view: view}
     )
   end
 end

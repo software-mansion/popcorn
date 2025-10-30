@@ -10,16 +10,6 @@
    The heroicons installation itself is managed by your mix.exs */
 @plugin "../vendor/heroicons";
 
-/* daisyUI Tailwind Plugin. You can update this file by fetching the latest version with:
-   curl -sLO https://github.com/saadeghi/daisyui/releases/latest/download/daisyui.js
-   Make sure to look at the daisyUI changelog: https://daisyui.com/docs/changelog/ 
-  
-TODO COMMENTED FOR NOW due to not being able to handle phx-clicks
-@plugin "../vendor/daisyui" {
-  themes: false;
-}
-*/
-
 /* daisyUI theme plugin. You can update this file by fetching the latest version with:
   curl -sLO https://github.com/saadeghi/daisyui/releases/latest/download/daisyui-theme.js
   We ship with two themes, a light one inspired on Phoenix colors and a dark one inspired
@@ -161,4 +151,18 @@ TODO COMMENTED FOR NOW due to not being able to handle phx-clicks
   position: absolute;
   height: 100%;
   width: 100%;
+}
+
+.show-modal-button {
+    background-color: #6b7280; /* bg-gray-500 */
+    color: #ffffff; /* text-white */
+    font-weight: bold; /* font-bold */
+    padding: 0.5rem 1rem; /* py-2 px-4 */
+    border-radius: 0.375rem; /* rounded */
+    transition: background-color 0.3s; /* smooth transition for hover */
+}
+
+.show-modal-button:hover {
+    background-color: #374151; /* hover:bg-gray-700 */
+    cursor: pointer;
 }

@@ -2501,9 +2501,11 @@ defmodule Phoenix.Component do
 
         {csrf_token, opts} =
           Keyword.pop_lazy(opts, :csrf_token, fn ->
-            if method == "post" do
-              Plug.CSRFProtection.get_csrf_token_for(action)
-            end
+            #          Patch reason: We don't use Plug in LocalLiveView
+            #            if method == "post" do
+            #              Plug.CSRFProtection.get_csrf_token_for(action)
+            #            end
+            nil
           end)
 
         {[action: action, method: method] ++ opts, hidden_method, csrf_token}
@@ -3128,7 +3130,7 @@ defmodule Phoenix.Component do
     """
   end
 
-  defp csrf_token(true, href), do: Plug.CSRFProtection.get_csrf_token_for(href)
+  #  defp csrf_token(true, href), do: Plug.CSRFProtection.get_csrf_token_for(href)
   defp csrf_token(false, _href), do: nil
   defp csrf_token(csrf, _href) when is_binary(csrf), do: csrf
 

@@ -1,17 +1,19 @@
 defmodule LocalLiveView.Message do
+  @moduledoc false
   defstruct topic: nil, event: nil, payload: nil, ref: nil, join_ref: nil
 end
 
 defmodule LocalLiveView.Server do
-  @moduledoc false
-  #  A LocalLiveView is a process that receives events, updates
-  #  its state, and renders updates to a page as diffs.
-  #  
-  #  LocalLiveView.Server is a instance of GenServer that handles 
-  #  events for LocalLiveView, just like a Phoenix.Channel.
-  #
-  #  One LocalLiveView.Server will be created per every LocalLiveView
-  #  used on the page.
+  @moduledoc """
+  A LocalLiveView.Server is a process that receives events, updates
+  its state, and renders updates to a page as diffs.
+
+  LocalLiveView.Server is a instance of GenServer that handles 
+  events for LocalLiveView, just like a Phoenix.Channel.
+
+  One LocalLiveView.Server will be created per every LocalLiveView
+  used on the page.
+  """
 
   use GenServer, restart: :temporary
 
@@ -30,6 +32,9 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
+  @doc """
+  Starts LocalLiveView.Server process.
+  """
   def start_llv_process() do
     DynamicSupervisor.start_child(
       LocalLiveView.Server.Supervisor,
@@ -37,6 +42,7 @@ defmodule LocalLiveView.Server do
     )
   end
 
+  @doc false
   def start_link(_arg) do
     GenServer.start_link(__MODULE__, [])
   end

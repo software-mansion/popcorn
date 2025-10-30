@@ -300,7 +300,7 @@ defmodule Phoenix.Socket do
 
       ## Callbacks
 
-      @behaviour Phoenix.Socket.Transport
+      # @behaviour Phoenix.Socket.Transport
 
       @doc false
       def child_spec(opts) do
@@ -686,41 +686,43 @@ defmodule Phoenix.Socket do
 
   defp handle_in(
          nil,
-         %{event: "phx_join", topic: topic, ref: ref, join_ref: join_ref} = message,
+         %{event: "phx_join", topic: _topic, ref: _ref, join_ref: _join_ref} = message,
          state,
          socket
        ) do
-    case socket.handler.__channel__(topic) do
-      {channel, opts} ->
-        case Phoenix.Channel.Server.join(socket, channel, message, opts) do
-          {:ok, reply, pid} ->
-            reply = %Reply{
-              join_ref: join_ref,
-              ref: ref,
-              topic: topic,
-              status: :ok,
-              payload: reply
-            }
-
-            state = put_channel(state, pid, topic, join_ref)
-            {:reply, :ok, encode_reply(socket, reply), {state, socket}}
-
-          {:error, reply} ->
-            reply = %Reply{
-              join_ref: join_ref,
-              ref: ref,
-              topic: topic,
-              status: :error,
-              payload: reply
-            }
-
-            {:reply, :error, encode_reply(socket, reply), {state, socket}}
-        end
-
-      _ ->
-        Logger.warning("Ignoring unmatched topic \"#{topic}\" in #{inspect(socket.handler)}")
-        {:reply, :error, encode_ignore(socket, message), {state, socket}}
-    end
+    #    Patch reason: LocalLiveView does not need Phoenix.Channel.Server - commented to resolve warning
+    {:reply, :ok, encode_ignore(socket, message), {state, socket}}
+    #    case socket.handler.__channel__(topic) do
+    #      {channel, opts} ->
+    #        case Phoenix.Channel.Server.join(socket, channel, message, opts) do
+    #          {:ok, reply, pid} ->
+    #            reply = %Reply{
+    #              join_ref: join_ref,
+    #              ref: ref,
+    #              topic: topic,
+    #              status: :ok,
+    #              payload: reply
+    #            }
+    #
+    #            state = put_channel(state, pid, topic, join_ref)
+    #            {:reply, :ok, encode_reply(socket, reply), {state, socket}}
+    #
+    #          {:error, reply} ->
+    #            reply = %Reply{
+    #              join_ref: join_ref,
+    #              ref: ref,
+    #              topic: topic,
+    #              status: :error,
+    #              payload: reply
+    #            }
+    #
+    #            {:reply, :error, encode_reply(socket, reply), {state, socket}}
+    #        end
+    #
+    #      _ ->
+    #        Logger.warning("Ignoring unmatched topic \"#{topic}\" in #{inspect(socket.handler)}")
+    #        {:reply, :error, encode_ignore(socket, message), {state, socket}}
+    #    end
   end
 
   defp handle_in({pid, _ref, status}, %{event: "phx_join", topic: topic} = message, state, socket) do
@@ -785,16 +787,16 @@ defmodule Phoenix.Socket do
     {:reply, :error, encode_ignore(socket, message), {state, socket}}
   end
 
-  defp put_channel(state, pid, topic, join_ref) do
-    %{channels: channels, channels_inverse: channels_inverse} = state
-    monitor_ref = Process.monitor(pid)
-
-    %{
-      state
-      | channels: Map.put(channels, topic, {pid, monitor_ref, :joined}),
-        channels_inverse: Map.put(channels_inverse, pid, {topic, join_ref})
-    }
-  end
+  #  defp put_channel(state, pid, topic, join_ref) do
+  #    %{channels: channels, channels_inverse: channels_inverse} = state
+  #    monitor_ref = Process.monitor(pid)
+  #
+  #    %{
+  #      state
+  #      | channels: Map.put(channels, topic, {pid, monitor_ref, :joined}),
+  #        channels_inverse: Map.put(channels_inverse, pid, {topic, join_ref})
+  #    }
+  #  end
 
   defp delete_channel(state, pid, topic, monitor_ref) do
     %{channels: channels, channels_inverse: channels_inverse} = state

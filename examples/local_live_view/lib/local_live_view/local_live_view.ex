@@ -5,7 +5,7 @@ defmodule LocalLiveView do
   LocalLiveView should be used exactly like its Phoenix equivalent:
 
       defmodule MyAppWeb.DemoLive do
-        use Phoenix.LiveView
+        use LocalLiveView
 
         def render(assigns) do
           ~H"""
@@ -77,9 +77,5 @@ defmodule LocalLiveView do
       lifecycle: Phoenix.LiveView.Lifecycle.build(on_mount),
       log: log
     }
-  end
-
-  def render(_assigns) do
-    :ok
   end
 end

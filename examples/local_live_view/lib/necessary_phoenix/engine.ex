@@ -1379,7 +1379,7 @@ defmodule Phoenix.LiveView.Engine do
   def safe_to_iodata(expr) do
     case expr do
       {:safe, data} -> data
-      bin when is_binary(bin) -> Plug.HTML.html_escape_to_iodata(bin)
+      #      bin when is_binary(bin) -> Plug.HTML.html_escape_to_iodata(bin)
       other -> Phoenix.HTML.Safe.to_iodata(other)
     end
   end
@@ -1391,7 +1391,7 @@ defmodule Phoenix.LiveView.Engine do
       %{__struct__: Phoenix.LiveView.Rendered} = other -> other
       %{__struct__: Phoenix.LiveView.Component} = other -> other
       %{__struct__: Phoenix.LiveView.Comprehension} = other -> other
-      bin when is_binary(bin) -> Plug.HTML.html_escape_to_iodata(bin)
+      #      bin when is_binary(bin) -> Plug.HTML.html_escape_to_iodata(bin)
       other -> Phoenix.HTML.Safe.to_iodata(other)
     end
   end

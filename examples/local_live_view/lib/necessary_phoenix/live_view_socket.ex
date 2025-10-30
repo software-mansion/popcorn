@@ -44,8 +44,8 @@ defmodule Phoenix.LiveView.Socket do
       end
   """
 
-  #  use Phoenix.Socket
-  #
+  use Phoenix.Socket
+
   #  require Logger
 
   require Logger

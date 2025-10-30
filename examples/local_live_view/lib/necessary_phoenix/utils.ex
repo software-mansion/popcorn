@@ -8,7 +8,7 @@ defmodule Phoenix.LiveView.Utils do
   # All available mount options
   @mount_opts [:temporary_assigns, :layout]
 
-  @max_flash_age :timer.seconds(60)
+  #  @max_flash_age :timer.seconds(60)
 
   @valid_uri_schemes [
     "http:",
@@ -520,21 +520,23 @@ defmodule Phoenix.LiveView.Utils do
   @doc """
   Signs the socket's flash into a token if it has been set.
   """
-  def sign_flash(endpoint_mod, %{} = flash) do
-    Phoenix.Token.sign(endpoint_mod, flash_salt(endpoint_mod), flash)
+  def sign_flash(_endpoint_mod, %{} = _flash) do
+    #  Phoenix.Token.sign(endpoint_mod, flash_salt(endpoint_mod), flash)
+    #  Patch reason: LocalLiveView should not depend on Phoenix.Token; cleaning warnings
+    :not_implemented
   end
 
-  @doc """
-  Verifies the socket's flash token.
-  """
-  def verify_flash(endpoint_mod, flash_token) do
-    salt = flash_salt(endpoint_mod)
-
-    case Phoenix.Token.verify(endpoint_mod, salt, flash_token, max_age: @max_flash_age) do
-      {:ok, flash} -> flash
-      {:error, _reason} -> %{}
-    end
-  end
+  #  @doc """
+  #  Verifies the socket's flash token.
+  #  """
+  #  def verify_flash(endpoint_mod, flash_token) do
+  #    salt = flash_salt(endpoint_mod)
+  #
+  #    case Phoenix.Token.verify(endpoint_mod, salt, flash_token, max_age: @max_flash_age) do
+  #      {:ok, flash} -> flash
+  #      {:error, _reason} -> %{}
+  #    end
+  #  end
 
   defp random_encoded_bytes do
     binary = <<
@@ -550,9 +552,9 @@ defmodule Phoenix.LiveView.Utils do
     %{socket | private: Map.drop(private, keys)}
   end
 
-  defp flash_salt(endpoint_mod) when is_atom(endpoint_mod) do
-    "flash:" <> salt!(endpoint_mod)
-  end
+  #  defp flash_salt(endpoint_mod) when is_atom(endpoint_mod) do
+  #    "flash:" <> salt!(endpoint_mod)
+  #  end
 
   def valid_destination!(%URI{} = uri, context) do
     valid_destination!(URI.to_string(uri), context)

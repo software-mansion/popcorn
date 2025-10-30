@@ -14,18 +14,20 @@ defmodule Phoenix.LiveView.Static do
   def token_vsn, do: @token_vsn
 
   # Max session age in seconds. Equivalent to 2 weeks.
-  @max_session_age 1_209_600
+  #  @max_session_age 1_209_600
 
   @doc """
   Verifies a LiveView token.
   """
-  def verify_token(endpoint, token) do
-    case Phoenix.Token.verify(endpoint, Utils.salt!(endpoint), token, max_age: @max_session_age) do
-      {:ok, {@token_vsn, term}} -> {:ok, term}
-      {:ok, _} -> {:error, :outdated}
-      {:error, :missing} -> {:error, :invalid}
-      {:error, reason} when reason in [:expired, :invalid] -> {:error, reason}
-    end
+  def verify_token(_endpoint, _token) do
+    #    case Phoenix.Token.verify(endpoint, Utils.salt!(endpoint), token, max_age: @max_session_age) do
+    #      {:ok, {@token_vsn, term}} -> {:ok, term}
+    #      {:ok, _} -> {:error, :outdated}
+    #      {:error, :missing} -> {:error, :invalid}
+    #      {:error, reason} when reason in [:expired, :invalid] -> {:error, reason}
+    #    end
+    #  Patch reason: LocalLiveView should not depend on Phoenix.Token; cleaning warnings
+    {:ok, %{}}
   end
 
   defp load_session(conn_or_socket_session, opts) do
@@ -290,8 +292,10 @@ defmodule Phoenix.LiveView.Static do
   @doc """
   Signs a LiveView token.
   """
-  def sign_token(endpoint, data) do
-    Phoenix.Token.sign(endpoint, Utils.salt!(endpoint), {@token_vsn, data})
+  def sign_token(_endpoint, _data) do
+    #  Phoenix.Token.sign(endpoint, Utils.salt!(endpoint), {@token_vsn, data})
+    #  Patch reason: LocalLiveView should not depend on Phoenix.Token; cleaning warnings
+    :not_implemented
   end
 
   defp container(%{container: {tag, attrs}}, opts) do

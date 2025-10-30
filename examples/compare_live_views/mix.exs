@@ -88,7 +88,7 @@ defmodule CompareLiveViews.MixProject do
 
   defp build_local(_) do
     Mix.shell().cmd("""
-    cd local/compare_live_views_local
+    cd local
     mix deps.get
     mix compile
     """)

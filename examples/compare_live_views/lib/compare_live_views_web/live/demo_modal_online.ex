@@ -4,6 +4,7 @@ defmodule CompareLiveViewsWeb.DemoModalOnline do
   def render(assigns) do
     ~H"""
     <p>PHOENIX LIVE VIEW</p>
+    <button class="show-modal-button" phx-click="show_modal">SHOW ONLINE MODAL</button>
 
     <%= if @show_modal do %>
       <div class="modal">
@@ -22,5 +23,9 @@ defmodule CompareLiveViewsWeb.DemoModalOnline do
 
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, show_modal: false)}
+  end
+
+  def handle_event("show_modal", _params, socket) do
+    {:noreply, assign(socket, show_modal: true)}
   end
 end

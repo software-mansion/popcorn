@@ -1,5 +1,12 @@
 defmodule LocalLiveView.Dispatcher do
-  @moduledoc false
+  @moduledoc """
+  This process dispatches events to different LocalLiveViews present on the page.
+    
+  It uses Popcorn API and registers as a main process to handle wasm messages inside Popcorn runtime.
+    
+  Uses GenServer.
+  """
+
   use GenServer
   alias Phoenix.LiveView.Session
   import Popcorn.Wasm
@@ -7,6 +14,7 @@ defmodule LocalLiveView.Dispatcher do
   alias LocalLiveView.Message
   @process_name :main
 
+  @doc false
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: @process_name)
   end
@@ -48,7 +56,7 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, %{state | views: views}}
   end
 
-  def start_local_live_view(view) do
+  defp start_local_live_view(view) do
     params = %{
       "session" => %Session{view: view}
     }
