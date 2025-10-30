@@ -12,10 +12,10 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
   Options:
     - `git` - source repo URL (defaults to FissionVM repo)
-    - `ref` - branch, tag or commit (only works with the `git` option)
+    - `git-ref` - branch, tag or commit (only works with the `git` option)
     - `path` - path to repo source (can be used instead of `git`)
     - `target` - `wasm` (default) or `unix`
-    - `cmake_opts` - string with space-separated `KEY=VALUE` options that
+    - `cmake-opts` - string with space-separated `KEY=VALUE` options that
     will be converted to `-DKEY=VALUE` cmake options
   """
 

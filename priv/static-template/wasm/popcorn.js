@@ -1,4 +1,4 @@
-const INIT_TIMEOUT_MS = 30_000;
+const INIT_VM_TIMEOUT_MS = 30_000;
 const CALL_TIMEOUT_MS = 60_000;
 const HEARTBEAT_TIMEOUT_MS = 60_000;
 
@@ -17,6 +17,7 @@ const HEARTBEAT_TIMEOUT_MS = 60_000;
 // ElixirAck: { requestId: number }
 const MESSAGES = {
   INIT: "popcorn-init",
+  START_VM: "popcorn-startVm",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
@@ -59,7 +60,7 @@ export class Popcorn {
   _listenerRef = null;
 
   _iframe = null;
-  _mountPromise = null;
+  _awaitedMessage = null;
   _heartbeatTimeout = null;
 
   /** @hideconstructor */
@@ -116,44 +117,32 @@ export class Popcorn {
     }
 
     this._trace("Main: mount, container: ", container);
-    const mountPromise = new Promise((resolve) => {
-      // will be resolved on init message from iframe
-      this._mountPromise = resolve;
 
-      // // example pathname: "/wasm/popcorn.js"
-      // const pathName = URL.parse(import.meta.url).pathname;
-      // const lastPart = /[^/]+$/;
-      // const leadingSlash = /^\//;
-      // const dir = pathName.replace(lastPart, "").replace(leadingSlash, "");
+    this._iframe = document.createElement("iframe");
+    this._iframe.srcdoc = `<html>
+      <html lang="en" dir="ltr">
+          <head>
+            <meta name="bundle-path" content="${"../" + this._bundlePath}" />
+          </head>
+          <script type="module" src="${this._wasmDir + "popcorn.js"}" defer></script>
+          <script type="module" src="${this._wasmDir + "AtomVM.mjs"}" defer></script>
+          <script type="module" src="${this._wasmDir + "popcorn_iframe.js"}" defer></script>
+          <script type="module" defer>
+            import { runIFrame } from "${this._wasmDir + "popcorn_iframe.js"}";
+            runIFrame();
+          </script>
+      </html>`;
+    this._iframe.style =
+      "visibility: hidden; width: 0px; height: 0px; border: none";
 
-      // const bundleDir = "../".repeat(dir.split("/").length - 1);
-
-      this._iframe = document.createElement("iframe");
-      this._iframe.srcdoc = `<html>
-        <html lang="en" dir="ltr">
-            <head>
-              <meta name="bundle-path" content="${"../" + this._bundlePath}" />
-            </head>
-            <script type="module" src="${this._wasmDir + "popcorn.js"}" defer></script>
-            <script type="module" src="${this._wasmDir + "AtomVM.mjs"}" defer></script>
-            <script type="module" src="${this._wasmDir + "popcorn_iframe.js"}" defer></script>
-            <script type="module" defer>
-              import { initVm } from "${this._wasmDir + "popcorn_iframe.js"}";
-              initVm();
-            </script>
-        </html>`;
-      this._iframe.style =
-        "visibility: hidden; width: 0px; height: 0px; border: none";
-
-      // TODO: handle multiple iframes
-      this._listenerRef = this._iframeListener.bind(this);
-      window.addEventListener("message", this._listenerRef);
-      container.appendChild(this._iframe);
-    });
-
-    await withTimeout(mountPromise, INIT_TIMEOUT_MS);
-    // sucessfully mounted, kick-off heartbeat listener
-    this._trace("Main: mount");
+    // TODO: handle multiple iframes
+    this._listenerRef = this._iframeListener.bind(this);
+    window.addEventListener("message", this._listenerRef);
+    container.appendChild(this._iframe);
+    await this._awaitMessage(MESSAGES.INIT);
+    this._trace("Main: iframe loaded");
+    this._initProcess = await withTimeout(this._awaitMessage(MESSAGES.START_VM), INIT_VM_TIMEOUT_MS);
+    this._trace("Main: mounted, main process: ", this._initProcess);
     this._onHeartbeat();
   }
 
@@ -249,7 +238,7 @@ export class Popcorn {
     window.removeEventListener("message", this._listenerRef);
     this._iframe.remove();
     this._iframe = null;
-    this._mountPromise = null;
+    this._awaitedMessage = null;
     this._listenerRef = null;
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
@@ -258,10 +247,16 @@ export class Popcorn {
   }
 
   _iframeListener({ data }) {
+    const awaitedMessage = this._awaitedMessage;
+    if (awaitedMessage && data.type == awaitedMessage.type) {
+      this._awaitedMessage = null;
+      awaitedMessage.resolve(data.value);
+      return;
+    }
+
     const handlers = {
       [MESSAGES.STDOUT]: this.onStdout.bind(this),
       [MESSAGES.STDERR]: this.onStderr.bind(this),
-      [MESSAGES.INIT]: this._onInit.bind(this),
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
       [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),
@@ -279,12 +274,6 @@ export class Popcorn {
         `Received unhandled event: ${JSON.stringify(data, null, 4)}`,
       );
     }
-  }
-
-  _onInit(initProcess) {
-    this._trace("Main: onInit, main process: ", initProcess);
-    this._mountPromise();
-    this._initProcess = initProcess;
   }
 
   _onCallAck({ requestId }) {
@@ -343,14 +332,24 @@ export class Popcorn {
     this._iframe.contentWindow.postMessage({ type, value: data });
   }
 
+  _awaitMessage(type) {
+    if (this._awaitedMessage) {
+      throw new Error(`Cannot await message ${this._awaitedMessage.type} when a message ${type} is already awaited on`)
+    }
+
+    this._awaitedMessage = { type };
+
+    return new Promise((resolve) => {
+      this._awaitedMessage.resolve = resolve;
+    })
+  }
+
   _trace(...messages) {
     if (this._debug) {
       console.debug(...messages);
     }
   }
 }
-
-function noop() { }
 
 async function withTimeout(promise, ms) {
   let timeout = null;

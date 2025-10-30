@@ -78,7 +78,9 @@ jobs:
       - name: Install Playwright deps
         run: mix playwright.install
       - name: Build AtomVM
-        run: mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
+        run: |
+          mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
+          echo 'config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}' >> config/config.exs
       - name: Cook
         run: mix popcorn.cook
       - name: Run tests

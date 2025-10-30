@@ -75,6 +75,9 @@ jobs:
       - name: Build AtomVM WASM
         run: |
           mix popcorn.build_runtime --target wasm
+      - name: Configure runtime source
+        run: |
+          echo 'config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}' >> config/config.exs
       - name: Install playwright deps
         run: mix playwright.install
       - name: Run tests

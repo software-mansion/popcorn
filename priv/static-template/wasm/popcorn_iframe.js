@@ -2,6 +2,7 @@ import init from "./AtomVM.mjs";
 
 const MESSAGES = {
   INIT: "popcorn-init",
+  START_VM: "popcorn-startVm",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
@@ -27,11 +28,37 @@ class TrackedValue {
 
 globalThis.TrackedValue = TrackedValue;
 
-export async function initVm() {
+export async function runIFrame() {
   const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
+  const bundleBuffer = await fetch(bundlePath).then(resp => resp.arrayBuffer());
+  const bundle = new Int8Array(bundleBuffer);
+  send(MESSAGES.INIT);
+  const initProcess = await startVm(bundle);
 
+  window.addEventListener("message", async ({ data }) => {
+    const type = data.type;
+
+    if (type === MESSAGES.CALL) {
+      await handleCall(data);
+    } else if (type.startsWith("popcorn")) {
+      console.error(`Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`);
+    }
+  });
+
+  send(MESSAGES.START_VM, initProcess);
+}
+
+async function startVm(avmBundle) {
+  let resolveResultPromise = null;
+  const resultPromise = new Promise((resolve) => { resolveResultPromise = resolve; });
   Module = await init({
-    arguments: [bundlePath],
+    preRun: [
+      function ({ FS }) {
+        FS.mkdir("/data");
+        FS.writeFile("/data/bundle.avm", avmBundle);
+      }
+    ],
+    arguments: ["/data/bundle.avm"],
     print(text) {
       send(MESSAGES.STDOUT, text);
     },
@@ -120,9 +147,28 @@ export async function initVm() {
   };
 
   Module["onElixirReady"] = (initProcess) => {
-    onVmInit(initProcess);
     Module["onElixirReady"] = null;
+    resolveResultPromise(initProcess);
   };
+
+  return resultPromise;
+}
+
+async function handleCall(data) {
+  const { requestId, process, args } = data.value;
+  send(MESSAGES.CALL_ACK, { requestId });
+
+  try {
+    const result = await Module.call(process, args);
+    send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
+  } catch (error) {
+    if (error == "noproc") {
+      send(MESSAGES.RELOAD, null);
+      console.error("Runtime VM crashed, popcorn iframe reloaded.");
+      return;
+    }
+    send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
+  }
 }
 
 function ensureFunctionEval(maybeFunction) {
@@ -144,29 +190,6 @@ function ensureResultKeyList(result) {
 function onVmInit(initProcess) {
   setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
 
-  window.addEventListener("message", async ({ data }) => {
-    const type = data.type;
-
-    if (type === MESSAGES.CALL) {
-      const { requestId, process, args } = data.value;
-      send(MESSAGES.CALL_ACK, { requestId });
-
-      try {
-        const result = await Module.call(process, args);
-        send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
-      } catch (error) {
-        if (error == "noproc") {
-          send(MESSAGES.RELOAD, null);
-          console.error("Runtime VM crashed, popcorn iframe reloaded.");
-          return;
-        }
-        send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
-      }
-    } else if (type.startsWith("popcorn")) {
-      `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`;
-    }
-  });
-  send(MESSAGES.INIT, initProcess);
 }
 
 function send(type, data) {
