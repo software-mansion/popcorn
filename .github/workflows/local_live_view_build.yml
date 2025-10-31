@@ -1,0 +1,87 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: LocalLiveView - Build & test
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "**"
+      - "!misc/**"
+      - "!examples/**"
+      - "examples/local_live_view/**"
+      - "examples/local_thermostat/**"
+      - "examples/compare_live_views/**"
+      - "!.github/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
+
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "**"
+      - "!misc/**"
+      - "!examples/**"
+      - "examples/local_live_view/**"
+      - "examples/local_thermostat/**"
+      - "examples/compare_live_views/**"
+      - "!.github/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
+
+# This ensures, that, except for the main branch, only one instance of workflow is executed on a branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref != 'refs/heads/main' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  MIX_ENV: test
+  ImageOS: "ubuntu22"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+
+    defaults:
+      run:
+        working-directory: examples/local_live_view
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          # Make sure to set a version number!
+          version: 4.0.7
+      - uses: webfactory/ssh-agent@v0.6.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.ACCESS_TO_FISSIONVM }}
+      - name: Set up Elixir
+        uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
+        with:
+          elixir-version: "1.17.3"
+          otp-version: "26.0.2"
+      - name: Restore dependencies cache
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+      - name: Install AtomVM deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
+      - name: Install dependencies
+        run: mix deps.get && mix deps.compile
+      - name: Lint
+        run: mix lint
+      - name: Build AtomVM
+        run: mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
+      - name: Cook
+        run: mix popcorn.cook
