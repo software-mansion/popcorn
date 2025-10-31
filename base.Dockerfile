@@ -12,7 +12,6 @@ ARG COMMIT_REF
 ENV ERL_AFLAGS='+JMsingle true'
 ENV DEBIAN_FRONTEND='noninteractive'
 ENV PATH="/build/emsdk:/build/emsdk/upstream/emscripten:/root/.local/share/mise/shims:$PATH"
-ENV MISE_TRUSTED_CONFIG_PATHS='/build/popcorn'
 ENV EMSDK_QUIET='1'
 
 
@@ -38,9 +37,9 @@ RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
     mix local.hex -if-missing --force
 RUN mise use --global emsdk@"${EMSDK_VERSION}" && mise install
 
-RUN git clone https://github.com/software-mansion-labs/FissionVM.git --branch=swm --depth=1 /build/atomvm
+RUN git clone https://github.com/software-mansion-labs/FissionVM.git --branch=swm --depth=1 /build/atomvm && mise trust /build/atomvm
 RUN cd /build/atomvm/src/platforms/emscripten && mkdir -p build
-RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn
+RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn && mise trust /build/popcorn
 RUN cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
 
 # Build AtomVM WASM
