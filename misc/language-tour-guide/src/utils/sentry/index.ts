@@ -6,8 +6,15 @@ export function initSentry() {
     dsn: import.meta.env.VITE_SENTRY_DSN,
     sendDefaultPii: true,
     environment: import.meta.env.MODE,
-    integrations: (integrations) =>
-      integrations.filter((integration) => integration.name !== "Dedupe")
+    replaysOnErrorSampleRate: 1.0,
+    replaysSessionSampleRate: 0.2,
+    integrations: (integrations) => [
+      ...integrations.filter((integration) => integration.name !== "Dedupe"),
+      Sentry.replayIntegration({
+        maskAllText: false,
+        maskAllInputs: false
+      })
+    ]
   });
 }
 
