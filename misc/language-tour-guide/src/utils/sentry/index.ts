@@ -34,7 +34,6 @@ export function captureCodeException(error: string, code: string) {
 
 export function captureAtomVmCrash(stdout: string, stderr: string) {
   const code = useCodeEditorStore.getState().code;
-  console.log("Capturing AtomVM crash with code:", code);
 
   Sentry.captureMessage("atomvm-crash", {
     level: "error",
@@ -48,6 +47,34 @@ export function captureAtomVmCrash(stdout: string, stderr: string) {
       stderr
     }
   });
+}
+
+export type LogSink = {
+  onStdout: (text: string) => void;
+  onStderr: (text: string) => void;
+  onCrash: () => void;
+};
+
+export function createLogSink() {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  return {
+    onStdout: (text: string) => {
+      console.log("Popcorn stdout:", text);
+      stdout.push(text);
+    },
+    onStderr: (text: string) => {
+      console.error("Popcorn stderr:", text);
+      stderr.push(text);
+    },
+    onCrash: () => {
+      captureAtomVmCrash(stdout.join("\n"), stderr.join("\n"));
+      // preserve ref to arrays, could also use stable object and change properties
+      stdout.length = 0;
+      stderr.length = 0;
+    }
+  };
 }
 
 export function wrapPopcornReloadIframe(

@@ -1,117 +1,105 @@
-import {
-  useState,
-  useEffect,
-  type ReactNode,
-  useCallback,
-  useRef
-} from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
-import { useCodeEditorStore } from "../../store/codeEditor";
-import {
-  captureAtomVmCrash,
-  wrapPopcornReloadIframe
-} from "../../utils/sentry";
+import { wrapPopcornReloadIframe, type LogSink } from "../../utils/sentry";
 
 interface PopcornProviderProps {
   children: ReactNode;
   debug?: boolean;
+  logSink: LogSink;
 }
 
 export const PopcornProvider = ({
   children,
+  logSink,
   debug = false
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
   const [isLoadingPopcorn, setIsLoadingPopcorn] = useState<boolean>(true);
 
-  const setStdoutResult = useCodeEditorStore((state) => state.setStdoutResult);
-  const setStderrResult = useCodeEditorStore((state) => state.setStderrResult);
-
-  const collectedStdout = useRef<string[]>([]);
-  const collectedStderr = useRef<string[]>([]);
-
-  // TODO: use bounded buffer for collection to avoid memory issues
-  const clearCollectedOutput = useCallback(() => {
-    collectedStdout.current = [];
-    collectedStderr.current = [];
-  }, []);
-
-  const processCollectedOutput = useCallback(() => {
-    const stdout = collectedStdout.current.join("\n");
-    const stderr = collectedStderr.current.join("\n");
-
-    captureAtomVmCrash(stdout, stderr);
-
-    clearCollectedOutput();
-  }, [clearCollectedOutput]);
-
-  const initializePopcorn = useCallback(async () => {
-    try {
-      setIsLoadingPopcorn(true);
-      const popcornInstance = await window.Popcorn.init({
-        debug,
-        wasmDir: import.meta.env.BASE_URL + "wasm/",
-        onStdout: (text) => {
-          collectedStdout.current.push(text);
-
-          console.log("Popcorn stdout:", text);
-          setStdoutResult(text);
-        },
-        onStderr: (text) => {
-          collectedStderr.current.push(text);
-
-          console.error("Popcorn stderr:", text);
-          // TODO: remove escape sequences from stderr
-          setStderrResult(text);
-        }
-      });
-
-      wrapPopcornReloadIframe(popcornInstance, () => {
-        processCollectedOutput();
-      });
-
-      setInstance(popcornInstance);
-    } catch (error) {
-      console.error("Failed to initialize Popcorn:", error);
-    } finally {
-      setIsLoadingPopcorn(false);
-    }
-  }, [debug, setStdoutResult, setStderrResult, processCollectedOutput]);
-
-  const reinitializePopcorn = useCallback(() => {
-    if (instance) {
-      try {
-        instance.deinit();
-        initializePopcorn();
-      } catch (e) {
-        console.error("Error during Popcorn reinitialization:", e);
-      }
-    }
-  }, [instance, initializePopcorn]);
-
   useEffect(() => {
-    initializePopcorn();
+    let currentInstance: Popcorn | null = null;
+
+    async function init() {
+      setIsLoadingPopcorn(true);
+      const { instance, error } = await initPopcorn({ debug, logSink });
+      if (error !== null) {
+        console.error("Error during Popcorn initialization:", error);
+        return;
+      }
+      setIsLoadingPopcorn(false);
+
+      currentInstance = instance;
+      setInstance(instance);
+    }
+
+    init();
 
     return () => {
-      if (instance) {
+      if (currentInstance) {
         try {
-          instance.deinit();
+          currentInstance.deinit();
         } catch (e) {
           console.error("Error during Popcorn cleanup:", e);
         }
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debug]);
+  }, [debug, logSink]);
+
+  // TODO: drop after popcorn cancel calls method is implemented (#378)
+  const reinitializePopcorn = async () => {
+    if (instance) {
+      try {
+        instance.deinit();
+      } catch (e) {
+        console.error("Error during Popcorn cleanup:", e);
+      }
+    }
+
+    setIsLoadingPopcorn(true);
+    const { instance: newInstance, error } = await initPopcorn({
+      debug,
+      logSink
+    });
+    if (error !== null) {
+      console.error("Error during Popcorn re-initialization:", error);
+      return;
+    }
+    setIsLoadingPopcorn(false);
+
+    setInstance(newInstance);
+  };
 
   const value: PopcornContextValue = {
     instance,
     isLoadingPopcorn,
-    reinitializePopcorn,
-    clearCollectedOutput
+    reinitializePopcorn
   };
 
   return (
     <PopcornContext.Provider value={value}>{children}</PopcornContext.Provider>
   );
 };
+
+type InitPopcornArgs = {
+  debug: boolean;
+  logSink: LogSink;
+};
+
+async function initPopcorn({
+  debug,
+  logSink
+}: InitPopcornArgs): Promise<{ instance: Popcorn | null; error: unknown }> {
+  try {
+    const instance = await window.Popcorn.init({
+      debug,
+      wasmDir: import.meta.env.BASE_URL + "wasm/",
+      onStdout: logSink.onStdout,
+      onStderr: logSink.onStderr
+    });
+
+    wrapPopcornReloadIframe(instance, logSink.onCrash);
+    return { instance, error: null };
+  } catch (error) {
+    return { instance: null, error };
+  }
+}

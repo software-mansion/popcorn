@@ -58,6 +58,7 @@ export class Popcorn {
   _requestId = 0;
   _calls = new Map();
   _listenerRef = null;
+  _logListeners = new Set();
 
   _iframe = null;
   _awaitedMessage = null;
@@ -240,10 +241,37 @@ export class Popcorn {
     this._iframe = null;
     this._awaitedMessage = null;
     this._listenerRef = null;
+    this._logListeners.clear();
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })
     }
+  }
+
+  /**
+   * Registers a log listener that will be called when stdout or stderr output is received.
+   * @param {function({stdout?: string, stderr?: string}): void} listener - Callback function
+   */
+  registerLogListener(listener) {
+    this._logListeners.add(listener);
+  }
+
+  /**
+   * Unregisters a previously registered log listener.
+   * @param {function({stdout?: string, stderr?: string}): void} listener - Callback function to remove
+   */
+  unregisterLogListener(listener) {
+    this._logListeners.delete(listener);
+  }
+
+  _notifyLogListeners(output) {
+    this._logListeners.forEach((listener) => {
+      try {
+        listener(output);
+      } catch (error) {
+        console.error("Error in log listener:", error);
+      }
+    });
   }
 
   _iframeListener({ data }) {
@@ -255,8 +283,14 @@ export class Popcorn {
     }
 
     const handlers = {
-      [MESSAGES.STDOUT]: this.onStdout.bind(this),
-      [MESSAGES.STDERR]: this.onStderr.bind(this),
+      [MESSAGES.STDOUT]: (value) => {
+        this.onStdout(value);
+        this._notifyLogListeners({ stdout: value });
+      },
+      [MESSAGES.STDERR]: (value) => {
+        this.onStderr(value);
+        this._notifyLogListeners({ stderr: value });
+      },
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
       [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),

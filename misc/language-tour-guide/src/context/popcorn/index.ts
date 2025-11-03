@@ -22,16 +22,27 @@ export type CallOptions = {
   timeoutMs?: number;
 };
 
+export interface PopcornError {
+  error: string;
+  durationMs?: number;
+}
+
 type PopcornCallResult = {
   data: AnySerializable;
   durationMs: number;
-  error?: AnySerializable;
 };
+
+export type LogListener = (output: {
+  stdout?: string;
+  stderr?: string;
+}) => void;
 
 export type Popcorn = {
   deinit(): void;
   call(args: AnySerializable, options: CallOptions): Promise<PopcornCallResult>;
   cast(args: AnySerializable, options: CastOptions): void;
+  registerLogListener(listener: LogListener): void;
+  unregisterLogListener(listener: LogListener): void;
 };
 
 type PopcornStatic = {
@@ -48,7 +59,6 @@ export type PopcornContextValue = {
   instance: Popcorn | null;
   isLoadingPopcorn: boolean;
   reinitializePopcorn: () => void;
-  clearCollectedOutput: () => void;
 };
 
 export const PopcornContext = createContext<PopcornContextValue | undefined>(

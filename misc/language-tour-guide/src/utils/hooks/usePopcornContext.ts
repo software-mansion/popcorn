@@ -1,5 +1,8 @@
 import { useContext } from "react";
-import { PopcornContext, type PopcornContextValue } from "./popcorn";
+import {
+  PopcornContext,
+  type PopcornContextValue
+} from "../../context/popcorn";
 
 export const usePopcornContext = (): PopcornContextValue => {
   const context = useContext(PopcornContext);
