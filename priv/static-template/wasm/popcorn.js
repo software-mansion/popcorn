@@ -58,7 +58,7 @@ export class Popcorn {
   _requestId = 0;
   _calls = new Map();
   _listenerRef = null;
-  _logListeners = new Set();
+  _logListeners = { stdout: new Set(), stderr: new Set() };
 
   _iframe = null;
   _awaitedMessage = null;
@@ -241,7 +241,8 @@ export class Popcorn {
     this._iframe = null;
     this._awaitedMessage = null;
     this._listenerRef = null;
-    this._logListeners.clear();
+    this._logListeners.stdout.clear();
+    this._logListeners.stderr.clear();
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })
@@ -249,28 +250,32 @@ export class Popcorn {
   }
 
   /**
-   * Registers a log listener that will be called when stdout or stderr output is received.
-   * @param {function({stdout?: string, stderr?: string}): void} listener - Callback function
+   * Registers a log listener that will be called when output of the specified type is received.
+   * @param {function(string): void} listener - Callback function that receives the log message
+   * @param {"stdout" | "stderr"} type - The output type to listen for
    */
-  registerLogListener(listener) {
-    this._logListeners.add(listener);
+  registerLogListener(listener, type) {
+    if (type !== "stdout" && type !== "stderr") {
+      throw new Error(`Invalid output type: ${type}. Must be "stdout" or "stderr"`);
+    }
+    this._logListeners[type].add(listener);
   }
 
   /**
    * Unregisters a previously registered log listener.
-   * @param {function({stdout?: string, stderr?: string}): void} listener - Callback function to remove
+   * @param {function(string): void} listener - Callback function to remove
+   * @param {"stdout" | "stderr"} type - The output type the listener was registered for
    */
-  unregisterLogListener(listener) {
-    this._logListeners.delete(listener);
+  unregisterLogListener(listener, type) {
+    if (type !== "stdout" && type !== "stderr") {
+      throw new Error(`Invalid output type: ${type}. Must be "stdout" or "stderr"`);
+    }
+    this._logListeners[type].delete(listener);
   }
 
-  _notifyLogListeners(output) {
-    this._logListeners.forEach((listener) => {
-      try {
-        listener(output);
-      } catch (error) {
-        console.error("Error in log listener:", error);
-      }
+  _notifyLogListeners(type, message) {
+    this._logListeners[type].forEach((listener) => {
+      listener(message);
     });
   }
 
@@ -285,11 +290,11 @@ export class Popcorn {
     const handlers = {
       [MESSAGES.STDOUT]: (value) => {
         this.onStdout(value);
-        this._notifyLogListeners({ stdout: value });
+        this._notifyLogListeners("stdout", value);
       },
       [MESSAGES.STDERR]: (value) => {
         this.onStderr(value);
-        this._notifyLogListeners({ stderr: value });
+        this._notifyLogListeners("stderr", value);
       },
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),

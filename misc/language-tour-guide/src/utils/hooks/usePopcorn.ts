@@ -20,19 +20,20 @@ export const usePopcorn = () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
 
-    const listener = (output: { stdout?: string; stderr?: string }) => {
-      if (output.stdout !== undefined) {
-        stdout.push(output.stdout);
-      }
-      if (output.stderr !== undefined) {
-        stderr.push(output.stderr);
-      }
+    const stdoutListener = (message: string) => {
+      stdout.push(message);
     };
 
-    ensureInstance().registerLogListener(listener);
+    const stderrListener = (message: string) => {
+      stderr.push(message);
+    };
+
+    ensureInstance().registerLogListener(stdoutListener, "stdout");
+    ensureInstance().registerLogListener(stderrListener, "stderr");
 
     const stopLogCapture = () => {
-      ensureInstance().unregisterLogListener(listener);
+      ensureInstance().unregisterLogListener(stdoutListener, "stdout");
+      ensureInstance().unregisterLogListener(stderrListener, "stderr");
       return {
         stdout,
         stderr

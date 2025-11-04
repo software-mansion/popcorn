@@ -32,17 +32,15 @@ type PopcornCallResult = {
   durationMs: number;
 };
 
-export type LogListener = (output: {
-  stdout?: string;
-  stderr?: string;
-}) => void;
+export type LogListener = (output: string) => void;
+type LogType = "stdout" | "stderr";
 
 export type Popcorn = {
   deinit(): void;
   call(args: AnySerializable, options: CallOptions): Promise<PopcornCallResult>;
   cast(args: AnySerializable, options: CastOptions): void;
-  registerLogListener(listener: LogListener): void;
-  unregisterLogListener(listener: LogListener): void;
+  registerLogListener(listener: LogListener, type: LogType): void;
+  unregisterLogListener(listener: LogListener, type: LogType): void;
 };
 
 type PopcornStatic = {

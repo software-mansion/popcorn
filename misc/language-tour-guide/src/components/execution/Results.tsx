@@ -30,10 +30,6 @@ export function Results() {
     }))
   );
 
-  const handleCancelRunning = () => {
-    cancelCall();
-  };
-
   const addHistoryEntry = useExecutionHistoryStore(
     (state) => state.addHistoryEntry
   );
@@ -116,11 +112,7 @@ export function Results() {
           )}
         </div>
         {pending && longRunning && (
-          <Button
-            title="Cancel"
-            type="secondary"
-            onClick={handleCancelRunning}
-          />
+          <Button title="Cancel" type="secondary" onClick={cancelCall} />
         )}
         {isCodeChanged() && (
           <Button
