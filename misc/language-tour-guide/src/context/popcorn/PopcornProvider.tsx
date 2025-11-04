@@ -22,6 +22,8 @@ export const PopcornProvider = ({
   debug = false
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
+  const [isLoadingPopcorn, setIsLoadingPopcorn] = useState<boolean>(true);
+
   const setStdoutResult = useCodeEditorStore((state) => state.setStdoutResult);
   const setStderrResult = useCodeEditorStore((state) => state.setStderrResult);
 
@@ -45,6 +47,7 @@ export const PopcornProvider = ({
 
   const initializePopcorn = useCallback(async () => {
     try {
+      setIsLoadingPopcorn(true);
       const popcornInstance = await window.Popcorn.init({
         debug,
         wasmDir: import.meta.env.BASE_URL + "wasm/",
@@ -70,6 +73,8 @@ export const PopcornProvider = ({
       setInstance(popcornInstance);
     } catch (error) {
       console.error("Failed to initialize Popcorn:", error);
+    } finally {
+      setIsLoadingPopcorn(false);
     }
   }, [debug, setStdoutResult, setStderrResult, processCollectedOutput]);
 
@@ -101,6 +106,7 @@ export const PopcornProvider = ({
 
   const value: PopcornContextValue = {
     instance,
+    isLoadingPopcorn,
     reinitializePopcorn,
     clearCollectedOutput
   };
