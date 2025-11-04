@@ -46,6 +46,7 @@ declare global {
 
 export type PopcornContextValue = {
   instance: Popcorn | null;
+  isLoadingPopcorn: boolean;
   reinitializePopcorn: () => void;
   clearCollectedOutput: () => void;
 };
