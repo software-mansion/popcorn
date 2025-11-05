@@ -36,6 +36,7 @@ defmodule Popcorn.Build do
   """
   def build(opts \\ []) do
     Logger.info("Bundling started")
+    start_time = DateTime.utc_now()
     original_formatter = BuildLogFormatter.enable()
 
     opts =
@@ -86,9 +87,10 @@ defmodule Popcorn.Build do
     File.write!(@cache_path, :erlang.term_to_binary(new_cache))
 
     :ok
-
     BuildLogFormatter.disable(original_formatter)
-    Logger.info("Bundling finished")
+    end_time = DateTime.utc_now()
+    duration = DateTime.diff(end_time, start_time, :microsecond)
+    Logger.info("Bundling finished (took #{to_human_duration(duration)})")
   end
 
   @doc """
@@ -307,5 +309,17 @@ defmodule Popcorn.Build do
     File.rm_rf!(tmp_dir)
     File.mkdir!(tmp_dir)
     tmp_dir
+  end
+
+  defp to_human_duration(us) do
+    us = :erlang.float(us)
+    ms = us / 1_000
+    s = ms / 1_000
+
+    cond do
+      s > 1.0 -> "#{Float.round(s, 2)}s"
+      ms > 1.0 -> "#{Float.round(ms, 2)}ms"
+      true -> "#{Float.round(us, 2)}us"
+    end
   end
 end

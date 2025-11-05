@@ -4,7 +4,7 @@ defmodule Popcorn.BuildLogFormatter do
   """
   require Logger
 
-  @clear_line "\e[2K\r"
+  @clear_line "#{IO.ANSI.clear_line()}\r"
   @overrides [
     format: {__MODULE__, :format},
     colors: [enabled: true],
@@ -50,12 +50,8 @@ defmodule Popcorn.BuildLogFormatter do
   end
 
   defp interactive_terminal? do
-    with {:ok, true} <- :standard_io |> :io.getopts() |> Keyword.fetch(:terminal),
-         true <- IO.ANSI.enabled?(),
-         nil <- System.get_env("CI") do
-      true
-    else
-      _ -> false
-    end
+    is_not_ci = "CI" |> System.get_env() |> is_nil()
+
+    IO.ANSI.enabled?() and is_not_ci
   end
 end
