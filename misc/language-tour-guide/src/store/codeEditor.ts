@@ -1,15 +1,14 @@
 import { create } from "zustand";
-import { hash32, getLocalStorageItem, setLocalStorageItem, removeLocalStorageItem } from "../utils/storage";
+import {
+  hash32,
+  getLocalStorageItem,
+  setLocalStorageItem,
+  removeLocalStorageItem
+} from "../utils/storage";
 
 type CodeEditorStore = {
   defaultCode: string;
   code: string;
-  stdoutResult: string[];
-  stderrResult: string[];
-  setStdoutResult: (stdoutResult: string) => void;
-  setStderrResult: (stderrResult: string) => void;
-  resetStdoutResult: () => void;
-  resetStderrResult: () => void;
   setCode: (code: string) => void;
   pathHash: string | null;
   setDefaultCode: (code: string) => void;
@@ -22,8 +21,6 @@ type CodeEditorStore = {
 export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
   defaultCode: "",
   code: "",
-  stdoutResult: [],
-  stderrResult: [],
   pathHash: null,
 
   setCode: (code: string) =>
@@ -49,15 +46,5 @@ export const useCodeEditorStore = create<CodeEditorStore>((set, get) => ({
   isCodeChanged: () => {
     const { code, defaultCode } = get();
     return code !== defaultCode;
-  },
-  setStdoutResult: (stdoutResult: string) =>
-    set((state) => ({
-      stdoutResult: [...state.stdoutResult, stdoutResult]
-    })),
-  setStderrResult: (stderrResult: string) =>
-    set((state) => ({
-      stderrResult: [...state.stderrResult, stderrResult]
-    })),
-  resetStdoutResult: () => set({ stdoutResult: [] }),
-  resetStderrResult: () => set({ stderrResult: [] })
+  }
 }));

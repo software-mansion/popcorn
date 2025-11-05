@@ -1,4 +1,4 @@
-import { usePopcorn } from "../../context/popcorn/actions";
+import { usePopcorn } from "../../utils/hooks/usePopcorn";
 import { History } from "./History";
 import { PopcornLoader } from "./PopcornLoader";
 import { Results } from "./Results";

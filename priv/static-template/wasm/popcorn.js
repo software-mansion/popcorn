@@ -58,6 +58,7 @@ export class Popcorn {
   _requestId = 0;
   _calls = new Map();
   _listenerRef = null;
+  _logListeners = { stdout: new Set(), stderr: new Set() };
 
   _iframe = null;
   _awaitedMessage = null;
@@ -240,10 +241,42 @@ export class Popcorn {
     this._iframe = null;
     this._awaitedMessage = null;
     this._listenerRef = null;
+    this._logListeners.stdout.clear();
+    this._logListeners.stderr.clear();
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })
     }
+  }
+
+  /**
+   * Registers a log listener that will be called when output of the specified type is received.
+   * @param {function(string): void} listener - Callback function that receives the log message
+   * @param {"stdout" | "stderr"} type - The output type to listen for
+   */
+  registerLogListener(listener, type) {
+    if (type !== "stdout" && type !== "stderr") {
+      throw new Error(`Invalid output type: ${type}. Must be "stdout" or "stderr"`);
+    }
+    this._logListeners[type].add(listener);
+  }
+
+  /**
+   * Unregisters a previously registered log listener.
+   * @param {function(string): void} listener - Callback function to remove
+   * @param {"stdout" | "stderr"} type - The output type the listener was registered for
+   */
+  unregisterLogListener(listener, type) {
+    if (type !== "stdout" && type !== "stderr") {
+      throw new Error(`Invalid output type: ${type}. Must be "stdout" or "stderr"`);
+    }
+    this._logListeners[type].delete(listener);
+  }
+
+  _notifyLogListeners(type, message) {
+    this._logListeners[type].forEach((listener) => {
+      listener(message);
+    });
   }
 
   _iframeListener({ data }) {
@@ -255,8 +288,14 @@ export class Popcorn {
     }
 
     const handlers = {
-      [MESSAGES.STDOUT]: this.onStdout.bind(this),
-      [MESSAGES.STDERR]: this.onStderr.bind(this),
+      [MESSAGES.STDOUT]: (value) => {
+        this.onStdout(value);
+        this._notifyLogListeners("stdout", value);
+      },
+      [MESSAGES.STDERR]: (value) => {
+        this.onStderr(value);
+        this._notifyLogListeners("stderr", value);
+      },
       [MESSAGES.CALL]: this._onCall.bind(this),
       [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
       [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),

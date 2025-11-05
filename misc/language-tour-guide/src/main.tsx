@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
-import { initSentry } from "./utils/sentry";
+import { createLogSink, initSentry } from "./utils/sentry";
 
 import "./styles/index.css";
 import { AppRoutes } from "./AppRoutes.tsx";
@@ -16,7 +16,7 @@ if (container === null) {
 initSentry();
 
 createRoot(container).render(
-  <PopcornProvider debug={true}>
+  <PopcornProvider debug={true} logSink={createLogSink()}>
     <StrictMode>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AppRoutes />
