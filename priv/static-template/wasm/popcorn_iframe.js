@@ -30,7 +30,9 @@ globalThis.TrackedValue = TrackedValue;
 
 export async function runIFrame() {
   const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
-  const bundleBuffer = await fetch(bundlePath).then(resp => resp.arrayBuffer());
+  const bundleBuffer = await fetch(bundlePath).then((resp) =>
+    resp.arrayBuffer(),
+  );
   const bundle = new Int8Array(bundleBuffer);
   send(MESSAGES.INIT);
   const initProcess = await startVm(bundle);
@@ -41,22 +43,27 @@ export async function runIFrame() {
     if (type === MESSAGES.CALL) {
       await handleCall(data);
     } else if (type.startsWith("popcorn")) {
-      console.error(`Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`);
+      console.error(
+        `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`,
+      );
     }
   });
 
   send(MESSAGES.START_VM, initProcess);
+  setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
 }
 
 async function startVm(avmBundle) {
   let resolveResultPromise = null;
-  const resultPromise = new Promise((resolve) => { resolveResultPromise = resolve; });
+  const resultPromise = new Promise((resolve) => {
+    resolveResultPromise = resolve;
+  });
   Module = await init({
     preRun: [
       function ({ FS }) {
         FS.mkdir("/data");
         FS.writeFile("/data/bundle.avm", avmBundle);
-      }
+      },
     ],
     arguments: ["/data/bundle.avm"],
     print(text) {
@@ -69,7 +76,7 @@ async function startVm(avmBundle) {
       // Timeout so that error logs are (hopefully) printed
       // before we terminate
       setTimeout(() => send(MESSAGES.RELOAD, null), 100);
-    }
+    },
   });
 
   Module["serialize"] = JSON.stringify;
@@ -185,11 +192,6 @@ function ensureResultKeyList(result) {
       "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
     );
   }
-}
-
-function onVmInit(initProcess) {
-  setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
-
 }
 
 function send(type, data) {
