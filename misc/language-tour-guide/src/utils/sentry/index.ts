@@ -32,14 +32,18 @@ export function captureCodeException(error: string, code: string) {
   });
 }
 
-export function captureAtomVmCrash(stdout: string, stderr: string) {
+export function captureReloadIframe(
+  reason: { source: string; category: string },
+  stdout: string,
+  stderr: string
+) {
   const code = useCodeEditorStore.getState().code;
 
-  Sentry.captureMessage("atomvm-crash", {
+  Sentry.captureMessage(reason.category, {
     level: "error",
     tags: {
-      source: "atomvm",
-      category: "atomvm-crash"
+      source: reason.source,
+      category: reason.category
     },
     extra: {
       code,
@@ -68,25 +72,42 @@ export function createLogSink() {
       console.error("Popcorn stderr:", text);
       stderr.push(text);
     },
-    onCrash: () => {
-      captureAtomVmCrash(stdout.join("\n"), stderr.join("\n"));
+    onCrash: (reason: ReloadReason) => {
+      const stdoutJoined = stdout.join("\n");
+      const stderrJoined = stderr.join("\n");
+
+      if (reason === "heartbeat_lost") {
+        captureReloadIframe(
+          { source: "heartbeat_lost", category: "popcorn-reload" },
+          stdoutJoined,
+          stderrJoined
+        );
+      } else {
+        captureReloadIframe(
+          { source: "atomvm", category: "atomvm-crash" },
+          stdoutJoined,
+          stderrJoined
+        );
+      }
+
       // preserve ref to arrays, could also use stable object and change properties
       stdout.length = 0;
       stderr.length = 0;
     }
   };
 }
+export type ReloadReason = "heartbeat_lost" | "unknown";
 
 export function wrapPopcornReloadIframe(
   popcornInstance: any,
-  customReloadCallback: () => void
+  customReloadCallback: (reason: ReloadReason) => void
 ) {
   const originalReloadIframe = popcornInstance.__proto__._reloadIframe;
 
   // TODO: not overwriting prototype method
-  popcornInstance.__proto__._reloadIframe = function () {
-    originalReloadIframe.call(this);
+  popcornInstance.__proto__._reloadIframe = function (reason: ReloadReason) {
+    originalReloadIframe.call(this, reason);
 
-    customReloadCallback();
+    customReloadCallback(reason);
   };
 }

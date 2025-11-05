@@ -348,11 +348,11 @@ export class Popcorn {
     clearTimeout(this._heartbeatTimeout);
     this._heartbeatTimeout = setTimeout(() => {
       this._trace("Main: heartbeat lost");
-      this._reloadIframe();
+      this._reloadIframe("heartbeat_lost");
     }, this.heartbeatTimeoutMs);
   }
 
-  _reloadIframe() {
+  _reloadIframe(reason = "other") {
     if (this._iframe === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
