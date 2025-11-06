@@ -23,7 +23,6 @@ defmodule Popcorn.Support.AtomVM do
 
   @unix_path "test/fixtures/unix/AtomVM"
 
-  defguardp is_ast(ast) when tuple_size(ast) == 3
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
   defmacro assert_result(result, expected) do
@@ -109,6 +108,7 @@ defmodule Popcorn.Support.AtomVM do
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
+    out_path = Path.join(run_dir, "out.txt")
 
     args |> :erlang.term_to_binary() |> then(&File.write(args_path, &1))
 
@@ -124,7 +124,7 @@ defmodule Popcorn.Support.AtomVM do
         "AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        ~s|out=$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}'); echo "$out"|
+        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}')|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
@@ -206,7 +206,7 @@ defmodule Popcorn.Support.AtomVM do
   Appends passed ast to common code that reads input from args.bin and writing to result.bin.
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
-  def compile_quoted(ast) when is_ast(ast) do
+  def compile_quoted(ast) do
     bundle_path = bundle_path(ast)
     build_dir = Path.dirname(bundle_path)
     stale = not File.exists?(bundle_path)

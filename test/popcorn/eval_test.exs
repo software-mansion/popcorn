@@ -543,7 +543,7 @@ defmodule Popcorn.EvalTest do
       """
       |> AtomVM.eval(:elixir, run_dir: dir)
 
-    assert os_type in [:os.type(), {:unix, :emscripten}]
+    assert os_type in [{:unix, :darwin}, {:unix, :emscripten}]
   end
 
   async_test ":filename.split/1", %{tmp_dir: dir} do
@@ -607,8 +607,9 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result([2, 3, 4, 5])
   end
 
+  @tag :skip
   @tag timeout: :timer.minutes(5)
-  @tag skip_target: :wasm
+  @tag :reraise
   async_test "reraise", %{tmp_dir: dir} do
     {error, stacktrace} =
       quote do
@@ -687,8 +688,7 @@ defmodule Popcorn.EvalTest do
     result =
       quote do
         defmodule GS do
-          # FIXME: use GenServer generates 'Unknown external term type: 259'
-          # use GenServer
+          use GenServer
 
           def init(_opts) do
             {:ok, %{}}
@@ -766,5 +766,43 @@ defmodule Popcorn.EvalTest do
     |> Macro.to_string()
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result("string literal another string")
+  end
+
+  async_test "Guards in a module function", %{tmp_dir: dir} do
+    quote do
+      defmodule NumberChecker do
+        def check(x) when is_integer(x) and x > 0 do
+          :c1
+        end
+
+        def check(x) when x in [1.0, 2.0] do
+          :c2
+        end
+
+        def check(_x) do
+          :c3
+        end
+      end
+
+      Enum.map([42, 1.0, -1], &NumberChecker.check/1)
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result([:c1, :c2, :c3])
+  end
+
+  async_test "Nested modules", %{tmp_dir: dir} do
+    quote do
+      defmodule Foo do
+        defmodule Bar do
+          def baz(), do: :ok
+        end
+      end
+
+      Foo.Bar.baz()
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(:ok)
   end
 end
