@@ -73,11 +73,11 @@ defmodule Popcorn.Build do
 
     ArtifactsCache.write_to_disk!(new_cache)
 
-    :ok
     BuildLogFormatter.disable(original_formatter)
     end_time = DateTime.utc_now()
     duration = DateTime.diff(end_time, start_time, :microsecond)
     Logger.info("Bundling finished (took #{to_human_duration(duration)})")
+    :ok
   end
 
   @doc """
