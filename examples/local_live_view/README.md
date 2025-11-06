@@ -1,13 +1,28 @@
-# LocalLiveView
+# First steps
 
-**This is a POC of LocalLiveView, a project that implements LiveView functionality 
-in the browser using Popcorn**
-
-Usage:
-
-1. Define your LiveView inside the lib directory. Remember to use pop-click instead of phx-click attribute if you want to catch click event.
-
-example:
+## Usage
+To use LocalLiveView you need to:
+1. Add `:local_live_view` to your mix.exs file:
+```elixir
+defmodule LocalThermostat.MixProject do
+  use Mix.Project
+  ...
+  defp deps do
+    [
+      {:local_live_view, github: "software-mansion/popcorn", sparse: "examples/local_live_view"}
+    ]
+  end
+end
+```
+2. Attach local_live_view.js script in your .html file:
+```html
+<html>
+    <script type="module" src="./local_live_view/local_live_view.js" defer></script>
+    <body>
+    </body>
+</html>
+```
+3. Define your LocalLiveView in the `lib` directory:
 ```elixir
 defmodule ThermostatLive do
   use LocalLiveView
@@ -30,33 +45,25 @@ defmodule ThermostatLive do
   end
 end
 ```
-2. Place your view inside the .html file, using data-pop-view attribute.
-
-example (index.html):
+4. Add html tag to render defined view, by using data-pop-view:
 ```html
 <html>
-    <style>
-        body {
-            font-size: 1.5em;
-            font-family: sans-serif;
-            max-width: 800px;
-            padding: 1em;
-            background-color: #161616;
-            color: #fcfcfc;
-        }
-    </style>
-    <script type="module" src="local_live_view.js" defer></script>
+    <script type="module" src="./local_live_view/local_live_view.js" defer></script>
     <body>
     <div data-pop-view="ThermostatLive"></div>
     </body>
 </html>
 ```
 
-3. Run:
+## Build
+To build the project after defining the above run:
 ```bash
 mix deps.get
-mix popcorn.cook
-elixir server.exs
+mix popcorn.cook --out-dir static/local_live_view/wasm
 ```
+This will generate the necessary scripts and popcorn files into the `static` directory in your project.
 
-and visit [localhost:4000](http://localhost:4000)
+You can also add `static/local_live_view/wasm` to your `config.exs` file (check [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started)) and run `mix popcorn.cook` without the option.
+## Serve
+
+To properly serve a project check the [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started). You can use `mix popcorn.dev_server` and run with `elixir dev_server.exs`

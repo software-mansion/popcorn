@@ -7,15 +7,7 @@ defmodule LocalLiveView.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      aliases: [
-        lint: [
-          "format --check-formatted",
-          "deps.unlock --check-unused",
-          "deps.compile",
-          "compile --force --warnings-as-errors",
-          "docs --warnings-as-errors"
-        ]
-      ],
+      aliases: aliases(),
       deps: deps(),
 
       # docs
@@ -47,12 +39,38 @@ defmodule LocalLiveView.MixProject do
       filter_modules: ~r/^(?!Elixir.Phoenix\.).*/,
       extras: [
         "pages/introduction/welcome.md",
-        "pages/getting_started/first_steps.md"
+        "README.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
-        "Getting started": ~r"/getting_started/"
+        "Getting started": "README.md"
       ]
     ]
+  end
+
+  @static_dir "static/local_live_view"
+  @out_dir Application.compile_env(:local_live_view, :out_dir, @static_dir)
+  
+  defp aliases() do
+    [
+      lint: [
+        "format --check-formatted",
+        "deps.unlock --check-unused",
+        "deps.compile",
+        "compile --force --warnings-as-errors",
+        "docs --warnings-as-errors"
+      ],
+      compile: ["compile", &copy_js/1]
+    ]
+  end
+
+  defp copy_js(_) do
+    Mix.shell().cmd(
+      """
+      mkdir -p ../../#{@out_dir}
+      cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
+      """,
+      cd: Mix.Project.build_path()
+    )
   end
 end

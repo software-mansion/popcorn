@@ -1,11 +1,11 @@
 defmodule LocalLiveView.Dispatcher do
-  @moduledoc """
-  This process dispatches events to different LocalLiveViews present on the page.
-    
-  It uses Popcorn API and registers as a main process to handle wasm messages inside Popcorn runtime.
-    
-  Uses GenServer.
-  """
+  @moduledoc false
+
+  #  This process dispatches events to different LocalLiveViews present on the page.
+  #    
+  #  It uses Popcorn API and registers as a main process to handle wasm messages inside Popcorn runtime.
+  #    
+  #  Uses GenServer.
 
   use GenServer
   alias Phoenix.LiveView.Session

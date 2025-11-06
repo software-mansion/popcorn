@@ -3,23 +3,23 @@ defmodule LocalLiveView do
   LocalLiveView is a module that implements functionality of Phoenix.LiveView inside the browser in  
   Popcorn runtime.
   LocalLiveView should be used exactly like its Phoenix equivalent:
+  ```
+  defmodule MyAppWeb.DemoLive do
+    use LocalLiveView
 
-      defmodule MyAppWeb.DemoLive do
-        use LocalLiveView
-
-        def render(assigns) do
-          ~H"""
-          Hello world!
-          """
-        end
-      end
-
+    def render(assigns) do
+      ~H"""
+      Hello world!
+      """
+    end
+  end
+  ```
   The LocalLiveView can be added to a page with:
   ```
   <div data-pop-view="DemoLive"></div>
   ```
 
-  During application runtime a LocalLiveView.Dispatcher will create a process that will handle a LocalLiveView state,
+  During application runtime, the application creates a process that handles a LocalLiveView's state,
   by storing and modifying its assigns.
   '''
 

@@ -87,10 +87,12 @@ defmodule CompareLiveViews.MixProject do
   end
 
   defp build_local(_) do
-    Mix.shell().cmd("""
-    cd local
-    mix deps.get
-    mix compile
-    """)
+    Mix.shell().cmd(
+      """
+      mix deps.get
+      mix popcorn.cook
+      """,
+      cd: "local"
+    )
   end
 end

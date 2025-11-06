@@ -6,6 +6,14 @@ The page is split into two halves, each covered by a modal. One modal is impleme
 
 The local part of the project is located in `local` directory.
 
+The most important files to look at are:
+
+```compare_live_views/lib/compare_live_views_web/live/demo_modal_online.ex``` - Phoenix LiveView that represents online part of the demo and is rendered on the left side of the page.
+
+```compare_live_views/local/lib/demo_modal_offline.ex``` - LocalLiveView that represents offline part of the demo and is rendered on the right side of the page.
+
+```compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex``` - home page that renders both views.
+
 To start your server:
 
 * To install and setup dependencies (both online and offline part), run:
@@ -18,4 +26,4 @@ _The popcorn output files will be generated into_ `priv/static/local_live_view` 
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
-_The project enables Phoenix LiveView latency simulation by using_ `liveSocket.enableLatencySim(1000)` _to show response time difference between the LiveViews._
+_The project enables Phoenix LiveView latency simulation by using `liveSocket.enableLatencySim(1000)` to show response time difference between the LiveViews. It can be later changed by calling `liveSocket.enableLatencySim` in the console._

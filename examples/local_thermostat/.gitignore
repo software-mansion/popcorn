@@ -25,6 +25,6 @@ local_thermostat-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
-/static/wasm
+/static/local_live_view
 
 /static/assets
