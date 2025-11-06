@@ -50,7 +50,7 @@ defmodule LocalLiveView.MixProject do
 
   @static_dir "static/local_live_view"
   @out_dir Application.compile_env(:local_live_view, :out_dir, @static_dir)
-  
+
   defp aliases() do
     [
       lint: [
