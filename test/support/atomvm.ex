@@ -108,6 +108,7 @@ defmodule Popcorn.Support.AtomVM do
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
+    out_path = Path.join(run_dir, "out.txt")
 
     args |> :erlang.term_to_binary() |> then(&File.write(args_path, &1))
 
@@ -123,7 +124,7 @@ defmodule Popcorn.Support.AtomVM do
         "AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        ~s|out=$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}'); echo "$out"|
+        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}')|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
