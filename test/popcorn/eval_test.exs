@@ -752,4 +752,19 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result([{1, 1}, {2, 1}])
   end
+
+  async_test "module binary literals", %{tmp_dir: dir} do
+    quote do
+      defmodule MyApp do
+        def main(x) do
+          "string literal" <> x
+        end
+      end
+
+      MyApp.main(" another string")
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("string literal another string")
+  end
 end
