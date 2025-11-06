@@ -4,15 +4,15 @@ This is a demo project that illustrates the differences between Popcorn's Local 
 
 The page is split into two halves, each covered by a modal. One modal is implemented using Local LiveView and the other with Phoenix LiveView.
 
-The local part of the project is located in `local` directory.
+The local part of the project is located in the `local` directory.
 
 The most important files to look at are:
 
-```compare_live_views/lib/compare_live_views_web/live/demo_modal_online.ex``` - Phoenix LiveView that represents online part of the demo and is rendered on the left side of the page.
+`compare_live_views/lib/compare_live_views_web/live/demo_modal_online.ex` - Phoenix LiveView that represents online part of the demo and is rendered on the left side of the page.
 
-```compare_live_views/local/lib/demo_modal_offline.ex``` - LocalLiveView that represents offline part of the demo and is rendered on the right side of the page.
+`compare_live_views/local/lib/demo_modal_offline.ex` - LocalLiveView that represents offline part of the demo and is rendered on the right side of the page.
 
-```compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex``` - home page that renders both views.
+`compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex` - home page that renders both views.
 
 To start your server:
 
