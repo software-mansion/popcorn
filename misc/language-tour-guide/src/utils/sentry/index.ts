@@ -56,10 +56,10 @@ export function captureReloadIframe(
 export type LogSink = {
   onStdout: (text: string) => void;
   onStderr: (text: string) => void;
-  onCrash: () => void;
+  onCrash: (reason: ReloadReason) => void;
 };
 
-export function createLogSink() {
+export function createLogSink(): LogSink {
   const stdout: string[] = [];
   const stderr: string[] = [];
 
