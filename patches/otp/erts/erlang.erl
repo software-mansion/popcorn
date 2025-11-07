@@ -111,6 +111,7 @@
     nif_error/1,
     bump_reductions/1,
     fun_info/1,
+    fun_info_mfa/1,
     phash2/1,
     phash2/2,
     phash/2
@@ -3175,6 +3176,9 @@ bump_reductions(_Reductions) -> true.
 fun_info(Fun) -> 
     Info = [?MODULE:fun_info(Fun, Key) || Key <- [module, name, arity, type, env]],
     Info ++ [{new_index, 0}, {uniq,  erlang:unique_integer()}].
+
+fun_info_mfa(Fun) ->
+    {?MODULE:fun_info(Fun, module), ?MODULE:fun_info(Fun, name), ?MODULE:fun_info(Fun, arity)}.
 
 %% Patch reason: nifs not implemented in Atom.
 %% Important: phash and phash2 are supposed to return

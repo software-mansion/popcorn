@@ -1109,8 +1109,7 @@ defmodule Popcorn.HexdocsTest do
           """,
           output: :world
         }
-      ],
-      skip: true
+      ]
     },
     {
       """
