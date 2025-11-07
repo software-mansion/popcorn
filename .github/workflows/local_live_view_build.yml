@@ -9,26 +9,18 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "**"
-      - "!misc/**"
-      - "!examples/**"
       - "examples/local_live_view/**"
       - "examples/local_thermostat/**"
       - "examples/compare_live_views/**"
-      - "!.github/**"
-      - ".github/workflows/hello_popcorn_build_test.yml"
+      - ".github/workflows/local_live_view_build.yml"
 
   pull_request:
     branches: ["**"]
     paths:
-      - "**"
-      - "!misc/**"
-      - "!examples/**"
       - "examples/local_live_view/**"
       - "examples/local_thermostat/**"
       - "examples/compare_live_views/**"
-      - "!.github/**"
-      - ".github/workflows/hello_popcorn_build_test.yml"
+      - ".github/workflows/local_live_view_build.yml"
 
 # This ensures, that, except for the main branch, only one instance of workflow is executed on a branch
 concurrency:
