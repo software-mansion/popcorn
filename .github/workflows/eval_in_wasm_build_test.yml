@@ -12,17 +12,6 @@ on:
       - "examples/eval_in_wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
 
-  pull_request:
-    branches: ["**"]
-    paths:
-      - "examples/eval_in_wasm/**"
-      - ".github/workflows/eval_in_wasm_build_test.yml"
-
-# This ensures, that, except for the main branch, only one instance of workflow is executed on a branch
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref != 'refs/heads/main' && github.ref || github.run_id }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
