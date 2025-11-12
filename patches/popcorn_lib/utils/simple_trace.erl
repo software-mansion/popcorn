@@ -36,28 +36,28 @@ print_trace(Type, PadCount, M, F, A, File, Line) ->
   MStr =
       case M of
           undefined -> [];
-          M -> [erlang:atom_to_list(M), "."]
+          M -> erlang:atom_to_list(M) ++ "."
       end,
-  console:print([
-      erlang:pid_to_list(self()),
-      " ",
-      name(),
-      " ",
-      pad(PadCount * 2),
-      " ",
-      Type,
-      " ",
-      MStr,
-      erlang:atom_to_list(F),
-      "/",
-      erlang:integer_to_list(A),
-      " ",
-      File,
-      ":",
-      erlang:integer_to_list(Line),
+  erlang:display_string(stderr,
+      erlang:pid_to_list(self()) ++
+      " " ++
+      name() ++
+      " " ++
+      pad(PadCount * 2) ++
+      " " ++
+      Type ++
+      " " ++
+      MStr ++
+      erlang:atom_to_list(F) ++
+      "/" ++
+      erlang:integer_to_list(A) ++
+      " " ++
+      File ++
+      ":" ++
+      erlang:integer_to_list(Line) ++
       "
 "
-  ]),
+  ),
   traced.
 
 trace(M, F, File, Line) ->
