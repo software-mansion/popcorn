@@ -805,4 +805,21 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(:ok)
   end
+
+  async_test "Module attributes", %{tmp_dir: dir} do
+    quote do
+      defmodule Foo do
+        @some_atribute "attribute_value"
+
+        def foo() do
+          {@some_atribute, @unknown_attribute}
+        end
+      end
+
+      Foo.foo()
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({"attribute_value", nil})
+  end
 end
