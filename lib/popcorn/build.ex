@@ -47,9 +47,10 @@ defmodule Popcorn.Build do
 
     patches_srcs = Path.wildcard("patches/**/*.{ex,erl,yrl,S}") |> MapSet.new()
     cache = ArtifactsCache.read_from_disk!()
+    is_cache_invalid = not ArtifactsCache.subset_of_sources?(cache, patches_srcs)
 
     cache =
-      if not ArtifactsCache.subset_of_sources?(cache, patches_srcs) do
+      if is_cache_invalid do
         File.rm_rf!(@patches_path)
         File.mkdir_p!(@patches_path)
         %{}
