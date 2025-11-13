@@ -57,30 +57,30 @@ module =
     MStr =
         case M of
             undefined -> [];
-            M -> [erlang:atom_to_list(M), "."]
+            M -> erlang:atom_to_list(M) ++ "."
         end,
-    console:print([
-        erlang:pid_to_list(self()),
-        " ",
-        name(),
-        " ",
-        pad(PadCount * 2),
-        " ",
-        Type,
-        " ",
-        MStr,
-        erlang:atom_to_list(F),
-        "/",
-        erlang:integer_to_list(A),
-        " ",
-        File,
-        ":",
-        erlang:integer_to_list(Line),
+    erlang:display_string(stderr,
+        erlang:pid_to_list(self()) ++
+        " " ++
+        name() ++
+        " " ++
+        pad(PadCount * 2) ++
+        " " ++
+        Type ++
+        " " ++
+        MStr ++
+        erlang:atom_to_list(F) ++
+        "/" ++
+        erlang:integer_to_list(A) ++
+        " " ++
+        File ++
+        ":" ++
+        erlang:integer_to_list(Line) ++
         "\n"
-    ]),
+    ),
     traced.
 
   #{impls}
   """
 
-File.write!("#{__DIR__}/patches/popcorn_utils/simple_trace.erl", module)
+File.write!("#{__DIR__}/patches/popcorn_lib/utils/simple_trace.erl", module)

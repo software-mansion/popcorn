@@ -124,7 +124,7 @@ defmodule Popcorn.Support.AtomVM do
         "AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}')|
+        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}'); cat '#{out_path}'|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
