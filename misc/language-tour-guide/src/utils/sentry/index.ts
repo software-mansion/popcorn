@@ -4,12 +4,14 @@ import { useCodeEditorStore } from "../../store/codeEditor";
 export function initSentry() {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
+    release: import.meta.env.VITE_APP_VERSION,
     sendDefaultPii: true,
     environment: import.meta.env.MODE,
     replaysOnErrorSampleRate: 1.0,
     replaysSessionSampleRate: 0.2,
     integrations: (integrations) => [
       ...integrations.filter((integration) => integration.name !== "Dedupe"),
+      Sentry.browserSessionIntegration(),
       Sentry.replayIntegration({
         maskAllText: false,
         maskAllInputs: false
@@ -19,8 +21,11 @@ export function initSentry() {
 }
 
 export function captureCodeException(error: string, code: string) {
-  Sentry.captureMessage("code-exception", {
-    level: "error",
+  const exception = new Error(error);
+  exception.name = "code-exception";
+  exception.message = "An exception occurred in user code";
+
+  Sentry.captureException(exception, {
     tags: {
       source: "code",
       category: "code-exception"
@@ -39,8 +44,10 @@ export function captureReloadIframe(
 ) {
   const code = useCodeEditorStore.getState().code;
 
-  Sentry.captureMessage(reason.category, {
-    level: "error",
+  const exception = new Error(`Iframe reload: ${reason.category}`);
+  exception.name = reason.category;
+
+  Sentry.captureException(exception, {
     tags: {
       source: reason.source,
       category: reason.category

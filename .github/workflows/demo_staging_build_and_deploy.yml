@@ -91,6 +91,7 @@ jobs:
           build-args: |
             SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
             SENTRY_MODE=staging
+            APP_VERSION=${{ github.sha }}
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
