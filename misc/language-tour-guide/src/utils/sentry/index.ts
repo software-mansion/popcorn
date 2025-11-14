@@ -21,11 +21,7 @@ export function initSentry() {
 }
 
 export function captureCodeException(error: string, code: string) {
-  const exception = new Error(error);
-  exception.name = "code-exception";
-  exception.message = "An exception occurred in user code";
-
-  Sentry.captureException(exception, {
+  Sentry.captureMessage("code-exception", {
     tags: {
       source: "code",
       category: "code-exception"
@@ -38,16 +34,13 @@ export function captureCodeException(error: string, code: string) {
 }
 
 export function captureReloadIframe(
-  reason: { source: string; category: string },
+  reason: { source: "heartbeat_lost" | "atomvm"; category: string },
   stdout: string,
   stderr: string
 ) {
   const code = useCodeEditorStore.getState().code;
 
-  const exception = new Error(`Iframe reload: ${reason.category}`);
-  exception.name = reason.category;
-
-  Sentry.captureException(exception, {
+  const context = {
     tags: {
       source: reason.source,
       category: reason.category
@@ -57,7 +50,17 @@ export function captureReloadIframe(
       stdout,
       stderr
     }
-  });
+  };
+
+  if (reason.source === "heartbeat_lost") {
+    Sentry.captureMessage(reason.category, context);
+    return;
+  }
+
+  const exception = new Error(`Iframe reload: ${reason.category}`);
+  exception.name = reason.category;
+
+  Sentry.captureException(exception, context);
 }
 
 export type LogSink = {
