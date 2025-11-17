@@ -135,7 +135,7 @@ end"
 
     try {
       popcorn = await window.Popcorn.init({
-        bundlePath: "/wasm/eval.avm",
+        bundlePath: "../wasm/eval.avm",
         wasmDir: "/wasm/",
         debug: true,
         onStdout: (text) => displayLog(text, { isError: false }),
