@@ -1,66 +1,16 @@
-%% Patch reason: in AVM the option "-unit:Size" inside bitstrings is not supported
+%% Patch reason: bitstring modifiers with size for binary matching and creation
+%% are not supported in AVM
+%% Particular changes are marked with a `Patch reason: bitstrings` comment
+%% These patches can be removed when https://github.com/atomvm/AtomVM/pull/1978
+%% is merged and downstreamed
+
 -module(eval_bits).
 
--export([expr_grp/3,expr_grp/4]).
+-compile({popcorn_patch_private, eval_exp_field/6}).
+-compile({popcorn_patch_private, get_value/6}).
 
 -define(STACKTRACE,
         element(2, erlang:process_info(self(), current_stacktrace))).
-
-expr_grp(Fields, Bindings, EvalFun, ErrorFun) ->
-    expr_grp(Fields, Bindings, EvalFun, ErrorFun, <<>>).
-
-expr_grp(Fields, Bindings, EvalFun) ->
-    expr_grp(Fields, Bindings, EvalFun, fun popcorn_module:default_error/3, <<>>).
-
-expr_grp(FS, Bs0, EvalFun, ErrorFun, Acc) ->
-    {ListOfEvalField,Bs1} = expr_grp1(FS, Bs0, EvalFun, ErrorFun, [], 1),
-    {value,popcorn_module:create_binary(ListOfEvalField, Acc),Bs1}.
-
-expr_grp1([Field | FS], Bs0, EvalFun, ErrorFun, ListOfEvalField, Pos) ->
-    {EvalField,Bs} = eval_field(Field, Bs0, EvalFun, ErrorFun, Pos),
-    expr_grp1(FS, Bs, EvalFun, ErrorFun, [EvalField|ListOfEvalField], Pos + 1);
-expr_grp1([], Bs, _EvalFun, _ErrorFun, ListOfFieldData, _Pos) ->
-    {lists:reverse(ListOfFieldData),Bs}.
-
-eval_field({bin_element, _, {string, _, S}, {integer,_,8}, [integer,{unit,1},unsigned,big]}, Bs0, _Fun, _ErrorFun, _Pos) ->
-    Latin1 = [C band 16#FF || C <- S],
-    {fun() -> list_to_binary(Latin1) end,Bs0};
-eval_field({bin_element, _, {string, _, S}, default, default}, Bs0, _Fun, _ErrorFun, _Pos) ->
-    Latin1 = [C band 16#FF || C <- S],
-    {fun() ->list_to_binary(Latin1) end,Bs0};
-eval_field({bin_element, Anno, {string, _, S}, Size0, Options0}, Bs0, Fun, ErrorFun, Pos) ->
-    {Size1,[Type,{unit,Unit},Sign,Endian]} =
-        popcorn_module:make_bit_type(Anno, Size0, Options0, ErrorFun),
-    {value,Size,Bs1} = Fun(Size1, Bs0),
-    {fun() ->
-        Res = << <<(eval_exp_field1(Anno, C, Size, Unit,
-            Type, Endian, Sign, ErrorFun, Pos))/bitstring>> ||
-            C <- S >>,
-        case S of
-            "" ->
-                _ = eval_exp_field1(Anno, 0, Size, Unit, Type, Endian, Sign, ErrorFun, Pos),
-                ok;
-            _ ->
-                ok
-        end,
-        Res
-     end,Bs1};
-eval_field({bin_element,Anno,E,Size0,Options0}, Bs0, Fun, ErrorFun, Pos) ->
-    {value,V,Bs1} = Fun(E, Bs0),
-    {Size1,[Type,{unit,Unit},Sign,Endian]} =
-        popcorn_module:make_bit_type(Anno, Size0, Options0, ErrorFun),
-    {value,Size,Bs} = Fun(Size1, Bs1),
-    {fun() -> eval_exp_field1(Anno, V, Size, Unit, Type, Endian, Sign, ErrorFun, Pos) end,Bs}.
-
-eval_exp_field1(Anno, V, Size, Unit, Type, Endian, Sign, ErrorFun, Pos) ->
-    try
-        eval_exp_field(V, Size, Unit, Type, Endian, Sign)
-    catch
-        error:system_limit:Stacktrace ->
-            ErrorFun(Anno, system_limit, popcorn_module:add_eval_pos_to_error_info(Stacktrace, Pos));
-        error:_:Stacktrace ->
-            ErrorFun(Anno, badarg, popcorn_module:add_eval_pos_to_error_info(Stacktrace, Pos))
-    end.
 
 eval_exp_field(Val, Size, Unit, integer, little, signed) ->
     <<Val:(Size*Unit)/little-signed>>;
@@ -97,17 +47,62 @@ eval_exp_field(Val, Size, Unit, float, big, _) ->
 eval_exp_field(Val, all, Unit, binary, _, _) ->
     case erlang:bit_size(Val) of
 	Size when Size rem Unit =:= 0 ->
+      % Patch reason: bitstrings
       Size1 = Size div 8,
-	    <<Val:Size1/binary>>;
+	  <<Val:Size1/binary>>;
 	_ ->
 	    erlang:raise(error, badarg, ?STACKTRACE)
     end;
 eval_exp_field(Val, Size, Unit, binary, _, _) ->
-    case Size rem 8 of
+    % Patch reason: bitstrings
+    case (Size * Unit) rem 8 of
         0 ->
-            Size1 = Size div 8,
-            <<Val:(Size1*Unit)/binary>>;
+            Size1 = (Size * Unit) div 8,
+            <<Val:Size1/binary>>;
         _ ->
-%%            This is still unsupported in AtomVM
+            % This is still unsupported in AtomVM
             <<Val:(Size*Unit)/binary-unit:1>>
+    end.
+
+
+get_value(Bin, integer, Size, Unit, Sign, Endian) ->
+    popcorn_module:get_integer(Bin, Size*Unit, Sign, Endian);
+get_value(Bin, float, Size, Unit, _Sign, Endian) ->
+    popcorn_module:get_float(Bin, Size*Unit, Endian);
+get_value(Bin, utf8, undefined, _Unit, _Sign, _Endian) ->
+    <<I/utf8,Rest/bits>> = Bin,
+    {I,Rest};
+get_value(Bin, utf16, undefined, _Unit, _Sign, big) ->
+    <<I/big-utf16,Rest/bits>> = Bin,
+    {I,Rest};
+get_value(Bin, utf16, undefined, _Unit, _Sign, little) ->
+    <<I/little-utf16,Rest/bits>> = Bin,
+    {I,Rest};
+get_value(Bin, utf16, undefined, _Unit, _Sign, native) ->
+    <<I/native-utf16,Rest/bits>> = Bin,
+    {I,Rest};
+get_value(Bin, utf32, undefined, _Unit, _Sign, big) ->
+    <<Val/big-utf32,Rest/bits>> = Bin,
+    {Val,Rest};
+get_value(Bin, utf32, undefined, _Unit, _Sign, little) ->
+    <<Val/little-utf32,Rest/bits>> = Bin,
+    {Val,Rest};
+get_value(Bin, utf32, undefined, _Unit, _Sign, native) ->
+    <<Val/native-utf32,Rest/bits>> = Bin,
+    {Val,Rest};
+get_value(Bin, binary, all, Unit, _Sign, _Endian) ->
+    0 = (bit_size(Bin) rem Unit),
+    {Bin,<<>>};
+get_value(Bin, binary, Size, Unit, _Sign, _Endian) ->
+    % Patch reason: bitstrings
+    case (Size * Unit) rem 8 of
+        0 ->
+            TotSize = (Size * Unit) div 8,
+            <<Val:TotSize/binary,Rest/bits>> = Bin,
+            {Val, Rest};
+        _ ->
+            % This is still unsupported in AtomVM
+            TotSize = Size * Unit,
+            <<Val:TotSize/bitstring,Rest/bits>> = Bin,
+            {Val, Rest}
     end.

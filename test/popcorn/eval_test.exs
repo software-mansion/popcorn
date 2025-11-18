@@ -822,4 +822,29 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result({"attribute_value", nil})
   end
+
+  async_test "Match binary", %{tmp_dir: dir} do
+    quote do
+      binary = <<1, 2, 3, 4, 5, 6, 7, 8>>
+
+      case binary do
+        <<part::binary-size(5), rest::binary>> -> {part, rest}
+        _other -> :no_match
+      end
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({<<1, 2, 3, 4, 5>>, <<6, 7, 8>>})
+  end
+
+  async_test "Create binary", %{tmp_dir: dir} do
+    quote do
+      bin1 = <<1, 2, 3, 4>>
+      bin2 = <<5, 6, 7, 8>>
+      <<bin1::binary-size(2), bin2::binary-size(3)>>
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(<<1, 2, 5, 6, 7>>)
+  end
 end
