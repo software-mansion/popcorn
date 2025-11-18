@@ -190,20 +190,23 @@ defmodule Popcorn.Build do
   defp patch(app, beam_paths, patch_paths, out_dir) do
     beams_by_name = Map.new(beam_paths, &{Path.basename(&1), &1})
 
+    patch_associated_beam = fn patch_path, tmp_dir ->
+      Logger.info("Compiling #{patch_path}", app_name: app)
+
+      patch_path
+      |> compile_patch(tmp_dir)
+      |> Enum.map(fn patch_beam_path ->
+        name = Path.basename(patch_beam_path)
+        do_patch(app, name, beams_by_name[name], patch_beam_path, out_dir)
+      end)
+    end
+
     # Compiling each file separately, like AtomVM does it.
     # Compiling together may break something, as these modules
     # will override stdlib modules.
     process_async(patch_paths, fn patch_path ->
       with_tmp_dir(out_dir, fn tmp_dir ->
-        Logger.info("Compiling #{patch_path}", app_name: app)
-
-        patch_path
-        |> compile_patch(tmp_dir)
-        # credo:disable-for-lines:3 Credo.Check.Refactor.Nesting
-        |> Enum.map(fn patch_beam_path ->
-          name = Path.basename(patch_beam_path)
-          do_patch(app, name, beams_by_name[name], patch_beam_path, out_dir)
-        end)
+        patch_associated_beam.(patch_path, tmp_dir)
       end)
     end)
 
