@@ -1,21 +1,20 @@
 defmodule Popcorn.ArtifactsCache do
-  @moduledoc """
-  Artifacts cache is a map, stored in external term format on disk. Stores input files with hashes for the previous build.
-  Used to skip building parts of input files if they did not change.
+  @moduledoc false
+  # Artifacts cache is a map, stored in external term format on disk. Stores input files with hashes for the previous build.
+  # Used to skip building parts of input files if they did not change.
 
-  The stored map has following structure:
-  %{
-    app1: %{
-      file_path1: hash1,
-      file_path2: hash2
-    },
-    app2: %{
-      ...
-    }
-  }
+  # The stored map has following structure:
+  # %{
+  #   app1: %{
+  #     file_path1: hash1,
+  #     file_path2: hash2
+  #   },
+  #   app2: %{
+  #     ...
+  #   }
+  # }
 
-  See `Popcorn.Build`.
-  """
+  # See `Popcorn.Build`.
 
   @app_path Mix.Project.app_path()
   @cache_path "#{@app_path}/popcorn_patch_cache"
@@ -100,10 +99,7 @@ defmodule Popcorn.ArtifactsCache do
         %{}
 
       {:error, reason} ->
-        raise(File.Error,
-          reason: reason,
-          path: @cache_path
-        )
+        raise File.Error, reason: reason, path: @cache_path
     end
   end
 
@@ -127,10 +123,7 @@ defmodule Popcorn.ArtifactsCache do
         :ok
 
       {:error, reason} ->
-        raise(File.Error,
-          reason: reason,
-          path: @cache_path
-        )
+        raise File.Error, reason: reason, path: @cache_path
     end
   end
 end

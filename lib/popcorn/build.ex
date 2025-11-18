@@ -1,8 +1,8 @@
 defmodule Popcorn.Build do
-  @moduledoc """
-  Uses system OTP and Elixir applications to create .avm bundles used in user bundles.
-  Applies Popcorn patches to .beam files in the applications.
-  """
+  @moduledoc false
+  # Uses system OTP and Elixir applications to create .avm bundles used in user bundles.
+  # Applies Popcorn patches to .beam files in the applications.
+
   require Popcorn.Config
   require Logger
   alias Popcorn.CoreErlangUtils

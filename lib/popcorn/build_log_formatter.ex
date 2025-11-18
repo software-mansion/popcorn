@@ -1,7 +1,7 @@
 defmodule Popcorn.BuildLogFormatter do
-  @moduledoc """
-  Used in Popcorn build and patch process to keep logs short.
-  """
+  @moduledoc false
+  # Used in Popcorn build and patch process to keep logs short.
+
   require Logger
 
   @clear_line "#{IO.ANSI.clear_line()}\r"
