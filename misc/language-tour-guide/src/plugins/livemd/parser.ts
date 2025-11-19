@@ -120,15 +120,12 @@ function remarkLivebook() {
   };
 }
 
-function escapeBackticks(value: string): string {
-  return value.replace(/`/g, "\\`");
-}
-
 function wrapProps(value: string): string {
-  return "`" + escapeBackticks(value) + "`";
+  const escaped = value.replace(/`/g, "\\`");
+  return "`" + escaped + "`";
 }
 
-export async function parseLivemd(markdown: string) {
+export async function transformToMdx(markdown: string) {
   const processor = unified()
     .use(remarkParse)
     .use(remarkLivebook)

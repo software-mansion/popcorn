@@ -1,7 +1,7 @@
 import type { Plugin, ResolvedConfig } from "vite";
-import fs from "fs";
+import { readFile } from "node:fs/promises";
 import path from "path";
-import { parseLivemd } from "./parser";
+import { transformToMdx } from "./parser";
 
 export function livemdPlugin(): Plugin {
   let rootPath: string;
@@ -20,19 +20,17 @@ export function livemdPlugin(): Plugin {
     },
 
     async load(id) {
-      if (id.endsWith(".livemd.mdx")) {
-        const livemdPath = id.replace(/\.mdx$/, "");
-
-        // Read the .livemd file
-        const livemdContent = fs.readFileSync(
-          path.join(rootPath, "src", livemdPath),
-          "utf-8"
-        );
-
-        const result = await parseLivemd(livemdContent);
-
-        return String(result);
+      if (!id.endsWith(".livemd.mdx")) {
+        return;
       }
+
+      const livemdName = id.replace(/\.mdx$/, "");
+      const livemdPath = path.join(rootPath, "src", livemdName);
+
+      // Read the .livemd file
+      const livemdContent = await readFile(livemdPath, "utf-8");
+
+      return String(await transformToMdx(livemdContent));
     }
   };
 }
