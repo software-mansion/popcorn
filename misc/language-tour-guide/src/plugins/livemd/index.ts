@@ -24,13 +24,12 @@ export function livemdPlugin(): Plugin {
         return;
       }
 
-      const livemdName = id.replace(/\.mdx$/, "");
-      const livemdPath = path.join(rootPath, "src", livemdName);
+      const livemdName = path.basename(id).replace(/\.mdx$/, "");
+      const livemdPath = path.join(rootPath, "src", "content", livemdName);
 
-      // Read the .livemd file
       const livemdContent = await readFile(livemdPath, "utf-8");
 
-      return String(await transformToMdx(livemdContent));
+      return transformToMdx(livemdContent);
     }
   };
 }

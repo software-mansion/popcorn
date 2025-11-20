@@ -135,5 +135,5 @@ export async function transformToMdx(markdown: string) {
       fences: true
     });
 
-  return await processor.process(markdown);
+  return String(await processor.process(markdown));
 }
