@@ -8,6 +8,7 @@ import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import { rehypeRawCode } from "./src/plugins/rehypeRawCode";
 import { remarkCollectCode } from "./src/plugins/remarkCollectCode";
+import { livemdPlugin } from "./src/plugins/livemd";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,6 +16,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    livemdPlugin(),
     mdx({
       providerImportSource: "@mdx-js/react",
       remarkPlugins: [remarkCollectCode],
