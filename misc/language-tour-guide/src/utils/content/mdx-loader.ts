@@ -2,7 +2,7 @@ import { hash64 } from "../storage";
 import type { LoadedEntry, MdxWithProperties, UnresolvedEntry } from "./types";
 
 export const mdxModules = import.meta.glob<MdxWithProperties>(
-  "/src/content/**/*.mdx"
+  "/src/content/**/*.{mdx,livemd}"
 );
 
 export async function load([
@@ -24,7 +24,7 @@ export async function load([
 }
 
 function getPath(path: string): string {
-  return path.replace("/src/content/", "").replace(/\.mdx$/, "");
+  return path.replace("/src/content/", "").replace(/\.(mdx|livemd)$/, "");
 }
 
 export function getNavigationPath(path: string): string {

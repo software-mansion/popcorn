@@ -1,0 +1,71 @@
+# Title
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.8.0", override: true}
+])
+```
+
+## Section
+
+### Atoms
+
+An atom is a constant whose value is its own name. Some other languages call these symbols.
+
+Atoms can be created using a preceding colon, like `:apple` or `:orange`. However, `true`, `false` and `nil` are also atoms - Elixir allows to skip the colon for them.
+
+Other commonly used atoms are `:ok` and `:error`. They usually denote a success or a failure of some operation. For example, `IO.puts` always returns `:ok`.
+
+```elixir
+IO.inspect :apple == :apple,
+  label: "are atoms with the same name equal?"
+
+IO.inspect :apple == :orange,
+  label: "are atoms with different names equal?"
+
+#💡 Let's use is_boolean to check if atom :false is a boolean.
+IO.inspect is_atom(true), label: "is true an atom?"
+
+IO.inspect true == :true, label: "are true and :true the same?"
+
+IO.inspect IO.puts("foo"), label: "IO.puts returns"
+
+2
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+are atoms with the same name equal?: true
+are atoms with different names equal?: false
+is true an atom?: true
+are true and :true the same?: true
+foo
+IO.puts returns: :ok
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+2
+```
+
+Markdown with codeblock
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+IO.inspect("inside markdown")
+```
+
+<!-- livebook:{"force_markdown":true} -->
+
+```python
+list = [1, 3, 3]
+```
+
+End markdown
+
+<!-- livebook:{"break_markdown":true} -->
+
+Break markdown
