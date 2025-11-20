@@ -32,7 +32,9 @@
     part/3,
     split/2, split/3,
     compile_pattern/1,
-    matches/2
+    matches/2,
+    decode_unsigned/1, decode_unsigned/2,
+    encode_unsigned/1, encode_unsigned/2
 ]).
 
 %%-----------------------------------------------------------------------------
@@ -147,3 +149,23 @@ do_matches(Binary, Patterns, Offset, Result) ->
         nomatch ->
             lists:reverse(Result)
     end.
+
+% Patch reason: encode_unsigned and decode_unsigned NIFs not available in AtomVM
+% These functions should also accept 'little' as the second argument,
+% but the 'little' modifier for binary matching / creation is unsupported in AtomVM.
+
+encode_unsigned(Unsigned) ->
+  BitSize = erlang:ceil(math:log2(Unsigned)),
+  Size = erlang:ceil(BitSize / 8) * 8,
+  <<Unsigned:Size>>.
+
+encode_unsigned(Unsigned, big) ->
+  encode_unsigned(Unsigned).
+
+decode_unsigned(Binary) ->
+    Size = erlang:byte_size(Binary) * 8,
+    <<Unsigned:Size>> = Binary,
+    Unsigned.
+
+decode_unsigned(Binary, big) ->
+    decode_unsigned(Binary).

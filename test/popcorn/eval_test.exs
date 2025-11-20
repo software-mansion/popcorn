@@ -88,14 +88,15 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(["a", "a", "a", "a", "a", "a", "a"])
   end
 
-  @tag :skip
   async_test "io_lib", %{tmp_dir: dir} do
-    """
-    term = {:ok, ["a", 2, 3.0]}
-    ~c"~p"
-    |> :io_lib.format([term])
-    |> to_string()
-    """
+    quote do
+      term = {:ok, ["a", 2, 3.0]}
+
+      ~c"~p"
+      |> :io_lib.format([term])
+      |> to_string()
+    end
+    |> Macro.to_string()
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result("{ok,[<<\"a\">>,2,3.0]}")
   end
@@ -189,7 +190,8 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip
+  @tag :long_running
+  @tag timeout: :timer.minutes(5)
   async_test "Capybara habitat - genserver", %{tmp_dir: dir} do
     "#{@examples_path}/CapybaraHabitat.ex"
     |> File.read!()
@@ -236,7 +238,6 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip
   async_test "line location", %{tmp_dir: dir} do
     """
     -module(long_function).
@@ -265,7 +266,6 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip
   async_test "Greetings - message passing", %{tmp_dir: dir} do
     "#{@examples_path}/greetings.erl"
     |> File.read!()
@@ -273,7 +273,6 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip
   async_test "Capybara habitat - message passing", %{tmp_dir: dir} do
     "#{@examples_path}/capybara_habitat.erl"
     |> File.read!()
@@ -307,9 +306,11 @@ defmodule Popcorn.EvalTest do
     })
   end
 
-  @tag :skip
   async_test "non-interpolating string sigil", %{tmp_dir: dir} do
-    ~s|~S(a #{1})|
+    quote do
+      ~S(a #{1})
+    end
+    |> Macro.to_string()
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result("a \#{1}")
   end
@@ -392,7 +393,6 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result(%ArithmeticError{})
   end
 
-  @tag :skip
   async_test "BadArityError", %{tmp_dir: dir} do
     "Enum.map([1], fn a, b -> :bad end)"
     |> wrap_in_try()
@@ -846,5 +846,14 @@ defmodule Popcorn.EvalTest do
     |> Macro.to_string()
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result(<<1, 2, 5, 6, 7>>)
+  end
+
+  async_test "binary:decode_unsigned, encode_unsigned", %{tmp_dir: dir} do
+    quote do
+      {:binary.decode_unsigned(<<169, 138, 199>>), :binary.encode_unsigned(11_111_111)}
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({11_111_111, <<169, 138, 199>>})
   end
 end
