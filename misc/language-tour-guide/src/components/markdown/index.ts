@@ -9,7 +9,8 @@ import {
   InlineCode,
   BlockQuote,
   CodeBlock,
-  Link
+  Link,
+  Editor
 } from "./MarkdownComponents";
 
 export const components = {
@@ -23,5 +24,6 @@ export const components = {
   code: InlineCode,
   blockquote: BlockQuote,
   pre: CodeBlock,
-  a: Link
+  a: Link,
+  Editor
 };
