@@ -4,6 +4,7 @@ import { visit, type Test } from "unist-util-visit";
 import remarkStringify from "remark-stringify";
 
 import type { Root, Node, Code, Html } from "mdast";
+import { hash64 } from "../../utils/storage";
 
 type LivebookMetadata = {
   output?: boolean;
@@ -31,7 +32,15 @@ function isHtmlNode(node: Node | undefined): node is Html {
   return node?.type === "html";
 }
 
+export type CodeSnippet = {
+  id: string;
+  initCode: string;
+  output: [string, string];
+};
+
 function remarkLivebook() {
+  const codeSnippets: CodeSnippet[] = [];
+
   return (tree: Root) => {
     visit<Root, Test>(tree, (node, index, parent) => {
       if (!parent || index === undefined) return;
@@ -58,9 +67,9 @@ function remarkLivebook() {
           }
         }
 
-        const initCode = wrapProps(node.value);
-        let outputStd = "``";
-        let outputResult = "``";
+        const initCode = node.value;
+        let firstOutput = "";
+        let secondOutput = "";
         let nodesToRemove = 0;
 
         // Check if there's output metadata after this code block
@@ -81,7 +90,7 @@ function remarkLivebook() {
                 );
               }
 
-              outputStd = wrapProps(firstOutputNode.value);
+              firstOutput = firstOutputNode.value;
               nodesToRemove = 2;
 
               // Check if there's a second output block
@@ -105,7 +114,7 @@ function remarkLivebook() {
                       );
                     }
 
-                    outputResult = wrapProps(secondOutputNode.value);
+                    secondOutput = secondOutputNode.value;
                     nodesToRemove = 4;
                   }
                 }
@@ -114,9 +123,17 @@ function remarkLivebook() {
           }
         }
 
+        const editorId = hash64(initCode + firstOutput + secondOutput);
+
+        codeSnippets.push({
+          id: editorId,
+          initCode,
+          output: [firstOutput, secondOutput]
+        });
+
         const editorNode = {
           type: "html" as const,
-          value: `<Editor init_code={${initCode}} output_std={${outputStd}} output_result={${outputResult}} />`
+          value: `<Editor id={"${editorId}"} />`
         };
 
         // Replace the Elixir code block with Editor component
@@ -134,12 +151,14 @@ function remarkLivebook() {
         }
       }
     });
-  };
-}
 
-function wrapProps(value: string): string {
-  const escaped = value.replace(/`/g, "\\`");
-  return "`" + escaped + "`";
+    const exportCodeNode = {
+      type: "html" as const,
+      value: `export const codeSnippets = ${JSON.stringify(codeSnippets)};`
+    };
+
+    tree.children.unshift(exportCodeNode);
+  };
 }
 
 export async function transformToMdx(markdown: string) {
