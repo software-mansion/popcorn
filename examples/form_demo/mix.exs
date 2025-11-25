@@ -85,7 +85,7 @@ defmodule FormDemo.MixProject do
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end
-  
+
   defp build_local(_) do
     Mix.shell().cmd(
       """

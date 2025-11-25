@@ -4,7 +4,6 @@ var events = [
     {js_event: "click", pop_event: "pop-click"},
     {js_event: "keydown", pop_event: "pop-keydown"},
     {js_event: "submit", pop_event: "pop-submit"},
-//    {js_event: "change", pop_event: "pop-change"},
     {js_event: "input", pop_event: "pop-change"}
 ]
 

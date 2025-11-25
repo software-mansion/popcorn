@@ -55,12 +55,12 @@ defmodule FormDemoWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
-  
+
   plug FormDemoWeb.Router,
-       headers: [
-         {"Access-Control-Allow-Origin", "*"},
-         {"Cross-Origin-Opener-Policy", "same-origin"},
-         {"Cache-Control", "public no-cache"},
-         {"Cross-Origin-Embedder-Policy", "require-corp"}
-       ]
+    headers: [
+      {"Access-Control-Allow-Origin", "*"},
+      {"Cross-Origin-Opener-Policy", "same-origin"},
+      {"Cache-Control", "public no-cache"},
+      {"Cross-Origin-Embedder-Policy", "require-corp"}
+    ]
 end
