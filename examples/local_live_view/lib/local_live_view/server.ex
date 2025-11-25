@@ -64,6 +64,7 @@ defmodule LocalLiveView.Server do
   def handle_info(%Message{event: "event"} = msg, state) do
     %{"value" => raw_val, "event" => event, "type" => _type} = msg.payload
     new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
+
     new_state.socket
     |> view_handle_event(event, raw_val)
     |> handle_result({:handle_event, 3, msg.ref}, new_state)
