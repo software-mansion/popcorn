@@ -4,12 +4,17 @@ defmodule FormDemoLocal do
 
   def render(assigns) do
     ~H"""
-    <.form for={@form} id="my-form" pop-change="validate" pop-submit="save">
+    <.form for={@form} id="my-form" pop-change="validate" pop-submit="save" class="bordered">
+      <label>USERNAME</label>
       <.input type="text" field={@form[:username]} />
+      <label>EMAIL</label>
       <.input type="email" field={@form[:email]} />
-      <button>Save</button>
+      <div class="centered">
+        <button class="ghost-button">SAVE</button>
+      </div>
     </.form>
-    <div>
+    <p style="color:red;"><%= @errors %></p>
+    <div class="bordered">
       <h1>User List:</h1>
       <ul>
         <%= for user <- @users do %>
@@ -17,7 +22,6 @@ defmodule FormDemoLocal do
         <% end %>
       </ul>
     </div>
-    <p style="color:red;"><%= @errors %></p>
     """
   end
 

@@ -91,6 +91,38 @@
   --noise: 0;
 }
 
+.centered-div {
+  width: 33%;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.centered {
+  text-align: center;
+}
+
+.bordered {
+  border: 1px solid white;
+  padding: 20px;
+}
+.ghost-button {
+  background-color: transparent; 
+  color: white; 
+  border: 2px solid white; 
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+}
+
+.ghost-button:hover {
+  background-color: white; 
+  color: #1a1a1a; 
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
+}
+  
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
