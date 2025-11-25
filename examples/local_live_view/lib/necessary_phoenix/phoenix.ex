@@ -18,13 +18,13 @@ defmodule Phoenix do
       :erlang.system_flag(:backtrace_depth, stacktrace_depth)
     end
 
-    if filter = Application.get_env(:phoenix, :filter_parameters) do
-      Application.put_env(:phoenix, :filter_parameters, Phoenix.Logger.compile_filter(filter))
-    end
+    #    if filter = Application.get_env(:phoenix, :filter_parameters) do
+    #      Application.put_env(:phoenix, :filter_parameters, Phoenix.Logger.compile_filter(filter))
+    #    end
 
-    if Application.fetch_env!(:phoenix, :logger) do
-      Phoenix.Logger.install()
-    end
+    #    if Application.fetch_env!(:phoenix, :logger) do
+    #      Phoenix.Logger.install()
+    #    end
 
     children = [
       # Code reloading must be serial across all Phoenix apps
