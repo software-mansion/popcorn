@@ -83,36 +83,3 @@ export const Link = ({ children, ...props }: ComponentProps<"a">) => (
     {children}
   </a>
 );
-
-type EditorProps = {
-  init_code: string;
-  output_std?: string;
-  output_result?: string;
-};
-
-export const Editor = ({ init_code, output_std, output_result }: EditorProps) => {
-  return (
-    <div className="my-6 rounded border border-gray-300 p-4">
-      <h3 className="mb-2 text-lg font-medium text-gray-800">Editor</h3>
-      <pre className="mb-4 overflow-x-auto rounded bg-gray-100 p-2 font-mono text-sm text-gray-700">
-        {init_code}
-      </pre>
-      {output_std && (
-        <>
-          <h4 className="mb-2 text-md font-medium text-gray-800">Output (stdout)</h4>
-          <pre className="mb-4 overflow-x-auto rounded bg-gray-100 p-2 font-mono text-sm text-gray-700">
-            {output_std}
-          </pre>
-        </>
-      )}
-      {output_result && (
-        <>
-          <h4 className="mb-2 text-md font-medium text-gray-800">Result</h4>
-          <pre className="overflow-x-auto rounded bg-gray-100 p-2 font-mono text-sm text-gray-700">
-            {output_result}
-          </pre>
-        </>
-      )}
-    </div>
-  );
-};

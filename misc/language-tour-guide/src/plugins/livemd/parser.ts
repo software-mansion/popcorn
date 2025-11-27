@@ -35,7 +35,8 @@ function isHtmlNode(node: Node | undefined): node is Html {
 export type CodeSnippet = {
   id: string;
   initCode: string;
-  output: [string, string];
+  stdout: string[];
+  output: string;
 };
 
 function remarkLivebook() {
@@ -69,7 +70,7 @@ function remarkLivebook() {
 
         const initCode = node.value;
         let firstOutput = "";
-        let secondOutput = "";
+        let secondOutput: string | null = null;
         let nodesToRemove = 0;
 
         // Check if there's output metadata after this code block
@@ -123,17 +124,18 @@ function remarkLivebook() {
           }
         }
 
-        const editorId = hash64(initCode + firstOutput + secondOutput);
+        const editorId = hash64(initCode + firstOutput + (secondOutput ?? ""));
 
         codeSnippets.push({
           id: editorId,
           initCode,
-          output: [firstOutput, secondOutput]
+          stdout: secondOutput === null ? [] : firstOutput.split("\n"),
+          output: secondOutput === null ? firstOutput : secondOutput
         });
 
         const editorNode = {
           type: "html" as const,
-          value: `<Editor id={"${editorId}"} />`
+          value: `<CodeCell id={"${editorId}"} />`
         };
 
         // Replace the Elixir code block with Editor component

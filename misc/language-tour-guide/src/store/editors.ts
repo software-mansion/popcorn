@@ -8,12 +8,12 @@ export type EditorData = {
   id: string;
   code: string;
   defaultCode: string;
-  output: [string, string];
   currentResult?: {
     stdoutResult?: string[];
     stderrResult?: string[];
     errorMessage?: string;
     durationMs?: number;
+    output?: any;
   };
   isExecuting: boolean;
 };
@@ -24,7 +24,8 @@ type EditorsStore = {
   initEditor: (
     id: string,
     defaultCode: string,
-    output: [string, string]
+    output: string,
+    stdout: string[]
   ) => void;
 
   getEditor: (id: string) => EditorData | undefined;
@@ -38,6 +39,7 @@ type EditorsStore = {
       stderrResult?: string[];
       errorMessage?: string;
       durationMs?: number;
+      output?: any;
     }
   ) => void;
 
@@ -54,15 +56,18 @@ export const useEditorsStore = create<EditorsStore>()(
   immer((set, get) => ({
     editors: new Map(),
 
-    initEditor: (id: string, defaultCode: string, output: [string, string]) => {
+    initEditor: (id, defaultCode, output, stdout) => {
       set((state) => {
         if (!state.editors.has(id)) {
           state.editors.set(id, {
             id,
             code: defaultCode,
             defaultCode,
-            output,
-            isExecuting: false
+            isExecuting: false,
+            currentResult: {
+              stdoutResult: stdout,
+              output
+            }
           });
         }
       });

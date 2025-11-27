@@ -8,7 +8,6 @@ export type Frontmatter = {
 export type MdxWithProperties = {
   default: ComponentType;
   frontmatter?: Frontmatter;
-  defaultCode?: string;
   codeSnippets?: CodeSnippet[];
 };
 

@@ -4,6 +4,15 @@ interface ButtonProps {
   className?: string;
   disabled?: boolean;
   onClick?: () => void;
+  hideTitle?: boolean;
+  Icon?: React.ComponentType<
+    React.SVGProps<SVGSVGElement> & {
+      title?: string;
+      titleId?: string;
+      desc?: string;
+      descId?: string;
+    }
+  >;
 }
 
 const BUTTON_CLASSES = {
@@ -19,15 +28,20 @@ export function Button({
   type,
   disabled,
   className,
-  onClick
+  onClick,
+  Icon,
+  hideTitle
 }: ButtonProps) {
   return (
     <button
       disabled={disabled}
-      className={`disabled:bg-brown-gray font-inter cursor-pointer rounded text-sm transition-all duration-300 disabled:cursor-not-allowed ${BUTTON_CLASSES[type]} ${className}`}
+      className={`group disabled:bg-brown-gray font-inter flex cursor-pointer items-center gap-2 rounded text-sm transition-all duration-300 disabled:cursor-not-allowed ${BUTTON_CLASSES[type]} ${className}`}
       onClick={onClick}
     >
-      {title}
+      {Icon && (
+        <Icon className="text-brown-90 h-4.5 group-disabled:text-white" />
+      )}
+      <span className={hideTitle ? "sr-only" : ""}>{title}</span>
     </button>
   );
 }
