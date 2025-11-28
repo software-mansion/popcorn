@@ -1,3 +1,5 @@
+import { CodeCell } from "../code-cell/CodeCell";
+
 import {
   Heading1,
   Heading2,
@@ -9,8 +11,7 @@ import {
   InlineCode,
   BlockQuote,
   CodeBlock,
-  Link,
-  Editor
+  Link
 } from "./MarkdownComponents";
 
 export const components = {
@@ -25,5 +26,5 @@ export const components = {
   blockquote: BlockQuote,
   pre: CodeBlock,
   a: Link,
-  Editor
+  CodeCell
 };

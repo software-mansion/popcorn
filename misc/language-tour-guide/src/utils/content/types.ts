@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { CodeSnippet } from "../../plugins/livemd/parser";
 
 export type Frontmatter = {
   order?: number;
@@ -7,7 +8,7 @@ export type Frontmatter = {
 export type MdxWithProperties = {
   default: ComponentType;
   frontmatter?: Frontmatter;
-  defaultCode?: string;
+  codeSnippets?: CodeSnippet[];
 };
 
 export type Dir = string;
