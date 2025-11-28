@@ -69,3 +69,21 @@ End markdown
 <!-- livebook:{"break_markdown":true} -->
 
 Break markdown
+
+```elixir
+IO.puts("new block")
+
+2 + 2
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+new block
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+4
+```

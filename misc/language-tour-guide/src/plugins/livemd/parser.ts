@@ -4,6 +4,7 @@ import { visit, type Test } from "unist-util-visit";
 import remarkStringify from "remark-stringify";
 
 import type { Root, Node, Code, Html } from "mdast";
+import { hash64 } from "../../utils/storage";
 
 type LivebookMetadata = {
   output?: boolean;
@@ -31,98 +32,135 @@ function isHtmlNode(node: Node | undefined): node is Html {
   return node?.type === "html";
 }
 
+export type CodeSnippet = {
+  id: string;
+  initCode: string;
+  stdout: string[];
+  output: string;
+};
+
 function remarkLivebook() {
+  const codeSnippets: CodeSnippet[] = [];
+
   return (tree: Root) => {
     visit<Root, Test>(tree, (node, index, parent) => {
       if (!parent || index === undefined) return;
 
-      // TODO: remove first elixir configuration code block if force_markdown is not set
-
-      if (node.type === "html") {
-        // Extract livebook metadata from HTML comments
-        const livebookMatch = node.value.match(/<!--\s*livebook:({.*?})\s*-->/);
-        if (!livebookMatch) return;
-
-        const metadata: LivebookMetadata = JSON.parse(livebookMatch[1]);
-
-        // Case 1: output: true - group previous Elixir code with next output block(s)
-        if (metadata.output === true && index > 0) {
-          const prevNode = parent.children[index - 1] as Code;
-
-          // Only process if previous node is an Elixir code block
-          if (!isElixirCodeBlock(prevNode)) {
-            throw new Error(
-              "Livemd parse error: Expected previous node to be an Elixir code block"
-            );
-          }
-
-          // Find the first output block
-          const firstOutputNode = parent.children[index + 1] as Code;
-
-          if (!isCodeOutputBlock(firstOutputNode)) {
-            throw new Error(
-              "Livemd parse error: Expected next node to be an output code block"
-            );
-          }
-
-          const initCode = wrapProps(prevNode.value);
-          const outputStd = wrapProps(firstOutputNode.value);
-          let outputResult = "``";
-
-          // Check if there's a second metadata comment followed by another output block
-          const secondMetadataNode = parent.children[index + 2];
-
-          if (isHtmlNode(secondMetadataNode)) {
-            const secondMatch = secondMetadataNode.value.match(
+      // Process Elixir code blocks - convert to Editor unless force_markdown is set
+      if (isElixirCodeBlock(node)) {
+        // Check if there's a force_markdown metadata before this code block
+        if (index > 0) {
+          const prevNode = parent.children[index - 1];
+          if (isHtmlNode(prevNode)) {
+            const metadataMatch = prevNode.value.match(
               /<!--\s*livebook:({.*?})\s*-->/
             );
 
-            if (secondMatch) {
-              const secondMetadata: LivebookMetadata = JSON.parse(
-                secondMatch[1]
-              );
+            if (metadataMatch) {
+              const metadata: LivebookMetadata = JSON.parse(metadataMatch[1]);
 
-              if (secondMetadata.output === true) {
-                const secondOutputNode = parent.children[index + 3] as Code;
-
-                if (!isCodeOutputBlock(secondOutputNode)) {
-                  throw new Error(
-                    "Livemd parse error: Expected second output node to be an output code block"
-                  );
-                }
-
-                outputResult = wrapProps(secondOutputNode.value);
-
-                // Remove second metadata and output block
-                parent.children.splice(index + 2, 2);
+              // If force_markdown is true, keep it as a normal code block
+              if (metadata.force_markdown === true) {
+                parent.children.splice(index - 1, 1);
+                return;
               }
             }
           }
+        }
 
-          const editorNode = {
-            type: "html" as const,
-            value: `<Editor init_code={${initCode}} output_std={${outputStd}} output_result={${outputResult}} />`
-          };
+        const initCode = node.value;
+        let firstOutput = "";
+        let secondOutput: string | null = null;
+        let nodesToRemove = 0;
 
-          // Replace the Elixir code block with Editor component
-          parent.children[index - 1] = editorNode;
+        // Check if there's output metadata after this code block
+        const nextNode = parent.children[index + 1];
+        if (isHtmlNode(nextNode)) {
+          const metadataMatch = nextNode.value.match(
+            /<!--\s*livebook:({.*?})\s*-->/
+          );
+          if (metadataMatch) {
+            const metadata: LivebookMetadata = JSON.parse(metadataMatch[1]);
 
-          // Remove first metadata and output block
-          parent.children.splice(index, 2);
-        } else {
-          // Other cases: when metadata is other than output: true
+            if (metadata.output === true) {
+              const firstOutputNode = parent.children[index + 2];
 
-          // Just remove the metadata html comment
+              if (!isCodeOutputBlock(firstOutputNode)) {
+                throw new Error(
+                  "Livemd parse error: Expected output code block after output:true metadata"
+                );
+              }
+
+              firstOutput = firstOutputNode.value;
+              nodesToRemove = 2;
+
+              // Check if there's a second output block
+              const secondMetadataNode = parent.children[index + 3];
+              if (isHtmlNode(secondMetadataNode)) {
+                const secondMatch = secondMetadataNode.value.match(
+                  /<!--\s*livebook:({.*?})\s*-->/
+                );
+
+                if (secondMatch) {
+                  const secondMetadata: LivebookMetadata = JSON.parse(
+                    secondMatch[1]
+                  );
+
+                  if (secondMetadata.output === true) {
+                    const secondOutputNode = parent.children[index + 4];
+
+                    if (!isCodeOutputBlock(secondOutputNode)) {
+                      throw new Error(
+                        "Livemd parse error: Expected second output code block"
+                      );
+                    }
+
+                    secondOutput = secondOutputNode.value;
+                    nodesToRemove = 4;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        const editorId = hash64(initCode + firstOutput + (secondOutput ?? ""));
+
+        codeSnippets.push({
+          id: editorId,
+          initCode,
+          stdout: secondOutput === null ? [] : firstOutput.split("\n"),
+          output: secondOutput === null ? firstOutput : secondOutput
+        });
+
+        const editorNode = {
+          type: "html" as const,
+          value: `<CodeCell id={"${editorId}"} />`
+        };
+
+        // Replace the Elixir code block with Editor component
+        parent.children[index] = editorNode;
+
+        // Remove output metadata and blocks if they exist
+        if (nodesToRemove > 0) {
+          parent.children.splice(index + 1, nodesToRemove);
+        }
+      } else if (isHtmlNode(node)) {
+        // Remove any remaining livebook metadata comments
+        const metadataMatch = node.value.match(/<!--\s*livebook:({.*?})\s*-->/);
+        if (metadataMatch) {
           parent.children.splice(index, 1);
         }
       }
     });
-  };
-}
 
-function wrapProps(value: string): string {
-  const escaped = value.replace(/`/g, "\\`");
-  return "`" + escaped + "`";
+    const exportCodeNode = {
+      type: "html" as const,
+      value: `export const codeSnippets = ${JSON.stringify(codeSnippets)};`
+    };
+
+    tree.children.unshift(exportCodeNode);
+  };
 }
 
 export async function transformToMdx(markdown: string) {
