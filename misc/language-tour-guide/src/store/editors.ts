@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
+import type { CodeSnippet } from "../plugins/livemd/parser";
 
 enableMapSet();
 
@@ -21,12 +22,7 @@ export type EditorData = {
 type EditorsStore = {
   editors: Map<string, EditorData>;
 
-  initEditor: (
-    id: string,
-    defaultCode: string,
-    output: string,
-    stdout: string[]
-  ) => void;
+  initEditor: (codeSnippet: CodeSnippet) => void;
 
   getEditor: (id: string) => EditorData | undefined;
 
@@ -56,7 +52,8 @@ export const useEditorsStore = create<EditorsStore>()(
   immer((set, get) => ({
     editors: new Map(),
 
-    initEditor: (id, defaultCode, output, stdout) => {
+    initEditor: (codeSnippet: CodeSnippet) => {
+      const { id, initCode: defaultCode, stdout, output } = codeSnippet;
       set((state) => {
         if (!state.editors.has(id)) {
           state.editors.set(id, {
@@ -90,9 +87,7 @@ export const useEditorsStore = create<EditorsStore>()(
       set((state) => {
         const editor = state.editors.get(id);
         if (editor) {
-          editor.currentResult = {
-            ...result
-          };
+          editor.currentResult = structuredClone(result);
         }
       });
     },

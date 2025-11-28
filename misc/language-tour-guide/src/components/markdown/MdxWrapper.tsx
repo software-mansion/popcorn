@@ -18,7 +18,7 @@ export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
     }
 
     for (const snippet of codeSnippets) {
-      initEditor(snippet.id, snippet.initCode, snippet.output, snippet.stdout);
+      initEditor(snippet);
     }
     setIsInitialized(true);
   }, [codeSnippets, initEditor]);

@@ -49,7 +49,7 @@ export function Results({ id }: EditorResultsProps) {
         <span className="">Output</span>
         <span className="text-xs font-light">
           {longExecuting
-            ? "pending..."
+            ? "Pending..."
             : durationMs !== undefined && `${durationMs.toFixed(3)}ms`}
         </span>
       </div>
