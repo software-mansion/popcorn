@@ -13,7 +13,10 @@ export function createRouteComponents(): JSX.Element[] {
 
       return {
         default: () => (
-          <MdxWrapper code={module.defaultCode} Component={module.default} />
+          <MdxWrapper
+            codeSnippets={module.codeSnippets}
+            Component={module.default}
+          />
         )
       };
     });

@@ -1,35 +1,31 @@
-import { useEffect } from "react";
-import { useCodeEditorStore } from "../../store/codeEditor";
-import { useLocation } from "react-router";
+import { useEffect, useState } from "react";
+import type { CodeSnippet } from "../../plugins/livemd/parser";
+import { useEditorsStore } from "../../store/editors";
 
 type MdxWrapperProps = {
   Component: React.ComponentType;
-  code?: string;
+  codeSnippets?: CodeSnippet[];
 };
 
-export function MdxWrapper({ Component, code }: MdxWrapperProps) {
-  const setCode = useCodeEditorStore((state) => state.setCode);
-  const setDefaultCode = useCodeEditorStore((state) => state.setDefaultCode);
-  const getCodeFromStorage = useCodeEditorStore(
-    (state) => state.getCodeFromStorage
-  );
-  const setPathHash = useCodeEditorStore((state) => state.setPathHash);
-  const { pathname } = useLocation();
+export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
+  const initEditor = useEditorsStore((state) => state.initEditor);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    setPathHash(pathname);
-    const storedCode = getCodeFromStorage();
+    if (!codeSnippets) {
+      setIsInitialized(true);
+      return;
+    }
 
-    setCode(storedCode ?? code ?? "");
-    setDefaultCode(code ?? "");
-  }, [
-    code,
-    setCode,
-    setDefaultCode,
-    getCodeFromStorage,
-    setPathHash,
-    pathname
-  ]);
+    for (const snippet of codeSnippets) {
+      initEditor(snippet);
+    }
+    setIsInitialized(true);
+  }, [codeSnippets, initEditor]);
+
+  if (!isInitialized) {
+    return null;
+  }
 
   return <Component />;
 }
