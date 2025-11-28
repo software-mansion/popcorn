@@ -23,6 +23,7 @@ defmodule Local.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:gettext, "~> 0.26"},
       {:local_live_view, path: "../../local_live_view"}
     ]
   end
