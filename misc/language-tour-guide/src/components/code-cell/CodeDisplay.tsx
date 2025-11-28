@@ -10,6 +10,7 @@ import {
 import { usePopcornEval } from "../../utils/hooks/usePopcornEval";
 import { usePopcorn } from "../../utils/hooks/usePopcorn";
 import RotatedCcw from "../../assets/rotated-ccw.svg?react";
+import { useDelayedPending } from "../../utils/hooks/useDelayedPending";
 
 type CodeDisplayProps = {
   id: string;
@@ -19,6 +20,8 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const code = useEditorCode(id);
   const isExecuting = useEditorExecuting(id);
   const isCodeChanged = useEditorChanged(id);
+  const longRunning = useDelayedPending(isExecuting, 500);
+
   const setEditorExecuting = useEditorsStore(
     (state) => state.setEditorExecuting
   );
@@ -29,17 +32,13 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
 
   const evalCode = usePopcornEval();
   const { cancelCall } = usePopcorn();
-  const [longRunning, setLongRunning] = useState(false);
 
   const handleRunCode = useCallback(async () => {
     if (isExecuting) return;
 
     setEditorExecuting(id, true);
 
-    setLongRunning(false);
-
-    const opts = { onLongRunning: () => setLongRunning(true) };
-    const runResult = await evalCode(code, opts);
+    const runResult = await evalCode(code);
     const { data, durationMs, stderr, stdout, error } = runResult;
 
     const ok = error === null;
@@ -66,8 +65,8 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
 
   const handleReset = useCallback(() => {
     resetEditorToDefault(id);
-    setLongRunning(false);
-  }, [id, resetEditorToDefault]);
+    setEditorExecuting(id, false);
+  }, [id, resetEditorToDefault, setEditorExecuting]);
 
   return (
     <>
@@ -88,7 +87,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
             hideTitle
           />
         )}
-        {isExecuting && longRunning && (
+        {longRunning && (
           <Button title="Cancel" type="secondary" onClick={cancelCall} />
         )}
       </div>

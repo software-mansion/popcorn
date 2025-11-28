@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
 import { useEditorResult, useEditorExecuting } from "../../store/editors";
 import StdoutResults from "../execution/StdoutResults";
 import { CompilerError } from "../execution/CompilerError";
 import { WarningOutput } from "../execution/WarningOutput";
 import ArrowRight from "../../assets/arrow-right.svg?react";
+import { useDelayedPending } from "../../utils/hooks/useDelayedPending";
 
 type EditorResultsProps = {
   id: string;
@@ -12,18 +12,7 @@ type EditorResultsProps = {
 export function Results({ id }: EditorResultsProps) {
   const result = useEditorResult(id);
   const isExecuting = useEditorExecuting(id);
-  const [longExecuting, setLongExecuting] = useState(false);
-
-  useEffect(() => {
-    if (isExecuting) {
-      const timer = setTimeout(() => {
-        setLongExecuting(true);
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      setLongExecuting(false);
-    }
-  }, [isExecuting]);
+  const longExecuting = useDelayedPending(isExecuting);
 
   if (!result) {
     return null;
