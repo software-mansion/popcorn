@@ -17,8 +17,8 @@ interface ButtonProps {
 
 const BUTTON_CLASSES = {
   primary:
-    "bg-orange-100 text-white hover:bg-orange-100/90 orange-shadow disabled:shadow-none px-4 py-2",
-  secondary: "bg-grey-20 text-brown-90 hover:bg-grey-20/80 px-4 py-2",
+    "bg-orange-100 text-white hover:bg-orange-70 disabled:shadow-none px-3.5 py-1.5",
+  secondary: "bg-grey-20 text-brown-90 hover:bg-grey-20/80 px-3.5 py-1.5",
   tertiary:
     "bg-brown-70 hover:bg-brown-60 shadow-md rounded-md px-3 py-1 font-medium text-white"
 };

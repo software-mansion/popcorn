@@ -70,11 +70,14 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   }, [id, resetEditorToDefault]);
 
   return (
-    <div className="relative">
-      <div className="absolute top-2 right-2 z-10 flex gap-2">
-        {isExecuting && longRunning && (
-          <Button title="Cancel" type="secondary" onClick={cancelCall} />
-        )}
+    <>
+      <div className="border-grey-20 flex items-center gap-2 border-b-4 bg-[#FDF6E3] px-2 py-2">
+        <Button
+          title="Run Code"
+          type="primary"
+          disabled={isExecuting}
+          onClick={handleRunCode}
+        />
         {isCodeChanged && (
           <Button
             type="secondary"
@@ -85,15 +88,12 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
             hideTitle
           />
         )}
-        <Button
-          title="Run Code"
-          type="primary"
-          disabled={isExecuting}
-          onClick={handleRunCode}
-        />
+        {isExecuting && longRunning && (
+          <Button title="Cancel" type="secondary" onClick={cancelCall} />
+        )}
       </div>
 
       <CodeEditor id={id} handleRunCode={handleRunCode} />
-    </div>
+    </>
   );
 }
