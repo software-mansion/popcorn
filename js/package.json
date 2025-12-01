@@ -24,12 +24,14 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "setup": "./scripts/get_atomvm.sh assets/",
     "build": "tsdown",
     "dev": "tsdown --watch",
     "test": "vitest",
     "lint": "eslint && prettier . --check --log-level=warn",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "npm run buildWasmFromGit && pnpm run build",
+    "buildWasmFromGit": "RUNTIME_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm' ./get_atomvm.sh assets/"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -37,6 +39,7 @@
     "bumpp": "^10.3.1",
     "eslint": "^9.39.1",
     "prettier": "3.6.2",
+    "rollup-plugin-copy": "^3.5.0",
     "tsdown": "^0.16.4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.47.0",
