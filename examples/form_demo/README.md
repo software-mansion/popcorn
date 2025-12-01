@@ -2,7 +2,7 @@
 
 The demo project implementing phoenix forms using LocalLiveView.
 
-The demo form is build as a html page with a single form and a rendered list of users (usernames and emails). 
+The demo form is built as an html page with a single form and a rendered list of users (usernames and emails). 
 List of users is stored in local live view process memory.
 The form handles onchange and onsubmit LocalLiveView events.
 The change event triggers validate function that looks through already saved users and makes sure that
