@@ -6,7 +6,7 @@ The demo form is build as a html page with a single form and a rendered list of 
 List of users is stored in local live view process memory.
 The form handles onchange and onsubmit LocalLiveView events.
 The change event triggers validate function that looks through already saved users and makes sure that
-new username or email isn't already present in the users list. The submit event add a new user to the user list.
+new username or email isn't already present in the users list. The submit event adds a new user to the user list.
 
 The local part of the project is located in the `local` directory.
 
