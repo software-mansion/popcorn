@@ -1,4 +1,4 @@
-# FormDemo
+# Local Live View Form Demo
 
 The demo project implementing phoenix forms using LocalLiveView.
 
