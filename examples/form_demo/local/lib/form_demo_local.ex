@@ -2,6 +2,7 @@ defmodule FormDemoLocal do
   use LocalLiveView
   import Local.CoreComponents
 
+  @impl true
   def render(assigns) do
     ~H"""
     <.form for={@form} id="my-form" pop-change="validate" pop-submit="save" class="bordered">
