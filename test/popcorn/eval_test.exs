@@ -856,4 +856,13 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result({11_111_111, <<169, 138, 199>>})
   end
+
+  async_test "inspect float", %{tmp_dir: dir} do
+    quote do
+      inspect(21.37)
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result("21.37")
+  end
 end
