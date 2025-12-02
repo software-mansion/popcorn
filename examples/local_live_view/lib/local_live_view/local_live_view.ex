@@ -82,7 +82,7 @@ defmodule LocalLiveView do
 
   @type unsigned_params :: map
 
-  @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
+  @callback render(assigns :: Socket.assigns()) :: map()
 
   @callback mount(
               params :: unsigned_params() | :not_mounted_at_router,
