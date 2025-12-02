@@ -11,7 +11,7 @@ defmodule FormDemoLocal do
       <label>EMAIL</label>
       <.input type="email" field={@form[:email]} />
       <div class="centered">
-        <button class="ghost-button">SAVE</button>
+        <button class="ghost-button" disabled={@disabled}>SAVE</button>
       </div>
     </.form>
     <p style="color:red;"><%= @errors %></p>
@@ -26,6 +26,7 @@ defmodule FormDemoLocal do
     """
   end
 
+  @impl true
   def mount(_params, _session, socket) do
     users = [
       %{"email" => "user1@example.com", "username" => "user1"},
@@ -33,12 +34,13 @@ defmodule FormDemoLocal do
       %{"email" => "user3@example.com", "username" => "user3"}
     ]
     user = %{"email" => "", "username" => ""}
-    {:ok, assign(socket, users: users, form: to_form(user), errors: "")}
+    {:ok, assign(socket, users: users, form: to_form(user), errors: "", disabled: false)}
   end
 
+  @impl true
   def handle_event("validate", params, socket) do
     errors = validate(params, socket.assigns.users)
-    {:noreply, assign(socket, form: to_form(params), errors: errors)}
+    {:noreply, assign(socket, form: to_form(params), errors: errors, disabled: errors != "")}
   end
 
   def handle_event("save", user_params, socket) do
@@ -53,16 +55,12 @@ defmodule FormDemoLocal do
   end
 
   defp validate(user, existing_users) do
-    result =
-      user
-      |> Enum.reduce(%{}, fn {k, v}, acc ->
-        in_existing_users = Enum.any?(existing_users, fn u -> Map.get(u, k) == v end)
-        Map.put(acc, k, in_existing_users)
-      end)
-
-    Enum.reduce(result, "", fn
-      {k, true}, acc -> acc <> "#{to_string(k)} already in use! "
-      {_k, false}, acc -> acc
+    user
+    |> Enum.filter(fn {key, value} ->
+      Enum.any?(existing_users, fn user -> Map.get(user, key) == value end)
     end)
+    |> Enum.map_join(", ", fn {key, _value} ->
+      String.capitalize("#{key} already in use")
+      end)
   end
 end

@@ -122,6 +122,18 @@
   color: #1a1a1a; 
   box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
 }
+
+.ghost-button:disabled {
+  color: gray;
+  border: 2px solid gray;
+}
+
+.ghost-button:disabled:hover {
+  color: gray;
+  background-color: transparent;
+  box-shadow: none;
+  cursor: auto;
+}
   
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);

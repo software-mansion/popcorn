@@ -12,6 +12,7 @@ defmodule LocalLiveView.Renderer do
         const view_nodes = document.querySelectorAll(`[#{attribute}=${args.view}]`);
         if(view_nodes.length == 1) {
           let key = [];
+          let selection_range = {start: 0, end: 0};
           let focus_after_render = false
           const view_el = view_nodes[0];
           const active_el = document.activeElement;
@@ -19,6 +20,9 @@ defmodule LocalLiveView.Renderer do
             focus_after_render = true;
             let el = view_el;
             let i = 0;
+            if(active_el.nodeName === 'INPUT') {
+              selection_range = { start: active_el.selectionStart, end: active_el.selectionEnd };
+            }
             while(el != active_el) {
               if(el.children[i].contains(active_el)) {
                 key.push(i);
@@ -37,10 +41,9 @@ defmodule LocalLiveView.Renderer do
               el = el.children[key.shift()]
             }
             if(el.nodeName === 'INPUT') {
-              let length = el.value.length;
               let type = el.getAttribute("type");
               el.setAttribute("type", "text");
-              el.setSelectionRange(length, length);
+              el.setSelectionRange(selection_range.start, selection_range.end);
               el.setAttribute("type", type);
             }
             el.focus();

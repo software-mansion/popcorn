@@ -26,6 +26,7 @@ defmodule LocalLiveView do
   defmacro __using__(_opts) do
     quote bind_quoted: [opts: []] do
       import LocalLiveView
+      @behaviour LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
@@ -78,4 +79,19 @@ defmodule LocalLiveView do
       log: log
     }
   end
+  
+  @type unsigned_params :: map
+
+  @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
+
+  @callback mount(
+              params :: unsigned_params() | :not_mounted_at_router,
+              session :: map,
+              socket :: Socket.t()
+            ) ::
+              {:ok, Socket.t()} | {:ok, Socket.t(), keyword()}
+
+  @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
+              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
 end
