@@ -12,6 +12,7 @@ on:
       - "examples/local_live_view/**"
       - "examples/local_thermostat/**"
       - "examples/compare_live_views/**"
+      - "examples/form_demo/**"
       - ".github/workflows/local_live_view_build.yml"
 
 permissions:
