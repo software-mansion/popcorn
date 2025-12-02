@@ -79,7 +79,7 @@ defmodule LocalLiveView do
       log: log
     }
   end
-  
+
   @type unsigned_params :: map
 
   @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
@@ -93,5 +93,4 @@ defmodule LocalLiveView do
 
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
-
 end
