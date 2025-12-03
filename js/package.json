@@ -1,0 +1,47 @@
+{
+  "name": "@swmansion/popcorn",
+  "version": "0.2.0",
+  "description": "JS bindings for Popcorn",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://popcorn.swmansion.com",
+  "bugs": {
+    "url": "https://github.com/software-mansion/popcorn/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/software-mansion/popcorn.git"
+  },
+  "author": "Software Mansion",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "setup": "./scripts/get_atomvm.sh assets/",
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "clean": "rm -rf dist",
+    "lint": "prettier . --check --log-level=warn",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run clean && npm run buildWasmFromGit && npm run build",
+    "buildWasmFromGit": "RUNTIME_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm' ./scripts/get_atomvm.sh assets/"
+  },
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.5",
+    "@types/node": "^24.10.2",
+    "eslint": "^9.39.1",
+    "prettier": "3.6.2",
+    "rollup": "^4.6.1",
+    "rollup-plugin-copy": "^3.5.0",
+    "typescript": "^5.9.3"
+  }
+}

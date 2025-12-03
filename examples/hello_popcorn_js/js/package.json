@@ -1,0 +1,17 @@
+{
+  "name": "hello-popcorn",
+  "version": "1.0.0",
+  "description": "Hello Popcorn example with esbuild",
+  "type": "module",
+  "scripts": {
+    "build": "npm run clean && esbuild src/main.js src/vendor.js --bundle --splitting --analyze --outdir=../dist --format=esm --target=es2022 && cp src/index.html ../dist/",
+    "dev": "esbuild src/main.js src/vendor.js --bundle --splitting --outdir=../dist --format=esm --target=es2022 --watch",
+    "clean": "rm -rf ../dist && mkdir -p ../dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  },
+  "dependencies": {
+    "@swmansion/popcorn": "file:../../../js/swmansion-popcorn-0.2.0.tgz"
+  }
+}
