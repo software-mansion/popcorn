@@ -145,9 +145,6 @@ export const useEditorsStore = create<EditorsStore>()(
     getEditorsToRun: (id: string) => {
       const state = get();
       const currentIndex = state.editorOrder.indexOf(id);
-      if (currentIndex === -1) return [id];
-
-      const editorsToRun: string[] = [];
 
       // run all editors from the last non-successful one up to the current one
       let startIndex = currentIndex;
@@ -161,11 +158,7 @@ export const useEditorsStore = create<EditorsStore>()(
         }
       }
 
-      for (let i = startIndex; i <= currentIndex; i++) {
-        editorsToRun.push(state.editorOrder[i]);
-      }
-
-      return editorsToRun;
+      return state.editorOrder.slice(startIndex, currentIndex + 1);
     },
 
     resetEditorToDefault: (id: string) => {

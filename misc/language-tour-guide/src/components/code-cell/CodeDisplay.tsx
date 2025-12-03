@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { Button } from "../Button";
 import { CodeEditor } from "./CodeEditor";
 import {
@@ -26,19 +26,18 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const isCodeChanged = useEditorChanged(id);
   const longRunning = useDelayedPending(isExecuting || isQueued, 300);
   const executionState = useEditorExecutionState(id);
-
-  const lastStableStateRef = useRef(executionState);
+  const [lastStableState, setLastStableState] = useState(executionState);
 
   useEffect(() => {
     if (executionState !== "running" && executionState !== "queued") {
-      lastStableStateRef.current = executionState;
+      setLastStableState(executionState);
     }
   }, [executionState]);
 
   const displayState =
     (executionState === "running" || executionState === "queued") &&
     !longRunning
-      ? lastStableStateRef.current
+      ? lastStableState
       : executionState;
 
   const {
