@@ -33,7 +33,7 @@ defmodule LocalLiveView do
       @before_compile LocalLiveView
 
       alias LocalLiveView.Message
-      use Phoenix.Component, Keyword.take(opts, [:global_prefixes])
+      use Phoenix.Component, global_prefixes: ~w(pop-)
     end
   end
 

@@ -82,6 +82,13 @@ defmodule FormDemo.MixProject do
         "esbuild form_demo --minify",
         "phx.digest"
       ],
+      lint: [
+        "format --check-formatted",
+        "deps.unlock --check-unused",
+        "deps.compile",
+        "compile --force --warnings-as-errors",
+        &local_lint/1
+      ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end
@@ -91,6 +98,15 @@ defmodule FormDemo.MixProject do
       """
       mix deps.get
       mix popcorn.cook
+      """,
+      cd: "local"
+    )
+  end
+
+  defp local_lint(_) do
+    Mix.shell().cmd(
+      """
+      mix lint
       """,
       cd: "local"
     )

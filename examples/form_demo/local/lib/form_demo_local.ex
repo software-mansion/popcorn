@@ -35,6 +35,7 @@ defmodule FormDemoLocal do
       %{"email" => "user2@example.com", "username" => "user2"},
       %{"email" => "user3@example.com", "username" => "user3"}
     ]
+
     user = %{"email" => "", "username" => ""}
     {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
   end
@@ -48,10 +49,18 @@ defmodule FormDemoLocal do
 
   def handle_event("save", user_params, socket) do
     users = socket.assigns.users
+
     case validate(user_params, users) do
       [] ->
         user = %{"email" => "", "username" => ""}
-        {:noreply, assign(socket, form: to_form(user), users: users ++ [user_params], errors: [], disabled: true)}
+
+        {:noreply,
+         assign(socket,
+           form: to_form(user),
+           users: users ++ [user_params],
+           errors: [],
+           disabled: true
+         )}
 
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}
@@ -59,10 +68,10 @@ defmodule FormDemoLocal do
   end
 
   defp validate(user, existing_users) do
-    validate_correctness(user) ++ validate_already_existing(user, existing_users)
+    (validate_correctness(user) ++ validate_already_existing(user, existing_users))
     |> Enum.filter(fn error -> error != "" end)
   end
-  
+
   defp validate_already_existing(user, existing_users) do
     user
     |> Enum.filter(fn {key, value} ->
@@ -72,7 +81,7 @@ defmodule FormDemoLocal do
       String.capitalize("#{key} already in use")
     end)
   end
-  
+
   defp validate_correctness(user) do
     Enum.map(user, fn {key, value} -> validate_correctness(key, value) end)
   end
@@ -83,7 +92,7 @@ defmodule FormDemoLocal do
       true -> ""
     end
   end
-  
+
   defp validate_correctness("email", value) do
     case String.split(value, "@") do
       [name, server] ->
@@ -91,7 +100,9 @@ defmodule FormDemoLocal do
           true -> ""
           false -> "Email must have an email format"
         end
-      _ -> "Email must have an email format"
+
+      _ ->
+        "Email must have an email format"
     end
   end
 end
