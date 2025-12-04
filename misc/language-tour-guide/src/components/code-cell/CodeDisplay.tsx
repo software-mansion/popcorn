@@ -1,33 +1,59 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { Button } from "../Button";
 import { CodeEditor } from "./CodeEditor";
 import {
-  useEditorCode,
   useEditorExecuting,
   useEditorChanged,
-  useEditorsStore
+  useEditorsStore,
+  useEditorExecutionState,
+  useEditorQueued
 } from "../../store/editors";
+import { useShallow } from "zustand/react/shallow";
 import { usePopcornEval } from "../../utils/hooks/usePopcornEval";
 import { usePopcorn } from "../../utils/hooks/usePopcorn";
 import RotatedCcw from "../../assets/rotated-ccw.svg?react";
+
 import { useDelayedPending } from "../../utils/hooks/useDelayedPending";
+import { ExecutionStateBadge } from "./ExecutionStateBadge";
 
 type CodeDisplayProps = {
   id: string;
 };
 
 export default function CodeDisplay({ id }: CodeDisplayProps) {
-  const code = useEditorCode(id);
   const isExecuting = useEditorExecuting(id);
+  const isQueued = useEditorQueued(id);
   const isCodeChanged = useEditorChanged(id);
-  const longRunning = useDelayedPending(isExecuting, 500);
+  const longRunning = useDelayedPending(isExecuting || isQueued, 300);
+  const executionState = useEditorExecutionState(id);
+  const [lastStableState, setLastStableState] = useState(executionState);
 
-  const setEditorExecuting = useEditorsStore(
-    (state) => state.setEditorExecuting
-  );
-  const setEditorResult = useEditorsStore((state) => state.setEditorResult);
-  const resetEditorToDefault = useEditorsStore(
-    (state) => state.resetEditorToDefault
+  useEffect(() => {
+    if (executionState !== "running" && executionState !== "queued") {
+      setLastStableState(executionState);
+    }
+  }, [executionState]);
+
+  const displayState =
+    (executionState === "running" || executionState === "queued") &&
+    !longRunning
+      ? lastStableState
+      : executionState;
+
+  const {
+    setEditorResult,
+    setEditorExecutionState,
+    getEditorsToRun,
+    getEditor,
+    resetEditorToDefault
+  } = useEditorsStore(
+    useShallow((state) => ({
+      setEditorResult: state.setEditorResult,
+      setEditorExecutionState: state.setEditorExecutionState,
+      getEditorsToRun: state.getEditorsToRun,
+      getEditor: state.getEditor,
+      resetEditorToDefault: state.resetEditorToDefault
+    }))
   );
 
   const evalCode = usePopcornEval();
@@ -36,37 +62,65 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const handleRunCode = useCallback(async () => {
     if (isExecuting) return;
 
-    setEditorExecuting(id, true);
+    const editorsToRun = getEditorsToRun(id);
+    let editorFailed = false;
 
-    const runResult = await evalCode(code);
-    const { data, durationMs, stderr, stdout, error } = runResult;
-
-    const ok = error === null;
-
-    if (ok) {
-      setEditorResult(id, {
-        output: data,
-        stdoutResult: stdout,
-        stderrResult: stderr,
-        durationMs
-      });
-    } else {
-      setEditorResult(id, {
-        output: data,
-        stdoutResult: stdout,
-        stderrResult: stderr,
-        errorMessage: error,
-        durationMs
-      });
+    for (const editorId of editorsToRun) {
+      setEditorExecutionState(editorId, "queued");
     }
 
-    setEditorExecuting(id, false);
-  }, [isExecuting, id, code, evalCode, setEditorExecuting, setEditorResult]);
+    for (const editorId of editorsToRun) {
+      const editor = getEditor(editorId);
+      if (!editor) continue;
+
+      if (editorFailed) {
+        setEditorExecutionState(editorId, "stale");
+        continue;
+      }
+
+      setEditorExecutionState(editorId, "running");
+
+      const runResult = await evalCode(editor.code);
+      const { data, durationMs, stderr, stdout, error } = runResult;
+
+      const ok = error === null;
+
+      if (ok) {
+        setEditorResult(editorId, {
+          output: data,
+          stdoutResult: stdout,
+          stderrResult: stderr,
+          durationMs
+        });
+        setEditorExecutionState(editorId, "success");
+      } else {
+        setEditorResult(editorId, {
+          output: data,
+          stdoutResult: stdout,
+          stderrResult: stderr,
+          errorMessage: error,
+          durationMs
+        });
+        setEditorExecutionState(editorId, "failure");
+
+        editorFailed = true;
+      }
+    }
+  }, [
+    isExecuting,
+    id,
+    evalCode,
+    setEditorResult,
+    setEditorExecutionState,
+    getEditorsToRun,
+    getEditor
+  ]);
 
   const handleReset = useCallback(() => {
     resetEditorToDefault(id);
-    setEditorExecuting(id, false);
-  }, [id, resetEditorToDefault, setEditorExecuting]);
+
+    setEditorExecutionState(id, "not_run");
+  }, [id, resetEditorToDefault, setEditorExecutionState]);
 
   return (
     <>
@@ -74,7 +128,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
         <Button
           title="Run Code"
           type="primary"
-          disabled={isExecuting}
+          disabled={isExecuting || isQueued}
           onClick={handleRunCode}
         />
         {isCodeChanged && (
@@ -83,13 +137,16 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
             title="Reset code"
             onClick={handleReset}
             Icon={RotatedCcw}
-            disabled={isExecuting}
+            disabled={isExecuting || isQueued}
             hideTitle
           />
         )}
-        {longRunning && (
+        {longRunning && !isQueued && (
           <Button title="Cancel" type="secondary" onClick={cancelCall} />
         )}
+        <div className="text-brown-90 ml-auto">
+          <ExecutionStateBadge state={displayState} />
+        </div>
       </div>
 
       <CodeEditor id={id} handleRunCode={handleRunCode} />

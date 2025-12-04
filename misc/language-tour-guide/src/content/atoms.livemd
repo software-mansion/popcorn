@@ -1,14 +1,5 @@
 # Atoms
 
-```elixir
-Mix.install([
-  {:jason, "~> 1.4"},
-  {:kino, "~> 0.9", override: true},
-  {:youtube, github: "brooklinjazz/youtube"},
-  {:hidden_cell, github: "brooklinjazz/hidden_cell"}
-])
-```
-
 ## Review Questions
 
 Upon completing this lesson, a student should be able to answer the following questions.
@@ -155,12 +146,6 @@ Check if `false` is equal to `:false`.
 
 ```elixir
 false === :false
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-true
 ```
 
 ## Further Reading

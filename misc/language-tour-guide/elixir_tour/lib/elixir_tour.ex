@@ -13,7 +13,7 @@ defmodule ElixirTour do
   def init(_init_arg) do
     Wasm.register(@process_name)
     :application.set_env(:elixir, :ansi_enabled, false)
-    {:ok, nil}
+    {:ok, %{}}
   end
 
   @impl GenServer
@@ -29,28 +29,31 @@ defmodule ElixirTour do
     {:noreply, state}
   end
 
-  defp handle_wasm({:wasm_call, ["eval_elixir", code]}, state) do
+  defp handle_wasm({:wasm_call, ["eval_elixir", page_id, code]}, all_bindings) do
+    bindings = Map.get(all_bindings, page_id, [])
+
     try do
-      case eval(code) do
-        {:ok, result} ->
-          {:resolve, inspect(result), state}
+      case eval(code, bindings) do
+        {:ok, result, new_bindings} ->
+          all_bindings = Map.put(all_bindings, page_id, new_bindings)
+          {:resolve, inspect(result), all_bindings}
 
         {:error, error_message} ->
-          {:reject, error_message, state}
+          {:reject, error_message, all_bindings}
       end
     rescue
       e ->
         error_message = Exception.format(:error, e)
-        {:reject, error_message, state}
+        {:reject, error_message, all_bindings}
     end
   end
 
-  defp eval(code) do
+  defp eval(code, bindings) do
     try do
-      {evaluated, _new_bindings} =
-        Code.eval_string(code, [], %Macro.Env{__ENV__ | file: "playground", line: 1})
+      {evaluated, new_bindings} =
+        Code.eval_string(code, bindings, %Macro.Env{__ENV__ | file: "playground", line: 1})
 
-      {:ok, evaluated}
+      {:ok, evaluated, new_bindings}
     rescue
       e ->
         error_message = Exception.format(:error, e)
