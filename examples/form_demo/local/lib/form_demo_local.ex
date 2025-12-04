@@ -48,7 +48,8 @@ defmodule FormDemoLocal do
 
   def handle_event("save", user_params, socket) do
     users = socket.assigns.users
-
+    IO.inspect "SEND"
+    LocalLiveView.ServerSocket.send(user_params, __MODULE__)
     case validate(user_params, users) do
       [] ->
         user = %{"email" => "", "username" => ""}

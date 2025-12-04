@@ -71,6 +71,15 @@ defmodule LocalLiveView.Server do
     |> handle_result({:handle_event, 3, msg.ref}, new_state)
   end
 
+  def handle_info(%Message{event: "rerender"}, %{socket: socket} = state) do
+    rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
+
+    rendered
+    |> Phoenix.HTML.Safe.to_iodata()
+    |> IO.iodata_to_binary()
+    |> LocalLiveView.Renderer.rerender(socket.view)
+  end
+
   def handle_info(msg, %{socket: socket} = state) do
     msg
     |> view_handle_info(socket)

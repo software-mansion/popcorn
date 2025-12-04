@@ -81,3 +81,7 @@ if (process.env.NODE_ENV === "development") {
   })
 }
 
+window.addEventListener("phx:llv_rerender", (e) => {
+  console.log("SIEMA")
+  document.dispatchEvent(new CustomEvent("popRender", {detail: e.detail}))
+});
