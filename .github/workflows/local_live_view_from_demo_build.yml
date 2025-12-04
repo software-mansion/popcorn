@@ -3,17 +3,14 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: LocalLiveView - Build
+name: LocalLiveView From Demo - Build
 
 on:
   push:
     branches: ["**"]
     paths:
-      - "examples/local_live_view/**"
-      - "examples/local_thermostat/**"
-      - "examples/compare_live_views/**"
       - "examples/form_demo/**"
-      - ".github/workflows/local_live_view_build.yml"
+      - ".github/workflows/local_live_view_form_demo_build.yml"
 
 permissions:
   contents: read

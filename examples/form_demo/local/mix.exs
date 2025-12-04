@@ -8,7 +8,8 @@ defmodule Local.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers()
+      compilers: Mix.compilers(),
+      aliases: aliases()
     ]
   end
 
@@ -23,7 +24,21 @@ defmodule Local.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:local_live_view, path: "../../local_live_view"}
+      {:gettext, "~> 0.26"},
+      {:local_live_view, path: "../../local_live_view"},
+      {:phoenix, "~> 1.8.0", runtime: false},
+      {:phoenix_live_view, "~> 1.1.0", runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      lint: [
+        "format --check-formatted",
+        "deps.unlock --check-unused",
+        "deps.compile",
+        "compile --force --warnings-as-errors"
+      ]
     ]
   end
 end
