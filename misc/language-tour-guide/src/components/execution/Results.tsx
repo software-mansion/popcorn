@@ -1,4 +1,8 @@
-import { useEditorResult, useEditorExecuting } from "../../store/editors";
+import {
+  useEditorResult,
+  useEditorExecuting,
+  useEditorQueued
+} from "../../store/editors";
 import StdoutResults from "../execution/StdoutResults";
 import { CompilerError } from "../execution/CompilerError";
 import { WarningOutput } from "../execution/WarningOutput";
@@ -13,6 +17,7 @@ export function Results({ id }: EditorResultsProps) {
   const result = useEditorResult(id);
   const isExecuting = useEditorExecuting(id);
   const longExecuting = useDelayedPending(isExecuting);
+  const isQueued = useEditorQueued(id);
 
   if (!result) {
     return null;
@@ -33,13 +38,15 @@ export function Results({ id }: EditorResultsProps) {
   }
 
   return (
-    <div className="text-brown-90 bg-light-30 border-grey-20 flex flex-col gap-2 rounded-b-md border-t px-4 py-3">
+    <div
+      className={`text-brown-90 bg-light-30 border-grey-20 flex flex-col gap-2 rounded-b-md border-t px-4 py-3 ${isQueued ? "opacity-60" : ""}`}
+    >
       <div className="text-brown-90/60 flex items-center gap-2 text-sm">
         <span className="">Output</span>
         <span className="text-xs font-light">
-          {longExecuting
-            ? "Pending..."
-            : durationMs !== undefined && `${durationMs.toFixed(3)}ms`}
+          {!longExecuting &&
+            durationMs !== undefined &&
+            `${durationMs.toFixed(3)}ms`}
         </span>
       </div>
 
