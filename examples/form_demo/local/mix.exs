@@ -25,7 +25,9 @@ defmodule Local.MixProject do
   defp deps do
     [
       {:gettext, "~> 0.26"},
-      {:local_live_view, path: "../../local_live_view"}
+      {:local_live_view, path: "../../local_live_view"},
+      {:phoenix, "~> 1.8.0", runtime: false},
+      {:phoenix_live_view, "~> 1.1.0", runtime: false}
     ]
   end
 

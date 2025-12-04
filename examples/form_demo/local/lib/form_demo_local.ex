@@ -15,13 +15,13 @@ defmodule FormDemoLocal do
       </div>
     </.form>
     <%= for error <- @errors do %>
-      <p style="color:red;"><%= error %></p>
+      <p style="color:red;">{error}</p>
     <% end %>
     <div class="bordered">
       <h1>User List:</h1>
       <ul>
         <%= for user <- @users do %>
-          <li>Username: <%= user["username"] %>, Email: <%= user["email"] %></li>
+          <li>Username: {user["username"]}, Email: {user["email"]}</li>
         <% end %>
       </ul>
     </div>
@@ -43,7 +43,6 @@ defmodule FormDemoLocal do
   @impl true
   def handle_event("validate", params, socket) do
     errors = validate(params, socket.assigns.users)
-    IO.inspect(errors)
     {:noreply, assign(socket, form: to_form(params), errors: errors, disabled: errors != [])}
   end
 
@@ -94,15 +93,12 @@ defmodule FormDemoLocal do
   end
 
   defp validate_correctness("email", value) do
-    case String.split(value, "@") do
-      [name, server] ->
-        case String.length(name) > 0 and String.contains?(server, ".") do
-          true -> ""
-          false -> "Email must have an email format"
-        end
-
-      _ ->
-        "Email must have an email format"
+    with [name, server] <- String.split(value, "@"),
+         true <- String.length(name) > 0 and String.contains?(server, ".")
+      do
+        ""
+      else
+        _err -> "Email must have an email format"
     end
   end
 end
