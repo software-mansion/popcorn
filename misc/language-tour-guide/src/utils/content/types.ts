@@ -1,40 +1,57 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactElement } from "react";
 import type { CodeSnippet } from "../../plugins/livemd/parser";
+import type { MdxWrapperProps } from "../../components/markdown/MdxWrapper";
 
-export type Frontmatter = {
-  order?: number;
+export function isConfigItem(
+  item: ConfigItem | ConfigGroup
+): item is ConfigItem {
+  return (item as ConfigItem).component !== undefined;
+}
+
+export function isConfigGroup(
+  item: ConfigItem | ConfigGroup
+): item is ConfigGroup {
+  return (item as ConfigGroup).items !== undefined;
+}
+
+type ConfigItem = {
+  name: string;
+  slug: string;
+  component: React.LazyExoticComponent<
+    () => ReactElement<
+      MdxWrapperProps,
+      React.FunctionComponent<MdxWrapperProps>
+    >
+  >;
+};
+
+type ConfigGroup = {
+  group: string;
+  slug: string;
+  items: (ConfigItem | ConfigGroup)[];
+};
+
+export type NavigationConfig = (ConfigItem | ConfigGroup)[];
+
+type LazyComponent = React.LazyExoticComponent<
+  () => ReactElement<MdxWrapperProps, React.FunctionComponent<MdxWrapperProps>>
+>;
+
+export type RouteItem = {
+  path: string;
+  component: LazyComponent;
 };
 
 export type MdxWithProperties = {
   default: ComponentType;
-  frontmatter?: Frontmatter;
   codeSnippets?: CodeSnippet[];
 };
 
-export type Dir = string;
-
-export type DirEntry = {
-  path: string[];
-  children: DirTree;
-  frontmatter: Frontmatter;
-};
-
-export type LoadedEntry = {
-  path: string[];
-  frontmatter: Frontmatter;
-  hash64: string;
-};
-
-export type UnresolvedEntry = [string, () => Promise<MdxWithProperties>];
-
-export type DirTree = Map<Dir, DirEntry>;
-
-type NavigationTreeItemType = "link" | "section";
+type NavigationTreeItemType = "link" | "group";
 
 export type NavigationTreeItem = {
   title: string;
   path: string;
-  parentPath: string;
   children: NavigationTreeItem[];
   type: NavigationTreeItemType;
 };

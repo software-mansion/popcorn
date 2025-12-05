@@ -1,33 +1,47 @@
-import { lazy, Suspense, type JSX } from "react";
 import { Route } from "react-router";
+import { Suspense, type JSX } from "react";
+import { navigationConfig } from "./configuration";
+import { isConfigGroup, type NavigationConfig, type RouteItem } from "./types";
 import { Loader } from "../../components/Loader";
-import { getNavigationPath, mdxModules } from "./mdx-loader";
-import { MdxWrapper } from "../../components/markdown/MdxWrapper";
+
+const MAX_NAVIGATION_DEPTH = 5000;
+
+function buildRoutes(
+  config: NavigationConfig,
+  parentPath: string = "",
+  depth: number = 0
+): RouteItem[] {
+  if (depth >= MAX_NAVIGATION_DEPTH) {
+    console.warn(
+      `Route depth limit reached (${MAX_NAVIGATION_DEPTH}). Stopping recursion to prevent stack overflow.`
+    );
+    return [];
+  }
+
+  return config.flatMap((item) => {
+    if (isConfigGroup(item)) {
+      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      return buildRoutes(item.items, currentPath, depth + 1);
+    } else {
+      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      return {
+        path: currentPath,
+        component: item.component
+      };
+    }
+  });
+}
+
+export const routes = buildRoutes(navigationConfig);
 
 export function createRouteComponents(): JSX.Element[] {
-  return Object.entries(mdxModules).map(([path, component]) => {
-    const routePath = getNavigationPath(path);
-
-    const LazyComponent = lazy(async () => {
-      const module = await component();
-
-      return {
-        default: () => (
-          <MdxWrapper
-            codeSnippets={module.codeSnippets}
-            Component={module.default}
-          />
-        )
-      };
-    });
-
+  return routes.map((route) => {
     return (
       <Route
-        key={routePath}
-        path={routePath}
+        path={route.path}
         element={
-          <Suspense fallback={<Loader />}>
-            <LazyComponent />
+          <Suspense key={route.path} fallback={<Loader />}>
+            <route.component />
           </Suspense>
         }
       />

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { CodeSnippet } from "../../plugins/livemd/parser";
 import { useEditorsStore } from "../../store/editors";
 
-type MdxWrapperProps = {
+export type MdxWrapperProps = {
   Component: React.ComponentType;
   codeSnippets?: CodeSnippet[];
 };
