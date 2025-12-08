@@ -1,5 +1,6 @@
 import XXH from "xxhashjs";
 
+const CONTENT_HASH_KEY = "defaultCodeHash";
 const SEED = 0x42;
 const H32 = XXH.h32(SEED);
 const H64 = XXH.h64(SEED);
