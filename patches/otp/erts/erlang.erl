@@ -87,6 +87,7 @@
     unlink/1,
     make_ref/0,
     send/2,
+    send/3,
     monitor/2,
     demonitor/1,
     demonitor/2,
@@ -2889,6 +2890,9 @@ make_ref() ->
 -spec send(Pid :: pid(), Message :: Message) -> Message.
 send(_Pid, _Message) ->
     erlang:nif_error(undefined).
+
+send(Pid, Message, _Opts) ->
+    erlang:send(Pid, Message).
 
 %%-----------------------------------------------------------------------------
 %% @param   Type    type of monitor to create

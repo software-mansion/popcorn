@@ -865,4 +865,19 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result("21.37")
   end
+
+  test "Task async/await", %{tmp_dir: dir} do
+    quote do
+      t =
+        Task.async(fn ->
+          Process.sleep(1000)
+          :ok
+        end)
+
+      Task.await(t)
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result(:ok)
+  end
 end
