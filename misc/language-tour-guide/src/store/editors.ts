@@ -2,8 +2,38 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { enableMapSet } from "immer";
 import type { CodeSnippet } from "../plugins/livemd/parser";
+import {
+  getSavedEditorState,
+  saveEditorState,
+  removeSavedEditorState
+} from "../utils/storage";
 
 enableMapSet();
+
+const saveDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const SAVE_DEBOUNCE_MS = 500;
+
+function debouncedSaveEditorState(
+  id: string,
+  code: string,
+  defaultCode: string
+) {
+  const existingTimer = saveDebounceTimers.get(id);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(() => {
+    if (code !== defaultCode) {
+      saveEditorState(id, { code, state: "not_run" });
+    } else {
+      removeSavedEditorState(id);
+    }
+    saveDebounceTimers.delete(id);
+  }, SAVE_DEBOUNCE_MS);
+
+  saveDebounceTimers.set(id, timer);
+}
 
 export type ExecutionState =
   | "not_run"
@@ -71,15 +101,22 @@ export const useEditorsStore = create<EditorsStore>()(
 
       set((state) => {
         if (!state.editors.has(id)) {
+          const savedState = getSavedEditorState(id);
+          const code = savedState?.code ?? defaultCode;
+          const editorState = savedState?.state;
+
           state.editors.set(id, {
             id,
-            code: defaultCode,
+            code,
             defaultCode,
-            executionState: output ? "success" : "not_run",
-            currentResult: {
-              stdoutResult: stdout,
-              output
-            }
+            executionState: editorState ?? (output ? "success" : "not_run"),
+            currentResult:
+              editorState !== "success"
+                ? undefined
+                : {
+                    stdoutResult: stdout,
+                    output
+                  }
           });
           state.editorOrder.push(id);
         }
@@ -91,6 +128,9 @@ export const useEditorsStore = create<EditorsStore>()(
     },
 
     setEditorCode: (id: string, code: string) => {
+      const editor = get().editors.get(id);
+      if (!editor) return;
+
       set((state) => {
         const editor = state.editors.get(id);
         if (editor) {
@@ -105,6 +145,7 @@ export const useEditorsStore = create<EditorsStore>()(
         }
       });
 
+      debouncedSaveEditorState(id, code, editor.defaultCode);
       get().markFollowingEditorsAsStale(id);
     },
 
@@ -127,16 +168,18 @@ export const useEditorsStore = create<EditorsStore>()(
     },
 
     markFollowingEditorsAsStale: (id: string) => {
-      set((state) => {
-        const currentIndex = state.editorOrder.indexOf(id);
-        if (currentIndex === -1) return;
+      const state = get();
+      const currentIndex = state.editorOrder.indexOf(id);
+      if (currentIndex === -1) return;
 
+      set((state) => {
         for (let i = currentIndex + 1; i < state.editorOrder.length; i++) {
           const editorId = state.editorOrder[i];
           const editor = state.editors.get(editorId);
 
           if (editor && editor.executionState !== "not_run") {
             editor.executionState = "stale";
+            saveEditorState(editorId, { code: null, state: "not_run" });
           }
         }
       });
@@ -170,6 +213,7 @@ export const useEditorsStore = create<EditorsStore>()(
           editor.executionState = "not_run";
         }
       });
+      removeSavedEditorState(id);
       get().markFollowingEditorsAsStale(id);
     },
 
