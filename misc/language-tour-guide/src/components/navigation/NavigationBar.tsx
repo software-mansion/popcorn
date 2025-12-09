@@ -1,7 +1,5 @@
 import { NavigationButton } from "./NavigationButton";
-// import { useSiblingsNode } from "../../utils/hooks/useSiblingsNode";
 import { FeedbackButton } from "./FeedbackButton";
-// import { getNodeNavigationSiblings } from "../../utils/content/navigation-builder";
 import { useLocation } from "react-router";
 import { getNodeNavigationSiblings } from "../../utils/content/navigation-builder";
 
