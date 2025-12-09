@@ -2,6 +2,10 @@
 /// <reference types="vite-plugin-svgr/client" />
 
 declare module "*.livemd" {
-  const content: string;
-  export default content;
+  import type { ComponentType } from "react";
+  import type { CodeSnippet } from "./plugins/livemd/parser";
+
+  export const codeSnippets: CodeSnippet[];
+  const Component: ComponentType;
+  export default Component;
 }
