@@ -2,16 +2,16 @@ import { useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import { NavigationItem } from "./NavigationItem";
-import { useNavigation } from "../../utils/hooks/useNavigation";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
 import { FeedbackButton } from "./FeedbackButton";
 
+import { navigationTree } from "../../utils/content/navigation-builder";
+
 export function Navigation() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const { navigation, isLoading } = useNavigation();
 
   const openMenu = () => {
     setIsOpen(true);
@@ -20,14 +20,6 @@ export function Navigation() {
   const closeMenu = () => {
     setIsOpen(false);
   };
-
-  if (isLoading || !navigation) {
-    return (
-      <span className="flex h-full items-center justify-center py-4">
-        Loading...
-      </span>
-    );
-  }
 
   return (
     <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-8 border-b px-4 py-3 lg:px-8">
@@ -54,7 +46,7 @@ export function Navigation() {
           <span className="sr-only">Close menu</span>
           <Close className="h-full w-5.5 text-white" />
         </button>
-        {navigation.map((item) => (
+        {navigationTree.map((item) => (
           <NavigationItem key={item.path} item={item} onClick={closeMenu} />
         ))}
         <li className="mt-8">

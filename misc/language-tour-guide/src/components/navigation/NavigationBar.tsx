@@ -1,9 +1,13 @@
 import { NavigationButton } from "./NavigationButton";
-import { useSiblingsNode } from "../../utils/hooks/useSiblingsNode";
 import { FeedbackButton } from "./FeedbackButton";
+import { useLocation } from "react-router";
+import { getNodeNavigationSiblings } from "../../utils/content/navigation-builder";
 
 export default function NavigationBar() {
-  const { siblingsNode, childrenCount, currentIndex } = useSiblingsNode();
+  const { pathname } = useLocation();
+
+  const { siblingsNode, childrenCount, currentIndex } =
+    getNodeNavigationSiblings(pathname);
 
   const isAtFirstInChapter = currentIndex === 1 || childrenCount === 0;
   const isAtLastInChapter = currentIndex === childrenCount;

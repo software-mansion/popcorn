@@ -1,119 +1,114 @@
-import { getRawMdxTree } from "./tree-builder";
-import type {
-  Dir,
-  DirEntry,
-  DirTree,
-  NavigationTree,
-  NavigationTreeItem
+import { getSlug, navigationConfig } from "./configuration";
+import {
+  isConfigGroup,
+  type NavigationConfig,
+  type NavigationTreeItem
 } from "./types";
 
-export async function createNavigation(): Promise<NavigationTree> {
-  const tree = await getRawMdxTree();
+const MAX_NAVIGATION_DEPTH = 5000;
 
-  return processNavigationLevel(tree);
-}
-
-function processNavigationLevel(mapTree: DirTree): NavigationTree {
-  const result: NavigationTree = [];
-  const entries: [Dir, DirEntry][] = Array.from(mapTree.entries());
-
-  entries.sort(compareEntriesByOrder);
-
-  for (const [key, entry] of entries) {
-    const isLeafNode = entry.children.size === 0;
-
-    const item: NavigationTreeItem = {
-      title: formatTitle(key),
-      path: "/" + entry.path.join("/"),
-      parentPath: "/" + entry.path.slice(0, -1).join("/"),
-      type: isLeafNode ? "link" : "section",
-      children: processNavigationLevel(entry.children)
-    };
-
-    result.push(item);
+function buildNavigationTree(
+  config: NavigationConfig,
+  parentPath: string = "",
+  depth: number = 0
+): NavigationTreeItem[] {
+  if (depth >= MAX_NAVIGATION_DEPTH) {
+    console.warn(
+      `Navigation depth limit reached (${MAX_NAVIGATION_DEPTH}). Stopping recursion to prevent stack overflow.`
+    );
+    return [];
   }
 
+  return config.map((item) => {
+    const slug = getSlug(item);
+
+    if (isConfigGroup(item)) {
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
+      const children = buildNavigationTree(item.items, currentPath, depth + 1);
+
+      return {
+        title: item.group,
+        path: currentPath,
+        children: children,
+        type: "group" as const
+      };
+    } else {
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
+
+      return {
+        title: item.name,
+        path: currentPath,
+        children: [],
+        type: "link" as const
+      };
+    }
+  });
+}
+
+type FlattenedNavigationItem = NavigationTreeItem & {
+  siblingCount: number;
+  indexInParent: number;
+};
+
+function flattenTreeToLinks(
+  tree: NavigationTreeItem[]
+): FlattenedNavigationItem[] {
+  const result: FlattenedNavigationItem[] = [];
+
+  function traverse(items: NavigationTreeItem[]) {
+    const linkChildren = items.filter((item) => item.type === "link");
+    const siblingCount = linkChildren.length;
+
+    let indexInParent = 0;
+
+    for (const item of items) {
+      if (item.type === "link") {
+        result.push({
+          ...item,
+          siblingCount,
+          indexInParent: indexInParent++
+        });
+      }
+      if (item.children.length > 0) {
+        traverse(item.children);
+      }
+    }
+  }
+
+  traverse(tree);
   return result;
 }
 
-function formatTitle(text: string): string {
-  const formattedText = text.replaceAll("-", " ");
+export function getNodeNavigationSiblings(path: string) {
+  const normalizePath = path.startsWith("/") ? path.slice(1) : path;
 
-  return formattedText.charAt(0).toUpperCase() + formattedText.slice(1);
-}
-
-function getParentPath(path: string): string {
-  const cleanPath = path.split("?")[0];
-
-  return cleanPath.split("/").slice(0, -1).join("/");
-}
-
-function compareEntriesByOrder(a: [Dir, DirEntry], b: [Dir, DirEntry]): number {
-  const [, entryA] = a;
-  const [, entryB] = b;
-
-  const orderA = entryA.frontmatter.order;
-  const orderB = entryB.frontmatter.order;
-
-  if ((orderA === undefined && orderB === undefined) || orderA === orderB) {
-    return 0;
-  }
-
-  return (orderA || Infinity) - (orderB || Infinity);
-}
-
-export function getNodeNavigationSiblings(tree: NavigationTree, path: string) {
-  const flatNavigation: { title: string; path: string; parentPath: string }[] =
-    [];
-
-  const traverse = (items: NavigationTree) => {
-    for (const item of items) {
-      if (item.type === "link") {
-        flatNavigation.push({
-          title: item.title,
-          path: item.path,
-          parentPath: item.parentPath
-        });
-      }
-
-      traverse(item.children);
-    }
-  };
-
-  traverse(tree);
-
-  const parentPath = getParentPath(path);
-
-  const children = flatNavigation.filter((item) => {
-    return item.parentPath === parentPath;
-  });
-
-  const currentChildrenIndex = children.findIndex((item) => item.path === path);
-
-  const navigationNodeIndex = flatNavigation.findIndex(
-    (item) => path === item.path
+  const currentIndex = navigationLinks.findIndex(
+    (item) => item.path === normalizePath
   );
 
-  if (navigationNodeIndex === -1) {
+  if (currentIndex === -1) {
     return { previousNode: null, nextNode: null };
   }
 
+  const currentNode = navigationLinks[currentIndex];
+
   const nextNode =
-    navigationNodeIndex + 1 < flatNavigation.length
-      ? flatNavigation[navigationNodeIndex + 1]
+    currentIndex + 1 < navigationLinks.length
+      ? navigationLinks[currentIndex + 1]
       : null;
 
   const previousNode =
-    navigationNodeIndex - 1 >= 0
-      ? flatNavigation[navigationNodeIndex - 1]
-      : null;
+    currentIndex - 1 >= 0 ? navigationLinks[currentIndex - 1] : null;
 
   return {
     siblingsNode: {
       previousNode,
       nextNode
     },
-    childrenCount: children.length,
-    currentIndex: currentChildrenIndex + 1
+    childrenCount: currentNode.siblingCount,
+    currentIndex: currentNode.indexInParent + 1
   };
 }
+
+export const navigationTree = buildNavigationTree(navigationConfig);
+const navigationLinks = flattenTreeToLinks(navigationTree);
