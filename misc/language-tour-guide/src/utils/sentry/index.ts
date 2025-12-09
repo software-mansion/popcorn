@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/react";
-import { useCodeEditorStore } from "../../store/codeEditor";
+import { useEditorsStore } from "../../store/editors";
 
 export function initSentry() {
   Sentry.init({
@@ -38,7 +38,16 @@ export function captureReloadIframe(
   stdout: string,
   stderr: string
 ) {
-  const code = useCodeEditorStore.getState().code;
+  const { editors, editorOrder } = useEditorsStore.getState();
+
+  const code = editorOrder
+    .map((id) => {
+      const editor = editors.get(id);
+      return editor ? `# Editor: ${id}\n${editor.code}` : null;
+    })
+    .join("\n\n");
+
+  console.log("Capturing iframe reload with code:", code);
 
   const context = {
     tags: {
