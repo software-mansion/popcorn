@@ -42,6 +42,9 @@ export type CodeSnippet = {
 function remarkLivebook() {
   const codeSnippets: CodeSnippet[] = [];
 
+  // editorCount is used to ensure unique hashes for editors with identical content like empty editors
+  let editorCount = 0;
+
   return (tree: Root) => {
     visit<Root, Test>(tree, (node, index, parent) => {
       if (!parent || index === undefined) return;
@@ -124,7 +127,9 @@ function remarkLivebook() {
           }
         }
 
-        const editorId = hash64(initCode + firstOutput + (secondOutput ?? ""));
+        const editorId = hash64(
+          initCode + firstOutput + (secondOutput ?? "") + editorCount++
+        );
 
         codeSnippets.push({
           id: editorId,
