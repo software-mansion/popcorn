@@ -1,4 +1,4 @@
-import { navigationConfig } from "./configuration";
+import { getSlug, navigationConfig } from "./configuration";
 import {
   isConfigGroup,
   type NavigationConfig,
@@ -20,8 +20,10 @@ function buildNavigationTree(
   }
 
   return config.map((item) => {
+    const slug = getSlug(item);
+
     if (isConfigGroup(item)) {
-      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
       const children = buildNavigationTree(item.items, currentPath, depth + 1);
 
       return {
@@ -31,7 +33,7 @@ function buildNavigationTree(
         type: "group" as const
       };
     } else {
-      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
 
       return {
         title: item.name,
@@ -51,7 +53,6 @@ type FlattenedNavigationItem = NavigationTreeItem & {
 function flattenTreeToLinks(
   tree: NavigationTreeItem[]
 ): FlattenedNavigationItem[] {
-  console.log(tree);
   const result: FlattenedNavigationItem[] = [];
 
   function traverse(items: NavigationTreeItem[]) {

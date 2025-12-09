@@ -1,6 +1,6 @@
 import { Route } from "react-router";
 import { Suspense, type JSX } from "react";
-import { navigationConfig } from "./configuration";
+import { getSlug, navigationConfig } from "./configuration";
 import { isConfigGroup, type NavigationConfig, type RouteItem } from "./types";
 import { Loader } from "../../components/Loader";
 
@@ -19,11 +19,13 @@ function buildRoutes(
   }
 
   return config.flatMap((item) => {
+    const slug = getSlug(item);
+
     if (isConfigGroup(item)) {
-      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
       return buildRoutes(item.items, currentPath, depth + 1);
     } else {
-      const currentPath = parentPath ? `${parentPath}/${item.slug}` : item.slug;
+      const currentPath = parentPath ? `${parentPath}/${slug}` : slug;
       return {
         path: currentPath,
         component: item.component

@@ -1,6 +1,12 @@
 import { createElement, lazy } from "react";
 import { MdxWrapper } from "../../components/markdown/MdxWrapper";
-import type { NavigationConfig } from "./types";
+import {
+  isConfigGroup,
+  isConfigItem,
+  type ConfigGroup,
+  type ConfigItem,
+  type NavigationConfig
+} from "./types";
 
 const defaultConfigurationContent = (name: string) => {
   const LazyComponent = lazy(async () => {
@@ -18,35 +24,43 @@ const defaultConfigurationContent = (name: string) => {
   return LazyComponent;
 };
 
+export function getSlug(item: ConfigItem | ConfigGroup): string {
+  let name = "";
+
+  if (isConfigGroup(item)) {
+    name = item.group;
+  }
+
+  if (isConfigItem(item)) {
+    name = item.name;
+  }
+
+  return name.toLowerCase().replace(/\s+/g, "-");
+}
+
 export const navigationConfig: NavigationConfig = [
   {
     group: "Basic types and operations",
-    slug: "basic-types-and-operations",
     items: [
       {
         name: "Atoms",
-        slug: "atoms",
         component: defaultConfigurationContent("atoms")
       },
       {
         name: "Enum Details",
-        slug: "enum",
         component: defaultConfigurationContent("enum")
       }
     ]
   },
   {
     group: "Tests",
-    slug: "tests",
     items: [
       {
         name: "Test",
-        slug: "test",
         component: defaultConfigurationContent("test")
       },
       {
         name: "Ranges",
-        slug: "ranges",
         component: defaultConfigurationContent("ranges")
       }
     ]

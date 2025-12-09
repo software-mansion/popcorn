@@ -14,9 +14,8 @@ export function isConfigGroup(
   return (item as ConfigGroup).items !== undefined;
 }
 
-type ConfigItem = {
+export type ConfigItem = {
   name: string;
-  slug: string;
   component: React.LazyExoticComponent<
     () => ReactElement<
       MdxWrapperProps,
@@ -25,9 +24,8 @@ type ConfigItem = {
   >;
 };
 
-type ConfigGroup = {
+export type ConfigGroup = {
   group: string;
-  slug: string;
   items: (ConfigItem | ConfigGroup)[];
 };
 
