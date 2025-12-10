@@ -1,3 +1,7 @@
-import { init } from "./vendor.js";
+import { Popcorn } from "./vendor.js";
 
-await init({ onStdout: console.log });
+await Popcorn.init({
+  onStdout: console.log,
+  debug: true,
+  bundlePath: "bundle.avm",
+});
