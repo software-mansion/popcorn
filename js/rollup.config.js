@@ -1,6 +1,7 @@
 import typescript from "@rollup/plugin-typescript";
 import { iframeBundle } from "./plugins/iframe-bundle.js";
 import { wasmModule } from "./plugins/wasm-module.js";
+import copy from "rollup-plugin-copy";
 
 /**
  * Right now, we
@@ -14,6 +15,9 @@ const config = [
     },
 
     plugins: [
+      copy({
+        targets: [{ src: "assets/AtomVM.wasm", dest: "dist" }],
+      }),
       iframeBundle({
         entrypointPath: "src/iframe.ts",
         moduleName: "virtual:iframe-bundle",

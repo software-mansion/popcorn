@@ -1,6 +1,7 @@
 // @ts-nocheck
 import init from "../assets/AtomVM.mjs";
-import { wasmPath } from "virtual:wasm";
+// import { wasmPath } from "virtual:wasm";
+import { trace as rawTrace } from "./utils";
 
 const MESSAGES = {
   INIT: "popcorn-init",
@@ -32,11 +33,14 @@ globalThis.TrackedValue = TrackedValue;
 
 export async function runIFrame() {
   const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
+  trace("runIFrame:fetch_avm_bundle", { bundlePath });
   const bundleBuffer = await fetch(bundlePath).then((resp) =>
     resp.arrayBuffer(),
   );
   const bundle = new Int8Array(bundleBuffer);
+  trace("runIFrame:send_init");
   send(MESSAGES.INIT);
+  trace("runIFrame:start_vm");
   const initProcess = await startVm(bundle);
 
   window.addEventListener("message", async ({ data }) => {
@@ -50,20 +54,21 @@ export async function runIFrame() {
       );
     }
   });
-
+  trace("runIFrame:send_start_vm");
   send(MESSAGES.START_VM, initProcess);
   setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
+  trace("runIFrame:end");
 }
 
 async function startVm(avmBundle) {
+  trace("startVm:start");
+
   let resolveResultPromise = null;
   const resultPromise = new Promise((resolve) => {
     resolveResultPromise = resolve;
   });
+  trace("startVm:init_wasm");
   Module = await init({
-    locateFile(_path: string) {
-      return wasmPath;
-    },
     preRun: [
       function ({ FS }) {
         FS.mkdir("/data");
@@ -83,6 +88,7 @@ async function startVm(avmBundle) {
       setTimeout(() => send(MESSAGES.RELOAD, null), 100);
     },
   });
+  trace("startVm:override_props");
 
   Module["serialize"] = JSON.stringify;
   Module["deserialize"] = deserialize;
@@ -168,17 +174,23 @@ async function startVm(avmBundle) {
 
 async function handleCall(data) {
   const { requestId, process, args } = data.value;
+  trace("handleCall:start", { requestId, process, args });
+  trace("handleCall:send_ack");
   send(MESSAGES.CALL_ACK, { requestId });
 
   try {
+    trace("handleCall:call_elixir");
     const result = await Module.call(process, args);
+    trace("handleCall:send_call");
     send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
   } catch (error) {
     if (error == "noproc") {
+      trace("handleCall:error_noproc");
       send(MESSAGES.RELOAD, null);
       console.error("Runtime VM crashed, popcorn iframe reloaded.");
       return;
     }
+    trace("handleCall:error", { requestId, error: Module.deserialize(error) });
     send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
   }
 }
@@ -217,3 +229,10 @@ function deserialize(message) {
     return Module.trackedObjectsMap.get(value.popcorn_ref);
   });
 }
+
+function trace(name: string, args: Record<string, string>): void {
+  rawTrace("iframe:" + name, args);
+}
+
+// kick-off init
+runIFrame();

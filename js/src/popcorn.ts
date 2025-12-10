@@ -1,5 +1,6 @@
 // @ts-nocheck
 import iframeBundleString from "virtual:iframe-bundle";
+import { trace } from "./utils";
 
 const INIT_VM_TIMEOUT_MS = 30_000;
 const CALL_TIMEOUT_MS = 60_000;
@@ -116,7 +117,7 @@ export class Popcorn {
   static async init(options) {
     const { container, ...constructorParams } = options;
     const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
-    popcorn._trace("Main: init, params: ", { container, ...constructorParams });
+    popcorn._trace("init:start", { container, ...constructorParams });
     await popcorn._mount(container ?? document.documentElement);
     return popcorn;
   }
@@ -126,7 +127,7 @@ export class Popcorn {
       throw new Error("Iframe already mounted");
     }
 
-    this._trace("Main: mount, container: ", container);
+    this._trace("mount:start", { container });
 
     this._iframe = document.createElement("iframe");
     this._iframe.srcdoc = `<html>
@@ -146,13 +147,14 @@ export class Popcorn {
     this._listenerRef = this._iframeListener.bind(this);
     window.addEventListener("message", this._listenerRef);
     container.appendChild(this._iframe);
+    this._trace("mount:mounted", { iframe: this._iframe });
     await this._awaitMessage(MESSAGES.INIT);
-    this._trace("Main: iframe loaded");
+    this._trace("mount:after_init");
     this._initProcess = await withTimeout(
       this._awaitMessage(MESSAGES.START_VM),
       INIT_VM_TIMEOUT_MS,
     );
-    this._trace("Main: mounted, main process: ", this._initProcess);
+    this._trace("mount:after_start_vm", { initProcess: this._initProcess });
     this._onHeartbeat();
   }
 
@@ -188,7 +190,7 @@ export class Popcorn {
 
     const requestId = this._requestId++;
     const callPromise = new Promise((resolve, reject) => {
-      this._trace("Main: call: ", { requestId, process, args });
+      this._trace("call", { requestId, process, args });
       this._send(MESSAGES.CALL, {
         requestId,
         process: targetProcess,
@@ -228,7 +230,7 @@ export class Popcorn {
     }
 
     const requestId = this._requestId++;
-    this._trace("Main: cast: ", { requestId, process, args });
+    this._trace("cast", { requestId, process, args });
     this._send(MESSAGES.CAST, {
       requestId,
       process: targetProcess,
@@ -244,7 +246,7 @@ export class Popcorn {
       throw new Error("Iframe not mounted");
     }
 
-    this._trace("Main: deinit");
+    this._trace("deinit");
     window.removeEventListener("message", this._listenerRef);
     this._iframe.remove();
     this._iframe = null;
@@ -334,7 +336,7 @@ export class Popcorn {
   }
 
   _onCallAck({ requestId }) {
-    this._trace("Main: onCallAck: ", { requestId });
+    this._trace("_onCallAck", { requestId });
     const callData = this._calls.get(requestId);
     if (callData === undefined) {
       throw new Error("Ack for non-existent call");
@@ -343,7 +345,7 @@ export class Popcorn {
   }
 
   _onCall({ requestId, error, data }) {
-    this._trace("Main: onCall: ", { requestId, error, data });
+    this._trace("_onCall", { requestId, error, data });
     const callData = this._calls.get(requestId);
     if (callData === undefined) {
       throw new Error("Response for non-existent call");
@@ -365,7 +367,7 @@ export class Popcorn {
   _onHeartbeat() {
     clearTimeout(this._heartbeatTimeout);
     this._heartbeatTimeout = setTimeout(() => {
-      this._trace("Main: heartbeat lost");
+      this._trace("_onHeartbeat:lost");
       this._reloadIframe("heartbeat_lost");
     }, this.heartbeatTimeoutMs);
   }
@@ -376,10 +378,10 @@ export class Popcorn {
     }
 
     if (document.hidden) {
-      this._trace("Main: reloading iframe skipped, window not visible");
+      this._trace("_reloadIframe:skip_invisible");
       return;
     }
-    this._trace("Main: reloading iframe");
+    this._trace("_reloadIframe:reload");
     const container = this._iframe.parentElement;
     this.deinit();
     this._mount(container);
@@ -403,9 +405,9 @@ export class Popcorn {
     });
   }
 
-  _trace(...messages) {
+  _trace(name, args) {
     if (this._debug) {
-      console.debug(...messages);
+      trace("main:" + name, args);
     }
   }
 }
