@@ -25,11 +25,24 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/form_demo"
 import topbar from "../vendor/topbar"
 
+Hooks = {}
+
+Hooks.ServerSendHook = {
+  mounted() {
+    this.el.addEventListener("serverSend", (e) => {
+      console.log(e)
+      this.pushEvent("llv_local_message", {payload: e.detail.payload, view: e.detail.view}, (reply) => {
+        console.debug(reply.message);
+      });
+    });
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: Hooks,
 })
 
 // Show progress bar on live navigation and form submits
@@ -81,7 +94,3 @@ if (process.env.NODE_ENV === "development") {
   })
 }
 
-window.addEventListener("phx:llv_rerender", (e) => {
-  console.log("SIEMA")
-  document.dispatchEvent(new CustomEvent("popRender", {detail: e.detail}))
-});

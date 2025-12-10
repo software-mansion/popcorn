@@ -18,7 +18,7 @@ defmodule FormDemoLocal do
       <p style="color:red;">{error}</p>
     <% end %>
     <div class="bordered">
-      <h1>User List:</h1>
+      <h1>[Local] User List:</h1>
       <ul>
         <%= for user <- @users do %>
           <li>Username: {user["username"]}, Email: {user["email"]}</li>
@@ -30,11 +30,7 @@ defmodule FormDemoLocal do
 
   @impl true
   def mount(_params, _session, socket) do
-    users = [
-      %{"email" => "user1@example.com", "username" => "user1"},
-      %{"email" => "user2@example.com", "username" => "user2"},
-      %{"email" => "user3@example.com", "username" => "user3"}
-    ]
+    users = []
 
     user = %{"email" => "", "username" => ""}
     {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
@@ -48,23 +44,26 @@ defmodule FormDemoLocal do
 
   def handle_event("save", user_params, socket) do
     users = socket.assigns.users
-    IO.inspect "SEND"
     LocalLiveView.ServerSocket.send(user_params, __MODULE__)
     case validate(user_params, users) do
       [] ->
         user = %{"email" => "", "username" => ""}
 
         {:noreply,
-         assign(socket,
-           form: to_form(user),
-           users: users ++ [user_params],
-           errors: [],
-           disabled: true
-         )}
+          assign(socket,
+            form: to_form(user),
+            users: users ++ [user_params],
+            errors: [],
+            disabled: true
+          )}
 
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}
     end
+  end
+
+  def handle_event("llv_server_message", %{"users" => users}, socket) do
+    {:noreply, assign(socket, users: users)}
   end
 
   defp validate(user, existing_users) do
