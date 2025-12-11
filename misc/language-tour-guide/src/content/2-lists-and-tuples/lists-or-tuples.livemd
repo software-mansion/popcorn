@@ -1,0 +1,36 @@
+# Lists or tuples?
+
+Due to their performance characteristics, lists are frequently used for storing dynamically growing, possibly large, collections.
+
+Tuples, on the other hand, are most useful for grouping a small, fixed number of values, for example to return them from a function.
+
+A common pattern is to use 'tagged tuples', which consist of an atom and a value, for example `{:ok, "result"}`.
+
+`String.split` returns a list (try adding another word):
+
+```elixir
+String.split("hello world", " ")
+```
+
+`String.split_at` returns a 2-element tuple:
+
+```elixir
+String.split_at("hello world", 3)
+```
+
+`Base.decode16` returns a tagged tuple (try using an invalid character like 'z'):
+
+```elixir
+Base.decode16("666F6F626172")
+```
+
+In Elixir, it's a convention to define two versions of functions that can fail:
+
+- One that returns a tagged tuple (`:ok` or `:error`) - useful when you want to handle errors gracefully
+- Another with a trailing `!` that raises an error - useful when failures are unexpected
+
+Try `Base.decode16!` with invalid input (like "xyz") to see the error:
+
+```elixir
+Base.decode16!("666F6F626172")
+```

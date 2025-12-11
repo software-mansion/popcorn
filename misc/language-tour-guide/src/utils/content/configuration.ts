@@ -102,5 +102,46 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("1-basic-types-and-operations/variables")
       }
     ]
+  },
+  {
+    group: "Lists and tuples",
+    items: [
+      {
+        name: "Introduction to Lists",
+        component: lazyLoadLiveMd(
+          "2-lists-and-tuples/introduction-to-lists-in-elixir"
+        )
+      },
+      {
+        name: "List Operations",
+        component: lazyLoadLiveMd(
+          "2-lists-and-tuples/list-operations-in-elixir"
+        )
+      },
+      {
+        name: "Prepending to List",
+        component: lazyLoadLiveMd("2-lists-and-tuples/prepending-to-list")
+      },
+      {
+        name: "Accessing List Elements",
+        component: lazyLoadLiveMd("2-lists-and-tuples/accessing-list-elements")
+      },
+      {
+        name: "Charlists",
+        component: lazyLoadLiveMd("2-lists-and-tuples/charlists")
+      },
+      {
+        name: "Tuples",
+        component: lazyLoadLiveMd("2-lists-and-tuples/tuples")
+      },
+      {
+        name: "Updating a Tuple",
+        component: lazyLoadLiveMd("2-lists-and-tuples/updating-a-tuple")
+      },
+      {
+        name: "Lists or Tuples?",
+        component: lazyLoadLiveMd("2-lists-and-tuples/lists-or-tuples")
+      }
+    ]
   }
 ];

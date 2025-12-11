@@ -1,0 +1,23 @@
+# Charlists
+
+When Elixir sees a list of printable ASCII numbers, it will print that as a charlist (a list of characters). That's for better interoperability with Erlang, where strings are represented as charlists instead of binaries.
+
+`~c""` syntax lets you create a charlist similarly to strings.
+
+Charlist with control characters (try appending `0` to the list):
+
+```elixir
+[11, 12, 13]
+```
+
+Charlist representing "hello":
+
+```elixir
+[104, 101, 108, 108, 111]
+```
+
+Using the `~c""` syntax:
+
+```elixir
+~c"hello"
+```

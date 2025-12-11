@@ -1,0 +1,23 @@
+# Tuples
+
+Elixir uses curly brackets to define tuples. Like lists, tuples can hold any value.
+
+Tuples store elements contiguously in memory which means accessing a tuple element by index or getting the tuple size is a fast operation.
+
+A tuple example:
+
+```elixir
+tuple = {:ok, "hello"}
+```
+
+Accessing the second element of a tuple:
+
+```elixir
+elem(tuple, 1)
+```
+
+Getting the size of a tuple:
+
+```elixir
+tuple_size(tuple)
+```

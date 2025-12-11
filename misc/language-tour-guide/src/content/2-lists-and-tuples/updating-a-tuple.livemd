@@ -1,5 +1,3 @@
-export const frontmatter = { order: 7 };
-
 # Updating a tuple
 
 It is possible to put an element at a particular index in a tuple with `put_elem`.
@@ -10,12 +8,15 @@ Note, however, that the elements themselves are not copied. When you update a tu
 
 This rule applies to most data structures in Elixir. Such approach reduces the amount of memory allocation the language needs to perform and is only possible thanks to the immutable semantics of the language.
 
-<EditorCode>
+Updating a tuple:
+
 ```elixir
 tuple = {:ok, "hello"}
-
-#💡 Let's print the 'tuple' variable after the update - did it change?
-#💡 Try changing 1 to an out-of-bound index, such as 3. What happens?
-IO.inspect put_elem(tuple, 1, "world"), label: "Updated tuple"
+put_elem(tuple, 1, "world")
 ```
-</EditorCode>
+
+Let's check the `tuple` variable after the update - did it change? (try changing 1 to an out-of-bound index, such as 3. What happens?):
+
+```elixir
+
+```
