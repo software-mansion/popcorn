@@ -1,17 +1,28 @@
-export const frontmatter = { order: 6 };
-
 # Strings
 
 Strings in Elixir are delimited by double quotes, and they are encoded in UTF-8. You can concatenate them with `<>` operator and interpolate with `#{}`. Interpolation works for all types that support conversion to string. Finally, `IO.puts` prints a string to the standard output.
 
-<EditorCode>
+A UTF-8 string:
+
 ```elixir
-IO.inspect "Cześć", label: "UTF-8 string"
-IO.inspect "hello" <> " " <> "world", label: "concat hello and world"
+"Cześć"
+```
 
+Concatenating strings:
+
+```elixir
+"hello" <> " " <> "world"
+```
+
+String interpolation with a variable:
+
+```elixir
 number = 42
-IO.inspect "I am #{number} years old!", label: "string interpolation"
+"I am #{number} years old!"
+```
 
+Printing to standard output:
+
+```elixir
 IO.puts("hello world")
 ```
-</EditorCode>

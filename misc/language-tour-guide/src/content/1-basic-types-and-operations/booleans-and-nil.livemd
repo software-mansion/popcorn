@@ -1,23 +1,41 @@
-export const frontmatter = { order: 5 };
-
 # Booleans and nil
 
 Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||`, `&&`, and `!`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
 
 As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.
 
-<EditorCode>
+Using `&&` with booleans:
+
 ```elixir
-IO.inspect true && false, label: "true && false"
-IO.inspect nil && 13, label: "nil && 13"
-IO.inspect true && 17, label: "true && 17"
-
-#💡 Let's change 'true' to IO.inspect("foo"). Is "foo" printed out?
-IO.inspect 1 || true, label: "1 || true"
-
-IO.inspect false || 11, label: "false || 11"
-
-#💡 Let's try !1 and !nil
-IO.inspect !true, label: "!true"
+true && false
 ```
-</EditorCode>
+
+`nil` is falsy, so `&&` short-circuits:
+
+```elixir
+nil && 13
+```
+
+`true` is truthy, so `&&` returns the right-hand side:
+
+```elixir
+true && 17
+```
+
+`||` returns the first truthy value - try changing `1` to `IO.inspect("foo")`:
+
+```elixir
+1 || true
+```
+
+`false` is falsy, so `||` returns the right-hand side:
+
+```elixir
+false || 11
+```
+
+The `!` operator - try `!1` and `!nil`:
+
+```elixir
+!true
+```

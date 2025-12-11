@@ -49,28 +49,57 @@ export function getSlug(item: ConfigItem | ConfigGroup): string {
 
 export const navigationConfig: NavigationConfig = [
   {
+    name: "Introduction",
+    component: lazyLoadLiveMd("introduction")
+  },
+  {
     group: "Basic types and operations",
     items: [
       {
+        name: "Basic Types",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/basic-types")
+      },
+      {
+        name: "Basic Arithmetic",
+        component: lazyLoadLiveMd(
+          "1-basic-types-and-operations/basic-arithmetic"
+        )
+      },
+      {
+        name: "Numbers",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/numbers")
+      },
+      {
+        name: "Booleans",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/booleans")
+      },
+      {
+        name: "Booleans and nil",
+        component: lazyLoadLiveMd(
+          "1-basic-types-and-operations/booleans-and-nil"
+        )
+      },
+      {
+        name: "Strings",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/strings")
+      },
+      {
+        name: "Strings pt 2",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/strings-pt-2")
+      },
+      {
         name: "Atoms",
-        component: defaultConfigurationContent("atoms")
+        component: lazyLoadLiveMd("1-basic-types-and-operations/atoms")
       },
       {
-        name: "Enum Details",
-        component: defaultConfigurationContent("enum")
-      }
-    ]
-  },
-  {
-    group: "Tests",
-    items: [
-      {
-        name: "Test",
-        component: defaultConfigurationContent("test")
+        name: "Structural Comparison",
+        component: lazyLoadLiveMd(
+          "1-basic-types-and-operations/structural-comparison"
+        )
       },
       {
-        name: "Ranges",
-        component: defaultConfigurationContent("ranges")
+        name: "Variables",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/variables")
       }
     ]
   }

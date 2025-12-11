@@ -1,0 +1,31 @@
+# Variables and Immutability
+
+Similarly to many other languages, you may define a new variable by assigning a value to an identifier using `=` sign.
+
+In Elixir, all data is immutable. However, you may re-assign the variable name to a different value, even of a different type.
+
+Variables must start with a lowercase letter or an underscore. By convention, the variable names are written in `snake_case`. Leading underscore has a special meaning, but we'll get back to that later.
+
+Assign a value to a variable:
+
+```elixir
+x = "value"
+x
+```
+
+Variables can be assigned from other variables:
+
+```elixir
+x = "value"
+y = x
+y
+```
+
+Re-assigning a variable doesn't affect other variables that were assigned its previous value:
+
+```elixir
+x = "value"
+y = x
+x = :ok
+{x, y}
+```

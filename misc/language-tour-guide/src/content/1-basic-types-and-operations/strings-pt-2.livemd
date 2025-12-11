@@ -1,0 +1,21 @@
+# Strings
+
+Strings in Elixir are represented internally by contiguous sequences of bytes, known as binaries. Thus, we can use functions such as `byte_size` on strings. Functions specific to strings are in the `String` module.
+
+Strings are binaries:
+
+```elixir
+is_binary("cześć")
+```
+
+In UTF-8, 'ś' and 'ć' take two bytes each. Try changing `byte_size` to `String.length`:
+
+```elixir
+byte_size("cześć")
+```
+
+Using the String module:
+
+```elixir
+String.upcase("cześć")
+```
