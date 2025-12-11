@@ -4,15 +4,15 @@ defmodule ThermostatLive do
   def render(assigns) do
     ~H"""
     <p>Current temperature: {@temperature}°F</p>
-    <button pop-click="inc_temperature">+</button>
-    <button pop-click="dec_temperature">-</button>
+    <button pop-click="inc_temperature" class="ghost-button">+</button>
+    <button pop-click="dec_temperature" class="ghost-button">-</button>
     <p>Country: {@country}</p>
     """
   end
 
   def mount(_params, _session, socket) do
     temperature = 65
-    country = "Colombia"
+    country = "Poland"
 
     socket =
       socket

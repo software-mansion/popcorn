@@ -36,7 +36,6 @@ defmodule LocalLiveView.Dispatcher do
          state
        ) do
     view = Module.safe_concat([view_string])
-    payload = payload |> Map.merge(%{"type" => %{}})
 
     Map.get(state.views, view)
     |> send(%Message{payload: payload, event: "event"})
