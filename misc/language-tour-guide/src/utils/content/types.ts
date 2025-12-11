@@ -2,6 +2,11 @@ import type { ComponentType, ReactElement } from "react";
 import type { CodeSnippet } from "../../plugins/livemd/parser";
 import type { MdxWrapperProps } from "../../components/markdown/MdxWrapper";
 
+export type LiveMdModule = {
+  default: ComponentType;
+  codeSnippets: CodeSnippet[];
+};
+
 export function isConfigItem(
   item: ConfigItem | ConfigGroup
 ): item is ConfigItem {
@@ -38,11 +43,6 @@ type LazyComponent = React.LazyExoticComponent<
 export type RouteItem = {
   path: string;
   component: LazyComponent;
-};
-
-export type MdxWithProperties = {
-  default: ComponentType;
-  codeSnippets?: CodeSnippet[];
 };
 
 type NavigationTreeItemType = "link" | "group";

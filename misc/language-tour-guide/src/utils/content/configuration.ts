@@ -5,12 +5,21 @@ import {
   isConfigItem,
   type ConfigGroup,
   type ConfigItem,
+  type LiveMdModule,
   type NavigationConfig
 } from "./types";
 
-const defaultConfigurationContent = (name: string) => {
+const modules = import.meta.glob("/src/content/**/*.livemd");
+
+const lazyLoadLiveMd = (name: string) => {
   const LazyComponent = lazy(async () => {
-    const module = await import(`../../content/${name}.livemd`);
+    const modulePath = `/src/content/${name}.livemd`;
+
+    if (!modules[modulePath]) {
+      throw new Error(`Module not found: ${modulePath}`);
+    }
+
+    const module = (await modules[modulePath]()) as LiveMdModule;
 
     return {
       default: () =>
