@@ -1,4 +1,4 @@
-FROM base:latest AS build_landing
+FROM ghcr.io/software-mansion/popcorn-base:latest AS build_landing
 
 WORKDIR /build/popcorn/examples/iex_wasm
 RUN mix deps.get
