@@ -1,0 +1,102 @@
+# Lists
+
+## Introduction to Lists in Elixir
+
+In this chapter we will learn two of the most used collection data-types in Elixir: lists and tuples. Let's start with lists.
+
+Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list.
+
+A list of various elements (try nesting another list within the list):
+
+```elixir
+[1, true, 3, "hello"]
+```
+
+Getting the length of a list:
+
+```elixir
+length([1, 2, 3])
+```
+
+## Accessing List Elements
+
+Throughout the tutorial, we will talk a lot about the head and tail of a list. The head is the first element of a list and the tail is the remainder of the list. They can be retrieved with the functions `hd` and `tl`.
+
+Head of the list (try changing the list to an empty list):
+
+```elixir
+hd([1, 2, 3])
+```
+
+Tail of the list:
+
+```elixir
+tl([1, 2, 3])
+```
+
+## Prepending to list
+
+Lists are stored in memory as linked lists, meaning that each element in a list holds its value and points to the following element until the end of the list is reached. Therefore, prepending to a list is a fast (constant time) operation, while appending requires traversing entire list. That's why prepending an element is a common operation in Elixir and there's a special syntax for it: `[element | list]`
+
+Prepending an element (try expressing it using the `++` operator):
+
+```elixir
+list = [1, 2, 3]
+[0 | list]
+```
+
+A list constructed only with `[head | tail]` syntax:
+
+```elixir
+[0 | [1 | [2 | [3 | []]]]]
+```
+
+## List Operations in Elixir
+
+Two lists can be concatenated or subtracted using the `++` and `--` operators respectively.
+
+List operators never modify the existing list. Concatenating to or removing elements from a list returns a new list. We say that Elixir data structures are _immutable_.
+
+One advantage of immutability is that it leads to clearer code. You can freely pass the data around with the guarantee no one will mutate it in memory - only transform it.
+
+Concatenating lists
+
+```elixir
+list ++ [4, 5, 6]
+```
+
+Let's check `list` after concatenating - did it change?
+
+```elixir
+list
+```
+
+Subtracting lists:
+
+```elixir
+[1, true, 2, false, 3, true] -- [true, false]
+```
+
+## Charlists
+
+When Elixir sees a list of printable ASCII numbers, it will print that as a charlist (a list of characters). That's for better interoperability with Erlang, where strings are represented as charlists instead of binaries.
+
+`~c""` syntax lets you create a charlist similarly to strings.
+
+Charlist with control characters (try appending `0` to the list):
+
+```elixir
+[11, 12, 13]
+```
+
+Charlist representing "hello":
+
+```elixir
+[104, 101, 108, 108, 111]
+```
+
+Using the `~c""` syntax:
+
+```elixir
+~c"hello"
+```

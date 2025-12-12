@@ -56,14 +56,8 @@ export const navigationConfig: NavigationConfig = [
     group: "Basic types and operations",
     items: [
       {
-        name: "Basic Types",
-        component: lazyLoadLiveMd("1-basic-types-and-operations/basic-types")
-      },
-      {
-        name: "Basic Arithmetic",
-        component: lazyLoadLiveMd(
-          "1-basic-types-and-operations/basic-arithmetic"
-        )
+        name: "Basics",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/basics")
       },
       {
         name: "Numbers",
@@ -74,32 +68,14 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("1-basic-types-and-operations/booleans")
       },
       {
-        name: "Booleans and nil",
-        component: lazyLoadLiveMd(
-          "1-basic-types-and-operations/booleans-and-nil"
-        )
-      },
-      {
         name: "Strings",
         component: lazyLoadLiveMd("1-basic-types-and-operations/strings")
       },
       {
-        name: "Strings pt 2",
-        component: lazyLoadLiveMd("1-basic-types-and-operations/strings-pt-2")
-      },
-      {
-        name: "Atoms",
-        component: lazyLoadLiveMd("1-basic-types-and-operations/atoms")
-      },
-      {
-        name: "Structural Comparison",
+        name: "Atoms and comparison",
         component: lazyLoadLiveMd(
-          "1-basic-types-and-operations/structural-comparison"
+          "1-basic-types-and-operations/atoms-and-comparison"
         )
-      },
-      {
-        name: "Variables",
-        component: lazyLoadLiveMd("1-basic-types-and-operations/variables")
       }
     ]
   },
@@ -107,39 +83,15 @@ export const navigationConfig: NavigationConfig = [
     group: "Lists and tuples",
     items: [
       {
-        name: "Introduction to Lists",
-        component: lazyLoadLiveMd(
-          "2-lists-and-tuples/introduction-to-lists-in-elixir"
-        )
-      },
-      {
-        name: "List Operations",
-        component: lazyLoadLiveMd(
-          "2-lists-and-tuples/list-operations-in-elixir"
-        )
-      },
-      {
-        name: "Prepending to List",
-        component: lazyLoadLiveMd("2-lists-and-tuples/prepending-to-list")
-      },
-      {
-        name: "Accessing List Elements",
-        component: lazyLoadLiveMd("2-lists-and-tuples/accessing-list-elements")
-      },
-      {
-        name: "Charlists",
-        component: lazyLoadLiveMd("2-lists-and-tuples/charlists")
+        name: "Lists",
+        component: lazyLoadLiveMd("2-lists-and-tuples/lists")
       },
       {
         name: "Tuples",
         component: lazyLoadLiveMd("2-lists-and-tuples/tuples")
       },
       {
-        name: "Updating a Tuple",
-        component: lazyLoadLiveMd("2-lists-and-tuples/updating-a-tuple")
-      },
-      {
-        name: "Lists or Tuples?",
+        name: "Lists or Tuples",
         component: lazyLoadLiveMd("2-lists-and-tuples/lists-or-tuples")
       }
     ]
