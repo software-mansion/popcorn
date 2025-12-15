@@ -1,0 +1,37 @@
+# Atoms
+
+An atom is a constant whose value is its own name. Some other languages call these symbols.
+
+Atoms can be created using a preceding colon, like `:apple` or `:orange`. However, `true`, `false` and `nil` are also atoms - Elixir allows to skip the colon for them.
+
+Other commonly used atoms are `:ok` and `:error`. They usually denote a success or a failure of some operation. For example, `IO.puts` always returns `:ok`.
+
+Atoms with the same name are equal:
+
+```elixir
+:apple == :apple
+```
+
+Atoms with different names are not equal:
+
+```elixir
+:apple == :orange
+```
+
+Let's check if `true` is an atom:
+
+```elixir
+is_atom(true)
+```
+
+`true` and `:true` are the same:
+
+```elixir
+true == :true
+```
+
+`IO.puts` returns `:ok`:
+
+```elixir
+IO.puts("foo")
+```

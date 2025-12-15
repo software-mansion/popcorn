@@ -1,7 +1,5 @@
 # Booleans and nil
 
-## Booleans
-
 Elixir supports `true` and `false` as booleans, and provides logical `and`, `or` and `not` operators to work on them.
 
 Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when doing side effects.
@@ -48,7 +46,7 @@ not true
 
 Beyond strict booleans, Elixir provides operators that work with any value.
 
-## Booleans and nil
+## The nil value
 
 Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||`, `&&`, and `!`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
 

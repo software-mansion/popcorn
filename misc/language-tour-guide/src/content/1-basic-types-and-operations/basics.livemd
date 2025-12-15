@@ -1,6 +1,4 @@
-# Basics
-
-## Basic Types
+# Basic Types
 
 In this chapter we will learn more about Elixir basic types: integers, floats, booleans, atoms, and strings. Let's see some examples.
 

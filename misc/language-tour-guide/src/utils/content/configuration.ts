@@ -72,10 +72,12 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("1-basic-types-and-operations/strings")
       },
       {
-        name: "Atoms and comparison",
-        component: lazyLoadLiveMd(
-          "1-basic-types-and-operations/atoms-and-comparison"
-        )
+        name: "Atoms",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/atoms")
+      },
+      {
+        name: "Comparison",
+        component: lazyLoadLiveMd("1-basic-types-and-operations/comparison")
       }
     ]
   },

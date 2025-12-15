@@ -1,7 +1,5 @@
 # Strings and binaries
 
-## Strings
-
 Strings in Elixir are delimited by double quotes, and they are encoded in UTF-8. You can concatenate them with `<>` operator and interpolate with `#{}`. Interpolation works for all types that support conversion to string. Finally, `IO.puts` prints a string to the standard output.
 
 A UTF-8 string:

@@ -1,7 +1,5 @@
 # Lists
 
-## Introduction to Lists in Elixir
-
 In this chapter we will learn two of the most used collection data-types in Elixir: lists and tuples. Let's start with lists.
 
 Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list.
