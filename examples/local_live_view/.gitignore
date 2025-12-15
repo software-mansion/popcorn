@@ -34,4 +34,6 @@ config.secret.exs
 # wasm build dir
 /static/wasm/
 
+/static/local_live_view/
+
 /static/assets/

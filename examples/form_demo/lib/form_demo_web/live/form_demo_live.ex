@@ -21,15 +21,15 @@ defmodule FormDemoWeb.FormDemoLive do
     """
   end
 
-  def mount(_params, session, socket) do
+  def mount(_params, _session, socket) do
     users = Application.get_env(FormDemo, :users, [])
     socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:ok, assign(socket, users: users)}
   end
 
-  def handle_event("llv_local_message", %{"view" => view, "payload" => payload}, socket) do
+  def handle_event("llv_local_message", %{"payload" => payload}, socket) do
     new_users = socket.assigns.users ++ [payload]
-    users = Application.put_env(FormDemo, :users, new_users)
+    Application.put_env(FormDemo, :users, new_users)
     {:noreply, assign(socket, users: new_users)}
   end
 

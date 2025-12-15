@@ -57,7 +57,7 @@ defmodule LocalLiveView.Dispatcher do
 
   defp handle_wasm({:wasm_call, %{"type" => "rerender"}}, state) do
     state.views
-    |> Enum.each(fn {name, pid} -> send(pid, %Message{event: "rerender"}) end)
+    |> Enum.each(fn {_name, pid} -> send(pid, %Message{event: "rerender"}) end)
 
     {:resolve, :ok, state}
   end

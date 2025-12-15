@@ -49,17 +49,19 @@ defmodule FormDemoLocal do
 
   def handle_event("save", user_params, socket) do
     users = socket.assigns.users
+
     case validate(user_params, users) do
       [] ->
         user = %{"email" => "", "username" => ""}
         LocalLiveView.ServerSocket.send(user_params, __MODULE__)
+
         {:noreply,
-          assign(socket,
-            form: to_form(user),
-            users: users ++ [user_params],
-            errors: [],
-            disabled: true
-          )}
+         assign(socket,
+           form: to_form(user),
+           users: users ++ [user_params],
+           errors: [],
+           disabled: true
+         )}
 
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}
@@ -69,16 +71,17 @@ defmodule FormDemoLocal do
   def handle_event("llv_server_message", %{"users" => users}, socket) do
     {:noreply, assign(socket, users: users)}
   end
-  
+
   def handle_event("generate_random", params, socket) do
     user = generate_random_user()
     errors = validate(user, socket.assigns.users)
+
     {:noreply,
-      assign(socket,
-        form: to_form(user),
-        errors: errors,
-        disabled: errors != []
-      )}
+     assign(socket,
+       form: to_form(user),
+       errors: errors,
+       disabled: errors != []
+     )}
   end
 
   defp validate(user, existing_users) do
@@ -109,17 +112,15 @@ defmodule FormDemoLocal do
 
   defp validate_correctness("email", value) do
     with [name, server] <- String.split(value, "@"),
-         true <- String.length(name) > 0 and String.contains?(server, ".")
-      do
-        ""
-      else
-        _err -> "Email must have an email format"
+         true <- String.length(name) > 0 and String.contains?(server, ".") do
+      ""
+    else
+      _err -> "Email must have an email format"
     end
   end
 
   defp generate_random_user() do
     number = to_string(Enum.random(1..999))
-    %{"email" => "user#{number}@example.com", 
-      "username" => "user#{number}"}
+    %{"email" => "user#{number}@example.com", "username" => "user#{number}"}
   end
 end
