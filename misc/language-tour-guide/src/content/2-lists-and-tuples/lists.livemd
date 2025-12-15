@@ -4,7 +4,9 @@ In this chapter we will learn two of the most used collection data-types in Elix
 
 Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list.
 
-A list of various elements (try nesting another list within the list):
+A list of various elements:
+
+> 💡 Try nesting another list within the list.
 
 ```elixir
 [1, true, 3, "hello"]
@@ -20,7 +22,9 @@ length([1, 2, 3])
 
 Throughout the tutorial, we will talk a lot about the head and tail of a list. The head is the first element of a list and the tail is the remainder of the list. They can be retrieved with the functions `hd` and `tl`.
 
-Head of the list (try changing the list to an empty list):
+Head of the list:
+
+> 💡 Try changing the list to an empty list.
 
 ```elixir
 hd([1, 2, 3])
@@ -36,7 +40,9 @@ tl([1, 2, 3])
 
 Lists are stored in memory as linked lists, meaning that each element in a list holds its value and points to the following element until the end of the list is reached. Therefore, prepending to a list is a fast (constant time) operation, while appending requires traversing entire list. That's why prepending an element is a common operation in Elixir and there's a special syntax for it: `[element | list]`
 
-Prepending an element (try expressing it using the `++` operator):
+Prepending an element:
+
+> 💡 Try expressing it using the `++` operator.
 
 ```elixir
 list = [1, 2, 3]
@@ -63,7 +69,7 @@ Concatenating lists
 list ++ [4, 5, 6]
 ```
 
-Let's check `list` after concatenating - did it change?
+> 💡 Let's check `list` after concatenating. Did it change?
 
 ```elixir
 list
@@ -81,7 +87,9 @@ When Elixir sees a list of printable ASCII numbers, it will print that as a char
 
 `~c""` syntax lets you create a charlist similarly to strings.
 
-Charlist with control characters (try appending `0` to the list):
+Charlist with control characters:
+
+> 💡 Try appending `0` to the list.
 
 ```elixir
 [11, 12, 13]

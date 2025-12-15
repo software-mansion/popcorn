@@ -20,6 +20,8 @@ Atoms with different names are not equal:
 
 Let's check if `true` is an atom:
 
+> 💡 Try using `is_boolean` to check if atom `:false` is a boolean.
+
 ```elixir
 is_atom(true)
 ```

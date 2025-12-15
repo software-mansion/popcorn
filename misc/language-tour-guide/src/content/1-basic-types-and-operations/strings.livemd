@@ -39,7 +39,9 @@ Strings are binaries:
 is_binary("cześć")
 ```
 
-In UTF-8, 'ś' and 'ć' take two bytes each. Try changing `byte_size` to `String.length`:
+In UTF-8, 'ś' and 'ć' take two bytes each.
+
+> 💡 Try changing `byte_size` to `String.length`.
 
 ```elixir
 byte_size("cześć")

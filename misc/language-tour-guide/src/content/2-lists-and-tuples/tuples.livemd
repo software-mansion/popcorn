@@ -34,12 +34,14 @@ This rule applies to most data structures in Elixir. Such approach reduces the a
 
 Updating a tuple:
 
+> 💡 Try changing the index in `put_elem` above to an out-of-bound value, such as 3. What happens?
+
 ```elixir
 put_elem(tuple, 1, "world")
 ```
 
-Let's check the `tuple` variable after the update - did it change? (try changing 1 to an out-of-bound index, such as 3. What happens?):
+> 💡 Now check the `tuple` variable - did it change after the update?
 
 ```elixir
-
+tuple
 ```

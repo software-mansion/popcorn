@@ -6,13 +6,17 @@ Elixir allows expressing numbers in decimal, binary, octal, hexadecimal and expo
 
 Normally, integers can be arbitrarily big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
 
-Check if a value is an integer (try changing to `is_float`):
+Check if a value is an integer:
+
+> 💡 Try changing to `is_float`.
 
 ```elixir
 is_integer(123)
 ```
 
 Check if a value is a float:
+
+> 💡 Try changing to `is_number`.
 
 ```elixir
 is_float(4.5)
@@ -96,7 +100,9 @@ Rounding a float:
 round(3.58)
 ```
 
-Truncating a float (try changing to `ceil`):
+Truncating a float:
+
+> 💡 Try changing to `ceil`. How does the result change?
 
 ```elixir
 trunc(3.58)
