@@ -52,12 +52,12 @@ defmodule FormDemoLocal do
 
     case validate(user_params, users) do
       [] ->
-        user = %{"email" => "", "username" => ""}
+        blank_user = %{"email" => "", "username" => ""}
         LocalLiveView.ServerSocket.send(user_params, __MODULE__)
 
         {:noreply,
          assign(socket,
-           form: to_form(user),
+           form: to_form(blank_user),
            users: users ++ [user_params],
            errors: [],
            disabled: true
@@ -73,15 +73,9 @@ defmodule FormDemoLocal do
   end
 
   def handle_event("generate_random", params, socket) do
-    user = generate_random_user()
-    errors = validate(user, socket.assigns.users)
-
-    {:noreply,
-     assign(socket,
-       form: to_form(user),
-       errors: errors,
-       disabled: errors != []
-     )}
+    users = socket.assigns.users
+    user = generate_random_user(users)
+    handle_event("save", user, socket)
   end
 
   defp validate(user, existing_users) do
@@ -119,8 +113,13 @@ defmodule FormDemoLocal do
     end
   end
 
-  defp generate_random_user() do
+  defp generate_random_user(existing_users) do
     number = to_string(Enum.random(1..999))
-    %{"email" => "user#{number}@example.com", "username" => "user#{number}"}
+    user = %{"email" => "user#{number}@example.com", "username" => "user#{number}"}
+    result = validate_already_existing(user, existing_users)
+    case result do
+      [] -> user
+      _ -> generate_random_user(existing_users)
+    end
   end
 end
