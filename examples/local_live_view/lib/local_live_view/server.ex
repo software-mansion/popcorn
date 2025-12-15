@@ -69,6 +69,7 @@ defmodule LocalLiveView.Server do
   def handle_info(%Message{event: "event"} = msg, state) do
     raw_val = Map.get(msg.payload, "value", %{})
     event = Map.get(msg.payload, "event")
+
     state.socket
     |> view_handle_event(event, raw_val)
     |> handle_result({:handle_event, 3, msg.ref}, state)
@@ -233,6 +234,7 @@ defmodule LocalLiveView.Server do
     {socket, diff, fingerprints, components} =
       if force? or changed? do
         rendered = rerender(socket)
+
         {diff, fingerprints, components} =
           Diff.render(socket, rendered, state.fingerprints, state.components)
 
@@ -250,7 +252,7 @@ defmodule LocalLiveView.Server do
     {:diff, diff,
      %{state | socket: new_socket, fingerprints: fingerprints, components: components}}
   end
-  
+
   def rerender(socket) do
     rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
 
@@ -258,7 +260,7 @@ defmodule LocalLiveView.Server do
     |> Phoenix.HTML.Safe.to_iodata()
     |> IO.iodata_to_binary()
     |> LocalLiveView.Renderer.rerender(socket.view)
-    
+
     rendered
   end
 
