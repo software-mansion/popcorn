@@ -27,8 +27,11 @@ async function setup() {
       });
   });
   
-  window.addEventListener("phx:llv_rerender", (e) => {
-    document.dispatchEvent(new CustomEvent("popRender", {detail: e.detail}))
+  window.addEventListener("phx:llv_rerender", async (e) => {
+    const { data, durationMs } = await popcorn.call({ "view": e.detail.view, "event": "llv_rerender", 
+        "payload": { "event": "llv_rerender" } }, {
+        timeoutMs: 10_000,
+    });
   });
 }
 

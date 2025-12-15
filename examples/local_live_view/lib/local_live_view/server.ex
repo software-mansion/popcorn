@@ -61,23 +61,17 @@ defmodule LocalLiveView.Server do
     end
   end
 
+  def handle_info(%Message{event: "event", payload: %{"event" => "llv_rerender"}} = msg, state) do
+    rerender(state.socket)
+    {:noreply, state}
+  end
+
   def handle_info(%Message{event: "event"} = msg, state) do
     raw_val = Map.get(msg.payload, "value", %{})
     event = Map.get(msg.payload, "event")
-    new_state = %{state | socket: maybe_update_uploads(state.socket, msg.payload)}
-
-    new_state.socket
+    state.socket
     |> view_handle_event(event, raw_val)
-    |> handle_result({:handle_event, 3, msg.ref}, new_state)
-  end
-
-  def handle_info(%Message{event: "rerender"}, %{socket: socket} = state) do
-    rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
-
-    rendered
-    |> Phoenix.HTML.Safe.to_iodata()
-    |> IO.iodata_to_binary()
-    |> LocalLiveView.Renderer.rerender(socket.view)
+    |> handle_result({:handle_event, 3, msg.ref}, state)
   end
 
   def handle_info(msg, %{socket: socket} = state) do
@@ -238,13 +232,7 @@ defmodule LocalLiveView.Server do
 
     {socket, diff, fingerprints, components} =
       if force? or changed? do
-        rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
-
-        rendered
-        |> Phoenix.HTML.Safe.to_iodata()
-        |> IO.iodata_to_binary()
-        |> LocalLiveView.Renderer.rerender(socket.view)
-
+        rendered = rerender(socket)
         {diff, fingerprints, components} =
           Diff.render(socket, rendered, state.fingerprints, state.components)
 
@@ -261,6 +249,17 @@ defmodule LocalLiveView.Server do
 
     {:diff, diff,
      %{state | socket: new_socket, fingerprints: fingerprints, components: components}}
+  end
+  
+  def rerender(socket) do
+    rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
+
+    rendered
+    |> Phoenix.HTML.Safe.to_iodata()
+    |> IO.iodata_to_binary()
+    |> LocalLiveView.Renderer.rerender(socket.view)
+    
+    rendered
   end
 
   defp reply(state, {ref, extra}, status, payload) do
@@ -425,6 +424,4 @@ defmodule LocalLiveView.Server do
   defp post_verified_mount(%{socket: socket} = state) do
     %{state | socket: Utils.post_mount_prune(socket)}
   end
-
-  defp maybe_update_uploads(%Socket{} = socket, %{} = _payload), do: socket
 end
