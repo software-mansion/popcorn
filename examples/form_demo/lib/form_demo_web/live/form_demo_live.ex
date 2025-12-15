@@ -30,6 +30,7 @@ defmodule FormDemoWeb.FormDemoLive do
   def handle_event("llv_local_message", %{"payload" => payload}, socket) do
     new_users = socket.assigns.users ++ [payload]
     Application.put_env(FormDemo, :users, new_users)
+    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:noreply, assign(socket, users: new_users)}
   end
 
