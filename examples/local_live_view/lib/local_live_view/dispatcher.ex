@@ -55,13 +55,6 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, %{state | views: views}}
   end
 
-  defp handle_wasm({:wasm_call, %{"type" => "rerender"}}, state) do
-    state.views
-    |> Enum.each(fn {_name, pid} -> send(pid, %Message{event: "rerender"}) end)
-
-    {:resolve, :ok, state}
-  end
-
   defp start_local_live_view(view) do
     params = %{
       "session" => %Session{view: view}

@@ -13,34 +13,49 @@ defmodule FormDemoWeb.FormDemoLive do
             <li>Username: {user["username"]}, Email: {user["email"]}</li>
           <% end %>
         </ul>
-        <div class="centered">
-          <button class="ghost-button" phx-click="synchronize">SYNCHRONIZE</button>
-        </div>
       </div>
     </div>
     """
   end
 
   def mount(_params, _session, socket) do
-    users = Application.get_env(FormDemo, :users, [])
-    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
-    {:ok, assign(socket, users: users)}
+    send(self(), :sync)
+    {:ok, assign(socket, users: [])}
   end
 
-  def handle_event("llv_local_message", %{"payload" => payload}, socket) do
-    new_users = socket.assigns.users ++ [payload]
+  def handle_event(
+        "llv_local_message",
+        %{"payload" => %{"type" => "new_user", "user" => user}},
+        socket
+      ) do
+    new_users = socket.assigns.users ++ [user]
     Application.put_env(FormDemo, :users, new_users)
     socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:noreply, assign(socket, users: new_users)}
   end
 
-  def handle_event("synchronize", _params, socket) do
+  def handle_event("llv_local_message", %{"payload" => %{"type" => "sync_request"}}, socket) do
     users = Application.get_env(FormDemo, :users, [])
-    payload = %{"users" => users}
+    payload = %{"type" => "synchronize", "users" => users}
 
     socket =
       push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
 
+    socket = assign(socket, users: users)
     {:noreply, socket}
+  end
+
+  def handle_info(:sync, socket) do
+    {:noreply, sync_local_users(socket)}
+  end
+
+  defp sync_local_users(socket) do
+    users = Application.get_env(FormDemo, :users, [])
+    payload = %{"type" => "synchronize", "users" => users}
+
+    socket =
+      push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
+
+    assign(socket, users: users)
   end
 end
