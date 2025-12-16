@@ -4,8 +4,10 @@ defmodule ThermostatLive do
   def render(assigns) do
     ~H"""
     <p>Current temperature: {@temperature}°C</p>
-    <button pop-click="inc_temperature" class="ghost-button">+</button>
-    <button pop-click="dec_temperature" class="ghost-button">-</button>
+    <div class="thermostat-controls">
+      <button pop-click="inc_temperature" class="ghost-button">+</button>
+      <button pop-click="dec_temperature" class="ghost-button">-</button>
+    </div>
     <p>Country: {@country}</p>
     """
   end

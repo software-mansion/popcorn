@@ -22,53 +22,90 @@ import Section from "../../components/Section.astro";
           new username or email isn't already present in the users list. The submit event adds a new user to the user list.
       </p>
     </header>
-    <style>
-         
-     </style>
-     <div class="bg-brown-100 relative w-1/2 rounded-lg border p-4" >
-         <div data-pop-view="FormDemoLocal" class="local_forms"></div>
-     </div>
+    <style></style>
+    <div
+      class="bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <div class="bg-brown-header px-6 py-3">
+        <h2
+          class="font-handjet text-light-20 text-center text-xl tracking-wide"
+        >
+          Add New User
+        </h2>
+      </div>
+      <div
+        data-pop-view="FormDemoLocal"
+        class="local_forms flex max-w-[412px] flex-col gap-4 p-8"
+      >
+      </div>
+    </div>
   </Section>
 </Layout>
 
 <style is:global>
-.local_forms .input {
-  border: 2px solid #E5E7EB;
-  border-radius: 5px;
-  width: 200px;
-  padding: 6px 10px;
-}
-.local_forms {
-  color: #E5E7EB;
-  align-items: center;
-  gap: 0.5rem;
-}
-.ghost-button {
-  background-color: transparent;
-  color: white;
-  border: 2px solid white;
-  padding: 12px 25px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-}
-.ghost-button:hover {
-  background-color: white;
-  color: #1a1a1a;
-  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
-}
-.ghost-button:disabled {
-  color: gray;
-  border: 2px solid gray;
-}
-.ghost-button:disabled:hover {
-  color: gray;
-  background-color: transparent;
-  box-shadow: none;
-  cursor: auto;
-}
+  .local_forms .input {
+    border: 2px solid #58330c;
+    border-radius: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: #fffdf5;
+    color: #301b05;
+    transition: all 0.2s ease;
+  }
+
+  .local_forms .input:focus {
+    outline: none;
+    border-color: #ef7c00;
+    box-shadow: 0 0 0 3px rgba(239, 124, 0, 0.1);
+  }
+
+  .local_forms .input::placeholder {
+    color: #696057;
+  }
+
+  .local_forms {
+    color: #301b05;
+  }
+
+  .local_forms form {
+    margin-bottom: 1rem;
+  }
+
+  .local_forms label {
+    font-weight: 600;
+    color: #58330c;
+    margin-bottom: 0.25rem;
+  }
+
+  .ghost-button {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .ghost-button:hover {
+    background: #ef7c00;
+    border-color: #ef7c00;
+    color: #fffdf5;
+  }
+
+  .ghost-button:disabled {
+    border-style: dashed;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ghost-button:disabled:hover {
+    background: transparent;
+    border-color: #58330c;
+    color: #58330c;
+  }
 </style>
 
 <script>

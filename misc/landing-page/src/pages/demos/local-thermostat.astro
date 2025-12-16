@@ -11,57 +11,76 @@ import Section from "../../components/Section.astro";
       >
         Local thermostat
       </h1>
-      <p class="mx-auto max-w-2xl">
-          The example below shows a page with two LocalLiveView components rendered next to each other.
-          ThermostatLive handles onclick events, which update the temperature.
-          ClockLive uses the popcorn runtime's internal timer to update the clock every 1 second.
+      <p class="mx-auto mt-4 max-w-2xl leading-6">
+        This example consists of two live view components powered by Popcorn. It
+        allows them to work fully locally, without any server for updates.
+      </p>
+      <p class="mt-3">
+        Temperature control demonstrates mouse events, the datetime control
+        demonstrates use of timers.
       </p>
     </header>
-    <style>
-         
-     </style>
-     <div class="bg-brown-100 relative w-1/2 rounded-lg border p-4" >
-         <div data-pop-view="ThermostatLive" class="text-light-20 items-center gap-2"></div>
-         <div data-pop-view="ClockLive" class="text-light-20 flex items-center gap-2"></div>
-     </div>
+    <div
+      class="bg-light-20 border-brown-header mx-auto mt-8 max-w-md overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <div
+        data-pop-view="ThermostatLive"
+        class="from-light-20 to-light-30 flex flex-col items-center gap-6 bg-gradient-to-br p-8"
+      >
+      </div>
+      <div
+        data-pop-view="ClockLive"
+        class="font-handjet text-light-20 bg-brown-header p-4 text-center text-2xl tracking-wide"
+      >
+      </div>
+    </div>
   </Section>
 </Layout>
 
 <style is:global>
-.local_thermostat {
-    font-size: 1.5em;
-    font-family: sans-serif;
-    max-width: 800px;
-    padding: 1em;
-    background-color: #161616;
-    color: #fcfcfc;
-}
-.ghost-button {
-  background-color: transparent;
-  color: white;
-  border: 2px solid white;
-  padding: 2px 5px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease-in-out;
-}
-.ghost-button:hover {
-  background-color: white;
-  color: #1a1a1a;
-  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
-}
-.ghost-button:disabled {
-  color: gray;
-  border: 2px solid gray;
-}
-.ghost-button:disabled:hover {
-  color: gray;
-  background-color: transparent;
-  box-shadow: none;
-  cursor: auto;
-}
+  .thermostat-controls {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .ghost-button {
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    border: 2px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ghost-button:hover {
+    background: #ef7c00;
+    border-color: #ef7c00;
+    color: #fffdf5;
+    transform: scale(1.1);
+  }
+
+  .ghost-button:active {
+    transform: scale(0.95);
+  }
+
+  .ghost-button:disabled {
+    color: gray;
+    border: 2px solid gray;
+  }
+  .ghost-button:disabled:hover {
+    color: gray;
+    background-color: transparent;
+    box-shadow: none;
+    cursor: auto;
+  }
 </style>
 
 <script>
