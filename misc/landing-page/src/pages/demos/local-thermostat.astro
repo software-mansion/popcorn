@@ -34,6 +34,49 @@ import Section from "../../components/Section.astro";
       >
       </div>
     </div>
+    <div
+            class="p-4 bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+    <pre>
+      <code is:raw>
+defmodule ThermostatLive do
+  use LocalLiveView
+
+  def render(assigns) do
+    ~H&quot;&quot;&quot;
+    &lt;p&gt;Current temperature: {@temperature}&deg;C&lt;/p&gt;
+    &lt;div class=&quot;thermostat-controls&quot;&gt;
+      &lt;button pop-click=&quot;inc_temperature&quot; class=&quot;ghost-button&quot;&gt;+&lt;/button&gt;
+      &lt;button pop-click=&quot;dec_temperature&quot; class=&quot;ghost-button&quot;&gt;-&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;p&gt;Country: {@country}&lt;/p&gt;
+    &quot;&quot;&quot;
+  end
+
+  def mount(_params, _session, socket) do
+    temperature = 25
+    country = &quot;Poland&quot;
+
+    socket =
+      socket
+      |&gt; assign(:temperature, temperature)
+      |&gt; assign(:country, country)
+
+    {:ok, socket}
+  end
+
+  def handle_event(&quot;inc_temperature&quot;, _params, socket) do
+    {:noreply, update(socket, :temperature, &amp;(&amp;1 + 1))}
+  end
+
+  def handle_event(&quot;dec_temperature&quot;, _params, socket) do
+    {:noreply, update(socket, :temperature, &amp;(&amp;1 - 1))}
+  end
+end
+
+      </code>
+    </pre>
+    </div>
   </Section>
 </Layout>
 

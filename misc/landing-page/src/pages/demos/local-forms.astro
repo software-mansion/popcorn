@@ -15,11 +15,9 @@ import Section from "../../components/Section.astro";
           The following example implements phoenix forms using LocalLiveView.
       </p>
       <p class="mx-auto max-w-2xl">
-          The form_demo is built as html page with a single form and a rendered list of users (usernames and emails).
-          List of users is stored in local live view process memory.
-          The form handles onchange and onsubmit LocalLiveView events.
-          The change event triggers validate function that looks through already saved users and makes sure that
-          new username or email isn't already present in the users list. The submit event adds a new user to the user list.
+        This example demonstrates uses of onchange and onsubmit form hooks. 
+        Live view component stores list of users which can be changed using form component. 
+        It validates that usernames are unique and emails are in correct format while typing in the form and on form submission.
       </p>
     </header>
     <style></style>
@@ -39,10 +37,122 @@ import Section from "../../components/Section.astro";
       >
       </div>
     </div>
+    <div
+            class="p-4 bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <pre>
+      <code is:raw>
+defmodule FormDemoLocal do
+  use LocalLiveView
+  import Local.CoreComponents
+
+  @impl true
+  def render(assigns) do
+    ~H&quot;&quot;&quot;
+    &lt;.form for={@form} id=&quot;my-form&quot; pop-change=&quot;validate&quot; pop-submit=&quot;save&quot; class=&quot;bordered&quot;&gt;
+      &lt;label&gt;USERNAME&lt;/label&gt;
+      &lt;.input type=&quot;text&quot; field={@form[:username]} /&gt;
+      &lt;label&gt;EMAIL&lt;/label&gt;
+      &lt;.input type=&quot;text&quot; field={@form[:email]} /&gt;
+      &lt;div class=&quot;centered&quot;&gt;
+        &lt;button class=&quot;ghost-button&quot; disabled={@disabled}&gt;SAVE&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/.form&gt;
+    &lt;%= for error &lt;- @errors do %&gt;
+      &lt;p style=&quot;color:red;&quot;&gt;{error}&lt;/p&gt;
+    &lt;% end %&gt;
+    &lt;div class=&quot;bordered&quot;&gt;
+      &lt;h1&gt;User List:&lt;/h1&gt;
+      &lt;ul&gt;
+        &lt;%= for user &lt;- @users do %&gt;
+          &lt;li&gt;Username: {user[&quot;username&quot;]}, Email: {user[&quot;email&quot;]}&lt;/li&gt;
+        &lt;% end %&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &quot;&quot;&quot;
+  end
+
+  @impl true
+  def mount(_params, _session, socket) do
+    users = [
+      %{&quot;email&quot; =&gt; &quot;user1@example.com&quot;, &quot;username&quot; =&gt; &quot;user1&quot;},
+      %{&quot;email&quot; =&gt; &quot;user2@example.com&quot;, &quot;username&quot; =&gt; &quot;user2&quot;},
+      %{&quot;email&quot; =&gt; &quot;user3@example.com&quot;, &quot;username&quot; =&gt; &quot;user3&quot;}
+    ]
+
+    user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+    {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
+  end
+
+  @impl true
+  def handle_event(&quot;validate&quot;, params, socket) do
+    errors = validate(params, socket.assigns.users)
+    {:noreply, assign(socket, form: to_form(params), errors: errors, disabled: errors != [])}
+  end
+
+  def handle_event(&quot;save&quot;, user_params, socket) do
+    users = socket.assigns.users
+
+    case validate(user_params, users) do
+      [] -&gt;
+        user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+
+        {:noreply,
+         assign(socket,
+           form: to_form(user),
+           users: users ++ [user_params],
+           errors: [],
+           disabled: true
+         )}
+
+      errors -&gt;
+        {:noreply, assign(socket, errors: errors, disabled: true)}
+    end
+  end
+
+  defp validate(user, existing_users) do
+    (validate_correctness(user) ++ validate_already_existing(user, existing_users))
+    |&gt; Enum.filter(fn error -&gt; error != &quot;&quot; end)
+  end
+
+  defp validate_already_existing(user, existing_users) do
+    user
+    |&gt; Enum.filter(fn {key, value} -&gt;
+      Enum.any?(existing_users, fn user -&gt; Map.get(user, key) == value end)
+    end)
+    |&gt; Enum.map(fn {key, _value} -&gt;
+      String.capitalize(&quot;#{key} already in use&quot;)
+    end)
+  end
+
+  defp validate_correctness(user) do
+    Enum.map(user, fn {key, value} -&gt; validate_correctness(key, value) end)
+  end
+
+  defp validate_correctness(&quot;username&quot;, value) do
+    cond do
+      String.length(value) &lt; 4 -&gt; &quot;Username length must be greater than 3 characters&quot;
+      true -&gt; &quot;&quot;
+    end
+  end
+
+  defp validate_correctness(&quot;email&quot;, value) do
+    with [name, server] &lt;- String.split(value, &quot;@&quot;),
+         true &lt;- String.length(name) &gt; 0 and String.contains?(server, &quot;.&quot;)
+      do
+        &quot;&quot;
+      else
+        _err -&gt; &quot;Email must have an email format&quot;
+    end
+  end
+end
+      </code>
+      </pre>
+    </div>
   </Section>
 </Layout>
 
-<style is:global>
+<style is:global class="language-elixir">
   .local_forms .input {
     border: 2px solid #58330c;
     border-radius: 0.5rem;
