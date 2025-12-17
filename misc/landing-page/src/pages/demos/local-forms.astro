@@ -1,0 +1,315 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
+---
+
+<Layout>
+  <Section background="light">
+    <header class="mb-4 text-center">
+      <h1
+        class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+      >
+        Local Forms
+      </h1>
+      <p class="mx-auto max-w-2xl">
+          The following example implements phoenix forms using LocalLiveView.
+      </p>
+      <p class="mx-auto max-w-2xl">
+        This example demonstrates uses of onchange and onsubmit form hooks. 
+        Live view component stores list of users which can be changed using form component. 
+        It validates that usernames are unique and emails are in correct format while typing in the form and on form submission.
+      </p>
+    </header>
+    <style></style>
+    <div
+      class="bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <div class="bg-brown-header px-6 py-3">
+        <h2
+          class="font-handjet text-light-20 text-center text-xl tracking-wide"
+        >
+          Add New User
+        </h2>
+      </div>
+      <div
+        data-pop-view="FormDemoLocal"
+        class="local_forms flex max-w-[412px] flex-col gap-4 p-8"
+      >
+      </div>
+    </div>
+    <div
+            class="p-4 bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <pre>
+      <code is:raw>
+defmodule FormDemoLocal do
+  use LocalLiveView
+  import Local.CoreComponents
+
+  @impl true
+  def render(assigns) do
+    ~H&quot;&quot;&quot;
+    &lt;.form for={@form} id=&quot;my-form&quot; pop-change=&quot;validate&quot; pop-submit=&quot;save&quot; class=&quot;bordered&quot;&gt;
+      &lt;label&gt;USERNAME&lt;/label&gt;
+      &lt;.input type=&quot;text&quot; field={@form[:username]} /&gt;
+      &lt;label&gt;EMAIL&lt;/label&gt;
+      &lt;.input type=&quot;text&quot; field={@form[:email]} /&gt;
+      &lt;div class=&quot;centered&quot;&gt;
+        &lt;button class=&quot;ghost-button&quot; disabled={@disabled}&gt;SAVE&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/.form&gt;
+    &lt;%= for error &lt;- @errors do %&gt;
+      &lt;p style=&quot;color:red;&quot;&gt;{error}&lt;/p&gt;
+    &lt;% end %&gt;
+    &lt;div class=&quot;bordered&quot;&gt;
+      &lt;h1&gt;User List:&lt;/h1&gt;
+      &lt;ul&gt;
+        &lt;%= for user &lt;- @users do %&gt;
+          &lt;li&gt;Username: {user[&quot;username&quot;]}, Email: {user[&quot;email&quot;]}&lt;/li&gt;
+        &lt;% end %&gt;
+      &lt;/ul&gt;
+    &lt;/div&gt;
+    &quot;&quot;&quot;
+  end
+
+  @impl true
+  def mount(_params, _session, socket) do
+    users = [
+      %{&quot;email&quot; =&gt; &quot;user1@example.com&quot;, &quot;username&quot; =&gt; &quot;user1&quot;},
+      %{&quot;email&quot; =&gt; &quot;user2@example.com&quot;, &quot;username&quot; =&gt; &quot;user2&quot;},
+      %{&quot;email&quot; =&gt; &quot;user3@example.com&quot;, &quot;username&quot; =&gt; &quot;user3&quot;}
+    ]
+
+    user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+    {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
+  end
+
+  @impl true
+  def handle_event(&quot;validate&quot;, params, socket) do
+    errors = validate(params, socket.assigns.users)
+    {:noreply, assign(socket, form: to_form(params), errors: errors, disabled: errors != [])}
+  end
+
+  def handle_event(&quot;save&quot;, user_params, socket) do
+    users = socket.assigns.users
+
+    case validate(user_params, users) do
+      [] -&gt;
+        user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+
+        {:noreply,
+         assign(socket,
+           form: to_form(user),
+           users: users ++ [user_params],
+           errors: [],
+           disabled: true
+         )}
+
+      errors -&gt;
+        {:noreply, assign(socket, errors: errors, disabled: true)}
+    end
+  end
+
+  defp validate(user, existing_users) do
+    (validate_correctness(user) ++ validate_already_existing(user, existing_users))
+    |&gt; Enum.filter(fn error -&gt; error != &quot;&quot; end)
+  end
+
+  defp validate_already_existing(user, existing_users) do
+    user
+    |&gt; Enum.filter(fn {key, value} -&gt;
+      Enum.any?(existing_users, fn user -&gt; Map.get(user, key) == value end)
+    end)
+    |&gt; Enum.map(fn {key, _value} -&gt;
+      String.capitalize(&quot;#{key} already in use&quot;)
+    end)
+  end
+
+  defp validate_correctness(user) do
+    Enum.map(user, fn {key, value} -&gt; validate_correctness(key, value) end)
+  end
+
+  defp validate_correctness(&quot;username&quot;, value) do
+    cond do
+      String.length(value) &lt; 4 -&gt; &quot;Username length must be greater than 3 characters&quot;
+      true -&gt; &quot;&quot;
+    end
+  end
+
+  defp validate_correctness(&quot;email&quot;, value) do
+    with [name, server] &lt;- String.split(value, &quot;@&quot;),
+         true &lt;- String.length(name) &gt; 0 and String.contains?(server, &quot;.&quot;)
+      do
+        &quot;&quot;
+      else
+        _err -&gt; &quot;Email must have an email format&quot;
+    end
+  end
+end
+      </code>
+      </pre>
+    </div>
+  </Section>
+</Layout>
+
+<style is:global class="language-elixir">
+  .local_forms .input {
+    border: 2px solid #58330c;
+    border-radius: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: #fffdf5;
+    color: #301b05;
+    transition: all 0.2s ease;
+  }
+
+  .local_forms .input:focus {
+    outline: none;
+    border-color: #ef7c00;
+    box-shadow: 0 0 0 3px rgba(239, 124, 0, 0.1);
+  }
+
+  .local_forms .input::placeholder {
+    color: #696057;
+  }
+
+  .local_forms {
+    color: #301b05;
+  }
+
+  .local_forms form {
+    margin-bottom: 1rem;
+  }
+
+  .local_forms label {
+    font-weight: 600;
+    color: #58330c;
+    margin-bottom: 0.25rem;
+  }
+
+  .ghost-button {
+    padding: 0.75rem 1.5rem;
+    border: 2px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .ghost-button:hover {
+    background: #ef7c00;
+    border-color: #ef7c00;
+    color: #fffdf5;
+  }
+
+  .ghost-button:disabled {
+    border-style: dashed;
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ghost-button:disabled:hover {
+    background: transparent;
+    border-color: #58330c;
+    color: #58330c;
+  }
+</style>
+
+<script>
+const events = [
+  {js_event: "click", pop_event: "pop-click"},
+  {js_event: "keydown", pop_event: "pop-keydown"},
+  {js_event: "submit", pop_event: "pop-submit"},
+  {js_event: "input", pop_event: "pop-change"}
+]
+  
+let focused_el = document.activeElement;
+  
+async function setup() {
+  const popcorn = await Popcorn.init({
+    debug: true,
+    bundlePath: "../wasm/local_forms.avm",
+    wasmDir: "/wasm/"
+  })
+  document.addEventListener("popRender", (event) => { afterRenderBind(event, popcorn) });
+  const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {
+    timeoutMs: 10_000,
+  });
+}
+    
+async function afterRenderBind(renderEvent, popcorn) {
+  const view = renderEvent.detail.view
+  const view_element = find_element(view)
+  if (view_element.dataset.popcornBound) return;
+  focused_el.focus()
+  events.forEach(({js_event: js_event, pop_event: pop_event}) => {
+    view_element.addEventListener(js_event, async (e) => {
+      const target_el = e.target.closest(`[${pop_event}]`);
+      console.log({event: e, target_el: target_el, pop_event: pop_event})
+      if (target_el && view_element.contains(target_el)) {
+        handlePopEvent(e, target_el, pop_event, popcorn, view);
+      }
+    });
+  })
+  view_element.dataset.popcornBound = "true";
+}
+
+async function handlePopEvent(e, target_el, pop_event, popcorn, view) {
+  focused_el = document.activeElement
+  const value = extractElementValue(e, target_el)
+  try {
+    const { data, durationMs } = await popcorn.call({ "view": view, "event": pop_event, 
+      "payload": {"event": target_el.getAttribute(pop_event), "value": value} }, {
+      timeoutMs: 10_000,
+    });
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+function extractElementValue(e, el) {
+  let value
+  if(el instanceof HTMLFormElement){
+    e.preventDefault();
+    const inputs = el.querySelectorAll('input');
+    const inputsArray = Array.from(inputs)
+    value = inputsArray.reduce((acc, input) => {
+      acc[input.name] = input.value;
+      return acc;
+    }, {});
+  } else if (el.hasAttribute(value))  {
+    value = el.value;
+  }
+  return value;
+};
+  
+// TODO this is a mock for heex templating inside index.html file
+function find_predefined_views() {
+  let elements = document.querySelectorAll('[data-pop-view]');
+  elements = Array.from(elements)
+  return elements.map(el => el.getAttribute("data-pop-view"))
+}
+
+function find_view(element) {
+  while(element) {
+    if(element.hasAttribute("data-pop-view")) {
+      return element.getAttribute("data-pop-view")
+    }
+    element = element.parentElement
+  }
+  return null
+}
+
+function find_element(view) {
+  let elements = document.querySelectorAll('[data-pop-view]');
+  elements = Array.from(elements)
+  const found = elements.find((element) => element.getAttribute("data-pop-view") == view);
+  return found
+}
+
+document.addEventListener("DOMContentLoaded", setup);
+document.addEventListener("astro:page-load", setup);
+</script>

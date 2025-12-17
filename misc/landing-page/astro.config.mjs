@@ -48,6 +48,16 @@ export default defineConfig({
       dir: "../../examples/eval_in_wasm",
       newBundleName: "eval.avm",
     }),
+    buildBundle({
+      wasmSrcPathDefault: "../../examples/local_thermostat/static/local_live_view/wasm",
+      dir: "../../examples/local_thermostat",
+      newBundleName: "local_thermostat.avm",
+    }),
+    buildBundle({
+      wasmSrcPathDefault: "../../examples/form_demo/priv/static/local_live_view/wasm",
+      dir: "../../examples/form_demo/local",
+      newBundleName: "local_forms.avm",
+    }),
     // take runtime from iex wasm
     buildWasm({ dir: "../../examples/iex_wasm/static/wasm" }),
   ],

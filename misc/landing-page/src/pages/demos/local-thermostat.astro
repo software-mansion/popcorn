@@ -1,0 +1,223 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Section from "../../components/Section.astro";
+---
+
+<Layout>
+  <Section background="light">
+    <header class="mb-4 text-center">
+      <h1
+        class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+      >
+        Local thermostat
+      </h1>
+      <p class="mx-auto mt-4 max-w-2xl leading-6">
+        This example consists of two live view components powered by Popcorn. It
+        allows them to work fully locally, without any server for updates.
+      </p>
+      <p class="mt-3">
+        Temperature control demonstrates mouse events, the datetime control
+        demonstrates use of timers.
+      </p>
+    </header>
+    <div
+      class="bg-light-20 border-brown-header mx-auto mt-8 max-w-md overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+      <div
+        data-pop-view="ThermostatLive"
+        class="from-light-20 to-light-30 flex flex-col items-center gap-6 bg-gradient-to-br p-8"
+      >
+      </div>
+      <div
+        data-pop-view="ClockLive"
+        class="font-handjet text-light-20 bg-brown-header p-4 text-center text-2xl tracking-wide"
+      >
+      </div>
+    </div>
+    <div
+            class="p-4 bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+    >
+    <pre>
+      <code is:raw>
+defmodule ThermostatLive do
+  use LocalLiveView
+
+  def render(assigns) do
+    ~H&quot;&quot;&quot;
+    &lt;p&gt;Current temperature: {@temperature}&deg;C&lt;/p&gt;
+    &lt;div class=&quot;thermostat-controls&quot;&gt;
+      &lt;button pop-click=&quot;inc_temperature&quot; class=&quot;ghost-button&quot;&gt;+&lt;/button&gt;
+      &lt;button pop-click=&quot;dec_temperature&quot; class=&quot;ghost-button&quot;&gt;-&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;p&gt;Country: {@country}&lt;/p&gt;
+    &quot;&quot;&quot;
+  end
+
+  def mount(_params, _session, socket) do
+    temperature = 25
+    country = &quot;Poland&quot;
+
+    socket =
+      socket
+      |&gt; assign(:temperature, temperature)
+      |&gt; assign(:country, country)
+
+    {:ok, socket}
+  end
+
+  def handle_event(&quot;inc_temperature&quot;, _params, socket) do
+    {:noreply, update(socket, :temperature, &amp;(&amp;1 + 1))}
+  end
+
+  def handle_event(&quot;dec_temperature&quot;, _params, socket) do
+    {:noreply, update(socket, :temperature, &amp;(&amp;1 - 1))}
+  end
+end
+
+      </code>
+    </pre>
+    </div>
+  </Section>
+</Layout>
+
+<style is:global>
+  .thermostat-controls {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .ghost-button {
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    border: 2px solid #58330c;
+    background: transparent;
+    color: #58330c;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ghost-button:hover {
+    background: #ef7c00;
+    border-color: #ef7c00;
+    color: #fffdf5;
+    transform: scale(1.1);
+  }
+
+  .ghost-button:active {
+    transform: scale(0.95);
+  }
+
+  .ghost-button:disabled {
+    color: gray;
+    border: 2px solid gray;
+  }
+  .ghost-button:disabled:hover {
+    color: gray;
+    background-color: transparent;
+    box-shadow: none;
+    cursor: auto;
+  }
+</style>
+
+<script>
+const events = [
+  {js_event: "click", pop_event: "pop-click"},
+  {js_event: "keydown", pop_event: "pop-keydown"},
+  {js_event: "submit", pop_event: "pop-submit"},
+  {js_event: "input", pop_event: "pop-change"}
+]
+  
+let focused_el = document.activeElement;
+
+async function setup() {
+  const popcorn = await Popcorn.init({
+    debug: true,
+    bundlePath: "../wasm/local_thermostat.avm",
+    wasmDir: "/wasm/"
+  })
+  document.addEventListener("popRender", (event) => { afterRenderBind(event, popcorn) });
+  const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {
+    timeoutMs: 10_000,
+  });
+}
+    
+async function afterRenderBind(renderEvent, popcorn) {
+  const view = renderEvent.detail.view
+  const view_element = find_element(view)
+  if (view_element.dataset.popcornBound) return;
+  focused_el.focus()
+  events.forEach(({js_event: js_event, pop_event: pop_event}) => {
+    view_element.addEventListener(js_event, async (e) => {
+      const target_el = e.target.closest(`[${pop_event}]`);
+      console.log({event: e, target_el: target_el, pop_event: pop_event})
+      if (target_el && view_element.contains(target_el)) {
+        handlePopEvent(e, target_el, pop_event, popcorn, view);
+      }
+    });
+  })
+  view_element.dataset.popcornBound = "true";
+}
+
+async function handlePopEvent(e, target_el, pop_event, popcorn, view) {
+  focused_el = document.activeElement
+  const value = extractElementValue(e, target_el)
+  try {
+    const { data, durationMs } = await popcorn.call({ "view": view, "event": pop_event, 
+      "payload": {"event": target_el.getAttribute(pop_event), "value": value} }, {
+      timeoutMs: 10_000,
+    });
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+function extractElementValue(e, el) {
+  let value
+  if(el instanceof HTMLFormElement){
+    e.preventDefault();
+    const inputs = el.querySelectorAll('input');
+    const inputsArray = Array.from(inputs)
+    value = inputsArray.reduce((acc, input) => {
+      acc[input.name] = input.value;
+      return acc;
+    }, {});
+  } else if (el.hasAttribute(value))  {
+    value = el.value;
+  }
+  return value;
+};
+  
+// TODO this is a mock for heex templating inside index.html file
+function find_predefined_views() {
+  let elements = document.querySelectorAll('[data-pop-view]');
+  elements = Array.from(elements)
+  return elements.map(el => el.getAttribute("data-pop-view"))
+}
+
+function find_view(element) {
+  while(element) {
+    if(element.hasAttribute("data-pop-view")) {
+      return element.getAttribute("data-pop-view")
+    }
+    element = element.parentElement
+  }
+  return null
+}
+
+function find_element(view) {
+  let elements = document.querySelectorAll('[data-pop-view]');
+  elements = Array.from(elements)
+  const found = elements.find((element) => element.getAttribute("data-pop-view") == view);
+  return found
+}
+
+document.addEventListener("DOMContentLoaded", setup);
+document.addEventListener("astro:page-load", setup);
+</script>

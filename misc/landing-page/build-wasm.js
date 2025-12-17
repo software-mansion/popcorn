@@ -3,13 +3,13 @@ import { cp, rm, mkdir, appendFile, readdir } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-export function buildBundle({ dir, newBundleName }) {
+export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
   return {
     name: "build-bundle",
     hooks: {
       "astro:config:setup": async ({ logger, config }) => {
         logger.info(`Building bundle in '${dir}'...`);
-        const wasmSrcPath = join(dir, "static", "wasm");
+        const wasmSrcPath = wasmSrcPathDefault || join(dir, "static", "wasm");
         const wasmDestPath = wasmDir(config);
 
         await run("mix", ["deps.get"], { dir });

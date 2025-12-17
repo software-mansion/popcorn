@@ -6,6 +6,8 @@ import HeaderTitle from "./HeaderTitle.astro";
 
 import gameOfLife from "../assets/gol.png";
 import evalExample from "../assets/eval.png";
+import localForms from "../assets/local_forms.png";
+import localThermostat from "../assets/local_thermostat.png";
 ---
 
 <Section id="examples" background="dark">
@@ -45,6 +47,27 @@ import evalExample from "../assets/eval.png";
       <Fragment slot="description">
         Here's John Conway's famous cellular automaton. The only difference is
         that this time, every cell is a process – brought to life with Popcorn.
+      </Fragment>
+    </ExampleCard>
+    <ExampleCard
+      n="03"
+      title="Local Thermostat"
+      href="/demos/local-thermostat"
+      image={localThermostat}
+    >
+      <Fragment slot="description">
+        An example showing how Popcorn integrates with Phoenix LiveView.
+        It allows using live components fully in frontend code, without need for separate server storing components' state.
+      </Fragment>
+    </ExampleCard>
+    <ExampleCard
+       n="04"
+       title="Local Forms"
+       href="/demos/local-forms"
+       image={localForms}
+    >
+      <Fragment slot="description">
+        Another example for Popcorn and Phoenix integration. Showcases use of forms.
       </Fragment>
     </ExampleCard>
   </div>
