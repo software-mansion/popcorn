@@ -9,7 +9,8 @@ defmodule Local.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: Mix.compilers(),
-      aliases: aliases()
+      aliases: aliases(),
+      preferred_cli_env: [lintformat: :fmt]
     ]
   end
 
@@ -26,15 +27,15 @@ defmodule Local.MixProject do
     [
       {:gettext, "~> 0.26"},
       {:local_live_view, path: "../../local_live_view"},
-      {:phoenix, "~> 1.8.0", runtime: false},
-      {:phoenix_live_view, "~> 1.1.0", runtime: false}
+      {:phoenix, "~> 1.8.0", only: [:fmt], runtime: false},
+      {:phoenix_live_view, "~> 1.1.0", only: [:fmt], runtime: false}
     ]
   end
 
   defp aliases do
     [
+      lintformat: "format --check-formatted",
       lint: [
-        "format --check-formatted",
         "deps.unlock --check-unused",
         "deps.compile",
         "compile --force --warnings-as-errors"

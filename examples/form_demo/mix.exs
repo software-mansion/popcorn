@@ -106,6 +106,7 @@ defmodule FormDemo.MixProject do
   defp local_lint(_) do
     Mix.shell().cmd(
       """
+      mix lintformat
       mix lint
       """,
       cd: "local"
