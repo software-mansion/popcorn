@@ -1,12 +1,24 @@
 # Local Live View Form Demo
 
+## Description
+
 The demo project implementing phoenix forms using LocalLiveView.
 
-The demo form is built as an html page with a single form and a rendered list of users (usernames and emails). 
-List of users is stored in local live view process memory.
+The demo form is built as an html page with a single form and a two rendered list of users (usernames and emails). 
+
+One list is stored in the local LiveView assigns, while the other is stored in the Phoenix LiveView assigns. These will be referred to as the local list and the server list, respectively.
+
 The form handles onchange and onsubmit LocalLiveView events.
 The change event triggers validate function that looks through already saved users and makes sure that
 new username or email isn't already present in the users list. The submit event adds a new user to the user list.
+
+On mount both local and phoenix liveViews synchronizes their states (list of users).
+
+On submit new user is added to the local list and also sent to server list.
+
+**Since both lists are stored in the runtime, the demo illustrates the persistent nature of a local-first approach. You can shut down the server to see the server list synchronize from its local counterpart upon restart. Conversely, refreshing the page will empty the local list, which then synchronizes from the server.**
+
+## Technical Overview
 
 The local part of the project is located in the `local` directory.
 
@@ -21,6 +33,8 @@ _The local_live_view project needs few things to run properly:_
 * `local_live_view` directory added to `static_paths` function in `form_demo/lib/form_demo_web.ex`
 * proper `out_dir` property in `form_demo/local/config/config.exs`
 * `/priv/static/local_live_view/` line added to `form_demo/.gitignore` file
+
+## Up and running
 
 To start your server:
 
