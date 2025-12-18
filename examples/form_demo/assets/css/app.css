@@ -105,6 +105,15 @@
   border: 1px solid white;
   padding: 20px;
 }
+.description {
+  font-style: italic;
+  font-size: 15px;
+}
+.title {
+  padding: 30px 25px;
+  font-size: 30px;
+  font-weight: bold;
+}
 .ghost-button {
   background-color: transparent; 
   color: white; 

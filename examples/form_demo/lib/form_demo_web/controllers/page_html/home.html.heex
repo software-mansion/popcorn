@@ -1,5 +1,8 @@
 <div class="page">
-  <div class="centered-div">
-    <div data-pop-view="FormDemoLocal"></div>
+  <p class="title centered">LocalLiveView & Phoenix Integration: Forms Demo</p>
+  <div class="centered-div description">
+    <p>Explore seamless form handling and LocalLiveView integration.</p>
+    <p>Try shutting down the server, adding new users, and restarting it to see the synchronization in action!</p>
   </div>
+  {live_render(@conn, FormDemoWeb.FormDemoLive, session: %{})}
 </div>

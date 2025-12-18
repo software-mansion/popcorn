@@ -5,20 +5,25 @@ defmodule FormDemoLocal do
   @impl true
   def render(assigns) do
     ~H"""
-    <.form for={@form} id="my-form" pop-change="validate" pop-submit="save" class="bordered">
-      <label>USERNAME</label>
-      <.input type="text" field={@form[:username]} />
-      <label>EMAIL</label>
-      <.input type="text" field={@form[:email]} />
+    <div class="bordered">
+      <.form for={@form} id="my-form" pop-change="validate" pop-submit="save">
+        <label>USERNAME</label>
+        <.input type="text" field={@form[:username]} />
+        <label>EMAIL</label>
+        <.input type="text" field={@form[:email]} />
+        <div class="centered">
+          <button class="ghost-button" disabled={@disabled}>SAVE</button>
+        </div>
+      </.form>
       <div class="centered">
-        <button class="ghost-button" disabled={@disabled}>SAVE</button>
+        <button class="ghost-button" pop-click="generate_random">GENERATE RANDOM</button>
       </div>
-    </.form>
+    </div>
     <%= for error <- @errors do %>
       <p style="color:red;">{error}</p>
     <% end %>
     <div class="bordered">
-      <h1>User List:</h1>
+      <h1>[Local Runtime] User List:</h1>
       <ul>
         <%= for user <- @users do %>
           <li>Username: {user["username"]}, Email: {user["email"]}</li>
@@ -30,14 +35,9 @@ defmodule FormDemoLocal do
 
   @impl true
   def mount(_params, _session, socket) do
-    users = [
-      %{"email" => "user1@example.com", "username" => "user1"},
-      %{"email" => "user2@example.com", "username" => "user2"},
-      %{"email" => "user3@example.com", "username" => "user3"}
-    ]
-
+    send(self(), :sync)
     user = %{"email" => "", "username" => ""}
-    {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
+    {:ok, assign(socket, users: [], form: to_form(user), errors: [], disabled: true)}
   end
 
   @impl true
@@ -51,11 +51,12 @@ defmodule FormDemoLocal do
 
     case validate(user_params, users) do
       [] ->
-        user = %{"email" => "", "username" => ""}
+        blank_user = %{"email" => "", "username" => ""}
+        send_to_phoenix(%{"type" => "new_user", "user" => user_params})
 
         {:noreply,
          assign(socket,
-           form: to_form(user),
+           form: to_form(blank_user),
            users: users ++ [user_params],
            errors: [],
            disabled: true
@@ -64,6 +65,37 @@ defmodule FormDemoLocal do
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}
     end
+  end
+
+  def handle_event(
+        "llv_server_message",
+        %{"type" => "synchronize", "users" => server_users},
+        socket
+      ) do
+    filtered_users =
+      Enum.filter(socket.assigns.users, fn user ->
+        case validate_already_existing(user, server_users) do
+          [] ->
+            send_to_phoenix(%{"type" => "new_user", "user" => user})
+            true
+
+          _ ->
+            false
+        end
+      end)
+
+    {:noreply, assign(socket, users: server_users ++ filtered_users)}
+  end
+
+  def handle_event("generate_random", _params, socket) do
+    users = socket.assigns.users
+    user = generate_random_user(users)
+    handle_event("save", user, socket)
+  end
+
+  def handle_info(:sync, socket) do
+    send_to_phoenix(%{"type" => "sync_request"})
+    {:noreply, socket}
   end
 
   defp validate(user, existing_users) do
@@ -94,11 +126,25 @@ defmodule FormDemoLocal do
 
   defp validate_correctness("email", value) do
     with [name, server] <- String.split(value, "@"),
-         true <- String.length(name) > 0 and String.contains?(server, ".")
-      do
-        ""
-      else
-        _err -> "Email must have an email format"
+         true <- String.length(name) > 0 and String.contains?(server, ".") do
+      ""
+    else
+      _err -> "Email must have an email format"
     end
+  end
+
+  defp generate_random_user(existing_users) do
+    number = to_string(Enum.random(1..999))
+    user = %{"email" => "user#{number}@example.com", "username" => "user#{number}"}
+    result = validate_already_existing(user, existing_users)
+
+    case result do
+      [] -> user
+      _ -> generate_random_user(existing_users)
+    end
+  end
+
+  defp send_to_phoenix(message) do
+    LocalLiveView.ServerSocket.send(message, __MODULE__)
   end
 end
