@@ -9,7 +9,7 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "examples/form_demo/**"
+      - "examples/local_form_demo/**"
       - ".github/workflows/local_live_view_form_demo_build.yml"
 
 permissions:
