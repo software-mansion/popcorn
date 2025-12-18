@@ -19,20 +19,6 @@ async function setup() {
   const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {
     timeoutMs: 10_000,
   });
-  
-  window.addEventListener("phx:llv_server_message", async (e) => {
-    const { data, durationMs } = await popcorn.call({ "view": e.detail.view, "event": "llv_server_message", 
-        "payload": { "event": "llv_server_message", "value": e.detail.payload } }, {
-        timeoutMs: 10_000,
-      });
-  });
-  
-  window.addEventListener("phx:llv_rerender", async (e) => {
-    const { data, durationMs } = await popcorn.call({ "view": e.detail.view, "event": "llv_rerender", 
-        "payload": { "event": "llv_rerender" } }, {
-        timeoutMs: 10_000,
-    });
-  });
 }
 
 async function afterRenderBind(renderEvent, popcorn) {
@@ -49,6 +35,18 @@ async function afterRenderBind(renderEvent, popcorn) {
       }
     });
   })
+  window.addEventListener("phx:llv_server_message", async (e) => {
+    const { data, durationMs } = await popcorn.call({ "view": e.detail.view, "event": "llv_server_message", 
+      "payload": { "event": "llv_server_message", "value": e.detail.payload } }, {
+      timeoutMs: 10_000,
+    });
+  });
+  window.addEventListener("phx:llv_rerender", async (e) => {
+    const { data, durationMs } = await popcorn.call({ "view": e.detail.view, "event": "llv_rerender", 
+      "payload": { "event": "llv_rerender" } }, {
+      timeoutMs: 10_000,
+    });
+  });
   view_element.dataset.popcornBound = "true";
 }
 
