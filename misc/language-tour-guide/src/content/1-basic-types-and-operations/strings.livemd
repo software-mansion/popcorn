@@ -41,9 +41,8 @@ is_binary("cześć")
 
 In UTF-8, 'ś' and 'ć' take two bytes each.
 
-> 💡 Try changing `byte_size` to `String.length`.
-
 ```elixir
+# 💡 Try changing `byte_size` to `String.length`.
 byte_size("cześć")
 ```
 

@@ -6,9 +6,8 @@ Elixir uses square brackets to specify a list of values. Values can be of any ty
 
 A list of various elements:
 
-> 💡 Try nesting another list within the list.
-
 ```elixir
+# 💡 Try nesting another list within the list.
 [1, true, 3, "hello"]
 ```
 
@@ -24,9 +23,8 @@ Throughout the tutorial, we will talk a lot about the head and tail of a list. T
 
 Head of the list:
 
-> 💡 Try changing the list to an empty list.
-
 ```elixir
+# 💡 Try changing the list to an empty list.
 hd([1, 2, 3])
 ```
 
@@ -42,9 +40,8 @@ Lists are stored in memory as linked lists, meaning that each element in a list 
 
 Prepending an element:
 
-> 💡 Try expressing it using the `++` operator.
-
 ```elixir
+# 💡 Try expressing it using the `++` operator.
 list = [1, 2, 3]
 [0 | list]
 ```
@@ -69,9 +66,8 @@ Concatenating lists
 list ++ [4, 5, 6]
 ```
 
-> 💡 Let's check `list` after concatenating. Did it change?
-
 ```elixir
+# 💡 Let's check `list` after concatenating. Did it change?
 list
 ```
 
@@ -89,9 +85,8 @@ When Elixir sees a list of printable ASCII numbers, it will print that as a char
 
 Charlist with control characters:
 
-> 💡 Try appending `0` to the list.
-
 ```elixir
+# 💡 Try appending `0` to the list.
 [11, 12, 13]
 ```
 

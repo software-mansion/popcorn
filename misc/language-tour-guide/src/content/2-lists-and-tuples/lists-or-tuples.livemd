@@ -8,9 +8,8 @@ A common pattern is to use 'tagged tuples', which consist of an atom and a value
 
 `String.split` returns a list:
 
-> 💡 Try adding another word to `"hello world"`
-
 ```elixir
+# 💡 Try adding another word to `"hello world"`
 String.split("hello world", " ")
 ```
 
@@ -22,9 +21,8 @@ String.split_at("hello world", 3)
 
 `Base.decode16` returns a tagged tuple:
 
-> 💡 Try changing the input so it contains an invalid character, such as 'z'
-
 ```elixir
+# 💡 Try changing the input so it contains an invalid character, such as 'z'
 Base.decode16("666F6F626172")
 ```
 
@@ -33,8 +31,7 @@ In Elixir, it's a convention to define two versions of functions that can fail:
 - One that returns a tagged tuple (`:ok` or `:error`) - useful when you want to handle errors gracefully
 - Another with a trailing `!` that raises an error - useful when failures are unexpected
 
-> 💡 Try `Base.decode16!` with invalid input (for example, containing 'z') to see the error.
-
 ```elixir
+# 💡 Try `Base.decode16!` with invalid input (for example, containing 'z') to see the error.
 Base.decode16!("666F6F626172")
 ```

@@ -28,9 +28,8 @@ true and true
 
 Short-circuit `and`.
 
-> 💡 Try changing `true` to `IO.inspect(true)` to see if it gets evaluated.
-
 ```elixir
+# 💡 Try changing `true` to `IO.inspect(true)` to see if it gets evaluated.
 false and true
 ```
 
@@ -74,9 +73,8 @@ true && 17
 
 `||` returns the first truthy value:
 
-> 💡 Try changing `1` to `IO.inspect("foo")`. Is "foo" printed out?
-
 ```elixir
+# 💡 Try changing `1` to `IO.inspect("foo")`. Is "foo" printed out?
 1 || true
 ```
 
@@ -88,8 +86,7 @@ false || 11
 
 The `!` operator:
 
-> 💡 Try `!1` and `!nil`.
-
 ```elixir
+# 💡 Try `!1` and `!nil`.
 !true
 ```
