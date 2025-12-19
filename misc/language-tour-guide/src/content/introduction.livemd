@@ -35,6 +35,9 @@ Try running this simple arithmetic:
 The editors share their scope, meaning variables defined in one editor are available in the next:
 
 ```elixir
+# A line that starts with # is a comment
+# We'll use comments for short explanations and small exercises
+# The exercises are additionally marked with 💡
 message = "Hello, Elixir!"
 ```
 
