@@ -1,0 +1,122 @@
+# Maps
+
+Apart from keyword lists, Elixir allows storing key-value pairs in maps. A map is created using the `%{}` syntax.
+
+Compared to keyword lists, maps:
+
+- allow any value as a key
+- don't allow duplicate keys
+- aren't ordered - you shouldn't rely on their internal ordering
+- are faster to operate on, especially with big number of keys
+
+An empty map:
+
+```elixir
+%{}
+```
+
+Map with keys and values of different types:
+
+```elixir
+%{1 => "a", :b => 10}
+```
+
+In maps, order doesn't matter:
+
+```elixir
+%{1 => "a", :b => 10} == %{:b => 10, 1 => "a"}
+```
+
+Now let's explore the operations available for working with maps.
+
+## Map module operations
+
+The [`Map`](https://hexdocs.pm/elixir/Map.html) module provides a very similar API to the `Keyword` module with convenience functions to add, remove, and update maps keys:
+
+Getting a value from a map:
+
+```elixir
+map = %{:a => 1, 2 => :b}
+
+# 💡 Try changing Map.get to Map.delete
+Map.get(map, :a)
+```
+
+Using bracket syntax:
+
+```elixir
+# 💡 Try changing :a to :x
+map[:a]
+```
+
+Adding a new key-value pair:
+
+```elixir
+# 💡 Try changing "c" to 2, which is already in the map. What happens?
+Map.put(%{:a => 1, 2 => :b}, "c", 3)
+```
+
+Converting a map to a list of tuples:
+
+```elixir
+# 💡 Let's change the map, so that Map.to_list returns a keyword list
+Map.to_list(%{:a => 1, 2 => :b})
+```
+
+Maps are often used with a predefined set of keys, which enables special syntax.
+
+## Maps with predefined keys
+
+In the previous section, we have used maps as a key-value data structure where keys can be added or removed at any time.
+
+However, it is also common to create maps with a predefined set of keys. Their values may be updated, but new keys are never added nor removed.
+
+This is useful when we know the shape of the data we are working with and, if we get a different key, it likely means a mistake was done elsewhere.
+
+In such cases, the keys are most often atoms. Thus, there's a syntax sugar for that: `%{key1: value1, key2: value2}`.
+
+A map representing a user:
+
+```elixir
+%{:name => "John", :age => 23}
+```
+
+The same user using syntax sugar:
+
+```elixir
+%{name: "John", age: 23}
+```
+
+When working with maps that have predefined atom keys, Elixir provides convenient dot notation.
+
+## Dot notation for atom keys
+
+When key is an atom, there's dedicated syntax for accessing the map: `map.key` and updating it: `%{map | key: value}`.
+
+When a map has predefined, atom keys, it's best to use this syntax over `Map` module, because it raises when the key is not already there. Thus, if you accidentally use a wrong key, you get feedback early on, sometimes even in the compile time.
+
+This is also the syntax used to power another Elixir feature called "Structs", which we will learn later on.
+
+Accessing a field (what happens if you try to get `user.surname`?):
+
+```elixir
+user = %{name: "John", age: 23}
+
+# 💡 What happens if you try to get user's surname, which is not there?
+user.name
+```
+
+Updating a field:
+
+```elixir
+# 💡 Try replacing age with a non-existent key
+%{user | age: 24}
+```
+
+## Summary
+
+In this chapter we learned about keyword lists and maps. To sum up:
+
+- Use keyword lists for passing optional values to functions
+- Use maps for general key-value data structures
+- Use maps when working with data that has a predefined set of keys

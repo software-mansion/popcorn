@@ -97,5 +97,18 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("2-lists-and-tuples/lists-or-tuples")
       }
     ]
+  },
+  {
+    group: "Keyword lists and maps",
+    items: [
+      {
+        name: "Keyword lists",
+        component: lazyLoadLiveMd("3-keyword-lists-and-maps/keyword_lists")
+      },
+      {
+        name: "Maps",
+        component: lazyLoadLiveMd("3-keyword-lists-and-maps/maps")
+      }
+    ]
   }
 ];
