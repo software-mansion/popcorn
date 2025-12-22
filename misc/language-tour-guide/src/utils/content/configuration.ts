@@ -110,5 +110,9 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("3-keyword-lists-and-maps/maps")
       }
     ]
+  },
+  {
+    name: "Pattern matching",
+    component: lazyLoadLiveMd("4-pattern-matching/pattern_matching")
   }
 ];
