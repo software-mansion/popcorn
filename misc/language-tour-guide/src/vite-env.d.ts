@@ -9,10 +9,9 @@
 declare const __CONTENT_HASH__: string;
 
 declare module "*.livemd" {
-  import type { ComponentType } from "react";
-  import type { CodeSnippet } from "./plugins/livemd/parser";
+  import type { LiveMdModule } from "./plugins/livemd/parser";
 
-  export const codeSnippets: CodeSnippet[];
-  const Component: ComponentType;
+  export const codeSnippets: LiveMdModule["codeSnippets"];
+  const Component: LiveMdModule["default"];
   export default Component;
 }
