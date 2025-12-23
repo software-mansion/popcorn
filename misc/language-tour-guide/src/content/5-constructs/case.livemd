@@ -1,0 +1,85 @@
+# Case
+
+In this chapter, we will learn about the `case`, `if`, and `cond` control flow structures. Let's start with `case`.
+
+`case` allows you to compare a value against many patterns until there is a matching one. You can use `_` as the last, catch-all pattern, that would match any value. Without it, if no pattern matches, an error is raised.
+
+Pattern matching with tuples:
+
+```elixir
+# 💡 Try changing {1, 2, 3} to other values and see what matches!
+case {1, 2, 3} do
+  {4, 5, 6} ->
+    "This clause won't match"
+  {1, x, 3} ->
+    "This clause will match and bind x to #{x} in this clause"
+  _ ->
+    "This clause would match any value"
+end
+```
+
+What happens without a catch-all clause:
+
+```elixir
+# 💡 Let's change :ok to :error. What happens?
+case :ok do
+  :ok -> "ok!"
+end
+```
+
+Now that you understand the basics of `case`, let's explore how to add additional conditions using guards.
+
+## Guards
+
+Case also allows extra conditions to be specified via guards.
+
+Guards are expressions that can be added to a pattern using the `when` keyword. In the example code, the first clause will only match when `x` is positive.
+
+Not any code can be put as a guard - you can perform arithmetic expressions, comparisons, type checking (`is_integer`, `is_atom` etc) and call several other functions. They are all listed in the documentation for the [Kernel](https://hexdocs.pm/elixir/Kernel.html) module, in the `Guards` section of sidebar. You can also consult the complete [Patterns and Guards reference](https://hexdocs.pm/elixir/patterns-and-guards.html#guards) for in-depth documentation.
+
+Using guards with case:
+
+```elixir
+# 💡 Try changing {1, 2, 3} to {1, -2, 3}
+case {1, 2, 3} do
+  {1, x, 3} when x > 0 ->
+    "Will match"
+
+  _ ->
+    "Would match, if guard condition were not satisfied"
+end
+```
+
+Building on guards, let's see how the pin operator can be used in case statements.
+
+## Pin operator
+
+Like in all patterns, we can use the pin `^` operator in `case`.
+
+Using pin operator in case:
+
+```elixir
+x = 1
+
+# 💡 Try changing 10 to 1
+case 10 do
+  ^x -> "Matched the value of x"
+  _ -> "Not matched the value of x"
+end
+```
+
+One important aspect of guards is how they handle errors.
+
+## Errors in guards
+
+Errors in guards do not leak but simply make the guard fail. It makes the code simpler, as some checks can be skipped - in the example, we don't have to check if `x` is a number. However, you won't be notified about a guard failure - it just won't match.
+
+Guard errors don't raise (try calling `"a" + 1` outside of the guard):
+
+```elixir
+# 💡 Try calling "a" + 1 outside of the guard
+case "a" do
+  x when x + 1 == 3 -> "Won't match"
+  x -> "Got #{x}"
+end
+```

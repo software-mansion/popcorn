@@ -56,7 +56,7 @@ export const BlockQuote = ({
   ...props
 }: ComponentProps<"blockquote">) => (
   <blockquote
-    className="text-brown-80 mb-4 flex gap-2 rounded-r-md border-l-4 border-yellow-600 bg-yellow-50 px-3 py-1 text-sm *:mb-0"
+    className="text-brown-80 mb-4 flex flex-col gap-1.5 rounded-r-md border-l-4 border-yellow-600 bg-yellow-50 px-3 py-1 text-sm *:mb-0"
     {...props}
   >
     {children}

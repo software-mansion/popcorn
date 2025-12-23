@@ -114,5 +114,18 @@ export const navigationConfig: NavigationConfig = [
   {
     name: "Pattern matching",
     component: lazyLoadLiveMd("4-pattern-matching/pattern_matching")
+  },
+  {
+    group: "Constructs",
+    items: [
+      {
+        name: "case",
+        component: lazyLoadLiveMd("5-constructs/case")
+      },
+      {
+        name: "if",
+        component: lazyLoadLiveMd("5-constructs/if_and_cond")
+      }
+    ]
   }
 ];
