@@ -1,0 +1,106 @@
+# Numbers and arithmetic
+
+As you can see, numbers in Elixir are either integers or floats. You can use `is_integer` and `is_float` to check what a value is.
+
+Elixir allows expressing numbers in decimal, binary, octal, hexadecimal and exponential notation.
+
+Normally, integers can be arbitrarily big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
+
+Check if a value is an integer:
+
+```elixir
+# 💡 Try changing to `is_float`.
+is_integer(123)
+```
+
+Check if a value is a float:
+
+```elixir
+# 💡 Try changing to `is_number`.
+is_float(4.5)
+```
+
+Decimal notation:
+
+```elixir
+123
+```
+
+Binary notation:
+
+```elixir
+0b1010
+```
+
+Octal notation:
+
+```elixir
+0o777
+```
+
+Hexadecimal notation:
+
+```elixir
+0x1F
+```
+
+Float in decimal notation:
+
+```elixir
+1.0
+```
+
+Exponential notation:
+
+```elixir
+1.0e-10
+```
+
+Now that we understand number types, let's explore arithmetic operations.
+
+## Basic Arithmetic
+
+Let's explore basic arithmetic operations. Notice, that `10 / 2` returned `5.0`. Division in Elixir always returns a float. For integer division, use `div`. For float to integer conversion, you can use `round` or `trunc`.
+
+Addition:
+
+```elixir
+1 + 2
+```
+
+Multiplication:
+
+```elixir
+5 * 6
+```
+
+Division always returns a float:
+
+```elixir
+10 / 2
+```
+
+Integer division:
+
+```elixir
+div(10, 2)
+```
+
+Remainder of integer division:
+
+```elixir
+rem(10, 3)
+```
+
+Rounding a float:
+
+```elixir
+round(3.58)
+```
+
+Truncating a float:
+
+```elixir
+# 💡 Try changing to `ceil`. How does the result change?
+trunc(3.58)
+```

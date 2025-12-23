@@ -1,5 +1,3 @@
-export const frontmatter = { order: 1 };
-
 # Welcome to the Elixir Language Tour 🚀
 
 This guide is your first step into the world of Elixir, a modern,
@@ -26,32 +24,40 @@ if your experiments go a bit too far.
 
 ## Hello, Elixir!
 
-As with every language, the first example is printing something. This is something you will often see in this guide:
-`IO.puts` prints a string, while `IO.inspect` prints a representation of any value (in Elixir called "term") and returns it.
-Click "Run code" to see them in action!
+This tour will walk you through Elixir's core concepts with interactive examples.
+Each code editor automatically displays the result of the last expression.
+Try running this simple arithmetic:
 
-After executing the code, below the editor, you'll see the execution time and what was printed to the standard output.
+```elixir
+1 + 2
+```
 
-<EditorCode>
+The editors share their scope, meaning variables defined in one editor are available in the next:
+
 ```elixir
 # A line that starts with # is a comment
 # We'll use comments for short explanations and small exercises
 # The exercises are additionally marked with 💡
-
-#💡 Try changing IO.puts to IO.inspect. What's the difference?
-IO.puts("Hello, Elixir!")
-
-IO.inspect(1 + 2)
-
-# You can specify a 'label' to include additional info:
-IO.inspect(1 + 2, label: "Added 1 to 2")
-
-# You can also omit braces. Elixir developers usually prefer
-# to use braces, but here we'll skip them just for calls
-# to IO.inspect, for better readability.
-IO.inspect 1 + 2, label: "Added 1 to 2"
+message = "Hello, Elixir!"
 ```
-</EditorCode>
+
+```elixir
+message
+```
+
+You can also use `IO.puts` to print text to the output. Unlike the automatic result display,
+`IO.puts` prints to the standard output and returns `:ok`:
+
+```elixir
+IO.puts("Hello, Elixir!")
+```
+
+Similarly, `IO.inspect` prints a representation of any value (in Elixir called "term")
+and returns that value. You can specify a 'label' to include additional info:
+
+```elixir
+IO.inspect(1 + 2, label: "Result")
+```
 
 ## It runs in your browser! 🍿
 
