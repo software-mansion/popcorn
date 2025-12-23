@@ -131,5 +131,18 @@ export const navigationConfig: NavigationConfig = [
   {
     name: "Anonymous functions",
     component: lazyLoadLiveMd("6-anonymous-functions/anonymous_functions")
+  },
+  {
+    group: "Processes",
+    items: [
+      {
+        name: "Processes basics",
+        component: lazyLoadLiveMd("7-processes/processes_basics")
+      },
+      {
+        name: "Message passing",
+        component: lazyLoadLiveMd("7-processes/message_passing")
+      }
+    ]
   }
 ];
