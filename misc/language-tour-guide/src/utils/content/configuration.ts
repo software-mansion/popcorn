@@ -127,5 +127,9 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("5-constructs/if_and_cond")
       }
     ]
+  },
+  {
+    name: "Anonymous functions",
+    component: lazyLoadLiveMd("6-anonymous-functions/anonymous_functions")
   }
 ];
