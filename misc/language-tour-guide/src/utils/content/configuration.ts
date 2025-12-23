@@ -144,5 +144,9 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("7-processes/message_passing")
       }
     ]
+  },
+  {
+    name: "Congratulations",
+    component: lazyLoadLiveMd("congratulations")
   }
 ];
