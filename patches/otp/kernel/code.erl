@@ -106,10 +106,10 @@ ensure_loaded(_Module) ->
 get_mode() ->
     embedded.
 
-%% Patch reason: there is no code server and code module is implemented differently in AtomVM
-%% eventually the latter should be implemented in AtomVM.
+%% Patch reason: `code_server:is_loaded` in AtomVM returns boolean instead
+%% of `{file, String} | false`. The value of the String is stubbed.
 is_loaded(Module) ->
-    case popcorn_module:which(Module) of
-        File when is_list(File) -> {file, File};
-        _ -> false
+    case code_server:is_loaded(Module) of
+        true -> {file, ""};
+        false -> false
     end.

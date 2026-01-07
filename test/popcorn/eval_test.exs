@@ -199,7 +199,7 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_is_module()
   end
 
-  @tag :skip
+  @tag :module_redefinition
   async_test "Module redefinition", %{tmp_dir: dir} do
     info =
       """
@@ -219,11 +219,10 @@ defmodule Popcorn.EvalTest do
       |> AtomVM.try_eval(:elixir, run_dir: dir)
 
     assert %{exit_status: 0, result: {{10, 20}, {20, 30}}} = info
-    # FIXME: Warnings are disabled due to GC problems
-    # logs = File.read!(info.log_path)
-    # assert String.contains?(logs, "warning: {unused_var,c,false}")
-    # assert String.contains?(logs, "warning: {module_defined,'Elixir.RunExpr.W'}")
-    # assert String.contains?(logs, "warning: {unused_var,a,false}")
+    logs = File.read!(info.log_path)
+    assert String.contains?(logs, ~s|variable "c" is unused|)
+    assert String.contains?(logs, ~s|redefining module RunExpr.W|)
+    assert String.contains?(logs, ~s|variable "a" is unused|)
   end
 
   async_test "Adder Erlang", %{tmp_dir: dir} do
