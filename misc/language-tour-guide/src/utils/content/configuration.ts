@@ -133,6 +133,27 @@ export const navigationConfig: NavigationConfig = [
     component: lazyLoadLiveMd("6-anonymous-functions/anonymous_functions")
   },
   {
+    group: "Modules",
+    items: [
+      {
+        name: "Modules",
+        component: lazyLoadLiveMd("10-modules/modules")
+      },
+      {
+        name: "Alias, require and import",
+        component: lazyLoadLiveMd("10-modules/alias-require-import")
+      },
+      {
+        name: "Module attributes",
+        component: lazyLoadLiveMd("10-modules/module-attributes")
+      },
+      {
+        name: "Behaviours",
+        component: lazyLoadLiveMd("10-modules/behaviours")
+      }
+    ]
+  },
+  {
     group: "Processes",
     items: [
       {

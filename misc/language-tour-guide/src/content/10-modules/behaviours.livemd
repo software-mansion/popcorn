@@ -1,0 +1,205 @@
+# Behaviours and use
+
+Behaviours in Elixir (and Erlang) are a way to separate and abstract the generic part of a component (which becomes the behaviour module) from the specific part (which becomes the callback module).
+
+Let's consider an example. Let's assume we have products that have name and price, and we want to print them in different ways:
+
+* as a human-readable sentence (`The bike costs $10`)
+* as a CSV row (`bike,10`)
+
+A common way to do that would be using pattern matching in function heads:
+
+```elixir
+defmodule ProductPrinter do
+  def print(product, :pretty) do
+    "The #{product.name} costs $#{product.price}"
+  end
+
+  def print(product, :csv) do
+    "#{product.name},#{product.price}"
+  end
+end
+
+ProductPrinter.print(%{name: "bike", price: 10}, :pretty)
+```
+
+This approach has a limitation though: whenever we want a new way of printing, we need to change the `ProductPrinter` module. Oftentimes it's perfectly fine and we don't need anything more complex. However, in some cases, we need more flexibility. For example, if `ProductPrinter` is not a part of our project, but belongs to some library, we can't change its code at all. That's when behaviours come into play.
+
+A behaviour is a module with _callback definitions_. Then, we can create modules that _implement_ the behaviour. Each of them should provide _callback implementations_, which are just functions. In our case, the behaviour needs one callback: `print/1`.
+
+```elixir
+defmodule ProductPrinter2 do
+  # The product type for convenience
+  @type product :: %{name: String.t(), price: number()}
+
+  # @callback has the same syntax as @spec - there's just no implementation
+  @callback print(product) :: String.t()
+end
+
+defmodule PrettyProductPrinter2 do
+  # With @behaviour we mark that the module implements given behaviour
+  @behaviour ProductPrinter2
+
+  # @impl true marks that a function is an implementation of a callback
+  # It helps distinguishing it from other functions that this module may have
+  #
+  # 💡 Try renaming the below function to `print2`. What happens?
+  @impl true
+  def print(product) do
+    "The #{product.name} costs $#{product.price}"
+  end
+end
+
+# 💡 Let's implement a CSV printer!
+defmodule CSVProductPrinter2 do
+end
+
+PrettyProductPrinter2.print(%{name: "bike", price: 10})
+```
+
+This way, we have different modules that implement the same API. Thanks to that, we can add a generic `print_product` function to the ProductPrinter, that accepts a product and a printer module:
+
+```elixir
+defmodule ProductPrinter3 do
+  @type product :: %{name: String.t(), price: number()}
+  @callback print(product) :: String.t()
+
+  # The new function that accepts a product
+  # and the printer module. In more complex
+  # scenarios it could have additional logic,
+  # like transforming the product argument
+  # or printed value.
+  def print_product(product, printer) do
+    printer.print(product)
+  end
+end
+
+defmodule PrettyProductPrinter3 do
+  @behaviour ProductPrinter3
+
+  @impl true
+  def print(product) do
+    "The #{product.name} costs $#{product.price}"
+  end
+end
+
+ProductPrinter3.print_product(%{name: "bike", price: 10}, PrettyProductPrinter3)
+```
+
+## Default callback implementations
+
+In some cases, we want to provide a default implementation of a callback, so that the implementation doesn't have to define it. It's particularly useful when there are many callbacks, but let's assume that `print` should default to `inspect` if the implementation isn't provided. We can do that with a macro:
+
+```elixir
+defmodule ProductPrinter4 do
+  @type product :: %{name: String.t(), price: number()}
+  @callback print(product) :: String.t()
+
+  # We can create a macro with defmacro
+  defmacro default_impl() do
+    # Macro returns code.
+    # To return code instead of evaluating it,
+    # we need to wrap it with quote do ... end
+    quote do
+      # This is the default implementation
+      # that will be 'injected' into the implementing
+      # module.
+      @impl true
+      def print(product) do
+        inspect(product)
+      end
+
+      # In case someone calls this macro and then
+      # provides implementation anyway, we mark
+      # `print/1` as overridable. This means that
+      # the default is not injected when the implementation
+      # is provided.
+      defoverridable print: 1
+    end
+  end
+  
+  def print_product(product, printer) do
+    printer.print(product)
+  end
+end
+
+defmodule DefaultPrinter4 do
+  @behaviour ProductPrinter4
+
+  # require so that we can call the macro
+  require ProductPrinter4
+
+  # call the macro that injects the default impl
+  ProductPrinter4.default_impl()
+end
+
+ProductPrinter4.print_product(%{name: "bike", price: 10}, DefaultPrinter4)
+```
+
+We learned how to inject default callback implementation with a macro. Macros are powerful and complex, but we won't dive into that here. To learn more about macros, see the [meta-programming chapter of the Elixir Guide](https://hexdocs.pm/elixir/quote-and-unquote.html).
+
+Now, let's see how we can simplify our code with `use`.
+
+## Use
+
+The pattern described above is popular in Elixir and it has a dedicated language construct: `use`.
+
+`use MyModule` is equivalent to calling `require MyModule` and then `MyModule.__using__()`. Let's see how it can simplify our code:
+
+```elixir
+defmodule ProductPrinter5 do
+  @type product :: %{name: String.t(), price: number()}
+  @callback print(product) :: String.t()
+
+  # We renamed default_impl to __using__
+  # It can be passed additional arguments,
+  # but we don't use them here
+  defmacro __using__(_args) do
+    quote do
+      # We added @behaviour here,
+      # so that it's automatically injected too
+      @behaviour ProductPrinter5
+      
+      @impl true
+      def print(product) do
+        inspect(product)
+      end
+
+      defoverridable print: 1
+    end
+  end
+  
+  def print_product(product, printer) do
+    printer.print(product)
+  end
+end
+
+defmodule DefaultPrinter5 do
+  # Now we can create a printer implementation
+  # with just a single line
+  use ProductPrinter5
+end
+
+defmodule PrettyProductPrinter5 do
+  # The pretty printer can also use the same
+  # API, by calling use instead of @behaviour
+  use ProductPrinter5
+
+  @impl true
+  def print(product) do
+    "The #{product.name} costs $#{product.price}"
+  end
+end
+
+# 💡 Let's implement a CSV printer using the new API
+
+ProductPrinter5.print_product(%{name: "bike", price: 10}, PrettyProductPrinter5)
+```
+
+While it may seem complex at first, in practice you just call `use SomeModule` and implement callbacks as stated in the docs.
+
+Note that `use` can inject any code into the caller module. Therefore, to keep the code maintainable and compilation times low, follow the following rules:
+
+* The documentation of a given module should state clearly what exactly happens when you `use` it
+* If something can be achieved with `alias` or `import`, they should be preferred to `use`
+* The amount of code injected with macros should be possibly small
