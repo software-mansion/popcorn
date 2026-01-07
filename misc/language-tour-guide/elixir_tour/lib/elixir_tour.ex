@@ -51,7 +51,12 @@ defmodule ElixirTour do
   defp eval(code, bindings) do
     try do
       {evaluated, new_bindings} =
-        Code.eval_string(code, bindings, %Macro.Env{__ENV__ | file: "playground", line: 1})
+        Code.eval_string(code, bindings, %Macro.Env{
+          __ENV__
+          | file: "playground",
+            line: 1,
+            module: nil
+        })
 
       {:ok, evaluated, new_bindings}
     rescue

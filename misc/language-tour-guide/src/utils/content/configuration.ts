@@ -97,5 +97,18 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("2-lists-and-tuples/lists-or-tuples")
       }
     ]
+  },
+  {
+    group: "Modules",
+    items: [
+      {
+        name: "Modules",
+        component: lazyLoadLiveMd("10-modules/modules")
+      },
+      {
+        name: "Alias, require, import and use",
+        component: lazyLoadLiveMd("10-modules/alias-import-require-use")
+      },
+    ]
   }
 ];
