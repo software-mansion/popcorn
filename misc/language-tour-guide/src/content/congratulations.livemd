@@ -1,11 +1,9 @@
-export const frontmatter = { order: 1000 };
+# Congratulations
 
-# Congratulations 🎉
-
-You completed the Elixir Language Tour, congrats! We hope you enjoyed it 😉
+You completed the Elixir Language Tour, congrats! We hope you enjoyed it.
 
 Now that you know the basics, you're ready to dive deeper into Elixir and its ecosystem.
-To do that, you can choose from various learing resources gathered on the
+To do that, you can choose from various learning resources gathered on the
 [learning page of the Elixir website](https://elixir-lang.org/learning.html).
 
 ## Why so short?
@@ -19,10 +17,8 @@ Thanks!
 The Elixir Language Tour is brought to you by the [Popcorn](https://popcorn.swmansion.com)
 Team at [Software Mansion](https://swmansion.com).
 
-<EditorCode>
 ```elixir
 IO.puts [67, 111, 110, 103, 114, 97,
         116, 117, 108, 97, 116, 105,
         111, 110, 115, 32, 58, 41]
 ```
-</EditorCode>

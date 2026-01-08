@@ -1,0 +1,142 @@
+# if and cond
+
+`case` builds on pattern matching and guards to destructure and match on certain conditions.
+
+However, patterns and guards are limited only to certain expressions which are optimized by the compiler. In many situations, you need to write conditions that go beyond what can be expressed with `case`. For those, `if` is a useful alternative.
+
+`if` accepts an expression, then a `do` block, and optionally an `else` block. If the expression evaluates to a truthy value (anything except `false` and `nil`), then the `do` block is evaluated. Otherwise - the `else` block, if present.
+
+Basic if:
+
+```elixir
+# 💡 Try changing true to IO.puts("hello")
+if true do
+  "This works!"
+end
+```
+
+Falsy values:
+
+```elixir
+# 💡 Try changing false to nil
+if false do
+  "This will never be seen"
+end
+```
+
+Using if/else:
+
+```elixir
+if 4 > 5 do
+  "This won't be seen"
+else
+  "This will"
+end
+```
+
+An important concept when working with `if` and other control structures is variable scoping.
+
+## Variable scoping
+
+This is a good opportunity to talk about variable scoping in Elixir. If any variable is declared or changed inside `if`, `case`, and similar constructs, the declaration and change will only be visible inside the construct.
+
+In said cases, if you want to change a value, you must return the value from the `if`.
+
+Variables changed inside blocks don't affect outer scope:
+
+```elixir
+x = 1
+if true do
+  x = x + 1
+end
+x
+```
+
+To change a variable, reassign from the if result:
+
+```elixir
+x = 1
+x = if true do
+  x + 1
+else
+  x
+end
+x
+```
+
+When you need to check multiple conditions, `cond` provides a useful alternative to nested `if` statements.
+
+## cond
+
+We have used `case` to find a matching clauses from many patterns. We have used `if` to check for a single condition. If you need to check across several conditions and find the first one that evaluates to a truthy value, `cond` is a useful construct.
+
+If you find yourself nesting several `if` blocks, you may want to consider using `cond` instead. `cond` is equivalent to `else if` clauses in many imperative languages - although used less frequently in Elixir.
+
+Using cond to check multiple conditions:
+
+```elixir
+cond do
+  2 + 2 == 5 ->
+    "This will not be true"
+  2 * 2 == 3 ->
+    "Nor this"
+  1 + 1 == 2 ->
+    "But this will"
+end
+```
+
+If all of the conditions in `cond` return `nil` or `false`, an error (`CondClauseError`) is raised. For this reason, it may be necessary to add a final condition, equal to `true`, which will always match.
+
+Adding a catch-all condition:
+
+```elixir
+# 💡 Try removing the last condition (true -> ...). What happens?
+cond do
+  2 + 2 == 5 ->
+    "This is never true"
+  2 * 2 == 3 ->
+    "Nor this"
+  true ->
+    "This is always true (equivalent to else)"
+end
+```
+
+Now that we've covered the main control flow constructs, let's review what we've learned.
+
+## Summing up
+
+We have concluded the introduction to the most fundamental control-flow constructs in Elixir.
+
+Generally speaking, Elixir developers prefer pattern matching and guards, using `case` and function definitions (which we will explore in future chapters), as they are succinct and precise.
+
+When your logic cannot be outlined within patterns and guards, you may consider `if`, falling back to `cond` when there are several conditions to check.
+
+Before you go further, let's try a little exercise 💡.
+
+> Try rewriting the following code into a single `case` with three clauses.
+>
+> You'll need to rephrase the conditions into pattern matching.
+>
+> Then, try changing the values of `nums` and `opt`.
+
+<details>
+  <summary>Hint</summary>
+  <span>
+    To put two values into `case`, make them a tuple.
+  </span>
+</details>
+
+```elixir
+nums = [1, 2, 3]
+opt = :a
+
+if opt == :a do
+  "fizz"
+else
+  if hd(nums) == 2 do
+    "buzz"
+  else
+    "bazz"
+  end
+end
+```
