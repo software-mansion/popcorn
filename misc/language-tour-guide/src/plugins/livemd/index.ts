@@ -47,8 +47,14 @@ export function livemdPlugin(): Plugin {
         return;
       }
 
-      const livemdRelativePath = id.replace(/\.mdx$/, "");
-      const livemdPath = path.join(rootPath, "src", livemdRelativePath);
+      const regex = /\/content\/.+\.livemd/;
+      const absoluteLivemdPath = id.match(regex)?.[0];
+
+      if (!absoluteLivemdPath) {
+        throw new Error(`Could not determine .livemd path from id: ${id}`);
+      }
+
+      const livemdPath = path.join(rootPath, "src", absoluteLivemdPath);
 
       const livemdContent = await readFile(livemdPath, "utf-8");
 
