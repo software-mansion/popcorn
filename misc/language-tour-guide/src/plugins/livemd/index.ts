@@ -36,10 +36,23 @@ export function livemdPlugin(): Plugin {
       };
     },
 
-    resolveId(source) {
-      if (source.endsWith(".livemd")) {
-        return source + ".mdx";
+    resolveId(source, importer) {
+      if (!source.endsWith(".livemd") || !importer) {
+        return null;
       }
+
+      const regex = /\/content\/.+\.livemd/;
+      const absoluteLivemdPath = source.match(regex)?.[0];
+
+      if (!absoluteLivemdPath) {
+        throw new Error(
+          `Could not determine .livemd path from source: ${source}`
+        );
+      }
+
+      const livemdPath = path.join(rootPath, "src", absoluteLivemdPath);
+
+      return livemdPath + ".mdx";
     },
 
     async load(id) {
@@ -47,18 +60,24 @@ export function livemdPlugin(): Plugin {
         return;
       }
 
-      const regex = /\/content\/.+\.livemd/;
-      const absoluteLivemdPath = id.match(regex)?.[0];
-
-      if (!absoluteLivemdPath) {
-        throw new Error(`Could not determine .livemd path from id: ${id}`);
-      }
-
-      const livemdPath = path.join(rootPath, "src", absoluteLivemdPath);
+      const livemdPath = id.replace(".mdx", "");
 
       const livemdContent = await readFile(livemdPath, "utf-8");
 
-      return transformToMdx(livemdContent);
+      return { code: await transformToMdx(livemdContent), map: null };
+    },
+
+    async handleHotUpdate({ file, server }) {
+      if (!file.endsWith(".livemd")) {
+        return;
+      }
+
+      const module = server.moduleGraph.getModuleById(file + ".mdx");
+
+      if (module) {
+        server.moduleGraph.invalidateModule(module);
+        return [module];
+      }
     }
   };
 }

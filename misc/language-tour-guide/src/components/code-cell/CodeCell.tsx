@@ -25,7 +25,7 @@ export function CodeCell({ id }: CodeCellProps) {
   }
 
   return (
-    <div className="border-grey-20 my-4 overflow-hidden rounded-md border">
+    <div className="border-grey-20 my-2 mb-8 min-w-2xl overflow-hidden rounded-md border">
       <CodeDisplay id={id} />
       <Results id={id} />
     </div>

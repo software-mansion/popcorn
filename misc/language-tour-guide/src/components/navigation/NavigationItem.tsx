@@ -29,7 +29,7 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
   return (
     <li className="my-1">
       <div
-        className={`flex items-center rounded-md px-3 py-0.5 text-sm ${
+        className={`mt-2 flex items-center rounded-md px-3 py-0.5 text-sm ${
           hasChildren
             ? "text-brown-header mt-2 cursor-pointer font-semibold hover:bg-orange-100/10"
             : "text-brown-80"
