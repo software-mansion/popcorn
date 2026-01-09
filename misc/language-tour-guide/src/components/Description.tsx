@@ -24,9 +24,9 @@ export function Description() {
   return (
     <section
       id="description"
-      className="bg-light-20 text-brown-100 scrollbar relative flex h-full w-full grow flex-col"
+      className="bg-light-30 text-brown-100 scrollbar relative flex h-full w-full grow flex-col"
     >
-      <div className="flex max-w-[1024px] grow flex-col p-8 pt-8 wrap-break-word lg:mx-auto lg:px-16">
+      <div className="flex max-w-[1024px] grow flex-col p-8 pt-8 pb-4 wrap-break-word lg:mx-auto lg:px-16 lg:pb-8">
         {isLoadingPopcorn ? (
           <Loader message="Popcorn is loading..." />
         ) : (
