@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CodeSnippet } from "../../plugins/livemd/parser";
 import { useEditorsStore } from "../../store/editors";
+import { useLocation } from "react-router";
 
 export type MdxWrapperProps = {
   Component: React.ComponentType;
@@ -9,7 +10,13 @@ export type MdxWrapperProps = {
 
 export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
   const initEditor = useEditorsStore((state) => state.initEditor);
+  const clearEditors = useEditorsStore((state) => state.clearEditors);
   const [isInitialized, setIsInitialized] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    clearEditors();
+  }, [pathname, clearEditors]);
 
   useEffect(() => {
     if (!codeSnippets) {

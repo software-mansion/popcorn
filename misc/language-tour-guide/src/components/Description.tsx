@@ -3,23 +3,10 @@ import { components } from "./markdown";
 import NavigationBar from "./navigation/NavigationBar";
 import { usePopcorn } from "../utils/hooks/usePopcorn";
 import { Loader } from "./Loader";
-import { Outlet, useLocation } from "react-router";
-import { useEffect } from "react";
-import { useExecutionHistoryStore } from "../store/executionHistory";
-import { useEditorsStore } from "../store/editors";
+import { Outlet } from "react-router";
 
 export function Description() {
   const { isLoadingPopcorn } = usePopcorn();
-
-  const { pathname } = useLocation();
-  const clearHistory = useExecutionHistoryStore((state) => state.clearHistory);
-  const clearEditors = useEditorsStore((state) => state.clearEditors);
-
-  useEffect(() => {
-    clearHistory();
-    clearEditors();
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [pathname, clearHistory, clearEditors]);
 
   return (
     <section
