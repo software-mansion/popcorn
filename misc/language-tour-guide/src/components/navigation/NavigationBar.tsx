@@ -6,12 +6,13 @@ import { getNodeNavigationSiblings } from "../../utils/content/navigation-builde
 export default function NavigationBar() {
   const { pathname } = useLocation();
 
-  const { siblingsNode, childrenCount, currentIndex } =
+  const { siblingsNode, siblingCount, currentIndex } =
     getNodeNavigationSiblings(pathname);
 
-  const isAtFirstInChapter = currentIndex === 1 || childrenCount === 0;
-  const isAtLastInChapter = currentIndex === childrenCount;
-  const isTopLevelChapter = childrenCount !== 0 || currentIndex !== 0;
+  const isAtFirstInChapter = currentIndex === 1 || siblingCount === 0;
+  const isAtLastInChapter = currentIndex === siblingCount;
+  const isTopLevelChapter = siblingCount !== 0 || currentIndex !== 0;
+
   const navigationClassName = isTopLevelChapter ? "block" : "invisible";
 
   return (
@@ -24,7 +25,7 @@ export default function NavigationBar() {
           isChapterNavigation={isAtFirstInChapter}
         />
         <span className={navigationClassName} aria-hidden={!isTopLevelChapter}>
-          {currentIndex}/{childrenCount}
+          {currentIndex}/{siblingCount}
         </span>
         <NavigationButton
           direction="next"
