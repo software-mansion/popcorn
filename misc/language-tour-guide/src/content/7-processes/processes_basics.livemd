@@ -12,16 +12,12 @@ The basic mechanism for spawning new processes is the auto-imported `spawn` func
 
 `spawn` takes a function which it will execute in another process, and returns a PID (process identifier), that can be used to interact and communicate with the process.
 
-After executing the function, the process exits immediately. We can check whether a process is alive with `Process.alive?` function.
-
-Spawning a process returns a PID:
-
 ```elixir
 pid = spawn(fn -> 1 + 2 end)
 pid
 ```
 
-Checking if a process is alive:
+After executing its function, a process exits immediately. We can check if a process is still alive using `Process.alive?`.
 
 ```elixir
 # 💡 Try replacing the function passed to spawn with
@@ -31,25 +27,21 @@ Process.alive?(pid)
 
 ## Self
 
-All Elixir code runs in processes.
-
-The code evaluator we use to run examples also spawns a process. We can tell that by calling `self`, which returns the PID of the current process.
-
-Getting the current process PID:
+The `self` function returns the PID of the current process. Since all code runs in processes, even our code evaluator has its own PID.
 
 ```elixir
 pid = self()
 pid
 ```
 
-Checking if the current process is alive:
+The current process is always alive while executing code.
 
 ```elixir
 pid = self()
 Process.alive?(pid)
 ```
 
-Each spawned process has its own PID:
+Each spawned process gets its own unique PID, different from the current process.
 
 ```elixir
 # 💡 Let's run this code a few times. How do the PIDs change?

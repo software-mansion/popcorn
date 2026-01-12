@@ -10,8 +10,6 @@ When a message is sent from a process A to a process B, it's enqueued in B's mai
 
 To pop a message from the mailbox, you can use `receive do ... end`.
 
-Spawning a receiver and sending it a message:
-
 ```elixir
 # First, spawn the receiver and get its PID
 receiver_pid = spawn(fn ->
@@ -25,7 +23,7 @@ end)
 send(receiver_pid, {:hello, "world"})
 ```
 
-A process can send a message to itself:
+A process can also send messages to itself.
 
 ```elixir
 send(self(), "message to self")
@@ -41,10 +39,6 @@ The syntax for the `receive` block may look similar to `case`. That's because yo
 
 The `receive` block goes through the process' mailbox searching for the first message that matches any of the given patterns.
 
-If there is no message in the mailbox matching any of the patterns, the current process will wait until a matching message arrives. A timeout can also be specified.
-
-Pattern matching in receive:
-
 ```elixir
 send(self(), {:hello, "world"})
 
@@ -57,7 +51,7 @@ receive do
 end
 ```
 
-Using timeout with receive:
+If no message matches, the process waits until a matching message arrives. You can specify a timeout to avoid waiting indefinitely.
 
 ```elixir
 # 💡 Try changing :bye to {:hello, "world"}

@@ -2,35 +2,29 @@
 
 Anonymous functions allow us to store and pass executable code around as if it was an integer or a string.
 
-To define an anonymous function, you can use `fn arguments -> body end` syntax, where 'arguments' are comma-separated and 'body' is regular Elixir code.
+To define an anonymous function, use the `fn arguments -> body end` syntax, where 'arguments' are comma-separated and 'body' is regular Elixir code.
 
 Such function can be assigned to a variable, passed as an argument to another function, etc.
-
-If an anonymous function is assigned to a variable `f`, we can invoke it with `f.(arguments)`. Notice the dot before the opening bracket - it's to differentiate calling an anonymous function from a regular one.
-
-The reason for that distinction is to avoid ambiguity and reduce mental overhead when reading a code. For example, when you see a call to `is_atom(:foo)`, you can be sure that `Kernel.is_atom` is called, not an anonymous function assigned to `is_atom` variable.
-
-Defining an anonymous function:
 
 ```elixir
 add = fn a, b -> a + b end
 add
 ```
 
-Calling the function:
+To call an anonymous function assigned to a variable `f`, use `f.(arguments)`. The dot before the opening bracket differentiates calling an anonymous function from a regular one. This distinction avoids ambiguity - when you see `is_atom(:foo)`, you know `Kernel.is_atom` is called, not an anonymous function assigned to `is_atom` variable.
 
 ```elixir
 # 💡 Try removing the dot from the call
 add.(2, 3)
 ```
 
-Checking if something is a function:
+You can check if a value is a function using `is_function/1`:
 
 ```elixir
 is_function(add)
 ```
 
-Checking arity:
+You can also check if a function has a specific arity (number of arguments) using `is_function/2`:
 
 ```elixir
 # 💡 Try changing 2 to a different number
@@ -41,13 +35,7 @@ is_function(add, 2)
 
 Now that we know how to define and call anonymous functions, let's understand how they return values.
 
-In many languages, there's a `return` keyword, used to return a value from a function.
-
-In Elixir, there's no such keyword - the value returned is just the last value in the function body.
-
-It means that each function returns something. If there's nothing sensible to return, we usually return `:ok`.
-
-The last expression is returned:
+In Elixir, there's no `return` keyword. Instead, the value returned is just the last expression in the function body. This means each function returns something - if there's nothing sensible to return, we usually return `:ok`.
 
 ```elixir
 # 💡 Let's make inspect_and_add return :ok
@@ -61,11 +49,7 @@ inspect_and_add.(2, 3)
 
 ## Closures
 
-Anonymous functions can also access variables that are in scope when the function is defined.
-
-This is typically referred to as closures, as they close over their scope.
-
-Closures capture variables from the defining scope:
+Similar to `case/2`, we can pattern match on the arguments of anonymous functions as well as define multiple clauses and guards. This is typically referred to as closures, as they close over their scope.
 
 ```elixir
 a = 3
@@ -80,11 +64,7 @@ increment_by_a.(2)
 
 ## Clauses and guards
 
-Similar to `case/2`, we can pattern match on the arguments of anonymous functions as well as define multiple clauses and guards - see the example.
-
-The number of arguments in each anonymous function clause needs to be the same, otherwise an error is raised.
-
-Multiple clauses with guards:
+Similar to `case/2`, anonymous functions can pattern match on arguments and define multiple clauses with guards. The number of arguments in each clause must be the same, otherwise an error is raised.
 
 ```elixir
 # 💡 Try adding another clause with three arguments: x, y and z
@@ -99,11 +79,9 @@ f.(1, 3)
 
 ## The capture operator
 
-For creating short, simple functions, we can also use the capture operator `&`.
+For creating short, simple functions, you can use the capture operator `&`.
 
-Then, we can use `&1`, `&2`, `&3` etc to refer to the first, second, third argument etc - see the example.
-
-Using capture operator:
+Then, we can use `&1`, `&2`, `&3` etc to refer to the first, second, third argument etc.
 
 ```elixir
 # This is equivalent to fn a, b -> a + b end
@@ -111,7 +89,7 @@ add = & &1 + &2
 add.(2, 3)
 ```
 
-Capturing function calls:
+You can also use the capture operator to wrap function calls:
 
 ```elixir
 split_by_comma = &String.split(&1, ",")
@@ -126,21 +104,17 @@ Sometimes we may want to convert a regular function to an anonymous one, for exa
 
 We could write it as `&function(&1, &2, ...)`, but there's a shorthand for that: `&function/arity`, where 'arity' stands for the number of arguments.
 
-Capturing a function:
-
 ```elixir
 # 💡 Try also &String.contains?/2
 string_split = &String.split/2
 string_split
 ```
 
-Checking the captured function:
+The captured function behaves just like any other anonymous function:
 
 ```elixir
 is_function(string_split)
 ```
-
-Calling the captured function:
 
 ```elixir
 string_split.("hello world", " ")

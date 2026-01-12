@@ -1,15 +1,8 @@
 # Pattern Matching
 
-You've seen the `=` operator used to assign a value to the variable.
-`=` in Elixir is called _the match operator_.
-As it turns out, it can do much more than just a simple assignment!
+You've seen the = operator used to assign a value to the variable. = in Elixir is called the match operator. As it turns out, it can do much more than just a simple assignment!
 
-Check out the example - after the `1` is assigned to `x`, it can be used for matching.
-Line `1 = x` is legal and means "match x against pattern 1", which succeeds.
-
-Test out what happens if the pattern becomes `2` or when you try to match the variable before an assignment.
-Spoiler alert - you'll see some errors. Notice the difference between them - one occurs in runtime,
-while the other occurs during compilation.
+## Basic Matching
 
 Matching identical values:
 
@@ -23,11 +16,13 @@ Assigning to a variable:
 x = 1
 ```
 
-Matching a variable's value:
+After the `1` is assigned to `x`, it can be used for matching. Line `1 = x` is legal and means "match x against pattern 1", which succeeds.
 
 ```elixir
 1 = x
 ```
+
+Test what happens when the pattern is `2`, or when you try to match a variable before it has been assigned. Experiment with mismatched patterns to see the difference between runtime and compilation errors.
 
 ```elixir
 x = 2
@@ -37,16 +32,9 @@ x = 2
 # 2 = new_variable
 ```
 
-Now that you understand how the match operator works, let's explore how it applies to different data structures, starting with tuples.
-
 ## Matching Tuples
 
-Thanks to pattern matching, you can "extract" each tuple element into a variable.
-The pattern must be of the same size for the match to succeed.
-
-In Elixir, it is common to return a tuple `{:ok, result}` on success and either `:error` atom
-or `{:error, reason}` tuple in case of failure.
-You can also use atoms in the pattern to match on such results.
+Pattern matching lets you extract tuple elements into variables. The pattern must match the tuple size.
 
 Extracting tuple elements:
 
@@ -57,7 +45,7 @@ IO.inspect(a, label: "a")
 IO.inspect(b, label: "b")
 ```
 
-The pattern must match the tuple size:
+The pattern must be of the same size for the match to succeed:
 
 ```elixir
 # ❗️ This code raises an error!
@@ -68,7 +56,7 @@ IO.inspect(x, label: "x")
 IO.inspect(y, label: "y")
 ```
 
-Matching on tagged tuples:
+In Elixir, functions commonly return `{:ok, result}` on success and `{:error, reason}` on failure. You can use atoms in patterns to match such results:
 
 ```elixir
 # 💡 Find out what happens if you replace `:answer`
@@ -77,16 +65,9 @@ Matching on tagged tuples:
 answer
 ```
 
-Just like tuples, lists can also be destructured using pattern matching, but with some unique capabilities.
-
 ## Matching Lists
 
-List matching works similarly to tuples - you can extract every element of the list.
-The sizes of pattern and the value must equal for a successful matching.
-
-There is, however, a special pattern using the "cons" operator (`|`, see [the lists section](../data-structures/lists-basics)).
-It allows matching on the first element of the list (called "head")
-and the rest of the list (called "tail") similarly to the way you can build a list.
+List matching works similarly to tuples - you can extract every element of the list. The sizes of pattern and the value must equal for a successful matching.
 
 Extracting list elements:
 
@@ -98,7 +79,7 @@ IO.inspect(k, label: "k")
 IO.inspect(l, label: "l")
 ```
 
-Using head/tail pattern:
+The cons operator (`|`, see [the lists section](../lists-and-tuples/lists)) provides a special pattern for matching the head (first element) and tail (remaining elements).
 
 ```elixir
 # 💡 Try to match empty (`[]`) or single element list (`[1]`)
@@ -108,7 +89,7 @@ IO.inspect(head, label: "head")
 IO.inspect(tail, label: "tail")
 ```
 
-The `|` operator works for both prepending and destructuring:
+This shows how lists are internally structured using the cons operator - each element is prepended to the rest of the list:
 
 ```elixir
 [head | tail] = [1 | [2 | [3 | []]]]
@@ -117,19 +98,16 @@ IO.inspect(head, label: "head")
 IO.inspect(tail, label: "tail")
 ```
 
-Creating a new list with different head:
+You can use the destructured parts to create new lists:
 
 ```elixir
 [head | tail] = [1, 2, 3]
 [0 | tail]
 ```
 
-Maps also support pattern matching with their own unique characteristics that make them particularly flexible.
-
 ## Matching Maps
 
-Patterns for maps can extract the value of any key or ensure that a specified key has a provided value.
-The pattern doesn't have to be exhaustive and cover every entry stored inside the map.
+Patterns for maps can extract the value of any key or ensure that a specified key has a provided value. The pattern doesn't have to be exhaustive and cover every entry stored inside the map.
 
 Extracting a value by key:
 
@@ -146,7 +124,7 @@ An empty map pattern matches any map:
 %{} = map
 ```
 
-Enforcing a specific value for `:c`:
+You can enforce specific values for keys:
 
 ```elixir
 # 💡 Try changing "c" to something else and see the result
@@ -161,18 +139,13 @@ For atom keys, a special syntax is available:
 cee
 ```
 
-Beyond these basic patterns, Elixir provides additional constructs that give you even more control over pattern matching.
-
 ## Special patterns
 
-There are some additional constructs you may use when building patterns.
+Elixir provides additional constructs for more precise pattern matching control.
 
 ### The pin operator
 
-In Elixir, variables can be rebound, i.e. assigned to a new value.
-If you want to avoid that in a pattern and match against the actual value assigned to that variable,
-you must use the pin `^` operator.
-It can be a part of more complex patterns.
+In Elixir, variables can be rebound, i.e. assigned to a new value. If you want to avoid that in a pattern and match against the actual value assigned to that variable, you must use the pin `^` operator. It can be a part of more complex patterns.
 
 Variables can be rebound:
 
@@ -191,7 +164,7 @@ x = 2
 ^x = 2
 ```
 
-Pin operator in complex patterns:
+The pin operator works in complex patterns:
 
 ```elixir
 {y, ^x} = {3, 2}
@@ -200,10 +173,7 @@ Pin operator in complex patterns:
 
 ### Repeated variables
 
-If a variable occurs more than once in the pattern, it must bind to the same value.
-Otherwise, the match will fail.
-
-Matching repeated variables:
+If a variable occurs more than once in the pattern, it must bind to the same value. Otherwise, the match will fail.
 
 ```elixir
 # 💡 Try changing one of the values in tuple on the right
@@ -213,11 +183,7 @@ z
 
 ### Ignore pattern
 
-If you only want to extract some of the values, you may use the ignore pattern: `_`.
-It is a special variable that can never be read from.
-Optionally, for readability, you may use a variable with `_` prefix, e.g. `_ignored`.
-
-Using underscore to ignore values:
+If you only want to extract some of the values, you may use the ignore pattern: `_`. It is a special variable that can never be read from
 
 ```elixir
 # 💡 Let's try using the underscore
@@ -225,7 +191,7 @@ Using underscore to ignore values:
 head
 ```
 
-Named ignore pattern is is slightly different, but yields a warning:
+You can use named ignore patterns (like `_reason`) for readability, though reading them yields a warning:
 
 ```elixir
 {:error, _reason} = {:error, :enoent}
