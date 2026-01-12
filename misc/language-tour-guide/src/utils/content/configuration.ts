@@ -123,7 +123,7 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("5-constructs/case")
       },
       {
-        name: "if",
+        name: "if and cond",
         component: lazyLoadLiveMd("5-constructs/if_and_cond")
       }
     ]
