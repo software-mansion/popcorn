@@ -79,6 +79,10 @@ function flattenTreeToLinks(
   return result;
 }
 
+function isRootItem(path: string): boolean {
+  return path.split("/").length === 1;
+}
+
 export function getNodeNavigationSiblings(path: string) {
   const normalizePath = path.startsWith("/") ? path.slice(1) : path;
 
@@ -91,6 +95,8 @@ export function getNodeNavigationSiblings(path: string) {
   }
 
   const currentNode = navigationLinks[currentIndex];
+
+  const isRoot = isRootItem(currentNode.path);
 
   const nextNode =
     currentIndex + 1 < navigationLinks.length
@@ -105,8 +111,8 @@ export function getNodeNavigationSiblings(path: string) {
       previousNode,
       nextNode
     },
-    childrenCount: currentNode.siblingCount,
-    currentIndex: currentNode.indexInParent + 1
+    siblingCount: isRoot ? 0 : currentNode.siblingCount,
+    currentIndex: isRoot ? 0 : currentNode.indexInParent + 1
   };
 }
 
