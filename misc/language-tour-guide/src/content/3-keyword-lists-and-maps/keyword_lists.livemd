@@ -90,8 +90,8 @@ You can pass multiple options to functions:
 ```elixir
 #💡 Try removing the label, try changing order of keys
 #💡 Try using 'printable_limit' key to limit printed characters
-IO.inspect [{1, 2, 3}, "hello world"],
-  label: "Print a list", pretty: true, width: 15
+IO.inspect([{1, 2, 3}, "hello world"],
+  label: "Print a list", pretty: true, width: 15)
 ```
 
 `String.split` also accepts a keyword list for options:
