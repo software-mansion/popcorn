@@ -40,14 +40,16 @@ export function captureReloadIframe(
 ) {
   const { editors, editorOrder } = useEditorsStore.getState();
 
+  const failedEditor = [...editors.values()].find(
+    (editor) => editor.executionState === "running"
+  );
+
   const code = editorOrder
     .map((id) => {
       const editor = editors.get(id);
       return editor ? `# Editor: ${id}\n${editor.code}` : null;
     })
     .join("\n\n");
-
-  console.log("Capturing iframe reload with code:", code);
 
   const context = {
     tags: {
@@ -57,7 +59,8 @@ export function captureReloadIframe(
     extra: {
       code,
       stdout,
-      stderr
+      stderr,
+      failedEditorId: failedEditor?.id || null
     }
   };
 
