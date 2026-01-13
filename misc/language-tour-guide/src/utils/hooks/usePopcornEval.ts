@@ -13,6 +13,7 @@ export function usePopcornEval() {
     async (code: string) => {
       const stopLogCapture = startLogCapture();
 
+      // TODO: clean elixir context between runs?
       const { data, durationMs, error } = await call(
         ["eval_elixir", pageId, code],
         {

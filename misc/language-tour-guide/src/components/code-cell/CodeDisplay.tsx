@@ -26,6 +26,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const isCodeChanged = useEditorChanged(id);
   const longRunning = useDelayedPending(isExecuting || isQueued, 300);
   const executionState = useEditorExecutionState(id);
+  const isExecutionFailure = executionState === "failure";
   const [lastStableState, setLastStableState] = useState(executionState);
 
   const editorControlRef = useRef<HTMLDivElement>(null);
@@ -35,6 +36,16 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   useEffect(() => {
     longRunningRef.current = longRunning;
   }, [longRunning]);
+
+  useEffect(() => {
+    if (isExecutionFailure) {
+      window.scrollBy({
+        left: 0,
+        top: getOffsetTopOfCodeEditor() - window.innerHeight * 0.3,
+        behavior: "smooth"
+      });
+    }
+  }, [isExecutionFailure]);
 
   useEffect(() => {
     if (executionState !== "running" && executionState !== "queued") {
