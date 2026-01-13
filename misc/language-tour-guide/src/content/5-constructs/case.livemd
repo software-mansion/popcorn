@@ -1,0 +1,71 @@
+# Case
+
+In this chapter, we will learn about the `case`, `if`, and `cond` control flow structures.
+
+`case` allows you to compare a value against many patterns until there is a matching one. You can use `_` as the last, catch-all pattern that matches any value.
+
+Let's see how pattern matching works with tuples:
+
+```elixir
+# 💡 Try changing {1, 2, 3} to other values and see what matches!
+case {1, 2, 3} do
+  {4, 5, 6} ->
+    "This clause won't match"
+  {1, x, 3} ->
+    "This clause will match and bind x to #{x} in this clause"
+  _ ->
+    "This clause would match any value"
+end
+```
+
+Without a catch-all pattern, if no clause matches, an error is raised:
+
+```elixir
+# 💡 Let's change :ok to :error. What happens?
+case :ok do
+  :ok -> "ok!"
+end
+```
+
+## Guards
+
+Guards allow you to add extra conditions to patterns using the `when` keyword. The first clause below will only match when `x` is positive:
+
+```elixir
+# 💡 Try changing {1, 2, 3} to {1, -2, 3}
+case {1, 2, 3} do
+  {1, x, 3} when x > 0 ->
+    "Will match"
+
+  _ ->
+    "Would match, if guard condition were not satisfied"
+end
+```
+
+Not any code can be put as a guard - you can perform arithmetic expressions, comparisons, type checking (`is_integer`, `is_atom` etc) and call several other functions. They are all listed in the documentation for the [Kernel](https://hexdocs.pm/elixir/Kernel.html) module, in the `Guards` section of sidebar. You can also consult the complete [Patterns and Guards reference](https://hexdocs.pm/elixir/patterns-and-guards.html#guards) for in-depth documentation.
+
+## Pin operator
+
+Like in all patterns, we can use the pin `^` operator in `case` to match against the value of an existing variable:
+
+```elixir
+x = 1
+
+# 💡 Try changing 10 to 1
+case 10 do
+  ^x -> "Matched the value of x"
+  _ -> "Not matched the value of x"
+end
+```
+
+## Errors in guards
+
+Errors in guards do not leak but simply make the guard fail. This makes the code simpler - in the example below, we don't have to check if `x` is a number before performing arithmetic. The guard just fails silently and moves to the next clause:
+
+```elixir
+# 💡 Try calling "a" + 1 outside of the guard
+case "a" do
+  x when x + 1 == 3 -> "Won't match"
+  x -> "Got #{x}"
+end
+```

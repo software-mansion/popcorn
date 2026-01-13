@@ -1,0 +1,108 @@
+# Keyword Lists
+
+In Elixir, we have two main associative data structures for storing key-value pairs: keyword lists and maps. Let's start with keyword lists.
+
+Keyword lists are regular lists with a specific structure: each element is a two-element tuple, where the first element (key) must be an atom, and the second (value) can be any type.
+
+```elixir
+[{:a, 1}, {:b, 2}]
+```
+
+Elixir provides syntax sugar for keyword lists that's more concise `[key1: value1, key2: value2, ...]`:
+
+```elixir
+[a: 1, b: 2]
+```
+
+Keyword lists allow duplicate keys, which can be useful for certain scenarios:
+
+```elixir
+[a: 1, b: 2, b: 3]
+```
+
+In keyword lists, order matters - two lists with the same keys in different order are not equal:
+
+```elixir
+[a: 1, b: 2] != [b: 2, a: 1]
+```
+
+Now that we understand what keyword lists are, let's explore the operations we can perform on them.
+
+## Keyword list operations
+
+Since keyword lists are regular lists, you can use list operations on them. The [`Keyword`](https://hexdocs.pm/elixir/Keyword.html) module also provides functions specific to keyword lists.
+
+Concatenating two keyword lists:
+
+```elixir
+[a: 1, b: 2] ++ [c: 3, d: 4]
+```
+
+Check if a value is a keyword list using `Keyword.keyword?`:
+
+> Note the trailing ? sign in 'keyword?' - it's just a part of the function name. However, the convention is to use it for functions returning booleans.
+
+```elixir
+Keyword.keyword?([a: 1, b: 2])
+```
+
+The tuple syntax also works:
+
+```elixir
+# 💡 Try changing :a to "a". Is it still a keyword list?
+Keyword.keyword?([{:a, 1}, {:b, 2}])
+```
+
+Get a value by its key:
+
+```elixir
+# 💡 Let's change Keyword.get to Keyword.delete
+Keyword.get([a: 1, b: 2], :a)
+```
+
+You can also use bracket syntax to access values:
+
+```elixir
+keyword = [a: 1, b: 2]
+keyword[:a]
+```
+
+Add a new key-value pair with `Keyword.put`:
+
+```elixir
+Keyword.put([a: 1, b: 2], :c, 3)
+```
+
+## Using keyword lists as function options
+
+Keyword lists are commonly used to pass options to functions. When a keyword list is the last argument of a function, you can omit the square brackets.
+
+Here are different ways to write the same `IO.inspect` call:
+
+```elixir
+IO.inspect("hello", [{:label, "Print hello"}])
+
+IO.inspect("hello", [label: "Print hello"])
+```
+
+You can pass multiple options to functions:
+
+```elixir
+#💡 Try removing the label, try changing order of keys
+#💡 Try using 'printable_limit' key to limit printed characters
+IO.inspect([{1, 2, 3}, "hello world"],
+  label: "Print a list", pretty: true, width: 15)
+```
+
+`String.split` also accepts a keyword list for options:
+
+```elixir
+String.split("1 2 3 4", " ")
+```
+
+With options to control the behavior:
+
+```elixir
+#💡 Try removing square braces from [parts: 3]
+String.split("1 2 3 4", " ", [parts: 3])
+```

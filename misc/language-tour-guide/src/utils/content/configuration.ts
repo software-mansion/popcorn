@@ -97,5 +97,56 @@ export const navigationConfig: NavigationConfig = [
         component: lazyLoadLiveMd("2-lists-and-tuples/lists-or-tuples")
       }
     ]
+  },
+  {
+    group: "Keyword lists and maps",
+    items: [
+      {
+        name: "Keyword lists",
+        component: lazyLoadLiveMd("3-keyword-lists-and-maps/keyword_lists")
+      },
+      {
+        name: "Maps",
+        component: lazyLoadLiveMd("3-keyword-lists-and-maps/maps")
+      }
+    ]
+  },
+  {
+    name: "Pattern matching",
+    component: lazyLoadLiveMd("4-pattern-matching/pattern_matching")
+  },
+  {
+    group: "Constructs",
+    items: [
+      {
+        name: "case",
+        component: lazyLoadLiveMd("5-constructs/case")
+      },
+      {
+        name: "if and cond",
+        component: lazyLoadLiveMd("5-constructs/if_and_cond")
+      }
+    ]
+  },
+  {
+    name: "Anonymous functions",
+    component: lazyLoadLiveMd("6-anonymous-functions/anonymous_functions")
+  },
+  {
+    group: "Processes",
+    items: [
+      {
+        name: "Processes basics",
+        component: lazyLoadLiveMd("7-processes/processes_basics")
+      },
+      {
+        name: "Message passing",
+        component: lazyLoadLiveMd("7-processes/message_passing")
+      }
+    ]
+  },
+  {
+    name: "Congratulations",
+    component: lazyLoadLiveMd("congratulations")
   }
 ];
