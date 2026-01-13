@@ -1,0 +1,201 @@
+# Pattern Matching
+
+You've seen the = operator used to assign a value to the variable. = in Elixir is called the match operator. As it turns out, it can do much more than just a simple assignment!
+
+## Basic Matching
+
+Matching identical values:
+
+```elixir
+1 = 1
+```
+
+Assigning to a variable:
+
+```elixir
+x = 1
+```
+
+After the `1` is assigned to `x`, it can be used for matching. Line `1 = x` is legal and means "match x against pattern 1", which succeeds.
+
+```elixir
+1 = x
+```
+
+Test what happens when the pattern is `2`, or when you try to match a variable before it has been assigned. Experiment with mismatched patterns to see the difference between runtime and compilation errors.
+
+```elixir
+x = 2
+
+# 💡 Try uncommenting the following lines. What happens?
+# 2 = x
+# 2 = new_variable
+```
+
+## Matching Tuples
+
+Pattern matching lets you extract tuple elements into variables. The pattern must match the tuple size.
+
+Extracting tuple elements:
+
+```elixir
+{a, b} = {:hello, "world"}
+
+IO.inspect(a, label: "a")
+IO.inspect(b, label: "b")
+```
+
+The pattern must be of the same size for the match to succeed:
+
+```elixir
+# ❗️ This code raises an error!
+# 💡 Let's modify the pattern on the left to fix the error
+{x, y} = {:hello, "world", 42}
+
+IO.inspect(x, label: "x")
+IO.inspect(y, label: "y")
+```
+
+In Elixir, functions commonly return `{:ok, result}` on success and `{:error, reason}` on failure. You can use atoms in patterns to match such results:
+
+```elixir
+# 💡 Find out what happens if you replace `:answer`
+# with a different atom
+{:ok, answer} = Map.fetch(%{answer: 42}, :answer)
+answer
+```
+
+## Matching Lists
+
+List matching works similarly to tuples - you can extract every element of the list. The sizes of pattern and the value must equal for a successful matching.
+
+Extracting list elements:
+
+```elixir
+[j, k, l] = [1, 2, 3]
+
+IO.inspect(j, label: "j")
+IO.inspect(k, label: "k")
+IO.inspect(l, label: "l")
+```
+
+The cons operator (`|`, see [the lists section](../lists-and-tuples/lists)) provides a special pattern for matching the head (first element) and tail (remaining elements).
+
+```elixir
+# 💡 Try to match empty (`[]`) or single element list (`[1]`)
+[head | tail] = [1, 2, 3]
+
+IO.inspect(head, label: "head")
+IO.inspect(tail, label: "tail")
+```
+
+This shows how lists are internally structured using the cons operator - each element is prepended to the rest of the list:
+
+```elixir
+[head | tail] = [1 | [2 | [3 | []]]]
+
+IO.inspect(head, label: "head")
+IO.inspect(tail, label: "tail")
+```
+
+You can use the destructured parts to create new lists:
+
+```elixir
+[head | tail] = [1, 2, 3]
+[0 | tail]
+```
+
+## Matching Maps
+
+Patterns for maps can extract the value of any key or ensure that a specified key has a provided value. The pattern doesn't have to be exhaustive and cover every entry stored inside the map.
+
+Extracting a value by key:
+
+```elixir
+map = %{"a" => 1, :b => 2, :c => "c"}
+%{"a" => one} = map
+one
+```
+
+An empty map pattern matches any map:
+
+```elixir
+%{} = %{}
+%{} = map
+```
+
+You can enforce specific values for keys:
+
+```elixir
+# 💡 Try changing "c" to something else and see the result
+%{:b => two, :c => "c"} = map
+two
+```
+
+For atom keys, a special syntax is available:
+
+```elixir
+%{c: cee} = map
+cee
+```
+
+## Special patterns
+
+Elixir provides additional constructs for more precise pattern matching control.
+
+### The pin operator
+
+In Elixir, variables can be rebound, i.e. assigned to a new value. If you want to avoid that in a pattern and match against the actual value assigned to that variable, you must use the pin `^` operator. It can be a part of more complex patterns.
+
+Variables can be rebound:
+
+```elixir
+x = 1
+x = 2
+x
+```
+
+Using the pin operator to match against current value:
+
+```elixir
+# 💡 Let's see what will happen if you change the value to 3
+x = 2
+# This is the equivalent of
+^x = 2
+```
+
+The pin operator works in complex patterns:
+
+```elixir
+{y, ^x} = {3, 2}
+{y, x}
+```
+
+### Repeated variables
+
+If a variable occurs more than once in the pattern, it must bind to the same value. Otherwise, the match will fail.
+
+```elixir
+# 💡 Try changing one of the values in tuple on the right
+{z, z} = {3, 3}
+z
+```
+
+### Ignore pattern
+
+If you only want to extract some of the values, you may use the ignore pattern: `_`. It is a special variable that can never be read from
+
+```elixir
+# 💡 Let's try using the underscore
+[head | _] = [1, 2, 3]
+head
+```
+
+You can use named ignore patterns (like `_reason`) for readability, though reading them yields a warning:
+
+```elixir
+{:error, _reason} = {:error, :enoent}
+
+# 💡 Let's try using _reason
+:ok
+```

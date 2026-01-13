@@ -1,0 +1,52 @@
+# Processes Basics
+
+In Elixir, all code runs inside processes. Processes are isolated from each other, run concurrent to one another and communicate via message passing. Processes are not only the basis for concurrency in Elixir, but they also provide the means for building distributed and fault-tolerant programs.
+
+Elixir's processes should not be confused with operating system processes. Processes in Elixir are extremely lightweight in terms of memory and CPU (even compared to threads as used in many other programming languages). Because of this, it is not uncommon to have tens or even hundreds of thousands of processes running simultaneously.
+
+In this chapter, we will learn about the basic constructs for spawning new processes, as well as sending and receiving messages between processes.
+
+## Spawning processes
+
+The basic mechanism for spawning new processes is the auto-imported `spawn` function.
+
+`spawn` takes a function which it will execute in another process, and returns a PID (process identifier), that can be used to interact and communicate with the process.
+
+```elixir
+pid = spawn(fn -> 1 + 2 end)
+pid
+```
+
+After executing its function, a process exits immediately. We can check if a process is still alive using `Process.alive?`.
+
+```elixir
+# 💡 Try replacing the function passed to spawn with
+pid = spawn(fn -> 1 + 2 end)
+Process.alive?(pid)
+```
+
+## Self
+
+The `self` function returns the PID of the current process. Since all code runs in processes, even our code evaluator has its own PID.
+
+```elixir
+pid = self()
+pid
+```
+
+The current process is always alive while executing code.
+
+```elixir
+pid = self()
+Process.alive?(pid)
+```
+
+Each spawned process gets its own unique PID, different from the current process.
+
+```elixir
+# 💡 Let's run this code a few times. How do the PIDs change?
+spawn(fn ->
+  IO.inspect self(), label: "This code runs in another process"
+end)
+self()
+```

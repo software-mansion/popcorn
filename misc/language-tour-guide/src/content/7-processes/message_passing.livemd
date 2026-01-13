@@ -1,0 +1,99 @@
+# Message Passing
+
+Processes get much more interesting when we are able to send and receive messages.
+
+We can send messages to a process with `send` and receive them with `receive`.
+
+`send` accepts the PID of the target process and a message which can be any value.
+
+When a message is sent from a process A to a process B, it's enqueued in B's mailbox. Mailbox is a special queue that each process has.
+
+To pop a message from the mailbox, you can use `receive do ... end`.
+
+```elixir
+# First, spawn the receiver and get its PID
+receiver_pid = spawn(fn ->
+  receive do
+    message -> IO.inspect message, label: "Received a message"
+  end
+end)
+
+# Then, send a message to the receiver
+# 💡 Try spawning another process and sending a message from there
+send(receiver_pid, {:hello, "world"})
+```
+
+A process can also send messages to itself.
+
+```elixir
+send(self(), "message to self")
+
+receive do
+  message -> IO.inspect message, label: "Received a message from self"
+end
+```
+
+## Receive clauses
+
+The syntax for the `receive` block may look similar to `case`. That's because you can pass patterns to `receive` as well!
+
+The `receive` block goes through the process' mailbox searching for the first message that matches any of the given patterns.
+
+```elixir
+send(self(), {:hello, "world"})
+
+receive do
+  x when is_integer(x) ->
+    IO.inspect x, label: "This won't match"
+
+  {:hello, addressee} ->
+    IO.inspect addressee, label: "Received hello to"
+end
+```
+
+If no message matches, the process waits until a matching message arrives. You can specify a timeout to avoid waiting indefinitely.
+
+```elixir
+# 💡 Try changing :bye to {:hello, "world"}
+send(self(), :bye)
+
+receive do
+  {:hello, addressee} ->
+    IO.inspect addressee, label: "This won't be received"
+after
+  1_000 -> "Nothing after 1s"
+end
+```
+
+## 💡 Exercise: send and receive
+
+Let's practice sending messages between processes.
+
+Let's spawn two processes: `p1` and `p2`. Firstly, `p2` should send a `ping` message to `p1`. The message should be a tuple: `{:ping, p2_pid}`.
+
+Then, `p1` should send back a `pong` message (just a `:pong` atom) to `p2`, using the PID it received.
+
+Let's make the processes print messages they send and receive, like `IO.puts("Sending ping to p1")`.
+
+<details>
+  <summary>Hint</summary> 
+  <span>
+    start from implementing `p2`, then implement `p1`.
+  </span>
+</details>
+
+```elixir
+p1 = spawn(fn ->
+  # Receive ping message from p2
+  # Use pattern matching to get the PID of p2
+  # Send a pong message back to p2
+end)
+
+p2 = spawn(fn ->
+  # Send a {:ping, self()} message to p1
+  # Receive pong message from p1
+end)
+
+# Wait until processes finish exchanging messages
+Process.sleep(100)
+```
