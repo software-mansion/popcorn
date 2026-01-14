@@ -1,5 +1,6 @@
 packages:
   - "popcorn"
+  - "examples/js-lib"
 
 catalog:
   "@types/node": ^25.0.8
