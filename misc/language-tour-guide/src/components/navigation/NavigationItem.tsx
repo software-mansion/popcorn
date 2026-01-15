@@ -1,85 +1,135 @@
-import { NavLink, useLocation, useMatch } from "react-router";
+import { NavLink, useMatch } from "react-router";
 
 import ChevronDown from "../../assets/chevron-down.svg?react";
 import ChevronRight from "../../assets/chevron-right.svg?react";
 import Circle from "../../assets/circle.svg?react";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { NavigationTreeItem } from "../../utils/content/types";
 
 type NavigationItemProps = {
   item: NavigationTreeItem;
   onClick?: () => void;
 };
-
 export function NavigationItem({ item, onClick }: NavigationItemProps) {
-  const { hash, pathname } = useLocation();
-  const [isOpen, setIsOpen] = useState(
-    `${pathname}${hash}`.includes(item.path)
-  );
-  const isActive = useMatch(item.path) !== null;
-
-  useEffect(() => {
-    setIsOpen(`${pathname}${hash}`.includes(item.path));
-  }, [pathname, hash, item.path]);
-
+  // TODO: assert could be removed by doing
+  //
+  // {navigationTree.map((item) => (
+  //   <NavigationItem key={item.path} item={item} onClick={closeMenu} />
+  // ))}
+  //
+  // ourselves, since we then know it's top-level
+  //
+  // ...or just saying "whatever", it will break immediately anyways
+  assert(isRoot(item));
   const hasChildren = item.children.length > 0;
 
-  const isRoot = (item: NavigationTreeItem) => {
-    const pathSegments = item.path.split("/");
-    return pathSegments.length === 1;
-  };
+  if (hasChildren) {
+    return <CollapsibleItem item={item} onClick={onClick} />;
+  }
+  return <TopLevelItem item={item} onClick={onClick} />;
+}
 
-  const className = isRoot(item) || hasChildren ? "font-semibold mt-2" : "mt-0";
+const baseItemStyle =
+  "text-brown-80 flex cursor-pointer items-center rounded-md px-3 py-0.5 text-sm hover:bg-orange-100/10 ";
+
+function CollapsibleItem({ item, onClick }: NavigationItemProps) {
+  const onChildPage = useMatch({ path: item.path, end: false }) !== null;
+  const [isOpen, toggleOpen] = useToggle(onChildPage);
 
   return (
     <li className="my-1">
       <div
-        className={`text-brown-80 flex cursor-pointer items-center rounded-md px-3 py-0.5 text-sm hover:bg-orange-100/10 ${className} ${isActive ? "bg-orange-100/20 hover:bg-orange-100/20" : ""}`}
-        onClick={() => hasChildren && setIsOpen((prev) => !prev)}
+        className={`mt-2 font-semibold ${baseItemStyle}`}
+        onClick={toggleOpen}
       >
-        <span className="mr-2 flex w-5 flex-shrink-0 justify-center text-xs text-orange-100">
-          {hasChildren ? (
-            <>
-              {isOpen ? (
-                <ChevronDown className="w-5" />
-              ) : (
-                <ChevronRight className="w-5" />
-              )}
-            </>
-          ) : (
-            <Circle className="w-1.5" />
-          )}
-        </span>
-
-        {item.type === "link" ? (
-          <NavLink
-            to={item.path}
-            className={({ isActive }) =>
-              `navigation-link pl-0 ${isActive && "font-semibold"}`
-            }
-            onClick={onClick}
-          >
-            {item.title}
-          </NavLink>
-        ) : (
-          <span className="capitalize">{item.title}</span>
-        )}
+        <NavigationIcon type={isOpen ? "group-opened" : "group-collapsed"} />
+        <span className="capitalize">{item.title}</span>
       </div>
 
-      {hasChildren && (
-        <ul
-          className={`pl-5 transition-all duration-300 ${isOpen ? "block opacity-100" : "hidden opacity-0"}`}
-        >
-          {item.children.map((childItem) => (
-            <NavigationItem
-              key={childItem.path}
-              item={childItem}
-              onClick={onClick}
-            />
-          ))}
-        </ul>
-      )}
+      <ul
+        className={`pl-5 transition-all duration-300 ${isOpen ? "block opacity-100" : "hidden opacity-0"}`}
+      >
+        {item.children.map((childItem) => (
+          <NestedItem key={childItem.path} item={childItem} onClick={onClick} />
+        ))}
+      </ul>
     </li>
   );
+}
+
+function TopLevelItem({ item, onClick }: NavigationItemProps) {
+  const onPage = useMatch(item.path) !== null;
+
+  return (
+    <li className="my-1">
+      <div
+        className={`mt-2 font-semibold ${baseItemStyle} ${onPage && "bg-orange-100/20 hover:bg-orange-100/20"}`}
+      >
+        <NavigationIcon type="item" />
+        <NavLink
+          to={item.path}
+          className={`navigation-link pl-0 ${onPage && "font-semibold"}`}
+          onClick={onClick}
+        >
+          {item.title}
+        </NavLink>
+      </div>
+    </li>
+  );
+}
+
+function NestedItem({ item, onClick }: NavigationItemProps) {
+  const onPage = useMatch(item.path) !== null;
+
+  return (
+    <li className="my-1">
+      <div
+        className={`${baseItemStyle} mt-0 ${onPage && "bg-orange-100/20 hover:bg-orange-100/20"}`}
+      >
+        <NavigationIcon type="item" />
+        <NavLink
+          to={item.path}
+          className={`navigation-link pl-0 ${onPage && "font-semibold"}`}
+          onClick={onClick}
+        >
+          {item.title}
+        </NavLink>
+      </div>
+    </li>
+  );
+}
+
+type NavigationIconProps = {
+  type: "group-opened" | "group-collapsed" | "item";
+};
+function NavigationIcon({ type }: NavigationIconProps) {
+  return (
+    <span className="mr-2 flex w-5 flex-shrink-0 justify-center text-xs text-orange-100">
+      {type === "group-opened" && <ChevronDown className="w-5" />}
+      {type === "group-collapsed" && <ChevronRight className="w-5" />}
+      {type === "item" && <Circle className="w-1.5" />}
+    </span>
+  );
+}
+
+function isRoot(item: NavigationTreeItem) {
+  const pathSegments = item.path.split("/");
+
+  return pathSegments.length === 1;
+}
+
+function assert(ok: boolean) {
+  const isDev = import.meta.env.DEV;
+  if (isDev && !ok) throw new Error("assert");
+}
+
+function useToggle(initial: boolean): [boolean, () => void] {
+  const [state, setState] = useState(initial);
+
+  const toggle = useCallback(() => {
+    setState((prev) => !prev);
+  }, [setState]);
+
+  return [state, toggle];
 }
