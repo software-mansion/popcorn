@@ -19,7 +19,7 @@ export function NavigationButton({
   const chapterLabel =
     direction === "next" ? "Next chapter" : "Previous chapter";
 
-  const className = `w-44 flex ${direction === "previous" ? "flex justify-end" : ""}`;
+  const className = `w-44 flex ${direction === "previous" ? "justify-end" : ""}`;
 
   if (!path) {
     return (
@@ -35,7 +35,7 @@ export function NavigationButton({
 
   if (isChapterNavigation) {
     return (
-      <div className="w-44">
+      <div className={`h-8 w-44 lg:h-9 ${className}`}>
         <NavLink
           to={path}
           className={`flex w-fit items-center gap-1 rounded-full bg-orange-100 py-1 text-sm font-medium text-white transition-colors duration-300 hover:bg-orange-200 lg:py-0`}

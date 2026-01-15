@@ -1,9 +1,7 @@
-import { NavLink, useLocation, useMatch } from "react-router";
+import { NavLink, useLocation } from "react-router";
 
 import ChevronDown from "../../assets/chevron-down.svg?react";
 import ChevronRight from "../../assets/chevron-right.svg?react";
-import Circle from "../../assets/circle.svg?react";
-
 import { useEffect, useState } from "react";
 import type { NavigationTreeItem } from "../../utils/content/types";
 
@@ -17,7 +15,6 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
   const [isOpen, setIsOpen] = useState(
     `${pathname}${hash}`.includes(item.path)
   );
-  const isActive = useMatch(item.path) !== null;
 
   useEffect(() => {
     setIsOpen(`${pathname}${hash}`.includes(item.path));
@@ -25,30 +22,30 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
 
   const hasChildren = item.children.length > 0;
 
-  const isRoot = (item: NavigationTreeItem) => {
-    const pathSegments = item.path.split("/");
-    return pathSegments.length === 1;
+  const isSelected = (item: NavigationTreeItem) => {
+    return item.path && item.path.includes(hash);
   };
-
-  const className = isRoot(item) || hasChildren ? "font-semibold mt-2" : "mt-0";
 
   return (
     <li className="my-1">
       <div
-        className={`text-brown-80 flex cursor-pointer items-center rounded-md px-3 py-0.5 text-sm hover:bg-orange-100/10 ${className} ${isActive ? "bg-orange-100/20 hover:bg-orange-100/20" : ""}`}
+        className={`mt-2 flex items-center rounded-md px-3 py-0.5 text-sm ${
+          hasChildren
+            ? "text-brown-header cursor-pointer font-semibold hover:bg-orange-100/10"
+            : "text-brown-80"
+        }`}
         onClick={() => hasChildren && setIsOpen((prev) => !prev)}
       >
-        <span className="mr-2 flex w-5 flex-shrink-0 justify-center text-xs text-orange-100">
-          {hasChildren ? (
-            <>
+        {/* Always reserve space for the chevron */}
+        <span className="mr-2 w-5 flex-shrink-0">
+          {hasChildren && (
+            <span className="text-xs text-orange-100">
               {isOpen ? (
                 <ChevronDown className="w-5" />
               ) : (
                 <ChevronRight className="w-5" />
               )}
-            </>
-          ) : (
-            <Circle className="w-1.5" />
+            </span>
           )}
         </span>
 
@@ -56,7 +53,11 @@ export function NavigationItem({ item, onClick }: NavigationItemProps) {
           <NavLink
             to={item.path}
             className={({ isActive }) =>
-              `navigation-link pl-0 ${isActive && "font-semibold"}`
+              `navigation-link pl-0 font-medium ${
+                isActive && isSelected(item)
+                  ? "bg-color-orange-20 text-color-orange-100 bg-orange-100/10 font-semibold"
+                  : "text-color-brown-80 hover:bg-orange-100/10"
+              }`
             }
             onClick={onClick}
           >

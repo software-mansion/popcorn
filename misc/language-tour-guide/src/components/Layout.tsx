@@ -1,13 +1,17 @@
 import { Outlet } from "react-router";
-import { Header } from "./Header";
+import { Branding } from "./Branding";
 import { Navigation } from "./navigation/Navigation";
 
 export function Layout() {
   return (
-    <main className="font-inter flex max-h-screen min-h-dvh flex-col pt-16">
-      <Header />
-      <Navigation />
-      <Outlet />
-    </main>
+    <>
+      <header className="fixed top-0 z-30 flex w-full flex-col">
+        <Branding />
+        <Navigation />
+      </header>
+      <main className="font-inter flex max-h-screen min-h-dvh flex-col pt-28">
+        <Outlet />
+      </main>
+    </>
   );
 }
