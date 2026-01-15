@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
-import { NavigationItem } from "./NavigationItem";
+import { NavigationList } from "./NavigationList";
 
 import Hamburger from "../../assets/hamburger.svg?react";
 import Close from "../../assets/close.svg?react";
@@ -46,9 +46,7 @@ export function Navigation() {
           <span className="sr-only">Close menu</span>
           <Close className="h-full w-5.5 text-white" />
         </button>
-        {navigationTree.map((item) => (
-          <NavigationItem key={item.path} item={item} onClick={closeMenu} />
-        ))}
+        <NavigationList items={navigationTree} onClick={closeMenu} />
         <li className="mt-8">
           <NavLink
             to="https://popcorn.swmansion.com/privacy-policy.html"
