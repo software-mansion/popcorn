@@ -1,4 +1,4 @@
-# Alias, require, and import
+# Alias, require and import
 
 ## alias
 
