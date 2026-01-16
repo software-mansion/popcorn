@@ -79,7 +79,14 @@ export const usePopcorn = () => {
     reinitializePopcorn();
   }, [reinitializePopcorn]);
 
-  return { call, cast, startLogCapture, cancelCall, isLoadingPopcorn };
+  return {
+    call,
+    cast,
+    startLogCapture,
+    cancelCall,
+    isLoadingPopcorn,
+    reinitializePopcorn
+  };
 };
 
 function isPopcornError(error: unknown): error is PopcornError {
