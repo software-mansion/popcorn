@@ -3,10 +3,20 @@ import { components } from "./markdown";
 import NavigationBar from "./navigation/NavigationBar";
 import { usePopcorn } from "../utils/hooks/usePopcorn";
 import { Loader } from "./Loader";
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
+import { useEffect, useRef } from "react";
 
 export function Description() {
-  const { isLoadingPopcorn } = usePopcorn();
+  const { isLoadingPopcorn, reinitializePopcorn } = usePopcorn();
+  const { pathname } = useLocation();
+  const prevPathnameRef = useRef<string>(pathname);
+
+  useEffect(() => {
+    if (prevPathnameRef.current !== pathname) {
+      reinitializePopcorn();
+      prevPathnameRef.current = pathname;
+    }
+  }, [pathname, reinitializePopcorn]);
 
   return (
     <section
