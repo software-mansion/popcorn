@@ -108,7 +108,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
 
       setEditorExecutionState(editorId, "running");
 
-      const runResult = await evalCode(editor.code);
+      const runResult = await evalCode(editor.code, editorId);
       const { data, durationMs, stderr, stdout, error } = runResult;
 
       const ok = error === null;
