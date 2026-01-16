@@ -5,6 +5,14 @@ defmodule ElixirTour do
 
   @process_name :main
 
+  @type editor_id :: String.t()
+  @type bindings :: Keyword.t()
+  @type state :: %{
+          editor_order: [editor_id()],
+          bindings: %{editor_id() => bindings()}
+        }
+  @type wasm_result :: {:resolve, String.t(), state()} | {:reject, String.t(), state()}
+
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: @process_name)
   end
@@ -13,7 +21,7 @@ defmodule ElixirTour do
   def init(_init_arg) do
     Wasm.register(@process_name)
     :application.set_env(:elixir, :ansi_enabled, false)
-    {:ok, %{}}
+    {:ok, %{editor_order: [], bindings: %{}}}
   end
 
   @impl GenServer
@@ -29,25 +37,69 @@ defmodule ElixirTour do
     {:noreply, state}
   end
 
-  defp handle_wasm({:wasm_call, ["eval_elixir", page_id, code]}, all_bindings) do
-    bindings = Map.get(all_bindings, page_id, [])
+  @spec handle_wasm({:wasm_call, list()}, state()) :: wasm_result()
+  defp handle_wasm({:wasm_call, ["set_editor_order", editor_order]}, _state) do
+    {:resolve, "ok", %{editor_order: editor_order, bindings: %{}}}
+  end
+
+  defp handle_wasm({:wasm_call, ["eval_elixir", editor_id, code]}, state) do
+    editor_order = Map.get(state, :editor_order, [])
+    bindings_map = Map.get(state, :bindings, %{})
+
+    preceding_editor_ids = get_preceding_editors(editor_order, editor_id)
+
+    merged_bindings =
+      preceding_editor_ids
+      |> Enum.reduce([], fn prev_editor_id, acc ->
+        case Map.get(bindings_map, prev_editor_id) do
+          bindings when is_list(bindings) ->
+            Keyword.merge(acc, bindings)
+
+          nil ->
+            acc
+        end
+      end)
 
     try do
-      case eval(code, bindings) do
+      case eval(code, merged_bindings) do
         {:ok, result, new_bindings} ->
-          all_bindings = Map.put(all_bindings, page_id, new_bindings)
-          {:resolve, inspect(result), all_bindings}
+          editor_bindings = extract_new_bindings(merged_bindings, new_bindings)
+          updated_bindings = Map.put(bindings_map, editor_id, editor_bindings)
+          updated_state = %{state | bindings: updated_bindings}
+
+          {:resolve, inspect(result), updated_state}
 
         {:error, error_message} ->
-          {:reject, error_message, all_bindings}
+          {:reject, error_message, state}
       end
     rescue
       e ->
         error_message = Exception.format(:error, e)
-        {:reject, error_message, all_bindings}
+
+        {:reject, error_message, state}
     end
   end
 
+  @spec get_preceding_editors([editor_id()], editor_id()) :: [editor_id()]
+  defp get_preceding_editors(editor_order, editor_id) do
+    case Enum.find_index(editor_order, &(&1 == editor_id)) do
+      nil -> []
+      index -> Enum.take(editor_order, index)
+    end
+  end
+
+  @spec extract_new_bindings(bindings(), bindings()) :: bindings()
+  defp extract_new_bindings(input_bindings, output_bindings) do
+    output_bindings
+    |> Enum.filter(fn {key, value} ->
+      case Keyword.get(input_bindings, key) do
+        old_value when old_value !== value -> true
+        _ -> false
+      end
+    end)
+  end
+
+  @spec eval(String.t(), bindings()) :: {:ok, any(), bindings()} | {:error, String.t()}
   defp eval(code, bindings) do
     try do
       {evaluated, new_bindings} =
