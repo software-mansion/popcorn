@@ -1,0 +1,160 @@
+# Modules and functions
+
+In Elixir, we group functions in modules. We've already used many different modules in the previous chapters, such as the String module:
+
+```elixir
+String.length("hello")
+```
+
+In order to create our own modules in Elixir, we use the `defmodule` macro. The convention is to start module name with an uppercase letter, but it can also be any atom. To define functions in the module, we can use `def` macro. A function name should start with a lowercase letter or an underscore.
+
+```elixir
+defmodule Math do
+  def sum(a, b) do
+    a + b
+  end
+end
+
+Math.sum(10, 11)
+```
+
+Inside a module, we can also define private functions with `defp/2`. A function defined with `def/2` can be invoked from other modules while a private function can only be invoked locally.
+
+```elixir
+defmodule Math2 do
+  def sum(a, b) do
+    do_sum(a, b)
+  end
+
+  defp do_sum(a, b) do
+    a + b
+  end
+end
+
+Math2.sum(11, 12)
+# 💡 Try calling Math2.do_sum from outside of the module
+```
+
+Function declarations also support guards and multiple clauses. If a function has several clauses, Elixir will try each clause until it finds one that matches. Here is an implementation of a function that checks if the given integer is zero or not:
+
+```elixir
+defmodule Math3 do
+  def zero?(0) do
+    true
+  end
+
+  def zero?(x) when is_integer(x) do
+    false
+  end
+end
+
+Math3.zero?(0)
+# 💡 Try calling Math3.zero? with an integer other that 0
+# 💡 Try calling Math3.zero? with a float
+```
+
+The trailing question mark in `zero?` is just a part of the function name and doesn't have any special implications. However, the convention is to use it for functions that return a boolean. To learn more about the naming conventions for modules, function names, variables and more in Elixir, see [Naming Conventions](https://hexdocs.pm/elixir/naming-conventions.html).
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Default arguments
+
+<!-- livebook:{"break_markdown":true} -->
+
+Function definitions in Elixir also support default arguments:
+
+```elixir
+defmodule Concat do
+  def join(a, b, sep \\ " ") do
+    a <> sep <> b
+  end
+end
+
+Concat.join("hello", "world", "_")
+# 💡 Try calling Concat.join with two arguments
+```
+
+Note that the expression provided as a default argument is evaluated on each function call. To see it, try running the below snippet a few times:
+
+```elixir
+defmodule Concat2 do
+  def join(a, b, sep \\ Enum.random([" ", "_", ", ", "-"])) do
+    a <> sep <> b
+  end
+end
+
+Concat2.join("hello", "world")
+```
+
+If a function with default values has multiple clauses, it is required to create a function head (a function definition without a body) for declaring defaults:
+
+```elixir
+defmodule Concat3 do
+  # A function head declaring defaults
+  def join(a, b, sep \\ " ")
+
+  def join(a, b, _sep) when b == "" do
+    a
+  end
+
+  def join(a, b, sep) do
+    a <> sep <> b
+  end
+end
+
+Concat3.join("hello", "")
+```
+
+### Module namespacing & nesting
+
+For now, we've been using single words as module names. In real projects, module names are usually prefixed with the project name and possibly internal namespaces, using a dot `.` separator:
+
+```elixir
+defmodule MyProject.Utils.Concat do
+  def join(a, b, sep \\ " ") do
+    a <> sep <> b
+  end
+end
+
+MyProject.Utils.Concat.join("hello", "world")
+```
+
+Actually, all modules are defined under `Elixir` namespace, but for convenience you can omit `Elixir.`
+
+💡 Try prefixing `MyProject.Utils.Concat.join(...)` above with `Elixir.` - does it still work?
+
+<!-- livebook:{"break_markdown":true} -->
+
+Modules can also be nested within one another. The following snippet creates two modules: `Foo` and `Foo.Bar`.
+
+```elixir
+defmodule Foo do
+  defmodule Bar do
+    def hello do
+      :ok
+    end
+  end
+end
+
+Foo.Bar.hello()
+```
+
+When modules are nested, the outer module can access the inner one by an unprefixed name:
+
+```elixir
+defmodule Foo2 do
+  defmodule Bar do
+    def hi do
+      "hi"
+    end
+  end
+
+  def hello() do
+    Bar.hi()
+  end
+end
+
+Foo2.hello()
+```
+
+In real-world projects, it's generally better to avoid nesting modules, especially when the inner module is used outside of the outer module. The usual approach is to have one module per file.

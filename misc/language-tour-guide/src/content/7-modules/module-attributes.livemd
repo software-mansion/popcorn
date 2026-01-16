@@ -1,0 +1,171 @@
+# Module attributes
+
+Module attributes in Elixir are constants computed at the compile-time that can be used within the given module:
+
+```elixir
+defmodule Math do
+  # Here we define a module attribute
+  # named 'pi' with value 3.14:
+  @pi 3.14
+
+  def circle_area(r) do
+    # Here we use the module attribute
+    # named 'pi'. When the module is compiled,
+    # it's value is substituted with 3.14,
+    # as we defined it.
+    @pi * r ** 2
+  end
+end 
+
+Math.circle_area(3)
+```
+
+💡 Try removing the `circle_area` function above. You should get a warning about an unused attribute.
+
+Module attributes can be redefined:
+
+```elixir
+defmodule Math2 do
+  @pi 3.14
+
+  def circle_area(r) do
+    @pi * r ** 2
+  end
+
+  # From now on, @pi is twice as big
+  @pi @pi * 2
+
+  def circle_area_in_alternative_world(r) do
+    @pi * r ** 2
+  end
+end 
+
+# 💡 Try calling `Math2.circle_area(3)`. What's the result?
+Math2.circle_area_in_alternative_world(3)
+```
+
+However, note that the attributes are calculated during the compilation: once the module is compiled, they're replaced with their values.
+
+Module attributes can also be used as annotations, for example to add documentation to modules and functions. For that purpose, Elixir adds special meaning to some attributes and we present some of them below - all are listed [here](https://hexdocs.pm/elixir/Module.html).
+
+## Documentation
+
+To include documentation in a module you can use `@moduledoc` (documents whole module) and `@doc` (documents particular function):
+
+```elixir
+defmodule Math3 do
+  @moduledoc """
+  Provides math-related functions.
+  """
+
+  @pi 3.14
+
+  @doc """
+  Calculates circle area from its radius.
+  """
+  def circle_area(r) do
+    @pi * r ** 2
+  end
+end 
+
+Math3.circle_area(3)
+```
+
+Note that `@doc` can still be accessed like any other module attribute.
+
+💡 Try changing the `circle_area` function so that it returns its own documentation.
+
+## Typespecs
+
+Elixir also allows to add type annotations to a function. It can be done using `@spec` attribute:
+
+`@spec function_name(argument1_type, argument2_type, ...) :: return_type`
+
+Let's do that for our `circle_area/1` function:
+
+```elixir
+defmodule Math4 do
+  @moduledoc """
+  Provides math-related functions.
+  """
+
+  @pi 3.14
+
+  @doc """
+  Calculates circle area from its radius.
+  """
+  @spec circle_area(number) :: number
+  def circle_area(r) do
+    @pi * r ** 2
+  end
+end 
+
+Math4.circle_area(3)
+```
+
+Let's try to improve our function, so that it handles invalid input:
+
+```elixir
+defmodule Math5 do
+  @moduledoc """
+  Provides math-related functions.
+  """
+
+  @pi 3.14
+
+  @doc """
+  Calculates circle area from its radius.
+  """
+  @spec circle_area(number) :: {:ok, number} | :error
+  def circle_area(r) when r >= 0 do
+    result = @pi * r ** 2
+    {:ok, result}
+  end
+
+  def circle_area(_r) do
+    :error
+  end
+end 
+
+Math5.circle_area(3)
+```
+
+Now, the function returns `{:ok, number}` tuple for valid (non-negative) input, or `:error` atom in other cases. It's reflected in the returned type: `{:ok, number} | :error`.
+
+For reusability, we can define a custom, named type using `@type` module attribute. A custom type can also have a its own documentation with `@typedoc`:
+
+```elixir
+defmodule Math6 do
+  @moduledoc """
+  Provides math-related functions.
+  """
+
+  @typedoc """
+  Result of a math-related function.
+  """
+  @type numeric_result :: {:ok, number} | :error
+  
+  @pi 3.14
+
+  @doc """
+  Calculates circle area from its radius.
+  """
+  @spec circle_area(number) :: numeric_result
+  def circle_area(r) when r >= 0 do
+    result = @pi * r ** 2
+    {:ok, result}
+  end
+
+  def circle_area(_r) do
+    :error
+  end
+end 
+
+Math6.circle_area(3)
+```
+
+Type annotations serve mostly documentation purposes, however there are tools that check their integrity to some extent, most popular being [Dialyzer](https://www.erlang.org/doc/apps/dialyzer/dialyzer.html). Dialyzer is an Erlang tool, but there's a wrapper called [Dialyxir](https://hexdocs.pm/dialyxir/readme.html) that provides better experience for Elixir projects.
+
+Elixir is in the process of implementing a [new type system](https://hexdocs.pm/elixir/gradual-set-theoretic-types.html), that provides formal verification based on set-theoretic types. Typespecs may be phased out as the set-theoretic type effort moves forward.
+
+For now, you can learn more about typespecs [here](https://hexdocs.pm/elixir/typespecs.html).

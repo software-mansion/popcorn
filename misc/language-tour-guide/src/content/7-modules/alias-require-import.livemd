@@ -1,0 +1,140 @@
+# Alias, require and import
+
+## alias
+
+`alias` allows you to refer to a module under a different name. It's useful when dealing with namespaced module names, like `MyProject.Utils`. The alias directive allows referring to it just as `Utils` within the current scope:
+
+```elixir
+defmodule MyProject.Utils do
+  def concat(a, b) do
+    a <> " " <> b
+  end
+end
+
+alias MyProject.Utils
+
+Utils.concat("hello", "world")
+```
+
+With the `as` option, you can also choose a different alias:
+
+```elixir
+alias MyProject.Utils, as: MyUtils
+
+MyUtils.concat("hello", "world")
+```
+
+Note that `alias` is lexically scoped, which allows you to set aliases inside specific functions:
+
+```elixir
+x = 5
+
+if x >= 4 do
+  alias MyProject.Utils, as: U
+
+  U.concat("hello", "world")
+else
+  # 💡 Try changing the value of `x`, so that it's less than 4, and uncomment the code below.
+  # Does the alias work in this scope?
+
+  # U.concat("hello", "world")
+end
+```
+
+Finally, all module names and aliases are converted to atoms at the compile time:
+
+```elixir
+is_atom(Foo.Bar) and Foo.Bar == :"Elixir.Foo.Bar"
+```
+
+## require
+
+Elixir provides macros as a mechanism for meta-programming (writing code that generates code). Macros are expanded at compile time.
+
+Public functions in modules are globally available, but in order to use macros, you need to opt-in by requiring the module they are defined in.
+
+In the code below, we use the Logger module. Logger provides macro-based API, so that when you configure it to disable some logs, they can be completely removed from the code at the compile-time. Therefore, `Logger.info` is a macro and we have to use `require` before calling it.
+
+```elixir
+# 💡 Try removing the line below and see what happens
+require Logger
+
+Logger.info("hello")
+```
+
+`require` also supports the `as` option, so you can do `require` and `alias` in one line:
+
+```elixir
+require Logger, as: L
+
+L.info("hello")
+```
+
+Note that `require` generates a _compile-time dependency_ on the required module. It means that the required module must be compiled before the one calling require. Also, if the required module changes, all modules which require it must be checked and may have to be recompiled. Therefore, using `require` too often may significantly increase compilation times.
+
+## import
+
+We use import whenever we want to access functions or macros from other modules without using the fully-qualified name. Note we can only import public functions, as private functions are never accessible externally.
+
+For example, if we want to use the `duplicate/2` function from the `List` module several times, we can import it:
+
+```elixir
+import List, only: [duplicate: 2]
+
+duplicate("hello", 3)
+```
+
+Note that we imported only the function `duplicate` (with arity 2) from `List`. Although `:only` is optional, its usage is recommended in order to avoid importing all the functions of a given module inside the current scope. `:except` could also be given as an option in order to import everything in a module except a list of functions.
+
+Like `alias`, `import` is lexically scoped too. This means that we can import specific macros or functions inside function definitions:
+
+```elixir
+defmodule Foo do
+  def bar() do
+    import List, only: [duplicate: 2]
+
+    duplicate("hello", 3)
+  end
+end
+
+Foo.bar()
+```
+
+In the example above, the imported `List.duplicate/2` is only visible within that specific function. `duplicate/2` won't be available in any other function in that module (or any other module for that matter).
+
+While imports can be useful for frameworks and libraries to build abstractions, developers should generally prefer `alias` to `import` on their own codebases, as aliases make the origin of the function being invoked clearer.
+
+Also, note that `import` also `require`s given module automatically.
+
+
+## Multi alias, require and import
+
+Let's say we have multiple modules in the same namespace:
+
+```elixir
+defmodule My.Project do
+  defmodule Foo do
+    def hello do
+      "hello"
+    end
+  end
+
+  defmodule Bar do
+    def hi do
+      "hi"
+    end
+  end
+end
+```
+
+To alias them, we can use the syntax with `{}` brackets:
+
+```elixir
+alias My.Project.{Foo, Bar}
+
+Foo.hello() <> " " <> Bar.hi()
+```
+
+The same applies to `require` and `import`.
+
+💡 Try changing `alias` to `import` above. Adjust the calls accordingly.
