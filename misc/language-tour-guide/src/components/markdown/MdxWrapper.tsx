@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { CodeSnippet } from "../../plugins/livemd/parser";
 import { useEditorsStore } from "../../store/editors";
 import { useLocation } from "react-router";
+import { usePopcorn } from "../../utils/hooks/usePopcorn";
 
 export type MdxWrapperProps = {
   Component: React.ComponentType;
@@ -13,6 +14,7 @@ export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
   const clearEditors = useEditorsStore((state) => state.clearEditors);
   const [isInitialized, setIsInitialized] = useState(false);
   const { pathname } = useLocation();
+  const { call } = usePopcorn();
 
   useEffect(() => {
     clearEditors();
@@ -27,8 +29,12 @@ export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
     for (const snippet of codeSnippets) {
       initEditor(snippet);
     }
+
+    const editorOrder = codeSnippets.map((snippet) => snippet.id);
+    call(["set_editor_order", editorOrder], { timeoutMs: 5000 });
+
     setIsInitialized(true);
-  }, [codeSnippets, initEditor]);
+  }, [codeSnippets, initEditor, call]);
 
   if (!isInitialized) {
     return null;
