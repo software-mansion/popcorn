@@ -44,17 +44,20 @@ end
 Math2.circle_area_in_alternative_world(3)
 ```
 
-However, note that the attributes are calculated during the compile-time: once the module is compiled, they can't change.
+However, note that the attributes are calculated during the compilation: once the module is compiled, they're replaced with their values.
+
+Module attributes can also be used as annotations, for example to add documentation to modules and functions. For that purpose, Elixir adds special meaning to some attributes and we present some of them below - all are listed [here](https://hexdocs.pm/elixir/Module.html).
 
 ## Documentation
 
-Module attributes are also used as annotations, for example to add documentation to modules and functions. For that purpose, Elixir adds special meaning to some attributes. For example, `@moduledoc` defines documentation for a module and `@doc` - for functions:
+To include documentation in a module you can use `@moduledoc` (documents whole module) and `@doc` (documents particular function):
 
 ```elixir
 defmodule Math3 do
   @moduledoc """
   Provides math-related functions.
   """
+
   @pi 3.14
 
   @doc """
@@ -85,6 +88,7 @@ defmodule Math4 do
   @moduledoc """
   Provides math-related functions.
   """
+
   @pi 3.14
 
   @doc """
@@ -106,6 +110,7 @@ defmodule Math5 do
   @moduledoc """
   Provides math-related functions.
   """
+
   @pi 3.14
 
   @doc """

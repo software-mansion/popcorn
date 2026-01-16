@@ -6,7 +6,7 @@ In Elixir, we group functions in modules. We've already used many different modu
 String.length("hello")
 ```
 
-In order to create our own modules in Elixir, we use the `defmodule` macro. The module name should start with an uppercase letter. To define functions in the module, we can use `def` macro. The function name should start with a lowercase letter or an underscore.
+In order to create our own modules in Elixir, we use the `defmodule` macro. The convention is to start module name with an uppercase letter, but it can also be any atom. To define functions in the module, we can use `def` macro. A function name should start with a lowercase letter or an underscore.
 
 ```elixir
 defmodule Math do
@@ -144,13 +144,13 @@ When modules are nested, the outer module can access the inner one by an unprefi
 ```elixir
 defmodule Foo2 do
   defmodule Bar do
-    def hello do
-      :ok
+    def hi do
+      "hi"
     end
   end
 
   def hello() do
-    Bar.hello()
+    Bar.hi()
   end
 end
 

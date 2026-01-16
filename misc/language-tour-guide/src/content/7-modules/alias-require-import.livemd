@@ -2,7 +2,7 @@
 
 ## alias
 
-`alias` allows you to set up aliases for any given module name. It's useful when dealing with namespaced module names, like `MyProject.Utils`. The alias directive allows referring to it just as `Utils` within the current scope:
+`alias` allows you to refer to a module under a different name. It's useful when dealing with namespaced module names, like `MyProject.Utils`. The alias directive allows referring to it just as `Utils` within the current scope:
 
 ```elixir
 defmodule MyProject.Utils do
@@ -41,6 +41,12 @@ else
 end
 ```
 
+Finally, all module names and aliases are converted to atoms at the compile time:
+
+```elixir
+is_atom(Foo.Bar) and Foo.Bar == :"Elixir.Foo.Bar"
+```
+
 ## require
 
 Elixir provides macros as a mechanism for meta-programming (writing code that generates code). Macros are expanded at compile time.
@@ -63,6 +69,8 @@ require Logger, as: L
 
 L.info("hello")
 ```
+
+Note that `require` generates a _compile-time dependency_ on the required module. It means that the required module must be compiled before the one calling require. Also, if the required module changes, all modules which require it must be checked and may have to be recompiled. Therefore, using `require` too often may significantly increase compilation times.
 
 ## import
 
@@ -97,3 +105,36 @@ In the example above, the imported `List.duplicate/2` is only visible within tha
 While imports can be useful for frameworks and libraries to build abstractions, developers should generally prefer `alias` to `import` on their own codebases, as aliases make the origin of the function being invoked clearer.
 
 Also, note that `import` also `require`s given module automatically.
+
+
+## Multi alias, require and import
+
+Let's say we have multiple modules in the same namespace:
+
+```elixir
+defmodule My.Project do
+  defmodule Foo do
+    def hello do
+      "hello"
+    end
+  end
+
+  defmodule Bar do
+    def hi do
+      "hi"
+    end
+  end
+end
+```
+
+To alias them, we can use the syntax with `{}` brackets:
+
+```elixir
+alias My.Project.{Foo, Bar}
+
+Foo.hello() <> " " <> Bar.hi()
+```
+
+The same applies to `require` and `import`.
+
+💡 Try changing `alias` to `import` above. Adjust the calls accordingly.
