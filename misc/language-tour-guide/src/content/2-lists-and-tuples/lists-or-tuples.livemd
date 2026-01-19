@@ -6,20 +6,20 @@ Tuples, on the other hand, are most useful for grouping a small, fixed number of
 
 A common pattern is to use 'tagged tuples', which consist of an atom and a value, for example `{:ok, "result"}`.
 
-`String.split` returns a list:
+`String.split/2` returns a list:
 
 ```elixir
 # 💡 Try adding another word to `"hello world"`
 String.split("hello world", " ")
 ```
 
-`String.split_at` returns a 2-element tuple:
+`String.split_at/2` returns a 2-element tuple:
 
 ```elixir
 String.split_at("hello world", 3)
 ```
 
-`Base.decode16` returns a tagged tuple:
+`Base.decode16/1` returns a tagged tuple:
 
 ```elixir
 # 💡 Try changing the input so it contains an invalid character, such as 'z'
@@ -32,6 +32,6 @@ In Elixir, it's a convention to define two versions of functions that can fail:
 - Another with a trailing `!` that raises an error - useful when failures are unexpected
 
 ```elixir
-# 💡 Try `Base.decode16!` with invalid input (for example, containing 'z') to see the error.
+# 💡 Try `Base.decode16!/1` with invalid input (for example, containing 'z') to see the error.
 Base.decode16!("666F6F626172")
 ```

@@ -17,13 +17,17 @@ pid = spawn(fn -> 1 + 2 end)
 pid
 ```
 
-After executing its function, a process exits immediately. We can check if a process is still alive using `Process.alive?`.
+After executing its function, a process exits immediately. We can check if a process is still alive using `Process.alive?/1`.
 
 ```elixir
-# 💡 Try replacing the function passed to spawn with
 pid = spawn(fn -> 1 + 2 end)
+
+# Since the process only performed addition,
+# it's most likely dead at this point.
 Process.alive?(pid)
 ```
+
+💡 Try replacing the function passed to spawn above with `fn -> Process.sleep(1000) end`. Is the process alive?
 
 ## Self
 
@@ -48,5 +52,9 @@ Each spawned process gets its own unique PID, different from the current process
 spawn(fn ->
   IO.inspect self(), label: "This code runs in another process"
 end)
+
+# Wait for the `IO.inspect` above to run
+Process.sleep(100)
+
 self()
 ```

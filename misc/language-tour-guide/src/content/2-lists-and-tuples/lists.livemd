@@ -2,9 +2,7 @@
 
 In this chapter we will learn two of the most used collection data-types in Elixir: lists and tuples. Let's start with lists.
 
-Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list.
-
-A list of various elements:
+Elixir uses square brackets to specify a list of values. Values can be of any type, so you can mix different types within one list:
 
 ```elixir
 # 💡 Try nesting another list within the list.
@@ -19,7 +17,7 @@ length([1, 2, 3])
 
 ## Accessing List Elements
 
-Throughout the tutorial, we will talk a lot about the head and tail of a list. The head is the first element of a list and the tail is the remainder of the list. They can be retrieved with the functions `hd` and `tl`.
+Throughout the tutorial, we will talk a lot about the head and tail of a list. The head is the first element of a list and the tail is the remainder of the list. They can be retrieved with the functions `hd/1` and `tl/1`.
 
 Head of the list:
 
@@ -60,7 +58,7 @@ List operators never modify the existing list. Concatenating to or removing elem
 
 One advantage of immutability is that it leads to clearer code. You can freely pass the data around with the guarantee no one will mutate it in memory - only transform it.
 
-Concatenating lists
+Concatenating lists:
 
 ```elixir
 list ++ [4, 5, 6]

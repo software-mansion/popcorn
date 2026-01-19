@@ -2,7 +2,6 @@
 
 Elixir also provides `==`, `!=`, `<=`, `>=`, `<` and `>` as comparison operators. We can compare numbers, atoms, strings, booleans, etc. Integers and floats compare the same if they have the same value, but you can use the strict comparison operator `===` and `!==` if you want to distinguish between integers and floats.
 
-The comparison operators in Elixir can compare across any data type. It means you can, for example, compare strings with integers. It's useful in cases like sorting algorithms, but there are caveats - you can read more about it [here](https://hexdocs.pm/elixir/Kernel.html#module-structural-comparison).
 
 Basic equality:
 
@@ -18,7 +17,7 @@ Basic equality:
 String comparison:
 
 ```elixir
-# 💡 Try changing `"bar"` to `"foo"`. Are the strings equal
+# 💡 Try changing `"bar"` to `"foo"`. What's the result now?
 "foo" == "bar"
 ```
 
@@ -29,7 +28,13 @@ Strict equality distinguishes integers from floats:
 1 === 1.0
 ```
 
-Cross-type comparison - strings are greater than numbers:
+Basic inequality:
+
+```elixir
+2 > 10
+```
+
+The comparison operators in Elixir can compare across any data type. It means you can, for example, compare strings with integers. It's useful in cases like sorting algorithms, but there are caveats - you can read more about it [here](https://hexdocs.pm/elixir/Kernel.html#module-structural-comparison).
 
 ```elixir
 "abc" > 1

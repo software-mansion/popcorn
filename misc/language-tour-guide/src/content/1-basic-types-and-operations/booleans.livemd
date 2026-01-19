@@ -1,10 +1,6 @@
 # Booleans and nil
 
-Elixir supports `true` and `false` as booleans, and provides logical `and`, `or` and `not` operators to work on them.
-
-Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when doing side effects.
-
-The boolean values:
+Elixir supports `true` and `false` as booleans.
 
 ```elixir
 true
@@ -20,13 +16,19 @@ Are they equal?
 true == false
 ```
 
+To operate on booleans, Elixir provides `and/2`, `or/2` and `not/1`.
+
 Logical `and` of two true values:
 
 ```elixir
 true and true
 ```
 
-Short-circuit `and`.
+```elixir
+true or false
+```
+
+Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when doing side effects.
 
 ```elixir
 # 💡 Try changing `true` to `IO.inspect(true)` to see if it gets evaluated.
@@ -45,13 +47,9 @@ Logical `not`:
 not true
 ```
 
-Beyond strict booleans, Elixir provides operators that work with any value.
-
 ## The nil value
 
 Elixir also provides the concept of `nil`, to indicate the absence of a value, and a set of logical operators that also manipulate `nil`: `||`, `&&`, and `!`. For these operators, `false` and `nil` are considered "falsy", all other values are considered "truthy".
-
-As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.
 
 Using `&&` with booleans:
 
@@ -62,6 +60,7 @@ true && false
 `nil` is falsy, so `&&` short-circuits:
 
 ```elixir
+# 💡 Try changing `&&` to `and`. What happens?
 nil && 13
 ```
 
@@ -90,3 +89,5 @@ The `!` operator:
 # 💡 Try `!1` and `!nil`.
 !true
 ```
+
+As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.

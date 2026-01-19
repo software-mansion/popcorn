@@ -1,10 +1,6 @@
 # Numbers and arithmetic
 
-As you can see, numbers in Elixir are either integers or floats. You can use `is_integer` and `is_float` to check what a value is.
-
-Elixir allows expressing numbers in decimal, binary, octal, hexadecimal and exponential notation.
-
-Normally, integers can be arbitrarily big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
+As you could see, numbers in Elixir are either integers or floats. You can use `is_integer/1` and `is_float/1` to check what a value is.
 
 Check if a value is an integer:
 
@@ -19,6 +15,8 @@ Check if a value is a float:
 # 💡 Try changing to `is_number`.
 is_float(4.5)
 ```
+
+Elixir allows expressing numbers in decimal, binary, octal, hexadecimal and exponential notation.
 
 Decimal notation:
 
@@ -56,11 +54,13 @@ Exponential notation:
 1.0e-10
 ```
 
+Normally, integers can be arbitrarily big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
+
 Now that we understand number types, let's explore arithmetic operations.
 
 ## Basic Arithmetic
 
-Let's explore basic arithmetic operations. Notice, that `10 / 2` returned `5.0`. Division in Elixir always returns a float. For integer division, use `div`. For float to integer conversion, you can use `round` or `trunc`.
+Let's explore basic arithmetic operations.
 
 Addition:
 
@@ -74,13 +74,13 @@ Multiplication:
 5 * 6
 ```
 
-Division always returns a float:
+Division:
 
 ```elixir
 10 / 2
 ```
 
-Integer division:
+Notice, that `10 / 2` returned `5.0`. Division in Elixir always returns a float. For integer division, use `div/2`:
 
 ```elixir
 div(10, 2)
@@ -92,13 +92,11 @@ Remainder of integer division:
 rem(10, 3)
 ```
 
-Rounding a float:
+For float to integer conversion, you can use `round/1` or `trunc/1`:
 
 ```elixir
 round(3.58)
 ```
-
-Truncating a float:
 
 ```elixir
 # 💡 Try changing to `ceil`. How does the result change?

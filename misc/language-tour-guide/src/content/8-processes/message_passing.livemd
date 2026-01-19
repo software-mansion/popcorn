@@ -21,6 +21,9 @@ end)
 # Then, send a message to the receiver
 # 💡 Try spawning another process and sending a message from there
 send(receiver_pid, {:hello, "world"})
+
+# Wait for the message to be received
+Process.sleep(100)
 ```
 
 A process can also send messages to itself.

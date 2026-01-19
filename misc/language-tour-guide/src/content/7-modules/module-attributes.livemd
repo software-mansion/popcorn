@@ -40,7 +40,7 @@ defmodule Math2 do
   end
 end 
 
-# 💡 Try calling `Math2.circle_area(3)`. What's the result?
+# 💡 Try calling `Math2.circle_area/1`. What's the result?
 Math2.circle_area_in_alternative_world(3)
 ```
 

@@ -1,6 +1,6 @@
 # Strings and binaries
 
-Strings in Elixir are delimited by double quotes, and they are encoded in UTF-8. You can concatenate them with `<>` operator and interpolate with `#{}`. Interpolation works for all types that support conversion to string. Finally, `IO.puts` prints a string to the standard output.
+Strings in Elixir are delimited by double quotes, and they are encoded in UTF-8:
 
 A UTF-8 string:
 
@@ -8,20 +8,20 @@ A UTF-8 string:
 "Cześć"
 ```
 
-Concatenating strings:
+You can concatenate them with `<>` operator and interpolate with `#{}`.
 
 ```elixir
 "hello" <> " " <> "world"
 ```
 
-String interpolation with a variable:
+Interpolation works for all types that support conversion to string:
 
 ```elixir
 number = 42
 "I am #{number} years old!"
 ```
 
-Printing to standard output:
+Finally, `IO.puts/1` prints a string to the standard output:
 
 ```elixir
 IO.puts("hello world")
@@ -42,7 +42,7 @@ is_binary("cześć")
 In UTF-8, 'ś' and 'ć' take two bytes each.
 
 ```elixir
-# 💡 Try changing `byte_size` to `String.length`.
+# 💡 Try changing `byte_size` to `String.length/1`.
 byte_size("cześć")
 ```
 
