@@ -1,6 +1,6 @@
-# Basic Types
+# Basic Types and Operations
 
-In this chapter we will learn more about Elixir basic types: integers, floats, booleans, atoms, and strings. Let's see some examples.
+In this chapter we will learn about Elixir basic types: integers, floats, booleans, atoms, and strings. Let's see some examples.
 
 Here's an integer:
 
@@ -8,7 +8,7 @@ Here's an integer:
 42
 ```
 
-A float (decimal number):
+A float (a floating point number):
 
 ```elixir
 3.14159
@@ -32,20 +32,28 @@ And a string:
 "Hello, Elixir!"
 ```
 
+We'll learn more about these types in a moment. Now, let's see how we can assign them to variables.
+
 ## Variables and Immutability
 
-Similarly to many other languages, you may define a new variable by assigning a value to an identifier using `=` sign.
-
-In Elixir, all data is immutable. However, you may re-assign the variable name to a different value, even of a different type.
-
-Variables must start with a lowercase letter or an underscore. By convention, the variable names are written in `snake_case`. Leading underscore has a special meaning, but we'll get back to that later.
-
-Assign a value to a variable:
+Similarly to many other languages, you can assign a value to a variable using `=` sign.
 
 ```elixir
 x = "value"
 x
 ```
+
+Variables must start with a lowercase letter or an underscore. By convention, the variable names are written in `snake_case`. Leading underscore has a special meaning, but we'll learn that (and more details about variables) in the chapter about pattern matching.
+
+You may re-assign the variable name to a different value, even of a different type:
+
+```elixir
+y = "foo"
+y = 1
+y
+```
+
+However, all data in Elixir is immutable. It means that under the hood, the `y` from the line 1 and `y` from the line 2 are two different variables - they just share the same name. We'll learn more about consequences of this in further chapters.
 
 Variables can be assigned from other variables:
 
@@ -60,6 +68,37 @@ Re-assigning a variable doesn't affect other variables that were assigned its pr
 ```elixir
 x = "value"
 y = x
-x = :ok
-{x, y}
+x = 1
+IO.inspect(x)
+y
 ```
+
+## Modules and functions
+
+In Elixir, functions are grouped in modules. To call a function, we use `Module.function(comma, separated, arguments)`. We already called `inspect` function from the `IO` module:
+
+```elixir
+IO.inspect("hello")
+```
+
+The Elixir standard library contains many modules and functions. For example, `String.duplicate` returns a string repeated given number of times:
+
+```elixir
+String.duplicate("hello", 3)
+```
+
+Functions from the `Kernel` module can be called just by their name, for example:
+
+```elixir
+Kernel.round(1.7)
+```
+
+is the same as:
+
+```elixir
+round(1.7)
+```
+
+In the documentation and guides like this, the convention is to refer to functions using `Module.function/arity` or `function/arity` syntax, where 'arity' is the number of arguments, for example: `IO.inspect/1`, `String.duplicate/2` or `round/1`. You can look up the documentation for each function on [hexdocs.pm](https://hexdocs.pm/elixir/Kernel.html).
+
+Now, let's learn more about the basic types and how to use them.

@@ -53,7 +53,7 @@ Elixir provides macros as a mechanism for meta-programming (writing code that ge
 
 Public functions in modules are globally available, but in order to use macros, you need to opt-in by requiring the module they are defined in.
 
-In the code below, we use the Logger module. Logger provides macro-based API, so that when you configure it to disable some logs, they can be completely removed from the code at the compile-time. Therefore, `Logger.info` is a macro and we have to use `require` before calling it.
+In the code below, we use the Logger module. Logger provides macro-based API, so that when you configure it to disable some logs, they can be completely removed from the code at the compile-time. Therefore, `Logger.info/1` is a macro and we have to use `require` before calling it.
 
 ```elixir
 # 💡 Try removing the line below and see what happens

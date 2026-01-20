@@ -55,11 +55,7 @@ Math3.zero?(0)
 
 The trailing question mark in `zero?` is just a part of the function name and doesn't have any special implications. However, the convention is to use it for functions that return a boolean. To learn more about the naming conventions for modules, function names, variables and more in Elixir, see [Naming Conventions](https://hexdocs.pm/elixir/naming-conventions.html).
 
-<!-- livebook:{"break_markdown":true} -->
-
 ### Default arguments
-
-<!-- livebook:{"break_markdown":true} -->
 
 Function definitions in Elixir also support default arguments:
 
@@ -122,8 +118,6 @@ MyProject.Utils.Concat.join("hello", "world")
 Actually, all modules are defined under `Elixir` namespace, but for convenience you can omit `Elixir.`
 
 💡 Try prefixing `MyProject.Utils.Concat.join(...)` above with `Elixir.` - does it still work?
-
-<!-- livebook:{"break_markdown":true} -->
 
 Modules can also be nested within one another. The following snippet creates two modules: `Foo` and `Foo.Bar`.
 

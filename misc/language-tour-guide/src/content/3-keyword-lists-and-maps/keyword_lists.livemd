@@ -38,7 +38,7 @@ Concatenating two keyword lists:
 [a: 1, b: 2] ++ [c: 3, d: 4]
 ```
 
-Check if a value is a keyword list using `Keyword.keyword?`:
+Check if a value is a keyword list using `Keyword.keyword?/1`:
 
 > Note the trailing ? sign in 'keyword?' - it's just a part of the function name. However, the convention is to use it for functions returning booleans.
 
@@ -67,7 +67,7 @@ keyword = [a: 1, b: 2]
 keyword[:a]
 ```
 
-Add a new key-value pair with `Keyword.put`:
+Add a new key-value pair with `Keyword.put/3`:
 
 ```elixir
 Keyword.put([a: 1, b: 2], :c, 3)
@@ -77,7 +77,7 @@ Keyword.put([a: 1, b: 2], :c, 3)
 
 Keyword lists are commonly used to pass options to functions. When a keyword list is the last argument of a function, you can omit the square brackets.
 
-Here are different ways to write the same `IO.inspect` call:
+Here are different ways to write the same `IO.inspect/2` call:
 
 ```elixir
 IO.inspect("hello", [{:label, "Print hello"}])
@@ -94,7 +94,7 @@ IO.inspect([{1, 2, 3}, "hello world"],
   label: "Print a list", pretty: true, width: 15)
 ```
 
-`String.split` also accepts a keyword list for options:
+`String.split/2` also accepts a keyword list for options:
 
 ```elixir
 String.split("1 2 3 4", " ")

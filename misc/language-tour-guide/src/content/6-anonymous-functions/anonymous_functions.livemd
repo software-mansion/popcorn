@@ -11,7 +11,7 @@ add = fn a, b -> a + b end
 add
 ```
 
-To call an anonymous function assigned to a variable `f`, use `f.(arguments)`. The dot before the opening bracket differentiates calling an anonymous function from a regular one. This distinction avoids ambiguity - when you see `is_atom(:foo)`, you know `Kernel.is_atom` is called, not an anonymous function assigned to `is_atom` variable.
+To call an anonymous function assigned to a variable `f`, use `f.(arguments)`. The dot before the opening bracket differentiates calling an anonymous function from a regular one. This distinction avoids ambiguity - when you see `is_atom(:foo)`, you know `Kernel.is_atom/1` is called, not an anonymous function assigned to `is_atom` variable.
 
 ```elixir
 # 💡 Try removing the dot from the call
