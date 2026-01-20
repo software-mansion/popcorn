@@ -77,7 +77,7 @@ defmodule ElixirTour do
     Enum.take_while(editor_order, &(&1 != editor_id))
   end
 
-  @spec extract_new_bindings(bindings(), bindings()) :: bindings()
+  @spec get_changed(bindings(), bindings()) :: bindings()
   defp get_changed(base_kw, new_kw) do
     unchanged? = fn {key, value} ->
       Keyword.get(base_kw, key) == value
