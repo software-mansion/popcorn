@@ -48,26 +48,18 @@ defmodule ElixirTour do
 
     preceding_editor_ids = get_preceding_editors(editor_order, editor_id)
 
-    merged_bindings =
+    preceding_bindings =
       preceding_editor_ids
-      |> Enum.reduce([], fn prev_editor_id, acc ->
-        case Map.get(bindings_map, prev_editor_id) do
-          bindings when is_list(bindings) ->
-            Keyword.merge(acc, bindings)
-
-          nil ->
-            acc
-        end
-      end)
+      |> Enum.map(&Map.get(bindings_map, &1, []))
+      |> Enum.reduce([], &Keyword.merge(&2, &1))
 
     try do
-      case eval(code, merged_bindings) do
+      case eval(code, preceding_bindings) do
         {:ok, result, new_bindings} ->
-          editor_bindings = extract_new_bindings(merged_bindings, new_bindings)
+          editor_bindings = get_changed(preceding_bindings, new_bindings)
           updated_bindings = Map.put(bindings_map, editor_id, editor_bindings)
-          updated_state = %{state | bindings: updated_bindings}
 
-          {:resolve, inspect(result), updated_state}
+          {:resolve, inspect(result), %{state | bindings: updated_bindings}}
 
         {:error, error_message} ->
           {:reject, error_message, state}
@@ -82,21 +74,16 @@ defmodule ElixirTour do
 
   @spec get_preceding_editors([editor_id()], editor_id()) :: [editor_id()]
   defp get_preceding_editors(editor_order, editor_id) do
-    case Enum.find_index(editor_order, &(&1 == editor_id)) do
-      nil -> []
-      index -> Enum.take(editor_order, index)
-    end
+    Enum.take_while(editor_order, &(&1 != editor_id))
   end
 
   @spec extract_new_bindings(bindings(), bindings()) :: bindings()
-  defp extract_new_bindings(input_bindings, output_bindings) do
-    output_bindings
-    |> Enum.filter(fn {key, value} ->
-      case Keyword.get(input_bindings, key) do
-        old_value when old_value !== value -> true
-        _ -> false
-      end
-    end)
+  defp get_changed(base_kw, new_kw) do
+    unchanged? = fn {key, value} ->
+      Keyword.get(base_kw, key) == value
+    end
+
+    Enum.reject(new_kw, unchanged?)
   end
 
   @spec eval(String.t(), bindings()) :: {:ok, any(), bindings()} | {:error, String.t()}
