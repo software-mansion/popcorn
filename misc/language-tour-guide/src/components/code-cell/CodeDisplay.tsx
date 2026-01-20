@@ -15,6 +15,7 @@ import RotatedCcw from "../../assets/rotated-ccw.svg?react";
 
 import { useDelayedPending } from "../../utils/hooks/useDelayedPending";
 import { ExecutionStateBadge } from "./ExecutionStateBadge";
+import { useScrollLock } from "../../utils/hooks/useScrollLock";
 
 type CodeDisplayProps = {
   id: string;
@@ -30,19 +31,19 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const [lastStableState, setLastStableState] = useState(executionState);
 
   const editorControlRef = useRef<HTMLDivElement>(null);
-
-  const longRunningRef = useRef(longRunning);
-
-  useEffect(() => {
-    longRunningRef.current = longRunning;
-  }, [longRunning]);
+  const { lockScroll, unlockScroll } = useScrollLock(editorControlRef);
 
   useEffect(() => {
-    if (isExecutionFailure) {
-      window.scrollBy({
-        left: 0,
-        top: getOffsetTopOfCodeEditor() - window.innerHeight * 0.3,
-        behavior: "smooth"
+    if (longRunning) {
+      unlockScroll();
+    }
+  }, [longRunning, unlockScroll]);
+
+  useEffect(() => {
+    if (isExecutionFailure && editorControlRef.current) {
+      editorControlRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
       });
     }
   }, [isExecutionFailure]);
@@ -78,17 +79,10 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const evalCode = usePopcornEval();
   const { cancelCall } = usePopcorn();
 
-  const getOffsetTopOfCodeEditor = () => {
-    if (!editorControlRef.current) return 0;
-
-    const editorControlRect = editorControlRef.current.getBoundingClientRect();
-
-    return editorControlRect.top;
-  };
-
   const handleRunCode = useCallback(async () => {
-    const offsetTopBefore = getOffsetTopOfCodeEditor();
     if (isExecuting) return;
+
+    lockScroll();
 
     const editorsToRun = getEditorsToRun(id);
     let editorFailed = false;
@@ -135,16 +129,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
       }
     }
 
-    if (longRunningRef.current) {
-      return;
-    }
-
-    const offsetTopAfter = getOffsetTopOfCodeEditor();
-    const difference = offsetTopAfter - offsetTopBefore;
-
-    if (difference !== 0) {
-      window.scrollBy({ left: 0, top: difference, behavior: "instant" });
-    }
+    unlockScroll();
   }, [
     isExecuting,
     id,
@@ -152,7 +137,9 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
     setEditorResult,
     setEditorExecutionState,
     getEditorsToRun,
-    getEditor
+    getEditor,
+    lockScroll,
+    unlockScroll
   ]);
 
   const handleReset = useCallback(() => {
