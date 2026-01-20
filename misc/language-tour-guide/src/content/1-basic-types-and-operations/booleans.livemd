@@ -28,7 +28,7 @@ true and true
 true or false
 ```
 
-Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when doing side effects.
+Note that `and` and `or` are short-circuit: if the left-hand side determines the result, the right-hand side won't even be evaluated. It's especially important when used expressions have side-effects.
 
 ```elixir
 # 💡 Try changing `true` to `IO.inspect(true)` to see if it gets evaluated.
@@ -90,4 +90,4 @@ The `!` operator:
 !true
 ```
 
-As a rule of thumb, use `and`, `or` and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||` and `!`.
+As a rule of thumb, use `and`, `or`, and `not` when you are expecting booleans. If any of the arguments are non-boolean, use `&&`, `||`, and `!`.

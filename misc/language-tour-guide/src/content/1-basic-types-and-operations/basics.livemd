@@ -36,12 +36,14 @@ We'll learn more about these types in a moment. Now, let's see how we can assign
 
 ## Variables and Immutability
 
-Similarly to many other languages, you can assign a value to a variable using `=` sign. Variables must start with a lowercase letter or an underscore. By convention, the variable names are written in `snake_case`. Leading underscore has a special meaning, but we'll get back to that later.
+Similarly to many other languages, you can assign a value to a variable using `=` sign.
 
 ```elixir
 x = "value"
 x
 ```
+
+Variables must start with a lowercase letter or an underscore. By convention, the variable names are written in `snake_case`. Leading underscore has a special meaning, but we'll learn that (and more details about variables) in the chapter about pattern matching.
 
 You may re-assign the variable name to a different value, even of a different type:
 
@@ -73,7 +75,7 @@ y
 
 ## Modules and functions
 
-In Elixir, functions are grouped in modules. To call a function, we use `Module.function(comma_separated_arguments)`. We already called `inspect` function from the `IO` module:
+In Elixir, functions are grouped in modules. To call a function, we use `Module.function(comma, separated, arguments)`. We already called `inspect` function from the `IO` module:
 
 ```elixir
 IO.inspect("hello")
