@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode, useCallback } from "react";
 import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
 import { wrapPopcornReloadIframe, type LogSink } from "../../utils/sentry";
 
@@ -46,7 +46,7 @@ export const PopcornProvider = ({
   }, [debug, logSink]);
 
   // TODO: drop after popcorn cancel calls method is implemented (#378)
-  const reinitializePopcorn = async () => {
+  const reinitializePopcorn = useCallback(async () => {
     if (instance) {
       try {
         instance.deinit();
@@ -67,7 +67,7 @@ export const PopcornProvider = ({
     setIsLoadingPopcorn(false);
 
     setInstance(newInstance);
-  };
+  }, [debug, logSink, instance]);
 
   const value: PopcornContextValue = {
     instance,
