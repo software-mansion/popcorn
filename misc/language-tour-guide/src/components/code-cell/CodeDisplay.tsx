@@ -16,6 +16,8 @@ import RotatedCcw from "../../assets/rotated-ccw.svg?react";
 import { useDelayedPending } from "../../utils/hooks/useDelayedPending";
 import { ExecutionStateBadge } from "./ExecutionStateBadge";
 import { useScrollLock } from "../../utils/hooks/useScrollLock";
+import { useExecutionToast } from "../../utils/hooks/useExecutionToast";
+import { EditorToast } from "./EditorToast";
 
 type CodeDisplayProps = {
   id: string;
@@ -28,16 +30,18 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const longRunning = useDelayedPending(isExecuting || isQueued, 300);
   const executionState = useEditorExecutionState(id);
   const isExecutionFailure = executionState === "failure";
+  const isExecutionSuccess = executionState === "success";
   const [lastStableState, setLastStableState] = useState(executionState);
 
   const editorControlRef = useRef<HTMLDivElement>(null);
+
   const { lockScroll, unlockScroll } = useScrollLock(editorControlRef);
 
-  useEffect(() => {
-    if (longRunning) {
-      unlockScroll();
-    }
-  }, [longRunning, unlockScroll]);
+  const { showCompleted, scrollToElement, dismissToast, startTracking } =
+    useExecutionToast({
+      isExecutionSuccess,
+      elementRef: editorControlRef
+    });
 
   useEffect(() => {
     if (isExecutionFailure && editorControlRef.current) {
@@ -82,6 +86,7 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
   const handleRunCode = useCallback(async () => {
     if (isExecuting) return;
 
+    startTracking();
     lockScroll();
 
     const editorsToRun = getEditorsToRun(id);
@@ -139,7 +144,8 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
     getEditorsToRun,
     getEditor,
     lockScroll,
-    unlockScroll
+    unlockScroll,
+    startTracking
   ]);
 
   const handleReset = useCallback(() => {
@@ -179,6 +185,11 @@ export default function CodeDisplay({ id }: CodeDisplayProps) {
       </div>
 
       <CodeEditor id={id} handleRunCode={handleRunCode} />
+      <EditorToast
+        isVisible={showCompleted}
+        onClick={scrollToElement}
+        onClose={dismissToast}
+      />
     </>
   );
 }
