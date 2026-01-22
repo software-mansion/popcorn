@@ -10,7 +10,7 @@ const dir = import.meta.dirname;
 export default defineConfig([
   globalIgnores(["dist", "node_modules"]),
   {
-    files: ["**/*.ts"],
+    files: ["src/*.ts"],
     extends: [
       js.configs.recommended,
       tseslint.configs.strict,

@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck will add types later
-
 const INIT_VM_TIMEOUT_MS = 30_000;
 const CALL_TIMEOUT_MS = 60_000;
 const HEARTBEAT_TIMEOUT_MS = 60_000;
@@ -33,16 +29,67 @@ const MESSAGES = {
 
 const INIT_TOKEN = Symbol();
 
-/** @module popcorn */
+type CallResult = {
+  /** Serialized value returned from Elixir */
+  data: AnySerializable;
+  /** Amount of time it took to process the call */
+  durationMs: number;
+  /** Optional error if call failed */
+  error?: AnySerializable;
+};
 
-/**
- * @typedef {Object} CallResult
- * @property {AnySerializable} data Serialized value returned from Elixir
- * @property {number} durationMs Amount of time it took to process the call
- * @property {AnySerializable} [error] Optional error if call failed
- */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySerializable = any;
 
-/** @typedef {any} AnySerializable */
+/** Output type for log listeners */
+type LogType = "stdout" | "stderr";
+
+/** Callback function that receives the log message */
+type LogListener = (message: string) => void;
+
+/** Options for Popcorn.init() */
+type PopcornInitOptions = {
+  /** DOM element to mount an iframe */
+  container?: HTMLElement;
+  /** Path to compiled Elixir bundle (`.avm` file). */
+  bundlePath?: string;
+  /** Handler for stderr messages. */
+  onStderr?: (message: string) => void;
+  /** Handler for stdout messages. */
+  onStdout?: (message: string) => void;
+  /** Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded. */
+  heartbeatTimeoutMs?: number;
+  /** Directory containing Wasm and scripts used inside iframe. */
+  wasmDir?: string;
+  /** Enable debug logging. */
+  debug?: boolean;
+};
+
+/** Options for call method */
+type CallOptions = {
+  /** Registered Elixir process name. */
+  process?: string;
+  /** Timeout (in milliseconds) for the call */
+  timeoutMs?: number;
+};
+
+/** Options for cast method */
+type CastOptions = {
+  /** Receiver process name. */
+  process?: string;
+};
+
+type CallData = {
+  acknowledged: boolean;
+  startTimeMs: number;
+  resolve: (result: CallResult) => void;
+  reject: (error: { error: unknown; durationMs: number }) => void;
+};
+
+type AwaitedMessage = {
+  type: string;
+  resolve?: (value: AnySerializable) => void;
+};
 
 class PopcornDeinitializedError extends Error {}
 
@@ -50,40 +97,37 @@ class PopcornDeinitializedError extends Error {}
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
  */
 export class Popcorn {
-  onStdout = null;
-  onStderr = null;
-  heartbeatTimeoutMs = null;
+  onStdout: ((message: string) => void) | null = null;
+  onStderr: ((message: string) => void) | null = null;
+  heartbeatTimeoutMs: number | null = null;
 
   _debug = false;
-  _bundleURL = null;
-  _initProcess = null;
+  _bundleURL: string | null = null;
+  _initProcess: string | null = null;
 
   _requestId = 0;
-  _calls = new Map();
-  _listenerRef = null;
-  _logListeners = { stdout: new Set(), stderr: new Set() };
+  _calls = new Map<number, CallData>();
+  _listenerRef: ((event: MessageEvent) => void) | null = null;
+  _logListeners: { stdout: Set<LogListener>; stderr: Set<LogListener> } = {
+    stdout: new Set(),
+    stderr: new Set(),
+  };
 
-  _iframe = null;
-  _awaitedMessage = null;
-  _heartbeatTimeout = null;
+  _iframe: HTMLIFrameElement | null = null;
+  _awaitedMessage: AwaitedMessage | null = null;
+  _heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /** @hideconstructor */
-  constructor(params, token) {
+  constructor(params: Omit<PopcornInitOptions, "container">, token: symbol) {
     if (token !== INIT_TOKEN) {
       throw new Error(
         "Don't construct the Popcorn object directly, use Popcorn.init() instead",
       );
     }
-    const {
-      bundlePath,
-      onStderr,
-      onStdout,
-      heartbeatTimeoutMs,
-      debug,
-      wasmDir,
-    } = params;
+    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
+      params;
 
-    this._debug = debug;
+    this._debug = debug ?? false;
     this._bundleURL = new URL(
       bundlePath ?? "/bundle.avm",
       import.meta.url,
@@ -97,25 +141,15 @@ export class Popcorn {
    * Creates an iframe and sets up communication channels.
    * Returns after Elixir code calls `Popcorn.Wasm.register/1`.
    *
-   * @param {object} options used to set timeouts, event handlers, path to bundle, etc.
-   * @param {HTMLElement} [options.container=document.body] DOM element to mount an iframe
-   * @param {string} [options.bundlePath="wasm/bundle.avm"] Path to compiled Elixir bundle (`.avm` file).
-   * @param {function(string): void} [options.onStderr=noop] Handler for stdout messages.
-   * @param {function(string): void} [options.onStdout=noop] Handler for stderr messages.
-   * @param {number} [options.heartbeatTimeoutMs=15_000] Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded.
-   * @param {string} [options.wasmDir="./wasm/"] - Directory containing Wasm and scripts used inside iframe.
-   * @param {boolean} [options.debug=false] Enable debug logging.
    * @example
-   * import { Popcorn } from "./wasm/popcorn.js";
-
+   * import { Popcorn } from "@swmansion/popcorn";
    * const popcorn = await Popcorn.init({
    *   onStdout: console.log,
    *   onStderr: console.error,
    *   debug: true,
    * });
-   * @returns {Promise<Popcorn>} Popcorn instance.
    */
-  static async init(options) {
+  static async init(options: PopcornInitOptions): Promise<Popcorn> {
     const { container, ...constructorParams } = options;
     const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
     popcorn._trace("Main: init, params: ", { container, ...constructorParams });
@@ -123,7 +157,7 @@ export class Popcorn {
     return popcorn;
   }
 
-  async _mount(container) {
+  async _mount(container: HTMLElement): Promise<void> {
     if (this._iframe !== null) {
       throw new Error("Iframe already mounted");
     }
@@ -168,10 +202,6 @@ export class Popcorn {
    * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
-   * @param {AnySerializable} args serializable data sent to Elixir process.
-   * @param {object} options
-   * @param {string} [options.process] Registered Elixir process name.
-   * @param {number} [options.timeoutMs=60_000] Timeout (in milliseconds) for the call
    * @example
    * const result = await popcorn.call(
    *   { action: "get_user", id: 123 },
@@ -179,19 +209,17 @@ export class Popcorn {
    * );
    * console.log(result.data); // Deserialized Elixir response
    * console.log(result.durationMs); // Entire call duration
-   * @returns {Promise<CallResult>} A promise resolved with {@link CallResult} or rejected on timeout
    */
-  async call(args, { process, timeoutMs }) {
+  async call(
+    args: AnySerializable,
+    { process, timeoutMs }: CallOptions,
+  ): Promise<CallResult> {
     const targetProcess = process ?? this._initProcess;
-    if (this._iframe === null) {
-      throw new Error("WASM iframe not mounted");
-    }
-    if (targetProcess === null) {
-      throw new Error("Unspecified target process");
-    }
+    if (this._iframe === null) throwError({ t: "unmounted" });
+    if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this._requestId++;
-    const callPromise = new Promise((resolve, reject) => {
+    const callPromise = new Promise<CallResult>((resolve, reject) => {
       this._trace("Main: call: ", { requestId, process, args });
       this._send(MESSAGES.CALL, {
         requestId,
@@ -217,19 +245,11 @@ export class Popcorn {
    *
    * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
-   *
-   * @param {AnySerializable} args sent to Elixir process.
-   * @param {object} options options for cast
-   * @param {string} [options.process] receiver process name.
    */
-  cast(args, { process }) {
+  cast(args: AnySerializable, { process }: CastOptions): void {
     const targetProcess = process ?? this._initProcess;
-    if (this._iframe === null) {
-      throw new Error("WASM iframe not mounted");
-    }
-    if (targetProcess === null) {
-      throw new Error("Unspecified target process");
-    }
+    if (this._iframe === null) throwError({ t: "unmounted" });
+    if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this._requestId++;
     this._trace("Main: cast: ", { requestId, process, args });
@@ -249,6 +269,7 @@ export class Popcorn {
     }
 
     this._trace("Main: deinit");
+    if (!this._listenerRef) throwError({ t: "assert" });
     window.removeEventListener("message", this._listenerRef);
     this._iframe.remove();
     this._iframe = null;
@@ -256,7 +277,7 @@ export class Popcorn {
     this._listenerRef = null;
     this._logListeners.stdout.clear();
     this._logListeners.stderr.clear();
-    for (const [_id, callData] of this._calls) {
+    for (const callData of this._calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({
         error: new PopcornDeinitializedError(
@@ -269,53 +290,39 @@ export class Popcorn {
 
   /**
    * Registers a log listener that will be called when output of the specified type is received.
-   * @param {function(string): void} listener - Callback function that receives the log message
-   * @param {"stdout" | "stderr"} type - The output type to listen for
    */
-  registerLogListener(listener, type) {
-    if (type !== "stdout" && type !== "stderr") {
-      throw new Error(
-        `Invalid output type: ${type}. Must be "stdout" or "stderr"`,
-      );
-    }
+  registerLogListener(listener: LogListener, type: LogType): void {
     this._logListeners[type].add(listener);
   }
 
   /**
    * Unregisters a previously registered log listener.
-   * @param {function(string): void} listener - Callback function to remove
-   * @param {"stdout" | "stderr"} type - The output type the listener was registered for
    */
-  unregisterLogListener(listener, type) {
-    if (type !== "stdout" && type !== "stderr") {
-      throw new Error(
-        `Invalid output type: ${type}. Must be "stdout" or "stderr"`,
-      );
-    }
+  unregisterLogListener(listener: LogListener, type: LogType): void {
     this._logListeners[type].delete(listener);
   }
 
-  _notifyLogListeners(type, message) {
+  _notifyLogListeners(type: LogType, message: string): void {
     this._logListeners[type].forEach((listener) => {
       listener(message);
     });
   }
 
-  _iframeListener({ data }) {
+  _iframeListener({ data }: MessageEvent): void {
     const awaitedMessage = this._awaitedMessage;
     if (awaitedMessage && data.type == awaitedMessage.type) {
       this._awaitedMessage = null;
-      awaitedMessage.resolve(data.value);
+      awaitedMessage.resolve?.(data.value);
       return;
     }
 
-    const handlers = {
-      [MESSAGES.STDOUT]: (value) => {
-        this.onStdout(value);
+    const handlers: Record<string, (value: AnySerializable) => void> = {
+      [MESSAGES.STDOUT]: (value: string) => {
+        this.onStdout?.(value);
         this._notifyLogListeners("stdout", value);
       },
-      [MESSAGES.STDERR]: (value) => {
-        this.onStderr(value);
+      [MESSAGES.STDERR]: (value: string) => {
+        this.onStderr?.(value);
         this._notifyLogListeners("stderr", value);
       },
       [MESSAGES.CALL]: this._onCall.bind(this),
@@ -337,24 +344,27 @@ export class Popcorn {
     }
   }
 
-  _onCallAck({ requestId }) {
+  _onCallAck({ requestId }: { requestId: number }): void {
     this._trace("Main: onCallAck: ", { requestId });
     const callData = this._calls.get(requestId);
-    if (callData === undefined) {
-      throw new Error("Ack for non-existent call");
-    }
+    if (callData === undefined) throwError({ t: "bad_ack" });
+
     this._calls.set(requestId, { ...callData, acknowledged: true });
   }
 
-  _onCall({ requestId, error, data }) {
+  _onCall({
+    requestId,
+    error,
+    data,
+  }: {
+    requestId: number;
+    error?: AnySerializable;
+    data?: AnySerializable;
+  }): void {
     this._trace("Main: onCall: ", { requestId, error, data });
     const callData = this._calls.get(requestId);
-    if (callData === undefined) {
-      throw new Error("Response for non-existent call");
-    }
-    if (!callData.acknowledged) {
-      throw new Error("Response for non-acknowledged call");
-    }
+    if (callData === undefined) throwError({ t: "bad_call" });
+    if (!callData.acknowledged) throwError({ t: "no_acked_call" });
 
     this._calls.delete(requestId);
 
@@ -366,15 +376,19 @@ export class Popcorn {
     }
   }
 
-  _onHeartbeat() {
-    clearTimeout(this._heartbeatTimeout);
+  _onHeartbeat(): void {
+    if (this._heartbeatTimeout) {
+      clearTimeout(this._heartbeatTimeout);
+    }
     this._heartbeatTimeout = setTimeout(() => {
       this._trace("Main: heartbeat lost");
       this._reloadIframe("heartbeat_lost");
-    }, this.heartbeatTimeoutMs);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    }, this.heartbeatTimeoutMs!);
   }
 
-  _reloadIframe(reason = "other") {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _reloadIframe(_reason = "other"): void {
     if (this._iframe === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
@@ -386,43 +400,85 @@ export class Popcorn {
     this._trace("Main: reloading iframe");
     const container = this._iframe.parentElement;
     this.deinit();
-    this._mount(container);
+    if (container) {
+      this._mount(container);
+    }
   }
 
-  _send(type, data) {
-    this._iframe.contentWindow.postMessage({ type, value: data });
+  _send(type: string, data: AnySerializable): void {
+    this._iframe?.contentWindow?.postMessage({ type, value: data });
   }
 
-  _awaitMessage(type) {
+  _awaitMessage(type: string): Promise<AnySerializable> {
     if (this._awaitedMessage) {
-      throw new Error(
-        `Cannot await message ${this._awaitedMessage.type} when a message ${type} is already awaited on`,
-      );
+      throwError({
+        t: "already_awaited",
+        messageType: this._awaitedMessage.type,
+        awaitedMessageType: type,
+      });
     }
 
     this._awaitedMessage = { type };
 
     return new Promise((resolve) => {
+      if (!this._awaitedMessage) throwError({ t: "assert" });
       this._awaitedMessage.resolve = resolve;
     });
   }
 
-  _trace(...messages) {
+  _trace(...messages: unknown[]): void {
     if (this._debug) {
       console.debug(...messages);
     }
   }
 }
 
-async function withTimeout(promise, ms) {
-  let timeout = null;
-  const timeoutPromise = new Promise((_resolve, reject) => {
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timeout = setTimeout(() => {
       reject("Promise timeout");
     }, ms);
   });
 
   const result = await Promise.race([promise, timeoutPromise]);
+
+  if (!timeout) throwError({ t: "assert" });
   clearTimeout(timeout);
   return result;
+}
+
+type ErrorData =
+  | { t: "assert" }
+  | { t: "bad_call" }
+  | { t: "no_acked_call" }
+  | { t: "bad_ack" }
+  | { t: "unmounted" }
+  | { t: "bad_target" }
+  | {
+      t: "already_awaited";
+      messageType: string;
+      awaitedMessageType: string;
+    };
+
+function throwError(error: ErrorData): never {
+  switch (error.t) {
+    case "assert":
+      throw new Error("Assertion error");
+    case "bad_call":
+      throw new Error("Response for non-existent call");
+    case "no_acked_call":
+      throw new Error("Response for non-acknowledged call");
+    case "bad_ack":
+      throw new Error("Ack for non-existent call");
+    case "unmounted":
+      throw new Error("WASM iframe not mounted");
+    case "bad_target":
+      throw new Error("Unspecified target process");
+
+    case "already_awaited":
+      throw new Error(
+        `Cannot await message ${error.messageType} when a message ${error.awaitedMessageType} is already awaited on`,
+      );
+  }
 }
