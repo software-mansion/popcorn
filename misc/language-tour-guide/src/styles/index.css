@@ -59,6 +59,16 @@
   --font-inter: "Inter Variable", sans-serif;
 }
 
+#toast-root {
+  position: fixed;
+  top: 8rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
 html,
 body {
   margin: 0;
