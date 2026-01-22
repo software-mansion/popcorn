@@ -57,6 +57,7 @@
   --color-yellow-700: #b26f00;
   --font-handjet: "Handjet Variable", system-ui;
   --font-inter: "Inter Variable", sans-serif;
+  --text-2xs: 0.625rem;
 }
 
 html,

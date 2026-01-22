@@ -22,7 +22,7 @@ export function Navigation() {
   };
 
   return (
-    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-8 border-b px-4 py-3 lg:px-8">
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-0 border-b px-4 py-3 lg:gap-8 lg:px-8">
       <button
         className="orange-shadow cursor-pointer rounded-md bg-orange-100 p-0.5"
         onClick={openMenu}
@@ -30,7 +30,7 @@ export function Navigation() {
         <span className="sr-only">Open menu</span>
         <Hamburger className="h-full w-5.5 text-white" />
       </button>
-      <span className="ml-5">{location.pathname}</span>
+      <span className="ml-6 text-sm sm:text-base">{location.pathname}</span>
       <FeedbackButton className="hidden lg:block" />
       <ul
         className={`scrollbar bg-light-20 fixed top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
