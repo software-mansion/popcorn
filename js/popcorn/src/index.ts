@@ -27,26 +27,8 @@ const MESSAGES = {
   RELOAD: "popcorn-reload",
 };
 
-type CallResult = {
-  /** Serialized value returned from Elixir */
-  data: AnySerializable;
-  /** Amount of time it took to process the call */
-  durationMs: number;
-  /** Optional error if call failed */
-  error?: AnySerializable;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySerializable = any;
-
-/** Output type for log listeners */
-type LogType = "stdout" | "stderr";
-
-/** Callback function that receives the log message */
-type LogListener = (message: string) => void;
-
 /** Options for Popcorn.init() */
-type PopcornInitOptions = {
+export type PopcornInitOptions = {
   /** DOM element to mount an iframe */
   container?: HTMLElement;
   /** Path to compiled Elixir bundle (`.avm` file). */
@@ -62,8 +44,13 @@ type PopcornInitOptions = {
   /** Enable debug logging. */
   debug?: boolean;
 };
-
 type CtorArgs = Omit<PopcornInitOptions, "container">;
+
+/** Options for cast method */
+type CastOptions = {
+  /** Receiver process name. */
+  process?: string;
+};
 
 /** Options for call method */
 type CallOptions = {
@@ -73,11 +60,21 @@ type CallOptions = {
   timeoutMs?: number;
 };
 
-/** Options for cast method */
-type CastOptions = {
-  /** Receiver process name. */
-  process?: string;
+type CallResult = {
+  /** Serialized value returned from Elixir */
+  data: AnySerializable;
+  /** Amount of time it took to process the call */
+  durationMs: number;
+  /** Optional error if call failed */
+  error?: AnySerializable;
 };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnySerializable = any;
+
+type LogType = "stdout" | "stderr";
+type LogListener = (message: string) => void;
+type LogListeners = Record<LogType, Set<LogListener>>;
 
 type CallData = {
   acknowledged: boolean;
@@ -107,11 +104,8 @@ export class Popcorn {
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
-  private listenerRef: ((event: MessageEvent) => void) | null = null;
-  private logListeners: {
-    stdout: Set<LogListener>;
-    stderr: Set<LogListener>;
-  } = {
+  private iframeListenerRef: ((event: MessageEvent) => void) | null = null;
+  private logListeners: LogListeners = {
     stdout: new Set(),
     stderr: new Set(),
   };
@@ -179,8 +173,8 @@ export class Popcorn {
       "visibility: hidden; width: 0px; height: 0px; border: none";
 
     // TODO: handle multiple iframes
-    this.listenerRef = this.iframeListener.bind(this);
-    window.addEventListener("message", this.listenerRef);
+    this.iframeListenerRef = this.iframeListener.bind(this);
+    window.addEventListener("message", this.iframeListenerRef);
     container.appendChild(this.iframe);
     await this.awaitMessage(MESSAGES.INIT);
     this.trace("Main: iframe loaded");
@@ -267,12 +261,12 @@ export class Popcorn {
     }
 
     this.trace("Main: deinit");
-    if (!this.listenerRef) throwError({ t: "assert" });
-    window.removeEventListener("message", this.listenerRef);
+    if (!this.iframeListenerRef) throwError({ t: "assert" });
+    window.removeEventListener("message", this.iframeListenerRef);
     this.iframe.remove();
     this.iframe = null;
     this.awaitedMessage = null;
-    this.listenerRef = null;
+    this.iframeListenerRef = null;
     this.logListeners.stdout.clear();
     this.logListeners.stderr.clear();
     for (const callData of this.calls.values()) {
