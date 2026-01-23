@@ -9,8 +9,12 @@ import { FeedbackButton } from "./FeedbackButton";
 
 import { navigationTree } from "../../utils/content/navigation-builder";
 
-export function Navigation() {
+function CurrentPath() {
   const location = useLocation();
+  return <span className="ml-6 text-sm sm:text-base">{location.pathname}</span>;
+}
+
+export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
 
   const openMenu = () => {
@@ -30,7 +34,7 @@ export function Navigation() {
         <span className="sr-only">Open menu</span>
         <Hamburger className="h-full w-5.5 text-white" />
       </button>
-      <span className="ml-6 text-sm sm:text-base">{location.pathname}</span>
+      <CurrentPath />
       <FeedbackButton className="hidden lg:block" />
       <ul
         className={`scrollbar bg-light-20 fixed top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
