@@ -1,10 +1,10 @@
-import { NavLink, useMatch } from "react-router";
+import { NavLink, useLocation, useMatch } from "react-router";
 
 import ChevronDown from "../../assets/chevron-down.svg?react";
 import ChevronRight from "../../assets/chevron-right.svg?react";
 import Circle from "../../assets/circle.svg?react";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { NavigationTreeItem } from "../../utils/content/types";
 
 type NavigationListProps = {
@@ -17,7 +17,9 @@ export function NavigationList({ items, onClick }: NavigationListProps) {
       {items.map((item) => {
         const hasChildren = item.children.length > 0;
         if (hasChildren) {
-          return <CollapsibleItem key={item.path} item={item} onClick={onClick} />;
+          return (
+            <CollapsibleItem key={item.path} item={item} onClick={onClick} />
+          );
         }
         return <TopLevelItem key={item.path} item={item} onClick={onClick} />;
       })}
@@ -34,8 +36,18 @@ const baseItemStyle =
   "text-brown-80 flex cursor-pointer items-center rounded-md px-3 py-0.5 text-sm hover:bg-orange-100/10 ";
 
 function CollapsibleItem({ item, onClick }: NavigationItemProps) {
+  const { pathname } = useLocation();
   const onChildPage = useMatch({ path: item.path, end: false }) !== null;
-  const [isOpen, toggleOpen] = useToggle(onChildPage);
+
+  const [isOpen, setIsOpen] = useState(onChildPage);
+
+  const toggleOpen = useCallback(() => {
+    setIsOpen((prev) => !prev);
+  }, []);
+
+  useEffect(() => {
+    setIsOpen(onChildPage);
+  }, [onChildPage, pathname]);
 
   return (
     <li className="my-1">
@@ -111,14 +123,4 @@ function NavigationIcon({ type }: NavigationIconProps) {
       {type === "item" && <Circle className="w-1.5" />}
     </span>
   );
-}
-
-function useToggle(initial: boolean): [boolean, () => void] {
-  const [state, setState] = useState(initial);
-
-  const toggle = useCallback(() => {
-    setState((prev) => !prev);
-  }, [setState]);
-
-  return [state, toggle];
 }
