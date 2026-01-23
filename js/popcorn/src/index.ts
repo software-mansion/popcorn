@@ -101,23 +101,25 @@ export class Popcorn {
   onStderr: ((message: string) => void) | null = null;
   heartbeatTimeoutMs: number | null = null;
 
-  _debug = false;
-  _bundleURL: string | null = null;
-  _initProcess: string | null = null;
+  private debug = false;
+  private bundleURL: string | null = null;
+  private initProcess: string | null = null;
 
-  _requestId = 0;
-  _calls = new Map<number, CallData>();
-  _listenerRef: ((event: MessageEvent) => void) | null = null;
-  _logListeners: { stdout: Set<LogListener>; stderr: Set<LogListener> } = {
+  private requestId = 0;
+  private calls = new Map<number, CallData>();
+  private listenerRef: ((event: MessageEvent) => void) | null = null;
+  private logListeners: {
+    stdout: Set<LogListener>;
+    stderr: Set<LogListener>;
+  } = {
     stdout: new Set(),
     stderr: new Set(),
   };
 
-  _iframe: HTMLIFrameElement | null = null;
-  _awaitedMessage: AwaitedMessage | null = null;
-  _heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private iframe: HTMLIFrameElement | null = null;
+  private awaitedMessage: AwaitedMessage | null = null;
+  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  /** @hideconstructor */
   constructor(params: Omit<PopcornInitOptions, "container">, token: symbol) {
     if (token !== INIT_TOKEN) {
       throw new Error(
@@ -127,11 +129,8 @@ export class Popcorn {
     const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
       params;
 
-    this._debug = debug ?? false;
-    this._bundleURL = new URL(
-      bundlePath ?? "/bundle.avm",
-      import.meta.url,
-    ).href;
+    this.debug = debug ?? false;
+    this.bundleURL = new URL(bundlePath ?? "/bundle.avm", import.meta.url).href;
     this.onStdout = onStdout ?? console.log;
     this.onStderr = onStderr ?? console.warn;
     this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
@@ -152,46 +151,46 @@ export class Popcorn {
   static async init(options: PopcornInitOptions): Promise<Popcorn> {
     const { container, ...constructorParams } = options;
     const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
-    popcorn._trace("Main: init, params: ", { container, ...constructorParams });
-    await popcorn._mount(container ?? document.documentElement);
+    popcorn.trace("Main: init, params: ", { container, ...constructorParams });
+    await popcorn.mount(container ?? document.documentElement);
     return popcorn;
   }
 
-  async _mount(container: HTMLElement): Promise<void> {
-    if (this._iframe !== null) {
+  private async mount(container: HTMLElement): Promise<void> {
+    if (this.iframe !== null) {
       throw new Error("Iframe already mounted");
     }
 
-    this._trace("Main: mount, container: ", container);
+    this.trace("Main: mount, container: ", container);
 
     const iframeUrl = new URL("./iframe.mjs", import.meta.url).href;
 
-    this._iframe = document.createElement("iframe");
-    this._iframe.srcdoc = `<html>
+    this.iframe = document.createElement("iframe");
+    this.iframe.srcdoc = `<html>
       <html lang="en" dir="ltr">
           <head>
-            <meta name="bundle-path" content="${this._bundleURL}" />
+            <meta name="bundle-path" content="${this.bundleURL}" />
           </head>
           <script type="module" defer>
             import { runIFrame } from "${iframeUrl}";
             runIFrame();
           </script>
       </html>`;
-    this._iframe.style =
+    this.iframe.style =
       "visibility: hidden; width: 0px; height: 0px; border: none";
 
     // TODO: handle multiple iframes
-    this._listenerRef = this._iframeListener.bind(this);
-    window.addEventListener("message", this._listenerRef);
-    container.appendChild(this._iframe);
-    await this._awaitMessage(MESSAGES.INIT);
-    this._trace("Main: iframe loaded");
-    this._initProcess = await withTimeout(
-      this._awaitMessage(MESSAGES.START_VM),
+    this.listenerRef = this.iframeListener.bind(this);
+    window.addEventListener("message", this.listenerRef);
+    container.appendChild(this.iframe);
+    await this.awaitMessage(MESSAGES.INIT);
+    this.trace("Main: iframe loaded");
+    this.initProcess = await withTimeout(
+      this.awaitMessage(MESSAGES.START_VM),
       INIT_VM_TIMEOUT_MS,
     );
-    this._trace("Main: mounted, main process: ", this._initProcess);
-    this._onHeartbeat();
+    this.trace("Main: mounted, main process: ", this.initProcess);
+    this.onHeartbeat();
   }
 
   /**
@@ -214,20 +213,20 @@ export class Popcorn {
     args: AnySerializable,
     { process, timeoutMs }: CallOptions,
   ): Promise<CallResult> {
-    const targetProcess = process ?? this._initProcess;
-    if (this._iframe === null) throwError({ t: "unmounted" });
+    const targetProcess = process ?? this.initProcess;
+    if (this.iframe === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
-    const requestId = this._requestId++;
+    const requestId = this.requestId++;
     const callPromise = new Promise<CallResult>((resolve, reject) => {
-      this._trace("Main: call: ", { requestId, process, args });
-      this._send(MESSAGES.CALL, {
+      this.trace("Main: call: ", { requestId, process, args });
+      this.send(MESSAGES.CALL, {
         requestId,
         process: targetProcess,
         args,
       });
 
-      this._calls.set(requestId, {
+      this.calls.set(requestId, {
         acknowledged: false,
         startTimeMs: performance.now(),
         resolve,
@@ -236,7 +235,7 @@ export class Popcorn {
     });
 
     const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
-    this._calls.delete(requestId);
+    this.calls.delete(requestId);
     return result;
   }
 
@@ -247,13 +246,13 @@ export class Popcorn {
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
   cast(args: AnySerializable, { process }: CastOptions): void {
-    const targetProcess = process ?? this._initProcess;
-    if (this._iframe === null) throwError({ t: "unmounted" });
+    const targetProcess = process ?? this.initProcess;
+    if (this.iframe === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
-    const requestId = this._requestId++;
-    this._trace("Main: cast: ", { requestId, process, args });
-    this._send(MESSAGES.CAST, {
+    const requestId = this.requestId++;
+    this.trace("Main: cast: ", { requestId, process, args });
+    this.send(MESSAGES.CAST, {
       requestId,
       process: targetProcess,
       args,
@@ -264,20 +263,20 @@ export class Popcorn {
    * Destroys an iframe and resets the instance.
    */
   deinit() {
-    if (this._iframe === null) {
+    if (this.iframe === null) {
       throw new Error("Iframe not mounted");
     }
 
-    this._trace("Main: deinit");
-    if (!this._listenerRef) throwError({ t: "assert" });
-    window.removeEventListener("message", this._listenerRef);
-    this._iframe.remove();
-    this._iframe = null;
-    this._awaitedMessage = null;
-    this._listenerRef = null;
-    this._logListeners.stdout.clear();
-    this._logListeners.stderr.clear();
-    for (const callData of this._calls.values()) {
+    this.trace("Main: deinit");
+    if (!this.listenerRef) throwError({ t: "assert" });
+    window.removeEventListener("message", this.listenerRef);
+    this.iframe.remove();
+    this.iframe = null;
+    this.awaitedMessage = null;
+    this.listenerRef = null;
+    this.logListeners.stdout.clear();
+    this.logListeners.stderr.clear();
+    for (const callData of this.calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({
         error: new PopcornDeinitializedError(
@@ -292,26 +291,26 @@ export class Popcorn {
    * Registers a log listener that will be called when output of the specified type is received.
    */
   registerLogListener(listener: LogListener, type: LogType): void {
-    this._logListeners[type].add(listener);
+    this.logListeners[type].add(listener);
   }
 
   /**
    * Unregisters a previously registered log listener.
    */
   unregisterLogListener(listener: LogListener, type: LogType): void {
-    this._logListeners[type].delete(listener);
+    this.logListeners[type].delete(listener);
   }
 
-  _notifyLogListeners(type: LogType, message: string): void {
-    this._logListeners[type].forEach((listener) => {
+  private notifyLogListeners(type: LogType, message: string): void {
+    this.logListeners[type].forEach((listener) => {
       listener(message);
     });
   }
 
-  _iframeListener({ data }: MessageEvent): void {
-    const awaitedMessage = this._awaitedMessage;
+  private iframeListener({ data }: MessageEvent): void {
+    const awaitedMessage = this.awaitedMessage;
     if (awaitedMessage && data.type == awaitedMessage.type) {
-      this._awaitedMessage = null;
+      this.awaitedMessage = null;
       awaitedMessage.resolve?.(data.value);
       return;
     }
@@ -319,16 +318,16 @@ export class Popcorn {
     const handlers: Record<string, (value: AnySerializable) => void> = {
       [MESSAGES.STDOUT]: (value: string) => {
         this.onStdout?.(value);
-        this._notifyLogListeners("stdout", value);
+        this.notifyLogListeners("stdout", value);
       },
       [MESSAGES.STDERR]: (value: string) => {
         this.onStderr?.(value);
-        this._notifyLogListeners("stderr", value);
+        this.notifyLogListeners("stderr", value);
       },
-      [MESSAGES.CALL]: this._onCall.bind(this),
-      [MESSAGES.CALL_ACK]: this._onCallAck.bind(this),
-      [MESSAGES.HEARTBEAT]: this._onHeartbeat.bind(this),
-      [MESSAGES.RELOAD]: this._reloadIframe.bind(this),
+      [MESSAGES.CALL]: this.onCall.bind(this),
+      [MESSAGES.CALL_ACK]: this.onCallAck.bind(this),
+      [MESSAGES.HEARTBEAT]: this.onHeartbeat.bind(this),
+      [MESSAGES.RELOAD]: this.reloadIframe.bind(this),
     };
 
     const handler = handlers[data.type];
@@ -344,15 +343,15 @@ export class Popcorn {
     }
   }
 
-  _onCallAck({ requestId }: { requestId: number }): void {
-    this._trace("Main: onCallAck: ", { requestId });
-    const callData = this._calls.get(requestId);
+  private onCallAck({ requestId }: { requestId: number }): void {
+    this.trace("Main: onCallAck: ", { requestId });
+    const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_ack" });
 
-    this._calls.set(requestId, { ...callData, acknowledged: true });
+    this.calls.set(requestId, { ...callData, acknowledged: true });
   }
 
-  _onCall({
+  private onCall({
     requestId,
     error,
     data,
@@ -361,12 +360,12 @@ export class Popcorn {
     error?: AnySerializable;
     data?: AnySerializable;
   }): void {
-    this._trace("Main: onCall: ", { requestId, error, data });
-    const callData = this._calls.get(requestId);
+    this.trace("Main: onCall: ", { requestId, error, data });
+    const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_call" });
     if (!callData.acknowledged) throwError({ t: "no_acked_call" });
 
-    this._calls.delete(requestId);
+    this.calls.delete(requestId);
 
     const durationMs = performance.now() - callData.startTimeMs;
     if (error !== undefined) {
@@ -376,58 +375,58 @@ export class Popcorn {
     }
   }
 
-  _onHeartbeat(): void {
-    if (this._heartbeatTimeout) {
-      clearTimeout(this._heartbeatTimeout);
+  private onHeartbeat(): void {
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
     }
-    this._heartbeatTimeout = setTimeout(() => {
-      this._trace("Main: heartbeat lost");
-      this._reloadIframe("heartbeat_lost");
+    this.heartbeatTimeout = setTimeout(() => {
+      this.trace("Main: heartbeat lost");
+      this.reloadIframe("heartbeat_lost");
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     }, this.heartbeatTimeoutMs!);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _reloadIframe(_reason = "other"): void {
-    if (this._iframe === null) {
+  private reloadIframe(_reason = "other"): void {
+    if (this.iframe === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
 
     if (document.hidden) {
-      this._trace("Main: reloading iframe skipped, window not visible");
+      this.trace("Main: reloading iframe skipped, window not visible");
       return;
     }
-    this._trace("Main: reloading iframe");
-    const container = this._iframe.parentElement;
+    this.trace("Main: reloading iframe");
+    const container = this.iframe.parentElement;
     this.deinit();
     if (container) {
-      this._mount(container);
+      this.mount(container);
     }
   }
 
-  _send(type: string, data: AnySerializable): void {
-    this._iframe?.contentWindow?.postMessage({ type, value: data });
+  private send(type: string, data: AnySerializable): void {
+    this.iframe?.contentWindow?.postMessage({ type, value: data });
   }
 
-  _awaitMessage(type: string): Promise<AnySerializable> {
-    if (this._awaitedMessage) {
+  private awaitMessage(type: string): Promise<AnySerializable> {
+    if (this.awaitedMessage) {
       throwError({
         t: "already_awaited",
-        messageType: this._awaitedMessage.type,
+        messageType: this.awaitedMessage.type,
         awaitedMessageType: type,
       });
     }
 
-    this._awaitedMessage = { type };
+    this.awaitedMessage = { type };
 
     return new Promise((resolve) => {
-      if (!this._awaitedMessage) throwError({ t: "assert" });
-      this._awaitedMessage.resolve = resolve;
+      if (!this.awaitedMessage) throwError({ t: "assert" });
+      this.awaitedMessage.resolve = resolve;
     });
   }
 
-  _trace(...messages: unknown[]): void {
-    if (this._debug) {
+  trace(...messages: unknown[]): void {
+    if (this.debug) {
       console.debug(...messages);
     }
   }
