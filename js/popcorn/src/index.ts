@@ -99,9 +99,7 @@ const INIT_TOKEN = Symbol();
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
  */
 export class Popcorn {
-  onStdout: ((message: string) => void) | null = null;
-  onStderr: ((message: string) => void) | null = null;
-  heartbeatTimeoutMs: number | null = null;
+  public heartbeatTimeoutMs: number | null = null;
 
   private debug = false;
   private bundleURL: string | null = null;
@@ -131,8 +129,9 @@ export class Popcorn {
 
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
-    this.onStdout = params.onStdout ?? console.log;
-    this.onStderr = params.onStderr ?? console.warn;
+
+    this.logListeners.stdout.add(params.onStdout ?? console.log);
+    this.logListeners.stdout.add(params.onStderr ?? console.warn);
     this.heartbeatTimeoutMs = params.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
@@ -317,11 +316,9 @@ export class Popcorn {
 
     const handlers: Record<string, (value: AnySerializable) => void> = {
       [MESSAGES.STDOUT]: (value: string) => {
-        this.onStdout?.(value);
         this.notifyLogListeners("stdout", value);
       },
       [MESSAGES.STDERR]: (value: string) => {
-        this.onStderr?.(value);
         this.notifyLogListeners("stderr", value);
       },
       [MESSAGES.CALL]: this.onCall.bind(this),
