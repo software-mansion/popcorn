@@ -150,10 +150,7 @@ export class Popcorn {
   }
 
   private async mount(container: HTMLElement): Promise<void> {
-    if (this.iframe !== null) {
-      throw new Error("Iframe already mounted");
-    }
-
+    if (this.iframe !== null) throwError({ t: "already_mounted" });
     this.trace("Main: mount, container: ", container);
 
     const iframeUrl = new URL("./iframe.mjs", import.meta.url).href;
@@ -256,9 +253,7 @@ export class Popcorn {
    * Destroys an iframe and resets the instance.
    */
   deinit() {
-    if (this.iframe === null) {
-      throw new Error("Iframe not mounted");
-    }
+    if (this.iframe === null) throwError({ t: "unmounted" });
 
     this.trace("Main: deinit");
     if (!this.iframeListenerRef) throwError({ t: "assert" });
@@ -450,7 +445,8 @@ type ErrorData =
       t: "already_awaited";
       messageType: string;
       awaitedMessageType: string;
-    };
+    }
+  | { t: "already_mounted" };
 
 function throwError(error: ErrorData): never {
   switch (error.t) {
@@ -475,5 +471,7 @@ function throwError(error: ErrorData): never {
       throw new Error(
         `Cannot await message ${error.messageType} when a message ${error.awaitedMessageType} is already awaited on`,
       );
+    case "already_mounted":
+      throw new Error("Iframe already mounted");
   }
 }
