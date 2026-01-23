@@ -27,8 +27,6 @@ const MESSAGES = {
   RELOAD: "popcorn-reload",
 };
 
-const INIT_TOKEN = Symbol();
-
 type CallResult = {
   /** Serialized value returned from Elixir */
   data: AnySerializable;
@@ -65,6 +63,8 @@ type PopcornInitOptions = {
   debug?: boolean;
 };
 
+type CtorArgs = Omit<PopcornInitOptions, "container">;
+
 /** Options for call method */
 type CallOptions = {
   /** Registered Elixir process name. */
@@ -93,6 +93,8 @@ type AwaitedMessage = {
 
 class PopcornDeinitializedError extends Error {}
 
+const INIT_TOKEN = Symbol();
+
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
  */
@@ -120,20 +122,18 @@ export class Popcorn {
   private awaitedMessage: AwaitedMessage | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(params: Omit<PopcornInitOptions, "container">, token: symbol) {
-    if (token !== INIT_TOKEN) {
-      throw new Error(
-        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
-      );
-    }
-    const { bundlePath, onStderr, onStdout, heartbeatTimeoutMs, debug } =
-      params;
 
-    this.debug = debug ?? false;
-    this.bundleURL = new URL(bundlePath ?? "/bundle.avm", import.meta.url).href;
-    this.onStdout = onStdout ?? console.log;
-    this.onStderr = onStderr ?? console.warn;
-    this.heartbeatTimeoutMs = heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+  private constructor(params: CtorArgs, token: symbol) {
+    if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
+
+    const bundlePath = params.bundlePath ?? "/bundle.avm";
+    const bundleURL = new URL(bundlePath, import.meta.url);
+
+    this.debug = params.debug ?? false;
+    this.bundleURL = bundleURL.href;
+    this.onStdout = params.onStdout ?? console.log;
+    this.onStderr = params.onStderr ?? console.warn;
+    this.heartbeatTimeoutMs = params.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
   /**
@@ -449,6 +449,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 type ErrorData =
   | { t: "assert" }
+  | { t: "private_constructor" }
   | { t: "bad_call" }
   | { t: "no_acked_call" }
   | { t: "bad_ack" }
@@ -464,6 +465,10 @@ function throwError(error: ErrorData): never {
   switch (error.t) {
     case "assert":
       throw new Error("Assertion error");
+    case "private_constructor":
+      throw new Error(
+        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
+      );
     case "bad_call":
       throw new Error("Response for non-existent call");
     case "no_acked_call":
