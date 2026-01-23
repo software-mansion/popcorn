@@ -90,6 +90,8 @@ type AwaitedMessage = {
 
 class PopcornDeinitializedError extends Error {}
 
+type State = { status: "uninitialized" } | { status: "ready" };
+
 const INIT_TOKEN = Symbol();
 
 /**
@@ -101,6 +103,8 @@ export class Popcorn {
   private debug = false;
   private bundleURL: string | null = null;
   private initProcess: string | null = null;
+
+  private state: State = { status: "uninitialized" };
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
@@ -151,6 +155,8 @@ export class Popcorn {
 
   private async mount(container: HTMLElement): Promise<void> {
     if (this.iframe !== null) throwError({ t: "already_mounted" });
+    this.assertStatus("uninitialized");
+
     this.trace("Main: mount, container: ", container);
 
     const iframeUrl = new URL("./iframe.mjs", import.meta.url).href;
@@ -236,6 +242,8 @@ export class Popcorn {
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
   cast(args: AnySerializable, { process }: CastOptions): void {
+    this.assertStatus("ready");
+
     const targetProcess = process ?? this.initProcess;
     if (this.iframe === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
@@ -330,6 +338,7 @@ export class Popcorn {
   }
 
   private onCallAck({ requestId }: { requestId: number }): void {
+    this.assertStatus("ready");
     this.trace("Main: onCallAck: ", { requestId });
     const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_ack" });
@@ -346,6 +355,7 @@ export class Popcorn {
     error?: AnySerializable;
     data?: AnySerializable;
   }): void {
+    this.assertStatus("ready");
     this.trace("Main: onCall: ", { requestId, error, data });
     const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_call" });
@@ -416,6 +426,17 @@ export class Popcorn {
       console.debug(...messages);
     }
   }
+
+  private assertStatus(status: State["status"]): void {
+    const currentStatus = this.state.status;
+    if (currentStatus !== status) {
+      throwError({
+        t: "bad_status",
+        status: currentStatus,
+        expectedStatus: status,
+      });
+    }
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -435,6 +456,11 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 type ErrorData =
   | { t: "assert" }
+  | {
+      t: "bad_status";
+      status: State["status"];
+      expectedStatus: State["status"];
+    }
   | { t: "private_constructor" }
   | { t: "bad_call" }
   | { t: "no_acked_call" }
@@ -452,6 +478,10 @@ function throwError(error: ErrorData): never {
   switch (error.t) {
     case "assert":
       throw new Error("Assertion error");
+    case "bad_status":
+      throw new Error(
+        `Unexpected status transition. Instance in ${error.status} status, expected ${error.expectedStatus}`,
+      );
     case "private_constructor":
       throw new Error(
         "Don't construct the Popcorn object directly, use Popcorn.init() instead",
