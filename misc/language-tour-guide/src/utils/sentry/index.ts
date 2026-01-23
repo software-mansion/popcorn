@@ -124,10 +124,11 @@ export function wrapPopcornReloadIframe(
   popcornInstance: any,
   customReloadCallback: (reason: ReloadReason) => void
 ) {
-  const originalReloadIframe = popcornInstance.__proto__._reloadIframe;
+  const originalReloadIframe =
+    popcornInstance._reloadIframe.bind(popcornInstance);
 
   // TODO: not overwriting prototype method
-  popcornInstance.__proto__._reloadIframe = function (reason: ReloadReason) {
+  popcornInstance._reloadIframe = function (reason: ReloadReason) {
     originalReloadIframe.call(this, reason);
 
     customReloadCallback(reason);

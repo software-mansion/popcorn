@@ -243,6 +243,7 @@ export class Popcorn {
     this._listenerRef = null;
     this._logListeners.stdout.clear();
     this._logListeners.stderr.clear();
+    clearTimeout(this._heartbeatTimeout);
     for (const [_id, callData] of this._calls) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.reject({ error: new PopcornDeinitializedError("Call cancelled due to instance deinit"), durationMs })

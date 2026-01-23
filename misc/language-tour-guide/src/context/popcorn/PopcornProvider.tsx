@@ -1,4 +1,10 @@
-import { useState, useEffect, type ReactNode, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  type ReactNode,
+  useCallback
+} from "react";
 import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
 import { wrapPopcornReloadIframe, type LogSink } from "../../utils/sentry";
 
@@ -15,44 +21,57 @@ export const PopcornProvider = ({
 }: PopcornProviderProps) => {
   const [instance, setInstance] = useState<Popcorn | null>(null);
   const [isLoadingPopcorn, setIsLoadingPopcorn] = useState<boolean>(true);
+  const instanceRef = useRef<Popcorn | null>(null);
+  const isReinitializingRef = useRef(false);
 
   useEffect(() => {
-    let currentInstance: Popcorn | null = null;
-
     async function init() {
+      isReinitializingRef.current = true;
       setIsLoadingPopcorn(true);
       const { instance, error } = await initPopcorn({ debug, logSink });
+
       if (error !== null) {
         console.error("Error during Popcorn initialization:", error);
+        isReinitializingRef.current = false;
         return;
       }
       setIsLoadingPopcorn(false);
 
-      currentInstance = instance;
+      instanceRef.current = instance;
       setInstance(instance);
+      isReinitializingRef.current = false;
     }
 
     init();
 
     return () => {
-      if (currentInstance) {
+      isReinitializingRef.current = false;
+      if (instanceRef.current) {
         try {
-          currentInstance.deinit();
+          instanceRef.current.deinit();
         } catch (e) {
           console.error("Error during Popcorn cleanup:", e);
         }
+        instanceRef.current = null;
       }
     };
   }, [debug, logSink]);
 
   // TODO: drop after popcorn cancel calls method is implemented (#378)
   const reinitializePopcorn = useCallback(async () => {
-    if (instance) {
+    if (isReinitializingRef.current) {
+      return;
+    }
+
+    isReinitializingRef.current = true;
+
+    if (instanceRef.current) {
       try {
-        instance.deinit();
+        instanceRef.current.deinit();
       } catch (e) {
         console.error("Error during Popcorn cleanup:", e);
       }
+      instanceRef.current = null;
     }
 
     setIsLoadingPopcorn(true);
@@ -60,14 +79,19 @@ export const PopcornProvider = ({
       debug,
       logSink
     });
+
     if (error !== null) {
       console.error("Error during Popcorn re-initialization:", error);
+      isReinitializingRef.current = false;
       return;
     }
     setIsLoadingPopcorn(false);
 
+    instanceRef.current = newInstance;
     setInstance(newInstance);
-  }, [debug, logSink, instance]);
+
+    isReinitializingRef.current = false;
+  }, [debug, logSink]);
 
   const value: PopcornContextValue = {
     instance,
