@@ -1,3 +1,5 @@
+import { IframeBridge, type IframeBridgeArgs } from "./bridge";
+
 const INIT_VM_TIMEOUT_MS = 30_000;
 const CALL_TIMEOUT_MS = 60_000;
 const HEARTBEAT_TIMEOUT_MS = 60_000;
@@ -25,7 +27,29 @@ const MESSAGES = {
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
   RELOAD: "popcorn-reload",
-};
+} as const;
+
+type InitialProcessName = string;
+type ReloadReason = string;
+type Message =
+  | { type: "popcorn-init"; value: never }
+  | { type: "popcorn-startVm"; value: InitialProcessName }
+  | {
+      type: "popcorn-call";
+      value: {
+        requestId: number;
+        error?: AnySerializable;
+        data?: AnySerializable;
+      };
+    }
+  | { type: "popcorn-cast"; value: never } // only sent, not received
+  | { type: "popcorn-callAck"; value: { requestId: number } }
+  | { type: "popcorn-stdout"; value: string }
+  | { type: "popcorn-stderr"; value: string }
+  | { type: "popcorn-heartbeat"; value: never }
+  | { type: "popcorn-reload"; value: ReloadReason };
+
+const MESSAGES_TYPES = new Set(Object.values(MESSAGES));
 
 /** Options for Popcorn.init() */
 export type PopcornInitOptions = {
@@ -44,7 +68,6 @@ export type PopcornInitOptions = {
   /** Enable debug logging. */
   debug?: boolean;
 };
-type CtorArgs = Omit<PopcornInitOptions, "container">;
 
 /** Options for cast method */
 type CastOptions = {
@@ -93,6 +116,7 @@ class PopcornDeinitializedError extends Error {}
 type State = { status: "uninitialized" } | { status: "ready" };
 
 const INIT_TOKEN = Symbol();
+const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
@@ -100,26 +124,28 @@ const INIT_TOKEN = Symbol();
 export class Popcorn {
   public heartbeatTimeoutMs: number | null = null;
 
+  private bridge: IframeBridge<Message> | null = null;
+  private bridgeConfig: IframeBridgeArgs<Message>;
   private debug = false;
-  private bundleURL: string | null = null;
+  private bundleURL: string;
   private initProcess: string | null = null;
 
   private state: State = { status: "uninitialized" };
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
-  private iframeListenerRef: ((event: MessageEvent) => void) | null = null;
   private logListeners: LogListeners = {
     stdout: new Set(),
     stderr: new Set(),
   };
 
-  private iframe: HTMLIFrameElement | null = null;
   private awaitedMessage: AwaitedMessage | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
-
-  private constructor(params: CtorArgs, token: symbol) {
+  private constructor(
+    params: PopcornInitOptions & { container: HTMLElement },
+    token: symbol,
+  ) {
     if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
 
     const bundlePath = params.bundlePath ?? "/bundle.avm";
@@ -127,6 +153,15 @@ export class Popcorn {
 
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
+
+    this.bridgeConfig = {
+      container: params.container,
+      script: { url: IFRAME_URL, entrypoint: "runIFrame" },
+      config: { "bundle-path": this.bundleURL },
+      debug: true,
+      messageFilter: isPopcornPayload,
+      onMessage: this.iframeHandler.bind(this),
+    };
 
     this.logListeners.stdout.add(params.onStdout ?? console.log);
     this.logListeners.stdout.add(params.onStderr ?? console.warn);
@@ -147,38 +182,24 @@ export class Popcorn {
    */
   static async init(options: PopcornInitOptions): Promise<Popcorn> {
     const { container, ...constructorParams } = options;
-    const popcorn = new Popcorn(constructorParams, INIT_TOKEN);
+    const containerWithDefault = container ?? document.documentElement;
+
+    const popcorn = new Popcorn(
+      { ...constructorParams, container: containerWithDefault },
+      INIT_TOKEN,
+    );
     popcorn.trace("Main: init, params: ", { container, ...constructorParams });
-    await popcorn.mount(container ?? document.documentElement);
+    await popcorn.mount();
     return popcorn;
   }
 
-  private async mount(container: HTMLElement): Promise<void> {
-    if (this.iframe !== null) throwError({ t: "already_mounted" });
+  private async mount(): Promise<void> {
+    if (this.bridge !== null) throwError({ t: "already_mounted" });
     this.assertStatus("uninitialized");
+    this.trace("Main: mount, container: ", this.bridgeConfig.container);
 
-    this.trace("Main: mount, container: ", container);
+    this.bridge = new IframeBridge<Message>(this.bridgeConfig);
 
-    const iframeUrl = new URL("./iframe.mjs", import.meta.url).href;
-
-    this.iframe = document.createElement("iframe");
-    this.iframe.srcdoc = `<html>
-      <html lang="en" dir="ltr">
-          <head>
-            <meta name="bundle-path" content="${this.bundleURL}" />
-          </head>
-          <script type="module" defer>
-            import { runIFrame } from "${iframeUrl}";
-            runIFrame();
-          </script>
-      </html>`;
-    this.iframe.style =
-      "visibility: hidden; width: 0px; height: 0px; border: none";
-
-    // TODO: handle multiple iframes
-    this.iframeListenerRef = this.iframeListener.bind(this);
-    window.addEventListener("message", this.iframeListenerRef);
-    container.appendChild(this.iframe);
     await this.awaitMessage(MESSAGES.INIT);
     this.trace("Main: iframe loaded");
     this.initProcess = await withTimeout(
@@ -210,16 +231,16 @@ export class Popcorn {
     { process, timeoutMs }: CallOptions,
   ): Promise<CallResult> {
     const targetProcess = process ?? this.initProcess;
-    if (this.iframe === null) throwError({ t: "unmounted" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this.requestId++;
     const callPromise = new Promise<CallResult>((resolve, reject) => {
+      if (this.bridge === null) throwError({ t: "unmounted" });
       this.trace("Main: call: ", { requestId, process, args });
-      this.send(MESSAGES.CALL, {
-        requestId,
-        process: targetProcess,
-        args,
+      this.bridge.send({
+        type: MESSAGES.CALL,
+        value: { requestId, process: targetProcess, args },
       });
 
       this.calls.set(requestId, {
@@ -245,15 +266,14 @@ export class Popcorn {
     this.assertStatus("ready");
 
     const targetProcess = process ?? this.initProcess;
-    if (this.iframe === null) throwError({ t: "unmounted" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this.requestId++;
     this.trace("Main: cast: ", { requestId, process, args });
-    this.send(MESSAGES.CAST, {
-      requestId,
-      process: targetProcess,
-      args,
+    this.bridge.send({
+      type: MESSAGES.CAST,
+      value: { requestId, process: targetProcess, args },
     });
   }
 
@@ -261,15 +281,10 @@ export class Popcorn {
    * Destroys an iframe and resets the instance.
    */
   deinit() {
-    if (this.iframe === null) throwError({ t: "unmounted" });
-
+    if (this.bridge === null) throwError({ t: "unmounted" });
     this.trace("Main: deinit");
-    if (!this.iframeListenerRef) throwError({ t: "assert" });
-    window.removeEventListener("message", this.iframeListenerRef);
-    this.iframe.remove();
-    this.iframe = null;
+    this.bridge.deinit();
     this.awaitedMessage = null;
-    this.iframeListenerRef = null;
     this.logListeners.stdout.clear();
     this.logListeners.stderr.clear();
     for (const callData of this.calls.values()) {
@@ -303,7 +318,7 @@ export class Popcorn {
     });
   }
 
-  private iframeListener({ data }: MessageEvent): void {
+  private iframeHandler(data: Message) {
     const awaitedMessage = this.awaitedMessage;
     if (awaitedMessage && data.type == awaitedMessage.type) {
       this.awaitedMessage = null;
@@ -311,29 +326,20 @@ export class Popcorn {
       return;
     }
 
-    const handlers: Record<string, (value: AnySerializable) => void> = {
-      [MESSAGES.STDOUT]: (value: string) => {
-        this.notifyLogListeners("stdout", value);
-      },
-      [MESSAGES.STDERR]: (value: string) => {
-        this.notifyLogListeners("stderr", value);
-      },
-      [MESSAGES.CALL]: this.onCall.bind(this),
-      [MESSAGES.CALL_ACK]: this.onCallAck.bind(this),
-      [MESSAGES.HEARTBEAT]: this.onHeartbeat.bind(this),
-      [MESSAGES.RELOAD]: this.reloadIframe.bind(this),
-    };
-
-    const handler = handlers[data.type];
-    if (handler !== undefined) {
-      handler(data.value);
-    } else if (
-      typeof data.type === "string" &&
-      data.type?.startsWith("popcorn")
-    ) {
-      console.warn(
-        `Received unhandled event: ${JSON.stringify(data, null, 4)}`,
-      );
+    if (data.type === MESSAGES.STDOUT) {
+      this.notifyLogListeners("stdout", data.value);
+    } else if (data.type === MESSAGES.STDERR) {
+      this.notifyLogListeners("stderr", data.value);
+    } else if (data.type === MESSAGES.CALL) {
+      this.onCall(data.value);
+    } else if (data.type === MESSAGES.CALL_ACK) {
+      this.onCallAck(data.value);
+    } else if (data.type === MESSAGES.HEARTBEAT) {
+      this.onHeartbeat();
+    } else if (data.type === MESSAGES.RELOAD) {
+      this.reloadIframe();
+    } else {
+      throwError({ t: "assert" });
     }
   }
 
@@ -384,7 +390,7 @@ export class Popcorn {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private reloadIframe(_reason = "other"): void {
-    if (this.iframe === null) {
+    if (this.bridge === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
 
@@ -393,15 +399,8 @@ export class Popcorn {
       return;
     }
     this.trace("Main: reloading iframe");
-    const container = this.iframe.parentElement;
     this.deinit();
-    if (container) {
-      this.mount(container);
-    }
-  }
-
-  private send(type: string, data: AnySerializable): void {
-    this.iframe?.contentWindow?.postMessage({ type, value: data });
+    this.mount();
   }
 
   private awaitMessage(type: string): Promise<AnySerializable> {
@@ -504,4 +503,25 @@ function throwError(error: ErrorData): never {
     case "already_mounted":
       throw new Error("Iframe already mounted");
   }
+}
+
+function isPayloadShape(
+  payload: object,
+): payload is { type: string; value: AnySerializable } {
+  const hasType = Object.hasOwn(payload, "type");
+  const hasValue = Object.hasOwn(payload, "value");
+  const hasFields = hasType && hasValue;
+  if (!hasFields) return false;
+  return true;
+}
+
+function isPopcornPayload(payload: unknown): payload is Message {
+  const isObject = typeof payload === "object" && payload !== null;
+  if (!isObject) return false;
+  if (!isPayloadShape(payload)) return false;
+  const hasOkFieldTypes = typeof payload.type === "string";
+  if (!hasOkFieldTypes) return false;
+
+  // TODO: may also check `value` under `debug`
+  return (MESSAGES_TYPES as Set<string>).has(payload.type);
 }
