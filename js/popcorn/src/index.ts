@@ -11,20 +11,6 @@ import {
   type AnySerializable,
 } from "./types";
 
-// postMessage data:
-//  | { type: "stdout", value: string }
-//  | { type: "stderr", value: string }
-//  | { type: "init", value: string }
-//  | { type: "call", value: ElixirRequest | ElixirResponse}
-//  | { type: "callAck", value: ElixirAck }
-//  | { type: "cast", value: ElixirRequest }
-//  | { type: "heartbeat", value: void }
-//  | { type: "reload", value: void }
-//
-// ElixirRequest: { requestId: number, process: string, action: string, args: any }
-// ElixirResponse: { requestId: number, error: string } | { requestId: number, data: any }
-// ElixirAck: { requestId: number }
-
 /** Options for Popcorn.init() */
 export type PopcornInitOptions = {
   /** DOM element to mount an iframe */
@@ -84,7 +70,13 @@ type AwaitedMessage = {
 
 class PopcornDeinitializedError extends Error {}
 
-type State = { status: "uninitialized" } | { status: "ready" };
+type State =
+  | { status: "uninitialized" }
+  | { status: "mount" }
+  | { status: "await_vm" }
+  | { status: "ready" }
+  | { status: "reload" }
+  | { status: "deinit" };
 
 const INIT_TOKEN = Symbol();
 const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
@@ -99,9 +91,8 @@ export class Popcorn {
   private bridgeConfig: IframeBridgeArgs<Message>;
   private debug = false;
   private bundleURL: string;
-  private initProcess: string | null = null;
-
   private state: State = { status: "uninitialized" };
+  private initProcess: string | null = null;
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
@@ -166,17 +157,21 @@ export class Popcorn {
 
   private async mount(): Promise<void> {
     if (this.bridge !== null) throwError({ t: "already_mounted" });
-    this.assertStatus("uninitialized");
+    this.assertStatus(["uninitialized", "reload"]);
+    this.transition({ status: "mount" });
     this.trace("Main: mount, container: ", this.bridgeConfig.container);
 
     this.bridge = new IframeBridge<Message>(this.bridgeConfig);
 
     await this.awaitMessage(MESSAGES.INIT);
+    this.transition({ status: "await_vm" });
     this.trace("Main: iframe loaded");
+
     this.initProcess = await withTimeout(
       this.awaitMessage(MESSAGES.START_VM),
       INIT_VM_TIMEOUT_MS,
     );
+    this.transition({ status: "ready" });
     this.trace("Main: mounted, main process: ", this.initProcess);
     this.onHeartbeat();
   }
@@ -199,8 +194,9 @@ export class Popcorn {
    */
   async call(
     args: AnySerializable,
-    { process, timeoutMs }: CallOptions,
+    { process, timeoutMs }: CallOptions = {},
   ): Promise<CallResult> {
+    this.assertStatus(["ready"]);
     const targetProcess = process ?? this.initProcess;
     if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
@@ -233,9 +229,8 @@ export class Popcorn {
    * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
-  cast(args: AnySerializable, { process }: CastOptions): void {
-    this.assertStatus("ready");
-
+  cast(args: AnySerializable, { process }: CastOptions = {}): void {
+    this.assertStatus(["ready"]);
     const targetProcess = process ?? this.initProcess;
     if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
@@ -254,8 +249,14 @@ export class Popcorn {
   deinit() {
     if (this.bridge === null) throwError({ t: "unmounted" });
     this.trace("Main: deinit");
+    this.transition({ status: "deinit" });
     this.bridge.deinit();
+    this.bridge = null;
     this.awaitedMessage = null;
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
     this.logListeners.stdout.clear();
     this.logListeners.stderr.clear();
     for (const callData of this.calls.values()) {
@@ -267,6 +268,7 @@ export class Popcorn {
         durationMs,
       });
     }
+    this.calls.clear();
   }
 
   /**
@@ -315,7 +317,7 @@ export class Popcorn {
   }
 
   private onCallAck({ requestId }: { requestId: number }): void {
-    this.assertStatus("ready");
+    this.assertStatus(["ready"]);
     this.trace("Main: onCallAck: ", { requestId });
     const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_ack" });
@@ -332,7 +334,7 @@ export class Popcorn {
     error?: AnySerializable;
     data?: AnySerializable;
   }): void {
-    this.assertStatus("ready");
+    this.assertStatus(["ready"]);
     this.trace("Main: onCall: ", { requestId, error, data });
     const callData = this.calls.get(requestId);
     if (callData === undefined) throwError({ t: "bad_call" });
@@ -370,7 +372,22 @@ export class Popcorn {
       return;
     }
     this.trace("Main: reloading iframe");
-    this.deinit();
+    this.transition({ status: "reload" });
+    this.bridge.deinit();
+    this.bridge = null;
+    this.awaitedMessage = null;
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+    for (const callData of this.calls.values()) {
+      const durationMs = performance.now() - callData.startTimeMs;
+      callData.reject({
+        error: new Error("Call cancelled due to iframe reload"),
+        durationMs,
+      });
+    }
+    this.calls.clear();
     this.mount();
   }
 
@@ -397,13 +414,18 @@ export class Popcorn {
     }
   }
 
-  private assertStatus(status: State["status"]): void {
+  private transition(to: State): void {
+    this.trace(`State: ${this.state.status} -> ${to.status}`);
+    this.state = to;
+  }
+
+  private assertStatus(validStatuses: State["status"][]): void {
     const currentStatus = this.state.status;
-    if (currentStatus !== status) {
+    if (!validStatuses.includes(currentStatus)) {
       throwError({
         t: "bad_status",
         status: currentStatus,
-        expectedStatus: status,
+        expectedStatus: validStatuses.join(" | "),
       });
     }
   }
@@ -429,7 +451,7 @@ type ErrorData =
   | {
       t: "bad_status";
       status: State["status"];
-      expectedStatus: State["status"];
+      expectedStatus: string;
     }
   | { t: "private_constructor" }
   | { t: "bad_call" }
