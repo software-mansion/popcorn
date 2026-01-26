@@ -85,8 +85,8 @@ Then, we can use `&1`, `&2`, `&3` etc to refer to the first, second, third argum
 
 ```elixir
 # This is equivalent to fn a, b -> a + b end
-add = & &1 + &2
-add.(2, 3)
+short_add = & &1 + &2
+short_add.(2, 3)
 ```
 
 You can also use the capture operator to wrap function calls:
