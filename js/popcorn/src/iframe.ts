@@ -2,9 +2,7 @@
 import init from "./AtomVM.mjs";
 import { send } from "./bridge";
 import { HEARTBEAT_INTERVAL_MS } from "./config";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySerializable = any;
+import type { AnySerializable, CallRequest, IframeRequest } from "./types";
 
 /** Emscripten filesystem interface */
 type EmscriptenFS = {
@@ -29,18 +27,6 @@ type AtomVMModule = {
   onElixirReady: ((initProcess: string) => void) | null;
 };
 
-/** Message data received from parent window */
-type MessageData = {
-  type: string;
-  value: AnySerializable;
-};
-
-/** Call request value */
-type CallRequestValue = {
-  requestId: number;
-  process: string;
-  args: AnySerializable;
-};
 
 const MESSAGES = {
   INIT: "popcorn-init",
@@ -89,11 +75,11 @@ export async function runIFrame(): Promise<void> {
 
   window.addEventListener(
     "message",
-    async ({ data }: MessageEvent<MessageData>) => {
+    async ({ data }: MessageEvent<IframeRequest>) => {
       const type = data.type;
 
       if (type === MESSAGES.CALL) {
-        await handleCall(data);
+        await handleCall(data.value);
       } else if (type.startsWith("popcorn")) {
         console.error(
           `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`,
@@ -220,11 +206,11 @@ async function startVm(avmBundle: Int8Array): Promise<string> {
   return resultPromise;
 }
 
-async function handleCall(data: MessageData): Promise<void> {
+async function handleCall(request: CallRequest): Promise<void> {
   if (!Module) {
     throw new Error("Module not initialized");
   }
-  const { requestId, process, args } = data.value as CallRequestValue;
+  const { requestId, process, args } = request;
   send(MESSAGES.CALL_ACK, { requestId });
 
   try {
