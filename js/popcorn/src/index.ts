@@ -1,8 +1,10 @@
-import { IframeBridge, type IframeBridgeArgs } from "./bridge";
-
-const INIT_VM_TIMEOUT_MS = 30_000;
-const CALL_TIMEOUT_MS = 60_000;
-const HEARTBEAT_TIMEOUT_MS = 60_000;
+import { IframeBridge, isMessageType, MESSAGES } from "./bridge";
+import type { Message, IframeBridgeArgs, AnySerializable } from "./bridge";
+import {
+  INIT_VM_TIMEOUT_MS,
+  HEARTBEAT_TIMEOUT_MS,
+  CALL_TIMEOUT_MS,
+} from "./config";
 
 // postMessage data:
 //  | { type: "stdout", value: string }
@@ -17,39 +19,6 @@ const HEARTBEAT_TIMEOUT_MS = 60_000;
 // ElixirRequest: { requestId: number, process: string, action: string, args: any }
 // ElixirResponse: { requestId: number, error: string } | { requestId: number, data: any }
 // ElixirAck: { requestId: number }
-const MESSAGES = {
-  INIT: "popcorn-init",
-  START_VM: "popcorn-startVm",
-  CALL: "popcorn-call",
-  CAST: "popcorn-cast",
-  CALL_ACK: "popcorn-callAck",
-  STDOUT: "popcorn-stdout",
-  STDERR: "popcorn-stderr",
-  HEARTBEAT: "popcorn-heartbeat",
-  RELOAD: "popcorn-reload",
-} as const;
-
-type InitialProcessName = string;
-type ReloadReason = string;
-type Message =
-  | { type: "popcorn-init"; value: never }
-  | { type: "popcorn-startVm"; value: InitialProcessName }
-  | {
-      type: "popcorn-call";
-      value: {
-        requestId: number;
-        error?: AnySerializable;
-        data?: AnySerializable;
-      };
-    }
-  | { type: "popcorn-cast"; value: never } // only sent, not received
-  | { type: "popcorn-callAck"; value: { requestId: number } }
-  | { type: "popcorn-stdout"; value: string }
-  | { type: "popcorn-stderr"; value: string }
-  | { type: "popcorn-heartbeat"; value: never }
-  | { type: "popcorn-reload"; value: ReloadReason };
-
-const MESSAGES_TYPES = new Set(Object.values(MESSAGES));
 
 /** Options for Popcorn.init() */
 export type PopcornInitOptions = {
@@ -91,9 +60,6 @@ type CallResult = {
   /** Optional error if call failed */
   error?: AnySerializable;
 };
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnySerializable = any;
 
 type LogType = "stdout" | "stderr";
 type LogListener = (message: string) => void;
@@ -507,7 +473,7 @@ function throwError(error: ErrorData): never {
 
 function isPayloadShape(
   payload: object,
-): payload is { type: string; value: AnySerializable } {
+): payload is { type: Message["type"]; value: AnySerializable } {
   const hasType = Object.hasOwn(payload, "type");
   const hasValue = Object.hasOwn(payload, "value");
   const hasFields = hasType && hasValue;
@@ -523,5 +489,5 @@ function isPopcornPayload(payload: unknown): payload is Message {
   if (!hasOkFieldTypes) return false;
 
   // TODO: may also check `value` under `debug`
-  return (MESSAGES_TYPES as Set<string>).has(payload.type);
+  return isMessageType(payload.type);
 }

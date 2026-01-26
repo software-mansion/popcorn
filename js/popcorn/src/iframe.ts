@@ -1,5 +1,7 @@
 // @ts-expect-error atomvm doesn't have types yet
 import init from "./AtomVM.mjs";
+import { send } from "./bridge";
+import { HEARTBEAT_INTERVAL_MS } from "./config";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySerializable = any;
@@ -51,8 +53,6 @@ const MESSAGES = {
   HEARTBEAT: "popcorn-heartbeat",
   RELOAD: "popcorn-reload",
 };
-
-const HEARTBEAT_INTERVAL_MS = 500;
 
 let Module: AtomVMModule | null = null;
 
@@ -257,10 +257,6 @@ function ensureResultKeyList(result: unknown): void {
       "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
     );
   }
-}
-
-function send(type: string, data: AnySerializable): void {
-  window.parent.postMessage({ type, value: data });
 }
 
 function deserialize(message: string): AnySerializable {

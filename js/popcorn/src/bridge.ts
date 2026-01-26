@@ -10,6 +10,50 @@ export type IframeBridgeArgs<T> = {
 const STYLE_HIDDEN =
   "visibility: hidden; width: 0px; height: 0px; border: none";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnySerializable = any;
+
+export const MESSAGES = {
+  INIT: "popcorn-init",
+  START_VM: "popcorn-startVm",
+  CALL: "popcorn-call",
+  CAST: "popcorn-cast",
+  CALL_ACK: "popcorn-callAck",
+  STDOUT: "popcorn-stdout",
+  STDERR: "popcorn-stderr",
+  HEARTBEAT: "popcorn-heartbeat",
+  RELOAD: "popcorn-reload",
+} as const;
+
+type InitialProcessName = string;
+type ReloadReason = string;
+export type Message =
+  | { type: "popcorn-init"; value: never }
+  | { type: "popcorn-startVm"; value: InitialProcessName }
+  | {
+      type: "popcorn-call";
+      value: {
+        requestId: number;
+        error?: AnySerializable;
+        data?: AnySerializable;
+      };
+    }
+  | { type: "popcorn-cast"; value: never } // only sent, not received
+  | { type: "popcorn-callAck"; value: { requestId: number } }
+  | { type: "popcorn-stdout"; value: string }
+  | { type: "popcorn-stderr"; value: string }
+  | { type: "popcorn-heartbeat"; value: never }
+  | { type: "popcorn-reload"; value: ReloadReason };
+
+const MESSAGES_TYPES = new Set<string>(Object.values(MESSAGES));
+export function isMessageType(type: string): type is Message["type"] {
+  return MESSAGES_TYPES.has(type);
+}
+
+export function send(type: string, data: any): void {
+  window.parent.postMessage({ type, value: data });
+}
+
 export class IframeBridge<T> {
   private iframe: HTMLIFrameElement;
   private handlerRef: (event: MessageEvent) => void;
