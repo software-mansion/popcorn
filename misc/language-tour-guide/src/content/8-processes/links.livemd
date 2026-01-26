@@ -1,0 +1,7 @@
+# Links
+
+```elixir
+{:ok, a} = Agent.start_link(fn -> %{} end)
+
+Agent.get(a, fn _s -> raise "dupa" end)
+```

@@ -1,15 +1,17 @@
 defmodule ElixirTour do
   use GenServer
+
   import Popcorn.Wasm, only: [is_wasm_message: 1]
+
+  alias ElixirTour.Evaluator
   alias Popcorn.Wasm
 
   @process_name :main
 
   @type editor_id :: String.t()
-  @type bindings :: Keyword.t()
   @type state :: %{
           editor_order: [editor_id()],
-          bindings: %{editor_id() => bindings()}
+          bindings: %{editor_id() => Evaluator.bindings()}
         }
   @type wasm_result :: {:resolve, String.t(), state()} | {:reject, String.t(), state()}
 
@@ -21,7 +23,7 @@ defmodule ElixirTour do
   def init(_init_arg) do
     Wasm.register(@process_name)
     :application.set_env(:elixir, :ansi_enabled, false)
-    {:ok, %{editor_order: [], bindings: %{}}}
+    {:ok, %{editor_order: [], bindings: %{}, evaluator: evaluator}}
   end
 
   @impl GenServer
@@ -38,15 +40,14 @@ defmodule ElixirTour do
   end
 
   @spec handle_wasm({:wasm_call, list()}, state()) :: wasm_result()
-  defp handle_wasm({:wasm_call, ["set_editor_order", editor_order]}, _state) do
-    {:resolve, "ok", %{editor_order: editor_order, bindings: %{}}}
+  defp handle_wasm({:wasm_call, ["set_editor_order", editor_order]}, state) do
+    {:resolve, "ok", %{state | editor_order: editor_order, bindings: %{}}}
   end
 
   defp handle_wasm({:wasm_call, ["eval_elixir", editor_id, code]}, state) do
-    editor_order = Map.get(state, :editor_order, [])
-    bindings_map = Map.get(state, :bindings, %{})
+    %{evaluator: evaluator, bindings: bindings_map} = state
 
-    preceding_editor_ids = get_preceding_editors(editor_order, editor_id)
+    preceding_editor_ids = get_preceding_editors(state.editor_order, editor_id)
 
     preceding_bindings =
       preceding_editor_ids
@@ -54,7 +55,7 @@ defmodule ElixirTour do
       |> Enum.reduce([], &Keyword.merge(&2, &1))
 
     try do
-      case eval(code, preceding_bindings) do
+      case Evaluator.eval(state.evaluator, code, preceding_bindings) do
         {:ok, result, new_bindings} ->
           editor_bindings = get_changed(preceding_bindings, new_bindings)
           updated_bindings = Map.put(bindings_map, editor_id, editor_bindings)
@@ -65,10 +66,10 @@ defmodule ElixirTour do
           {:reject, error_message, state}
       end
     rescue
-      e ->
-        error_message = Exception.format(:error, e)
-
-        {:reject, error_message, state}
+      error ->
+        error_message = Exception.format(:error, error)
+        evaluator = if Process.alive?(state.evaluator), do: evaluator, else: Evaluator.start!()
+        {:reject, error_message, %{state | evaluator: evaluator}}
     end
   end
 
@@ -77,31 +78,12 @@ defmodule ElixirTour do
     Enum.take_while(editor_order, &(&1 != editor_id))
   end
 
-  @spec get_changed(bindings(), bindings()) :: bindings()
+  @spec get_changed(Evaluator.bindings(), Evaluator.bindings()) :: Evaluator.bindings()
   defp get_changed(base_kw, new_kw) do
     unchanged? = fn {key, value} ->
       Keyword.get(base_kw, key) == value
     end
 
     Enum.reject(new_kw, unchanged?)
-  end
-
-  @spec eval(String.t(), bindings()) :: {:ok, any(), bindings()} | {:error, String.t()}
-  defp eval(code, bindings) do
-    try do
-      {evaluated, new_bindings} =
-        Code.eval_string(code, bindings, %Macro.Env{
-          __ENV__
-          | file: "playground",
-            line: 1,
-            module: nil
-        })
-
-      {:ok, evaluated, new_bindings}
-    rescue
-      e ->
-        error_message = Exception.format(:error, e)
-        {:error, error_message}
-    end
   end
 end
