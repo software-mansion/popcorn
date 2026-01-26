@@ -1,14 +1,3 @@
-import type {
-  AnySerializable,
-  IframeRequest,
-  IframeResponse,
-} from "./types";
-
-export type { AnySerializable, IframeRequest, IframeResponse };
-
-/** Union of all messages (requests and responses) */
-export type Message = IframeRequest | IframeResponse;
-
 export type IframeBridgeArgs<T> = {
   container: HTMLElement;
   config: Record<string, string>;
@@ -20,23 +9,6 @@ export type IframeBridgeArgs<T> = {
 
 const STYLE_HIDDEN =
   "visibility: hidden; width: 0px; height: 0px; border: none";
-
-export const MESSAGES = {
-  INIT: "popcorn-init",
-  START_VM: "popcorn-startVm",
-  CALL: "popcorn-call",
-  CAST: "popcorn-cast",
-  CALL_ACK: "popcorn-callAck",
-  STDOUT: "popcorn-stdout",
-  STDERR: "popcorn-stderr",
-  HEARTBEAT: "popcorn-heartbeat",
-  RELOAD: "popcorn-reload",
-} as const;
-
-const MESSAGES_TYPES = new Set<string>(Object.values(MESSAGES));
-export function isMessageType(type: string): type is Message["type"] {
-  return MESSAGES_TYPES.has(type);
-}
 
 export function send(type: string, data: any): void {
   window.parent.postMessage({ type, value: data });

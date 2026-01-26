@@ -2,7 +2,12 @@
 import init from "./AtomVM.mjs";
 import { send } from "./bridge";
 import { HEARTBEAT_INTERVAL_MS } from "./config";
-import type { AnySerializable, CallRequest, IframeRequest } from "./types";
+import {
+  MESSAGES,
+  type AnySerializable,
+  type CallRequest,
+  type IframeRequest,
+} from "./types";
 
 /** Emscripten filesystem interface */
 type EmscriptenFS = {
@@ -25,19 +30,6 @@ type AtomVMModule = {
     | null;
   onGetTrackedObjects: ((keys: number[]) => string[]) | null;
   onElixirReady: ((initProcess: string) => void) | null;
-};
-
-
-const MESSAGES = {
-  INIT: "popcorn-init",
-  START_VM: "popcorn-startVm",
-  CALL: "popcorn-call",
-  CAST: "popcorn-cast",
-  CALL_ACK: "popcorn-callAck",
-  STDOUT: "popcorn-stdout",
-  STDERR: "popcorn-stderr",
-  HEARTBEAT: "popcorn-heartbeat",
-  RELOAD: "popcorn-reload",
 };
 
 let Module: AtomVMModule | null = null;

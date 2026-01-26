@@ -38,3 +38,24 @@ export type IframeResponse =
   | { type: "popcorn-stderr"; value: string }
   | { type: "popcorn-heartbeat"; value: null }
   | { type: "popcorn-reload"; value: string | null };
+
+/** Union of all messages (requests and responses) */
+export type Message = IframeRequest | IframeResponse;
+
+export const MESSAGES = {
+  INIT: "popcorn-init",
+  START_VM: "popcorn-startVm",
+  CALL: "popcorn-call",
+  CAST: "popcorn-cast",
+  CALL_ACK: "popcorn-callAck",
+  STDOUT: "popcorn-stdout",
+  STDERR: "popcorn-stderr",
+  HEARTBEAT: "popcorn-heartbeat",
+  RELOAD: "popcorn-reload",
+} as const;
+
+const MESSAGES_TYPES = new Set<string>(Object.values(MESSAGES));
+
+export function isMessageType(type: string): type is Message["type"] {
+  return MESSAGES_TYPES.has(type);
+}

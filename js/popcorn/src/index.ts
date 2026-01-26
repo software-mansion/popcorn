@@ -1,10 +1,15 @@
-import { IframeBridge, isMessageType, MESSAGES } from "./bridge";
-import type { Message, IframeBridgeArgs, AnySerializable } from "./bridge";
+import { IframeBridge, type IframeBridgeArgs } from "./bridge";
 import {
   INIT_VM_TIMEOUT_MS,
   HEARTBEAT_TIMEOUT_MS,
   CALL_TIMEOUT_MS,
 } from "./config";
+import {
+  MESSAGES,
+  isMessageType,
+  type Message,
+  type AnySerializable,
+} from "./types";
 
 // postMessage data:
 //  | { type: "stdout", value: string }
