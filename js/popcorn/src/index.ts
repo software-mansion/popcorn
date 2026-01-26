@@ -6,8 +6,7 @@ import {
 } from "./config";
 import {
   MESSAGES,
-  isMessageType,
-  type Message,
+  type IframeResponse,
   type AnySerializable,
 } from "./types";
 
@@ -87,8 +86,8 @@ const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 export class Popcorn {
   public heartbeatTimeoutMs: number | null = null;
 
-  private bridge: IframeBridge<Message> | null = null;
-  private bridgeConfig: IframeBridgeArgs<Message>;
+  private bridge: IframeBridge | null = null;
+  private bridgeConfig: IframeBridgeArgs;
   private debug = false;
   private bundleURL: string;
   private state: State = { status: "uninitialized" };
@@ -121,7 +120,6 @@ export class Popcorn {
       script: { url: IFRAME_URL, entrypoint: "runIFrame" },
       config: { "bundle-path": this.bundleURL },
       debug: true,
-      messageFilter: isPopcornPayload,
       onMessage: this.iframeHandler.bind(this),
     };
 
@@ -161,7 +159,7 @@ export class Popcorn {
     this.transition({ status: "mount" });
     this.trace("Main: mount, container: ", this.bridgeConfig.container);
 
-    this.bridge = new IframeBridge<Message>(this.bridgeConfig);
+    this.bridge = new IframeBridge(this.bridgeConfig);
 
     await this.awaitMessage(MESSAGES.INIT);
     this.transition({ status: "await_vm" });
@@ -291,7 +289,7 @@ export class Popcorn {
     });
   }
 
-  private iframeHandler(data: Message) {
+  private iframeHandler(data: IframeResponse) {
     const awaitedMessage = this.awaitedMessage;
     if (awaitedMessage && data.type == awaitedMessage.type) {
       this.awaitedMessage = null;
@@ -496,25 +494,4 @@ function throwError(error: ErrorData): never {
     case "already_mounted":
       throw new Error("Iframe already mounted");
   }
-}
-
-function isPayloadShape(
-  payload: object,
-): payload is { type: Message["type"]; value: AnySerializable } {
-  const hasType = Object.hasOwn(payload, "type");
-  const hasValue = Object.hasOwn(payload, "value");
-  const hasFields = hasType && hasValue;
-  if (!hasFields) return false;
-  return true;
-}
-
-function isPopcornPayload(payload: unknown): payload is Message {
-  const isObject = typeof payload === "object" && payload !== null;
-  if (!isObject) return false;
-  if (!isPayloadShape(payload)) return false;
-  const hasOkFieldTypes = typeof payload.type === "string";
-  if (!hasOkFieldTypes) return false;
-
-  // TODO: may also check `value` under `debug`
-  return isMessageType(payload.type);
 }

@@ -1,31 +1,35 @@
-export type IframeBridgeArgs<T> = {
+import {
+  type IframeRequest,
+  type IframeResponse,
+  type AnySerializable,
+  isMessageType,
+} from "./types";
+
+export type IframeBridgeArgs = {
   container: HTMLElement;
   config: Record<string, string>;
   script: { url: string; entrypoint: string };
   debug: boolean;
-  messageFilter: (data: unknown) => data is T;
-  onMessage: (data: T) => void;
+  onMessage: (data: IframeResponse) => void;
 };
 
 const STYLE_HIDDEN =
   "visibility: hidden; width: 0px; height: 0px; border: none";
 
-export function send(type: string, data: any): void {
+export function send(type: string, data: AnySerializable): void {
   window.parent.postMessage({ type, value: data });
 }
 
-export class IframeBridge<T> {
+export class IframeBridge {
   private iframe: HTMLIFrameElement;
   private handlerRef: (event: MessageEvent) => void;
   // @ts-expect-error TODO: use for tracing
   private debug: boolean;
-  private messageFilter: (data: unknown) => data is T;
-  private onMessage: (data: T) => void;
+  private onMessage: (data: IframeResponse) => void;
 
-  public constructor(args: IframeBridgeArgs<T>) {
-    const { container, config, script, debug, messageFilter, onMessage } = args;
+  public constructor(args: IframeBridgeArgs) {
+    const { container, config, script, debug, onMessage } = args;
     this.debug = debug;
-    this.messageFilter = messageFilter;
     this.onMessage = onMessage;
 
     this.iframe = document.createElement("iframe");
@@ -48,7 +52,7 @@ export class IframeBridge<T> {
     container.appendChild(this.iframe);
   }
 
-  public send<T>(data: T): void {
+  public send(data: IframeRequest): void {
     this.iframe?.contentWindow?.postMessage(data);
   }
 
@@ -58,10 +62,18 @@ export class IframeBridge<T> {
   }
 
   private messageHandler({ data }: MessageEvent): void {
-    if (this.messageFilter(data)) {
+    if (isIframeResponse(data)) {
       this.onMessage(data);
     }
   }
+}
+
+function isIframeResponse(payload: unknown): payload is IframeResponse {
+  if (typeof payload !== "object" || payload === null) return false;
+  if (!Object.hasOwn(payload, "type") || !Object.hasOwn(payload, "value"))
+    return false;
+  if (typeof (payload as { type: unknown }).type !== "string") return false;
+  return isMessageType((payload as { type: string }).type);
 }
 
 function metaTagsFrom(config: Record<string, string>) {
