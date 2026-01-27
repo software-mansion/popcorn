@@ -56,6 +56,16 @@ IO.inspect(x, label: "x")
 IO.inspect(y, label: "y")
 ```
 
+<!-- langtour:{"correct_code":true} -->
+
+```elixir
+{x, y, z} = {:hello, "world", 42}
+
+IO.inspect(x, label: "x")
+IO.inspect(y, label: "y")
+IO.inspect(z, label: "z")
+```
+
 In Elixir, functions commonly return `{:ok, result}` on success and `{:error, reason}` on failure. You can use atoms in patterns to match such results:
 
 ```elixir

@@ -6,9 +6,10 @@ import remarkStringify from "remark-stringify";
 import type { Root, Node, Code, Html } from "mdast";
 import { hash64 } from "../../utils/storage";
 
-type LivebookMetadata = {
+type Metadata = {
   output?: boolean;
   force_markdown?: boolean;
+  correct_code?: boolean;
   [key: string]: unknown;
 };
 
@@ -37,6 +38,7 @@ export type CodeSnippet = {
   initCode: string;
   stdout: string[];
   output: string;
+  correctCode?: string;
 };
 
 function remarkLivebook() {
@@ -51,6 +53,8 @@ function remarkLivebook() {
 
       // Process Elixir code blocks - convert to Editor unless force_markdown is set
       if (isElixirCodeBlock(node)) {
+        // console.log("Processing Elixir code block:", node);
+
         // Check if there's a force_markdown metadata before this code block
         if (index > 0) {
           const prevNode = parent.children[index - 1];
@@ -60,7 +64,7 @@ function remarkLivebook() {
             );
 
             if (metadataMatch) {
-              const metadata: LivebookMetadata = JSON.parse(metadataMatch[1]);
+              const metadata: Metadata = JSON.parse(metadataMatch[1]);
 
               // If force_markdown is true, keep it as a normal code block
               if (metadata.force_markdown === true) {
@@ -83,7 +87,7 @@ function remarkLivebook() {
             /<!--\s*livebook:({.*?})\s*-->/
           );
           if (metadataMatch) {
-            const metadata: LivebookMetadata = JSON.parse(metadataMatch[1]);
+            const metadata: Metadata = JSON.parse(metadataMatch[1]);
 
             if (metadata.output === true) {
               const firstOutputNode = parent.children[index + 2];
@@ -105,9 +109,7 @@ function remarkLivebook() {
                 );
 
                 if (secondMatch) {
-                  const secondMetadata: LivebookMetadata = JSON.parse(
-                    secondMatch[1]
-                  );
+                  const secondMetadata: Metadata = JSON.parse(secondMatch[1]);
 
                   if (secondMetadata.output === true) {
                     const secondOutputNode = parent.children[index + 4];
@@ -127,6 +129,26 @@ function remarkLivebook() {
           }
         }
 
+        // Check for correct_code block
+        let correctCode: string | undefined;
+        const correctCodeMetaIndex = index + 1 + nodesToRemove;
+        const correctCodeMetaNode = parent.children[correctCodeMetaIndex];
+        if (isHtmlNode(correctCodeMetaNode)) {
+          const correctMatch = correctCodeMetaNode.value.match(
+            /<!--\s*langtour:({.*?})\s*-->/
+          );
+          if (correctMatch) {
+            const correctMeta: Metadata = JSON.parse(correctMatch[1]);
+            if (correctMeta.correct_code === true) {
+              const correctCodeNode = parent.children[correctCodeMetaIndex + 1];
+              if (isElixirCodeBlock(correctCodeNode)) {
+                correctCode = correctCodeNode.value;
+                nodesToRemove += 2;
+              }
+            }
+          }
+        }
+
         const editorId = hash64(
           initCode + firstOutput + (secondOutput ?? "") + editorCount++
         );
@@ -135,7 +157,8 @@ function remarkLivebook() {
           id: editorId,
           initCode,
           stdout: secondOutput === null ? [] : firstOutput.split("\n"),
-          output: secondOutput === null ? firstOutput : secondOutput
+          output: secondOutput === null ? firstOutput : secondOutput,
+          ...(correctCode && { correctCode })
         });
 
         const editorNode = {
