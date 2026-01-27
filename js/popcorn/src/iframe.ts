@@ -1,29 +1,44 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions */
-/* eslint-disable @typescript-eslint/no-extraneous-class */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-nocheck types will be added later
-
 // @ts-expect-error atomvm doesn't have types yet
 import init from "./AtomVM.mjs";
+import { sendIframeResponse } from "./bridge";
+import { HEARTBEAT_INTERVAL_MS } from "./types";
+import {
+  MESSAGES,
+  type AnySerializable,
+  type CallRequest,
+  type IframeRequest,
+} from "./types";
 
-const MESSAGES = {
-  INIT: "popcorn-init",
-  START_VM: "popcorn-startVm",
-  CALL: "popcorn-call",
-  CAST: "popcorn-cast",
-  CALL_ACK: "popcorn-callAck",
-  STDOUT: "popcorn-stdout",
-  STDERR: "popcorn-stderr",
-  HEARTBEAT: "popcorn-heartbeat",
-  RELOAD: "popcorn-reload",
+/** Emscripten filesystem interface */
+type EmscriptenFS = {
+  mkdir: (path: string) => void;
+  writeFile: (path: string, data: Int8Array) => void;
 };
 
-const HEARTBEAT_INTERVAL_MS = 500;
+/** AtomVM Module interface - the WASM module with Elixir runtime */
+type AtomVMModule = {
+  serialize: (data: AnySerializable) => string;
+  deserialize: (message: string) => AnySerializable;
+  cleanupFunctions: Map<number, () => void>;
+  trackedObjectsMap: Map<number, AnySerializable>;
+  nextTrackedObjectKey: () => number;
+  cast: (process: string, args: string) => void;
+  call: (process: string, args: string) => Promise<string>;
+  onTrackedObjectDelete: ((key: number) => void) | null;
+  onRunTrackedJs:
+    | ((scriptString: string, isDebug: boolean) => number[] | null)
+    | null;
+  onGetTrackedObjects: ((keys: number[]) => string[]) | null;
+  onElixirReady: ((initProcess: string) => void) | null;
+};
 
-let Module = null;
+let Module: AtomVMModule | null = null;
 
 class TrackedValue {
-  constructor({ key, value }) {
+  key: number;
+  value: AnySerializable;
+
+  constructor({ key, value }: { key: number; value: AnySerializable }) {
     if (typeof key !== "number") {
       throw new Error("key property in TrackedValue must be a number");
     }
@@ -32,64 +47,78 @@ class TrackedValue {
   }
 }
 
+declare const globalThis: { TrackedValue: typeof TrackedValue };
 globalThis.TrackedValue = TrackedValue;
 
-export async function runIFrame() {
-  const bundlePath = document.querySelector('meta[name="bundle-path"]').content;
+export async function runIFrame(): Promise<void> {
+  const metaElement = document.querySelector(
+    'meta[name="bundle-path"]',
+  ) as HTMLMetaElement | null;
+  if (!metaElement) {
+    throw new Error("Missing meta[name='bundle-path'] element");
+  }
+  const bundlePath = metaElement.content;
   const bundleBuffer = await fetch(bundlePath).then((resp) =>
     resp.arrayBuffer(),
   );
   const bundle = new Int8Array(bundleBuffer);
-  send(MESSAGES.INIT);
+  sendIframeResponse(MESSAGES.INIT, null);
   const initProcess = await startVm(bundle);
 
-  window.addEventListener("message", async ({ data }) => {
-    const type = data.type;
+  window.addEventListener(
+    "message",
+    async ({ data }: MessageEvent<IframeRequest>) => {
+      const type = data.type;
 
-    if (type === MESSAGES.CALL) {
-      await handleCall(data);
-    } else if (type.startsWith("popcorn")) {
-      console.error(
-        `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`,
-      );
-    }
-  });
+      if (type === MESSAGES.CALL) {
+        await handleCall(data.value);
+      } else if (type.startsWith("popcorn")) {
+        console.error(
+          `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`,
+        );
+      }
+    },
+  );
 
-  send(MESSAGES.START_VM, initProcess);
-  setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
+  sendIframeResponse(MESSAGES.START_VM, initProcess);
+  setInterval(
+    () => sendIframeResponse(MESSAGES.HEARTBEAT, null),
+    HEARTBEAT_INTERVAL_MS,
+  );
 }
 
-async function startVm(avmBundle) {
-  let resolveResultPromise = null;
-  const resultPromise = new Promise((resolve) => {
+async function startVm(avmBundle: Int8Array): Promise<string> {
+  let resolveResultPromise: ((value: string) => void) | null = null;
+  const resultPromise = new Promise<string>((resolve) => {
     resolveResultPromise = resolve;
   });
-  Module = await init({
+  const moduleInstance: AtomVMModule = await init({
     preRun: [
-      function ({ FS }) {
+      function ({ FS }: { FS: EmscriptenFS }) {
         FS.mkdir("/data");
         FS.writeFile("/data/bundle.avm", avmBundle);
       },
     ],
     arguments: ["/data/bundle.avm"],
-    print(text) {
-      send(MESSAGES.STDOUT, text);
+    print(text: string) {
+      sendIframeResponse(MESSAGES.STDOUT, text);
     },
-    printErr(text) {
-      send(MESSAGES.STDERR, text);
+    printErr(text: string) {
+      sendIframeResponse(MESSAGES.STDERR, text);
     },
     onAbort() {
       // Timeout so that error logs are (hopefully) printed
       // before we terminate
-      setTimeout(() => send(MESSAGES.RELOAD, null), 100);
+      setTimeout(() => sendIframeResponse(MESSAGES.RELOAD, null), 100);
     },
   });
+  Module = moduleInstance;
 
-  Module["serialize"] = JSON.stringify;
-  Module["deserialize"] = deserialize;
-  Module["cleanupFunctions"] = new Map();
-  Module["onTrackedObjectDelete"] = (key) => {
-    const fns = Module["cleanupFunctions"];
+  moduleInstance["serialize"] = JSON.stringify;
+  moduleInstance["deserialize"] = deserialize;
+  moduleInstance["cleanupFunctions"] = new Map<number, () => void>();
+  moduleInstance["onTrackedObjectDelete"] = (key: number) => {
+    const fns = moduleInstance["cleanupFunctions"];
     const fn = fns.get(key);
     fns.delete(key);
     try {
@@ -97,25 +126,28 @@ async function startVm(avmBundle) {
     } catch (e) {
       console.error(e);
     } finally {
-      Module["trackedObjectsMap"].delete(key);
+      moduleInstance["trackedObjectsMap"].delete(key);
     }
   };
-  const origCast = Module["cast"];
-  const origCall = Module["call"];
+  const origCast = moduleInstance["cast"];
+  const origCall = moduleInstance["call"];
 
-  Module["cast"] = (process, args) => {
-    const serialized = Module.serialize(args);
+  moduleInstance["cast"] = (process: string, args: AnySerializable) => {
+    const serialized = moduleInstance.serialize(args);
     origCast(process, serialized);
   };
-  Module["call"] = (process, args) => {
-    const serialized = Module.serialize(args);
+  moduleInstance["call"] = (process: string, args: AnySerializable) => {
+    const serialized = moduleInstance.serialize(args);
     return origCall(process, serialized);
   };
 
-  Module["onRunTrackedJs"] = (scriptString, isDebug) => {
-    const trackValue = (tracked) => {
-      const getKey = Module["nextTrackedObjectKey"];
-      const map = Module["trackedObjectsMap"];
+  moduleInstance["onRunTrackedJs"] = (
+    scriptString: string,
+    isDebug: boolean,
+  ) => {
+    const trackValue = (tracked: AnySerializable): number => {
+      const getKey = moduleInstance["nextTrackedObjectKey"];
+      const map = moduleInstance["trackedObjectsMap"];
 
       if (tracked instanceof TrackedValue) {
         map.set(tracked.key, tracked.value);
@@ -127,7 +159,9 @@ async function startVm(avmBundle) {
       return key;
     };
 
-    let fn;
+    let fn:
+      | ((module: AtomVMModule) => AnySerializable[] | undefined)
+      | undefined;
     try {
       const indirectEval = eval;
       fn = indirectEval(scriptString);
@@ -136,55 +170,64 @@ async function startVm(avmBundle) {
       console.error(e);
       return null;
     }
-    isDebug && ensureFunctionEval(fn);
-    let result;
+    if (isDebug) ensureFunctionEval(fn);
+    let result: AnySerializable[] | undefined;
     try {
-      result = fn(Module);
+      result = fn?.(moduleInstance);
     } catch (e) {
       // TODO: send onEvalError for Popcorn object
       console.error(e);
       return null;
     }
-    isDebug && ensureResultKeyList(result);
+    if (isDebug) ensureResultKeyList(result);
 
     return result?.map(trackValue) ?? [];
   };
-  Module["onGetTrackedObjects"] = (keys) => {
-    const getTrackedObject = (key) => {
-      const serialize = Module["serialize"];
-      const map = Module["trackedObjectsMap"];
+  moduleInstance["onGetTrackedObjects"] = (keys: number[]) => {
+    const getTrackedObject = (key: number): string => {
+      const serialize = moduleInstance["serialize"];
+      const map = moduleInstance["trackedObjectsMap"];
 
       return serialize(map.get(key));
     };
     return keys.map(getTrackedObject);
   };
 
-  Module["onElixirReady"] = (initProcess) => {
-    Module["onElixirReady"] = null;
-    resolveResultPromise(initProcess);
+  moduleInstance["onElixirReady"] = (initProcess: string) => {
+    moduleInstance["onElixirReady"] = null;
+    resolveResultPromise?.(initProcess);
   };
 
   return resultPromise;
 }
 
-async function handleCall(data) {
-  const { requestId, process, args } = data.value;
-  send(MESSAGES.CALL_ACK, { requestId });
+async function handleCall(request: CallRequest): Promise<void> {
+  if (!Module) {
+    throw new Error("Module not initialized");
+  }
+  const { requestId, process, args } = request;
+  sendIframeResponse(MESSAGES.CALL_ACK, { requestId });
 
   try {
     const result = await Module.call(process, args);
-    send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
+    sendIframeResponse(MESSAGES.CALL, {
+      requestId,
+      data: Module.deserialize(result),
+    });
   } catch (error) {
     if (error == "noproc") {
-      send(MESSAGES.RELOAD, null);
+      sendIframeResponse(MESSAGES.RELOAD, null);
       console.error("Runtime VM crashed, popcorn iframe reloaded.");
       return;
     }
-    send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
+    sendIframeResponse(MESSAGES.CALL, {
+      requestId,
+      error: Module.deserialize(error as string),
+    });
   }
 }
 
-function ensureFunctionEval(maybeFunction) {
+function ensureFunctionEval(maybeFunction: unknown): void {
   if (typeof maybeFunction !== "function") {
     throw new Error(
       "Script passed to onRunTrackedJs() is not wrapped in a function",
@@ -192,7 +235,7 @@ function ensureFunctionEval(maybeFunction) {
   }
 }
 
-function ensureResultKeyList(result) {
+function ensureResultKeyList(result: unknown): void {
   if (!Array.isArray(result) && result !== undefined) {
     throw new Error(
       "Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined",
@@ -200,12 +243,8 @@ function ensureResultKeyList(result) {
   }
 }
 
-function send(type, data) {
-  window.parent.postMessage({ type, value: data });
-}
-
-function deserialize(message) {
-  return JSON.parse(message, (key, value) => {
+function deserialize(message: string): AnySerializable {
+  return JSON.parse(message, (_key: string, value: AnySerializable) => {
     const isRef =
       typeof value === "object" &&
       value !== null &&
@@ -215,6 +254,6 @@ function deserialize(message) {
     if (!isRef) {
       return value;
     }
-    return Module.trackedObjectsMap.get(value.popcorn_ref);
+    return Module?.trackedObjectsMap.get(value.popcorn_ref);
   });
 }

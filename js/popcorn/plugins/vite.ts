@@ -13,7 +13,7 @@ const popcornDistDir = resolve(__dirname, "..");
 export function popcorn(options: PopcornPluginOptions): Plugin {
   const bundlePath = options.bundlePath;
   const bundleName = basename(bundlePath);
-  const bundleServePath = `/${bundleName}`;
+  const bundleUrl = `/${bundleName}`;
 
   let assetsDir: string;
 
@@ -44,26 +44,22 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
       server.middlewares.use(async (req, res, next) => {
         setSharedArrayBufferHeaders(res);
 
-        // Serve bundle file in dev mode
-        if (req.url === bundleServePath) {
-          try {
-            const content = await readFile(bundlePath);
-            res.setHeader("Content-Type", "application/octet-stream");
-            res.end(content);
-            return;
-          } catch (err) {
-            console.error(`[popcorn] Failed to serve bundle:`, err);
-            throw err;
-          }
-        }
+        const opts = { bundleUrl, bundlePath };
+        const served = await serveAvmBundle(req, res, opts);
+        if (served) return;
 
         next();
       });
     },
 
     configurePreviewServer(server) {
-      server.middlewares.use((_req: unknown, res: Res, next: () => void) => {
+      server.middlewares.use(async (req, res, next) => {
         setSharedArrayBufferHeaders(res);
+
+        const opts = { bundleUrl, bundlePath };
+        const served = await serveAvmBundle(req, res, opts);
+        if (served) return;
+
         next();
       });
     },
@@ -90,6 +86,27 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
 }
 
 type Res = ServerResponse<IncomingMessage>;
+
+type ServeAvmBundleOpts = { bundleUrl: string; bundlePath: string };
+async function serveAvmBundle(
+  req: IncomingMessage,
+  res: Res,
+  { bundleUrl, bundlePath }: ServeAvmBundleOpts,
+) {
+  try {
+    if (req.url === bundleUrl) {
+      const content = await readFile(bundlePath);
+      res.setHeader("Content-Type", "application/octet-stream");
+      res.end(content);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error(`[popcorn] Failed to serve bundle:`, err);
+    throw err;
+  }
+}
+
 function setSharedArrayBufferHeaders(res: Res): void {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
   res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
