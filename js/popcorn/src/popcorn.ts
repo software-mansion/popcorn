@@ -42,14 +42,21 @@ export type CallOptions = {
   timeoutMs?: number;
 };
 
-type CallResult = {
-  /** Serialized value returned from Elixir */
-  data: AnySerializable;
-  /** Amount of time it took to process the call */
-  durationMs: number;
-  /** Optional error if call failed */
-  error?: AnySerializable;
-};
+type CallResult =
+  | {
+      ok: true;
+      /** Serialized value returned from Elixir */
+      data: AnySerializable;
+      /** Amount of time it took to process the call */
+      durationMs: number;
+    }
+  | {
+      ok: false;
+      /** Error from failed call */
+      error?: AnySerializable;
+      /** Amount of time it took to process the call */
+      durationMs: number;
+    };
 
 type LogType = "stdout" | "stderr";
 type LogListener = (message: string) => void;
@@ -346,9 +353,9 @@ export class Popcorn {
 
     const durationMs = performance.now() - callData.startTimeMs;
     if (error !== undefined) {
-      callData.reject({ error, durationMs });
+      callData.resolve({ ok: false, error, durationMs });
     } else {
-      callData.resolve({ data, durationMs });
+      callData.resolve({ ok: true, data, durationMs });
     }
   }
 
