@@ -40,5 +40,9 @@ export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
     return null;
   }
 
-  return <Component />;
+  return (
+    <div data-testid="mdx-wrapper">
+      <Component />
+    </div>
+  );
 }
