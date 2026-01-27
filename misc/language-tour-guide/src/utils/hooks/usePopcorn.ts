@@ -1,11 +1,15 @@
 import { useCallback } from "react";
+import { usePopcornContext } from "./usePopcornContext";
 import type {
   AnySerializable,
   CallOptions,
-  CastOptions,
-  PopcornError
-} from "../../context/popcorn";
-import { usePopcornContext } from "./usePopcornContext";
+  CastOptions
+} from "@swmansion/popcorn";
+
+export interface PopcornError {
+  error: string;
+  durationMs?: number;
+}
 
 export const usePopcorn = () => {
   const { instance, reinitializePopcorn, isLoadingPopcorn } =
