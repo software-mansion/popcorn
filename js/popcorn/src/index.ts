@@ -123,7 +123,7 @@ export class Popcorn {
     };
 
     this.logListeners.stdout.add(params.onStdout ?? console.log);
-    this.logListeners.stdout.add(params.onStderr ?? console.warn);
+    this.logListeners.stderr.add(params.onStderr ?? console.warn);
     this.heartbeatTimeoutMs = params.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
   }
 
