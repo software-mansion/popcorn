@@ -18,6 +18,8 @@ export type PopcornInitOptions = {
   onStderr?: (message: string) => void;
   /** Handler for stdout messages. */
   onStdout?: (message: string) => void;
+  /** Handler called when Popcorn reloads due to iframe crash */
+  onReload?: (reason: string) => void;
   /** Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded. */
   heartbeatTimeoutMs?: number;
   /** Directory containing Wasm and scripts used inside iframe. */
@@ -84,6 +86,8 @@ const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 export class Popcorn {
   public heartbeatTimeoutMs: number | null = null;
 
+  private onReloadCallback: (reason: string) => void;
+
   private bridge: IframeBridge | null = null;
   private bridgeConfig: IframeBridgeArgs;
   private debug = false;
@@ -111,6 +115,7 @@ export class Popcorn {
     const bundlePath = params.bundlePath ?? "/bundle.avm";
     const bundleURL = new URL(bundlePath, import.meta.url);
 
+    this.onReloadCallback = params.onReload ?? noop;
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
 
@@ -359,7 +364,7 @@ export class Popcorn {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private reloadIframe(_reason = "other"): void {
+  private reloadIframe(reason = "other"): void {
     if (this.bridge === null) {
       throw new Error("WASM iframe not mounted for reload");
     }
@@ -392,6 +397,7 @@ export class Popcorn {
       });
     }
     this.calls.clear();
+    this.onReloadCallback(reason);
     this.mount();
   }
 
@@ -448,4 +454,8 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   if (!timeout) throwError({ t: "assert" });
   clearTimeout(timeout);
   return result;
+}
+
+function noop() {
+  /* noop */
 }
