@@ -100,3 +100,24 @@ end)
 # Wait until processes finish exchanging messages
 Process.sleep(100)
 ```
+
+<!-- langtour:{"correct_code":true} -->
+
+```elixir
+p1 = spawn(fn ->
+  receive do
+    {:ping, pid} ->
+      IO.puts("recevied :ping, sending :pong")
+      send(pid, :pong)
+  end
+end)
+
+p2 = spawn(fn ->
+  send(p1, {:ping, self()})
+  receive do
+    :pong -> IO.puts("received :pong")
+  end
+end)
+
+Process.sleep(100)
+```
