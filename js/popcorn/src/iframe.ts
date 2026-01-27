@@ -1,7 +1,7 @@
 // @ts-expect-error atomvm doesn't have types yet
 import init from "./AtomVM.mjs";
 import { sendIframeResponse } from "./bridge";
-import { HEARTBEAT_INTERVAL_MS } from "./types";
+import { HEARTBEAT_INTERVAL_MS, type CastRequest } from "./types";
 import {
   MESSAGES,
   type AnySerializable,
@@ -72,10 +72,8 @@ export async function runIFrame(): Promise<void> {
 
       if (type === MESSAGES.CALL) {
         await handleCall(data.value);
-      } else if (type.startsWith("popcorn")) {
-        console.error(
-          `Iframe: received unhandled popcorn event: ${JSON.stringify(data, null, 4)}`,
-        );
+      } else if (type === MESSAGES.CAST) {
+        handleCast(data.value);
       }
     },
   );
@@ -225,6 +223,15 @@ async function handleCall(request: CallRequest): Promise<void> {
       error: Module.deserialize(error as string),
     });
   }
+}
+
+function handleCast(request: CastRequest): void {
+  if (!Module) {
+    throw new Error("Module not initialized");
+  }
+
+  const { process, args } = request;
+  Module.cast(process, args);
 }
 
 function ensureFunctionEval(maybeFunction: unknown): void {
