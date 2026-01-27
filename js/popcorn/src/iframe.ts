@@ -1,7 +1,7 @@
 // @ts-expect-error atomvm doesn't have types yet
 import init from "./AtomVM.mjs";
-import { send } from "./bridge";
-import { HEARTBEAT_INTERVAL_MS } from "./config";
+import { sendIframeResponse } from "./bridge";
+import { HEARTBEAT_INTERVAL_MS } from "./types";
 import {
   MESSAGES,
   type AnySerializable,
@@ -62,7 +62,7 @@ export async function runIFrame(): Promise<void> {
     resp.arrayBuffer(),
   );
   const bundle = new Int8Array(bundleBuffer);
-  send(MESSAGES.INIT, null);
+  sendIframeResponse(MESSAGES.INIT, null);
   const initProcess = await startVm(bundle);
 
   window.addEventListener(
@@ -80,8 +80,11 @@ export async function runIFrame(): Promise<void> {
     },
   );
 
-  send(MESSAGES.START_VM, initProcess);
-  setInterval(() => send(MESSAGES.HEARTBEAT, null), HEARTBEAT_INTERVAL_MS);
+  sendIframeResponse(MESSAGES.START_VM, initProcess);
+  setInterval(
+    () => sendIframeResponse(MESSAGES.HEARTBEAT, null),
+    HEARTBEAT_INTERVAL_MS,
+  );
 }
 
 async function startVm(avmBundle: Int8Array): Promise<string> {
@@ -98,15 +101,15 @@ async function startVm(avmBundle: Int8Array): Promise<string> {
     ],
     arguments: ["/data/bundle.avm"],
     print(text: string) {
-      send(MESSAGES.STDOUT, text);
+      sendIframeResponse(MESSAGES.STDOUT, text);
     },
     printErr(text: string) {
-      send(MESSAGES.STDERR, text);
+      sendIframeResponse(MESSAGES.STDERR, text);
     },
     onAbort() {
       // Timeout so that error logs are (hopefully) printed
       // before we terminate
-      setTimeout(() => send(MESSAGES.RELOAD, null), 100);
+      setTimeout(() => sendIframeResponse(MESSAGES.RELOAD, null), 100);
     },
   });
   Module = moduleInstance;
@@ -203,18 +206,21 @@ async function handleCall(request: CallRequest): Promise<void> {
     throw new Error("Module not initialized");
   }
   const { requestId, process, args } = request;
-  send(MESSAGES.CALL_ACK, { requestId });
+  sendIframeResponse(MESSAGES.CALL_ACK, { requestId });
 
   try {
     const result = await Module.call(process, args);
-    send(MESSAGES.CALL, { requestId, data: Module.deserialize(result) });
+    sendIframeResponse(MESSAGES.CALL, {
+      requestId,
+      data: Module.deserialize(result),
+    });
   } catch (error) {
     if (error == "noproc") {
-      send(MESSAGES.RELOAD, null);
+      sendIframeResponse(MESSAGES.RELOAD, null);
       console.error("Runtime VM crashed, popcorn iframe reloaded.");
       return;
     }
-    send(MESSAGES.CALL, {
+    sendIframeResponse(MESSAGES.CALL, {
       requestId,
       error: Module.deserialize(error as string),
     });

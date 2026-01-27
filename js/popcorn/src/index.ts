@@ -3,12 +3,10 @@ import {
   INIT_VM_TIMEOUT_MS,
   HEARTBEAT_TIMEOUT_MS,
   CALL_TIMEOUT_MS,
-} from "./config";
-import {
-  MESSAGES,
-  type IframeResponse,
-  type AnySerializable,
+  MAX_RELOAD_N,
 } from "./types";
+import { MESSAGES, type IframeResponse, type AnySerializable } from "./types";
+import { throwError } from "./utils";
 
 /** Options for Popcorn.init() */
 export type PopcornInitOptions = {
@@ -102,6 +100,7 @@ export class Popcorn {
 
   private awaitedMessage: AwaitedMessage | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reloadN = 0;
 
   private constructor(
     params: PopcornInitOptions & { container: HTMLElement },
@@ -203,7 +202,7 @@ export class Popcorn {
     const callPromise = new Promise<CallResult>((resolve, reject) => {
       if (this.bridge === null) throwError({ t: "unmounted" });
       this.trace("Main: call: ", { requestId, process, args });
-      this.bridge.send({
+      this.bridge.sendIframeRequest({
         type: MESSAGES.CALL,
         value: { requestId, process: targetProcess, args },
       });
@@ -235,7 +234,7 @@ export class Popcorn {
 
     const requestId = this.requestId++;
     this.trace("Main: cast: ", { requestId, process, args });
-    this.bridge.send({
+    this.bridge.sendIframeRequest({
       type: MESSAGES.CAST,
       value: { requestId, process: targetProcess, args },
     });
@@ -369,6 +368,13 @@ export class Popcorn {
       this.trace("Main: reloading iframe skipped, window not visible");
       return;
     }
+
+    this.reloadN++;
+    if (this.reloadN > MAX_RELOAD_N) {
+      this.trace("Main: exceeded max reload number");
+      return;
+    }
+
     this.trace("Main: reloading iframe");
     this.transition({ status: "reload" });
     this.bridge.deinit();
@@ -442,56 +448,4 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   if (!timeout) throwError({ t: "assert" });
   clearTimeout(timeout);
   return result;
-}
-
-type ErrorData =
-  | { t: "assert" }
-  | {
-      t: "bad_status";
-      status: State["status"];
-      expectedStatus: string;
-    }
-  | { t: "private_constructor" }
-  | { t: "bad_call" }
-  | { t: "no_acked_call" }
-  | { t: "bad_ack" }
-  | { t: "unmounted" }
-  | { t: "bad_target" }
-  | {
-      t: "already_awaited";
-      messageType: string;
-      awaitedMessageType: string;
-    }
-  | { t: "already_mounted" };
-
-function throwError(error: ErrorData): never {
-  switch (error.t) {
-    case "assert":
-      throw new Error("Assertion error");
-    case "bad_status":
-      throw new Error(
-        `Unexpected status transition. Instance in ${error.status} status, expected ${error.expectedStatus}`,
-      );
-    case "private_constructor":
-      throw new Error(
-        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
-      );
-    case "bad_call":
-      throw new Error("Response for non-existent call");
-    case "no_acked_call":
-      throw new Error("Response for non-acknowledged call");
-    case "bad_ack":
-      throw new Error("Ack for non-existent call");
-    case "unmounted":
-      throw new Error("WASM iframe not mounted");
-    case "bad_target":
-      throw new Error("Unspecified target process");
-
-    case "already_awaited":
-      throw new Error(
-        `Cannot await message ${error.messageType} when a message ${error.awaitedMessageType} is already awaited on`,
-      );
-    case "already_mounted":
-      throw new Error("Iframe already mounted");
-  }
 }

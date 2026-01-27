@@ -4,6 +4,7 @@ import {
   type AnySerializable,
   isMessageType,
 } from "./types";
+import { throwError } from "./utils";
 
 export type IframeBridgeArgs = {
   container: HTMLElement;
@@ -16,7 +17,7 @@ export type IframeBridgeArgs = {
 const STYLE_HIDDEN =
   "visibility: hidden; width: 0px; height: 0px; border: none";
 
-export function send(type: string, data: AnySerializable): void {
+export function sendIframeResponse(type: string, data: AnySerializable): void {
   window.parent.postMessage({ type, value: data });
 }
 
@@ -52,8 +53,11 @@ export class IframeBridge {
     container.appendChild(this.iframe);
   }
 
-  public send(data: IframeRequest): void {
-    this.iframe?.contentWindow?.postMessage(data);
+  public sendIframeRequest(data: IframeRequest): void {
+    const w = this.iframe.contentWindow;
+    if (w === null) throwError({ t: "assert" });
+
+    w.postMessage(data);
   }
 
   public deinit() {
