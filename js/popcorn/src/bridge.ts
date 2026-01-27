@@ -34,15 +34,17 @@ export class IframeBridge {
     this.onMessage = onMessage;
 
     this.iframe = document.createElement("iframe");
-    this.iframe.srcdoc = `<html>
+    this.iframe.srcdoc = `
       <html lang="en" dir="ltr">
           <head>
           ${metaTagsFrom(config)}
           </head>
-          <script type="module" defer>
-            import { ${script.entrypoint} } from "${script.url}";
-            ${script.entrypoint}();
-          </script>
+          <body>
+            <script type="module" defer>
+              import { ${script.entrypoint} } from "${script.url}";
+              ${script.entrypoint}();
+            </script>
+          </body>
       </html>`;
     this.iframe.style = STYLE_HIDDEN;
 
