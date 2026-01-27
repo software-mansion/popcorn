@@ -19,19 +19,24 @@ export function isConfigGroup(
   return (item as ConfigGroup).items !== undefined;
 }
 
-export type ConfigItem = {
+export type NavItem = {
   name: string;
-  component: React.LazyExoticComponent<
-    () => ReactElement<
-      MdxWrapperProps,
-      React.FunctionComponent<MdxWrapperProps>
-    >
-  >;
+  contentPath: string;
 };
 
-export type ConfigGroup = {
+export type NavGroup = {
   group: string;
-  items: (ConfigItem | ConfigGroup)[];
+  items: NavItem[];
+};
+
+export type NavigationStructure = (NavItem | NavGroup)[];
+
+export type ConfigItem = Omit<NavItem, "contentPath"> & {
+  component: LazyComponent;
+};
+
+export type ConfigGroup = Omit<NavGroup, "items"> & {
+  items: ConfigItem[];
 };
 
 export type NavigationConfig = (ConfigItem | ConfigGroup)[];
