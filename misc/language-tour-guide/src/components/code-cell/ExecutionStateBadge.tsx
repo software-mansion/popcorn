@@ -68,6 +68,8 @@ export function ExecutionStateBadge({ state }: ExecutionStateBadgeProps) {
 
   return (
     <div
+      data-testid="execution-state-badge"
+      data-state={state}
       className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${config.bgColor} ${config.textColor} ${config.borderColor}`}
     >
       {config.icon}
