@@ -1,0 +1,9 @@
+node_modules
+assets
+dist
+*.log
+.DS_Store
+.env
+*.tar.gz
+*.tsbuildinfo
+.rollup.cache

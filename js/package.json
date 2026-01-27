@@ -1,0 +1,8 @@
+{
+  "name": "popcorn-mono",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Monorepo root",
+  "scripts": {},
+  "packageManager": "pnpm@10.28.1"
+}

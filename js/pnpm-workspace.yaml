@@ -1,0 +1,8 @@
+packages:
+  - "popcorn"
+
+catalog:
+  "@types/node": ^25.0.8
+  vite: ^7.3.1
+  typescript: ^5.9.3
+  eslint: ^9.39.2
