@@ -1,0 +1,44 @@
+name: Release NPM Package
+
+on:
+  push:
+    tags:
+      - "v*"
+# https://docs.npmjs.com/trusted-publishers
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ./js
+
+      - name: Build production
+        run: pnpm build:prod
+        working-directory: ./js
+
+      - name: Pack package
+        run: pnpm -F popcorn pack
+        working-directory: ./js
+
+      - name: Publish to NPM
+        run: pnpm -F popcorn publish --provenance --access public
+        working-directory: ./js
