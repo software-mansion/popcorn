@@ -44,6 +44,17 @@ end
 x
 ```
 
+<!-- langtour:{"correct_code":true} -->
+
+```elixir
+x = 1
+if true do
+  x = x + 1
+  x
+end
+x
+```
+
 To change a variable, you must return the value from the `if` and reassign it:
 
 ```elixir
