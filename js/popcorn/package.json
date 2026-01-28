@@ -43,7 +43,7 @@
     "dev": "rollup -c --watch",
     "lint": "tsc --noEmit && eslint && prettier . --check --log-level=warn",
     "test": "vitest",
-    "build:prod": "pnpm run lint && (rm -r assets || true) && (rm -r dist || true) && pnpm run assets:prod && rollup -c",
+    "build:prod": "pnpm run lint && (rm -rf assets || true) && (rm -rf dist || true) && pnpm run assets:prod && rollup -c",
     "assets:dev": "./scripts/get_atomvm.sh assets/",
     "assets:prod": "RUNTIME_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm' ./scripts/get_atomvm.sh assets/"
   },
