@@ -1,3 +1,3 @@
 # @swmansion/popcorn
 
-A package exposing Popcorn to the browser
+A package exposing Popcorn to the browser.
