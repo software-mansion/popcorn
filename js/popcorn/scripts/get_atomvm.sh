@@ -86,7 +86,7 @@ setup_atomvm_source() {
         local branch_name="${branch}"
         # Sanitize branch name for filesystem
         branch_name="${branch_name//[^a-zA-Z0-9._-]/_}"
-        TEMP_DIR=$(mktemp -d -t "popcorn-${branch_name}")
+        TEMP_DIR=$(mktemp -d -t "popcorn-${branch_name}.XXXXXXX")
 
         log "Using git repository: ${repo_url} (branch: ${branch})"
         git clone --depth 1 --branch "${branch}" "${repo_url}" "${TEMP_DIR}/atomvm"
