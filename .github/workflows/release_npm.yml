@@ -32,7 +32,7 @@ jobs:
         working-directory: ./js
 
       - name: Build production
-        run: pnpm build:prod
+        run: pnpm -F popcorn build:prod
         working-directory: ./js
 
       - name: Pack package
