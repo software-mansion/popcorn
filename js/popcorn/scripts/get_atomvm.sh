@@ -104,9 +104,15 @@ setup_atomvm_source() {
 
 build_atomvm() {
     local atomvm_dir="$1"
+    local jobs_flag=""
+
+    # Use single-threaded build in CI to avoid OOM
+    if [[ -n "${CI}" ]]; then
+        jobs_flag="-j 1"
+    fi
 
     pushd "${atomvm_dir}" >/dev/null
-    ./build-fission.sh debug-wasm
+    ./build-fission.sh ${jobs_flag} debug-wasm
     popd >/dev/null
 }
 
