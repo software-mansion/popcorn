@@ -38,5 +38,5 @@ jobs:
 
       - name: Publish to NPM
         run: |
-          npm publish "$(ls swmansion-popcorn-*.tgz)" --provenance --access public
+          npm publish "$(ls swmansion-popcorn-*.tgz)" --provenance --access public --tag latest
         working-directory: ./js/popcorn/output
