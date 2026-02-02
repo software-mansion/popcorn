@@ -22,7 +22,7 @@ jobs:
       - name: Run Docker container and extract built artifacts
         run: |
           docker create --name popcorn-build popcorn-builder
-          docker cp popcorn-build:/output/dist ./js/popcorn/
+          docker cp popcorn-build:/output/ ./js/popcorn/
           docker rm popcorn-build
 
       - name: Setup Node.js
