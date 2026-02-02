@@ -37,5 +37,6 @@ jobs:
           version: 10
 
       - name: Publish to NPM
-        run: npm publish $(echo swmansion-popcorn-*.tgz) --provenance --access public
+        run: |
+          npm publish $(echo swmansion-popcorn-*.tgz) --provenance --access public
         working-directory: ./js/popcorn
