@@ -37,5 +37,5 @@ jobs:
           version: 10
 
       - name: Publish to NPM
-        run: pnpm -F popcorn publish --no-git-checks --provenance --access public
-        working-directory: ./js
+        run: npm publish swmansion-popcorn-*.tgz --provenance --access public
+        working-directory: ./js/popcorn
