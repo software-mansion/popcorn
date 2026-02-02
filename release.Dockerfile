@@ -55,4 +55,4 @@ RUN pnpm -F popcorn build:prod
 RUN pnpm -F popcorn pack
 
 RUN mkdir -p /output && \
-    cp -r /build/popcorn/js/popcorn/dist /output/
+    cp /build/popcorn/js/swmansion-popcorn-*.tgz /output/
