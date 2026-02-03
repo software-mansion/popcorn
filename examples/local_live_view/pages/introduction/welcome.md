@@ -14,8 +14,8 @@ It is built as an Elixir project with a supervisor tree.
 On start, it receives all names of LocalLiveViews present on the page and for each view it creates a LocalLiveView.Server process.
 - LocalLiveView.Server.Supervisor is a dynamic supervisor that is used by LocalLiveView.Dispatcher
 to create LocalLiveView.Server processes dynamically.
-- LocalLiveView.Dispatcher handles wasm messages that contains phoenix events by dispatching it to 
-a correct LocalLiveView.Server process.
+- LocalLiveView.Dispatcher handles messages from JS that contain Phoenix events by dispatching them to
+correct LocalLiveView.Server processes.
 - LocalLiveView.Server handles the phoenix events and rerenders the LocalLiveView if needed.
 - LocalLiveView.Renderer is used by LocalLiveView.Server to rerender LocalLiveView.
 It is done by replaceing innerHTML of div marked as a LocalLiveView (the div must have 
