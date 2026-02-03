@@ -6,7 +6,7 @@ It allows to store, update and render the assigns similarly to Phoenix LiveView.
 ## Architecture
 ### Popcorn part
 Local Live View is running on AtomVM in WASM in the browser using erlang virtual machine.
-It is built as an elixir project with supervisor tree.
+It is built as an Elixir project with a supervisor tree.
 
 ![supervisor_tree.png](supervisor_tree.png)
 - LocalLiveView.Application starts LocalLiveView.Dispatcher and LocalLiveView.Server.Supervisor.
