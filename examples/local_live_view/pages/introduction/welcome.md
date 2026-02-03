@@ -23,7 +23,7 @@ It is done by replaceing innerHTML of div marked as a LocalLiveView (the div mus
 - All the files in `lib/necessary_phoenix` directory are copies of the phoenix framework code.
 It is used to generate new HTML body for LocalLiveView that will be rendered into the marked div.
 - LocalLiveView.Server stores the state (socket and assigns) of the LocalLiveView.
-It fills similar role to the phoenix's channel in Phoenix Live View.
+It fills a similar role to the Phoenix's channel in Phoenix Live View.
 
 ### JS part
 
