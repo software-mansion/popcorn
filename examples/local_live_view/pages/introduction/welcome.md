@@ -35,4 +35,4 @@ present on the page using `popcorn.call()`.
 "pop-\<event\>" attribute where \<event\> is a browser event (`click`, `change`, `input` etc.).
 - When the event listener is added to the element with "pop-event" attribute 
 the closest LocalLiveView is found by checking every ancestor if it is marked with `data-pop-view` attribute.
-That way when the event is triggered the phoenix event sent via `popcorn.call()` gets to correct LocalLiveView.Server.
+That way, when the event is triggered, the Phoenix event sent via `popcorn.call()` reaches the correct LocalLiveView.Server.
