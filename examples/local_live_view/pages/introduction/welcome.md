@@ -10,7 +10,7 @@ It is built as an Elixir project with a supervisor tree.
 
 ![supervisor_tree.png](supervisor_tree.png)
 - LocalLiveView.Application starts LocalLiveView.Dispatcher and LocalLiveView.Server.Supervisor.
-- LocalLiveView.Dispatcher is an entry point for Popcorn to handle the wasm messages. 
+- LocalLiveView.Dispatcher is an entry point for Popcorn to handle messages from JS.
 On start, it receives all names of LocalLiveViews present on the page and for each view it creates a LocalLiveView.Server process.
 - LocalLiveView.Server.Supervisor is a dynamic supervisor that is used by LocalLiveView.Dispatcher
 to create LocalLiveView.Server processes dynamically.
