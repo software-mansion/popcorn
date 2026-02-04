@@ -39,7 +39,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "setup:dev": "npm run assets:dev",
+    "setup:dev": "npm run assets:dev && rollup -c",
     "dev": "rollup -c --watch",
     "lint": "tsc --noEmit && eslint && prettier . --check --log-level=warn",
     "test": "vitest",

@@ -1,12 +1,19 @@
-import { IframeBridge, type IframeBridgeArgs } from "./bridge";
+import { IframeBridge } from "./bridge";
 import {
   INIT_VM_TIMEOUT_MS,
   HEARTBEAT_TIMEOUT_MS,
   CALL_TIMEOUT_MS,
   MAX_RELOAD_N,
+  MESSAGES,
 } from "./types";
-import { MESSAGES, type IframeResponse, type AnySerializable } from "./types";
-import { throwError } from "./utils";
+import { PopcornError, PopcornInternalError, throwError } from "./errors";
+
+import type { IframeBridgeArgs } from "./bridge";
+import type { IframeResponse, AnySerializable } from "./types";
+import type { PopcornErrorCode, PopcornInternalErrorCode } from "./errors";
+
+export { PopcornError, PopcornInternalError };
+export type { PopcornErrorCode, PopcornInternalErrorCode };
 
 /** Options for Popcorn.init() */
 export type PopcornInitOptions = {
@@ -53,7 +60,7 @@ type CallResult =
   | {
       ok: false;
       /** Error from failed call */
-      error?: AnySerializable;
+      error: Error;
       /** Amount of time it took to process the call */
       durationMs: number;
     };
@@ -66,15 +73,12 @@ type CallData = {
   acknowledged: boolean;
   startTimeMs: number;
   resolve: (result: CallResult) => void;
-  reject: (error: { error: unknown; durationMs: number }) => void;
 };
 
 type AwaitedMessage = {
   type: string;
   resolve?: (value: AnySerializable) => void;
 };
-
-export class PopcornDeinitializedError extends Error {}
 
 type State =
   | { status: "uninitialized" }
@@ -175,11 +179,19 @@ export class Popcorn {
     await this.awaitMessage(MESSAGES.INIT);
     this.transition({ status: "await_vm" });
     this.trace("Main: iframe loaded");
-
-    this.initProcess = await withTimeout(
-      this.awaitMessage(MESSAGES.START_VM),
+    const startTime = performance.now();
+    const startVmResult = await withTimeout(
+      this.awaitMessage(MESSAGES.START_VM).then(
+        (data): CallResult => ({
+          ok: true,
+          data,
+          durationMs: performance.now() - startTime,
+        }),
+      ),
       INIT_VM_TIMEOUT_MS,
     );
+    if (!startVmResult.ok) throwError({ t: "assert" });
+    this.initProcess = startVmResult.data as string;
     this.transition({ status: "ready" });
     this.trace("Main: mounted, main process: ", this.initProcess);
     this.onHeartbeat();
@@ -211,7 +223,8 @@ export class Popcorn {
     if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this.requestId++;
-    const callPromise = new Promise<CallResult>((resolve, reject) => {
+    const startTimeMs = performance.now();
+    const callPromise = new Promise<CallResult>((resolve) => {
       if (this.bridge === null) throwError({ t: "unmounted" });
       this.trace("Main: call: ", { requestId, process, args });
       this.bridge.sendIframeRequest({
@@ -221,9 +234,8 @@ export class Popcorn {
 
       this.calls.set(requestId, {
         acknowledged: false,
-        startTimeMs: performance.now(),
+        startTimeMs,
         resolve,
-        reject,
       });
     });
 
@@ -270,10 +282,9 @@ export class Popcorn {
     this.logListeners.stderr.clear();
     for (const callData of this.calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
-      callData.reject({
-        error: new PopcornDeinitializedError(
-          "Call cancelled due to instance deinit",
-        ),
+      callData.resolve({
+        ok: false,
+        error: new PopcornError("deinitialized"),
         durationMs,
       });
     }
@@ -370,10 +381,9 @@ export class Popcorn {
     }, this.heartbeatTimeoutMs!);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private reloadIframe(reason = "other"): void {
     if (this.bridge === null) {
-      throw new Error("WASM iframe not mounted for reload");
+      throwError({ t: "unmounted" });
     }
 
     if (document.hidden) {
@@ -398,8 +408,9 @@ export class Popcorn {
     }
     for (const callData of this.calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
-      callData.reject({
-        error: new Error("Call cancelled due to iframe reload"),
+      callData.resolve({
+        ok: false,
+        error: new PopcornError("reload"),
         durationMs,
       });
     }
@@ -448,11 +459,18 @@ export class Popcorn {
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+async function withTimeout(
+  promise: Promise<CallResult>,
+  ms: number,
+): Promise<CallResult> {
   let timeout: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+  const timeoutPromise = new Promise<CallResult>((resolve) => {
     timeout = setTimeout(() => {
-      reject("Promise timeout");
+      resolve({
+        ok: false,
+        error: new PopcornError("timeout"),
+        durationMs: ms,
+      });
     }, ms);
   });
 
