@@ -1,0 +1,10 @@
+# Build output
+dist/
+assets/
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Node
+node_modules/
