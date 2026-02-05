@@ -1,5 +1,6 @@
 packages:
   - "popcorn"
+  - "popcorn/e2e/setup"
   - "examples/js-lib"
   - "examples/hello_popcorn/assets"
 
