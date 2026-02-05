@@ -5,7 +5,6 @@ on: workflow_dispatch
 env:
   REGISTRY: ghcr.io
   ORG_NAME: software-mansion
-  REPO_NAME: ${{ github.repository }}
 
 jobs:
   build_docker_images:
@@ -24,7 +23,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log into registry ${{ env.REGISTRY }}
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -61,6 +59,9 @@ jobs:
         with:
           context: .
           file: ./landing.Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=latest
+          pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
@@ -76,9 +77,11 @@ jobs:
           file: ./langtour.Dockerfile
           # Sentry DSN is embedded in built JS, not really a secret
           build-args: |
+            POPCORN_BASE_TAG=latest
             SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
             SENTRY_MODE=production
             APP_VERSION=${{ github.sha }}
+          pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
@@ -98,5 +101,7 @@ jobs:
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ secrets.POPCORN_PORT }}
           script: |
+            docker compose -f popcorn-landing.yml -p landing pull
             docker compose -f popcorn-landing.yml -p landing up -d
+            docker compose -f elixir-langtour.yml -p langtour pull
             docker compose -f elixir-langtour.yml -p langtour up -d
