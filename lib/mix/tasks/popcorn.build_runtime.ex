@@ -17,6 +17,8 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     - `target` - `wasm` (default) or `unix`
     - `cmake-opts` - string with space-separated `KEY=VALUE` options that
     will be converted to `-DKEY=VALUE` cmake options
+
+  This is a thin wrapper around `scripts/build-atomvm.sh`.
   """
 
   use Mix.Task
@@ -24,11 +26,9 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   @requirements "app.config"
 
   @out_dir "popcorn_runtime_source"
-  @default_repo "git@github.com:software-mansion-labs/FissionVM.git"
 
-  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def run(args) do
-    options_defaults = %{path: nil, git: nil, git_ref: nil, cmake_opts: ""}
+    options_defaults = %{path: nil, git: nil, git_ref: nil, cmake_opts: nil}
     parser_config = [strict: [:target | Map.keys(options_defaults)] |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(options_defaults, Map.new(options))
@@ -37,77 +37,32 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
       raise "Missing option `target`"
     end
 
-    {source_type, runtime_source} =
-      cond do
-        options.path && options.git ->
-          raise "Both `path` and `git` options were provided, only one can be given at a time"
+    target = options.target
 
-        options.path ->
-          {:path, options.path}
+    # Build script args
+    script_args = build_script_args(options)
 
-        true ->
-          {:git, fetch_repo(options.git || @default_repo, options.git_ref)}
-      end
-
-    {cmake_opts, options} = Map.pop(options, :cmake_opts)
-    cmake_opts = cmake_opts |> String.split(" ", trim: true) |> Enum.map(&"-D#{&1}")
-
-    artifacts_dir = Path.join([@out_dir, "artifacts", "#{options.target}"])
+    # Add output directory
+    artifacts_dir = Path.join([@out_dir, "artifacts", target])
     File.mkdir_p!(artifacts_dir)
     File.write!(Path.join(@out_dir, ".gitignore"), "*\n")
 
-    # Skip building AtomVM stdlib
-    if source_type != :path do
-      File.write!(Path.join(runtime_source, "libs/CMakeLists.txt"), "\n")
+    script_args = ["--outdir", artifacts_dir | script_args]
+
+    # Add build mode (positional) - always use debug for now
+    build_mode = "debug-#{target}"
+    script_args = script_args ++ [build_mode]
+
+    # Find script path relative to project root
+    script_path = Path.join([File.cwd!(), "scripts", "build-atomvm.sh"])
+
+    unless File.exists?(script_path) do
+      raise "Build script not found at #{script_path}"
     end
 
-    case String.to_existing_atom(options.target) do
-      :unix ->
-        ensure_executables!(~w"cmake make")
-        build_dir = Path.join(runtime_source, "build")
-        File.mkdir_p!(build_dir)
-        cmd(~w"cmake .. -DAVM_BUILD_RUNTIME_ONLY=1" ++ cmake_opts, cd: build_dir)
-        cmd(~w"make -j", cd: build_dir)
+    IO.puts(:stderr, "Running: #{script_path} #{Enum.join(script_args, " ")}")
 
-        cp_artifact("src/AtomVM", build_dir, artifacts_dir)
-
-      :wasm ->
-        ensure_executables!(
-          ~w"cmake make emcmake",
-          "Please make sure you have emscripten instaled."
-        )
-
-        build_dir = Path.join(runtime_source, "src/platforms/emscripten/build")
-        File.mkdir_p!(build_dir)
-
-        cmd(
-          ~w"emcmake cmake .. -DAVM_BUILD_RUNTIME_ONLY=1 -DAVM_EMSCRIPTEN_ENV=web" ++
-            cmake_opts,
-          cd: build_dir
-        )
-
-        cmd(~w"emmake make -j", cd: build_dir)
-        cp_artifact("src/AtomVM.mjs", build_dir, artifacts_dir)
-        cp_artifact("src/AtomVM.wasm", build_dir, artifacts_dir)
-
-      target ->
-        raise "Invalid target #{inspect(target)}, valid targets: unix, wasm"
-    end
-  end
-
-  defp fetch_repo(addr, ref) do
-    output = Path.join(@out_dir, "atomvm")
-    File.rm_rf!(output)
-    IO.puts(:stderr, "Cloning AtomVM from #{addr}")
-    cmd(["git", "clone", addr, "--", output])
-    if ref, do: cmd(["git", "checkout", ref], cd: output)
-    output
-  end
-
-  defp cmd([command | args], opts \\ []) do
-    opts = Keyword.put_new(opts, :use_stdio, false)
-
-    case System.cmd(command, args, opts) do
+    case System.cmd(script_path, script_args, into: IO.stream(:stdio, :line)) do
       {_output, 0} ->
         :ok
 
@@ -120,15 +75,41 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     :ok
   end
 
-  defp cp_artifact(subpath, build_dir, artifacts_dir) do
-    File.cp!(Path.join(build_dir, subpath), Path.join(artifacts_dir, Path.basename(subpath)))
-  end
+  defp build_script_args(options) do
+    args = []
 
-  defp ensure_executables!(executables, description \\ "") do
-    missing = Enum.reject(executables, &System.find_executable/1)
+    # Handle source: --path or --git + --git-ref
+    args =
+      cond do
+        options.path && options.git ->
+          raise "Both `path` and `git` options were provided, only one can be given at a time"
 
-    if missing != [] do
-      raise "Required commands not found: #{inspect(missing)}. #{description}"
-    end
+        options.path ->
+          ["--source", options.path | args]
+
+        options.git ->
+          source =
+            if options.git_ref do
+              "#{options.git}##{options.git_ref}"
+            else
+              raise "When using --git, --git-ref is required"
+            end
+
+          ["--source", source | args]
+
+        true ->
+          # Use default source from script
+          args
+      end
+
+    # Handle cmake-opts
+    args =
+      if options.cmake_opts do
+        ["--cmake-opts", options.cmake_opts | args]
+      else
+        args
+      end
+
+    args
   end
 end
