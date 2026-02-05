@@ -45,6 +45,13 @@ export default [
       preserveModulesRoot: "src",
     },
     cache: false,
+    // Suppress eval warning for AtomVM.mjs (emscripten-generated code)
+    onwarn(warning, warn) {
+      if (warning.code === "EVAL" && warning.id?.includes("AtomVM.mjs")) {
+        return;
+      }
+      warn(warning);
+    },
     plugins: [
       resolveAtomVM(),
       typescript({ tsconfig: "./src/tsconfig.json", outputToFilesystem: true }),

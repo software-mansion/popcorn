@@ -1,12 +1,13 @@
 // @ts-expect-error atomvm doesn't have types yet
 import init from "./AtomVM.mjs";
 import { sendIframeResponse } from "./bridge";
-import { HEARTBEAT_INTERVAL_MS, type CastRequest } from "./types";
-import {
-  MESSAGES,
-  type AnySerializable,
-  type CallRequest,
-  type IframeRequest,
+import { HEARTBEAT_INTERVAL_MS, MESSAGES } from "./types";
+
+import type {
+  AnySerializable,
+  CallRequest,
+  CastRequest,
+  IframeRequest,
 } from "./types";
 
 /** Emscripten filesystem interface */

@@ -1,10 +1,7 @@
-import {
-  type IframeRequest,
-  type IframeResponse,
-  type AnySerializable,
-  isMessageType,
-} from "./types";
-import { throwError } from "./utils";
+import { isMessageType } from "./types";
+import { throwError } from "./errors";
+
+import type { IframeRequest, IframeResponse, AnySerializable } from "./types";
 
 export type IframeBridgeArgs = {
   container: HTMLElement;
