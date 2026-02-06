@@ -1,0 +1,14 @@
+# Links
+
+```elixir
+defmodule S do
+  use GenServer
+  def handle_info(_msg, _state) do
+    raise "dupa"
+  end
+end
+
+{:ok, s} = GenServer.start(S, [])
+
+send(s, :hello)
+```
