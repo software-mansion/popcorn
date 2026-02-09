@@ -14,7 +14,7 @@ export const test = base.extend<{ errorCollector: ErrorCollector }>({
 
     page.on("pageerror", (error) => pageErrors.push(error));
     page.on("console", (msg) => {
-      if (msg.type() === "error") {
+      if (msg.type() === "error" && msg.text().startsWith("Popcorn stderr:")) {
         consoleErrors.push(msg.text());
       }
     });

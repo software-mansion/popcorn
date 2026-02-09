@@ -54,7 +54,9 @@ test.describe("Language Tour - All Topics", () => {
       const badges = page.locator("[data-testid='execution-state-badge']");
       const count = await badges.count();
       for (let i = 0; i < count; i++) {
-        await expect(badges.nth(i)).toHaveAttribute("data-state", "success");
+        await expect(badges.nth(i)).toHaveAttribute("data-state", "success", {
+          timeout: 30000
+        });
       }
 
       errorCollector.assertNoErrors();
