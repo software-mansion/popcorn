@@ -1,0 +1,69 @@
+name: Language Tour E2E tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "misc/language-tour-guide/**"
+      - "lib/**/wasm.ex"
+      - ".github/workflows/langtour_e2e_test.yml"
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  e2e:
+    name: Language Tour E2E tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.7
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
+        with:
+          elixir-version: "1.17.3"
+          otp-version: "26.0.2"
+          rebar3-version: "3.18.0"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: misc/language-tour-guide/package-lock.json
+
+      - name: Install AtomVM build deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
+
+      - name: Restore Elixir dependencies cache
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install Elixir dependencies
+        run: mix deps.get
+        working-directory: misc/language-tour-guide/elixir_tour
+
+      - name: Install npm dependencies
+        run: npm ci
+        working-directory: misc/language-tour-guide
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+        working-directory: misc/language-tour-guide
+
+      - name: Run e2e tests
+        run: npm test
+        working-directory: misc/language-tour-guide
