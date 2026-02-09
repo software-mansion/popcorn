@@ -107,7 +107,7 @@ Process.sleep(100)
 p1 = spawn(fn ->
   receive do
     {:ping, pid} ->
-      IO.puts("recevied :ping, sending :pong")
+      IO.puts("received :ping, sending :pong")
       send(pid, :pong)
   end
 end)
