@@ -27,7 +27,7 @@ export function CodeCell({ id }: CodeCellProps) {
   return (
     <div
       className="code-cell border-grey-20 my-2 mb-8 overflow-hidden rounded-md border lg:min-w-2xl"
-      data-correct-code={editor.correctCode}
+      data-test-replace-code={editor.testReplaceCode}
     >
       <CodeDisplay id={id} />
       <Results id={id} />

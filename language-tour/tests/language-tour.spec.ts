@@ -18,11 +18,11 @@ test.describe("Language Tour - All Topics", () => {
       const mdxWrapper = page.locator("[data-testid='mdx-wrapper']");
       await mdxWrapper.waitFor({ state: "visible" });
 
-      const fixableEditors = page.locator("[data-correct-code]");
+      const fixableEditors = page.locator("[data-test-replace-code]");
       const fixCount = await fixableEditors.count();
       for (let i = 0; i < fixCount; i++) {
         const cell = fixableEditors.nth(i);
-        const correctCode = await cell.getAttribute("data-correct-code");
+        const testReplaceCode = await cell.getAttribute("data-test-replace-code");
         const cmContent = cell.locator(".cm-content");
 
         // dispatch change to CodeMirror instance to prevent auto closing
@@ -35,7 +35,7 @@ test.describe("Language Tour - All Topics", () => {
               insert: code
             }
           });
-        }, correctCode!);
+        }, testReplaceCode!);
       }
 
       const runButtons = page.locator("button").filter({ hasText: "Run Code" });
