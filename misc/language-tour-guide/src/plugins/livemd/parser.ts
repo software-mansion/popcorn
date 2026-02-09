@@ -9,7 +9,7 @@ import { hash64 } from "../../utils/storage";
 type Metadata = {
   output?: boolean;
   force_markdown?: boolean;
-  correct_code?: boolean;
+  test_replace_code?: string;
   [key: string]: unknown;
 };
 
@@ -38,7 +38,7 @@ export type CodeSnippet = {
   initCode: string;
   stdout: string[];
   output: string;
-  correctCode?: string;
+  testReplaceCode?: string;
 };
 
 function remarkLivebook() {
@@ -53,23 +53,31 @@ function remarkLivebook() {
 
       // Process Elixir code blocks - convert to Editor unless force_markdown is set
       if (isElixirCodeBlock(node)) {
-        // console.log("Processing Elixir code block:", node);
-
-        // Check if there's a force_markdown metadata before this code block
+        // Check preceding node for metadata
+        let testReplaceCode: string | undefined;
         if (index > 0) {
           const prevNode = parent.children[index - 1];
           if (isHtmlNode(prevNode)) {
-            const metadataMatch = prevNode.value.match(
+            const livebookMatch = prevNode.value.match(
               /<!--\s*livebook:({.*?})\s*-->/
             );
-
-            if (metadataMatch) {
-              const metadata: Metadata = JSON.parse(metadataMatch[1]);
-
-              // If force_markdown is true, keep it as a normal code block
+            if (livebookMatch) {
+              const metadata: Metadata = JSON.parse(livebookMatch[1]);
               if (metadata.force_markdown === true) {
                 parent.children.splice(index - 1, 1);
                 return;
+              }
+            }
+
+            const langtourMatch = prevNode.value.match(
+              /<!--\s*langtour:({.*?})\s*-->/
+            );
+            if (langtourMatch) {
+              const langtourMeta: Metadata = JSON.parse(langtourMatch[1]);
+              if (typeof langtourMeta.test_replace_code === "string") {
+                testReplaceCode = langtourMeta.test_replace_code;
+                parent.children.splice(index - 1, 1);
+                index -= 1;
               }
             }
           }
@@ -129,26 +137,6 @@ function remarkLivebook() {
           }
         }
 
-        // Check for correct_code block
-        let correctCode: string | undefined;
-        const correctCodeMetaIndex = index + 1 + nodesToRemove;
-        const correctCodeMetaNode = parent.children[correctCodeMetaIndex];
-        if (isHtmlNode(correctCodeMetaNode)) {
-          const correctMatch = correctCodeMetaNode.value.match(
-            /<!--\s*langtour:({.*?})\s*-->/
-          );
-          if (correctMatch) {
-            const correctMeta: Metadata = JSON.parse(correctMatch[1]);
-            if (correctMeta.correct_code === true) {
-              const correctCodeNode = parent.children[correctCodeMetaIndex + 1];
-              if (isElixirCodeBlock(correctCodeNode)) {
-                correctCode = correctCodeNode.value;
-                nodesToRemove += 2;
-              }
-            }
-          }
-        }
-
         const editorId = hash64(
           initCode + firstOutput + (secondOutput ?? "") + editorCount++
         );
@@ -158,7 +146,7 @@ function remarkLivebook() {
           initCode,
           stdout: secondOutput === null ? [] : firstOutput.split("\n"),
           output: secondOutput === null ? firstOutput : secondOutput,
-          ...(correctCode && { correctCode })
+          ...(testReplaceCode && { testReplaceCode })
         });
 
         const editorNode = {

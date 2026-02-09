@@ -47,7 +47,7 @@ export type EditorData = {
   id: string;
   code: string;
   defaultCode: string;
-  correctCode?: string;
+  testReplaceCode?: string;
   currentResult?: {
     stdoutResult?: string[];
     stderrResult?: string[];
@@ -103,7 +103,7 @@ export const useEditorsStore = create<EditorsStore>()(
         initCode: defaultCode,
         stdout,
         output,
-        correctCode
+        testReplaceCode
       } = codeSnippet;
 
       set((state) => {
@@ -116,7 +116,7 @@ export const useEditorsStore = create<EditorsStore>()(
             id,
             code,
             defaultCode,
-            ...(correctCode && { correctCode }),
+            ...(testReplaceCode && { testReplaceCode }),
             executionState: editorState ?? (output ? "success" : "not_run"),
             currentResult:
               editorState !== "success" && !output
