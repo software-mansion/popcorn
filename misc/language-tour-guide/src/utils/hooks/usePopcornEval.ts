@@ -9,19 +9,25 @@ export function usePopcornEval() {
     async (code: string, editorId: string) => {
       const stopLogCapture = startLogCapture();
 
-      const { data, durationMs, error } = await call(
-        ["eval_elixir", editorId, code],
-        {
-          timeoutMs: 10_000
-        }
-      );
+      const result = await call(["eval_elixir", editorId, code], {
+        timeoutMs: 10_000
+      });
       const { stderr, stdout } = stopLogCapture();
 
-      if (error !== null) {
-        captureCodeException(error, code);
-        return { error: error, stderr, stdout, durationMs };
+      if (!result.ok) {
+        const { error, durationMs } = result;
+        const errorMessage = String(error);
+
+        captureCodeException(errorMessage, code);
+        return {
+          error: errorMessage,
+          stderr,
+          stdout,
+          durationMs
+        };
       }
 
+      const { data, durationMs } = result;
       return { data, durationMs, stderr, stdout, error: null };
     },
     [call, startLogCapture]
