@@ -1,11 +1,10 @@
 import { useCallback } from "react";
+import { usePopcornContext } from "./usePopcornContext";
 import type {
   AnySerializable,
   CallOptions,
-  CastOptions,
-  PopcornError
-} from "../../context/popcorn";
-import { usePopcornContext } from "./usePopcornContext";
+  CastOptions
+} from "@swmansion/popcorn";
 
 export const usePopcorn = () => {
   const { instance, reinitializePopcorn, isLoadingPopcorn } =
@@ -43,26 +42,9 @@ export const usePopcorn = () => {
     return stopLogCapture;
   }, [ensureInstance]);
 
-  // TODO: popcorn should never throw, an exception on call
-  // drop it after #378 is implemented
   const call = useCallback(
     async (args: AnySerializable, options: CallOptions) => {
-      try {
-        console.log("Popcorn call args:", args, "options:", options);
-
-        const result = await ensureInstance().call(args, options);
-        return { ...result, error: null };
-      } catch (error) {
-        if (isDeinitializedError(error)) {
-          return { error: error.error.message, durationMs: 0, data: null };
-        }
-
-        if (isPopcornError(error)) {
-          return { error: error.error, durationMs: 0, data: null };
-        }
-
-        return { error: "Popcorn call error", durationMs: 0, data: null };
-      }
+      return ensureInstance().call(args, options);
     },
     [ensureInstance]
   );
@@ -88,16 +70,3 @@ export const usePopcorn = () => {
     reinitializePopcorn
   };
 };
-
-function isPopcornError(error: unknown): error is PopcornError {
-  return typeof error === "object" && error !== null && "error" in error;
-}
-
-function isDeinitializedError(error: unknown): error is { error: Error } {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "error" in error &&
-    error.error instanceof Error
-  );
-}

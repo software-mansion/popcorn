@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "cook": "cd elixir_tour && mix popcorn.cook",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -15,6 +16,7 @@
     "@mdx-js/react": "^3.1.0",
     "@mdx-js/rollup": "^3.1.0",
     "@sentry/react": "^10.17.0",
+    "@swmansion/popcorn": "^0.2.0-rc.3",
     "@tailwindcss/vite": "^4.1.11",
     "@types/xxhashjs": "^0.2.4",
     "@uiw/codemirror-theme-solarized": "^4.24.2",

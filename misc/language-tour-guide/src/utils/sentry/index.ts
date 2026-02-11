@@ -75,6 +75,8 @@ export function captureReloadIframe(
   Sentry.captureException(exception, context);
 }
 
+type ReloadReason = "heartbeat_lost" | "unknown";
+
 export type LogSink = {
   onStdout: (text: string) => void;
   onStderr: (text: string) => void;
@@ -116,21 +118,5 @@ export function createLogSink(): LogSink {
       stdout.length = 0;
       stderr.length = 0;
     }
-  };
-}
-export type ReloadReason = "heartbeat_lost" | "unknown";
-
-export function wrapPopcornReloadIframe(
-  popcornInstance: any,
-  customReloadCallback: (reason: ReloadReason) => void
-) {
-  const originalReloadIframe =
-    popcornInstance._reloadIframe.bind(popcornInstance);
-
-  // TODO: not overwriting prototype method
-  popcornInstance._reloadIframe = function (reason: ReloadReason) {
-    originalReloadIframe.call(this, reason);
-
-    customReloadCallback(reason);
   };
 }

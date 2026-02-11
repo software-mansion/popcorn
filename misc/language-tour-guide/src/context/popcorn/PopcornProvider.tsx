@@ -5,8 +5,9 @@ import {
   type ReactNode,
   useCallback
 } from "react";
-import { PopcornContext, type Popcorn, type PopcornContextValue } from ".";
-import { wrapPopcornReloadIframe, type LogSink } from "../../utils/sentry";
+import { PopcornContext, type PopcornContextValue } from ".";
+import { Popcorn } from "@swmansion/popcorn";
+import { type LogSink } from "../../utils/sentry";
 
 interface PopcornProviderProps {
   children: ReactNode;
@@ -114,14 +115,14 @@ async function initPopcorn({
   logSink
 }: InitPopcornArgs): Promise<{ instance: Popcorn | null; error: unknown }> {
   try {
-    const instance = await window.Popcorn.init({
+    const instance = await Popcorn.init({
       debug,
-      wasmDir: import.meta.env.BASE_URL + "wasm/",
       onStdout: logSink.onStdout,
-      onStderr: logSink.onStderr
+      onStderr: logSink.onStderr,
+      // TODO(jgonet): prepare closed error set for reloads
+      onReload: logSink.onCrash as (reason: string) => void
     });
 
-    wrapPopcornReloadIframe(instance, logSink.onCrash);
     return { instance, error: null };
   } catch (error) {
     return { instance: null, error };
