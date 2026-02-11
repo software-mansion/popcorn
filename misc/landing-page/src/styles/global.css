@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@xterm/xterm";
 @theme {
+  --breakpoint-nav-wide: 74rem;
   --color-*: initial;
   --color-white: #fff;
   --color-light-20: #fffdf5;
