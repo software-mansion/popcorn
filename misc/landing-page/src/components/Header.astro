@@ -1,6 +1,5 @@
 ---
 import { Icon } from "astro-icon/components";
-import Banner from "../components/Banner.astro";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
@@ -10,13 +9,22 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
   <nav
     class="flex h-16 items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
   >
-    <a href="/" class="flex-shrink-0">
-      <Icon
-        name="logo-text"
-        class="text-brown-100 text-4xl transition-colors duration-300"
-        data-logo
-      />
-    </a>
+    <div class="nav-wide:gap-10 flex items-center gap-4 lg:gap-6">
+      <a href="/" class="flex-shrink-0">
+        <Icon
+          name="logo-text"
+          class="text-brown-100 text-2xl transition-colors duration-300 md:text-4xl"
+          data-logo
+        />
+      </a>
+      <a
+        href="https://elixir-language-tour.swmansion.com"
+        class="lang-tour text-light-20 nav-wide:px-4 nav-wide:py-1.5 nav-wide:text-base pointer rounded-md bg-orange-100 px-3 py-1 text-[0.625rem]"
+        target="_blank"
+      >
+        Elixir Language Tour
+      </a>
+    </div>
 
     <div
       class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
@@ -59,7 +67,6 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       />
     </button>
   </nav>
-  <Banner />
 </div>
 
 <script>
@@ -187,7 +194,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     const nav = document.querySelector("nav")!;
     const container = nav.parentElement!;
     const logo = nav.querySelector("[data-logo]");
-    const links = nav.querySelectorAll("a");
+    const links = nav.querySelectorAll("a:not(.lang-tour)");
     const hamburgerIcon = nav.querySelector("[data-hamburger-icon]");
 
     const elements = {
@@ -209,3 +216,20 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
   document.addEventListener("DOMContentLoaded", setup);
   document.addEventListener("astro:page-load", setup);
 </script>
+
+<style>
+  .lang-tour {
+    background-image: linear-gradient(
+      var(--color-brown-100),
+      var(--color-brown-100)
+    );
+    background-size: 0% 100%;
+    background-position: right;
+    background-repeat: no-repeat;
+    transition: background-size 0.3s ease;
+  }
+
+  .lang-tour:hover {
+    background-size: 100% 100%;
+  }
+</style>
