@@ -29,11 +29,14 @@ function copyAssets(targets) {
   };
 }
 
+function isEvalWarning(log) {
+  return log.code === "EVAL" && log.id?.includes("AtomVM.mjs");
+}
+
 export default [
   // Main library
   {
     input: {
-      iframe: "src/iframe.ts",
       AtomVM: "assets/AtomVM.mjs",
       index: "src/index.ts",
     },
@@ -45,17 +48,27 @@ export default [
       preserveModulesRoot: "src",
     },
     cache: false,
-    // Suppress eval warning for AtomVM.mjs (emscripten-generated code)
     onwarn(warning, warn) {
-      if (warning.code === "EVAL" && warning.id?.includes("AtomVM.mjs")) {
-        return;
-      }
+      if (isEvalWarning(warning)) return;
       warn(warning);
     },
     plugins: [
       resolveAtomVM(),
       typescript({ tsconfig: "./src/tsconfig.json", outputToFilesystem: true }),
       copyAssets([{ src: "assets/AtomVM.wasm", dest: "dist" }]),
+    ],
+  },
+  // Iframe runtime
+  {
+    input: "src/iframe.ts",
+    output: {
+      file: "dist/iframe.mjs",
+      format: "esm",
+    },
+    external: ["./AtomVM.mjs"],
+    cache: false,
+    plugins: [
+      typescript({ tsconfig: "./src/tsconfig.json", outputToFilesystem: true }),
     ],
   },
   {
