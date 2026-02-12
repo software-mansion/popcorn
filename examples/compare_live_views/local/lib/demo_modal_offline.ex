@@ -4,12 +4,12 @@ defmodule DemoModalOffline do
   def render(assigns) do
     ~H"""
     <p>LOCAL LIVE VIEW</p>
-    <button class="show-modal-button" pop-click="show_modal">SHOW OFFLINE MODAL</button>
+    <button class="show-modal-button" phx-click="show_modal">SHOW OFFLINE MODAL</button>
 
     <%= if @show_modal do %>
     <div class="modal">
       <div class="modal-content">
-        <span class="close" pop-click="close_modal">&times;</span>
+        <span class="close" phx-click="close_modal">&times;</span>
         <p>OFFLINE MODAL</p>
       </div>
     </div>

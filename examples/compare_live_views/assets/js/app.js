@@ -31,11 +31,76 @@ const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
   hooks: {...colocatedHooks},
 })
+console.log({roots: {...liveSocket.roots}})
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
+
+
+
+
+
+
+
+
+
+
+
+
+// LOCAL LIVE VIEW START========================================================================================
+import { Popcorn } from "../vendor/local_live_view/wasm/popcorn.js";
+
+async function setup() {
+  const popcorn = await Popcorn.init({
+    debug: true,
+    bundlePath: "../local_live_view/wasm/bundle.avm",
+    wasmDir: "./local_live_view/wasm/"
+  })
+  
+  const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {
+    timeoutMs: 10_000,
+  });
+  
+  const POP_VIEW = "data-pop-view"
+  const PHX_ROOT_ID = "data-phx-root-id"
+  const PHX_SESSION = "data-phx-session"
+  const query = `[${POP_VIEW}]`
+  const pop_view_els = Array.from(document.querySelectorAll(query));
+  console.log({roots: {...liveSocket.roots}, pop_view_els: pop_view_els})
+  
+  pop_view_els.forEach((pop_view_el) => {
+//  create a view
+    const view = liveSocket.newRootView(pop_view_el);
+//  update key functions within a view to call popcorn instead of pushing to the channel
+    view.pushWithReply = async function(refGenerator, event, payload) {
+      console.log({event: event, payload: payload})
+      const { data, durationMs } = await popcorn.call({ "view": this.id, "event": event, 
+        "payload": payload }, {
+        timeoutMs: 10_000,
+      });
+      return new Promise((resolve, reject) => {})
+    }
+    view.join = function(_callback) {
+      this.el.setAttribute(PHX_ROOT_ID, this.root.id);
+      this.el.setAttribute(PHX_SESSION, this.root.id);
+      console.log("joined!")
+    }
+    view.isConnected = function() { return true } //  todo implement it properly so that it returns weather we are connected to popcorn
+//  run necessary callbacks
+    view.join()
+  });
+}
+
+function find_predefined_views() {
+  let elements = document.querySelectorAll('[data-pop-view]');
+  elements = Array.from(elements)
+  return elements.map(el => el.getAttribute("data-pop-view"))
+}
+
+setup();
+// LOCAL LIVE VIEW END========================================================================================
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()

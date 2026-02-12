@@ -29,7 +29,6 @@ async function afterRenderBind(renderEvent, popcorn) {
   events.forEach(({js_event: js_event, pop_event: pop_event}) => {
     view_element.addEventListener(js_event, async (e) => {
       const target_el = e.target.closest(`[${pop_event}]`);
-      console.log({event: e, target_el: target_el, pop_event: pop_event})
       if (target_el && view_element.contains(target_el)) {
         handlePopEvent(e, target_el, pop_event, popcorn, view);
       }
