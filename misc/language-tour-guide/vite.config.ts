@@ -6,6 +6,7 @@ import svgr from "vite-plugin-svgr";
 import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import { livemdPlugin } from "./src/plugins/livemd";
+import { cookOnChange } from "./src/plugins/cook";
 import { popcorn } from "@swmansion/popcorn/vite";
 
 // https://vite.dev/config/
@@ -20,7 +21,8 @@ export default defineConfig({
       rehypePlugins: [[rehypeHighlight, { languages: { elixir } }]]
     }),
     svgr(),
-    popcorn({ bundlePath: "./public/wasm/bundle.avm" })
+    popcorn({ bundlePath: "./public/wasm/bundle.avm" }),
+    cookOnChange()
   ],
   server: {
     headers: {
