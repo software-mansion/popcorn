@@ -163,6 +163,18 @@ export const navigationConfig: NavigationConfig = [
       {
         name: "Message passing",
         component: lazyLoadLiveMd("8-processes/message_passing")
+      },
+      {
+        name: "Links",
+        component: lazyLoadLiveMd("8-processes/links")
+      },
+      {
+        name: "State and Agent",
+        component: lazyLoadLiveMd("8-processes/state_and_agent")
+      },
+      {
+        name: "GenServer",
+        component: lazyLoadLiveMd("8-processes/gen_server")
       }
     ]
   },
