@@ -53,7 +53,7 @@ export function Navigation() {
         <NavigationList items={navigationTree} onClick={closeMenu} />
         <li className="mt-8">
           <NavLink
-            to="https://popcorn.swmansion.com/privacy-policy.html"
+            to="https://swmansion.com/privacy/policy"
             className="navigation-link underline"
             target="_blank"
           >
