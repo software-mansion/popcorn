@@ -1,28 +1,31 @@
 import type { Plugin } from "vite";
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
 import path from "node:path";
+
+const execPromise = promisify(exec);
 
 export function cookOnChange(): Plugin {
   return {
     name: "vite-plugin-cook-on-change",
     apply: "serve",
     configureServer(server) {
-      const elixirTourLib = path.join(process.cwd(), "elixir_tour", "lib");
+      const elixirTourDir = path.join(process.cwd(), "elixir_tour");
+      const elixirTourLib = path.join(elixirTourDir, "lib");
 
       server.watcher.add(elixirTourLib);
 
-      server.watcher.on("change", (file) => {
+      server.watcher.on("change", async (file) => {
         if (!file.startsWith(elixirTourLib) || !file.endsWith(".ex")) return;
 
         console.log(`[cook] ${path.basename(file)} changed`);
         try {
-          execSync("mix popcorn.cook", {
-            cwd: path.join(process.cwd(), "elixir_tour"),
-            stdio: "inherit"
+          await execPromise("mix popcorn.cook", {
+            cwd: elixirTourDir
           });
-          server.ws.send({ type: "full-reload" });
-        } catch {
-          console.error("[cook] mix popcorn.cook failed");
+        } catch (error) {
+          console.error("[cook] mix popcorn.cook failed", error);
         }
       });
     }
