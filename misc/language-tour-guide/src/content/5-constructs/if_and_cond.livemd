@@ -36,6 +36,8 @@ end
 
 This is a good opportunity to talk about variable scoping in Elixir. If any variable is declared or changed inside `if`, `case`, and similar constructs, the declaration and change will only be visible inside the construct:
 
+<!-- langtour:{"test_replace_code":"x = 1\nif true do\n  x = x + 1\n  x\nend\nx"} -->
+
 ```elixir
 x = 1
 if true do

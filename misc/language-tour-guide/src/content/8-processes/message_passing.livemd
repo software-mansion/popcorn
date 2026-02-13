@@ -85,6 +85,8 @@ Let's make the processes print messages they send and receive, like `IO.puts("Se
   </span>
 </details>
 
+<!-- langtour:{"test_replace_code":"p1 = spawn(fn ->\n  receive do\n    {:ping, pid} ->\n      IO.puts(\"received :ping, sending :pong\")\n      send(pid, :pong)\n  end\nend)\n\np2 = spawn(fn ->\n  send(p1, {:ping, self()})\n  receive do\n    :pong -> IO.puts(\"received :pong\")\n  end\nend)\n\nProcess.sleep(100)"} -->
+
 ```elixir
 p1 = spawn(fn ->
   # Receive ping message from p2

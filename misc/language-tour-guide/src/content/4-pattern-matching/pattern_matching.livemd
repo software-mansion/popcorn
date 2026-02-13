@@ -47,6 +47,8 @@ IO.inspect(b, label: "b")
 
 The pattern must be of the same size for the match to succeed:
 
+<!-- langtour:{"test_replace_code":"{x, y, z} = {:hello, \"world\", 42}\n\nIO.inspect(x, label: \"x\")\nIO.inspect(y, label: \"y\")\nIO.inspect(z, label: \"z\")"} -->
+
 ```elixir
 # ❗️ This code raises an error!
 # 💡 Let's modify the pattern on the left to fix the error
