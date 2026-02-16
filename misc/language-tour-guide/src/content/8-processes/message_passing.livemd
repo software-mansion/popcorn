@@ -68,6 +68,26 @@ after
 end
 ```
 
+## Process registration
+
+With `Process.register/2`, we can register a process under a custom name, and use this name instead of a PID. The name registered with `Process.register/2` must be an atom and must be unique in the system. More flexible process registration is possible with Registry - we'll learn that in a chapter about dynamic supervisors.
+
+```elixir
+pid = spawn(fn ->
+  receive do
+    :hello -> IO.puts("Received hello!")
+  end
+end)
+
+Process.register(pid, :my_process)
+send(:my_process, :hello)
+
+# Wait for the process to receive the message
+Process.sleep(100)
+```
+
+💡 Try to register `self()` as `:my_process` at the beginning of the previous snippet What happens?
+
 ## 💡 Exercise: send and receive
 
 Let's practice sending messages between processes.

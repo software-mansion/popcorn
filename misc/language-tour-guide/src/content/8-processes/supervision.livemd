@@ -1,0 +1,174 @@
+# Supervision
+
+In the chapter about links, we learned that processes are isolated: when one process crashes, others can run just fine. But what to do with the crashed process? We can use `Supervisor`, that will automatically restart it.
+
+To demonstrate how supervisors work, we'll create two GenServers: Executor and Throttler. The executor is a simple GenServer that prints the data sent to it:
+
+```elixir
+defmodule Executor do
+  use GenServer
+
+  def start_link(options \\ []) do
+    # Here we pass a new option to the GenServer.start_link: name.
+    # It's a wrapper over `Process.register/2` that we learned
+    # in the chapter about message passing. It allows to communicate
+    # with executor using the `:executor` name instead of a PID
+    GenServer.start_link(__MODULE__, options, name: :executor)
+  end
+
+  def request(data) do
+    # We use the name to communicate with the executor
+    GenServer.cast(:executor, {:request, data})
+  end
+
+  @impl true
+  def init(_options) do
+    # We print that the executor is starting,
+    # so we can see when it's restarted
+    IO.puts("Starting Executor, PID: #{inspect(self())}")
+    {:ok, %{}}
+  end
+
+  @impl true
+  def handle_cast({:request, data}, state) do
+    IO.puts(data)
+    {:noreply, state}
+  end
+end
+```
+
+Throttler, on the other hand, limits the numbers of requests sent to the executor: 
+
+```elixir
+defmodule Throttler do
+  use GenServer
+
+  def start_link(options \\ []) do
+    GenServer.start_link(__MODULE__, options, name: :throttler)
+  end
+
+  def request(data) do
+    GenServer.call(:throttler, {:request, data})
+  end
+
+  @impl true
+  def init(options) do
+    IO.puts("Starting Throttler, PID: #{inspect(self())}")
+    # throttle_time is the smallest time between two requests
+    throttle_time = Keyword.get(options, :throttle_time, 1000)
+
+    current_time = System.monotonic_time(:millisecond)
+
+    # Cleverly set the init time, so we don't throttle the first request
+    init_time = current_time - throttle_time
+
+    {:ok, %{last_request_time: init_time, throttle_time: throttle_time}}
+  end
+
+  @impl true
+  def handle_call({:request, data}, _from, state) do
+    %{last_request_time: last_request_time, throttle_time: throttle_time} = state
+    current_time = System.monotonic_time(:millisecond)
+
+    if current_time - last_request_time > throttle_time do
+      # If the previous request was at least `throttle_time`
+      # earlier, pass it to the executor and reply `:ok`.
+      # Because we named the executor earlier, we don't
+      # need to know its PID.
+      Executor.request(data)
+      state = %{state | last_request_time: current_time}
+      {:reply, :ok, state}
+    else
+      # Otherwise, reply with an error
+      {:reply, {:error, :rate_limit_exceeded}, state}
+    end
+  end
+end
+```
+
+We could spawn our GenServers by calling their `start_link/1` functions. This time, we'll start a supervisor and let it spawn our GenServers. To do that, we'll create child specs.
+
+A child spec is a map, that contains at least `id` and `start` keys:
+- `id` - identifies the process in the supervisor
+- `start` - a tuple with module, function and list of arguments, so-called MFA tuple. The supervisor calls this function to start the process. Here, we pass appropriate `start_link/1` functions.
+
+```elixir
+throttler_options = [throttle_time: 1000]
+
+throttler_spec = %{
+  id: Throttler,
+  start: {Throttler, :start_link, [throttler_options]}
+}
+
+executor_spec = %{
+  id: Executor,
+  start: {Executor, :start_link, []}
+}
+```
+
+Now we can call `Supervisor.start_link/2` to spawn a supervisor, passing our child specs to it. We must also pass the `strategy` option - we'll explain it in a moment. Finally, for convenience, we register our supervisor under `:my_app_supervisor` name.
+
+```elixir
+{:ok, pid} = Supervisor.start_link(
+  [throttler_spec, executor_spec],
+  strategy: :one_for_one,
+  name: :my_app_supervisor
+)
+```
+
+Let's check if it works!
+
+```elixir
+Throttler.request("hello")
+```
+
+💡 Call the above cell quickly a few times. What are the results?
+
+Let's see what happens when the executor crashes. Let's pass it something that can't be printed with `IO.puts/1` - a tuple:
+
+```elixir
+Throttler.request({:hello, :world})
+
+# Wait for the executor to crash
+Process.sleep(100)
+```
+
+As you can see, the executor process crashed. But, it was restarted! Let's try requestning the throttler again:
+
+```elixir
+Throttler.request("hello, world!")
+```
+
+As you can see, the executor works - we recovered from the failure!
+
+Note that since the executor crashed and started again, it has now a new PID. However, since it's registered as `:executor`, the throttler can still send requests to it. That's why relying on PIDs is complex and error-prone when communicating with processes that can fail, and name registration is the way to go.
+
+## Strategy
+
+In some situations, processes are more tightly coupled than in our case, and if a crash happens to a process, we need to restart others too. That's when supervisor's strategy comes into play. So far, we used `:one_for_one` which means that only crashed process are restarted. There's also `:one_for_all`, which restarts all processes if any of them crashes:
+
+```elixir
+# If the supervisor is still running, stop it
+if Process.whereis(:my_app_supervisor) do
+  Supervisor.stop(:my_app_supervisor)
+end
+
+{:ok, pid} = Supervisor.start_link(
+  [throttler_spec, executor_spec],
+  strategy: :one_for_all,
+  name: :my_app_supervisor
+)
+```
+
+Let's send the malformed request again. You should see both processes restarted:
+
+```elixir
+Throttler.request({:hello, :world})
+
+# Wait for the executor to crash
+Process.sleep(100)
+```
+
+There's one more strategy available: `:rest_for_all`, that restarts only the children that are further in the spec list passed to `Supervisor.start_link/2`.
+
+💡 Change the strategy to `:rest_for_all`. How does the behavior change? Reverse the order of the `[throttle_spec, executor_spec]` and try again.
