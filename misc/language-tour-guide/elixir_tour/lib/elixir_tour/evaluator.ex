@@ -10,10 +10,19 @@ defmodule ElixirTour.Evaluator do
   @spec eval(String.t(), bindings()) ::
           {:ok, result :: any(), bindings()} | {:error, message :: String.t()}
   def eval(code, bindings) do
+    do_eval(code, bindings, true)
+  end
+
+  defp do_eval(code, bindings, retry) do
     try do
       GenServer.call(__MODULE__, {:eval, code, bindings}, :infinity)
     catch
-      :exit, reason -> {:error, inspect(reason)}
+      :exit, {:noproc, _info} when retry ->
+        Process.sleep(100)
+        do_eval(code, bindings, false)
+
+      :exit, reason ->
+        {:error, inspect(reason)}
     end
   end
 
