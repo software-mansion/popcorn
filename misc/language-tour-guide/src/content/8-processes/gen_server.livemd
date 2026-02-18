@@ -1,0 +1,255 @@
+# GenServer
+
+We learned that we can use Agents to keep state and Tasks to execute possibly long-running jobs with limited interaction.
+For more complex scenarios, that don't fit these abstractions, `GenServer` is usually the way to go.
+
+`GenServer` stands for _generic server_ and abstracts the common client-server interaction. The `GenServer` process acts as a server - it receives requests from clients and sends responses back. Any other process can be a client, and there can be multiple clients. Client can send two kinds of requests to the server:
+
+- `call` - the client sends the request and waits for response,
+- `cast` - the client sends the request and continues its work (fire & forget).
+
+Let's try using `GenServer` to implement a key-value store, as we did in the 'State and Agents' chapter. 
+
+```elixir
+defmodule KV do
+  # Firstly, we must `use` GenServer.
+  # We learned about `use` in the chapter about modules.
+  # For details of what exactly `use GenServer` does, consult
+  # GenServer documentation.
+  use GenServer
+
+  # GenServer is a behaviour and here we implement some of its callbacks.
+  # First one is handle_init, that receives options and initializes the
+  # server's state.
+  @impl true
+  def init(_options) do
+    state = %{}
+    {:ok, state}
+  end
+
+  # handle_call is executed whenever the server receives a call request.
+  # The server replies by returning a `{:reply, replied_value, new_server_state}`
+  # tuple.
+  @impl true
+  def handle_call({:get, key}, _from, state) do
+    value = Map.get(state, key)
+    {:reply, value, state}
+  end
+
+  # handle_cast is executed whenever the server receives a cast request.
+  # The server updates its state and returns it in a `{:noreply, new_state}` tuple.
+  @impl true
+  def handle_cast({:put, key, value}, state) do
+    state = Map.put(state, key, value)
+    {:noreply, state}
+  end
+end
+```
+
+Let's start our server:
+
+```elixir
+# GenServer.start_link accepts the server module and options.
+# We don't pass any options, so put an empty list there.
+{:ok, pid} = GenServer.start_link(KV, [])
+```
+
+and put something into the store:
+
+```elixir
+# Put a new key-value pair
+:ok = GenServer.cast(pid, {:put, :hello, :world})
+
+# Get the value under :hello key
+GenServer.call(pid, {:get, :hello})
+```
+
+💡 Try putting and getting different keys and values from the store
+
+As you can see, we achieved similar functionality as we did with Agent. However, with GenServer we can go further. Let's change our key-value store into a cache. The cache will also keep key-value pairs, but they will automatically expire after a given timeout.
+
+```elixir
+defmodule Cache do
+  use GenServer
+
+  @impl true
+  def init(options) do
+    # If a key-value pair isn't updated in expiration_time milliseconds,
+    # it will be removed from the cache. If expiration_time isn't provided,
+    # we default to 5 seconds.
+    expiration_time = Keyword.get(options, :expiration_time, 5000)
+
+    # Send a `:cleanup` message to self after `expiration_time`
+    Process.send_after(self(), :cleanup, expiration_time)
+
+    # We need to keep both the content of the cache and the expiration_time,
+    # so we put them under separate keys in the state
+    state = %{data: %{}, expiration_time: expiration_time}
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:get, key}, _from, state) do
+    time = System.monotonic_time(:millisecond)
+    value =
+      case Map.get(state.data, key) do
+        {value, timestamp} when time - timestamp < state.expiration_time ->
+          # The value is there and it hasn't expired
+          value
+        _other ->
+          # The value isn't there or it expired
+          nil
+      end
+
+    {:reply, value, state}
+  end
+
+  @impl true
+  def handle_cast({:put, key, value}, state) do
+    # When storing a value, we also keep the timestamp
+    timestamp = System.monotonic_time(:millisecond)
+    data = Map.put(state.data, key, {value, timestamp})
+    state = %{state | data: data}
+    {:noreply, state}
+  end
+
+  # `Process.send_after` that we called in `init` doesn't use
+  # GenServer API - it just sends a regular message like `send/2`.
+  # To process such a message with GenServer, we use another
+  # callback: handle_info.
+  @impl true
+  def handle_info(:cleanup, state) do
+    # Schedule the next cleanup after expiration_time
+    Process.send_after(self(), :cleanup, state.expiration_time)
+
+    # Remove all expired entries
+    time = System.monotonic_time(:millisecond)
+    data = Map.filter(state.data, fn {_key, {_value, timestamp}} ->
+      time - timestamp < state.expiration_time
+    end)
+
+    state = %{state | data: data}
+    {:noreply, state}
+  end
+end
+```
+
+Note that we used a new callback - `handle_info/2`. This callbacks allows you to receive a regular message, sent with `send/2`, `Process.send_after/3` or other functions that aren't aware of the GenServer API. What's the difference between `send` (and `handle_info/2`) and `cast` (and `handle_cast/2`) then? Well, there's no much difference. It's there mostly to separate messages that constitute GenServer's API from all other messages.
+
+Let's start our cache! The API is almost the same as in `KV` - we just pass the `expiration_time` option to `GenServer.start_link/2`.
+
+```elixir
+{:ok, pid} = GenServer.start_link(Cache, expiration_time: 3000)
+```
+
+Let's put something into the cache:
+
+```elixir
+:ok = GenServer.cast(pid, {:put, :hello, :world})
+
+GenServer.call(pid, {:get, :hello})
+```
+
+💡 Try putting and getting different keys and values from the cache
+
+💡 Run the following cell. Did the value expire? If not, run it again after a few seconds.
+
+```elixir
+GenServer.call(pid, {:get, :hello})
+```
+
+Our cache is almost ready - the only thing left is to wrap calls and casts with public functions. While not necessary, it's good from both future-proofing and developer experience points of view.
+
+```elixir
+defmodule BetterCache do
+  use GenServer
+
+  @doc """
+  Starts a new cache.
+
+  Accepts `expiration_time` option - time in millisecods after
+  which the key-value pairs expire.
+  """
+  @spec start_link([expiration_time: pos_integer()]) :: {:ok, pid}
+  def start_link(options) do
+    # __MODULE__ resolves to the current module name, namely `BetterCache`
+    GenServer.start_link(__MODULE__, options)
+  end
+
+  @doc """
+  Puts the given value under the given key in the cache.
+  """
+  def put(cache, key, value) do
+    # Note that `put` is a regular function, and it runs in the calling process
+    IO.puts("`BetterCache.put/3` is run in the calling process: #{inspect(self())}")
+    GenServer.cast(cache, {:put, key, value})
+  end
+
+  # 💡 Implement get/2 function
+
+  @impl true
+  def init(options) do
+    expiration_time = Keyword.get(options, :expiration_time, 5000)
+    Process.send_after(self(), :cleanup, expiration_time)
+    state = %{data: %{}, expiration_time: expiration_time}
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:get, key}, _from, state) do
+    time = System.monotonic_time(:millisecond)
+    value =
+      case Map.get(state.data, key) do
+        {value, timestamp} when time - timestamp < state.expiration_time ->
+          value
+        _other ->
+          nil
+      end
+
+    {:reply, value, state}
+  end
+
+  @impl true
+  def handle_cast({:put, key, value}, state) do
+    # The `handle_cast` callback is still executed in the GenServer process
+    IO.puts("`BetterCache.handle_cast/3` is run in the GenServer process: #{inspect(self())}")
+    timestamp = System.monotonic_time(:millisecond)
+    data = Map.put(state.data, key, {value, timestamp})
+    state = %{state | data: data}
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(:cleanup, state) do
+    Process.send_after(self(), :cleanup, state.expiration_time)
+    time = System.monotonic_time(:millisecond)
+
+    data = Map.filter(state.data, fn {_key, {_value, timestamp}} ->
+      time - timestamp < state.expiration_time
+    end)
+
+    state = %{state | data: data}
+    {:noreply, state}
+  end
+end
+```
+
+Now, we can start our cache with `BetterCache.start_link/1`:
+
+```elixir
+{:ok, cache} = BetterCache.start_link(timeout: 3000)
+```
+
+And use dedicated functions to interface with it:
+
+```elixir
+BetterCache.put(cache, :hello, :world)
+
+# 💡 Implement `BetterCache.get/2` and check if it works
+
+# Wait until `BetterCache.put` is finished
+Process.sleep(100)
+```
+
+Note that `BetterCache.put/3` is a regular function, and is therefore executed in the same process that called it.
+The `BetterCache.handle_call/3` callback, on the other hand, is called by the GenServer and runs in the GenServer's process.

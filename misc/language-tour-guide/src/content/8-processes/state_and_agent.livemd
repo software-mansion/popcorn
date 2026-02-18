@@ -1,0 +1,80 @@
+# State & Agent
+
+We haven't talked about state so far. If you are building an application that requires state, for example, to keep your application configuration, or you need to parse a file and keep it in memory, where would you store it?
+
+Processes are the most common answer to this question. We can write processes that loop infinitely, maintain state, and send and receive messages. As an example, let's write a module that starts new processes that work as a key-value store:
+
+```elixir
+defmodule KV do
+  def spawn_link() do
+    spawn_link(fn -> loop(%{}) end)
+  end
+
+  defp loop(map) do
+    receive do
+      {:get, key, caller} ->
+        value = Map.get(map, key)
+        send(caller, {:value, value})
+        loop(map)
+      {:put, key, value} ->
+        map = Map.put(map, key, value)
+        loop(map)
+    end
+  end
+end
+```
+
+Note that the `spawn_link` function starts a new process that runs the `loop/1` function, starting with an empty map. The `loop/1` (private) function then waits for messages and performs the appropriate action for each message. We made `loop/1` private by using `defp` instead of `def`. In the case of a `:get` message, it sends a message back to the caller and calls `loop/1` again, to wait for a new message. The `:put` message actually invokes `loop/1` with a new version of the map, with the given key and value stored.
+
+Let's spawn a new `KV` and try to get something from it:
+
+```elixir
+pid = KV.spawn_link()
+send(pid, {:get, :hello, self()})
+receive do
+    {:value, v} -> v
+end
+```
+
+At first, the process map has no keys, so we got `nil` back. Let's try to put something in the store:
+
+```elixir
+send(pid, {:put, :hello, :world})
+send(pid, {:get, :hello, self()})
+receive do
+    {:value, v} -> v
+end
+```
+
+💡 Try putting and getting more values into the store
+
+Notice how the process is keeping a state and we can get and update this state by sending the process messages. In fact, any process that knows the pid above will be able to send it messages and manipulate the state.
+
+💡 Add support for an `:update` message in `KV`, so the following code works and returns 4:
+```elixir
+send(pid, {:put, :num, 3})
+send(pid, {:update, :num, fn num -> num + 1 end})
+send(pid, {:get, :num, self()})
+receive do
+    {:value, v} -> v
+end
+```
+
+## Agents
+
+Using processes to maintain state and name registration are very common patterns in Elixir applications. However, most of the time, we won't implement those patterns manually as above, but by using one of the many abstractions that ship with Elixir. For example, Elixir provides Agents, which are simple abstractions around state. Our code above could be directly written as:
+
+```elixir
+# Create a new agent and set its initial state to an empty map
+{:ok, pid} = Agent.start_link(fn -> %{} end)
+
+# Update the state of the agent, by putting :world under the key :hello
+:ok = Agent.update(pid, fn map -> Map.put(map, :hello, :world) end)
+
+# Get the value under :hello key from the agent's state
+Agent.get(pid, fn map -> Map.get(map, :hello) end)
+```
+
+💡 Try using `Agent.get_and_update/2` to change and fetch the value at the same time.
+
+Notice that we instantiated the agent using `start_link/1`, not `spawn_link/1`, and it returned `{:ok, pid}` instead of just `pid`. The convention is that `spawn` and `spawn_link` are restricted to bare processes, while `start` and `start_link` interface is common to all abstractions over processes, throughout the standard library and beyond.

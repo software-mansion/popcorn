@@ -47,10 +47,10 @@ send(self(), {:hello, "world"})
 
 receive do
   x when is_integer(x) ->
-    IO.inspect x, label: "This won't match"
+    "Received an integer: #{x}"
 
   {:hello, addressee} ->
-    IO.inspect addressee, label: "Received hello to"
+    "Received hello to: #{addressee}"
 end
 ```
 
@@ -62,9 +62,9 @@ send(self(), :bye)
 
 receive do
   {:hello, addressee} ->
-    IO.inspect addressee, label: "This won't be received"
+    "Received hello to: #{addressee}"
 after
-  1_000 -> "Nothing after 1s"
+  100 -> "Nothing after 100 milliseconds"
 end
 ```
 

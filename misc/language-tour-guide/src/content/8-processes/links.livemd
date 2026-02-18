@@ -1,0 +1,27 @@
+# Links
+
+Let's see what happens when we spawn a process and there's an error in it:
+
+```elixir
+pid = spawn(fn -> 1 / 0 end)
+
+# Wait for the process to run
+Process.sleep(100)
+
+Process.alive?(pid)
+```
+
+So, the spawned process is dead, but the evaluator process (the one that's running the example) continued just fine! This demonstrates another feature of processes: _isolation_. A failure in a process is only limited to that process - it won't crash or corrupt state of any other process. Here, the evaluator process and the newly spawned process, are also isolated. Therefore, the evaluator continues to run, even though the spawned process crashed.
+
+However, in many cases, we have a group of processes that cooperate with each other. Then, a failure of any of these processes should affect the whole group. For that, we need to _link_ processes together. We can do that using the `spawn_link/1` function:
+
+```elixir
+spawn_link(fn -> 1 / 0 end)
+
+# Wait for the process to run
+Process.sleep(100)
+```
+
+Now, the evaluator process is linked to the newly spawned process. If any of them crashes, they both exit.
+
+Processes and links play an important role when building fault-tolerant systems. While other languages would require us to catch/handle exceptions, in Elixir we are actually fine with letting processes fail, and rely on _supervisors_ to restart them. We'll learn about supervisors in a dedicated chapter. "Failing fast" (sometimes referred as "let it crash") is a common philosophy when writing Elixir software!
