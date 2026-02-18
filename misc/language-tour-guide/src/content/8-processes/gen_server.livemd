@@ -180,6 +180,8 @@ defmodule BetterCache do
   Puts the given value under the given key in the cache.
   """
   def put(cache, key, value) do
+    # Note that `put` is a regular function, and it runs in the calling process
+    IO.puts("`BetterCache.put/3` is run in the calling process: #{inspect(self())}")
     GenServer.cast(cache, {:put, key, value})
   end
 
@@ -199,10 +201,8 @@ defmodule BetterCache do
     value =
       case Map.get(state.data, key) do
         {value, timestamp} when time - timestamp < state.expiration_time ->
-          # The value is there and it hasn't expired
           value
         _other ->
-          # The value isn't there or it expired
           nil
       end
 
@@ -211,24 +211,19 @@ defmodule BetterCache do
 
   @impl true
   def handle_cast({:put, key, value}, state) do
-    # When storing a value, we also keep the timestamp
+    # The `handle_cast` callback is still executed in the GenServer process
+    IO.puts("`BetterCache.handle_cast/3` is run in the GenServer process: #{inspect(self())}")
     timestamp = System.monotonic_time(:millisecond)
     data = Map.put(state.data, key, {value, timestamp})
     state = %{state | data: data}
     {:noreply, state}
   end
 
-  # `Process.send_after` that we called in `init` doesn't use
-  # GenServer API - it just sends a regular message like `send/2`.
-  # To process such a message with GenServer, we use another
-  # callback - handle_info. 
   @impl true
   def handle_info(:cleanup, state) do
-    # Schedule the next cleanup after expiration_time
     Process.send_after(self(), :cleanup, state.expiration_time)
-
-    # Remove all expired entries
     time = System.monotonic_time(:millisecond)
+
     data = Map.filter(state.data, fn {_key, {_value, timestamp}} ->
       time - timestamp < state.expiration_time
     end)
@@ -251,4 +246,10 @@ And use dedicated functions to interface with it:
 BetterCache.put(cache, :hello, :world)
 
 # 💡 Implement `BetterCache.get/2` and check if it works
+
+# Wait until `BetterCache.put` is finished
+Process.sleep(100)
 ```
+
+Note that `BetterCache.put/3` is a regular function, and is therefore executed in the same process that called it.
+The `BetterCache.handle_call/3` callback, on the other hand, is called by the GenServer and runs in the GenServer's process.

@@ -24,4 +24,4 @@ Process.sleep(100)
 
 Now, the evaluator process is linked to the newly spawned process. If any of them crashes, they both exit.
 
-Processes and links play an important role when building fault-tolerant systems. While other languages would require us to catch/handle exceptions, in Elixir we are actually fine with letting processes fail, and rely _supervisors_ to restart them. We'll learn about supervisors in a dedicated chapter. "Failing fast" (sometimes referred as "let it crash") is a common philosophy when writing Elixir software!
+Processes and links play an important role when building fault-tolerant systems. While other languages would require us to catch/handle exceptions, in Elixir we are actually fine with letting processes fail, and rely on _supervisors_ to restart them. We'll learn about supervisors in a dedicated chapter. "Failing fast" (sometimes referred as "let it crash") is a common philosophy when writing Elixir software!
