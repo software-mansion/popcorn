@@ -1,0 +1,30 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #242424;
+  color: #fffff2f2;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  padding: 20px;
+}
+
+.code {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+#codeInput {
+  min-width: 400px;
+  min-height: 150px;
+}
+
+#run {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+#output {}
