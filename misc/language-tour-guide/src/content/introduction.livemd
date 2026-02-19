@@ -66,4 +66,4 @@ It is still under development and has some limitations.
 If you encounter any problems or have suggestions regarding the tour content, let us know by filing an issue
 in the [project's repo](https://github.com/software-mansion/popcorn/issues).
 
-For information about data handling and privacy, please see our [Privacy Policy](https://popcorn.swmansion.com/privacy-policy.html).
+For information about data handling and privacy, please see our [Privacy Policy](https://swmansion.com/privacy/policy).
