@@ -176,25 +176,30 @@ export class Popcorn {
 
     this.bridge = new IframeBridge(this.bridgeConfig);
 
-    await this.awaitMessage(MESSAGES.INIT);
-    this.transition({ status: "await_vm" });
-    this.trace("Main: iframe loaded");
-    const startTime = performance.now();
-    const startVmResult = await withTimeout(
-      this.awaitMessage(MESSAGES.START_VM).then(
-        (data): CallResult => ({
-          ok: true,
-          data,
-          durationMs: performance.now() - startTime,
-        }),
-      ),
-      INIT_VM_TIMEOUT_MS,
-    );
-    if (!startVmResult.ok) throwError({ t: "assert" });
-    this.initProcess = startVmResult.data as string;
-    this.transition({ status: "ready" });
-    this.trace("Main: mounted, main process: ", this.initProcess);
-    this.onHeartbeat();
+    try {
+      await this.awaitMessage(MESSAGES.INIT);
+      this.transition({ status: "await_vm" });
+      this.trace("Main: iframe loaded");
+      const startTime = performance.now();
+      const startVmResult = await withTimeout(
+        this.awaitMessage(MESSAGES.START_VM).then(
+          (data): CallResult => ({
+            ok: true,
+            data,
+            durationMs: performance.now() - startTime,
+          }),
+        ),
+        INIT_VM_TIMEOUT_MS,
+      );
+      if (!startVmResult.ok) throwError({ t: "assert" });
+      this.initProcess = startVmResult.data as string;
+      this.transition({ status: "ready" });
+      this.trace("Main: mounted, main process: ", this.initProcess);
+      this.onHeartbeat();
+    } catch (error) {
+      this.deinit();
+      throw error;
+    }
   }
 
   /**
