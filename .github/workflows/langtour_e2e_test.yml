@@ -1,4 +1,4 @@
-name: Language Tour E2E tests
+name: Language Tour Build & test
 
 on:
   push:
