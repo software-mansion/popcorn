@@ -39,12 +39,8 @@ defmodule ElixirTour do
     {:noreply, state}
   end
 
-  @spec handle_wasm({:wasm_call, list()}, state()) :: wasm_result()
-  defp handle_wasm({:wasm_call, ["set_editor_order", editor_order]}, state) do
-    {:resolve, "ok", %{state | editor_order: editor_order, bindings: %{}}}
-  end
 
-  defp handle_wasm({:wasm_call, ["eval_elixir", editor_id, code]}, state) do
+  defp handle_wasm({:wasm_call, ["eval_elixir", editor_id, code, editor_order]}, state) do
     %{bindings: bindings_map} = state
 
     preceding_editor_ids = get_preceding_editors(state.editor_order, editor_id)
@@ -59,7 +55,7 @@ defmodule ElixirTour do
         editor_bindings = get_changed(preceding_bindings, new_bindings)
         updated_bindings = Map.put(bindings_map, editor_id, editor_bindings)
 
-        {:resolve, inspect(result), %{state | bindings: updated_bindings}}
+        {:resolve, inspect(result), %{state | editor_order: editor_order, bindings: updated_bindings}}
 
       {:error, error_message} ->
         {:reject, error_message, state}

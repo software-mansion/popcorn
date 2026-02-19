@@ -30,9 +30,6 @@ export function MdxWrapper({ Component, codeSnippets }: MdxWrapperProps) {
       initEditor(snippet);
     }
 
-    const editorOrder = codeSnippets.map((snippet) => snippet.id);
-    call(["set_editor_order", editorOrder], { timeoutMs: 5000 });
-
     setIsInitialized(true);
   }, [codeSnippets, initEditor, call]);
 
