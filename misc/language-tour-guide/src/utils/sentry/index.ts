@@ -38,11 +38,16 @@ export function captureReloadIframe(
   stdout: string,
   stderr: string
 ) {
-  const { editors, editorOrder } = useEditorsStore.getState();
+  const { editors, editorOrder, markPrecedingEditorsAsStale } =
+    useEditorsStore.getState();
 
   const failedEditor = [...editors.values()].find(
     (editor) => editor.executionState === "running"
   );
+
+  if (failedEditor) {
+    markPrecedingEditorsAsStale(failedEditor.id);
+  }
 
   const code = editorOrder
     .map((id) => {
