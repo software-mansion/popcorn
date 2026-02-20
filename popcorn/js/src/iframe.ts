@@ -30,7 +30,8 @@ type AtomVMModule = {
     | ((scriptString: string, isDebug: boolean) => number[] | null)
     | null;
   onGetTrackedObjects: ((keys: number[]) => string[]) | null;
-  onElixirReady: ((initProcess: string) => void) | null;
+  sendEvent: ((eventName: string, payload: AnySerializable) => void) | null;
+  _vmInitialized?: boolean;
 };
 
 let Module: AtomVMModule | null = null;
@@ -51,7 +52,7 @@ class TrackedValue {
 declare const globalThis: { TrackedValue: typeof TrackedValue };
 globalThis.TrackedValue = TrackedValue;
 
-export async function runIFrame(): Promise<void> {
+export async function initVm(): Promise<void> {
   const metaElement = document.querySelector(
     'meta[name="bundle-path"]',
   ) as HTMLMetaElement | null;
@@ -63,34 +64,12 @@ export async function runIFrame(): Promise<void> {
     resp.arrayBuffer(),
   );
   const bundle = new Int8Array(bundleBuffer);
-  sendIframeResponse(MESSAGES.INIT, null);
-  const initProcess = await startVm(bundle);
+  await startVm(bundle);
 
-  window.addEventListener(
-    "message",
-    async ({ data }: MessageEvent<IframeRequest>) => {
-      const type = data.type;
-
-      if (type === MESSAGES.CALL) {
-        await handleCall(data.value);
-      } else if (type === MESSAGES.CAST) {
-        handleCast(data.value);
-      }
-    },
-  );
-
-  sendIframeResponse(MESSAGES.START_VM, initProcess);
-  setInterval(
-    () => sendIframeResponse(MESSAGES.HEARTBEAT, null),
-    HEARTBEAT_INTERVAL_MS,
-  );
+  initListener();
 }
 
-async function startVm(avmBundle: Int8Array): Promise<string> {
-  let resolveResultPromise: ((value: string) => void) | null = null;
-  const resultPromise = new Promise<string>((resolve) => {
-    resolveResultPromise = resolve;
-  });
+async function startVm(avmBundle: Int8Array): Promise<void> {
   const moduleInstance: AtomVMModule = await init({
     preRun: [
       function ({ FS }: { FS: EmscriptenFS }) {
@@ -192,12 +171,36 @@ async function startVm(avmBundle: Int8Array): Promise<string> {
     return keys.map(getTrackedObject);
   };
 
-  moduleInstance["onElixirReady"] = (initProcess: string) => {
-    moduleInstance["onElixirReady"] = null;
-    resolveResultPromise?.(initProcess);
-  };
+  moduleInstance["sendEvent"] = (eventName: string, payload: AnySerializable) => {
+    if (!moduleInstance._vmInitialized) {
+      moduleInstance._vmInitialized = true;
+      initHeartbeat();
+    }
 
-  return resultPromise;
+    sendIframeResponse(MESSAGES.EVENT, { eventName, payload });
+  };
+}
+
+function initHeartbeat(): void {
+  setInterval(
+    () => sendIframeResponse(MESSAGES.HEARTBEAT, null),
+    HEARTBEAT_INTERVAL_MS,
+  );
+}
+
+function initListener(): void {
+  window.addEventListener(
+    "message",
+    async ({ data }: MessageEvent<IframeRequest>) => {
+      const type = data.type;
+
+      if (type === MESSAGES.CALL) {
+        await handleCall(data.value);
+      } else if (type === MESSAGES.CAST) {
+        handleCast(data.value);
+      }
+    },
+  );
 }
 
 async function handleCall(request: CallRequest): Promise<void> {

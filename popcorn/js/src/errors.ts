@@ -25,12 +25,10 @@ export type PopcornInternalErrorCode =
   | "bad_call"
   | "no_acked_call"
   | "bad_ack"
-  | "already_awaited"
   | "already_mounted"
   | "unmounted"
   | "bad_target"
-  | "bad_status"
-  | "bundle_not_found";
+  | "bad_status";
 
 /** Non-recoverable error indicating a bug or library misuse (always thrown) */
 export class PopcornInternalError extends Error {
@@ -50,11 +48,6 @@ type ErrorData =
   | { t: "bad_call" }
   | { t: "no_acked_call" }
   | { t: "bad_ack" }
-  | {
-      t: "already_awaited";
-      messageType: string;
-      awaitedMessageType: string;
-    }
   | { t: "already_mounted" }
   | { t: "unmounted" }
   | { t: "bad_target" }
@@ -62,8 +55,7 @@ type ErrorData =
       t: "bad_status";
       status: string;
       expectedStatus: string;
-    }
-  | { t: "bundle_not_found"; primary: string; fallback: string };
+    };
 
 export function throwError(error: ErrorData): never {
   switch (error.t) {
@@ -86,11 +78,6 @@ export function throwError(error: ErrorData): never {
       );
     case "bad_ack":
       throw new PopcornInternalError("bad_ack", "Ack for non-existent call");
-    case "already_awaited":
-      throw new PopcornInternalError(
-        "already_awaited",
-        `Cannot await message "${error.messageType}" when message "${error.awaitedMessageType}" is already awaited`,
-      );
     case "already_mounted":
       throw new PopcornInternalError(
         "already_mounted",
@@ -107,11 +94,6 @@ export function throwError(error: ErrorData): never {
       throw new PopcornInternalError(
         "bad_status",
         `Operation not allowed: instance in "${error.status}" state, expected "${error.expectedStatus}"`,
-      );
-    case "bundle_not_found":
-      throw new PopcornInternalError(
-        "bundle_not_found",
-        `Could not find a valid .avm bundle at "${error.primary}" or fallback "${error.fallback}"`,
       );
   }
 }
