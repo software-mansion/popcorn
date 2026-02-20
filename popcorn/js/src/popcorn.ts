@@ -356,7 +356,10 @@ export class Popcorn {
     }
   }
 
-  private dispatchPopcornEvent(eventName: string, payload: AnySerializable): void {
+  private dispatchPopcornEvent(
+    eventName: string,
+    payload: AnySerializable,
+  ): void {
     switch (eventName) {
       case EVENT_NAMES.ELIXIR_READY:
         if (this.mountPromise) {

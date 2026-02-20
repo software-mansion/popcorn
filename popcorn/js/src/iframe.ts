@@ -171,7 +171,10 @@ async function startVm(avmBundle: Int8Array): Promise<void> {
     return keys.map(getTrackedObject);
   };
 
-  moduleInstance["sendEvent"] = (eventName: string, payload: AnySerializable) => {
+  moduleInstance["sendEvent"] = (
+    eventName: string,
+    payload: AnySerializable,
+  ) => {
     if (!moduleInstance._vmInitialized) {
       moduleInstance._vmInitialized = true;
       initHeartbeat();
