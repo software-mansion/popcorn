@@ -13,20 +13,21 @@ Represents opaque reference to JS value. Automatically cleaned up when garbage c
 
 ## Core Functions
 
-### `register(main_process_name)`
+### `register_default_receiver/2` (optional)
 
-Notifies JS that Elixir side finished initializing. Can be called only once.
+Registers a process in Elixir and sets up a default receiver in the JS Popcorn library. This function is optional and should only be used when you want to have a default receiver and don't want to pass a receiver in cast and call functions of Popcorn.
 
 **Parameters:**
 
-- `main_process_name` (atom or string) - Name of the main process that will receive JS messages by default.
+- `pid` (pid) - The PID of the process to register.
+- `name` (atom) - Name of the main process that will receive JS messages by default.
 
 **Returns:** `:ok`.
 
 **Example:**
 
 ```elixir
-Popcorn.Wasm.register(:main)
+Popcorn.Wasm.register_default_receiver(self(), :main)
 ```
 
 ### `handle_message!(raw_message, handler)`
