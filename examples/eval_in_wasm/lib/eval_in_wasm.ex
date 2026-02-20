@@ -11,7 +11,7 @@ defmodule EvalInWasm do
 
   @impl GenServer
   def init(_args) do
-    Wasm.register(@process_name)
+    Wasm.register_default_receiver(self(), @process_name)
     {:ok, nil}
   end
 

@@ -42,7 +42,7 @@ defmodule MyApp.Application do
 end
 ```
 
-A minimal worker should register itself using `Popcorn.Wasm.register/1`:
+A minimal worker can optionally register itself using `Popcorn.Wasm.register_default_receiver/2`:
 
 ```elixir
 # lib/my_app/worker.ex
@@ -58,7 +58,7 @@ defmodule MyApp.Worker do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.register(@process_name)
+    Popcorn.Wasm.register_default_receiver(self(), @process_name)
     IO.puts("Hello from WASM!")
     state = %{}
     {:ok, state}
@@ -80,12 +80,12 @@ Finally, run `mix deps.get` and `mix popcorn.cook`. The latter will generate WAS
 <!-- index.html -->
 <html>
   <script type="module">
-      import { Popcorn } from "./wasm/popcorn.js";
-      await Popcorn.init({ onStdout: console.log });
+    import { Popcorn } from "./wasm/popcorn.js";
+    await Popcorn.init({ onStdout: console.log });
   </script>
   <body></body>
 </html>
- ```
+```
 
 ### Serving the artifacts
 
@@ -111,12 +111,12 @@ The index.html requires an extra line to load the required JavaScript.
 <html>
   <script type="text/javascript" src="/dev_server.js"></script>
   <script type="module">
-      import { Popcorn } from "./wasm/popcorn.js";
-      await Popcorn.init({ onStdout: console.log });
+    import { Popcorn } from "./wasm/popcorn.js";
+    await Popcorn.init({ onStdout: console.log });
   </script>
   <body></body>
 </html>
- ```
+```
 
 ## Popcorn project files structure
 

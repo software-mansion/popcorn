@@ -9,7 +9,6 @@ defmodule HelloPopcorn do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.register(@process_name)
     IO.puts("Hello console!")
 
     Popcorn.Wasm.run_js("""

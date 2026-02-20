@@ -25,7 +25,6 @@ export type PopcornInternalErrorCode =
   | "bad_call"
   | "no_acked_call"
   | "bad_ack"
-  | "already_awaited"
   | "already_mounted"
   | "unmounted"
   | "bad_target"
@@ -49,11 +48,6 @@ type ErrorData =
   | { t: "bad_call" }
   | { t: "no_acked_call" }
   | { t: "bad_ack" }
-  | {
-      t: "already_awaited";
-      messageType: string;
-      awaitedMessageType: string;
-    }
   | { t: "already_mounted" }
   | { t: "unmounted" }
   | { t: "bad_target" }
@@ -84,11 +78,6 @@ export function throwError(error: ErrorData): never {
       );
     case "bad_ack":
       throw new PopcornInternalError("bad_ack", "Ack for non-existent call");
-    case "already_awaited":
-      throw new PopcornInternalError(
-        "already_awaited",
-        `Cannot await message "${error.messageType}" when message "${error.awaitedMessageType}" is already awaited`,
-      );
     case "already_mounted":
       throw new PopcornInternalError(
         "already_mounted",
