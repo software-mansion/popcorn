@@ -4,8 +4,6 @@ defmodule GameOfLife do
   executing `run/0` when the app is ready.
   """
 
-  alias Popcorn.Wasm
-
   @doc false
   def child_spec(_arg) do
     %{
@@ -20,7 +18,6 @@ defmodule GameOfLife do
   """
   def run() do
     IO.puts("Running...\n")
-    Wasm.register("noop")
     :ignore
   end
 end

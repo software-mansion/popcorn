@@ -257,6 +257,8 @@ defmodule Popcorn do
 
           {:ok, _apps} = Application.ensure_all_started(unquote(app), :permanent)
 
+          Popcorn.Wasm.send_event("popcorn_elixir_ready")
+
           unquote(run)
         end
       end
