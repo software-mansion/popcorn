@@ -29,3 +29,6 @@ popcorn-*.tar
 
 # MacOS specific
 .DS_Store
+
+# Local environment
+.env

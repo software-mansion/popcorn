@@ -12,13 +12,16 @@ on:
       - "examples/eval_in_wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 env:
   CI: true
   MIX_ENV: test
-  ImageOS: "ubuntu22"
 
 jobs:
   build:
@@ -31,38 +34,43 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Setup emsdk
-        uses: mymindstorm/setup-emsdk@v14
-        with:
-          # Make sure to set a version number!
-          version: 4.0.7
-      - uses: webfactory/ssh-agent@v0.6.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.ACCESS_TO_FISSIONVM }}
-      - name: Set up Elixir
-        uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
-        with:
-          elixir-version: "1.17.3"
-          otp-version: "26.0.2"
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+
       - name: Restore dependencies cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: deps
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
-      - name: Install AtomVM deps
-        run: |
-          sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev
-      - name: Install dependencies
-        run: mix deps.get && mix deps.compile
-      - name: Install Playwright deps
-        run: mix playwright.install
+          path: examples/eval_in_wasm/deps
+          key: ${{ runner.os }}-mix-eval_in_wasm-${{ hashFiles('examples/eval_in_wasm/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-eval_in_wasm-
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
       - name: Build AtomVM
+        uses: ./.github/actions/build-atomvm
+        with:
+          working-directory: examples/eval_in_wasm
+          build-mode: debug-wasm
+          outdir: popcorn_runtime_source/artifacts/wasm
+          cmake-opts: "SANITIZER=OFF"
+
+      - name: Compile Hex dependencies
+        run: mix deps.compile
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: examples-eval-in-wasm
+          lockfile: examples/eval_in_wasm/mix.lock
+
+      - name: Configure runtime source
         run: |
-          mix popcorn.build_runtime --target wasm --cmake-opts "SANITIZER=OFF"
-          echo 'config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}' >> config/config.exs
+          echo "config :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}" >> config/config.exs
+
       - name: Cook
         run: mix popcorn.cook
+
       - name: Run tests
         run: mix test --no-start

@@ -1,0 +1,27 @@
+name: Setup Playwright
+description: Cache and install Playwright browsers
+
+inputs:
+  cache-prefix:
+    description: Cache key prefix for this workflow
+    required: true
+  lockfile:
+    description: Path to lockfile used for cache key hashing
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ inputs.cache-prefix }}-${{ hashFiles(inputs.lockfile) }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-${{ inputs.cache-prefix }}-
+          ${{ runner.os }}-playwright-
+
+    - name: Install Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install chromium

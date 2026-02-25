@@ -1,11 +1,12 @@
-FROM ghcr.io/software-mansion/popcorn-base:latest AS build_landing
+ARG POPCORN_BASE_TAG=latest
+FROM ghcr.io/software-mansion/popcorn-base:${POPCORN_BASE_TAG} AS build_landing
 
 WORKDIR /build/popcorn/examples/iex_wasm
 RUN mix deps.get
 RUN mix popcorn.cook
 
 WORKDIR /build/popcorn/misc/landing-page
-RUN npm install
+RUN npm ci
 RUN npm run build
 RUN cp -r dist/* /build/out
 

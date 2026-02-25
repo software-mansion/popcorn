@@ -18,7 +18,6 @@ on:
 env:
   REGISTRY: ghcr.io
   ORG_NAME: software-mansion
-  REPO_NAME: ${{ github.repository }}
 
 jobs:
   build_docker_images:
@@ -63,7 +62,7 @@ jobs:
             COMMIT_REF=${{ github.sha }}
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:latest"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:staging"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -74,9 +73,12 @@ jobs:
         with:
           context: .
           file: ./landing.Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=staging
+          pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -89,12 +91,14 @@ jobs:
           file: ./langtour.Dockerfile
           # Sentry DSN is embedded in built JS, not really a secret
           build-args: |
+            POPCORN_BASE_TAG=staging
             SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
             SENTRY_MODE=staging
             APP_VERSION=${{ github.sha }}
+          pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:staging"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -111,5 +115,7 @@ jobs:
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ secrets.STAG_POPCORN_PORT }}
           script: |
+            docker compose -f popcorn-landing.yml -p landing pull
             docker compose -f popcorn-landing.yml -p landing up -d
+            docker compose -f elixir-langtour.yml -p langtour pull
             docker compose -f elixir-langtour.yml -p langtour up -d

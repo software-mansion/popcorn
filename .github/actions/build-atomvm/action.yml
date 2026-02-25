@@ -1,0 +1,53 @@
+name: Build AtomVM
+description: Cache and build AtomVM artifacts for a specific mode
+
+inputs:
+  working-directory:
+    description: Working directory to run the build from
+    default: "."
+  build-mode:
+    description: AtomVM build mode (debug-wasm, debug-unix, etc.)
+    required: true
+  outdir:
+    description: Output directory for AtomVM build (relative to working-directory)
+    required: true
+  cmake-opts:
+    description: Additional cmake options for AtomVM build
+    default: ""
+
+outputs:
+  cache-hit:
+    description: Whether the AtomVM cache was hit
+    value: ${{ steps.atomvm-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Get FissionVM commit hash
+      id: fvm-hash
+      shell: bash
+      run: echo "hash=$(git ls-remote https://github.com/software-mansion-labs/FissionVM.git swm | cut -f1)" >> $GITHUB_OUTPUT
+
+    - name: Compute cmake opts hash
+      id: cmake-opts-hash
+      shell: bash
+      run: echo "hash=$(echo -n '${{ inputs.cmake-opts }}' | sha256sum | cut -c1-8)" >> $GITHUB_OUTPUT
+
+    - name: Cache AtomVM build
+      id: atomvm-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.working-directory }}/${{ inputs.outdir }}
+        key: atomvm-${{ runner.os }}-${{ steps.fvm-hash.outputs.hash }}-${{ inputs.build-mode }}-${{ steps.cmake-opts-hash.outputs.hash }}
+
+    - name: Build AtomVM
+      if: steps.atomvm-cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        SCRIPT_PATH="${{ github.workspace }}/scripts/build-atomvm.sh"
+        if [ -n "${{ inputs.cmake-opts }}" ]; then
+          "$SCRIPT_PATH" --outdir "${{ inputs.outdir }}" --cmake-opts "${{ inputs.cmake-opts }}" "${{ inputs.build-mode }}"
+        else
+          "$SCRIPT_PATH" --outdir "${{ inputs.outdir }}" "${{ inputs.build-mode }}"
+        fi

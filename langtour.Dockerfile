@@ -1,4 +1,5 @@
-FROM ghcr.io/software-mansion/popcorn-base:latest AS build_lang_tour
+ARG POPCORN_BASE_TAG=latest
+FROM ghcr.io/software-mansion/popcorn-base:${POPCORN_BASE_TAG} AS build_lang_tour
 
 ARG SENTRY_DSN
 ARG SENTRY_MODE
@@ -9,7 +10,7 @@ RUN mix deps.get
 RUN mix popcorn.cook
 
 WORKDIR /build/popcorn/misc/language-tour-guide
-RUN npm install
+RUN npm ci
 RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" npm run build
 RUN cp -r dist/* /build/out
 
