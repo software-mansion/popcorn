@@ -58,6 +58,7 @@ jobs:
         run: mix deps.compile
 
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -67,7 +68,8 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright deps
-        run: mix playwright.install
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
 
       - name: Configure runtime source
         run: |

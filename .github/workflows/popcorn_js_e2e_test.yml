@@ -49,6 +49,7 @@ jobs:
         working-directory: js/popcorn
 
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -58,6 +59,7 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install chromium --with-deps
         working-directory: js/popcorn
 
