@@ -38,7 +38,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-toolchain
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
@@ -47,17 +48,18 @@ jobs:
           key: ${{ runner.os }}-mix-local_live_view-${{ hashFiles('examples/local_live_view/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-local_live_view-
 
-      - name: Install dependencies
+      - name: Install Hex dependencies
         run: mix deps.get
 
-      - uses: ./.github/actions/build-atomvm
+      - name: Build AtomVM
+        uses: ./.github/actions/build-atomvm
         with:
           working-directory: examples/local_live_view
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
-      - name: Compile dependencies
+      - name: Compile Hex dependencies
         run: mix deps.compile
 
       - name: Lint

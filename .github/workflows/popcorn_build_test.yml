@@ -44,7 +44,7 @@ jobs:
           key: ${{ runner.os }}-mix-root-${{ hashFiles('mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-root-
 
-      - name: Install dependencies
+      - name: Install Hex dependencies
         run: mix deps.get
 
       - name: Build AtomVM Unix
@@ -60,19 +60,11 @@ jobs:
           build-mode: debug-wasm
           outdir: atomvm-build/wasm
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-popcorn-root-${{ hashFiles('mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-popcorn-root-
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright deps
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install chromium
+          cache-prefix: popcorn-root
+          lockfile: mix.lock
 
       - name: Lint
         run: mix lint

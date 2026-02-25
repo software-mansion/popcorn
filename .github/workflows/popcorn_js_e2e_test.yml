@@ -26,7 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-toolchain
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -48,20 +49,11 @@ jobs:
         run: pnpm build:prod
         working-directory: js/popcorn
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-js-popcorn-${{ hashFiles('js/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-js-popcorn-
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium --with-deps
-        working-directory: js/popcorn
+          cache-prefix: js-popcorn
+          lockfile: js/pnpm-lock.yaml
 
       - name: Run e2e tests
         run: pnpm test:e2e
