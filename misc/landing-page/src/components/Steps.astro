@@ -3,11 +3,7 @@ import Step from "./Step.astro";
 import Section from "./Section.astro";
 ---
 
-<Section
-  id="features"
-  background="light"
-  class="gap-20 md:gap-36"
->
+<Section id="features" background="light" class="gap-20 md:gap-36">
   <Step n="01">
     <Fragment slot="header-title">Elixir, meet <br /> WebAssembly.</Fragment>
     <Fragment slot="title">Compile your Elixir to Wasm.</Fragment>
@@ -49,6 +45,18 @@ import Section from "./Section.astro";
 <script>
   import { setupStepVisibility } from "../utils/stepAnimation";
 
+  function easeInOut(t: number): number {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  }
+
+  const SLIDE_Y = 32;
+  const CONTENT_KEYS = [
+    "headerTitle",
+    "title",
+    "description",
+    "break",
+  ] as const;
+
   function setup() {
     const steps = [...document.querySelectorAll<HTMLElement>("[data-step]")];
 
@@ -64,24 +72,32 @@ import Section from "./Section.astro";
       sectionSelector: "#features",
       stepSelector: "[data-step]",
       onUpdate: (step, nextStep, scale, { currentStep }) => {
-        const contentOpacity = scale * 3;
-        const numberOpacity = scale;
+        step.style.opacity = "";
+        nextStep.style.opacity = "";
 
-        stepElements[currentStep].number.style.opacity = String(numberOpacity);
-        stepElements[currentStep + 1].number.style.opacity = String(
-          1 - numberOpacity,
-        );
+        const progress = 1 - Math.max(0, Math.min(1, scale));
+        const t = 1 - easeInOut(progress);
 
-        // Content group (shorter animation)
-        (["headerTitle", "title", "description", "break"] as const).forEach(
-          (key) => {
-            stepElements[currentStep][key].style.opacity =
-              String(contentOpacity);
-            stepElements[currentStep + 1][key].style.opacity = String(
-              1 - contentOpacity,
-            );
-          },
-        );
+        step.style.translate = "";
+        stepElements[currentStep].number.style.opacity = String(t);
+        stepElements[currentStep].number.style.transform =
+          `translateY(${(1 - t) * -SLIDE_Y}px)`;
+
+        stepElements[currentStep + 1].number.style.opacity = String(1 - t);
+        stepElements[currentStep + 1].number.style.transform =
+          `translateY(${t * SLIDE_Y}px)`;
+
+        const outOpacity = Math.min(1, t / 0.15);
+        const inOpacity = Math.max(0, (0.15 - t) / 0.15);
+        CONTENT_KEYS.forEach((k) => {
+          stepElements[currentStep][k].style.opacity = String(outOpacity);
+          stepElements[currentStep][k].style.transform =
+            `translateY(${(1 - outOpacity) * -SLIDE_Y}px)`;
+          stepElements[currentStep + 1][k].style.opacity = String(inOpacity);
+        });
+      },
+      onLeave: (step) => {
+        step.style.opacity = "0";
       },
       duration: 700,
     });

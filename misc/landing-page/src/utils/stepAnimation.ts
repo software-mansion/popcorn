@@ -13,15 +13,19 @@ type StepVisibilityOptions = {
       isCurrentStepIsInBottomHalfOfViewport: boolean;
     },
   ) => void;
+  onLeave?: (step: HTMLElement, index: number, currentStep: number) => void;
   threshold?: number;
   duration?: number;
 };
+
+const LERP_FACTOR = 0.16;
 
 export function setupStepVisibility({
   sectionSelector,
   stepSelector,
   onUpdate,
-  threshold = 50,
+  onLeave,
+  threshold = 80,
   duration = 500,
 }: StepVisibilityOptions) {
   const section = document.querySelector(sectionSelector) as HTMLElement | null;
@@ -30,6 +34,11 @@ export function setupStepVisibility({
 
   section.style.gap = `${duration * 1.7}px`;
 
+  const spacer = document.createElement("div");
+  spacer.style.height = "0px";
+  spacer.setAttribute("aria-hidden", "true");
+  section.appendChild(spacer);
+
   const steps = Array.from(
     document.querySelectorAll<HTMLElement>(stepSelector),
   );
@@ -37,10 +46,17 @@ export function setupStepVisibility({
   if (steps.length < 2) return;
 
   let currentStep = 0;
+  let prevCurrentStep = 0;
   let isInViewport = false;
+  let smoothedScale = 1;
   let ticking = false;
 
   function updateVisibility() {
+    if (currentStep !== prevCurrentStep) {
+      smoothedScale = currentStep > prevCurrentStep ? 1 : 0;
+      prevCurrentStep = currentStep;
+    }
+
     const step = steps[currentStep];
     const stepRect = step.getBoundingClientRect();
     const nextStep = steps[currentStep + 1];
@@ -49,15 +65,25 @@ export function setupStepVisibility({
     if (!nextStep || !nextStepRect) return;
 
     const distance = nextStepRect.top - stepRect.top;
-    const scale = Math.max(Math.min((distance - threshold) / duration, 1), 0);
+    const targetScale = Math.max(
+      Math.min((distance - threshold) / duration, 1),
+      0,
+    );
 
-    // const scale = 0.9 + 0.1 * opacity;
+    smoothedScale += (targetScale - smoothedScale) * LERP_FACTOR;
 
     const isCurrentStepIsInBottomHalfOfViewport =
       stepRect.top + stepRect.height / 2 - threshold * 2 >
       window.innerHeight / 2;
 
-    onUpdate(step, nextStep, scale, {
+    if (onLeave) {
+      steps.forEach((s, i) => {
+        if (i !== currentStep && i !== currentStep + 1)
+          onLeave(s, i, currentStep);
+      });
+    }
+
+    onUpdate(step, nextStep, smoothedScale, {
       currentStep,
       stepRect,
       nextStepRect,
@@ -84,18 +110,15 @@ export function setupStepVisibility({
   }
 
   const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        isInViewport = entry.isIntersecting;
-      });
+    ([entry]) => {
+      isInViewport = entry.isIntersecting;
     },
     { threshold: 0 },
   );
 
   observer.observe(section);
 
-  // Initial visibility update
-  steps.forEach((step) => {
+  steps.forEach(() => {
     updateVisibility();
   });
 
