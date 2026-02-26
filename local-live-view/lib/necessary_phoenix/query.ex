@@ -143,8 +143,8 @@ defmodule Plug.Conn.Query do
   end
 
   defp decode_www_form(value, invalid_exception, validate_utf8) do
-#    Patch reason: The URI.decode_www_form/1 function is 
-#    binary = URI.decode_www_form(value)
+    #    Patch reason: The URI.decode_www_form/1 function is 
+    #    binary = URI.decode_www_form(value)
     binary = decode_www_form2(value)
 
     case validate_utf8 do
@@ -155,7 +155,7 @@ defmodule Plug.Conn.Query do
 
     binary
   end
-  
+
   import Bitwise
   @spec decode_www_form2(binary) :: binary
   def decode_www_form2(string) when is_binary(string) do
@@ -187,7 +187,6 @@ defmodule Plug.Conn.Query do
   defp hex_to_dec(n) when n in ?a..?f, do: n - ?a + 10
   defp hex_to_dec(n) when n in ?0..?9, do: n - ?0
   defp hex_to_dec(_n), do: nil
-
 
   @doc """
   Starts a stateful decoder.
