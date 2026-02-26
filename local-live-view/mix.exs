@@ -48,8 +48,8 @@ defmodule LocalLiveView.MixProject do
     ]
   end
 
-  @static_dir "static/local_live_view"
-  @out_dir Application.compile_env(:local_live_view, :out_dir, @static_dir)
+  @default_out_dir "../assets/vendor/local_live_view"
+  @out_dir Application.compile_env(:local_live_view, :out_dir, @default_out_dir)
 
   defp aliases() do
     [
@@ -69,6 +69,7 @@ defmodule LocalLiveView.MixProject do
       """
       mkdir -p ../../#{@out_dir}
       cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
+      cp lib/popcorn/priv/static-template/wasm/popcorn.js ../../#{@out_dir}
       """,
       cd: Mix.Project.build_path()
     )

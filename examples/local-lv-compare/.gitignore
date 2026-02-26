@@ -36,3 +36,5 @@ compare_live_views-*.tar
 npm-debug.log
 /assets/node_modules/
 
+/assets/vendor/local_live_view
+
