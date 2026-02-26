@@ -31,13 +31,13 @@ const liveSocket = new LiveSocket("/live", Socket, {
   params: {_csrf_token: csrfToken},
   hooks: {...colocatedHooks},
 })
-console.log({roots: {...liveSocket.roots}})
 
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
 import { setup } from "../vendor/local_live_view/local_live_view"
 setup(liveSocket);
 

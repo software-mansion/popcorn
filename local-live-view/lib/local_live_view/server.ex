@@ -68,8 +68,7 @@ defmodule LocalLiveView.Server do
 
   def handle_info(%Message{event: "event"} = msg, state) do
     %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
-    IO.inspect(msg, label: "Received event msg")
-    val = decode_event_type(type, raw_val, msg.payload) |> IO.inspect(label: "Decoded event value")
+    val = decode_event_type(type, raw_val, msg.payload)
 
     state.socket
     |> view_handle_event(event, val)
@@ -115,9 +114,7 @@ defmodule LocalLiveView.Server do
 
   defp decode_event_type("form", url_encoded, raw_payload) do
     url_encoded
-    |> IO.inspect(label: "Raw form data")
     |> Plug.Conn.Query.decode()
-    |> IO.inspect(label: "Decoded form data")
     |> maybe_merge_meta(raw_payload)
     |> decode_merge_target()
   end
