@@ -132,7 +132,7 @@ defmodule FormDemoLocal do
       _err -> "Email must have an email format"
     end
   end
-  
+
   defp validate_correctness(_, value) do
     ""
   end
