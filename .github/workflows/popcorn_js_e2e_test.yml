@@ -4,8 +4,8 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "js/popcorn/**"
-      - "lib/**/wasm.ex"
+      - "popcorn/js/**"
+      - "popcorn/elixir/lib/**/wasm.ex"
       - ".github/workflows/popcorn_js_e2e_test.yml"
 
 concurrency:
@@ -31,30 +31,28 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: "pnpm"
-          cache-dependency-path: js/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install JS dependencies
         run: pnpm install
-        working-directory: js
 
       - name: Build popcorn JS package
         run: pnpm build:prod
-        working-directory: js/popcorn
+        working-directory: popcorn/js
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          cache-prefix: js-popcorn
-          lockfile: js/pnpm-lock.yaml
+          cache-prefix: js-e2e
+          lockfile: pnpm-lock.yaml
+          version: "1.58.2"
 
       - name: Run e2e tests
         run: pnpm test:e2e
-        working-directory: js/popcorn
+        working-directory: popcorn/js

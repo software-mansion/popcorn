@@ -1,0 +1,235 @@
+---
+import { Icon } from "astro-icon/components";
+
+const linkClass = "transition-colors duration-300 hover:text-orange-100";
+const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
+---
+
+<div class="pointer-events-auto fixed top-0 right-0 left-0 z-50 min-w-max">
+  <nav
+    class="flex h-16 items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
+  >
+    <div class="nav-wide:gap-10 flex items-center gap-4 lg:gap-6">
+      <a href="/" class="flex-shrink-0">
+        <Icon
+          name="logo-text"
+          class="text-brown-100 text-2xl transition-colors duration-300 md:text-4xl"
+          data-logo
+        />
+      </a>
+      <a
+        href="https://elixir-language-tour.swmansion.com"
+        class="lang-tour text-light-20 nav-wide:px-4 nav-wide:py-1.5 nav-wide:text-base pointer rounded-md bg-orange-100 px-3 py-1 text-[0.625rem]"
+        target="_blank"
+      >
+        Elixir Language Tour
+      </a>
+    </div>
+
+    <div
+      class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
+      data-mobile-menu
+    >
+      <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
+        <a class={linkClass} href="/#features">Features</a>
+        <a class={linkClass} href="/#examples">Examples</a>
+        <a class:list={["hidden lg:block", linkClass]} href="/#live-demo"
+          >Live demo</a
+        >
+        <a class={linkClass} href="/#outtro">Contact us</a>
+      </div>
+
+      <hr class="lg:hidden" />
+      <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
+        <a class={linkClass} {...openNewTab} href="/docs/">Documentation →</a>
+        <a
+          class={linkClass}
+          {...openNewTab}
+          href="https://github.com/software-mansion/popcorn/">Github →</a
+        >
+      </div>
+    </div>
+
+    <button
+      class="flex h-6 w-6 flex-col items-center justify-center gap-1 lg:hidden"
+      data-mobile-menu-toggle
+      aria-label="Toggle mobile menu"
+    >
+      <Icon
+        name="hamburger"
+        class="text-brown-header text-2xl transition-colors duration-300"
+        data-hamburger-icon
+      />
+      <Icon
+        name="close"
+        class="text-light-20 hidden text-2xl transition-colors duration-300"
+        data-close-icon
+      />
+    </button>
+  </nav>
+</div>
+
+<script>
+  interface HeaderElements {
+    container: HTMLElement;
+    nav: HTMLElement;
+    logo: Element | null;
+    links: NodeListOf<HTMLAnchorElement>;
+    hamburgerIcon: Element | null;
+  }
+
+  interface HeaderState {
+    isMenuOpen: boolean;
+  }
+
+  function setupMobileMenu(elements: HeaderElements, state: HeaderState) {
+    const { nav, logo, links, hamburgerIcon } = elements;
+
+    const closeIcon = document.querySelector("[data-close-icon]");
+    const mobileMenu = document.querySelector("[data-mobile-menu]")!;
+    const menuToggle = document.querySelector("[data-mobile-menu-toggle]")!;
+
+    function showMenu(open: boolean) {
+      mobileMenu.classList.toggle("-translate-y-full", !open);
+      mobileMenu.classList.toggle("flex", open);
+      // 14 instead of 16 to slightly overlap (pixels glitch)
+      mobileMenu.classList.toggle("top-14", open);
+
+      hamburgerIcon?.classList.toggle("hidden", open);
+      closeIcon?.classList.toggle("hidden", !open);
+
+      nav.classList.toggle("bg-brown-70", open);
+      logo?.classList.toggle("text-light-20", open);
+    }
+
+    function closeMenu() {
+      state.isMenuOpen = false;
+      showMenu(state.isMenuOpen);
+    }
+
+    function toggleMenu() {
+      state.isMenuOpen = !state.isMenuOpen;
+      showMenu(state.isMenuOpen);
+    }
+
+    links.forEach((link) => {
+      link.addEventListener("click", closeMenu);
+    });
+
+    menuToggle.addEventListener("click", toggleMenu);
+  }
+
+  function setupHeaderColorChange(
+    elements: HeaderElements,
+    state: HeaderState,
+  ) {
+    const { container, nav, logo, links, hamburgerIcon } = elements;
+
+    function swapTextColor() {
+      const headerRect = nav.getBoundingClientRect();
+      const headerCenter = {
+        x: headerRect.left + headerRect.width / 2,
+        y: headerRect.top + headerRect.height / 2,
+      };
+
+      // Temporarily hide header to check what's behind it
+      container.style.pointerEvents = "none";
+      const elementBehind = document.elementFromPoint(
+        headerCenter.x,
+        headerCenter.y,
+      );
+
+      container.style.pointerEvents = "";
+
+      if (!elementBehind) return;
+
+      // Check if we're over a dark section
+      const isDarkSection: boolean = !!elementBehind.closest(
+        '[data-background="dark"]',
+      );
+
+      // Toggle classes based on background
+      nav.classList.toggle("text-orange-100", isDarkSection);
+      logo?.classList.toggle(
+        "text-orange-100",
+        isDarkSection && !state.isMenuOpen,
+      );
+      logo?.classList.toggle("lg:text-orange-100", isDarkSection);
+
+      logo?.classList.toggle("lg:text-brown-header", !isDarkSection);
+
+      hamburgerIcon?.classList.toggle("text-orange-100", isDarkSection);
+
+      // Apply classes to links
+      for (const link of links) {
+        link.classList.toggle("lg:text-orange-100", isDarkSection);
+        link.classList.toggle("lg:hover:text-orange-100", !isDarkSection);
+        link.classList.toggle("lg:hover:text-light-20", isDarkSection);
+      }
+    }
+
+    // Throttled scroll handler for performance
+    let ticking = false;
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          swapTextColor();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }
+
+    // Set up event listeners
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", swapTextColor, {
+      passive: true,
+    });
+
+    // Initial check
+    swapTextColor();
+  }
+
+  function setup() {
+    const nav = document.querySelector("nav")!;
+    const container = nav.parentElement!;
+    const logo = nav.querySelector("[data-logo]");
+    const links = nav.querySelectorAll("a:not(.lang-tour)");
+    const hamburgerIcon = nav.querySelector("[data-hamburger-icon]");
+
+    const elements = {
+      container,
+      nav,
+      logo,
+      links,
+      hamburgerIcon,
+    };
+
+    const state = {
+      isMenuOpen: false,
+    };
+
+    setupHeaderColorChange(elements, state);
+    setupMobileMenu(elements, state);
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
+</script>
+
+<style>
+  .lang-tour {
+    background-image: linear-gradient(
+      var(--color-brown-100),
+      var(--color-brown-100)
+    );
+    background-size: 0% 100%;
+    background-position: right;
+    background-repeat: no-repeat;
+    transition: background-size 0.3s ease;
+  }
+
+  .lang-tour:hover {
+    background-size: 100% 100%;
+  }
+</style>

@@ -9,7 +9,7 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "examples/eval_in_wasm/**"
+      - "examples/eval-in-wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
 
 concurrency:
@@ -30,7 +30,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: examples/eval_in_wasm
+        working-directory: examples/eval-in-wasm
 
     steps:
       - uses: actions/checkout@v4
@@ -41,8 +41,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: examples/eval_in_wasm/deps
-          key: ${{ runner.os }}-mix-eval_in_wasm-${{ hashFiles('examples/eval_in_wasm/mix.lock') }}
+          path: examples/eval-in-wasm/deps
+          key: ${{ runner.os }}-mix-eval_in_wasm-${{ hashFiles('examples/eval-in-wasm/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-eval_in_wasm-
 
       - name: Install Hex dependencies
@@ -51,7 +51,7 @@ jobs:
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: examples/eval_in_wasm
+          working-directory: examples/eval-in-wasm
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
@@ -63,7 +63,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           cache-prefix: examples-eval-in-wasm
-          lockfile: examples/eval_in_wasm/mix.lock
+          lockfile: examples/eval-in-wasm/mix.lock
 
       - name: Configure runtime source
         run: |

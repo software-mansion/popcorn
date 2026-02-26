@@ -10,9 +10,11 @@ on:
     branches: ["**"]
     paths:
       - "**"
-      - "!misc/**"
+      - "!landing-page/**"
+      - "!language-tour/**"
+      - "!local-live-view/**"
       - "!examples/**"
-      - "examples/hello_popcorn/**"
+      - "examples/hello-popcorn/**"
       - "!.github/**"
       - ".github/workflows/hello_popcorn_build_test.yml"
 
@@ -34,7 +36,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: examples/hello_popcorn
+        working-directory: examples/hello-popcorn
 
     steps:
       - uses: actions/checkout@v4
@@ -45,8 +47,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: examples/hello_popcorn/deps
-          key: ${{ runner.os }}-mix-hello_popcorn-${{ hashFiles('examples/hello_popcorn/mix.lock') }}
+          path: examples/hello-popcorn/deps
+          key: ${{ runner.os }}-mix-hello_popcorn-${{ hashFiles('examples/hello-popcorn/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-hello_popcorn-
 
       - name: Install Hex dependencies
@@ -55,7 +57,7 @@ jobs:
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: examples/hello_popcorn
+          working-directory: examples/hello-popcorn
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
@@ -67,7 +69,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           cache-prefix: examples-hello-popcorn
-          lockfile: examples/hello_popcorn/mix.lock
+          lockfile: examples/hello-popcorn/mix.lock
 
       - name: Configure runtime source
         run: |

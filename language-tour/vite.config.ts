@@ -1,0 +1,41 @@
+import { createLogger, defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import mdx from "@mdx-js/rollup";
+import tailwindcss from "@tailwindcss/vite";
+import svgr from "vite-plugin-svgr";
+import rehypeHighlight from "rehype-highlight";
+import elixir from "highlight.js/lib/languages/elixir";
+import { livemdPlugin } from "./src/plugins/livemd";
+import { cookOnChange } from "./src/plugins/cook";
+import { popcorn } from "@swmansion/popcorn/vite";
+
+// https://vite.dev/config/
+const logger = createLogger();
+const originalWarn = logger.warn.bind(logger);
+logger.warn = (msg, options) => {
+  if (msg.includes(".livemd.mdx") && msg.includes("points to missing source files")) return;
+  originalWarn(msg, options);
+};
+
+export default defineConfig({
+  base: "/",
+  customLogger: logger,
+  plugins: [
+    react(),
+    tailwindcss(),
+    livemdPlugin(),
+    mdx({
+      providerImportSource: "@mdx-js/react",
+      rehypePlugins: [[rehypeHighlight, { languages: { elixir } }]]
+    }),
+    svgr(),
+    popcorn({ bundlePath: "./public/wasm/bundle.avm" }),
+    cookOnChange()
+  ],
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp"
+    }
+  }
+});

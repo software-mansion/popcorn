@@ -1,0 +1,11 @@
+%{
+  "atomvm_packbeam": {:git, "https://github.com/atomvm/atomvm_packbeam.git", "a2b08723e8e23b15483d6e8b0878b42ac344df71", []},
+  "castore": {:hex, :castore, "1.0.12", "053f0e32700cbec356280c0e835df425a3be4bc1e0627b714330ad9d0f05497f", [:mix], [], "hexpm", "3dca286b2186055ba0c9449b4e95b97bf1b57b47c1f2644555879e659960c224"},
+  "cowlib": {:hex, :cowlib, "2.7.3", "a7ffcd0917e6d50b4d5fb28e9e2085a0ceb3c97dea310505f7460ff5ed764ce9", [:rebar3], [], "hexpm", "1e1a3d176d52daebbecbbcdfd27c27726076567905c2a9d7398c54da9d225761"},
+  "elixir_uuid": {:hex, :elixir_uuid, "1.2.1", "dce506597acb7e6b0daeaff52ff6a9043f5919a4c3315abb4143f0b00378c097", [:mix], [], "hexpm", "f7eba2ea6c3555cea09706492716b0d87397b88946e6380898c2889d68585752"},
+  "esbuild": {:hex, :esbuild, "0.8.2", "5f379dfa383ef482b738e7771daf238b2d1cfb0222bef9d3b20d4c8f06c7a7ac", [:mix], [{:castore, ">= 0.0.0", [hex: :castore, repo: "hexpm", optional: false]}, {:jason, "~> 1.4", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "558a8a08ed78eb820efbfda1de196569d8bfa9b51e8371a1934fbb31345feda7"},
+  "gun": {:hex, :gun, "1.3.3", "cf8b51beb36c22b9c8df1921e3f2bc4d2b1f68b49ad4fbc64e91875aa14e16b4", [:rebar3], [{:cowlib, "~> 2.7.0", [hex: :cowlib, repo: "hexpm", optional: false]}], "hexpm", "3106ce167f9c9723f849e4fb54ea4a4d814e3996ae243a1c828b256e749041e0"},
+  "jason": {:hex, :jason, "1.4.4", "b9226785a9aa77b6857ca22832cffa5d5011a667207eb2a0ad56adb5db443b8a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b"},
+  "playwright": {:git, "https://github.com/membraneframework-labs/playwright-elixir.git", "5c02249512fa543f5e619a69b7e5c9e046605fe5", []},
+  "recase": {:hex, :recase, "0.8.1", "ab98cd35857a86fa5ca99036f575241d71d77d9c2ab0c39aacf1c9b61f6f7d1d", [:mix], [], "hexpm", "9fd8d63e7e43bd9ea385b12364e305778b2bbd92537e95c4b2e26fc507d5e4c2"},
+}

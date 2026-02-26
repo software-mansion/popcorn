@@ -18,41 +18,62 @@ The API documentation and guides are available at <https://hexdocs.pm/popcorn>
 
 ## Examples
 
-The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples` directory.
+The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples/` directory.
+
+## Repository Structure
+
+```
+popcorn/
+├── popcorn/
+│   ├── elixir/      # Elixir library
+│   └── js/          # JS library
+├── examples/
+├── landing-page/
+├── language-tour/
+├── local-live-view/
+├── scripts/
+└── docker/
+```
 
 ## Development
 
-We use [`mise`](https://mise.jdx.dev) to manage dependencies. [Install it](https://mise.jdx.dev/installing-mise.html) and install deps and dev tools with:
+We use [`mise`](https://mise.jdx.dev) to manage tool versions and run tasks. [Install it](https://mise.jdx.dev/installing-mise.html), then:
 
 ```shell
 mise install
+mise run dev
 ```
 
-Then, you should setup pre-commit hooks using [lefthook](https://lefthook.dev):
+This installs all dependencies (Elixir, Node, pnpm) and starts the JS library in watch mode.
+
+To develop with an example or project:
 
 ```shell
-lefthook install
+mise run dev --example hello-popcorn
+mise run dev --project landing-page
+mise run dev --project language-tour
 ```
+
+Run `scripts/dev.sh --help` to see all available examples and projects.
 
 ### Testing
 
-Popcorn tests can be run either on WASM via Playwright or natively on UNIX. To run them on WASM, run
-
 ```shell
-TARGET=wasm mix test
+mise run test               # Elixir unix tests (default)
+mise run test --wasm     # Elixir wasm tests
+mise run test --js       # JS tests
 ```
 
-To run tests on UNIX, use
+AtomVM is built automatically if artifacts are missing. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed.
+
+### Other tasks
 
 ```shell
-mix popcorn.build_runtime --target unix
+mise run clean              # Clean build artifacts
+mise run clean --all     # Clean everything including examples
 ```
 
-to build AtomVM from source. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed. Then, run
-
-```shell
-mix test
-```
+All tasks are thin wrappers around `scripts/*.sh` — you can run those directly.
 
 ## Authors
 

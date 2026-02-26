@@ -1,0 +1,153 @@
+:root {
+    --swm-header: #001a72;
+    --swm-text: #232736;
+    --swm-background: #fcfcff;
+    --swm-yellow-40: #ffd61e;
+    --swm-red-100: #ff6259;
+    --swm-green-100: #57b495;
+    --swm-blue-100: #38acdd;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --swm-header: #fcfcff;
+        --swm-text: #c1c6e5;
+        --swm-background: #232736;
+        --swm-yellow-100: #fd4;
+        --swm-red-100: #ff7774;
+        --swm-green-100: #3fc684;
+        --swm-blue-100: #00a9f0;
+    }
+}
+
+.erl-initial {
+    color: var(--swm-background);
+    background-color: var(--swm-red-100);
+    padding: 10px;
+}
+
+.erl-color {
+    color: var(--swm-red-100);
+}
+
+.ex-initial {
+    color: var(--swm-background);
+    background-color: var(--swm-header);
+    padding: 10px;
+}
+
+.primary-btn:active {
+    color: var(--swm-background);
+    background-color: var(--swm-yellow-40);
+}
+
+.secondary-btn:active {
+    color: var(--swm-text);
+    background-color: var(--swm-green-100);
+}
+
+details > .container {
+    margin-top: 0.5em;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    max-width: 50em;
+    gap: 1em;
+}
+
+.horizontal-container {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+}
+
+.controls {
+    display: flex;
+    gap: 1em;
+    justify-content: flex-end;
+}
+
+.controls *:first-child {
+    margin-right: auto;
+}
+
+.logs {
+    display: flex;
+    flex-direction: column;
+    max-height: 30em;
+    min-height: 3em;
+    padding: 0.5em;
+    margin: 0;
+    font-size: small;
+    overflow: scroll;
+    border: 1px solid var(--swm-text);
+}
+
+body {
+    margin: 40px auto;
+    padding: 0 15px;
+    font-size: 18px;
+    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+body,
+button,
+textarea,
+a,
+p,
+h1,
+h2,
+h3 {
+    color: var(--swm-text);
+    background-color: var(--swm-background);
+}
+
+h1,
+h2,
+h3 {
+    color: var(--swm-header);
+    line-height: 1.2;
+    margin-bottom: 0;
+}
+
+button {
+    border: 1px solid var(--swm-text);
+    padding: 1em;
+    align-self: flex-start;
+    font-size: 12px;
+}
+
+button:active {
+    color: var(--swm-text);
+    background-color: var(--swm-blue-100);
+}
+
+pre {
+    white-space: pre-wrap;
+}
+
+textarea {
+    font-size: medium;
+    padding: 0.5em;
+    font-family: monospace;
+    border: 1px solid var(--swm-text);
+    min-height: 6em;
+}
+@media screen and (min-device-width: 600px) {
+    body {
+        max-width: 80%;
+    }
+    .container {
+        min-width: 25em;
+    }
+    textarea {
+        min-height: 20em;
+    }
+}

@@ -43,7 +43,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./base.Dockerfile
+          file: ./docker/base.Dockerfile
           build-args: |
             COMMIT_REF=${{ github.sha }}
           push: true
@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./landing.Dockerfile
+          file: ./docker/landing.Dockerfile
           build-args: |
             POPCORN_BASE_TAG=latest
           pull: true
@@ -74,7 +74,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./langtour.Dockerfile
+          file: ./docker/langtour.Dockerfile
           # Sentry DSN is embedded in built JS, not really a secret
           build-args: |
             POPCORN_BASE_TAG=latest

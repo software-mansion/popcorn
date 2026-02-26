@@ -9,10 +9,10 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "examples/local_live_view/**"
-      - "examples/local_thermostat/**"
-      - "examples/compare_live_views/**"
-      - "examples/local_form_demo/**"
+      - "local-live-view/**"
+      - "examples/local-lv-thermostat/**"
+      - "examples/local-lv-compare/**"
+      - "examples/local-lv-forms/**"
       - ".github/workflows/local_live_view_build.yml"
 
 concurrency:
@@ -33,7 +33,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: examples/local_live_view
+        working-directory: local-live-view
 
     steps:
       - uses: actions/checkout@v4
@@ -44,8 +44,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: examples/local_live_view/deps
-          key: ${{ runner.os }}-mix-local_live_view-${{ hashFiles('examples/local_live_view/mix.lock') }}
+          path: local-live-view/deps
+          key: ${{ runner.os }}-mix-local_live_view-${{ hashFiles('local-live-view/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-local_live_view-
 
       - name: Install Hex dependencies
@@ -54,7 +54,7 @@ jobs:
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: examples/local_live_view
+          working-directory: local-live-view
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
