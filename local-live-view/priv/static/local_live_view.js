@@ -16,7 +16,6 @@ export async function setup(liveSocket) {
   const PHX_SESSION = "data-phx-session"
   const query = `[${POP_VIEW}]`
   const pop_view_els = Array.from(document.querySelectorAll(query));
-  console.log({roots: {...liveSocket.roots}, pop_view_els: pop_view_els})
   
   pop_view_els.forEach((pop_view_el) => {
 //  create a view
@@ -27,7 +26,6 @@ export async function setup(liveSocket) {
         "payload": payload }, {
         timeoutMs: 10_000,
       });
-      console.log({popcorn_call: { "view": this.id, "event": event, "payload": payload }})
       return new Promise((resolve, reject) => {})
     }
     view.join = function(_callback) {
