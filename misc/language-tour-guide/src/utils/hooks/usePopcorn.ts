@@ -7,8 +7,7 @@ import type {
 } from "@swmansion/popcorn";
 
 export const usePopcorn = () => {
-  const { instance, reinitializePopcorn, isLoadingPopcorn } =
-    usePopcornContext();
+  const { instance, reinitializePopcorn, popcornStatus } = usePopcornContext();
 
   const ensureInstance = useCallback(() => {
     if (!instance) throw new Error("Popcorn instance not initialized");
@@ -66,7 +65,7 @@ export const usePopcorn = () => {
     cast,
     startLogCapture,
     cancelCall,
-    isLoadingPopcorn,
+    popcornStatus,
     reinitializePopcorn
   };
 };

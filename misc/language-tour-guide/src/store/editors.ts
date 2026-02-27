@@ -82,6 +82,8 @@ type EditorsStore = {
 
   markFollowingEditorsAsStale: (id: string) => void;
 
+  markPrecedingEditorsAsStale: (id: string) => void;
+
   getEditorsToRun: (id: string) => string[];
 
   resetEditorToDefault: (id: string) => void;
@@ -179,7 +181,31 @@ export const useEditorsStore = create<EditorsStore>()(
 
           if (editor && editor.executionState !== "not_run") {
             editor.executionState = "stale";
-            saveEditorState(editorId, { code: null, state: "not_run" });
+            const code =
+              editor.code !== editor.defaultCode ? editor.code : null;
+
+            saveEditorState(editorId, { code, state: "not_run" });
+          }
+        }
+      });
+    },
+
+    markPrecedingEditorsAsStale: (id: string) => {
+      const state = get();
+      const currentIndex = state.editorOrder.indexOf(id);
+      if (currentIndex === -1) return;
+
+      set((state) => {
+        for (let i = 0; i < currentIndex; i++) {
+          const editorId = state.editorOrder[i];
+          const editor = state.editors.get(editorId);
+
+          if (editor) {
+            editor.executionState = "stale";
+            const code =
+              editor.code !== editor.defaultCode ? editor.code : null;
+
+            saveEditorState(editorId, { code, state: "not_run" });
           }
         }
       });
