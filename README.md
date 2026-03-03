@@ -28,8 +28,8 @@ The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com
 - **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
 - **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.
 - **`local-live-view/`** - Experimental client-side LiveView implementation.
-- **`scripts/`** -- Shell scripts for development, testing, and CI tasks.
-- **`docker/`** -- Dockerfiles and nginx configs for CI and deployment.
+- **`scripts/`** - Shell scripts for development, testing, and CI tasks.
+- **`docker/`** - Dockerfiles and nginx configs for CI and deployment.
 
 ## Development
 
