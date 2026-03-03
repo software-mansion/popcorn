@@ -13,3 +13,11 @@ type InitOpts = {
 type Popcorn = {
   init(opts: InitOpts): Promise<Popcorn>;
 };
+
+interface ImportMetaEnv {
+  readonly PROD: boolean;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
