@@ -22,18 +22,14 @@ The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com
 
 ## Repository Structure
 
-```
-popcorn/
-├── popcorn/
-│   ├── elixir/      # Elixir library
-│   └── js/          # JS library
-├── examples/
-├── landing-page/
-├── language-tour/
-├── local-live-view/
-├── scripts/
-└── docker/
-```
+- **`popcorn/elixir/`** - Elixir library used to patch OTP and Elixir stdlib, create .avm bundles and containing JS interop API.
+- **`popcorn/js/`** - JavaScript library loads the VM in Wasm, manages its isolation, and bridges JS and Elixir.
+- **`examples/`** - Example projects showcasing Popcorn features, hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples). Examples use development version of Popcorn.
+- **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
+- **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.
+- **`local-live-view/`** - Experimental client-side LiveView implementation.
+- **`scripts/`** -- Shell scripts for development, testing, and CI tasks.
+- **`docker/`** -- Dockerfiles and nginx configs for CI and deployment.
 
 ## Development
 
