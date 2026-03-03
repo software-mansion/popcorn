@@ -1,5 +1,0 @@
-_build/
-deps/
-priv/
-.elixir_ls/
-*.beam

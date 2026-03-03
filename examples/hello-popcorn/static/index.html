@@ -1,0 +1,18 @@
+<html>
+    <style>
+        body {
+            font-size: 1.5em;
+            font-family: sans-serif;
+            max-width: 800px;
+            padding: 1em;
+            background-color: #161616;
+            color: #fcfcfc;
+        }
+    </style>
+    <script type="module">
+        import { Popcorn } from "./wasm/popcorn.js";
+
+        await Popcorn.init({ onStdout: console.log });
+    </script>
+    <body></body>
+</html>

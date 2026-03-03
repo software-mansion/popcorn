@@ -1,6 +1,23 @@
 [tools]
 elixir = "1.17.3-otp-26"
 erlang = "26.0.2"
-lefthook = "latest"
 node = "22"
+pnpm = "latest"
 rebar = "latest"
+watchexec = "latest"
+
+[tasks.dev]
+run = "scripts/dev.sh"
+description = "Start dev mode"
+
+[tasks.test]
+run = "scripts/test.sh"
+description = "Run tests"
+
+[tasks.build-vm]
+run = "scripts/build-atomvm.sh"
+description = "Build AtomVM"
+
+[tasks.clean]
+run = "scripts/clean.sh"
+description = "Clean build artifacts"

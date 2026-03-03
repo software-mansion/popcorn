@@ -1,0 +1,7 @@
+.cm-scroller {
+  scrollbar-width: thin;
+}
+
+.cm-focused {
+  outline: none !important;
+}

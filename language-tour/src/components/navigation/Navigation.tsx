@@ -1,0 +1,74 @@
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router";
+
+import { NavigationList } from "./NavigationList";
+
+import Hamburger from "../../assets/hamburger.svg?react";
+import Close from "../../assets/close.svg?react";
+import { FeedbackButton } from "./FeedbackButton";
+
+import { navigationTree } from "../../utils/content/navigation-builder";
+
+function CurrentPath() {
+  const location = useLocation();
+  return <span className="ml-6 text-sm sm:text-base">{location.pathname}</span>;
+}
+
+export function Navigation() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const openMenu = () => {
+    setIsOpen(true);
+  };
+
+  const closeMenu = () => {
+    setIsOpen(false);
+  };
+
+  return (
+    <nav className="border-grey-20 bg-light-20 flex h-12 items-center gap-0 border-b px-4 py-3 lg:gap-8 lg:px-8">
+      <button
+        className="orange-shadow cursor-pointer rounded-md bg-orange-100 p-0.5"
+        onClick={openMenu}
+      >
+        <span className="sr-only">Open menu</span>
+        <Hamburger className="h-full w-5.5 text-white" />
+      </button>
+      <CurrentPath />
+      <FeedbackButton className="hidden lg:block" />
+      <ul
+        className={`scrollbar bg-light-20 fixed top-16 left-0 z-30 m-0 h-[calc(100%-theme(space.16))] list-none overflow-y-auto px-4 py-3 pr-12 transition-all duration-300 ease-in-out ${
+          isOpen
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none -translate-x-full opacity-0"
+        }`}
+      >
+        <button
+          className="orange-shadow mb-3 cursor-pointer rounded-md bg-orange-100 p-0.5 lg:ml-4"
+          onClick={closeMenu}
+        >
+          <span className="sr-only">Close menu</span>
+          <Close className="h-full w-5.5 text-white" />
+        </button>
+        <NavigationList items={navigationTree} onClick={closeMenu} />
+        <li className="mt-8">
+          <NavLink
+            to="https://swmansion.com/privacy/policy"
+            className="navigation-link underline"
+            target="_blank"
+          >
+            Privacy Policy
+          </NavLink>
+        </li>
+      </ul>
+
+      <div
+        className={`fixed inset-0 z-20 h-full w-full bg-black/20 transition-opacity duration-300 ease-in-out ${
+          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        aria-hidden={!isOpen}
+        onClick={closeMenu}
+      ></div>
+    </nav>
+  );
+}

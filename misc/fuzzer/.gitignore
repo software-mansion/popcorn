@@ -1,7 +1,0 @@
-.env
-# tmp dir for erlfuzz
-out/
-# samples that failed
-interesting/
-# minimized samples
-minimized/

@@ -1,0 +1,102 @@
+@import "highlight.js/styles/github.css";
+
+/* handjet-latin-wght-normal */
+@font-face {
+  font-family: "Handjet Variable";
+  font-style: normal;
+  font-display: auto;
+  font-weight: 100 900;
+  src: url(@fontsource-variable/handjet/files/handjet-latin-wght-normal.woff2)
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+/* inter-latin-wght-normal */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: auto;
+  font-weight: 100 900;
+  src: url(@fontsource-variable/inter/files/inter-latin-wght-normal.woff2)
+    format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@import "tailwindcss";
+@theme {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-light-20: #fffdf5;
+  --color-light-30: #fffaf7;
+  --color-grey-20: #efecea;
+  --color-grey-10: #f5f2f0;
+  --color-orange-20: #ffe6cc;
+  --color-orange-100: #ef7c00;
+  --color-orange-200: #d36e00;
+  --color-brown-header: #58330c;
+  --color-brown-100: #301b05;
+  --color-brown-90: #36220d;
+  --color-brown-80: #423221;
+  --color-brown-70: #5f4122;
+  --color-brown-60: #696057;
+  --color-brown-gray: #696057;
+  --color-black: #301b05;
+  --color-red-50: #fff5f5;
+  --color-red-200: #fbbcbc;
+  --color-red-600: #cf3f3f;
+  --color-red-700: #b52e2e;
+  --color-yellow-50: #fffbf0;
+  --color-yellow-200: #ffe2a8;
+  --color-yellow-600: #d48f00;
+  --color-yellow-700: #b26f00;
+  --font-handjet: "Handjet Variable", system-ui;
+  --font-inter: "Inter Variable", sans-serif;
+  --text-2xs: 0.625rem;
+}
+
+#toast-root {
+  position: fixed;
+  top: 8rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+pre code.hljs {
+  background-color: inherit;
+  padding: 0;
+}
+
+@layer utilities {
+  html,
+  .scrollbar {
+    scrollbar-color: var(--color-orange-100) var(--color-grey-20);
+    scrollbar-width: thin;
+  }
+
+  .orange-shadow {
+    @apply shadow-[0_4px_12px_rgba(239,124,0,0.3)] hover:shadow-[0_6px_20px_rgba(239,124,0,0.4)];
+  }
+}
+
+@layer components {
+  .navigation-link {
+    @apply flex w-full items-center rounded-md px-3 py-0.5 text-sm transition-colors duration-300;
+  }
+}

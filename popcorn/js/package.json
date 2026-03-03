@@ -1,0 +1,83 @@
+{
+  "name": "@swmansion/popcorn",
+  "version": "0.2.0-rc.6",
+  "description": "JS bindings for Popcorn",
+  "type": "module",
+  "license": "Apache-2.0",
+  "homepage": "https://popcorn.swmansion.com",
+  "bugs": {
+    "url": "https://github.com/software-mansion/popcorn/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/software-mansion/popcorn.git"
+  },
+  "author": "Software Mansion",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs"
+    },
+    "./vite": {
+      "types": "./dist/plugins/vite.d.ts",
+      "import": "./dist/plugins/vite.mjs"
+    },
+    "./rollup": {
+      "types": "./dist/plugins/rollup.d.ts",
+      "import": "./dist/plugins/rollup.mjs"
+    },
+    "./esbuild": {
+      "types": "./dist/plugins/esbuild.d.ts",
+      "import": "./dist/plugins/esbuild.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "setup:dev": "npm run assets:dev && rollup -c",
+    "dev": "rollup -c --watch",
+    "lint": "tsc --noEmit && eslint && prettier . --check --log-level=warn",
+    "test": "vitest",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "build:prod": "pnpm run lint && (rm -rf assets || true) && (rm -rf dist || true) && pnpm run assets:prod && rollup -c",
+    "assets:dev": "../../scripts/build-atomvm.sh --outdir assets/ debug-wasm",
+    "assets:prod": "../../scripts/build-atomvm.sh --source 'https://github.com/software-mansion-labs/FissionVM.git#swm' --outdir assets/ debug-wasm"
+  },
+  "peerDependencies": {
+    "esbuild": ">=0.17.0",
+    "rollup": ">=4.0.0",
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0"
+  },
+  "peerDependenciesMeta": {
+    "esbuild": {
+      "optional": true
+    },
+    "rollup": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.52.0",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "@types/node": "catalog:",
+    "esbuild": "^0.25.0",
+    "eslint": "catalog:",
+    "globals": "^16.2.0",
+    "prettier": "^3.7.4",
+    "rollup": "^4.55.1",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.53.0",
+    "vite": "catalog:",
+    "vitest": "^4.0.17"
+  }
+}

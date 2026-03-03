@@ -1,15 +1,13 @@
 #!/bin/bash
 set -e
 
+LOG_PREFIX="BUILD ATOMVM"
+# shellcheck source=_common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
+
 # Global variables
 TEMP_DIR=""
 ATOMVM_DIR=""
-
-# Color codes for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
 
 # Default values
 DEFAULT_SOURCE="https://github.com/software-mansion-labs/FissionVM.git#swm"
@@ -61,40 +59,10 @@ EOF
     exit 0
 }
 
-log() {
-    echo -e "${BLUE}BUILD ATOMVM |${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}BUILD ATOMVM |${NC} $1"
-}
-
-error() {
-    echo -e "${RED}BUILD ATOMVM: ERROR |${NC} $1" >&2
-    exit 1
-}
-
 cleanup() {
     if [[ -n "${TEMP_DIR}" ]] && [[ -d "${TEMP_DIR}" ]]; then
         log "Cleaning up temp directory: ${TEMP_DIR}"
         rm -rf "${TEMP_DIR}"
-    fi
-}
-
-load_env() {
-    # Load .env from project root (parent of scripts/)
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root
-    project_root="$(dirname "${script_dir}")"
-    local env_file="${project_root}/.env"
-
-    if [[ -f "${env_file}" ]]; then
-        log "Loading .env from ${env_file}"
-        set -a
-        # shellcheck source=/dev/null
-        source "${env_file}"
-        set +a
     fi
 }
 

@@ -9,10 +9,12 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "**"
-      - "!examples/**"
-      - "!misc/**"
-      - "!.github/**"
+      - "popcorn/elixir/**"
+      - "popcorn/js/**"
+      - ".github/**"
+      - "!.github/workflows/demo_*"
+      - "!.github/workflows/local_*"
+      - "!.github/workflows/release_*"
       - ".github/workflows/popcorn_build_test.yml"
 
 concurrency:
@@ -31,6 +33,10 @@ jobs:
     name: Build & test
     runs-on: ubuntu-22.04
 
+    defaults:
+      run:
+        working-directory: popcorn/elixir
+
     steps:
       - uses: actions/checkout@v4
 
@@ -40,8 +46,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: deps
-          key: ${{ runner.os }}-mix-root-${{ hashFiles('mix.lock') }}
+          path: popcorn/elixir/deps
+          key: ${{ runner.os }}-mix-root-${{ hashFiles('popcorn/elixir/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-root-
 
       - name: Install Hex dependencies
@@ -50,6 +56,7 @@ jobs:
       - name: Build AtomVM Unix
         uses: ./.github/actions/build-atomvm
         with:
+          working-directory: popcorn/elixir
           build-mode: debug-unix
           outdir: atomvm-build/unix
           cmake-opts: "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
@@ -57,6 +64,7 @@ jobs:
       - name: Build AtomVM WASM
         uses: ./.github/actions/build-atomvm
         with:
+          working-directory: popcorn/elixir
           build-mode: debug-wasm
           outdir: atomvm-build/wasm
 
@@ -64,7 +72,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           cache-prefix: popcorn-root
-          lockfile: mix.lock
+          lockfile: popcorn/elixir/mix.lock
 
       - name: Lint
         run: mix lint

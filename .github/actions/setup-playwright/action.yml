@@ -8,6 +8,10 @@ inputs:
   lockfile:
     description: Path to lockfile used for cache key hashing
     required: true
+  version:
+    description: Playwright version to install (default matches Elixir dep)
+    required: false
+    default: "1.49.1"
 runs:
   using: composite
   steps:
@@ -24,4 +28,4 @@ runs:
     - name: Install Playwright browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: npx playwright install chromium
+      run: pnpm dlx playwright@${{ inputs.version }} install chromium

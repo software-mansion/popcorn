@@ -1,0 +1,11 @@
+{
+  "name": "popcorn-e2e",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@swmansion/popcorn": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:"
+  }
+}
