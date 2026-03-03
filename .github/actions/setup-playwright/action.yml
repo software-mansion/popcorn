@@ -28,4 +28,4 @@ runs:
     - name: Install Playwright browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: pnpm dlx playwright@${{ inputs.version }} install chromium
+      run: npx playwright@${{ inputs.version }} install chromium
