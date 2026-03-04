@@ -54,8 +54,6 @@ defmodule LocalLiveView.Server do
   @impl true
   def handle_info({LocalLiveView.Server, params, from, phx_socket}, _ref) do
     try do
-      IO.puts("ELO")
-      IO.inspect(params, label: "oparamsa")
       mount(params, from, phx_socket)
     rescue
       e ->
@@ -256,9 +254,7 @@ defmodule LocalLiveView.Server do
   end
 
   def rerender(socket) do
-    IO.puts "before"
     rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
-    IO.puts "after"
 
     rendered
     |> Phoenix.HTML.Safe.to_iodata()
@@ -285,7 +281,6 @@ defmodule LocalLiveView.Server do
   defp mount(%{"session" => session} = params, from, phx_socket) do
     with %Phoenix.LiveView.Session{view: view} <- session,
          {:ok, config} <- load_live_view(view) do
-      IO.puts "mount"
       verified_mount(
         session,
         config,
@@ -326,7 +321,6 @@ defmodule LocalLiveView.Server do
          from,
          phx_socket
        ) do
-    IO.puts "verified moutn"
     %Session{
       view: view
     } = verified
@@ -336,9 +330,9 @@ defmodule LocalLiveView.Server do
     socket = %Socket{
       view: view
     }
-    IO.puts "b4 lifecycle"
+
     lifecycle = load_lifecycle(config, nil)
-    IO.puts "b4 mount_private"
+
     case mount_private(verified, connect_params, nil, lifecycle) do
       {:ok, mount_priv} ->
         socket = %{
@@ -349,11 +343,9 @@ defmodule LocalLiveView.Server do
             host_uri: :not_mounted_at_router
         }
 
-        IO.puts "b4 Socket gen"
         try do
           %Socket{socket | view: view}
           |> Utils.maybe_call_live_view_mount!(view, params, verified)
-          |> IO.inspect(label: "after maybe")
           |> build_state(phx_socket)
           |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)
