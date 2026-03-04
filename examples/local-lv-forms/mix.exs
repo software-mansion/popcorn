@@ -97,7 +97,7 @@ defmodule FormDemo.MixProject do
     Mix.shell().cmd(
       """
       mix deps.get
-      mix popcorn.cook
+      mix local_live_view.cook
       """,
       cd: "local"
     )

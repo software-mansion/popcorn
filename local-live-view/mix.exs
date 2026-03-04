@@ -29,6 +29,14 @@ defmodule LocalLiveView.MixProject do
     [
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
       {:popcorn, path: "../popcorn/elixir"},
+      {:phoenix, "~> 1.8", runtime: false},
+      {:phoenix_live_view, runtime: false},
+      {:phoenix_html, "~> 4.1", runtime: false},
+      {:phoenix_ecto, "~> 4.6", runtime: false},
+      {:ecto, "~> 3.12", runtime: false},
+      {:plug, "~> 1.14", runtime: false},
+      {:esbuild, "~> 0.10", runtime: false},
+      {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"}
     ]
   end
@@ -60,15 +68,16 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      compile: ["compile", &copy_js/1]
+      compile: ["compile", &copy_priv/1]
     ]
   end
 
-  defp copy_js(_) do
+  defp copy_priv(_) do
     Mix.shell().cmd(
       """
       mkdir -p ../../#{@out_dir}
       cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
+      cp -r lib/local_live_view/priv/static/stubs ../../stubs
       """,
       cd: Mix.Project.build_path()
     )
