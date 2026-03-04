@@ -30,4 +30,25 @@ defmodule Mix.Tasks.LocalLiveView.Cook do
     Popcorn.cook(extra_beams: dep_beams ++ stub_beams)
   end
 
+  defp compile_stubs do
+    File.mkdir_p!(@stubs_out)
+
+    # Purge any previously loaded versions of stub modules so Code.compile_file works
+    stub_files = Path.wildcard(Path.join([@stubs_dir, "*.ex"]))
+
+    all_modules =
+      for file <- stub_files, reduce: [] do
+        acc ->
+          modules = Code.compile_file(file)
+
+          for {mod, binary} <- modules do
+            beam_path = Path.join(@stubs_out, "#{mod}.beam")
+            File.write!(beam_path, binary)
+          end
+
+          acc ++ modules
+      end
+
+    all_modules
+  end
 end
