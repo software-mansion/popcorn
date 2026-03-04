@@ -275,17 +275,25 @@ export class Popcorn {
 
   /**
    * Registers an event handler function to receive events from Elixir.
+   * Returns an unregister function.
    *
    * If this is the first handler registered, it will immediately process any events
    * that were received before any handlers were registered.
    */
-  registerEventHandler(handler: EventHandler): void {
+  registerEventHandler(handler: EventHandler): () => void {
     const firstRegister = this.eventHandlers.length === 0;
     this.eventHandlers.push(handler);
 
     if (firstRegister) {
       this.processPreMountEvents();
     }
+
+    return () => {
+      const index = this.eventHandlers.indexOf(handler);
+      if (index !== -1) {
+        this.eventHandlers.splice(index, 1);
+      }
+    };
   }
 
   /**

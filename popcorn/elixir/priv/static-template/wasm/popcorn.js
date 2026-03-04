@@ -227,18 +227,18 @@ export class Popcorn {
 
   /**
    * Registers an event handler function to receive events from Elixir.
+   * Returns an unregister function.
    *
    * If this is the first handler registered, it will immediately process any events
    * that were received before any handlers were registered.
    *
    * @param {function(string, AnySerializable): void} handler - Function that receives event name and payload
+   * @returns {function(): void} A function that unregisters the handler when called
    * @example
-   * popcorn.registerEventHandler((eventName, payload) => {
+   * const unregister = popcorn.registerEventHandler((eventName, payload) => {
    *   console.log(`Received event: ${eventName}`, payload);
-   *   if (eventName === "user_logged_in") {
-   *     updateUI(payload.user);
-   *   }
    * });
+   * // later: unregister();
    */
   registerEventHandler(handler) {
     const firstRegister = this._eventHandlers.length === 0;
@@ -247,6 +247,13 @@ export class Popcorn {
     if (firstRegister) {
       this._processPreMountEvents();
     }
+
+    return () => {
+      const index = this._eventHandlers.indexOf(handler);
+      if (index !== -1) {
+        this._eventHandlers.splice(index, 1);
+      }
+    };
   }
 
   /**
