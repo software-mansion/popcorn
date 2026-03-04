@@ -159,8 +159,13 @@ export class Popcorn {
     const { container, ...constructorParams } = options;
     const containerWithDefault = container ?? document.documentElement;
 
+    const bundlePath = await resolveBundleURL(
+      constructorParams.bundlePath ?? "/bundle.avm",
+      "/assets/bundle.avm",
+    );
+
     const popcorn = new Popcorn(
-      { ...constructorParams, container: containerWithDefault },
+      { ...constructorParams, bundlePath, container: containerWithDefault },
       INIT_TOKEN,
     );
     popcorn.trace("Main: init, params: ", { container, ...constructorParams });
@@ -549,4 +554,25 @@ async function withTimeout(
 
 function noop() {
   /* noop */
+}
+
+async function resolveBundleURL(
+  primary: string,
+  fallback: string,
+): Promise<string> {
+  const fetchBundle = async (path: string): Promise<string> => {
+    const url = new URL(path, import.meta.url).href;
+    const response = await fetch(url, { method: "HEAD" });
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (!response.ok || contentType.includes("text/html")) {
+      throw new Error(`Bundle not found at "${path}"`);
+    }
+    return path;
+  };
+
+  try {
+    return await Promise.any([fetchBundle(primary), fetchBundle(fallback)]);
+  } catch {
+    throwError({ t: "bundle_not_found", primary, fallback });
+  }
 }

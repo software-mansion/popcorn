@@ -178,11 +178,13 @@ function initListener() {
         send(MESSAGES.CALL, { requestId, error: Module.deserialize(error) });
       }
     } else if (type?.startsWith("popcorn")) {
-      `Iframe: received unhandled popcorn event: ${JSON.stringify(
-        data,
-        null,
-        4
-      )}`;
+      console.error(
+        `Iframe: received unhandled popcorn event: ${JSON.stringify(
+          data,
+          null,
+          4
+        )}`
+      );
     }
   });
 }

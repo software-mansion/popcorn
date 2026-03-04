@@ -28,7 +28,8 @@ export type PopcornInternalErrorCode =
   | "already_mounted"
   | "unmounted"
   | "bad_target"
-  | "bad_status";
+  | "bad_status"
+  | "bundle_not_found";
 
 /** Non-recoverable error indicating a bug or library misuse (always thrown) */
 export class PopcornInternalError extends Error {
@@ -55,7 +56,8 @@ type ErrorData =
       t: "bad_status";
       status: string;
       expectedStatus: string;
-    };
+    }
+  | { t: "bundle_not_found"; primary: string; fallback: string };
 
 export function throwError(error: ErrorData): never {
   switch (error.t) {
@@ -94,6 +96,11 @@ export function throwError(error: ErrorData): never {
       throw new PopcornInternalError(
         "bad_status",
         `Operation not allowed: instance in "${error.status}" state, expected "${error.expectedStatus}"`,
+      );
+    case "bundle_not_found":
+      throw new PopcornInternalError(
+        "bundle_not_found",
+        `Could not find a valid .avm bundle at "${error.primary}" or fallback "${error.fallback}"`,
       );
   }
 }

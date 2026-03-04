@@ -307,12 +307,13 @@ defmodule Popcorn.Wasm do
   @doc """
   Sends an event to the JavaScript side.
 
-  Events are queued if sent before `send_elixir_ready/0` is called.
+  On the JavaScript side, events sent before `popcorn_elixir_ready` are queued
+  and delivered once an event handler is registered.
 
   ## Examples
 
-      Popcorn.Wasm.sendEvent("processing_finished", %{id: 123})
-      Popcorn.Wasm.sendEvent("user_logged_in", %{user: "john", timestamp: DateTime.utc_now()})
+      Popcorn.Wasm.send_event("processing_finished", %{id: 123})
+      Popcorn.Wasm.send_event("user_logged_in", %{user: "john", timestamp: DateTime.utc_now()})
 
   """
   @spec send_event(String.t()) :: :ok
