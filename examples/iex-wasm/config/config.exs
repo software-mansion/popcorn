@@ -14,7 +14,7 @@ include_tracing =
   end
 
 config :popcorn,
-  out_dir: "static/wasm",
+  out_dir: "dist/wasm",
   extra_apps: [:iex],
   add_tracing: include_tracing
 
