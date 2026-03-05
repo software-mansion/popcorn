@@ -1,18 +1,13 @@
 {
   "name": "hello_popcorn",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
     "build": "node build.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "packageManager": "pnpm@10.28.1",
   "dependencies": {
     "@swmansion/popcorn": "workspace:*"
   },
   "devDependencies": {
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.0"
   }
 }

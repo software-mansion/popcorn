@@ -25,4 +25,5 @@ hello_popcorn-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+/dist
 /static/wasm
