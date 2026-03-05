@@ -167,14 +167,14 @@ elif [[ -n "${EXAMPLE}" ]]; then
     cd "${example_dir}"
     mix deps.get
 
-    log "Cooking example..."
-    mix popcorn.cook
+    log "Building example..."
+    mix build_wasm
 
     if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
         watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
     fi
     watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm --filter @swmansion/popcorn exec rollup -c"
-    watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
+    watch dir="${mix_dir}/lib" exts="ex" cmd="cd '${mix_dir}' && mix build_assets"
     start_watchers
 
     success "Starting example server..."
