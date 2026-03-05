@@ -7,10 +7,10 @@ defmodule EvalInWasm.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      compilers: Mix.compilers(),
       deps: deps(),
       aliases: [
-        build_wasm: ["popcorn.build_runtime --target wasm", "popcorn.cook --js"]
+        build_assets: ["popcorn.cook", &build_js/1],
+        dev: ["build_assets", "popcorn.server"]
       ]
     ]
   end
@@ -28,5 +28,14 @@ defmodule EvalInWasm.MixProject do
       {:playwright,
        github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
     ]
+  end
+
+  defp build_js(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: Path.join(File.cwd!(), "assets"),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
   end
 end
