@@ -32,13 +32,12 @@ defmodule Mix.Tasks.LocalLiveView.Cook do
 
   defp compile_stubs do
     File.mkdir_p!(@stubs_out)
-
-    # Purge any previously loaded versions of stub modules so Code.compile_file works
     stub_files = Path.wildcard(Path.join([@stubs_dir, "*.ex"]))
 
     all_modules =
       for file <- stub_files, reduce: [] do
         acc ->
+          purge_stubbed_modules(file)
           modules = Code.compile_file(file)
 
           for {mod, binary} <- modules do
@@ -50,5 +49,29 @@ defmodule Mix.Tasks.LocalLiveView.Cook do
       end
 
     all_modules
+  end
+
+  defp purge_stubbed_modules(file) do
+    {:ok, content} = File.read(file)
+    {:ok, ast} = Code.string_to_quoted(content)
+
+    modules =
+      Macro.prewalk(ast, [], fn
+        {:defmodule, _, [{:__aliases__, _, name} | _]} = node, acc ->
+          {node, [Module.concat(name) | acc]}
+
+        {:defmodule, _, [name | _]} = node, acc when is_atom(name) ->
+          {node, [name | acc]}
+
+        node, acc ->
+          {node, acc}
+      end)
+      |> elem(1)
+
+    for mod <- modules do
+      :code.which(mod)
+      |> to_string()
+      |> File.rm()
+    end
   end
 end
