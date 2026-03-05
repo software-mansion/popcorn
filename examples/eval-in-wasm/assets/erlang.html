@@ -3,19 +3,19 @@
   <head>
     <meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0" name="viewport">
     <meta charset="utf-8" />
-    <meta name="code-language" content="elixir" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <meta name="code-language" content="erlang" />
+    <link rel="icon" type="image/png" href="favicon-erl.png" />
     <link rel="stylesheet" href="style.css" />
     <title>IEx x WASM x AtomVM</title>
   </head>
 
   <body>
-    <h1><span class="ex-initial">Elixir</span> in the browser</h1>
+    <h1 class="erl-color"><span class="erl-initial">Erlang</span> in the browser</h1>
     <p>
-      Type Elixir code in the textarea below and press CTRL+Enter or click
+      Type Erlang code in the textarea below and press CTRL+Enter or click
       'evaluate' to run it.
     </p>
-    <a href="erlang.html">Also, try Erlang</a>
+    <a href="index.html">Also, try Elixir</a>
 
     <div class="horizontal-container">
       <div class="container">
@@ -24,11 +24,26 @@
         <div class="controls">
           <button id="eval"><b>Evaluate</b></button>
           <button data-type="example" value="
-case Enum.max([1, 2, 3]) do
-    3 -> {:ok, 3}
-    2 -> {:error, 2}
-end
+case lists:max([1,3,2]) of
+    3 -> {ok, 3};
+    2 -> {error, 2}
+end.
           ">Example: case</button>
+        </div>
+      </div>
+      <div class="container">
+        <h3>Module</h3>
+        <textarea id="module"></textarea>
+        <div class="controls">
+          <button class="secondary-btn" id="eval-module">
+            <b>Compile module</b>
+          </button>
+          <button data-type="example" data-input="module" value="
+-module(basic).
+-export([add/2]).
+
+add(A, B) -> A + B.
+          ">Example: module</button>
         </div>
       </div>
     </div>
@@ -45,7 +60,6 @@ end
       </div>
     </details>
 
-    <script type="module" src="./wasm/popcorn.js" defer></script>
-    <script type="module" src="script.js" defer></script>
+    <script type="module" src="./index.js"></script>
   </body>
 </html>

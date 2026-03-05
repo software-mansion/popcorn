@@ -1,4 +1,4 @@
-import { Popcorn } from "./wasm/popcorn.js";
+import { Popcorn } from "@swmansion/popcorn";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const LANGUAGE_ERLANG = "erlang";
@@ -46,6 +46,7 @@ const Elements = {
 async function setup() {
   const popcorn = await Popcorn.init({
     debug: true,
+    bundlePath: "/wasm/bundle.avm",
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
