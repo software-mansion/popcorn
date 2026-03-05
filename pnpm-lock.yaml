@@ -23,6 +23,16 @@ importers:
 
   .: {}
 
+  examples/eval-in-wasm/assets:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../../popcorn/js
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   examples/hello-popcorn/assets:
     dependencies:
       '@swmansion/popcorn':
