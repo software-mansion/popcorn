@@ -147,7 +147,6 @@ defmodule Popcorn.MixProject do
   defp deps do
     [
       # {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
-      {:bandit, "~> 1.1"},
       {:jason, "~> 1.4"},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},

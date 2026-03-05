@@ -294,14 +294,6 @@ defmodule Popcorn do
                 :public_key,
                 :crypto,
                 :asn1,
-                :bandit,
-                :plug,
-                :plug_crypto,
-                :mime,
-                :hpax,
-                :thousand_island,
-                :telemetry,
-                :websock,
                 :async_test,
                 :playwright
               ]
