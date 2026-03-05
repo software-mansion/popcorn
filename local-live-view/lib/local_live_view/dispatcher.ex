@@ -21,7 +21,7 @@ defmodule LocalLiveView.Dispatcher do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.register(@process_name)
+    Wasm.register_default_receiver(self(), @process_name)
     {:ok, %{views: []}}
   end
 
