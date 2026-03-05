@@ -37,6 +37,10 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
+import { setup } from "../vendor/local_live_view/local_live_view"
+setup(liveSocket);
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 liveSocket.enableLatencySim(500)

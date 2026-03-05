@@ -67,11 +67,11 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "event"} = msg, state) do
-    raw_val = Map.get(msg.payload, "value", %{})
-    event = Map.get(msg.payload, "event")
+    %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
+    val = decode_event_type(type, raw_val, msg.payload)
 
     state.socket
-    |> view_handle_event(event, raw_val)
+    |> view_handle_event(event, val)
     |> handle_result({:handle_event, 3, msg.ref}, state)
   end
 
@@ -111,6 +111,41 @@ defmodule LocalLiveView.Server do
   defp view_handle_info(msg, %{view: view} = socket) do
     view.handle_info(msg, socket)
   end
+
+  defp decode_event_type("form", url_encoded, raw_payload) do
+    url_encoded
+    |> Plug.Conn.Query.decode()
+    |> maybe_merge_meta(raw_payload)
+    |> decode_merge_target()
+  end
+
+  defp decode_event_type(_, value, _raw_payload), do: value
+
+  defp decode_merge_target(%{"_target" => target} = params) when is_list(target), do: params
+
+  defp decode_merge_target(%{"_target" => target} = params) when is_binary(target) do
+    keyspace = target |> Plug.Conn.Query.decode() |> gather_keys([])
+    Map.put(params, "_target", Enum.reverse(keyspace))
+  end
+
+  defp decode_merge_target(%{} = params), do: params
+
+  defp maybe_merge_meta(value, %{"meta" => meta}) when is_map(value) do
+    Map.merge(value, meta)
+  end
+
+  defp maybe_merge_meta(value, _raw_payload), do: value
+
+  defp gather_keys(%{} = map, acc) do
+    case Enum.at(map, 0) do
+      {key, val} -> gather_keys(val, [key | acc])
+      nil -> acc
+    end
+  end
+
+  defp gather_keys([], acc), do: acc
+  defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
+  defp gather_keys(_, acc), do: acc
 
   defp maybe_call_mount_handle_params(%{socket: socket} = state, params) do
     %{view: view, redirected: mount_redirect} = socket
