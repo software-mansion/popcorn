@@ -25,6 +25,7 @@ defmodule Popcorn do
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
   - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
+  - `include_vm` - If `true`, includes the VM and supporting files in the output directory (e.g. AtomVM.wasm, AtomVM.mjs and JS glue for wasm; AtomVM binary for unix).
 
   Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
@@ -33,9 +34,10 @@ defmodule Popcorn do
           | {:start_module, module}
           | {:target, :wasm | :unix}
           | {:extra_beams, [String.t()]}
+          | {:include_vm, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
-    ingredients(Keyword.take(options, [:out_dir, :target]))
+    ingredients(Keyword.take(options, [:out_dir, :target, :include_vm]))
     bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
   end
 
@@ -75,18 +77,21 @@ defmodule Popcorn do
 
   Options have the same semantics as in `cook/1`.
   """
-  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix}]) :: :ok
+  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix} | {:include_vm, boolean()}]) ::
+          :ok
   def ingredients(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
-      target: :wasm
+      target: :wasm,
+      include_vm: false
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
     ensure_option_present(options, :out_dir, "Output directory")
 
     File.mkdir_p!(options.out_dir)
-    copy_runtime_artifacts(options)
+    maybe_copy_runtime_artifacts(options)
+
     :ok
   end
 
@@ -172,7 +177,9 @@ defmodule Popcorn do
     String.contains?(src_path, @api_dir)
   end
 
-  defp copy_runtime_artifacts(options) do
+  defp maybe_copy_runtime_artifacts(%{include_vm: false}), do: :ok
+
+  defp maybe_copy_runtime_artifacts(options) do
     if options.target == :wasm do
       wasm_template_files = Path.wildcard(Path.join(@priv_dir, "static-template/wasm/**"))
       cp_gzip(wasm_template_files, options.out_dir)
