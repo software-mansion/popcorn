@@ -62,7 +62,7 @@ ensure_js_dist() {
     if [[ ! -f "${JS_DIR}/dist/index.mjs" ]]; then
         log "JS dist not found, building..."
         cd "${JS_DIR}"
-        pnpm exec rollup -c
+        pnpm --filter @swmansion/popcorn exec rollup -c
     fi
 }
 
@@ -96,13 +96,16 @@ start_watchers() {
 
     local main_pid=$$
     local dirs=()
+    for ((i = 0; i < ${#WATCHER_CMDS[@]}; i += 3)); do
+        dirs+=("${WATCHER_CMDS[i]#"${PROJECT_ROOT}"/}")
+    done
+
     (
         for ((i = 0; i < ${#WATCHER_CMDS[@]}; i += 3)); do
             local dir="${WATCHER_CMDS[i]}"
             local exts="${WATCHER_CMDS[i+1]}"
             local cmd="${WATCHER_CMDS[i+2]}"
-            dirs+=("${dir}")
-            watchexec -w "${dir}" -e "${exts}" -- \
+            watchexec --postpone -w "${dir}" -e "${exts}" -- \
                 bash -c "${cmd} || kill ${main_pid}" &
         done
         while kill -0 ${main_pid} 2>/dev/null; do sleep 5; done
@@ -168,14 +171,17 @@ elif [[ -n "${EXAMPLE}" ]]; then
     mix popcorn.cook
 
     if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
-        watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm exec rollup -c"
+        watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
     fi
-    watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm exec rollup -c"
+    watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm --filter @swmansion/popcorn exec rollup -c"
     watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
     start_watchers
 
     success "Starting example server..."
-    elixir server.exs
+    elixir --erl "+Bi" -S mix popcorn.server &
+    SERVER_PID=$!
+    trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
+    wait ${SERVER_PID}
 else
     ensure_wasm_assets
     success "Starting JS library in watch mode..."
