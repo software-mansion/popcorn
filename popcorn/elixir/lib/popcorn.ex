@@ -25,6 +25,7 @@ defmodule Popcorn do
   - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
   first with `mix popcorn.build_runtime --target unix`
   - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
+  - `js` - If `true`, copies JS templates and runtime artifacts (AtomVM.wasm, AtomVM.mjs) to the output directory.
 
   Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
@@ -33,9 +34,10 @@ defmodule Popcorn do
           | {:start_module, module}
           | {:target, :wasm | :unix}
           | {:extra_beams, [String.t()]}
+          | {:js, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
-    ingredients(Keyword.take(options, [:out_dir, :target]))
+    ingredients(Keyword.take(options, [:out_dir, :target, :js]))
     bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
   end
 
@@ -75,11 +77,13 @@ defmodule Popcorn do
 
   Options have the same semantics as in `cook/1`.
   """
-  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix}]) :: :ok
+  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix} | {:js, boolean()}]) ::
+          :ok
   def ingredients(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
-      target: :wasm
+      target: :wasm,
+      js: false
     ]
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
@@ -87,6 +91,7 @@ defmodule Popcorn do
 
     File.mkdir_p!(options.out_dir)
     copy_runtime_artifacts(options)
+
     :ok
   end
 
@@ -173,7 +178,7 @@ defmodule Popcorn do
   end
 
   defp copy_runtime_artifacts(options) do
-    if options.target == :wasm do
+    if options.js and options.target == :wasm do
       wasm_template_files = Path.wildcard(Path.join(@priv_dir, "static-template/wasm/**"))
       cp_gzip(wasm_template_files, options.out_dir)
     end

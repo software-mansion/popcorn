@@ -74,7 +74,7 @@ import Config
 config :popcorn, out_dir: "static/wasm"
 ```
 
-Finally, run `mix deps.get` and `mix popcorn.cook`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
+Finally, run `mix deps.get` and `mix popcorn.cook --js`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
 
 ```html
 <!-- index.html -->
