@@ -1,6 +1,6 @@
 # GameOfLife Popcorn demo
 
-Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Popcorn
+Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Popcorn.
 
 ## Code usage
 
@@ -8,17 +8,19 @@ With the `GameOfLife.Application` started, the simulation can be run by calling 
 
 See the [AVM entrypoint](./lib/game_of_life.ex)
 
-## Running on AtomVM
+## Usage
 
-1. `mix deps.get`
-2. `mix compile`
-3. `/path_to_atom_vm _build/dev/bundle.avm`
+From the repository root:
 
-## Running in WASM
+```bash
+pnpm install
+mise run dev --example game-of-life
+```
 
-1. `mix deps.get`
-2. `mix compile`
-3. Copy or symlink `AtomVM.js` & `AtomVM.wasm` into `wasm` folder
-4. Run `mix popcorn.server`
-5. Open `http://localhost:4000/index.html`
-6. Check the console for output
+or directly from the example directory:
+
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000)

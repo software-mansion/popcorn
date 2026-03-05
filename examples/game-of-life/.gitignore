@@ -27,4 +27,5 @@ game_of_life-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+/dist
 /static/wasm
