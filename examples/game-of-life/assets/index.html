@@ -13,16 +13,6 @@
     <body>
         <h1>Game of Life</h1>
         <main id="root"></main>
-        <script type="module" src="wasm/popcorn.js" defer></script>
-        <script type="module">
-            import { Popcorn } from "./wasm/popcorn.js";
-
-            const popcorn = await Popcorn.init({
-                bundlePath: "wasm/bundle.avm",
-                debug: true,
-                onStdout: console.log,
-                onStderr: console.error,
-            });
-        </script>
+        <script type="module" src="./index.js"></script>
     </body>
 </html>
