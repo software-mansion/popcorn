@@ -76,7 +76,7 @@ jobs:
           echo "config :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}" >> config/config.exs
 
       - name: Cook
-        run: mix popcorn.cook
+        run: mix popcorn.cook --js
 
       - name: Run tests
         run: mix test --no-start

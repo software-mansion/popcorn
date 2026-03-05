@@ -6,7 +6,7 @@ To build, type:
 
 ```sh
 mix deps.get
-mix popcorn.cook
+mix popcorn.cook --js
 ```
 
 You can serve it by running

@@ -6,7 +6,7 @@ Usage:
 
 ```bash
 mix deps.get
-mix popcorn.cook
+mix popcorn.cook --js
 mix popcorn.server
 ```
 
