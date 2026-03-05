@@ -34,7 +34,6 @@ defmodule LocalLiveView.Renderer do
             }
           }
           view_el.innerHTML = args.rendered;
-          document.dispatchEvent(new CustomEvent('popRender', {detail: {view: args.view}}));
           if(focus_after_render) {
             let el = view_el
             while(key.length != 0) {

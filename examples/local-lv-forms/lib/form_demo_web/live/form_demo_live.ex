@@ -19,7 +19,6 @@ defmodule FormDemoWeb.FormDemoLive do
   end
 
   def mount(_params, _session, socket) do
-    send(self(), :sync)
     {:ok, assign(socket, users: [])}
   end
 
@@ -30,7 +29,6 @@ defmodule FormDemoWeb.FormDemoLive do
       ) do
     new_users = socket.assigns.users ++ [user]
     Application.put_env(FormDemo, :users, new_users)
-    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:noreply, assign(socket, users: new_users)}
   end
 
@@ -43,10 +41,6 @@ defmodule FormDemoWeb.FormDemoLive do
 
     socket = assign(socket, users: users)
     {:noreply, socket}
-  end
-
-  def handle_info(:sync, socket) do
-    {:noreply, sync_local_users(socket)}
   end
 
   defp sync_local_users(socket) do
