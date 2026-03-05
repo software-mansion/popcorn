@@ -3,6 +3,9 @@ packages:
   - "popcorn/js/e2e/setup"
   - "examples/hello-react"
   - "examples/hello-popcorn/assets"
+  - "examples/eval-in-wasm/assets"
+  - "examples/iex-wasm/assets"
+  - "examples/game-of-life/assets"
   - "landing-page"
   - "language-tour"
 

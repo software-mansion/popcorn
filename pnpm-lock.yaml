@@ -23,6 +23,26 @@ importers:
 
   .: {}
 
+  examples/eval-in-wasm/assets:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../../popcorn/js
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
+  examples/game-of-life/assets:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../../popcorn/js
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   examples/hello-popcorn/assets:
     dependencies:
       '@swmansion/popcorn':
@@ -30,7 +50,7 @@ importers:
         version: link:../../../popcorn/js
     devDependencies:
       esbuild:
-        specifier: ^0.25.12
+        specifier: ^0.25.0
         version: 0.25.12
 
   examples/hello-react:
@@ -84,6 +104,19 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1)
+
+  examples/iex-wasm/assets:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../../popcorn/js
+      '@xterm/xterm':
+        specifier: ^5.5.0
+        version: 5.5.0
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
 
   landing-page:
     dependencies:
