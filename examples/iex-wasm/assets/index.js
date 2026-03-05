@@ -1,4 +1,5 @@
-import { Popcorn } from "./wasm/popcorn.js";
+import { Popcorn } from "@swmansion/popcorn";
+import { Terminal } from "@xterm/xterm";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const ARROW_UP_KEY_CODE = 38;
@@ -13,6 +14,7 @@ async function setup() {
 
   const popcorn = await Popcorn.init({
     debug: true,
+    bundlePath: "/wasm/bundle.avm",
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });

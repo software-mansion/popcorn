@@ -4,6 +4,7 @@ packages:
   - "examples/hello-react"
   - "examples/hello-popcorn/assets"
   - "examples/eval-in-wasm/assets"
+  - "examples/iex-wasm/assets"
   - "landing-page"
   - "language-tour"
 
