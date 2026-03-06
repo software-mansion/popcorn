@@ -81,6 +81,7 @@ clean_example() {
     log "Cleaning example: ${name}"
     clean_dir "${dir}/_build"
     clean_dir "${dir}/deps"
+    clean_dir "${dir}/dist"
 
     if [[ -d "${dir}/assets/node_modules" ]]; then
         clean_dir "${dir}/assets/node_modules"
