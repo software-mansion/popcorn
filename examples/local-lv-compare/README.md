@@ -14,16 +14,21 @@ The most important files to look at are:
 
 `compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex` - home page that renders both views.
 
-To start your server:
+## Usage
 
-* To install and setup dependencies (both online and offline part), run:
+From the repository root:
+
+```bash
+pnpm install
+mise run dev --example local-lv-compare
 ```
-mix setup
-``` 
-_The popcorn output files will be generated into_ `priv/static/local_live_view` _also the local_live_view.js script is included in the head section of_ `lib/compare_live_views_web/components/layouts/root.html.heex`
 
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+or directly from the example directory:
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000)
 
 _The project enables Phoenix LiveView latency simulation by using `liveSocket.enableLatencySim(1000)` to show response time difference between the LiveViews. It can be later changed by calling `liveSocket.enableLatencySim` in the console._

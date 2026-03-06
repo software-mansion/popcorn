@@ -56,17 +56,32 @@ end
 ```
 
 ## Build
-To build the project after defining the above run:
+
+To build the project after defining the above, run:
+
 ```bash
 mix deps.get
-mix popcorn.cook --include-vm --out-dir static/local_live_view/wasm
+mix build
 ```
-This will generate the necessary scripts and popcorn files into the `static` directory in your project.
 
-You can also add `static/local_live_view/wasm` to your `config.exs` file (check [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started)) and run `mix popcorn.cook --include-vm` without the out-dir option.
+This will generate the necessary scripts and popcorn files into the output directory.
+
 ## Serve
 
-To properly serve a project check the [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started). You can use `mix popcorn.server`
+To serve the project locally:
+
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000).
+
+You can also use `mix popcorn.server` directly, or any HTTP server that sets the required headers:
+
+```
+Cross-Origin-Opener-Policy: "same-origin"
+Cross-Origin-Embedder-Policy: "require-corp"
+```
 
 ## Examples
 

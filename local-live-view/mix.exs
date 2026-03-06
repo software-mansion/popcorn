@@ -68,17 +68,54 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      compile: ["compile", &copy_priv/1]
+      compile: ["compile", &build_js/1, &copy_js/1],
+      build: ["deps.get", &pnpm_install/1, "popcorn.cook", &force_build_js/1]
     ]
   end
 
-  defp copy_priv(_) do
-    Mix.shell().cmd(
-      """
-      mkdir -p ../../#{@out_dir}
-      cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
-      """,
-      cd: Mix.Project.build_path()
-    )
+  @assets_dir Path.join(__DIR__, "assets")
+
+  defp pnpm_install(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["install"],
+        cd: File.cwd!(),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp build_js(_) do
+    priv_static = Path.join(__DIR__, "priv/static")
+
+    if not File.exists?(Path.join(priv_static, "local_live_view.js")) do
+      do_build_js()
+    end
+  end
+
+  defp force_build_js(_), do: do_build_js()
+
+  defp do_build_js do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: @assets_dir,
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  @priv_static Path.join(__DIR__, "priv/static")
+
+  defp copy_js(_) do
+    if File.dir?(@priv_static) do
+      build_path = Mix.Project.build_path()
+      out_dir = Path.join([build_path, "..", "..", @out_dir]) |> Path.expand()
+      File.mkdir_p!(out_dir)
+
+      @priv_static
+      |> File.ls!()
+      |> Enum.each(fn file ->
+        File.cp!(Path.join(@priv_static, file), Path.join(out_dir, file))
+      end)
+    end
   end
 end

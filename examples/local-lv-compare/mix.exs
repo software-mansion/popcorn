@@ -92,7 +92,7 @@ defmodule CompareLiveViews.MixProject do
     Mix.shell().cmd(
       """
       mix deps.get
-      mix popcorn.cook --include-vm
+      mix popcorn.cook
       """,
       cd: "local"
     )
