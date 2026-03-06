@@ -1,8 +1,14 @@
 # Stub: telemetry is not available on AtomVM, so we provide no-op implementations
+:code.delete(:telemetry)
+
 defmodule :telemetry do
   def execute(_event, _measurements, _metadata \\ %{}), do: :ok
 
   def span(_event, _metadata, fun) do
+<<<<<<< HEAD:local-live-view/priv/static/stubs/telemetry_stub.ex
+=======
+    IO.puts("STUBBED!")
+>>>>>>> 6bff854 (Include deps with runtime: false in the bundle, adjust local liveview):local-live-view/lib/stubs/telemetry_stub.ex
     {result, _updated_metadata} = fun.()
     result
   end

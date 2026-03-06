@@ -1,6 +1,13 @@
 # Stub: AtomVM fails to percent decode in URI.decode_www_form, so we replace it with a local implementation
+:code.delete(Plug.Conn.Query)
+
 defmodule Plug.Conn.Query do
-  def decode(query, initial \\ [], invalid_exception \\ Plug.Conn.InvalidQueryError, validate_utf8 \\ true)
+  def decode(
+        query,
+        initial \\ [],
+        invalid_exception \\ Plug.Conn.InvalidQueryError,
+        validate_utf8 \\ true
+      )
 
   def decode("", initial, _invalid_exception, _validate_utf8) do
     Map.new(initial)
@@ -22,6 +29,7 @@ defmodule Plug.Conn.Query do
         [key, value] ->
           {decode_www_form(key, invalid_exception, validate_utf8),
            decode_www_form(value, invalid_exception, validate_utf8)}
+
         [key] ->
           {decode_www_form(key, invalid_exception, validate_utf8), ""}
       end
@@ -169,6 +177,7 @@ defmodule Plug.Conn.Query do
         raise ArgumentError,
               "cannot encode maps inside lists when the map has 0 or more than 1 element, " <>
                 "got: #{inspect(value)}"
+
       value ->
         [?&, encode_pair(parent_field <> "[]", value, encoder)]
     end
@@ -184,7 +193,9 @@ defmodule Plug.Conn.Query do
 
   defp encode_kv(kv, parent_field, encoder) do
     mapper = fn
-      {_, value} when value in [%{}, []] -> []
+      {_, value} when value in [%{}, []] ->
+        []
+
       {field, value} ->
         field =
           if parent_field == "" do
@@ -192,6 +203,7 @@ defmodule Plug.Conn.Query do
           else
             parent_field <> "[" <> encode_key(field) <> "]"
           end
+
         [?&, encode_pair(field, value, encoder)]
     end
 

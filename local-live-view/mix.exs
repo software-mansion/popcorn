@@ -77,7 +77,6 @@ defmodule LocalLiveView.MixProject do
       """
       mkdir -p ../../#{@out_dir}
       cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
-      cp -r lib/local_live_view/priv/static/stubs ../../stubs
       """,
       cd: Mix.Project.build_path()
     )
