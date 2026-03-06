@@ -1,9 +1,11 @@
 # Stub: telemetry is not available on AtomVM, so we provide no-op implementations
+:code.delete(:telemetry)
+
 defmodule :telemetry do
   def execute(_event, _measurements, _metadata \\ %{}), do: :ok
 
   def span(_event, _metadata, fun) do
-    IO.puts "STUBBED!"
+    IO.puts("STUBBED!")
     {result, _updated_metadata} = fun.()
     result
   end
