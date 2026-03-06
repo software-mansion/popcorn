@@ -164,11 +164,13 @@ elif [[ -n "${EXAMPLE}" ]]; then
     fi
 
     log "Setting up example: ${EXAMPLE}"
-    cd "${example_dir}"
-    mix deps.get
 
-    log "Building example..."
-    mix build_wasm
+    mix_exs=$(find "${example_dir}" -maxdepth 2 -name mix.exs -not -path "*/deps/*" | head -1)
+    [[ -n "${mix_exs}" ]] || error "No mix.exs found in ${EXAMPLE}"
+    mix_dir="$(dirname "${mix_exs}")"
+
+    cd "${mix_dir}"
+    mix deps.get
 
     if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
         watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
@@ -178,10 +180,16 @@ elif [[ -n "${EXAMPLE}" ]]; then
     start_watchers
 
     success "Starting example server..."
-    elixir --erl "+Bi" -S mix popcorn.server &
-    SERVER_PID=$!
-    trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
-    wait ${SERVER_PID}
+    if [[ -f "${example_dir}/package.json" ]]; then
+        cd "${example_dir}"
+        pnpm run dev
+    else
+        cd "${mix_dir}"
+        elixir --erl "+Bi" -S mix dev &
+        SERVER_PID=$!
+        trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
+        wait ${SERVER_PID}
+    fi
 else
     ensure_wasm_assets
     success "Starting JS library in watch mode..."

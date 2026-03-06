@@ -89,7 +89,9 @@ defmodule FormDemo.MixProject do
         "compile --force --warnings-as-errors",
         &local_lint/1
       ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"],
+      build_assets: [&build_local/1],
+      dev: ["build_assets", "phx.server"]
     ]
   end
 

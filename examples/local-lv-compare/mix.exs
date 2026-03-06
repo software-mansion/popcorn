@@ -82,7 +82,9 @@ defmodule CompareLiveViews.MixProject do
         "esbuild compare_live_views --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"],
+      build_assets: [&build_local/1],
+      dev: ["build_assets", "phx.server"]
     ]
   end
 
