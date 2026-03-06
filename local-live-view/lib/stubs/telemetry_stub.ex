@@ -1,7 +1,10 @@
 # Stub: telemetry is not available on AtomVM, so we provide no-op implementations
-:code.delete(:telemetry)
 
-defmodule :telemetry do
+module = :telemetry
+File.rm(:code.which(module))
+:code.purge(module)
+
+defmodule module do
   def execute(_event, _measurements, _metadata \\ %{}), do: :ok
 
   def span(_event, _metadata, fun) do
