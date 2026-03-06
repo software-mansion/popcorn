@@ -120,7 +120,6 @@ defmodule Popcorn do
 
     dep_beams =
       Mix.Project.build_path()
-      |> IO.inspect()
       |> Path.join("lib/*/ebin/*.beam")
       |> Path.wildcard()
       |> Enum.reject(fn path ->
