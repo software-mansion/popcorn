@@ -6,7 +6,7 @@ Usage:
 
 ```bash
 mix deps.get
-mix local_live_view.cook
+mix popcorn.cook
 elixir server.exs
 ```
 
