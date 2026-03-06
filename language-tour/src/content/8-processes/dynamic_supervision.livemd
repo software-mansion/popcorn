@@ -1,0 +1,86 @@
+# Dynamic supervision
+
+In the previous chapter, we had a constant number of processes running simultaneously. In many use cases, we want to dynamically spawn processes as we need. For that, we can use `Supervisor.start_child`. Firstly, we spawn a supervisor. It doesn't have any child processes for now:
+
+```elixir
+child_specs = []
+{:ok, supervisor} = Supervisor.start_link(child_specs, strategy: :one_for_one)
+```
+
+Then, we spawn a task under the supervisor. `Task` module implements a `child_spec/1` function, so we can pass `{Task, fn -> ... end}` as a child spec:
+
+```elixir
+Supervisor.start_child(supervisor, {
+    Task,
+    fn ->
+        IO.puts("Hello from a task spawned dynamically under a supervisor")
+    end
+})
+```
+
+💡 Run the above snippet a few times to spawn more tasks.
+
+As you can see, the `Supervisor` allows dynamically spawning children. However, due to the performance characteristics, it's better to use `DynamicSupervisor` for such use cases, especially if there can be a lot of child processes at some point. From the API perspective, the `DynamicSupervisor` is similar to the `Supervisor`. Here are the main differences:
+- `DynamicSupervisor` doesn't allow spawning any children at startup - `DynamicSupervisor.start_child/2` is the only option.
+- The only supported strategy is `:one_for_one` - that's because other strategies don't make much sense and would reduce performance.
+
+💡 Change the above snippets to use `DynamicSupervisor`. Note that `DynamicSupervisor.start_link/1` doesn't accept the `child_specs` argument, and `DynamicSupervisor.start_child/2` must be used instead of `Supervisor.start_child/2`.
+
+## Example: HTTP server
+
+As an example for dynamic supervision, we'll simulate an HTTP server.
+
+```elixir
+defmodule HTTPServer do
+  use GenServer
+
+  @type method :: :get | :post | :patch | :delete
+  @type status_code :: 100..599
+
+  def start_link(options) do
+    # Using the module name as a name for the process 
+    # is a common pattern.
+    GenServer.start_link(__MODULE__, options, name: __MODULE__)
+  end
+
+  @spec request(%{method: method(), body: String.t()})
+    :: {status_code, String.t()}
+  def request(data) do
+    GenServer.call(__MODULE__, {:request, data})
+  end
+
+  @impl true
+  def init(_options) do
+    {:ok, %{}}
+  end
+
+  @impl true
+  def handle_call({:request, data}, from, state) do
+    DynamicSupervisor.start_child(
+      HTTPServer.Supervisor,
+      {Task, fn -> process_request(from, data) end}
+    )
+    {:noreply, state}
+  end
+
+  defp process_request(from, data) do
+    reply = "Received a #{data.method} request!"
+    GenServer.reply(from, {200, reply})
+  end
+end
+```
+
+```elixir
+# Check if the supervisor is already running and if so, stop it.
+# This makes it possible to avoid a name conflict when you rerun this cell.
+if Process.whereis(:my_app_supervisor) do
+  Supervisor.stop(:my_app_supervisor)
+end
+
+child_specs = [{DynamicSupervisor, name: HTTPServer.Supervisor}, HTTPServer]
+Supervisor.start_link(child_specs, strategy: :one_for_one, name: :my_app_supervisor)
+```
+
+```elixir
+HTTPServer.request(%{method: :get})
+```
