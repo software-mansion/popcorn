@@ -1,5 +1,4 @@
 %{
-  "atomvm_packbeam": {:git, "https://github.com/atomvm/atomvm_packbeam.git", "2daea6d0339aa40b8a07b8ad4d4583fb64b608de", []},
   "castore": {:hex, :castore, "1.0.13", "b735ea45d87f027128debaf662c6cdf618604f530bec554cc60c195f2a55b506", [:mix], [], "hexpm", "ec09e81a9c3db92d27c6651d119d8adc6d1cbbb3d90f8c1293eee2af590bf55d"},
   "cowlib": {:hex, :cowlib, "2.7.3", "a7ffcd0917e6d50b4d5fb28e9e2085a0ceb3c97dea310505f7460ff5ed764ce9", [:rebar3], [], "hexpm", "1e1a3d176d52daebbecbbcdfd27c27726076567905c2a9d7398c54da9d225761"},
   "elixir_uuid": {:hex, :elixir_uuid, "1.2.1", "dce506597acb7e6b0daeaff52ff6a9043f5919a4c3315abb4143f0b00378c097", [:mix], [], "hexpm", "f7eba2ea6c3555cea09706492716b0d87397b88946e6380898c2889d68585752"},
