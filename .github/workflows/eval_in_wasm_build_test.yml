@@ -38,6 +38,20 @@ jobs:
       - name: Setup toolchain
         uses: ./.github/actions/setup-toolchain
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+        working-directory: .
+
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
@@ -69,8 +83,8 @@ jobs:
         run: |
           echo "config :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}" >> config/config.exs
 
-      - name: Cook
-        run: mix popcorn.cook --include-vm
+      - name: Build
+        run: mix build
 
       - name: Run tests
         run: mix test --no-start
