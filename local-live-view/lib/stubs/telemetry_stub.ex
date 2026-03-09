@@ -1,6 +1,6 @@
 # Stub: telemetry is not available on AtomVM, so we provide no-op implementations
 
-module = Plug.Conn.Query
+module = :telemetry
 File.rm(:code.which(module))
 :code.purge(module)
 
