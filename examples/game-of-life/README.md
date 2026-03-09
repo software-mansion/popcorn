@@ -19,6 +19,6 @@ See the [AVM entrypoint](./lib/game_of_life.ex)
 1. `mix deps.get`
 2. `mix compile`
 3. Copy or symlink `AtomVM.js` & `AtomVM.wasm` into `wasm` folder
-4. Run `elixir wasm/server.exs`
+4. Run `mix popcorn.server`
 5. Open `http://localhost:4000/index.html`
 6. Check the console for output

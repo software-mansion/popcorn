@@ -66,7 +66,7 @@ This will generate the necessary scripts and popcorn files into the `static` dir
 You can also add `static/local_live_view/wasm` to your `config.exs` file (check [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started)) and run `mix popcorn.cook` without the option.
 ## Serve
 
-To properly serve a project check the [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started). You can use `mix popcorn.dev_server` and run with `elixir dev_server.exs`
+To properly serve a project check the [Popcorn documentation](https://hexdocs.pm/popcorn/0.1.0/readme.html#getting-started). You can use `mix popcorn.server`
 
 ## Examples
 

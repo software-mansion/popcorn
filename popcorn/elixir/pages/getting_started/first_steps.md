@@ -89,7 +89,7 @@ Finally, run `mix deps.get` and `mix popcorn.cook`. The latter will generate WAS
 
 ### Serving the artifacts
 
-The easiest way to host the page is to generate a simple HTTP server script with `mix popcorn.simple_server` and run it with `elixir server.exs`. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the console.
+The easiest way to host the page is to run `mix popcorn.server`. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the console.
 
 The webpage can also be hosted with any HTTP static file server, but **it must add the following HTTP headers**:
 
@@ -99,24 +99,6 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 Otherwise, browsers refuse to run WASM.
-
-### Live reloading
-
-Popcorn also ships with a server that supports live reloading. It can be generated with `mix popcorn.dev_server` and run with `elixir dev_server.exs`.
-
-The index.html requires an extra line to load the required JavaScript.
-
-```html
-<!-- index.html -->
-<html>
-  <script type="text/javascript" src="/dev_server.js"></script>
-  <script type="module">
-      import { Popcorn } from "./wasm/popcorn.js";
-      await Popcorn.init({ onStdout: console.log });
-  </script>
-  <body></body>
-</html>
- ```
 
 ## Popcorn project files structure
 

@@ -12,7 +12,7 @@ defmodule HelloPopcornTest do
     port = 9876
     url = "http://localhost:#{port}"
 
-    Task.start_link(fn -> System.shell("elixir server.exs --port #{port}") end)
+    Task.start_link(fn -> System.shell("mix popcorn.server --port #{port}") end)
 
     # Wait until the server is ready
     page = Playwright.Browser.new_page(browser)

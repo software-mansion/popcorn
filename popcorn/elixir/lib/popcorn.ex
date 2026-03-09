@@ -288,7 +288,16 @@ defmodule Popcorn do
         spec =
           case app do
             :popcorn ->
-              non_api_deps = [:inets, :ssl, :public_key, :crypto, :async_test, :playwright]
+              non_api_deps = [
+                :inets,
+                :ssl,
+                :public_key,
+                :crypto,
+                :asn1,
+                :async_test,
+                :playwright
+              ]
+
               Keyword.update!(spec, :applications, &(&1 -- non_api_deps))
 
             _app ->
