@@ -106,7 +106,7 @@ executor_spec = %{
 }
 ```
 
-Now we can call `Supervisor.start_link/2` to spawn a supervisor, passing our child specs to it. Each child spec spawns a process - we it a _child processes_ of the supervisor. We must also pass the `strategy` option - we'll explain it in a moment. Finally, for convenience, we register our supervisor under `:my_app_supervisor` name.
+Now we can call `Supervisor.start_link/2` to spawn a supervisor, passing our child specs to it. Each child spec spawns a process - we call it a _child processes_ of the supervisor. We must also pass the `strategy` option - we'll explain it in a moment. Finally, for convenience, we register our supervisor under `:my_app_supervisor` name.
 
 ```elixir
 # Check if the supervisor is already running and if so, stop it.
