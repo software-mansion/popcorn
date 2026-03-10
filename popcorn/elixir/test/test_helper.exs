@@ -13,10 +13,15 @@ end
 
 case target do
   :unix ->
-    Popcorn.ingredients(target: :unix, out_dir: "test/fixtures/unix")
+    Popcorn.ingredients(target: :unix, include_vm: true, out_dir: "test/fixtures/unix")
 
   :wasm ->
-    Popcorn.ingredients(target: :wasm, out_dir: "test/fixtures/wasm/static/wasm")
+    Popcorn.ingredients(
+      target: :wasm,
+      include_vm: true,
+      out_dir: "test/fixtures/wasm/static/wasm"
+    )
+
     Browser.launch()
 end
 

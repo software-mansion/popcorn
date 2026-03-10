@@ -97,7 +97,7 @@ defmodule FormDemo.MixProject do
     Mix.shell().cmd(
       """
       mix deps.get
-      mix popcorn.cook
+      mix popcorn.cook --include-vm
       """,
       cd: "local"
     )
