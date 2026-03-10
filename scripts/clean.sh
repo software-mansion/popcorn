@@ -5,9 +5,6 @@ LOG_PREFIX="CLEAN"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-MODE="default"
-EXAMPLE_NAME=""
-
 usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
@@ -27,20 +24,6 @@ $(list_examples)
 EOF
     exit 0
 }
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage ;;
-        --all) MODE="all"; shift ;;
-        --atomvm) MODE="atomvm"; shift ;;
-        --example)
-            MODE="example"
-            EXAMPLE_NAME="$2"
-            shift 2
-            ;;
-        *) error "Unknown option: $1" ;;
-    esac
-done
 
 clean_dir() {
     if [[ -d "$1" ]]; then
@@ -105,23 +88,44 @@ clean_all_examples() {
     done
 }
 
-case "${MODE}" in
-    default)
-        clean_elixir
-        clean_js
-        ;;
-    all)
-        clean_elixir
-        clean_js
-        clean_atomvm
-        clean_all_examples
-        ;;
-    atomvm)
-        clean_atomvm
-        ;;
-    example)
-        clean_example "${EXAMPLE_NAME}"
-        ;;
-esac
+main() {
+    local MODE="default"
+    local EXAMPLE_NAME=""
 
-success "Clean complete!"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) usage ;;
+            --all) MODE="all"; shift ;;
+            --atomvm) MODE="atomvm"; shift ;;
+            --example)
+                MODE="example"
+                EXAMPLE_NAME="$2"
+                shift 2
+                ;;
+            *) error "Unknown option: $1" ;;
+        esac
+    done
+
+    case "${MODE}" in
+        default)
+            clean_elixir
+            clean_js
+            ;;
+        all)
+            clean_elixir
+            clean_js
+            clean_atomvm
+            clean_all_examples
+            ;;
+        atomvm)
+            clean_atomvm
+            ;;
+        example)
+            clean_example "${EXAMPLE_NAME}"
+            ;;
+    esac
+
+    success "Clean complete!"
+}
+
+main "$@"

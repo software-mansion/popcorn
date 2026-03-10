@@ -15,8 +15,8 @@ NC='\033[0m'
 
 : "${LOG_PREFIX:=SCRIPT}"
 
-log() { echo -e "${BLUE}${LOG_PREFIX} |${NC} $1"; }
-success() { echo -e "${GREEN}${LOG_PREFIX} |${NC} $1"; }
+log() { echo -e "${BLUE}${LOG_PREFIX} |${NC} $1" >&2; }
+success() { echo -e "${GREEN}${LOG_PREFIX} |${NC} $1" >&2; }
 error() { echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2; exit 1; }
 
 list_examples() {

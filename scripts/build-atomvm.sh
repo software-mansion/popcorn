@@ -5,18 +5,10 @@ LOG_PREFIX="BUILD ATOMVM"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-# Global variables
+# Must be global for trap cleanup handler
 TEMP_DIR=""
-ATOMVM_DIR=""
 
-# Default values
 DEFAULT_SOURCE="https://github.com/software-mansion-labs/FissionVM.git#swm"
-SOURCE=""
-OUTDIR=""
-CMAKE_OPTS=""
-CLEAN=false
-JOBS=""
-BUILD_MODE=""
 
 usage() {
     cat << EOF
@@ -74,28 +66,35 @@ cleanup_old_temps() {
 }
 
 resolve_source() {
+    local source="$1"
+
     # Priority: --source flag > $ATOMVM_SOURCE env > default
-    if [[ -n "${SOURCE}" ]]; then
-        log "Using source from --source flag: ${SOURCE}"
+    if [[ -n "${source}" ]]; then
+        log "Using source from --source flag: ${source}"
     elif [[ -n "${ATOMVM_SOURCE}" ]]; then
-        SOURCE="${ATOMVM_SOURCE}"
-        log "Using source from \$ATOMVM_SOURCE env: ${SOURCE}"
+        source="${ATOMVM_SOURCE}"
+        log "Using source from \$ATOMVM_SOURCE env: ${source}"
     else
-        SOURCE="${DEFAULT_SOURCE}"
-        log "Using default source: ${SOURCE}"
+        source="${DEFAULT_SOURCE}"
+        log "Using default source: ${source}"
     fi
+
+    echo "${source}"
 }
 
+# Prints the atomvm directory path. Sets global TEMP_DIR if cloning.
 setup_atomvm_source() {
+    local source="$1"
+
     # Check if source is a git URL or local path
-    if [[ "${SOURCE}" =~ ^https?://|^git@ ]]; then
+    if [[ "${source}" =~ ^https?://|^git@ ]]; then
         # It's a git repository - branch is required
-        if [[ "${SOURCE}" != *"#"* ]]; then
+        if [[ "${source}" != *"#"* ]]; then
             error "Branch/ref is required for git repository. Use format: repo_url#ref"
         fi
 
-        local repo_url="${SOURCE%#*}"
-        local ref="${SOURCE#*#}"
+        local repo_url="${source%#*}"
+        local ref="${source#*#}"
 
         # Create temp directory with ref name in template
         local ref_name="${ref}"
@@ -104,21 +103,21 @@ setup_atomvm_source() {
         TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/atomvm-build-${ref_name}.XXXXXXX")
 
         log "Cloning ${repo_url} (ref: ${ref})"
-        git clone --depth 1 --branch "${ref}" "${repo_url}" "${TEMP_DIR}/atomvm"
-        ATOMVM_DIR="${TEMP_DIR}/atomvm"
+        git clone --depth 1 --branch "${ref}" "${repo_url}" "${TEMP_DIR}/atomvm" >&2
+        echo "${TEMP_DIR}/atomvm"
     else
         # It's a local path — resolve relative paths against PROJECT_ROOT
-        local resolved="${SOURCE}"
+        local resolved="${source}"
         if [[ "${resolved}" != /* ]]; then
             resolved="${PROJECT_ROOT}/${resolved}"
         fi
 
         if [[ ! -d "${resolved}" ]]; then
-            error "Local path '${SOURCE}' does not exist (resolved to: ${resolved})"
+            error "Local path '${source}' does not exist (resolved to: ${resolved})"
         fi
 
         log "Using local path: ${resolved}"
-        ATOMVM_DIR="${resolved}"
+        echo "${resolved}"
     fi
 }
 
@@ -134,23 +133,20 @@ ensure_emscripten() {
     fi
 }
 
-get_output_dir() {
-    if [[ -n "${OUTDIR}" ]]; then
-        echo "${OUTDIR}"
-    else
-        echo "${ATOMVM_DIR}/out"
-    fi
-}
-
 build_unix() {
-    local build_type="$1"  # Debug or Release
-    local build_dir="${ATOMVM_DIR}/build"
+    local build_type="$1"
+    local atomvm_dir="$2"
+    local outdir="$3"
+    local clean="$4"
+    local cmake_opts="$5"
+    local jobs="$6"
+    local build_dir="${atomvm_dir}/build"
 
     log "Building Unix target (${build_type})"
 
     ensure_ninja
 
-    if [[ "${CLEAN}" == "true" ]] && [[ -d "${build_dir}" ]]; then
+    if [[ "${clean}" == "true" ]] && [[ -d "${build_dir}" ]]; then
         log "Cleaning build directory"
         rm -rf "${build_dir}"
     fi
@@ -164,9 +160,8 @@ build_unix() {
         "-DAVM_BUILD_RUNTIME_ONLY=1"
     )
 
-    # Add user-provided cmake options
-    if [[ -n "${CMAKE_OPTS}" ]]; then
-        for opt in ${CMAKE_OPTS}; do
+    if [[ -n "${cmake_opts}" ]]; then
+        for opt in ${cmake_opts}; do
             cmake_args+=("-D${opt}")
         done
     fi
@@ -178,16 +173,14 @@ build_unix() {
 
     log "Running ninja..."
     local ninja_args=()
-    if [[ -n "${JOBS}" ]]; then
-        ninja_args+=("-j" "${JOBS}")
+    if [[ -n "${jobs}" ]]; then
+        ninja_args+=("-j" "${jobs}")
     fi
     ninja "${ninja_args[@]}" AtomVM
 
     popd > /dev/null
 
-    # Copy artifacts to output directory
-    local out_dir
-    out_dir=$(get_output_dir)
+    local out_dir="${outdir:-${atomvm_dir}/out}"
     mkdir -p "${out_dir}"
     cp "${build_dir}/src/AtomVM" "${out_dir}/"
 
@@ -195,15 +188,20 @@ build_unix() {
 }
 
 build_wasm() {
-    local build_type="$1"  # Debug or Release
-    local build_dir="${ATOMVM_DIR}/src/platforms/emscripten/build"
+    local build_type="$1"
+    local atomvm_dir="$2"
+    local outdir="$3"
+    local clean="$4"
+    local cmake_opts="$5"
+    local jobs="$6"
+    local build_dir="${atomvm_dir}/src/platforms/emscripten/build"
 
     log "Building WASM target (${build_type})"
 
     ensure_ninja
     ensure_emscripten
 
-    if [[ "${CLEAN}" == "true" ]] && [[ -d "${build_dir}" ]]; then
+    if [[ "${clean}" == "true" ]] && [[ -d "${build_dir}" ]]; then
         log "Cleaning build directory"
         rm -rf "${build_dir}"
     fi
@@ -218,9 +216,8 @@ build_wasm() {
         "-DAVM_EMSCRIPTEN_ENV=web"
     )
 
-    # Add user-provided cmake options
-    if [[ -n "${CMAKE_OPTS}" ]]; then
-        for opt in ${CMAKE_OPTS}; do
+    if [[ -n "${cmake_opts}" ]]; then
+        for opt in ${cmake_opts}; do
             cmake_args+=("-D${opt}")
         done
     fi
@@ -232,16 +229,14 @@ build_wasm() {
 
     log "Running ninja..."
     local ninja_args=()
-    if [[ -n "${JOBS}" ]]; then
-        ninja_args+=("-j" "${JOBS}")
+    if [[ -n "${jobs}" ]]; then
+        ninja_args+=("-j" "${jobs}")
     fi
     ninja "${ninja_args[@]}" AtomVM
 
     popd > /dev/null
 
-    # Copy artifacts to output directory
-    local out_dir
-    out_dir=$(get_output_dir)
+    local out_dir="${outdir:-${atomvm_dir}/out}"
     mkdir -p "${out_dir}"
     cp "${build_dir}/src/AtomVM.wasm" "${out_dir}/"
     cp "${build_dir}/src/AtomVM.mjs" "${out_dir}/"
@@ -255,34 +250,46 @@ build_wasm() {
     success "WASM build complete. Artifacts written to: ${out_dir}"
 }
 
-parse_args() {
+main() {
+    trap cleanup EXIT
+
+    # Load .env from project root (before arg parsing so flags can override)
+    load_env
+
+    local source=""
+    local outdir=""
+    local cmake_opts=""
+    local clean=false
+    local jobs=""
+    local build_mode=""
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 usage
                 ;;
             --source)
-                SOURCE="$2"
+                source="$2"
                 shift 2
                 ;;
             --outdir)
-                OUTDIR="$2"
+                outdir="$2"
                 shift 2
                 ;;
             --cmake-opts)
-                CMAKE_OPTS="$2"
+                cmake_opts="$2"
                 shift 2
                 ;;
             --clean)
-                CLEAN=true
+                clean=true
                 shift
                 ;;
             -j)
-                JOBS="$2"
+                jobs="$2"
                 shift 2
                 ;;
             debug-wasm|release-wasm|debug-unix|release-unix)
-                BUILD_MODE="$1"
+                build_mode="$1"
                 shift
                 ;;
             *)
@@ -291,51 +298,31 @@ parse_args() {
         esac
     done
 
-    if [[ -z "${BUILD_MODE}" ]]; then
+    if [[ -z "${build_mode}" ]]; then
         error "Build mode is required. Use: debug-wasm, release-wasm, debug-unix, release-unix"
     fi
 
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
-    if [[ -n "${CI}" ]] && [[ -z "${JOBS}" ]]; then
-        JOBS="1"
+    if [[ -n "${CI}" ]] && [[ -z "${jobs}" ]]; then
+        jobs="1"
         log "CI detected, using -j 1 to avoid OOM"
     fi
-}
 
-main() {
-    # Setup trap for cleanup
-    trap cleanup EXIT
-
-    # Load .env from project root (before parse_args so flags can override)
-    load_env
-
-    parse_args "$@"
-
-    # Clean up old temp directories
     cleanup_old_temps
 
-    resolve_source
-    setup_atomvm_source
+    source=$(resolve_source "${source}")
+    local atomvm_dir
+    atomvm_dir=$(setup_atomvm_source "${source}")
 
-    # Determine build type
     local build_type
-
-    case "${BUILD_MODE}" in
-        debug-*)
-            build_type="Debug"
-            ;;
-        release-*)
-            build_type="Release"
-            ;;
+    case "${build_mode}" in
+        debug-*)  build_type="Debug" ;;
+        release-*) build_type="Release" ;;
     esac
 
-    case "${BUILD_MODE}" in
-        *-wasm)
-            build_wasm "${build_type}"
-            ;;
-        *-unix)
-            build_unix "${build_type}"
-            ;;
+    case "${build_mode}" in
+        *-wasm) build_wasm "${build_type}" "${atomvm_dir}" "${outdir}" "${clean}" "${cmake_opts}" "${jobs}" ;;
+        *-unix) build_unix "${build_type}" "${atomvm_dir}" "${outdir}" "${clean}" "${cmake_opts}" "${jobs}" ;;
     esac
 
     success "Build completed successfully!"
