@@ -107,13 +107,18 @@ setup_atomvm_source() {
         git clone --depth 1 --branch "${ref}" "${repo_url}" "${TEMP_DIR}/atomvm"
         ATOMVM_DIR="${TEMP_DIR}/atomvm"
     else
-        # It's a local path
-        if [[ ! -d "${SOURCE}" ]]; then
-            error "Local path '${SOURCE}' does not exist"
+        # It's a local path — resolve relative paths against PROJECT_ROOT
+        local resolved="${SOURCE}"
+        if [[ "${resolved}" != /* ]]; then
+            resolved="${PROJECT_ROOT}/${resolved}"
         fi
 
-        log "Using local path: ${SOURCE}"
-        ATOMVM_DIR="${SOURCE}"
+        if [[ ! -d "${resolved}" ]]; then
+            error "Local path '${SOURCE}' does not exist (resolved to: ${resolved})"
+        fi
+
+        log "Using local path: ${resolved}"
+        ATOMVM_DIR="${resolved}"
     fi
 }
 
