@@ -86,7 +86,7 @@ send(:my_process, :hello)
 Process.sleep(100)
 ```
 
-💡 Try to register `self()` as `:my_process` at the beginning of the previous snippet What happens?
+💡 Try to register `self()` as `:my_process` at the beginning of the previous snippet. What happens?
 
 
 ## 💡 Exercise: send and receive
