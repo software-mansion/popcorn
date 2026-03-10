@@ -5,9 +5,6 @@ LOG_PREFIX="DEV"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-EXAMPLE=""
-PROJECT=""
-
 usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
@@ -27,24 +24,6 @@ $(list_projects)
 EOF
     exit 0
 }
-
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage ;;
-        --example)
-            EXAMPLE="$2"
-            shift 2
-            ;;
-        --project)
-            PROJECT="$2"
-            shift 2
-            ;;
-        *) error "Unknown option: $1" ;;
-    esac
-done
-
-JS_DIR="${PROJECT_ROOT}/popcorn/js"
-WATCHER_CMDS=()
 
 require_cmd() {
     command -v "$1" &> /dev/null || error "$1 is required but not found"
@@ -116,75 +95,100 @@ start_watchers() {
     log "Watching for changes (${dirs[*]})"
 }
 
-load_env
-require_cmd pnpm
+main() {
+    local EXAMPLE=""
+    local PROJECT=""
 
-log "Installing dependencies..."
-cd "${PROJECT_ROOT}"
-pnpm install
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) usage ;;
+            --example)
+                EXAMPLE="$2"
+                shift 2
+                ;;
+            --project)
+                PROJECT="$2"
+                shift 2
+                ;;
+            *) error "Unknown option: $1" ;;
+        esac
+    done
 
-cd "${PROJECT_ROOT}/popcorn/elixir"
-mix deps.get
+    local JS_DIR="${PROJECT_ROOT}/popcorn/js"
+    WATCHER_CMDS=()
 
-if [[ -n "${PROJECT}" ]]; then
-    project_dir="${PROJECT_ROOT}/${PROJECT}"
+    load_env
+    require_cmd pnpm
 
-    if [[ ! -d "${project_dir}" ]]; then
-        error "Project '${PROJECT}' not found at ${project_dir}"
-    fi
+    log "Installing dependencies..."
+    cd "${PROJECT_ROOT}"
+    pnpm install
 
-    log "Setting up project: ${PROJECT}"
-    cd "${project_dir}"
-
-    case "${PROJECT}" in
-        landing-page)
-            cd "${project_dir}"
-            pnpm install
-            success "Starting landing page dev server..."
-            pnpm run dev
-            ;;
-        language-tour)
-            cd "${project_dir}/elixir_tour"
-            mix deps.get
-            cd "${project_dir}"
-            pnpm install
-            success "Starting language tour dev server..."
-            pnpm run dev
-            ;;
-        *) error "Unknown project '${PROJECT}'. Use --help to see available projects." ;;
-    esac
-elif [[ -n "${EXAMPLE}" ]]; then
-    ensure_wasm_assets
-    ensure_js_dist
-
-    example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
-
-    if [[ ! -d "${example_dir}" ]]; then
-        error "Example '${EXAMPLE}' not found at ${example_dir}"
-    fi
-
-    log "Setting up example: ${EXAMPLE}"
-    cd "${example_dir}"
+    cd "${PROJECT_ROOT}/popcorn/elixir"
     mix deps.get
 
-    log "Cooking example..."
-    mix popcorn.cook
+    if [[ -n "${PROJECT}" ]]; then
+        local project_dir="${PROJECT_ROOT}/${PROJECT}"
 
-    if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
-        watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
+        if [[ ! -d "${project_dir}" ]]; then
+            error "Project '${PROJECT}' not found at ${project_dir}"
+        fi
+
+        log "Setting up project: ${PROJECT}"
+        cd "${project_dir}"
+
+        case "${PROJECT}" in
+            landing-page)
+                cd "${project_dir}"
+                pnpm install
+                success "Starting landing page dev server..."
+                pnpm run dev
+                ;;
+            language-tour)
+                cd "${project_dir}/elixir_tour"
+                mix deps.get
+                cd "${project_dir}"
+                pnpm install
+                success "Starting language tour dev server..."
+                pnpm run dev
+                ;;
+            *) error "Unknown project '${PROJECT}'. Use --help to see available projects." ;;
+        esac
+    elif [[ -n "${EXAMPLE}" ]]; then
+        ensure_wasm_assets
+        ensure_js_dist
+
+        local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+
+        if [[ ! -d "${example_dir}" ]]; then
+            error "Example '${EXAMPLE}' not found at ${example_dir}"
+        fi
+
+        log "Setting up example: ${EXAMPLE}"
+        cd "${example_dir}"
+        mix deps.get
+
+        log "Cooking example..."
+        mix popcorn.cook
+
+        if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
+            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
+        fi
+        watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm --filter @swmansion/popcorn exec rollup -c"
+        watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
+        start_watchers
+
+        success "Starting example server..."
+        elixir --erl "+Bi" -S mix popcorn.server &
+        local SERVER_PID=$!
+        trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
+        wait ${SERVER_PID}
+    else
+        ensure_wasm_assets
+        success "Starting JS library in watch mode..."
+        cd "${JS_DIR}"
+        pnpm run dev
     fi
-    watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm --filter @swmansion/popcorn exec rollup -c"
-    watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
-    start_watchers
+}
 
-    success "Starting example server..."
-    elixir --erl "+Bi" -S mix popcorn.server &
-    SERVER_PID=$!
-    trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
-    wait ${SERVER_PID}
-else
-    ensure_wasm_assets
-    success "Starting JS library in watch mode..."
-    cd "${JS_DIR}"
-    pnpm run dev
-fi
+main "$@"

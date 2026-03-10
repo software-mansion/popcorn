@@ -5,10 +5,6 @@ LOG_PREFIX="TEST"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-# Defaults
-MODE="unix"
-TEST_PATH=""
-
 usage() {
     cat << EOF
 Usage: $0 [OPTIONS] [path]
@@ -31,27 +27,6 @@ EOF
     exit 0
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage ;;
-        --unix) MODE="unix"; shift ;;
-        --wasm) MODE="wasm"; shift ;;
-        --js) MODE="js"; shift ;;
-        *)
-            if [[ -z "${TEST_PATH}" ]]; then
-                TEST_PATH="$1"
-            else
-                error "Unknown argument: $1"
-            fi
-            shift
-            ;;
-    esac
-done
-
-ELIXIR_DIR="${PROJECT_ROOT}/popcorn/elixir"
-ARTIFACTS_DIR="${ELIXIR_DIR}/popcorn_runtime_source/artifacts"
-BUILD_SCRIPT="${SCRIPT_DIR}/build-atomvm.sh"
-
 ensure_atomvm() {
     local target="$1"
     local artifact_dir="${ARTIFACTS_DIR}/${target}"
@@ -68,27 +43,55 @@ ensure_atomvm() {
     fi
 }
 
-case "${MODE}" in
-    unix)
-        ensure_atomvm unix
-        log "Running Elixir tests (unix target)"
-        cd "${ELIXIR_DIR}"
-        mix deps.get
-        mix test ${TEST_PATH}
-        ;;
-    wasm)
-        ensure_atomvm wasm
-        log "Running Elixir tests (wasm target)"
-        cd "${ELIXIR_DIR}"
-        mix deps.get
-        TARGET=wasm mix test ${TEST_PATH}
-        ;;
-    js)
-        log "Running JS e2e tests"
-        cd "${PROJECT_ROOT}/popcorn/js"
-        pnpm install
-        pnpm test:e2e ${TEST_PATH}
-        ;;
-esac
+main() {
+    local MODE="unix"
+    local TEST_PATH=""
 
-success "Tests passed!"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) usage ;;
+            --unix) MODE="unix"; shift ;;
+            --wasm) MODE="wasm"; shift ;;
+            --js) MODE="js"; shift ;;
+            *)
+                if [[ -z "${TEST_PATH}" ]]; then
+                    TEST_PATH="$1"
+                else
+                    error "Unknown argument: $1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    local ELIXIR_DIR="${PROJECT_ROOT}/popcorn/elixir"
+    local ARTIFACTS_DIR="${ELIXIR_DIR}/popcorn_runtime_source/artifacts"
+    local BUILD_SCRIPT="${SCRIPT_DIR}/build-atomvm.sh"
+
+    case "${MODE}" in
+        unix)
+            ensure_atomvm unix
+            log "Running Elixir tests (unix target)"
+            cd "${ELIXIR_DIR}"
+            mix deps.get
+            mix test ${TEST_PATH}
+            ;;
+        wasm)
+            ensure_atomvm wasm
+            log "Running Elixir tests (wasm target)"
+            cd "${ELIXIR_DIR}"
+            mix deps.get
+            TARGET=wasm mix test ${TEST_PATH}
+            ;;
+        js)
+            log "Running JS e2e tests"
+            cd "${PROJECT_ROOT}/popcorn/js"
+            pnpm install
+            pnpm test:e2e ${TEST_PATH}
+            ;;
+    esac
+
+    success "Tests passed!"
+}
+
+main "$@"
