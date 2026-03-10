@@ -29,7 +29,9 @@ EOF
 
 ensure_atomvm() {
     local target="$1"
-    local artifact_dir="${ARTIFACTS_DIR}/${target}"
+    local artifacts_dir="$2"
+    local build_script="$3"
+    local artifact_dir="${artifacts_dir}/${target}"
 
     case "${target}" in
         unix) local expected="${artifact_dir}/AtomVM" ;;
@@ -39,7 +41,7 @@ ensure_atomvm() {
     if [[ ! -f "${expected}" ]]; then
         log "AtomVM artifacts not found for ${target}, building..."
         load_env
-        "${BUILD_SCRIPT}" --outdir "${artifact_dir}" "debug-${target}"
+        "${build_script}" --outdir "${artifact_dir}" "debug-${target}"
     fi
 }
 
@@ -64,22 +66,22 @@ main() {
         esac
     done
 
-    local ELIXIR_DIR="${PROJECT_ROOT}/popcorn/elixir"
-    local ARTIFACTS_DIR="${ELIXIR_DIR}/popcorn_runtime_source/artifacts"
-    local BUILD_SCRIPT="${SCRIPT_DIR}/build-atomvm.sh"
+    local elixir_dir="${PROJECT_ROOT}/popcorn/elixir"
+    local artifacts_dir="${elixir_dir}/popcorn_runtime_source/artifacts"
+    local build_script="${SCRIPT_DIR}/build-atomvm.sh"
 
     case "${MODE}" in
         unix)
-            ensure_atomvm unix
+            ensure_atomvm unix "${artifacts_dir}" "${build_script}"
             log "Running Elixir tests (unix target)"
-            cd "${ELIXIR_DIR}"
+            cd "${elixir_dir}"
             mix deps.get
             mix test ${TEST_PATH}
             ;;
         wasm)
-            ensure_atomvm wasm
+            ensure_atomvm wasm "${artifacts_dir}" "${build_script}"
             log "Running Elixir tests (wasm target)"
-            cd "${ELIXIR_DIR}"
+            cd "${elixir_dir}"
             mix deps.get
             TARGET=wasm mix test ${TEST_PATH}
             ;;

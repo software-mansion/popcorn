@@ -30,17 +30,19 @@ require_cmd() {
 }
 
 ensure_wasm_assets() {
-    if [[ ! -f "${JS_DIR}/assets/AtomVM.wasm" ]]; then
+    local js_dir="$1"
+    if [[ ! -f "${js_dir}/assets/AtomVM.wasm" ]]; then
         log "WASM assets not found, building..."
-        cd "${JS_DIR}"
+        cd "${js_dir}"
         pnpm run assets:dev
     fi
 }
 
 ensure_js_dist() {
-    if [[ ! -f "${JS_DIR}/dist/index.mjs" ]]; then
+    local js_dir="$1"
+    if [[ ! -f "${js_dir}/dist/index.mjs" ]]; then
         log "JS dist not found, building..."
-        cd "${JS_DIR}"
+        cd "${js_dir}"
         pnpm --filter @swmansion/popcorn exec rollup -c
     fi
 }
@@ -114,7 +116,7 @@ main() {
         esac
     done
 
-    local JS_DIR="${PROJECT_ROOT}/popcorn/js"
+    local js_dir="${PROJECT_ROOT}/popcorn/js"
     WATCHER_CMDS=()
 
     load_env
@@ -155,8 +157,8 @@ main() {
             *) error "Unknown project '${PROJECT}'. Use --help to see available projects." ;;
         esac
     elif [[ -n "${EXAMPLE}" ]]; then
-        ensure_wasm_assets
-        ensure_js_dist
+        ensure_wasm_assets "${js_dir}"
+        ensure_js_dist "${js_dir}"
 
         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
 
@@ -172,9 +174,9 @@ main() {
         mix popcorn.cook
 
         if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
-            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
+            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${js_dir}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
         fi
-        watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm --filter @swmansion/popcorn exec rollup -c"
+        watch dir="${js_dir}/src" exts="ts,js" cmd="cd '${js_dir}' && pnpm --filter @swmansion/popcorn exec rollup -c"
         watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
         start_watchers
 
@@ -184,9 +186,9 @@ main() {
         trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
         wait ${SERVER_PID}
     else
-        ensure_wasm_assets
+        ensure_wasm_assets "${js_dir}"
         success "Starting JS library in watch mode..."
-        cd "${JS_DIR}"
+        cd "${js_dir}"
         pnpm run dev
     fi
 }
