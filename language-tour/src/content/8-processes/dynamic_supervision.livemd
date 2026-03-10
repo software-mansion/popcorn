@@ -129,6 +129,7 @@ JobQueue.schedule_job(
 
 This job is quite simple, but we could run more complex jobs, like querying a database, that could potentially fail. Let's simulate that: the cell below runs a job that has ~30% failure rate:
 
+<!-- langtour:{"test_replace_code":"JobQueue.schedule_job(fn -> \"Job result\" end)"} -->
 ```elixir
 JobQueue.schedule_job(
   fn ->

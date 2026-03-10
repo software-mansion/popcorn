@@ -80,7 +80,9 @@ export const navigationStructure: NavigationStructure = [
       { name: "Message passing", contentPath: "8-processes/message_passing" },
       { name: "Links", contentPath: "8-processes/links" },
       { name: "State and Agent", contentPath: "8-processes/state_and_agent" },
-      { name: "GenServer", contentPath: "8-processes/gen_server" }
+      { name: "GenServer", contentPath: "8-processes/gen_server" },
+      { name: "Supervision", contentPath: "8-processes/supervision" },
+      { name: "Dynamic supervision", contentPath: "8-processes/dynamic_supervision" },
     ]
   },
   {
