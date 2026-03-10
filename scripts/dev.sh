@@ -25,6 +25,22 @@ EOF
     exit 0
 }
 
+unknown_example() {
+    echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2
+    echo ""
+    echo "Available examples:"
+    list_examples
+    exit 1
+}
+
+unknown_project() {
+    echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2
+    echo ""
+    echo "Available projects:"
+    list_projects
+    exit 1
+}
+
 require_cmd() {
     command -v "$1" &> /dev/null || error "$1 is required but not found"
 }
@@ -105,11 +121,23 @@ main() {
         case "$1" in
             -h|--help) usage ;;
             --example)
+                if [[ -z "${2:-}" || "$2" == --* ]]; then
+                    unknown_example "--example requires a name."
+                fi
                 EXAMPLE="$2"
+                if [[ ! -d "${PROJECT_ROOT}/examples/${EXAMPLE}" ]]; then
+                    unknown_example "Unknown example '${EXAMPLE}'."
+                fi
                 shift 2
                 ;;
             --project)
+                if [[ -z "${2:-}" || "$2" == --* ]]; then
+                    unknown_project "--project requires a name."
+                fi
                 PROJECT="$2"
+                if [[ ! -d "${PROJECT_ROOT}/${PROJECT}" ]]; then
+                    unknown_project "Unknown project '${PROJECT}'."
+                fi
                 shift 2
                 ;;
             *) error "Unknown option: $1" ;;
@@ -132,10 +160,6 @@ main() {
     if [[ -n "${PROJECT}" ]]; then
         local project_dir="${PROJECT_ROOT}/${PROJECT}"
 
-        if [[ ! -d "${project_dir}" ]]; then
-            error "Project '${PROJECT}' not found at ${project_dir}"
-        fi
-
         log "Setting up project: ${PROJECT}"
         cd "${project_dir}"
 
@@ -154,17 +178,13 @@ main() {
                 success "Starting language tour dev server..."
                 pnpm run dev
                 ;;
-            *) error "Unknown project '${PROJECT}'. Use --help to see available projects." ;;
+            *) unknown_project "Unknown project '${PROJECT}'." ;;
         esac
     elif [[ -n "${EXAMPLE}" ]]; then
         ensure_wasm_assets "${js_dir}"
         ensure_js_dist "${js_dir}"
 
         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
-
-        if [[ ! -d "${example_dir}" ]]; then
-            error "Example '${EXAMPLE}' not found at ${example_dir}"
-        fi
 
         log "Setting up example: ${EXAMPLE}"
         cd "${example_dir}"
