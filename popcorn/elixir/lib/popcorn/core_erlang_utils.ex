@@ -208,7 +208,12 @@ defmodule Popcorn.CoreErlangUtils do
   end
 
   defp rename_funs_and_local_calls({:id, {line, col, id}}, ctx) do
-    "-" <> id = Atom.to_string(id)
+    id =
+      case Atom.to_string(id) do
+        "-" <> id -> id
+        id -> id
+      end
+
     {:id, {line, col, :"-#{ctx.prefix}_#{id}"}}
   end
 
