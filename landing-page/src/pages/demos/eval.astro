@@ -89,6 +89,8 @@ end"
 </style>
 
 <script>
+  import { Popcorn } from "@swmansion/popcorn";
+
   const LANGUAGE = "elixir";
   const EVAL_ELIXIR = "eval_elixir";
 
@@ -129,14 +131,9 @@ end"
   };
 
   async function setup() {
-    if (typeof window.Popcorn === "undefined") {
-      throw new Error("Popcorn not available after waiting");
-    }
-
     try {
-      popcorn = await window.Popcorn.init({
-        bundlePath: "../wasm/eval.avm",
-        wasmDir: "/wasm/",
+      popcorn = await Popcorn.init({
+        bundlePath: "/wasm/eval.avm",
         debug: true,
         onStdout: (text) => displayLog(text, { isError: false }),
         onStderr: (text) => displayLog(text, { isError: true }),

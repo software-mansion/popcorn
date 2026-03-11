@@ -134,11 +134,12 @@ import Section from "../../components/Section.astro";
 </style>
 
 <script>
+  import { Popcorn } from "@swmansion/popcorn";
+
   async function init() {
     try {
       await Popcorn.init({
-        bundlePath: "../wasm/gol.avm",
-        wasmDir: "/wasm/",
+        bundlePath: "/wasm/gol.avm",
         debug: false,
         onStdout: (text: string) => console.log(text),
         onStderr: (text: string) => console.error(text),

@@ -13,6 +13,7 @@
     "@fontsource-variable/handjet": "^5.2.6",
     "@fontsource-variable/inter": "^5.2.6",
     "@iconify-json/material-symbols-light": "^1.2.30",
+    "@swmansion/popcorn": "workspace:*",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -28,6 +29,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "rehype-mermaid": "^3.0.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.1.11",
     "three": "^0.178.0"
   },

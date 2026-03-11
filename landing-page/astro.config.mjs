@@ -8,7 +8,8 @@ import icon from "astro-icon";
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
 import devtoolsJson from "vite-plugin-devtools-json";
-import { buildBundle, buildWasm, cleanWasmDir } from "./build-wasm.js";
+import { popcorn } from "@swmansion/popcorn/vite";
+import { buildBundle, cleanWasmDir } from "./build-wasm.js";
 
 // https://astro.build/config
 export default defineConfig({
@@ -25,7 +26,11 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [devtoolsJson(), tailwindcss()],
+    plugins: [
+      devtoolsJson(),
+      tailwindcss(),
+      popcorn({ bundlePath: "./public/wasm/iex.avm" }),
+    ],
   },
   integrations: [
     react(),
@@ -60,8 +65,6 @@ export default defineConfig({
       dir: "../examples/local-lv-forms/local",
       newBundleName: "local_forms.avm",
     }),
-    // take runtime from iex wasm
-    buildWasm({ dir: "../examples/iex-wasm/static/wasm" }),
   ],
   markdown: {
     // used for build-time generation of diagrams

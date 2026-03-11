@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { cp, rm, mkdir, appendFile, readdir } from "fs/promises";
+import { cp, rm, mkdir, readdir } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -22,43 +22,6 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
         await cp(src, dst);
 
         logger.info("Bundle copied");
-      },
-    },
-  };
-}
-
-const RUNTIME_FILES = [
-  "AtomVM.mjs",
-  "AtomVM.wasm",
-  "popcorn.js",
-  "popcorn_iframe.js",
-];
-
-export function buildWasm({ dir }) {
-  return {
-    name: "build-wasm",
-    hooks: {
-      "astro:config:setup": async ({ logger, config }) => {
-        logger.info(`Copying runtime files from '${dir}'...`);
-        const srcFiles = await readdir(dir);
-        const wasmDestPath = wasmDir(config);
-
-        const cpPromises = srcFiles
-          .filter((file) => RUNTIME_FILES.includes(file))
-          .map((file) => {
-            const src = join(dir, file);
-            const dst = join(wasmDestPath, file);
-            return cp(src, dst);
-          });
-
-        await Promise.all(cpPromises);
-
-        await appendFile(
-          join(wasmDestPath, "popcorn.js"),
-          "\nwindow.Popcorn = Popcorn;\n",
-        );
-
-        logger.info("Wasm files copied to public directory");
       },
     },
   };

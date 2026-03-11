@@ -132,6 +132,9 @@ importers:
       '@iconify-json/material-symbols-light':
         specifier: ^1.2.30
         version: 1.2.58
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../popcorn/js
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.1(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1))
@@ -177,6 +180,9 @@ importers:
       rehype-mermaid:
         specifier: ^3.0.0
         version: 3.0.0(playwright@1.58.2)
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
       tailwindcss:
         specifier: ^4.1.11
         version: 4.2.1
@@ -4890,8 +4896,7 @@ snapshots:
       '@iconify/types': 2.0.0
       mlly: 1.8.0
 
-  '@img/colour@1.0.0':
-    optional: true
+  '@img/colour@1.0.0': {}
 
   '@img/sharp-darwin-arm64@0.34.5':
     optionalDependencies:
@@ -8297,7 +8302,6 @@ snapshots:
       '@img/sharp-win32-arm64': 0.34.5
       '@img/sharp-win32-ia32': 0.34.5
       '@img/sharp-win32-x64': 0.34.5
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:

@@ -1,12 +1,9 @@
+ARG POPCORN_BASE_IMAGE=ghcr.io/software-mansion/popcorn-base
 ARG POPCORN_BASE_TAG=latest
-FROM ghcr.io/software-mansion/popcorn-base:${POPCORN_BASE_TAG} AS build_landing
-
-WORKDIR /build/popcorn/examples/iex-wasm
-RUN mix build
+FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS build_landing
 
 WORKDIR /build/popcorn/landing-page
-RUN npm ci
-RUN npm run build
+RUN pnpm run build
 RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
