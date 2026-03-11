@@ -74,6 +74,8 @@ defmodule CompareLiveViews.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
+      build: ["setup"],
+      dev: ["phx.server"],
       setup: ["deps.get", "compile", "assets.setup", "assets.build", &build_local/1],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind compare_live_views", "esbuild compare_live_views"],

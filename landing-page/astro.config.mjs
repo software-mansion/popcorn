@@ -49,12 +49,14 @@ export default defineConfig({
       newBundleName: "eval.avm",
     }),
     buildBundle({
-      wasmSrcPathDefault: "../examples/local-lv-thermostat/static/local_live_view/wasm",
+      wasmSrcPathDefault:
+        "../examples/local-lv-thermostat/static/local_live_view/wasm",
       dir: "../examples/local-lv-thermostat",
       newBundleName: "local_thermostat.avm",
     }),
     buildBundle({
-      wasmSrcPathDefault: "../examples/local-lv-forms/priv/static/local_live_view/wasm",
+      wasmSrcPathDefault:
+        "../examples/local-lv-forms/priv/static/local_live_view/wasm",
       dir: "../examples/local-lv-forms/local",
       newBundleName: "local_forms.avm",
     }),
