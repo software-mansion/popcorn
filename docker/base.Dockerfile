@@ -30,6 +30,7 @@ RUN install -dm 755 /etc/apt/keyrings && \
     apt install -y mise
 
 RUN mise use --global node@"${NODE_VERSION}" && mise install
+RUN mise use --global pnpm@10 && mise install
 RUN mise use --global erlang@"${ERLANG_VERSION}" && mise install
 RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
     mise install && \
@@ -47,3 +48,12 @@ WORKDIR /build/atomvm/src/platforms/emscripten/build
 RUN emcmake cmake .. -DAVM_EMSCRIPTEN_ENV=web
 RUN emmake make -j$(nproc)
 RUN cp src/AtomVM.mjs src/AtomVM.wasm /build/out/
+
+# Install JS workspace dependencies
+WORKDIR /build/popcorn
+RUN pnpm install --frozen-lockfile
+
+# Build the popcorn JS package (reuse pre-built AtomVM instead of rebuilding)
+RUN mkdir -p popcorn/js/assets && \
+    cp /build/out/AtomVM.mjs /build/out/AtomVM.wasm popcorn/js/assets/
+RUN cd popcorn/js && pnpm exec rollup -c
