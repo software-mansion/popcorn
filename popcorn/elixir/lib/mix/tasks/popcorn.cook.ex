@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   Without this flag, only the `.avm` bundle is generated.
 
   `out_dir` is mandatory, unless provided via `config.exs`,
-  for example `config :popcorn, out_dir: "static/wasm"`
+  for example `config :popcorn, out_dir: "dist/wasm"`
   """
   use Mix.Task
 

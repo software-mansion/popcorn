@@ -10,7 +10,7 @@ defmodule HelloPopcorn.MixProject do
       deps: deps(),
       aliases: [
         build: ["deps.get", &pnpm_install/1, "popcorn.cook", &build_js/1],
-        dev: ["build", "popcorn.server --dir dist"]
+        dev: ["build", "popcorn.server"]
       ]
     ]
   end

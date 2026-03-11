@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Popcorn.Server do
   ## Options
 
     * `--port` - port to listen on (default: 4000)
-    * `--dir` - directory to serve files from (default: "static")
+    * `--dir` - directory to serve files from (default: "dist")
 
   ## Examples
 
@@ -106,7 +106,7 @@ defmodule Mix.Tasks.Popcorn.Server do
       OptionParser.parse!(args, strict: [port: :integer, dir: :string])
 
     port_num = Keyword.get(opts, :port, 4000)
-    dir = Path.expand(Keyword.get(opts, :dir, "static"))
+    dir = Path.expand(Keyword.get(opts, :dir, "dist"))
 
     if not File.dir?(dir) do
       Mix.raise("Directory #{inspect(dir)} does not exist")

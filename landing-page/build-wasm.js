@@ -9,7 +9,7 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
     hooks: {
       "astro:config:setup": async ({ logger, config }) => {
         logger.info(`Building bundle in '${dir}'...`);
-        const wasmSrcPath = wasmSrcPathDefault ?? join(dir, "static", "wasm");
+        const wasmSrcPath = wasmSrcPathDefault ?? join(dir, "dist", "wasm");
         const wasmDestPath = wasmDir(config);
 
         await run("mix", ["build"], { dir });

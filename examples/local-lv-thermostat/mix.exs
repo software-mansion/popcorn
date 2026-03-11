@@ -10,7 +10,7 @@ defmodule LocalThermostat.MixProject do
       deps: deps(),
       aliases: [
         build: ["deps.get", "popcorn.cook"],
-        dev: ["build", "popcorn.server"]
+        dev: ["build", "popcorn.server --dir static"]
       ]
     ]
   end
