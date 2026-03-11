@@ -74,6 +74,8 @@ defmodule FormDemo.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
+      build: ["setup"],
+      dev: ["setup", "phx.server"],
       setup: ["deps.get", "compile", "assets.setup", "assets.build", &build_local/1],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind form_demo", "esbuild form_demo"],
@@ -94,13 +96,7 @@ defmodule FormDemo.MixProject do
   end
 
   defp build_local(_) do
-    Mix.shell().cmd(
-      """
-      mix deps.get
-      mix popcorn.cook --include-vm
-      """,
-      cd: "local"
-    )
+    Mix.shell().cmd("mix build", cd: "local")
   end
 
   defp local_lint(_) do
