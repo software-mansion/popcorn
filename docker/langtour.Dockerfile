@@ -1,13 +1,13 @@
+ARG POPCORN_BASE_IMAGE=ghcr.io/software-mansion/popcorn-base
 ARG POPCORN_BASE_TAG=latest
-FROM ghcr.io/software-mansion/popcorn-base:${POPCORN_BASE_TAG} AS build_lang_tour
+FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS build_lang_tour
 
 ARG SENTRY_DSN
 ARG SENTRY_MODE
 ARG APP_VERSION
 
 WORKDIR /build/popcorn/language-tour
-RUN npm ci
-RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" npm run build
+RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" pnpm run build
 RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
