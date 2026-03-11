@@ -11,5 +11,5 @@ await esbuild.build({
   format: "esm",
   sourcemap: true,
   outfile: "../dist/index.js",
-  plugins: [popcorn({ bundlePath: "../dist/wasm/bundle.avm" })],
+  plugins: [popcorn({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
 });

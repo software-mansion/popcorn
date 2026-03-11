@@ -29,7 +29,7 @@ export default defineConfig({
       rehypePlugins: [[rehypeHighlight, { languages: { elixir } }]]
     }),
     svgr(),
-    popcorn({ bundlePath: "./public/wasm/bundle.avm" }),
+    popcorn({ bundlePaths: ["./public/wasm/bundle.avm"] }),
     cookOnChange()
   ],
   server: {
