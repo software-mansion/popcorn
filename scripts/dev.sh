@@ -198,6 +198,12 @@ main() {
          cd "${example_dir}"
          mix dev
 
+    elif [[ "${EXAMPLE}" == "hello-react" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         pnpm run dev
+
     elif [[ -n "${EXAMPLE}" ]]; then
         ensure_wasm_assets "${js_dir}"
         ensure_js_dist "${js_dir}"
