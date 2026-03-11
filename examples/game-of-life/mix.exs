@@ -10,7 +10,8 @@ defmodule GameOfLife.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        build_wasm: "popcorn.build_runtime --target wasm"
+        build: ["deps.get", "popcorn.build_runtime --target wasm", "popcorn.cook --include-vm"],
+        dev: ["build", "popcorn.server"]
       ]
     ]
   end
