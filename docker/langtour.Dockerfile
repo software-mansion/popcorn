@@ -5,10 +5,6 @@ ARG SENTRY_DSN
 ARG SENTRY_MODE
 ARG APP_VERSION
 
-WORKDIR /build/popcorn/language-tour/elixir_tour
-RUN mix deps.get
-RUN mix popcorn.cook
-
 WORKDIR /build/popcorn/language-tour
 RUN npm ci
 RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" npm run build
