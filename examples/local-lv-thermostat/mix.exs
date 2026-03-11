@@ -7,7 +7,11 @@ defmodule LocalThermostat.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: [
+        build: ["deps.get", "popcorn.cook --include-vm"],
+        dev: ["build", "popcorn.server"]
+      ]
     ]
   end
 
