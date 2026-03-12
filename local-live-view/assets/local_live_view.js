@@ -63,11 +63,6 @@ export async function setup(liveSocket) {
     );
   });
   window.addEventListener("phx:llv_rerender", async (e) => {
-    console.log("llv_rerender event received", e.detail.view);
-    console.log(
-      "llv_rerender event roots view",
-      liveSocket.roots[e.detail.view],
-    );
     liveSocket.roots[e.detail.view].join();
     const { data, durationMs } = await popcorn.call(
       {
