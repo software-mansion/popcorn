@@ -74,8 +74,8 @@ defmodule LocalThermostat.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      build: ["deps.get", "popcorn.cook"],
-      dev: ["build", "popcorn.server --dir static"]
+      build: ["setup"],
+      dev: ["setup", "phx.server"],
       setup: [&build_local/1, "deps.get", "compile", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind local_thermostat", "esbuild local_thermostat"],
