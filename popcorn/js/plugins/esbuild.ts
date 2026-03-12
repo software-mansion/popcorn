@@ -9,9 +9,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const popcornDistDir = resolve(__dirname, "..");
 
 export function popcorn(options: PopcornPluginOptions): Plugin {
-  const bundlePath = options.bundlePath;
-  const bundleName = basename(bundlePath);
-  const bundleDir = dirname(bundlePath);
+  const bundles = options.bundlePaths.map((p) => ({
+    name: basename(p),
+    dir: dirname(p),
+  }));
 
   let outputDir: string;
   return {
@@ -42,8 +43,10 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
 
         try {
           await Promise.all([
-            // Copy bundle to wasm directory
-            copy(bundleName, { inDir: bundleDir, outDir: outputDir }),
+            // Copy bundles to output directory
+            ...bundles.map((b) =>
+              copy(b.name, { inDir: b.dir, outDir: outputDir }),
+            ),
             // Copy popcorn runtime files to output directory
             // These need to be alongside the bundled code for import.meta.url to work
             copy("iframe.mjs", { inDir: popcornDistDir, outDir: outputDir }),

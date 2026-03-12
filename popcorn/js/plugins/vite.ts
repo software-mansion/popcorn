@@ -11,9 +11,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const popcornDistDir = resolve(__dirname, "..");
 
 export function popcorn(options: PopcornPluginOptions): Plugin {
-  const bundlePath = options.bundlePath;
-  const bundleName = basename(bundlePath);
-  const bundleUrl = `/${bundleName}`;
+  const bundlePaths = options.bundlePaths;
+  const bundles = bundlePaths.map((p) => ({
+    path: p,
+    name: basename(p),
+    url: `/${basename(p)}`,
+  }));
 
   let assetsDir: string;
 
@@ -30,10 +33,13 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
     },
 
     async configResolved(config: ResolvedConfig) {
-      try {
-        await stat(bundlePath);
-      } catch {
-        this.error(`[popcorn] Bundle doesn't exist at '${bundlePath}'`);
+      const results = await Promise.allSettled(
+        bundles.map((b) => stat(b.path)),
+      );
+      for (const [i, result] of results.entries()) {
+        if (result.status === "rejected") {
+          this.error(`[popcorn] Bundle doesn't exist at '${bundles[i].path}'`);
+        }
       }
 
       config.server.fs.allow.push(popcornDistDir);
@@ -44,9 +50,11 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
       server.middlewares.use(async (req, res, next) => {
         setSharedArrayBufferHeaders(res);
 
-        const opts = { bundleUrl, bundlePath };
-        const served = await serveAvmBundle(req, res, opts);
-        if (served) return;
+        for (const bundle of bundles) {
+          const opts = { bundleUrl: bundle.url, bundlePath: bundle.path };
+          const served = await serveAvmBundle(req, res, opts);
+          if (served) return;
+        }
 
         next();
       });
@@ -56,21 +64,25 @@ export function popcorn(options: PopcornPluginOptions): Plugin {
       server.middlewares.use(async (req, res, next) => {
         setSharedArrayBufferHeaders(res);
 
-        const opts = { bundleUrl, bundlePath };
-        const served = await serveAvmBundle(req, res, opts);
-        if (served) return;
+        for (const bundle of bundles) {
+          const opts = { bundleUrl: bundle.url, bundlePath: bundle.path };
+          const served = await serveAvmBundle(req, res, opts);
+          if (served) return;
+        }
 
         next();
       });
     },
 
     async generateBundle() {
-      // Emit bundle to wasm directory
-      this.emitFile({
-        type: "asset",
-        fileName: `${assetsDir}/${bundleName}`,
-        source: await readFile(bundlePath),
-      });
+      // Emit bundles to assets directory
+      for (const bundle of bundles) {
+        this.emitFile({
+          type: "asset",
+          fileName: `${assetsDir}/${bundle.name}`,
+          source: await readFile(bundle.path),
+        });
+      }
 
       // Emit AtomVM files to assets directory (same location as iframe.mjs)
       // Vite treats iframe.mjs as a static asset and doesn't analyze its imports

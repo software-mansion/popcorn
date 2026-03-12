@@ -9,19 +9,23 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const popcornDistDir = resolve(__dirname, "..");
 
 export function popcorn(options: PopcornPluginOptions): Plugin<unknown> {
-  const bundlePath = options.bundlePath;
-  const bundleName = basename(bundlePath);
+  const bundles = options.bundlePaths.map((p) => ({
+    path: p,
+    name: basename(p),
+  }));
 
   return {
     name: "popcorn",
 
     async generateBundle() {
-      // Emit bundle to wasm directory
-      this.emitFile({
-        type: "asset",
-        fileName: resolve(popcornDistDir, bundleName),
-        source: await readFile(bundlePath),
-      });
+      // Emit bundles
+      for (const bundle of bundles) {
+        this.emitFile({
+          type: "asset",
+          fileName: resolve(popcornDistDir, bundle.name),
+          source: await readFile(bundle.path),
+        });
+      }
 
       // Emit popcorn runtime files to output directory
       // These need to be alongside the bundled code for import.meta.url to work

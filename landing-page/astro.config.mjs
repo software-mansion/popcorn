@@ -29,7 +29,7 @@ export default defineConfig({
     plugins: [
       devtoolsJson(),
       tailwindcss(),
-      popcorn({ bundlePath: "./public/wasm/iex.avm" }),
+      popcorn({ bundlePaths: [] }),
     ],
   },
   integrations: [

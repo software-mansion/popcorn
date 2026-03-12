@@ -10,7 +10,7 @@ const bundlePath = resolve(__dirname, "../elixir/_build/bundle.avm");
 
 export default defineConfig({
   root: __dirname,
-  plugins: [popcorn({ bundlePath })],
+  plugins: [popcorn({ bundlePaths: [bundlePath] })],
   server: {
     port: 5173,
     strictPort: true,

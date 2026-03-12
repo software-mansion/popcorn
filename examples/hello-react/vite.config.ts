@@ -13,7 +13,7 @@ export default defineConfig({
 
     popcorn({
       // Path to your .avm bundle file
-      bundlePath: "ex_app/_build/wasm/bundle.avm",
+      bundlePaths: ["ex_app/_build/wasm/bundle.avm"],
     }),
   ],
 });
