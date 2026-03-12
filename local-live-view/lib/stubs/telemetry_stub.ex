@@ -1,7 +1,12 @@
 # Stub: telemetry is not available on AtomVM, so we provide no-op implementations
 
 module = :telemetry
-File.rm(:code.which(module))
+
+:code.which(module)
+|> case do
+  :non_existing -> :ok
+  path -> File.rm(path)
+end
 :code.purge(module)
 
 defmodule :telemetry do

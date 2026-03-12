@@ -24,5 +24,3 @@ demo_modal_offline-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-
-/stubs/

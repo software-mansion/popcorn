@@ -28,5 +28,3 @@ local_thermostat-*.tar
 /static/local_live_view
 
 /static/assets
-
-/stubs/

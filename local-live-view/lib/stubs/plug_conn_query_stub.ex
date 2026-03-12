@@ -1,7 +1,12 @@
 # Stub: AtomVM fails to percent decode in URI.decode_www_form, so we replace it with a local implementation
 
 module = Plug.Conn.Query
-File.rm(:code.which(module))
+
+:code.which(module)
+|> case do
+  :non_existing -> :ok
+  path -> File.rm(path)
+end
 :code.purge(module)
 
 defmodule module do

@@ -123,7 +123,8 @@ defmodule Popcorn do
       |> Path.join("lib/*/ebin/*.beam")
       |> Path.wildcard()
       |> Enum.reject(fn path ->
-        String.starts_with?(path, @popcorn_path) and not beam_src_in_api_dir?(path)
+        is_popcorn_subpath = Path.relative_to(path, @popcorn_path) != path
+        is_popcorn_subpath and not beam_src_in_api_dir?(path)
       end)
 
     consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
