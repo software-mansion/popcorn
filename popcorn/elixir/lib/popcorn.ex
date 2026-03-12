@@ -98,8 +98,7 @@ defmodule Popcorn do
   defp bundled_artifacts(applications) do
     builtin_apps = Build.builtin_app_names() |> MapSet.new()
 
-    {builtin_deps, dep_apps} =
-      Enum.split_with(applications, &MapSet.member?(builtin_apps, to_string(&1)))
+    builtin_deps = Enum.filter(applications, &MapSet.member?(builtin_apps, to_string(&1)))
 
     available_builtin_apps = Build.available_apps() |> MapSet.new()
 
@@ -125,15 +124,12 @@ defmodule Popcorn do
     popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
 
     dep_beams =
-      Enum.flat_map(dep_apps, fn dep ->
-        beams = dep |> Application.app_dir("ebin/*.beam") |> Path.wildcard()
-
-        # TODO: Separate runtime and build modules to avoid such ugly filtering
-        if dep == :popcorn do
-          Enum.filter(beams, &beam_src_in_api_dir?/1)
-        else
-          beams
-        end
+      Mix.Project.build_path()
+      |> Path.join("lib/*/ebin/*.beam")
+      |> Path.wildcard()
+      |> Enum.reject(fn path ->
+        is_popcorn_subpath = Path.relative_to(path, @popcorn_path) != path
+        is_popcorn_subpath and not beam_src_in_api_dir?(path)
       end)
 
     consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))

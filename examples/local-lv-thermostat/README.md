@@ -11,4 +11,3 @@ mix popcorn.server
 ```
 
 and visit [localhost:4000](http://localhost:4000)
-
