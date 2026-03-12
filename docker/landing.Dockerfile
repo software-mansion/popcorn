@@ -2,8 +2,7 @@ ARG POPCORN_BASE_TAG=latest
 FROM ghcr.io/software-mansion/popcorn-base:${POPCORN_BASE_TAG} AS build_landing
 
 WORKDIR /build/popcorn/examples/iex-wasm
-RUN mix deps.get
-RUN mix popcorn.cook
+RUN mix build
 
 WORKDIR /build/popcorn/landing-page
 RUN npm ci

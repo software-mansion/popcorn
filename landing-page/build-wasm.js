@@ -9,11 +9,10 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
     hooks: {
       "astro:config:setup": async ({ logger, config }) => {
         logger.info(`Building bundle in '${dir}'...`);
-        const wasmSrcPath = wasmSrcPathDefault || join(dir, "static", "wasm");
+        const wasmSrcPath = wasmSrcPathDefault ?? join(dir, "static", "wasm");
         const wasmDestPath = wasmDir(config);
 
-        await run("mix", ["deps.get"], { dir });
-        await run("mix", ["popcorn.cook"], { dir });
+        await run("mix", ["build"], { dir });
 
         const srcFiles = await readdir(wasmSrcPath);
         const [avm] = srcFiles.filter((path) => path.endsWith(".avm"));

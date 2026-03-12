@@ -53,8 +53,11 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     build_mode = "debug-#{target}"
     script_args = script_args ++ [build_mode]
 
-    # Find script path relative to project root
-    script_path = Path.join([File.cwd!(), "scripts", "build-atomvm.sh"])
+    # Find script path relative to the popcorn package root
+    popcorn_root = Mix.Project.deps_paths()[:popcorn] || File.cwd!()
+
+    script_path =
+      Path.join([popcorn_root, "..", "..", "scripts", "build-atomvm.sh"]) |> Path.expand()
 
     unless File.exists?(script_path) do
       raise "Build script not found at #{script_path}"

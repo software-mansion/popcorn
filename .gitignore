@@ -2,7 +2,7 @@
 
 # Elixir build artifacts
 _build/
-elixir/popcorn_runtime_source/
+popcorn/elixir/popcorn_runtime_source/
 cover/
 deps/
 doc/

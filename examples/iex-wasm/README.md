@@ -6,13 +6,13 @@ To build, type:
 
 ```sh
 mix deps.get
-mix popcorn.cook
+mix popcorn.cook --include-vm
 ```
 
 You can serve it by running
 
 ```sh
-elixir server.exs
+mix popcorn.server
 ```
 
 and it'll be available at <http://localhost:4000>

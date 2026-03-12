@@ -5,9 +5,6 @@ LOG_PREFIX="DEV"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-EXAMPLE=""
-PROJECT=""
-
 usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
@@ -28,41 +25,41 @@ EOF
     exit 0
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage ;;
-        --example)
-            EXAMPLE="$2"
-            shift 2
-            ;;
-        --project)
-            PROJECT="$2"
-            shift 2
-            ;;
-        *) error "Unknown option: $1" ;;
-    esac
-done
+unknown_example() {
+    echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2
+    echo ""
+    echo "Available examples:"
+    list_examples
+    exit 1
+}
 
-JS_DIR="${PROJECT_ROOT}/popcorn/js"
-WATCHER_CMDS=()
+unknown_project() {
+    echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2
+    echo ""
+    echo "Available projects:"
+    list_projects
+    exit 1
+}
 
 require_cmd() {
     command -v "$1" &> /dev/null || error "$1 is required but not found"
 }
 
 ensure_wasm_assets() {
-    if [[ ! -f "${JS_DIR}/assets/AtomVM.wasm" ]]; then
+    local js_dir="$1"
+    if [[ ! -f "${js_dir}/assets/AtomVM.wasm" ]]; then
         log "WASM assets not found, building..."
-        cd "${JS_DIR}"
+        cd "${js_dir}"
         pnpm run assets:dev
     fi
 }
 
 ensure_js_dist() {
-    if [[ ! -f "${JS_DIR}/dist/index.mjs" ]]; then
+    local js_dir="$1"
+    if [[ ! -f "${js_dir}/dist/index.mjs" ]]; then
         log "JS dist not found, building..."
-        cd "${JS_DIR}"
-        pnpm exec rollup -c
+        cd "${js_dir}"
+        pnpm --filter @swmansion/popcorn exec rollup -c
     fi
 }
 
@@ -96,13 +93,16 @@ start_watchers() {
 
     local main_pid=$$
     local dirs=()
+    for ((i = 0; i < ${#WATCHER_CMDS[@]}; i += 3)); do
+        dirs+=("${WATCHER_CMDS[i]#"${PROJECT_ROOT}"/}")
+    done
+
     (
         for ((i = 0; i < ${#WATCHER_CMDS[@]}; i += 3)); do
             local dir="${WATCHER_CMDS[i]}"
             local exts="${WATCHER_CMDS[i+1]}"
             local cmd="${WATCHER_CMDS[i+2]}"
-            dirs+=("${dir}")
-            watchexec -w "${dir}" -e "${exts}" -- \
+            watchexec --postpone -w "${dir}" -e "${exts}" -- \
                 bash -c "${cmd} || kill ${main_pid}" &
         done
         while kill -0 ${main_pid} 2>/dev/null; do sleep 5; done
@@ -113,72 +113,152 @@ start_watchers() {
     log "Watching for changes (${dirs[*]})"
 }
 
-load_env
-require_cmd pnpm
+main() {
+    local EXAMPLE=""
+    local PROJECT=""
 
-log "Installing dependencies..."
-cd "${PROJECT_ROOT}"
-pnpm install
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help) usage ;;
+            --example)
+                if [[ -z "${2:-}" || "$2" == --* ]]; then
+                    unknown_example "--example requires a name."
+                fi
+                EXAMPLE="$2"
+                if [[ ! -d "${PROJECT_ROOT}/examples/${EXAMPLE}" ]]; then
+                    unknown_example "Unknown example '${EXAMPLE}'."
+                fi
+                shift 2
+                ;;
+            --project)
+                if [[ -z "${2:-}" || "$2" == --* ]]; then
+                    unknown_project "--project requires a name."
+                fi
+                PROJECT="$2"
+                if [[ ! -d "${PROJECT_ROOT}/${PROJECT}" ]]; then
+                    unknown_project "Unknown project '${PROJECT}'."
+                fi
+                shift 2
+                ;;
+            *) error "Unknown option: $1" ;;
+        esac
+    done
 
-cd "${PROJECT_ROOT}/popcorn/elixir"
-mix deps.get
+    local js_dir="${PROJECT_ROOT}/popcorn/js"
+    WATCHER_CMDS=()
 
-if [[ -n "${PROJECT}" ]]; then
-    project_dir="${PROJECT_ROOT}/${PROJECT}"
+    load_env
+    require_cmd pnpm
 
-    if [[ ! -d "${project_dir}" ]]; then
-        error "Project '${PROJECT}' not found at ${project_dir}"
-    fi
+    log "Installing dependencies..."
+    cd "${PROJECT_ROOT}"
+    pnpm install
 
-    log "Setting up project: ${PROJECT}"
-    cd "${project_dir}"
-
-    case "${PROJECT}" in
-        landing-page)
-            cd "${project_dir}"
-            pnpm install
-            success "Starting landing page dev server..."
-            pnpm run dev
-            ;;
-        language-tour)
-            cd "${project_dir}/elixir_tour"
-            mix deps.get
-            cd "${project_dir}"
-            pnpm install
-            success "Starting language tour dev server..."
-            pnpm run dev
-            ;;
-        *) error "Unknown project '${PROJECT}'. Use --help to see available projects." ;;
-    esac
-elif [[ -n "${EXAMPLE}" ]]; then
-    ensure_wasm_assets
-    ensure_js_dist
-
-    example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
-
-    if [[ ! -d "${example_dir}" ]]; then
-        error "Example '${EXAMPLE}' not found at ${example_dir}"
-    fi
-
-    log "Setting up example: ${EXAMPLE}"
-    cd "${example_dir}"
+    cd "${PROJECT_ROOT}/popcorn/elixir"
     mix deps.get
 
-    log "Cooking example..."
-    mix popcorn.cook
+    if [[ -n "${PROJECT}" ]]; then
+        local project_dir="${PROJECT_ROOT}/${PROJECT}"
 
-    if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
-        watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${JS_DIR}' && pnpm run assets:dev && pnpm exec rollup -c"
+        log "Setting up project: ${PROJECT}"
+        cd "${project_dir}"
+
+        case "${PROJECT}" in
+            landing-page)
+                cd "${project_dir}"
+                pnpm install
+                success "Starting landing page dev server..."
+                pnpm run dev
+                ;;
+            language-tour)
+                cd "${project_dir}/elixir_tour"
+                mix deps.get
+                cd "${project_dir}"
+                pnpm install
+                success "Starting language tour dev server..."
+                pnpm run dev
+                ;;
+            *) unknown_project "Unknown project '${PROJECT}'." ;;
+        esac
+    elif [[ "${EXAMPLE}" == "eval-in-wasm" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "game-of-life" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "hello-popcorn" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "hello-react" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         pnpm run dev
+
+    elif [[ "${EXAMPLE}" == "iex-wasm" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "local-lv-compare" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "local-lv-forms" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ "${EXAMPLE}" == "local-lv-thermostat" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         mix dev
+
+    elif [[ -n "${EXAMPLE}" ]]; then
+        ensure_wasm_assets "${js_dir}"
+        ensure_js_dist "${js_dir}"
+
+        local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+
+        log "Setting up example: ${EXAMPLE}"
+        cd "${example_dir}"
+        mix deps.get
+
+        log "Cooking example..."
+        mix popcorn.cook
+
+        if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
+            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${js_dir}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
+        fi
+        watch dir="${js_dir}/src" exts="ts,js" cmd="cd '${js_dir}' && pnpm --filter @swmansion/popcorn exec rollup -c"
+        watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
+        start_watchers
+
+        success "Starting example server..."
+        elixir --erl "+Bi" -S mix popcorn.server &
+        local SERVER_PID=$!
+        trap "kill ${SERVER_PID} 2>/dev/null; exit 0" INT TERM
+        wait ${SERVER_PID}
+    else
+        ensure_wasm_assets "${js_dir}"
+        success "Starting JS library in watch mode..."
+        cd "${js_dir}"
+        pnpm run dev
     fi
-    watch dir="${JS_DIR}/src" exts="ts,js" cmd="cd '${JS_DIR}' && pnpm exec rollup -c"
-    watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
-    start_watchers
+}
 
-    success "Starting example server..."
-    elixir server.exs
-else
-    ensure_wasm_assets
-    success "Starting JS library in watch mode..."
-    cd "${JS_DIR}"
-    pnpm run dev
-fi
+main "$@"

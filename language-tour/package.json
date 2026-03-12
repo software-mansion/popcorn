@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "npm run cook && vite",
-    "build": "tsc -b && vite build",
-    "cook": "cd elixir_tour && mix popcorn.cook",
+    "build": "npm run cook && tsc -b && vite build",
+    "cook": "cd elixir_tour && mix build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

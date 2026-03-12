@@ -159,10 +159,9 @@ export class Popcorn {
     const { container, ...constructorParams } = options;
     const containerWithDefault = container ?? document.documentElement;
 
-    const bundlePath = await resolveBundleURL(
-      constructorParams.bundlePath ?? "/bundle.avm",
-      "/assets/bundle.avm",
-    );
+    const bundlePath = constructorParams.bundlePath
+      ? constructorParams.bundlePath
+      : await resolveBundleURL("/bundle.avm", "/assets/bundle.avm");
 
     const popcorn = new Popcorn(
       { ...constructorParams, bundlePath, container: containerWithDefault },

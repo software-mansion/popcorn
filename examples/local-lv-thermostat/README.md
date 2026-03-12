@@ -6,8 +6,8 @@ Usage:
 
 ```bash
 mix deps.get
-mix popcorn.cook
-elixir server.exs
+mix popcorn.cook --include-vm
+mix popcorn.server
 ```
 
 and visit [localhost:4000](http://localhost:4000)
