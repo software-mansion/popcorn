@@ -6,7 +6,7 @@ defmodule FormDemoLocal do
   def render(assigns) do
     ~H"""
     <div class="bordered">
-      <.form for={@form} id="my-form" pop-change="validate" pop-submit="save">
+      <.form for={@form} id="my-form" phx-change="validate" phx-submit="save">
         <label>USERNAME</label>
         <.input type="text" field={@form[:username]} />
         <label>EMAIL</label>
@@ -16,7 +16,7 @@ defmodule FormDemoLocal do
         </div>
       </.form>
       <div class="centered">
-        <button class="ghost-button" pop-click="generate_random">GENERATE RANDOM</button>
+        <button class="ghost-button" phx-click="generate_random">GENERATE RANDOM</button>
       </div>
     </div>
     <%= for error <- @errors do %>
@@ -131,6 +131,10 @@ defmodule FormDemoLocal do
     else
       _err -> "Email must have an email format"
     end
+  end
+  
+  defp validate_correctness(_, value) do
+    ""
   end
 
   defp generate_random_user(existing_users) do
