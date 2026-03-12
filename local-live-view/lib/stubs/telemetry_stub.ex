@@ -7,6 +7,7 @@ module = :telemetry
   :non_existing -> :ok
   path -> File.rm(path)
 end
+
 :code.purge(module)
 
 defmodule :telemetry do

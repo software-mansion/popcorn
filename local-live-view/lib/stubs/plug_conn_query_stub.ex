@@ -7,6 +7,7 @@ module = Plug.Conn.Query
   :non_existing -> :ok
   path -> File.rm(path)
 end
+
 :code.purge(module)
 
 defmodule module do
