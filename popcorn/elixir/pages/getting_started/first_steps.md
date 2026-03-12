@@ -66,30 +66,65 @@ defmodule MyApp.Worker do
 end
 ```
 
-Then, configure the directory to output static artifacts:
+Then, configure the output directory for compiled artifacts:
 
 ```elixir
 # config/config.exs
 import Config
-config :popcorn, out_dir: "static/wasm"
+config :popcorn, out_dir: "dist/wasm"
 ```
 
-Finally, run `mix deps.get` and `mix popcorn.cook --include-vm`. The latter will generate WASM artifacts in the `static/wasm` directory. Add a simple HTML file that will load it:
+Next, fetch dependencies and compile your Elixir code to WebAssembly:
 
-```html
-<!-- index.html -->
-<html>
-  <script type="module">
-      import { Popcorn } from "./wasm/popcorn.js";
-      await Popcorn.init({ onStdout: console.log });
-  </script>
-  <body></body>
-</html>
- ```
+```console
+$ mix deps.get
+$ mix popcorn.cook
+```
+
+### Setting up the JavaScript build
+
+Popcorn uses a JavaScript bundler to package the runtime and your compiled code for the browser. A generator scaffolds the required files:
+
+```console
+$ mix popcorn.gen.js
+```
+
+This creates an `assets/` directory with:
+
+- `package.json` — npm project with [`@swmansion/popcorn`](https://www.npmjs.com/package/@swmansion/popcorn) and `esbuild`
+- `build.mjs` — esbuild configuration with the Popcorn plugin
+- `index.js` — JavaScript entry point that initializes Popcorn
+- `index.html` — HTML template
+
+The generated `index.js` looks like this:
+
+```javascript
+// assets/index.js
+import { Popcorn } from "@swmansion/popcorn";
+
+await Popcorn.init({ bundlePath: "/wasm/bundle.avm", onStdout: console.log });
+```
+
+`bundlePath` tells Popcorn where to find the compiled Elixir bytecode, matching the `out_dir` you configured earlier. `onStdout` receives anything your Elixir code prints with `IO.puts/1`.
+
+Install the npm dependencies and build:
+
+```console
+$ npm install --prefix assets
+$ npm run build --prefix assets
+```
+
+The build step bundles your JavaScript, copies the WebAssembly runtime assets, and outputs everything to the `dist/` directory.
+
+> #### Other bundlers {: .info}
+>
+> The generator uses esbuild, but Popcorn also ships plugins for Vite (`@swmansion/popcorn/vite`) and Rollup (`@swmansion/popcorn/rollup`). You can swap the bundler by editing `build.mjs` after scaffolding.
+>
+> Vite is especially convenient for development — its dev server provides hot reloading out of the box. See the [hello-react example](https://github.com/software-mansion/popcorn/tree/main/examples/hello-react) for a working Vite setup.
 
 ### Serving the artifacts
 
-The easiest way to host the page is to run `mix popcorn.server`. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the console.
+Run `mix popcorn.server` to start a local server. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the browser console.
 
 The webpage can also be hosted with any HTTP static file server, but **it must add the following HTTP headers**:
 
@@ -102,16 +137,26 @@ Otherwise, browsers refuse to run WASM.
 
 ## Popcorn project files structure
 
-Here's the breakdown of files served in the Popcorn's based project
+Here's the breakdown of a Popcorn project:
 
 ```console
 your-app
-└── static
-    ├── index.html             HTML skeleton loading Popcorn scripts
-    └── wasm
-        ├── AtomVM.mjs         Runtime glue code for browser APIs
-        ├── AtomVM.wasm        Compiled AtomVM runtime
-        ├── bundle.avm         Bundled Elixir bytecode
-        ├── popcorn_iframe.js  Manages Wasm module, internal
-        └── popcorn.js         Initializes Popcorn, allows Elixir communication
+├── assets                  Source files (JavaScript, HTML)
+│   ├── build.mjs           esbuild config with Popcorn plugin
+│   ├── index.html          HTML template
+│   ├── index.js            JS entry point — initializes Popcorn
+│   └── package.json        npm dependencies
+├── config
+│   └── config.exs          Popcorn configuration (out_dir)
+├── dist                    Build output (generated)
+│   ├── AtomVM.mjs          Runtime glue code for browser APIs
+│   ├── AtomVM.wasm         Compiled AtomVM runtime
+│   ├── index.html          Copied HTML
+│   ├── index.js            Bundled JavaScript
+│   └── wasm
+│       └── bundle.avm      Bundled Elixir bytecode
+└── lib
+    └── my_app
+        ├── application.ex  Application supervisor
+        └── worker.ex       Worker process
 ```

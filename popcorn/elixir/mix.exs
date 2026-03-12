@@ -76,15 +76,12 @@ defmodule Popcorn.MixProject do
       extras: [
         "pages/getting_started/introduction.md",
         "pages/getting_started/first_steps.md",
-        "pages/guides/simple_project.md",
-        "pages/guides/runtime.md",
         "pages/reference/architecture.md",
         "pages/reference/limitations.md",
         "JS Documentation": [url: "js-api/index.html"]
       ],
       groups_for_extras: [
         "Getting started": ~r"/getting_started/",
-        Guides: ~r"/guides/",
         Reference: ~r"(?:/reference/|js-api/)"
       ],
       groups_for_modules: [
