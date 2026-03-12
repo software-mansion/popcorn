@@ -219,20 +219,21 @@ end
 </style>
 
 <script>
+import { Popcorn } from "@swmansion/popcorn";
+
 const events = [
   {js_event: "click", pop_event: "pop-click"},
   {js_event: "keydown", pop_event: "pop-keydown"},
   {js_event: "submit", pop_event: "pop-submit"},
   {js_event: "input", pop_event: "pop-change"}
 ]
-  
+
 let focused_el = document.activeElement;
-  
+
 async function setup() {
   const popcorn = await Popcorn.init({
     debug: true,
-    bundlePath: "../wasm/local_forms.avm",
-    wasmDir: "/wasm/"
+    bundlePath: "/wasm/local_forms.avm",
   })
   document.addEventListener("popRender", (event) => { afterRenderBind(event, popcorn) });
   const { data, durationMs } = await popcorn.call({ "views": find_predefined_views()}, {

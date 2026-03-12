@@ -1,4 +1,4 @@
-import { Popcorn } from "./wasm/popcorn.js";
+import { Popcorn } from "@swmansion/popcorn";
 
 const events = [
   { js_event: "click", pop_event: "pop-click" },
@@ -12,8 +12,7 @@ let focused_el = document.activeElement;
 async function setup() {
   const popcorn = await Popcorn.init({
     debug: true,
-    bundlePath: "../local_live_view/wasm/bundle.avm",
-    wasmDir: "./local_live_view/wasm/",
+    bundlePath: "wasm/bundle.avm",
   });
   const views = find_predefined_views();
   const { data, durationMs } = await popcorn.call(

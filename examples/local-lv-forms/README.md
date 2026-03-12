@@ -4,7 +4,7 @@
 
 The demo project implementing phoenix forms using LocalLiveView.
 
-The demo form is built as an html page with a single form and a two rendered list of users (usernames and emails). 
+The demo form is built as an html page with a single form and a two rendered list of users (usernames and emails).
 
 One list is stored in the local LiveView assigns, while the other is stored in the Phoenix LiveView assigns. These will be referred to as the local list and the server list, respectively.
 
@@ -24,7 +24,7 @@ The local part of the project is located in the `local` directory.
 
 The most important files to look at are:
 
-`compare_live_views/local/lib/form_demo_local.ex` - 
+`compare_live_views/local/lib/form_demo_local.ex` -
 LocalLiveView that implements the form demo.
 
 `compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex` - home page that renders both views.
@@ -34,16 +34,19 @@ _The local_live_view project needs few things to run properly:_
 * proper `out_dir` property in `form_demo/local/config/config.exs`
 * `/priv/static/local_live_view/` line added to `form_demo/.gitignore` file
 
-## Up and running
+## Usage
 
-To start your server:
+From the repository root:
 
-* To install and setup dependencies (both online and offline part), run:
+```bash
+pnpm install
+mise run dev --example local-lv-forms
 ```
-mix setup
-``` 
-_The popcorn output files will be generated into_ `priv/static/local_live_view` _also the local_live_view.js script is included in the head section of_ `lib/compare_live_views_web/components/layouts/root.html.heex`
 
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+or directly from the example directory:
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000)

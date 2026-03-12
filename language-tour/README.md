@@ -56,30 +56,24 @@ The Elixir Language Tour Guide is a platform that provides:
 
 ### Prerequisites
 
-- **Node.js**: 18.x or higher
-- **npm**: 9.x or higher (or compatible package manager)
+- **Node.js**: 22.x or higher
+- **pnpm**: latest
 - **Mix**: Elixir build tool (for building WebAssembly)
 - **Elixir**: 1.17
 
-### Installation
+### Usage
 
-1. **Install dependencies:**
+From the repository root:
 
 ```bash
-npm install
+pnpm install
+mise run dev --project language-tour
 ```
 
-2. **Set up environment variables** (see [Environment Variables](#environment-variables) section):
+or directly from this directory:
 
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-3. **Start the development server:**
-
-```bash
-npm run dev
+pnpm run dev
 ```
 
 The application will be available at `http://localhost:5173`.
@@ -121,7 +115,7 @@ export const frontmatter = { order: 10 };
 Lesson content goes here...
 
 <EditorCode>
-```elixir 
+```elixir
 IO.puts("Example code")
 ```
 </EditorCode>

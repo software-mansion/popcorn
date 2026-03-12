@@ -31,5 +31,5 @@ eval_in_wasm-*.tar
 # secret config
 config.secret.exs
 
-# wasm build dir
-static/wasm
+/dist
+/static/wasm

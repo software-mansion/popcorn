@@ -1,11 +1,12 @@
 {
-  "name": "hello_popcorn",
+  "name": "iex_wasm",
   "private": true,
   "scripts": {
     "build": "node build.mjs"
   },
   "dependencies": {
-    "@swmansion/popcorn": "workspace:*"
+    "@swmansion/popcorn": "workspace:*",
+    "@xterm/xterm": "^5.5.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

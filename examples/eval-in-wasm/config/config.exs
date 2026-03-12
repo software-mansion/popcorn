@@ -14,7 +14,7 @@ include_tracing =
   end
 
 config :popcorn,
-  out_dir: "static/wasm",
+  out_dir: "dist/wasm",
   add_tracing: include_tracing
 
 if path = System.get_env("ATOMVM_SOURCE_PATH") do

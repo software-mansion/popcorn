@@ -32,7 +32,7 @@ defmodule Local.MixProject do
 
   defp aliases do
     [
-      build: ["deps.get", "popcorn.cook --include-vm"],
+      build: ["deps.get", "popcorn.cook"],
       dev: ["build", "popcorn.server"],
       lintformat: "format --check-formatted",
       lint: [

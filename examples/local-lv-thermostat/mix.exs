@@ -9,8 +9,8 @@ defmodule LocalThermostat.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        build: ["deps.get", "popcorn.cook --include-vm"],
-        dev: ["build", "popcorn.server"]
+        build: ["deps.get", "popcorn.cook"],
+        dev: ["build", "popcorn.server --dir static"]
       ]
     ]
   end

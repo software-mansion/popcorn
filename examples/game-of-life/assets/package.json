@@ -1,5 +1,5 @@
 {
-  "name": "hello_popcorn",
+  "name": "game_of_life",
   "private": true,
   "scripts": {
     "build": "node build.mjs"

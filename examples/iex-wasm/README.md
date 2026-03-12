@@ -1,18 +1,20 @@
 # IEx Wasm
 
-This project aims to be an Elixir IEx running fully in the browser via WASM via AtomVM.
+Elixir IEx running fully in the browser via WebAssembly.
 
-To build, type:
+## Usage
 
-```sh
-mix deps.get
-mix popcorn.cook --include-vm
+From the repository root:
+
+```bash
+pnpm install
+mise run dev --example iex-wasm
 ```
 
-You can serve it by running
+or directly from the example directory:
 
-```sh
-mix popcorn.server
+```bash
+mix dev
 ```
 
-and it'll be available at <http://localhost:4000>
+and visit [localhost:4000](http://localhost:4000)

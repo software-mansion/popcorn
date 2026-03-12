@@ -1,5 +1,5 @@
 {
-  "name": "hello_popcorn",
+  "name": "local_live_view",
   "private": true,
   "scripts": {
     "build": "node build.mjs"

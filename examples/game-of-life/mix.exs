@@ -6,17 +6,15 @@ defmodule GameOfLife.MixProject do
       app: :game_of_life,
       version: "0.1.0",
       elixir: "~> 1.17",
-      compilers: Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        build: ["deps.get", "popcorn.build_runtime --target wasm", "popcorn.cook --include-vm"],
+        build: ["deps.get", &pnpm_install/1, "popcorn.cook", &build_js/1],
         dev: ["build", "popcorn.server"]
       ]
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:eex],
@@ -24,10 +22,27 @@ defmodule GameOfLife.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:popcorn, path: "../../popcorn/elixir"}
     ]
+  end
+
+  defp pnpm_install(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["install"],
+        cd: File.cwd!(),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp build_js(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: Path.join(File.cwd!(), "assets"),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
   end
 end

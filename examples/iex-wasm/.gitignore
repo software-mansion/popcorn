@@ -31,7 +31,6 @@ iex_wasm-*.tar
 # secret config
 config.secret.exs
 
-# wasm build dir
-static/wasm
-
-static/assets
+/dist
+/static/wasm
+/static/assets
