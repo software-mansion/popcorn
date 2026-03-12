@@ -21,7 +21,7 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
     Next steps:
       npm install --prefix assets
       mix popcorn.cook
-      node assets/build.mjs
+      npm run build --prefix assets
       mix popcorn.server
     """)
   end
