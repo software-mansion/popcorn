@@ -73,7 +73,6 @@ defmodule LocalLiveView.MixProject do
     ]
   end
 
-<<<<<<< HEAD
   @assets_dir Path.join(__DIR__, "assets")
 
   defp pnpm_install(_) do
@@ -118,16 +117,5 @@ defmodule LocalLiveView.MixProject do
         File.cp!(Path.join(@priv_static, file), Path.join(out_dir, file))
       end)
     end
-=======
-  defp copy_priv(_) do
-    Mix.shell().cmd(
-      """
-      mkdir -p ../../#{@out_dir}
-      cp lib/local_live_view/priv/static/local_live_view.js ../../#{@out_dir}
-      cp lib/popcorn/priv/static-template/wasm/popcorn.js ../../#{@out_dir}
-      """,
-      cd: Mix.Project.build_path()
-    )
->>>>>>> 572ae96 (Fixed local live view examples according to new LLV JS.)
   end
 end
