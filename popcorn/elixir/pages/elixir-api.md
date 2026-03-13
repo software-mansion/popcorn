@@ -13,20 +13,38 @@ Represents opaque reference to JS value. Automatically cleaned up when garbage c
 
 ## Core Functions
 
-### `register(main_process_name)`
+### `send_event(event_name, payload \\ nil)`
 
-Notifies JS that Elixir side finished initializing. Can be called only once.
+Sends an event to the JS side. Fire-and-forget.
 
 **Parameters:**
 
-- `main_process_name` (atom or string) - Name of the main process that will receive JS messages by default.
+- `event_name` (string) - Name of the event.
+- `payload` (any, optional) - Event payload. Default: `nil`.
 
 **Returns:** `:ok`.
 
 **Example:**
 
 ```elixir
-Popcorn.Wasm.register(:main)
+Popcorn.Wasm.send_event("processing_finished", %{id: 123})
+Popcorn.Wasm.send_event("simple_event")
+```
+
+### `set_default_receiver(name)`
+
+Sets the default receiver process for JS calls/casts. Registers the calling process under `name` if not already registered.
+
+**Parameters:**
+
+- `name` (atom) - Process name to register as default receiver.
+
+**Returns:** `:ok`.
+
+**Example:**
+
+```elixir
+Popcorn.Wasm.set_default_receiver(:main)
 ```
 
 ### `handle_message!(raw_message, handler)`

@@ -42,7 +42,7 @@ defmodule MyApp.Application do
 end
 ```
 
-A minimal worker should register itself using `Popcorn.Wasm.register/1`:
+A minimal worker should set itself as the default receiver using `Popcorn.Wasm.set_default_receiver/1`:
 
 ```elixir
 # lib/my_app/worker.ex
@@ -58,7 +58,7 @@ defmodule MyApp.Worker do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.register(@process_name)
+    Popcorn.Wasm.set_default_receiver(@process_name)
     IO.puts("Hello from WASM!")
     state = %{}
     {:ok, state}

@@ -181,7 +181,7 @@ defmodule Popcorn do
         end
       end
 
-    no_warn_undefined = [:atomvm | List.wrap(start_module)]
+    no_warn_undefined = [:atomvm, Popcorn.Wasm | List.wrap(start_module)]
 
     # The module below tries to mimic BEAMs boot script, then start user's app
     contents =
@@ -207,6 +207,8 @@ defmodule Popcorn do
           :ok = :application.start_boot(:stdlib, :permanent)
 
           {:ok, _apps} = Application.ensure_all_started(unquote(app), :permanent)
+
+          Popcorn.Wasm.send_event("popcorn_elixir_ready")
 
           unquote(run)
         end

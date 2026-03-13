@@ -240,16 +240,34 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Notifies JS that Elixir side finished initializing. Can be called only once.
+  Sends an event to JS side. Fire-and-forget.
   """
-  def register(main_process_name) do
+  @spec send_event(String.t()) :: :ok
+  @spec send_event(String.t(), term()) :: :ok
+  def send_event(event_name, payload \\ nil) when is_binary(event_name) do
     """
     ({ wasm, args }) => {
-      wasm.onElixirReady?.(args.main);
+      wasm.sendEvent(args.eventName, args.payload)
     }
     """
-    |> run_js(%{main: to_string(main_process_name)})
+    |> run_js(%{eventName: event_name, payload: payload}, return: :ref)
 
+    :ok
+  end
+
+  @doc """
+  Sets the default receiver process for JS calls/casts.
+  Registers the calling process under `name` if not already registered.
+  """
+  @spec set_default_receiver(atom()) :: :ok
+  def set_default_receiver(name) when is_atom(name) do
+    case Process.whereis(name) do
+      nil -> Process.register(self(), name)
+      pid when pid == self() -> :ok
+      _other -> raise "Name #{name} already registered to another process"
+    end
+
+    send_event("popcorn_set_default_receiver", %{name: to_string(name)})
     :ok
   end
 

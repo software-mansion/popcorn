@@ -7,6 +7,11 @@ export const MAX_RELOAD_N = 3;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnySerializable = any;
 
+export type ElixirEvent = {
+  eventName: string;
+  payload: AnySerializable;
+};
+
 export type CallRequest = {
   requestId: number;
   process: string;
@@ -36,8 +41,7 @@ export type CallAck = {
 
 /** Messages sent from iframe to parent window */
 export type IframeResponse =
-  | { type: "popcorn-init"; value: null }
-  | { type: "popcorn-startVm"; value: string }
+  | { type: "popcorn-event"; value: ElixirEvent }
   | { type: "popcorn-call"; value: CallResponse }
   | { type: "popcorn-callAck"; value: CallAck }
   | { type: "popcorn-stdout"; value: string }
@@ -49,8 +53,7 @@ export type IframeResponse =
 export type Message = IframeRequest | IframeResponse;
 
 export const MESSAGES = {
-  INIT: "popcorn-init",
-  START_VM: "popcorn-startVm",
+  EVENT: "popcorn-event",
   CALL: "popcorn-call",
   CAST: "popcorn-cast",
   CALL_ACK: "popcorn-callAck",
@@ -58,6 +61,11 @@ export const MESSAGES = {
   STDERR: "popcorn-stderr",
   HEARTBEAT: "popcorn-heartbeat",
   RELOAD: "popcorn-reload",
+} as const;
+
+export const EVENT_NAMES = {
+  ELIXIR_READY: "popcorn_elixir_ready",
+  SET_DEFAULT_RECEIVER: "popcorn_set_default_receiver",
 } as const;
 
 const MESSAGES_TYPES = new Set<string>(Object.values(MESSAGES));
