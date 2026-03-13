@@ -114,7 +114,8 @@
     fun_info_mfa/1,
     phash2/1,
     phash2/2,
-    phash/2
+    phash/2,
+    md5/1
 ]).
 
 -export_type([
@@ -3201,3 +3202,5 @@ phash2(Term, N) ->
     (Hash rem N).
 
 phash(Term, N) -> phash2(Term, N) + 1.
+
+md5(Data) -> crypto:hash(md5, Data).
