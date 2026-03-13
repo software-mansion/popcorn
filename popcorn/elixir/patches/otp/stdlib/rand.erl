@@ -1,7 +1,5 @@
 -module(rand).
 
--export([splitmix64_next/1]).
-
 -compile({popcorn_patch_private, default_seed/0}).
 
 %% Patch reason: term_to_binary used in `erlang:phash2/2' patch
@@ -13,7 +11,3 @@ default_seed() ->
    erlang:system_time(microsecond),
    erlang:unique_integer()}.
 
-%% Patch reason: Replaced with native implementation that handles 64 bit rollover
-%% Handling in Erlang on AtomVM would require big integers support
-splitmix64_next(X) ->
-  avm_rand:splitmix64_next(X).
