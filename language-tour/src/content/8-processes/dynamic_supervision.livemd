@@ -1,0 +1,154 @@
+# Dynamic supervision
+
+In the previous chapter, we had a constant number of processes running simultaneously. In many use cases, we want to dynamically spawn processes as we need. For that, we can use `Supervisor.start_child`. Firstly, we spawn a supervisor. It doesn't have any child processes for now:
+
+```elixir
+child_specs = []
+{:ok, supervisor} = Supervisor.start_link(child_specs, strategy: :one_for_one)
+```
+
+Then, we spawn a task under the supervisor. `Task` module implements a `child_spec/1` function, so we can pass `{Task, fn -> ... end}` as a child spec:
+
+```elixir
+Supervisor.start_child(supervisor, {
+    Task,
+    fn ->
+        IO.puts("Hello from a task spawned dynamically under a supervisor")
+    end
+})
+```
+
+💡 Run the above snippet a few times to spawn more tasks.
+
+As you can see, the `Supervisor` allows dynamically spawning children. However, due to the performance characteristics, it's better to use `DynamicSupervisor` for such use cases, especially if there can be a lot of child processes at some point. From the API perspective, the `DynamicSupervisor` is similar to the `Supervisor`. Here are the main differences:
+- `DynamicSupervisor` doesn't allow spawning any children at startup - `DynamicSupervisor.start_child/2` is the only option.
+- The only supported strategy is `:one_for_one` - that's because other strategies don't make much sense and would reduce performance.
+
+💡 Change the above snippets to use `DynamicSupervisor`. Note that `DynamicSupervisor.start_link/1` doesn't accept the `child_specs` argument, and `DynamicSupervisor.start_child/2` must be used instead of `Supervisor.start_child/2`.
+
+## Example: Job queue
+
+As an example for dynamic supervision, we'll create a very simple job queue. It's going to be a GenServer receiving calls with jobs (which are just anonymous functions). For each job, the queue spawns a task, runs the job in there and sends the result back.
+
+```elixir
+defmodule JobQueue do
+  use GenServer
+
+  @type job_result :: any()
+  @type job :: (() -> job_result())
+
+  def start_link(options) do
+    # Using the module name as a name for the process 
+    # is a common pattern.
+    GenServer.start_link(__MODULE__, options, name: __MODULE__)
+  end
+
+  @spec schedule_job(job()) :: job_result()
+  def schedule_job(data) do
+    GenServer.call(__MODULE__, {:schedule_job, data})
+  end
+
+  @impl true
+  def init(_options) do
+    {:ok, %{}}
+  end
+
+  @impl true
+  def handle_call({:schedule_job, job}, from, state) do
+    # Prepare a spec for the task that will handle the job
+    # and send the result back.
+    # We don't want to do that in this GenServer,
+    # as it could become a bottleneck.
+    task_spec = {Task, fn ->
+        # Note that we're passing `from`, the second argument
+        # of handle_call/3. It allows replying the call
+        # from another process.
+        run_job(from, job)
+      end}
+
+    # Start the task under a dynamic supervisor
+    DynamicSupervisor.start_child(JobSupervisor, task_spec)
+
+    # Despite it's handle_call, we return :noreply tuple,
+    # because run_job/2 takes care of replying.
+    {:noreply, state}
+  end
+
+  defp run_job(from, job) do
+    # Run the actual job
+    result = job.()
+
+    # This is equivalent of returning a :reply
+    # tuple from handle_call/3, but we can call
+    # it from anywhere.
+    GenServer.reply(from, result)
+  end
+end
+```
+
+A real-world job queues have a lot of features we didn't implement, but the core idea is the same: there's a job scheduler that delegates work to short-lived processes. Thanks to the Erlang VM, this simple architecture scales very well.
+
+Let's start our queue:
+
+```elixir
+# Check if the supervisor is already running and if so, stop it.
+# This makes it possible to avoid a name conflict when you rerun this cell.
+if Process.whereis(:my_app_supervisor) do
+  Supervisor.stop(:my_app_supervisor)
+end
+
+child_specs = [{DynamicSupervisor, name: JobSupervisor}, JobQueue]
+Supervisor.start_link(child_specs, strategy: :one_for_one, name: :my_app_supervisor)
+```
+
+Note that job queue and job supervisor are spawned under another, top-level supervisor. Our architecture now forms a tree:
+
+```text
+      my_app_supervisor
+       |             |
+       V             V
+ JobSupervisor    JobQueue
+ |     |     |    
+ V     V     V
+Job1  Job2  Job3 ...
+```
+
+Such a tree is called a _supervision tree_. The nodes are supervisors, the leafs are workers, and the edges represent supervision relationship. Supervision trees are common and convenient way of organizing Elixir applications in a fault-tolerant way.
+
+Since we started our queue, let's make it run some jobs:
+
+```elixir
+JobQueue.schedule_job(
+  fn ->
+    IO.puts("#{inspect(self())}: Running a job")
+    Process.sleep(100)
+    "Job result"
+  end
+)
+```
+
+This job is quite simple, but we could run more complex jobs, like querying a database, that could potentially fail. Let's simulate that: the cell below runs a job that has ~30% failure rate:
+
+```elixir
+JobQueue.schedule_job(
+  fn ->
+    IO.puts("#{inspect(self())}: Running a job")
+
+    # :rand.uniform() returns a value from 0 to 1
+    # from a uniform distribution
+    if :rand.uniform() > 0.7 do
+      raise "Job failure"
+    end
+
+    "Job result"
+  end
+)
+```
+
+💡 Keep re-running the cell above until it fails
+
+As you can see, when the job fails, the caller fails with a timeout. The task failed and the call was never replied to. It's not our desired behavior - we'd want the supervisor to restart the job. Do you have an idea why it didn't?
+
+The reason is `Task.child_spec/1` - it sets the restart mode to `:temporary`, which makes tasks not restarted by default. 
+
+💡 Let's fix it by changing the code of the JobQueue where it spawns the task under the dynamic supervisor. Use [Supervisor.child_spec/2](https://hexdocs.pm/elixir/Supervisor.html#child_spec/2) to convert the task spec, so that restart mode is `:transient`. Rerun the above cell again, until the task fails - it should now be restarted as expected.

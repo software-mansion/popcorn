@@ -175,6 +175,14 @@ export const navigationConfig: NavigationConfig = [
       {
         name: "GenServer",
         component: lazyLoadLiveMd("8-processes/gen_server")
+      },
+      {
+        name: "Supervision",
+        component: lazyLoadLiveMd("8-processes/supervision")
+      },
+      {
+        name: "Dynamic supervision",
+        component: lazyLoadLiveMd("8-processes/dynamic_supervision")
       }
     ]
   },
