@@ -76,7 +76,7 @@ defmodule FormDemo.MixProject do
     [
       build: ["setup"],
       dev: ["setup", "phx.server"],
-      setup: ["deps.get", "compile", "assets.setup", "assets.build", &build_local/1],
+      setup: [&build_local/1, "deps.get", "compile", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind form_demo", "esbuild form_demo"],
       "assets.deploy": [

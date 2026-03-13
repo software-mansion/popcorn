@@ -5,8 +5,8 @@ defmodule ThermostatLive do
     ~H"""
     <p>Current temperature: {@temperature}°C</p>
     <div class="thermostat-controls">
-      <button pop-click="inc_temperature" class="ghost-button">+</button>
-      <button pop-click="dec_temperature" class="ghost-button">-</button>
+      <button phx-click="inc_temperature" class="ghost-button">+</button>
+      <button phx-click="dec_temperature" class="ghost-button">-</button>
     </div>
     <p>Country: {@country}</p>
     """

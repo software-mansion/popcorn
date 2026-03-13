@@ -52,6 +52,10 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
+// setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
+import { setup } from "../vendor/local_live_view/local_live_view"
+setup(liveSocket);
+
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
@@ -92,4 +96,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-
