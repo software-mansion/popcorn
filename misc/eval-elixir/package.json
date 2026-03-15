@@ -1,0 +1,17 @@
+{
+  "name": "eval-elixir",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run cook && vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "cook": "cd elixir && mix deps.get && mix popcorn.cook && cp out/bundle.avm ../public/bundle.avm"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "@swmansion/popcorn": "^0.2.0-rc.4"
+  }
+}
