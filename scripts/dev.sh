@@ -150,12 +150,8 @@ main() {
     load_env
     require_cmd pnpm
 
-    log "Installing dependencies..."
-    cd "${PROJECT_ROOT}"
-    pnpm install
-
-    cd "${PROJECT_ROOT}/popcorn/elixir"
-    mix deps.get
+    install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
+    install_elixir_deps "${PROJECT_ROOT}/popcorn/elixir" "Popcorn Elixir deps"
 
     if [[ -n "${PROJECT}" ]]; then
         local project_dir="${PROJECT_ROOT}/${PROJECT}"
@@ -166,15 +162,14 @@ main() {
         case "${PROJECT}" in
             landing-page)
                 cd "${project_dir}"
-                pnpm install
+                install_pnpm_deps "${project_dir}" "${PROJECT} deps"
                 success "Starting landing page dev server..."
                 pnpm run dev
                 ;;
             language-tour)
-                cd "${project_dir}/elixir_tour"
-                mix deps.get
+                install_elixir_deps "${project_dir}/elixir_tour" "language-tour Elixir deps"
+                install_pnpm_deps "${project_dir}" "${PROJECT} deps"
                 cd "${project_dir}"
-                pnpm install
                 success "Starting language tour dev server..."
                 pnpm run dev
                 ;;
@@ -184,48 +179,56 @@ main() {
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "game-of-life" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "hello-popcorn" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "hello-react" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_pnpm_deps "${example_dir}" "${EXAMPLE} deps"
          pnpm run dev
 
     elif [[ "${EXAMPLE}" == "iex-wasm" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "local-lv-compare" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "local-lv-forms" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ "${EXAMPLE}" == "local-lv-thermostat" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"
          cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
     elif [[ -n "${EXAMPLE}" ]]; then
@@ -236,7 +239,7 @@ main() {
 
         log "Setting up example: ${EXAMPLE}"
         cd "${example_dir}"
-        mix deps.get
+        install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
 
         log "Cooking example..."
         mix popcorn.cook

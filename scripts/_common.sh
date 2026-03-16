@@ -43,3 +43,27 @@ load_env() {
         set +a
     fi
 }
+
+install_elixir_deps() {
+    local elixir_dir="$1"
+    local label="${2:-Elixir deps}"
+
+    log "Installing ${label}..."
+    (cd "${elixir_dir}" && mix deps.get)
+}
+
+install_pnpm_deps() {
+    local dir="$1"
+    local label="${2:-pnpm deps}"
+
+    log "Installing ${label}..."
+    (cd "${dir}" && pnpm install)
+}
+
+install_pnpm_workspace_deps() {
+    local repo_root="$1"
+    local label="${2:-pnpm workspace deps}"
+
+    log "Installing ${label}..."
+    (cd "${repo_root}" && pnpm install --frozen-lockfile)
+}
