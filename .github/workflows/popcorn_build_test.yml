@@ -43,6 +43,16 @@ jobs:
       - name: Setup toolchain
         uses: ./.github/actions/setup-toolchain
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
@@ -52,6 +62,10 @@ jobs:
 
       - name: Install Hex dependencies
         run: mix deps.get
+
+      - name: Install JS dependencies
+        working-directory: .
+        run: pnpm install
 
       - name: Build AtomVM Unix
         uses: ./.github/actions/build-atomvm

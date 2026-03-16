@@ -12,7 +12,8 @@ defmodule Popcorn.Support.AtomVM do
   This input is provided by serializing terms to `opts.bin` which is read
   when this module runs `start/0`. We then write code output to `result.bin`.
 
-  Compiled files are cached with phash2 key of AST contents under tmp/modules/ directory.
+  Compiled files are cached under `tmp/modules/` using a hash of the generated
+  module plus this support file's source, so helper changes invalidate stale bundles.
   All eval tests run the same underlying code so `eval` expects
   module to be compiled and cached prior to call.
   Input and output files for tests running concurently are keyed by `AVM_RUN_DIR` which stores path prefix.
@@ -21,7 +22,7 @@ defmodule Popcorn.Support.AtomVM do
 
   require Logger
 
-  @unix_path "test/fixtures/unix/AtomVM"
+  @support_source_digest :erlang.md5(File.read!(__ENV__.file))
 
   defguardp is_eval_type(type) when type in [:erlang_module, :erlang_expr, :elixir]
 
@@ -73,7 +74,8 @@ defmodule Popcorn.Support.AtomVM do
   def try_eval(code, type, opts \\ []) when is_binary(code) and is_eval_type(type) do
     run_dir = Keyword.fetch!(opts, :run_dir)
     fragment = type |> to_ast_fragment_type() |> ast_fragment()
-    bundle_path = bundle_path(fragment)
+    target = test_target()
+    bundle_path = fragment |> module(target) |> bundle_path(target)
 
     if not File.exists?(bundle_path) do
       raise "Compile eval module before using it"
@@ -105,6 +107,7 @@ defmodule Popcorn.Support.AtomVM do
   end
 
   defp do_try_run(:unix, bundle_path, run_dir, args) do
+    unix_path = unix_runtime_path()
     result_path = Path.join(run_dir, "result.bin")
     args_path = Path.join(run_dir, "args.bin")
     log_path = Path.join(run_dir, "logs.txt")
@@ -112,19 +115,19 @@ defmodule Popcorn.Support.AtomVM do
 
     args |> :erlang.term_to_binary() |> then(&File.write(args_path, &1))
 
-    if System.shell("which '#{@unix_path}'") |> elem(1) != 0 do
+    if not File.exists?(unix_path) do
       raise """
-      AtomVM not found, please run `mix popcorn.build_runtime` \
-      or put `config :popcorn, runtime_path: "path/to/AtomVM"` in your config.exs
+      AtomVM test runtime not found at #{unix_path}. \
+      `test/test_helper.exs` is expected to build it automatically before unix tests run.
       """
     end
 
     cmd =
       if System.get_env("CI") == "true" do
-        "AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}'"
+        "AVM_RUN_DIR='#{run_dir}' '#{unix_path}' '#{bundle_path}'"
       else
         # $() suppresses sh error about process signal traps, i.e. when AVM crashes
-        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{@unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}'); cat '#{out_path}'|
+        ~s|$(AVM_RUN_DIR='#{run_dir}' '#{unix_path}' '#{bundle_path}' 2>'#{log_path}' 1>'#{out_path}'); cat '#{out_path}'|
       end
 
     File.write!(log_path, "Run command: #{cmd}\n\n\n")
@@ -196,10 +199,15 @@ defmodule Popcorn.Support.AtomVM do
     |> Map.merge(%{log_path: log_path, output: output})
   end
 
-  defp bundle_path(ast) do
-    hash = ast |> :erlang.phash2() |> to_string()
-    build_dir = Path.join(compile_dir(), hash)
+  defp bundle_path(module_ast, target) do
+    hash_material = [target, @support_source_digest, Macro.to_string(module_ast)]
+    hash = hash_material |> :erlang.phash2() |> to_string()
+    build_dir = Path.join(compile_dir(target), hash)
     Path.join(build_dir, "bundle.avm")
+  end
+
+  def unix_runtime_path() do
+    Path.join([File.cwd!(), "test/fixtures/unix", "AtomVM"])
   end
 
   @doc """
@@ -207,7 +215,9 @@ defmodule Popcorn.Support.AtomVM do
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
   def compile_quoted(ast) do
-    bundle_path = bundle_path(ast)
+    target = test_target()
+    module_ast = module(ast, target)
+    bundle_path = bundle_path(module_ast, target)
     build_dir = Path.dirname(bundle_path)
     stale = not File.exists?(bundle_path)
 
@@ -215,8 +225,7 @@ defmodule Popcorn.Support.AtomVM do
       File.rm_rf!(build_dir)
       File.mkdir_p!(build_dir)
 
-      ast
-      |> module(test_target())
+      module_ast
       |> run_elixirc(build_dir)
     end
 
@@ -231,8 +240,8 @@ defmodule Popcorn.Support.AtomVM do
     bundle_path
   end
 
-  defp compile_dir() do
-    Path.join([File.cwd!(), "tmp/modules", to_string(test_target())])
+  defp compile_dir(target) do
+    Path.join([File.cwd!(), "tmp/modules", to_string(target)])
   end
 
   defp run_elixirc(ast, dir) do
