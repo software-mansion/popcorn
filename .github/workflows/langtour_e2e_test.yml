@@ -4,7 +4,7 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "misc/language-tour-guide/**"
+      - "language-tour/**"
       - "lib/**/wasm.ex"
       - ".github/workflows/langtour_e2e_test.yml"
 
@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: misc/language-tour-guide/package-lock.json
+          cache-dependency-path: language-tour/package-lock.json
 
       - name: Install AtomVM build deps
         run: |
@@ -54,16 +54,16 @@ jobs:
 
       - name: Install Elixir dependencies
         run: mix deps.get
-        working-directory: misc/language-tour-guide/elixir_tour
+        working-directory: language-tour/elixir_tour
 
       - name: Install npm dependencies
         run: npm ci
-        working-directory: misc/language-tour-guide
+        working-directory: language-tour
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
-        working-directory: misc/language-tour-guide
+        working-directory: language-tour
 
       - name: Run e2e tests
         run: npm test
-        working-directory: misc/language-tour-guide
+        working-directory: language-tour
