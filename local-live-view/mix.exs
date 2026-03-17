@@ -68,7 +68,7 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      compile: ["compile", &build_js/1, &copy_js/1],
+      compile: ["compile", &build_js/1],
       build: ["deps.get", &pnpm_install/1, "popcorn.cook", &force_build_js/1]
     ]
   end
@@ -101,21 +101,5 @@ defmodule LocalLiveView.MixProject do
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )
-  end
-
-  @priv_static Path.join(__DIR__, "priv/static")
-
-  defp copy_js(_) do
-    if File.dir?(@priv_static) do
-      build_path = Mix.Project.build_path()
-      out_dir = Path.join([build_path, "..", "..", @out_dir]) |> Path.expand()
-      File.mkdir_p!(out_dir)
-
-      @priv_static
-      |> File.ls!()
-      |> Enum.each(fn file ->
-        File.cp!(Path.join(@priv_static, file), Path.join(out_dir, file))
-      end)
-    end
   end
 end

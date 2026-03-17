@@ -1,0 +1,13 @@
+{
+  "name": "local_lv_compare",
+  "private": true,
+  "dependencies": {
+    "local_live_view": "workspace:*"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

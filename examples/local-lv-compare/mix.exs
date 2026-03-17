@@ -74,7 +74,17 @@ defmodule CompareLiveViews.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: [&build_local/1, "deps.get", "compile", "assets.setup", "assets.build"],
+      build: ["setup"],
+      dev: ["phx.server"],
+      setup: [
+        &build_local/1,
+        &pnpm_install/1,
+        &build_js/1,
+        "deps.get",
+        "compile",
+        "assets.setup",
+        "assets.build"
+      ],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind compare_live_views", "esbuild compare_live_views"],
       "assets.deploy": [
@@ -94,5 +104,23 @@ defmodule CompareLiveViews.MixProject do
       """,
       cd: "local"
     )
+  end
+
+  defp pnpm_install(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["install"],
+        cd: File.cwd!(),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp build_js(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: Path.join(File.cwd!(), "assets"),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
   end
 end
