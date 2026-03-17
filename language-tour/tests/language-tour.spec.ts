@@ -56,6 +56,8 @@ test.describe("Language Tour - All Topics", () => {
         }
       }).toPass({ timeout: 30_000 });
 
+      // TODO: support data-test-expect-failure attribute on code cells
+      // to allow editors that are expected to fail
       const badges = page.locator("[data-testid='execution-state-badge']");
       const count = await badges.count();
       for (let i = 0; i < count; i++) {
