@@ -70,9 +70,14 @@ defmodule ElixirTour do
   @spec get_changed(Evaluator.bindings(), Evaluator.bindings()) :: Evaluator.bindings()
   defp get_changed(base_kw, new_kw) do
     unchanged? = fn {key, value} ->
-      Keyword.get(base_kw, key) == value
+      safe_equal?(Keyword.get(base_kw, key), value)
     end
 
     Enum.reject(new_kw, unchanged?)
   end
+
+  # AtomVM crashes when comparing function terms, so functions are always marked as changed.
+  defp safe_equal?(a, _b) when is_function(a), do: false
+  defp safe_equal?(_a, b) when is_function(b), do: false
+  defp safe_equal?(a, b), do: a == b
 end
