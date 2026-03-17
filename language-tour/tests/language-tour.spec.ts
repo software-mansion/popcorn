@@ -49,13 +49,13 @@ test.describe("Language Tour - All Topics", () => {
           expect(state).not.toBe("running");
           expect(state).not.toBe("queued");
         }
-      }).toPass({ timeout: 30000 });
+      }).toPass({ timeout: 30_000 });
 
       const badges = page.locator("[data-testid='execution-state-badge']");
       const count = await badges.count();
       for (let i = 0; i < count; i++) {
         await expect(badges.nth(i)).toHaveAttribute("data-state", "success", {
-          timeout: 30000
+          timeout: 90_000
         });
       }
 

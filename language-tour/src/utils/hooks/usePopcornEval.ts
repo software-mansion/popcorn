@@ -12,7 +12,7 @@ export function usePopcornEval() {
       const stopLogCapture = startLogCapture();
 
       const result = await call(["eval_elixir", editorId, code, editorOrder], {
-        timeoutMs: 30_000
+        timeoutMs: 45_000
       });
       const { stderr, stdout } = stopLogCapture();
 
