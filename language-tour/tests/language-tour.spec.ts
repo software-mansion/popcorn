@@ -22,20 +22,25 @@ test.describe("Language Tour - All Topics", () => {
       const fixCount = await fixableEditors.count();
       for (let i = 0; i < fixCount; i++) {
         const cell = fixableEditors.nth(i);
-        const testReplaceCode = await cell.getAttribute("data-test-replace-code");
+        const testReplaceCode = await cell.getAttribute(
+          "data-test-replace-code"
+        );
+
         const cmContent = cell.locator(".cm-content");
 
-        // dispatch change to CodeMirror instance to prevent auto closing
+        await cmContent.click();
+        await page.keyboard.press("Meta+A");
         await cmContent.evaluate((el, code) => {
-          const view = (el as any).cmView.view;
-          view.dispatch({
-            changes: {
-              from: 0,
-              to: view.state.doc.length,
-              insert: code
-            }
-          });
-        }, testReplaceCode!);
+          const dt = new DataTransfer();
+          dt.setData("text/plain", code!);
+          el.dispatchEvent(
+            new ClipboardEvent("paste", {
+              clipboardData: dt,
+              bubbles: true,
+              cancelable: true
+            })
+          );
+        }, testReplaceCode);
       }
 
       const runButtons = page.locator("button").filter({ hasText: "Run Code" });
