@@ -15,6 +15,8 @@ So, the spawned process is dead, but the evaluator process (the one that's runni
 
 However, in many cases, we have a group of processes that cooperate with each other. Then, a failure of any of these processes should affect the whole group. For that, we need to _link_ processes together. We can do that using the `spawn_link/1` function:
 
+<!-- langtour:{"test_replace_code":" "} -->
+
 ```elixir
 spawn_link(fn -> 1 / 0 end)
 
