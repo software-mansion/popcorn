@@ -4,6 +4,8 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
   use Mix.Task
   import Mix.Generator
 
+  @popcorn_version Mix.Project.config()[:version]
+
   @impl true
   def run(_args) do
     app_name =
@@ -34,7 +36,7 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
       "build": "node build.mjs"
     },
     "dependencies": {
-      "@swmansion/popcorn": "^0.2.0"
+      "@swmansion/popcorn": "^#{@popcorn_version}"
     },
     "devDependencies": {
       "esbuild": "^0.25.0"
