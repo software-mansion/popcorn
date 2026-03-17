@@ -5,7 +5,6 @@ on:
     branches: ["**"]
     paths:
       - "language-tour/**"
-      - "lib/**/wasm.ex"
       - ".github/workflows/langtour_e2e_test.yml"
 
 permissions:
