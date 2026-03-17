@@ -2,8 +2,6 @@ import * as Sentry from "@sentry/react";
 import { useEditorsStore } from "../../store/editors";
 
 export function initSentry() {
-  console.log(import.meta.env);
-
   if (
     !import.meta.env.VITE_SENTRY_DSN ||
     import.meta.env.VITE_PLAYWRIGHT_TEST
