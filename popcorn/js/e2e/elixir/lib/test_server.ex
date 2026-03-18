@@ -35,6 +35,11 @@ defmodule TestServer do
     {:resolve, %{"printed" => "stdout"}, state}
   end
 
+  defp handle_wasm({:wasm_call, %{"action" => "send_event", "name" => name, "payload" => payload}}, state) do
+    Wasm.send_event(name, payload)
+    {:resolve, %{"sent" => true}, state}
+  end
+
   defp handle_wasm({:wasm_call, %{"action" => "crash"}}, _state) do
     raise "intentional crash"
   end

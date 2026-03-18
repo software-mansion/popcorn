@@ -186,7 +186,10 @@ async function startVm(avmBundle: Int8Array): Promise<void> {
     return keys.map(getTrackedObject);
   };
 
-  moduleInstance["sendEvent"] = (eventName: string, payload: AnySerializable) => {
+  moduleInstance["sendEvent"] = (
+    eventName: string,
+    payload: AnySerializable,
+  ) => {
     sendIframeResponse(MESSAGES.EVENT, { eventName, payload });
   };
 }
