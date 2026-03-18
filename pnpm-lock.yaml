@@ -349,6 +349,16 @@ importers:
         specifier: ^0.25.0
         version: 0.25.12
 
+  popcorn/elixir/test/fixtures/wasm/assets:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../../../../js
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   popcorn/js:
     devDependencies:
       '@eslint/js':

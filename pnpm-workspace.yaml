@@ -1,6 +1,7 @@
 packages:
   - "popcorn/js"
   - "popcorn/js/e2e/setup"
+  - "popcorn/elixir/test/fixtures/wasm/assets"
   - "examples/hello-react"
   - "examples/hello-popcorn/assets"
   - "examples/eval-in-wasm/assets"

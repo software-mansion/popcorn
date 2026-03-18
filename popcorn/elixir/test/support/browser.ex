@@ -32,6 +32,22 @@ defmodule Popcorn.Support.Browser do
     url = "#{url}?bundlePath=#{Path.relative_to_cwd(bundle_path)}"
     page = Playwright.Browser.new_page(browser)
 
+    Playwright.Page.on(page, "console", fn %{params: log} ->
+      prefix =
+        cond do
+          log.location.url == "" -> ""
+          String.starts_with?(log.text, "[popcorn stdout]") -> ""
+          true -> "[#{log.location.url}:#{log.location.lineNumber}] "
+        end
+
+      log_handler.("#{prefix}#{log.text}\n")
+    end)
+
+    Playwright.Page.on(page, "pageerror", fn %{params: error} ->
+      message = Map.get(error, :message) || Map.get(error, "message") || inspect(error)
+      log_handler.("[pageerror] #{message}\n")
+    end)
+
     on_exit(fn ->
       # in debug mode we want to keep the page open to allow interaction with it
       if not debug_mode?(), do: Playwright.Page.close(page)
@@ -54,17 +70,6 @@ defmodule Popcorn.Support.Browser do
       console.log(`[${event.filename}:${event.lineno}] ${message}`, event);
     })
     """)
-
-    Playwright.Page.on(page, "console", fn %{params: log} ->
-      prefix =
-        cond do
-          log.location.url == "" -> ""
-          String.starts_with?(log.text, "[popcorn stdout]") -> ""
-          true -> "[#{log.location.url}:#{log.location.lineNumber}] "
-        end
-
-      log_handler.("#{prefix}#{log.text}\n")
-    end)
 
     page
   end
