@@ -3,6 +3,7 @@ export const CALL_TIMEOUT_MS = 60_000;
 export const HEARTBEAT_TIMEOUT_MS = 60_000;
 export const HEARTBEAT_INTERVAL_MS = 500;
 export const MAX_RELOAD_N = 3;
+export const DEFAULT_RECEIVER_TIMEOUT_MS = 5_000;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnySerializable = any;

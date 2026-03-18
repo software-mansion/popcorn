@@ -6,6 +6,7 @@ import {
   MAX_RELOAD_N,
   MESSAGES,
   EVENT_NAMES,
+  DEFAULT_RECEIVER_TIMEOUT_MS,
 } from "./types";
 import { PopcornError, PopcornInternalError, throwError } from "./errors";
 
@@ -116,6 +117,8 @@ export class Popcorn {
   private initOnMessage: MessageHandler | null = null;
   private mountResolve: (() => void) | null = null;
   private mounted = false;
+  private defaultReceiverWaiter: Promise<string | null> | null = null;
+  private resolveDefaultReceiver: ((name: string) => void) | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private reloadN = 0;
 
@@ -231,26 +234,28 @@ export class Popcorn {
     { process, timeoutMs }: CallOptions = {},
   ): Promise<CallResult> {
     this.assertStatus(["ready"]);
-    const targetProcess = process ?? this.defaultReceiver;
     if (this.bridge === null) throwError({ t: "unmounted" });
-    if (targetProcess === null) throwError({ t: "bad_target" });
 
     const requestId = this.requestId++;
     const startTimeMs = performance.now();
     const callPromise = new Promise<CallResult>((resolve) => {
-      if (this.bridge === null) throwError({ t: "unmounted" });
+      this.calls.set(requestId, { acknowledged: false, startTimeMs, resolve });
+    });
+
+    const targetProcess = await this.resolveTargetProcess(process);
+
+    if (targetProcess === null) {
+      this.calls.delete(requestId);
+      throwError({ t: "bad_target" });
+    }
+
+    if (this.bridge !== null) {
       this.trace("Main: call: ", { requestId, process, args });
       this.bridge.sendIframeRequest({
         type: MESSAGES.CALL,
         value: { requestId, process: targetProcess, args },
       });
-
-      this.calls.set(requestId, {
-        acknowledged: false,
-        startTimeMs,
-        resolve,
-      });
-    });
+    }
 
     const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
     this.calls.delete(requestId);
@@ -266,8 +271,8 @@ export class Popcorn {
   cast(args: AnySerializable, { process }: CastOptions = {}): void {
     this.assertStatus(["ready"]);
     const targetProcess = process ?? this.defaultReceiver;
-    if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
 
     const requestId = this.requestId++;
     this.trace("Main: cast: ", { requestId, process, args });
@@ -291,6 +296,25 @@ export class Popcorn {
     this.messageHandlers.clear();
   }
 
+  private async resolveTargetProcess(
+    process: string | undefined,
+  ): Promise<string | null> {
+    const target = process ?? this.defaultReceiver;
+    if (target !== null) return target;
+
+    if (this.defaultReceiverWaiter === null) {
+      this.defaultReceiverWaiter = new Promise<string | null>((resolve) => {
+        this.resolveDefaultReceiver = resolve;
+        setTimeout(() => {
+          this.resolveDefaultReceiver = null;
+          resolve(null);
+        }, DEFAULT_RECEIVER_TIMEOUT_MS);
+      });
+    }
+
+    return this.defaultReceiverWaiter;
+  }
+
   private teardownBridge(errorCode: "deinitialized" | "reload") {
     if (this.bridge) {
       this.bridge.deinit();
@@ -299,6 +323,8 @@ export class Popcorn {
     this.mountResolve = null;
     this.mounted = false;
     this.defaultReceiver = null;
+    this.defaultReceiverWaiter = null;
+    this.resolveDefaultReceiver = null;
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
       this.heartbeatTimeout = null;
@@ -351,6 +377,8 @@ export class Popcorn {
         this.mountResolve = null;
       } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
         this.defaultReceiver = payload.name;
+        this.resolveDefaultReceiver?.(payload.name);
+        this.resolveDefaultReceiver = null;
       } else {
         this.trace("Unknown internal event:", eventName);
       }
