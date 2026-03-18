@@ -5,28 +5,131 @@ defmodule LocalThermostat.MixProject do
     [
       app: :local_thermostat,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "~> 1.15",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps(),
-      aliases: [
-        build: ["deps.get", "popcorn.cook"],
-        dev: ["build", "popcorn.server --dir static"]
-      ]
+      compilers: [:phoenix_live_view] ++ Mix.compilers(),
+      listeners: [Phoenix.CodeReloader]
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
+  # Configuration for the OTP application.
+  #
+  # Type `mix help compile.app` for more information.
   def application do
     [
-      extra_applications: [:logger],
-      mod: {LocalThermostat.Application, []}
+      mod: {LocalThermostat.Application, []},
+      extra_applications: [:logger, :runtime_tools]
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  def cli do
+    [
+      preferred_envs: [precommit: :test]
+    ]
+  end
+
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  # Specifies your project dependencies.
+  #
+  # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:local_live_view, path: "../../local-live-view"}
+      {:phoenix, "~> 1.8.0"},
+      {:phoenix_html, "~> 4.1"},
+      {:phoenix_live_reload, "~> 1.2", only: :dev},
+      {:phoenix_live_view, "~> 1.1.0"},
+      {:lazy_html, ">= 0.1.0", only: :test},
+      {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:heroicons,
+       github: "tailwindlabs/heroicons",
+       tag: "v2.2.0",
+       sparse: "optimized",
+       app: false,
+       compile: false,
+       depth: 1},
+      {:swoosh, "~> 1.16"},
+      {:req, "~> 0.5"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
+      {:gettext, "~> 0.26"},
+      {:jason, "~> 1.2"},
+      {:dns_cluster, "~> 0.2.0"},
+      {:bandit, "~> 1.5"}
     ]
+  end
+
+  # Aliases are shortcuts or tasks specific to the current project.
+  # For example, to install project dependencies and perform other setup tasks, run:
+  #
+  #     $ mix setup
+  #
+  # See the documentation for `Mix` for more info on aliases.
+  defp aliases do
+    [
+      build: ["setup"],
+      dev: ["setup", "phx.server"],
+      setup: [&build_local/1, &pnpm_install/1, "deps.get", "compile", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing"],
+      "assets.build": [&build_js/1, "tailwind local_thermostat"],
+      "assets.deploy": [
+        &build_js/1,
+        "tailwind local_thermostat --minify",
+        "phx.digest"
+      ],
+      lint: [
+        "format --check-formatted",
+        "deps.unlock --check-unused",
+        "deps.compile",
+        "compile --force --warnings-as-errors",
+        &local_lint/1
+      ],
+      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+    ]
+  end
+
+  defp build_local(_) do
+    Mix.shell().cmd(
+      """
+      mix deps.get
+      mix popcorn.cook
+      """,
+      cd: "local"
+    )
+  end
+
+  defp pnpm_install(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["install"],
+        cd: File.cwd!(),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp build_js(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: Path.join(File.cwd!(), "assets"),
+        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp local_lint(_) do
+    Mix.shell().cmd(
+      """
+      mix lintformat
+      mix lint
+      """,
+      cd: "local"
+    )
   end
 end

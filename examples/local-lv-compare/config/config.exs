@@ -30,16 +30,6 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :compare_live_views, CompareLiveViews.Mailer, adapter: Swoosh.Adapters.Local
 
-# Configure esbuild (the version is required)
-config :esbuild,
-  version: "0.25.4",
-  compare_live_views: [
-    args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --format=esm --external:/fonts/* --external:/images/* --alias:@=.),
-    cd: Path.expand("../assets", __DIR__),
-    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
-  ]
-
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.7",

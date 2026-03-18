@@ -46,7 +46,6 @@ defmodule FormDemo.MixProject do
       {:phoenix_live_view, "~> 1.1.0"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:heroicons,
        github: "tailwindlabs/heroicons",
@@ -76,12 +75,12 @@ defmodule FormDemo.MixProject do
     [
       build: ["setup"],
       dev: ["setup", "phx.server"],
-      setup: ["deps.get", "compile", "assets.setup", "assets.build", &build_local/1],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["tailwind form_demo", "esbuild form_demo"],
+      setup: [&build_local/1, &pnpm_install/1, "deps.get", "compile", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing"],
+      "assets.build": [&build_js/1, "tailwind form_demo"],
       "assets.deploy": [
+        &build_js/1,
         "tailwind form_demo --minify",
-        "esbuild form_demo --minify",
         "phx.digest"
       ],
       lint: [
@@ -97,6 +96,25 @@ defmodule FormDemo.MixProject do
 
   defp build_local(_) do
     Mix.shell().cmd("mix build", cd: "local")
+  end
+
+  defp pnpm_install(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["install"],
+        cd: File.cwd!(),
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+  end
+
+  defp build_js(_) do
+    {_, 0} =
+      System.cmd("pnpm", ["run", "build"],
+        cd: Path.join(File.cwd!(), "assets"),
+        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
   end
 
   defp local_lint(_) do

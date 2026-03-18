@@ -1,35 +1,61 @@
 import { Popcorn } from "@swmansion/popcorn";
 
-const events = [
-  { js_event: "click", pop_event: "pop-click" },
-  { js_event: "keydown", pop_event: "pop-keydown" },
-  { js_event: "submit", pop_event: "pop-submit" },
-  { js_event: "input", pop_event: "pop-change" },
-];
-
-let focused_el = document.activeElement;
-
-async function setup() {
+export async function setup(liveSocket, opts = {}) {
   const popcorn = await Popcorn.init({
     debug: true,
-    bundlePath: "wasm/bundle.avm",
+    bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
-  const views = find_predefined_views();
   const { data, durationMs } = await popcorn.call(
     { views: find_predefined_views() },
     {
       timeoutMs: 10_000,
     },
   );
-  views.forEach((view) => {
-    afterRenderBind(view, popcorn);
+
+  const POP_VIEW = "data-pop-view";
+  const PHX_ROOT_ID = "data-phx-root-id";
+  const PHX_SESSION = "data-phx-session";
+  const query = `[${POP_VIEW}]`;
+  const pop_view_els = Array.from(document.querySelectorAll(query));
+  console.log({ roots: { ...liveSocket.roots }, pop_view_els: pop_view_els });
+
+  pop_view_els.forEach((pop_view_el) => {
+    //  create a view
+    const view = liveSocket.newRootView(pop_view_el);
+    //  update key functions within a view to call popcorn instead of pushing to the channel
+    view.pushWithReply = async function (refGenerator, event, payload) {
+      const { data, durationMs } = await popcorn.call(
+        { view: this.id, event: event, payload: payload },
+        {
+          timeoutMs: 10_000,
+        },
+      );
+      console.log({
+        popcorn_call: { view: this.id, event: event, payload: payload },
+      });
+      return new Promise((resolve, reject) => {});
+    };
+    view.join = function (_callback) {
+      this.el.setAttribute(PHX_ROOT_ID, this.root.id);
+      this.el.setAttribute(PHX_SESSION, this.root.id);
+    };
+    view.isConnected = function () {
+      return true;
+    }; //  todo implement it properly so that it returns weather we are connected to popcorn
+    //  run necessary callbacks
+    view.join();
   });
+
   window.addEventListener("phx:llv_server_message", async (e) => {
     const { data, durationMs } = await popcorn.call(
       {
         view: e.detail.view,
         event: "llv_server_message",
-        payload: { event: "llv_server_message", value: e.detail.payload },
+        payload: {
+          event: "llv_server_message",
+          value: e.detail.payload,
+          type: "llv_server_message",
+        },
       },
       {
         timeoutMs: 10_000,
@@ -37,11 +63,12 @@ async function setup() {
     );
   });
   window.addEventListener("phx:llv_rerender", async (e) => {
+    liveSocket.roots[e.detail.view].join();
     const { data, durationMs } = await popcorn.call(
       {
         view: e.detail.view,
         event: "llv_rerender",
-        payload: { event: "llv_rerender" },
+        payload: { event: "llv_rerender", type: "llv_server_message" },
       },
       {
         timeoutMs: 10_000,
@@ -50,82 +77,8 @@ async function setup() {
   });
 }
 
-async function afterRenderBind(view, popcorn) {
-  const view_element = find_element(view);
-  console.log({ ...view_element.dataset });
-  if (view_element.dataset.popcornBound) return;
-  focused_el.focus();
-  events.forEach(({ js_event: js_event, pop_event: pop_event }) => {
-    view_element.addEventListener(js_event, async (e) => {
-      const target_el = e.target.closest(`[${pop_event}]`);
-      console.log({ event: e, target_el: target_el, pop_event: pop_event });
-      if (target_el && view_element.contains(target_el)) {
-        handlePopEvent(e, target_el, pop_event, popcorn, view);
-      }
-    });
-  });
-  view_element.dataset.popcornBound = "true";
-}
-
-async function handlePopEvent(e, target_el, pop_event, popcorn, view) {
-  focused_el = document.activeElement;
-  const value = extractElementValue(e, target_el);
-  try {
-    const { data, durationMs } = await popcorn.call(
-      {
-        view: view,
-        event: pop_event,
-        payload: { event: target_el.getAttribute(pop_event), value: value },
-      },
-      {
-        timeoutMs: 10_000,
-      },
-    );
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-function extractElementValue(e, el) {
-  let value;
-  if (el instanceof HTMLFormElement) {
-    e.preventDefault();
-    const inputs = el.querySelectorAll("input");
-    const inputsArray = Array.from(inputs);
-    value = inputsArray.reduce((acc, input) => {
-      acc[input.name] = input.value;
-      return acc;
-    }, {});
-  } else if (el.hasAttribute(value)) {
-    value = el.value;
-  }
-  return value;
-}
-
-// TODO this is a mock for heex templating inside index.html file
 function find_predefined_views() {
   let elements = document.querySelectorAll("[data-pop-view]");
   elements = Array.from(elements);
   return elements.map((el) => el.getAttribute("data-pop-view"));
 }
-
-function find_view(element) {
-  while (element) {
-    if (element.hasAttribute("data-pop-view")) {
-      return element.getAttribute("data-pop-view");
-    }
-    element = element.parentElement;
-  }
-  return null;
-}
-
-function find_element(view) {
-  let elements = document.querySelectorAll("[data-pop-view]");
-  elements = Array.from(elements);
-  const found = elements.find(
-    (element) => element.getAttribute("data-pop-view") == view,
-  );
-  return found;
-}
-
-await setup();

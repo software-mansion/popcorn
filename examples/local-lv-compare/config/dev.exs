@@ -15,7 +15,10 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "kkoz3bWTFeKbaSGq3oqEQwL7bpFAR4f0ejreK+rg71pTgpW8WCFdz+rksVqa6MAE",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:compare_live_views, ~w(--sourcemap=inline --watch)]},
+    node: ["build.mjs", "--watch",
+      cd: Path.expand("../assets", __DIR__),
+      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
+    ],
     tailwind: {Tailwind, :install_and_run, [:compare_live_views, ~w(--watch)]}
   ]
 

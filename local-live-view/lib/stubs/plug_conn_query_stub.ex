@@ -10,7 +10,7 @@ end
 
 :code.purge(module)
 
-defmodule module do
+defmodule Plug.Conn.Query do
   def decode(
         query,
         initial \\ [],

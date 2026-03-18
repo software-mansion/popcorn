@@ -20,6 +20,7 @@ defmodule FormDemoWeb.FormDemoLive do
 
   def mount(_params, _session, socket) do
     send(self(), :sync)
+    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:ok, assign(socket, users: [])}
   end
 
