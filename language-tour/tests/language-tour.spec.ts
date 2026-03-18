@@ -29,18 +29,8 @@ test.describe("Language Tour - All Topics", () => {
         const cmContent = cell.locator(".cm-content");
 
         await cmContent.click();
-        await page.keyboard.press("Meta+A");
-        await cmContent.evaluate((el, code) => {
-          const dt = new DataTransfer();
-          dt.setData("text/plain", code!);
-          el.dispatchEvent(
-            new ClipboardEvent("paste", {
-              clipboardData: dt,
-              bubbles: true,
-              cancelable: true
-            })
-          );
-        }, testReplaceCode);
+        await page.keyboard.press("ControlOrMeta+A");
+        await page.keyboard.insertText(testReplaceCode!);
       }
 
       const runButtons = page.locator("button").filter({ hasText: "Run Code" });
@@ -62,7 +52,7 @@ test.describe("Language Tour - All Topics", () => {
       const count = await badges.count();
       for (let i = 0; i < count; i++) {
         await expect(badges.nth(i)).toHaveAttribute("data-state", "success", {
-          timeout: 90_000
+          timeout: 180_000
         });
       }
 

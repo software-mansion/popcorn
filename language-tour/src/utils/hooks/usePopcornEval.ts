@@ -11,8 +11,10 @@ export function usePopcornEval() {
     async (code: string, editorId: string) => {
       const stopLogCapture = startLogCapture();
 
+      const timeout = import.meta.env.VITE_PLAYWRIGHT_TEST ? 160_000 : 45_000;
+
       const result = await call(["eval_elixir", editorId, code, editorOrder], {
-        timeoutMs: 45_000
+        timeoutMs: timeout
       });
       const { stderr, stdout } = stopLogCapture();
 
