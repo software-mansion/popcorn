@@ -128,6 +128,26 @@ importers:
         specifier: ^0.25.0
         version: 0.25.12
 
+  examples/local-lv-forms/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view/assets
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
+  examples/local-lv-thermostat/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view/assets
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   landing-page:
     dependencies:
       '@astrojs/react':
@@ -348,10 +368,6 @@ importers:
       '@swmansion/popcorn':
         specifier: workspace:*
         version: link:../../popcorn/js
-    devDependencies:
-      esbuild:
-        specifier: ^0.25.0
-        version: 0.25.12
 
   popcorn/js:
     devDependencies:

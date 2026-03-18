@@ -46,7 +46,6 @@ defmodule CompareLiveViews.MixProject do
       {:phoenix_live_view, "~> 1.1.0"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:heroicons,
        github: "tailwindlabs/heroicons",
@@ -79,17 +78,16 @@ defmodule CompareLiveViews.MixProject do
       setup: [
         &build_local/1,
         &pnpm_install/1,
-        &build_js/1,
         "deps.get",
         "compile",
         "assets.setup",
         "assets.build"
       ],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["tailwind compare_live_views", "esbuild compare_live_views"],
+      "assets.setup": ["tailwind.install --if-missing"],
+      "assets.build": [&build_js/1, "tailwind compare_live_views"],
       "assets.deploy": [
+        &build_js/1,
         "tailwind compare_live_views --minify",
-        "esbuild compare_live_views --minify",
         "phx.digest"
       ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
@@ -119,6 +117,7 @@ defmodule CompareLiveViews.MixProject do
     {_, 0} =
       System.cmd("pnpm", ["run", "build"],
         cd: Path.join(File.cwd!(), "assets"),
+        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )

@@ -1,9 +1,9 @@
 import { Popcorn } from "@swmansion/popcorn";
 
-export async function setup(liveSocket) {
+export async function setup(liveSocket, opts = {}) {
   const popcorn = await Popcorn.init({
     debug: true,
-    bundlePath: "wasm/bundle.avm",
+    bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
   const { data, durationMs } = await popcorn.call(
     { views: find_predefined_views() },

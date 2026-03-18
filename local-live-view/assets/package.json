@@ -1,13 +1,11 @@
 {
   "name": "local_live_view",
   "private": true,
-  "scripts": {
-    "build": "node build.mjs"
+  "exports": {
+    ".": "./local_live_view.js",
+    "./esbuild": "./esbuild.mjs"
   },
   "dependencies": {
     "@swmansion/popcorn": "workspace:*"
-  },
-  "devDependencies": {
-    "esbuild": "^0.25.0"
   }
 }

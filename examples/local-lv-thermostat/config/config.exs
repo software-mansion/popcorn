@@ -30,16 +30,6 @@ config :local_thermostat, LocalThermostatWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :local_thermostat, LocalThermostat.Mailer, adapter: Swoosh.Adapters.Local
 
-# Configure esbuild (the version is required)
-config :esbuild,
-  version: "0.25.4",
-  local_thermostat: [
-    args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-    cd: Path.expand("../assets", __DIR__),
-    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
-  ]
-
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.7",

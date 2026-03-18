@@ -35,7 +35,6 @@ defmodule LocalLiveView.MixProject do
       {:phoenix_ecto, "~> 4.6", runtime: false},
       {:ecto, "~> 3.12", runtime: false},
       {:plug, "~> 1.14", runtime: false},
-      {:esbuild, "~> 0.10", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"}
     ]
@@ -56,9 +55,6 @@ defmodule LocalLiveView.MixProject do
     ]
   end
 
-  @default_out_dir "../assets/vendor/local_live_view"
-  @out_dir Application.compile_env(:local_live_view, :out_dir, @default_out_dir)
-
   defp aliases() do
     [
       lint: [
@@ -68,36 +64,14 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      compile: ["compile", &build_js/1],
-      build: ["deps.get", &pnpm_install/1, "popcorn.cook", &force_build_js/1]
+      build: ["deps.get", &pnpm_install/1, "popcorn.cook"]
     ]
   end
-
-  @assets_dir Path.join(__DIR__, "assets")
 
   defp pnpm_install(_) do
     {_, 0} =
       System.cmd("pnpm", ["install"],
         cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
-    priv_static = Path.join(__DIR__, "priv/static")
-
-    if not File.exists?(Path.join(priv_static, "local_live_view.js")) do
-      do_build_js()
-    end
-  end
-
-  defp force_build_js(_), do: do_build_js()
-
-  defp do_build_js do
-    {_, 0} =
-      System.cmd("pnpm", ["run", "build"],
-        cd: @assets_dir,
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )

@@ -1,5 +1,5 @@
 {
-  "name": "local_lv_compare",
+  "name": "local_lv_forms",
   "private": true,
   "dependencies": {
     "local_live_view": "workspace:*"
