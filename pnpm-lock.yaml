@@ -230,8 +230,8 @@ importers:
         specifier: ^10.17.0
         version: 10.40.0(react@19.2.3)
       '@swmansion/popcorn':
-        specifier: ^0.2.0
-        version: 0.2.0(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))
+        specifier: ^0.2.1
+        version: 0.2.1(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.1(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))
@@ -1463,8 +1463,8 @@ packages:
     peerDependencies:
       '@svgr/core': '*'
 
-  '@swmansion/popcorn@0.2.0':
-    resolution: {integrity: sha512-JIIpY4qyPLvKGJPWXV8lY3SDP7OzfnwLvaJTvkxHpePx5/Ov6o7H+3SXpkcH6AKbW9hu0F07kDxXQDZs0N6z9A==}
+  '@swmansion/popcorn@0.2.1':
+    resolution: {integrity: sha512-JFnRpctTzCXEZCL7RqbgyuvtOuKaLqwKc2JwnUcLClZRcy9G9KJmMwEXcbMMpdm+ip7wHfMkhVWYedCROUneIg==}
     peerDependencies:
       esbuild: '>=0.17.0'
       rollup: '>=4.0.0'
@@ -5337,7 +5337,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@swmansion/popcorn@0.2.0(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))':
+  '@swmansion/popcorn@0.2.1(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))':
     optionalDependencies:
       esbuild: 0.27.3
       rollup: 4.55.2
