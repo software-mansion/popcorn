@@ -6,6 +6,10 @@
   <img alt="Popcorn" src="https://raw.githubusercontent.com/software-mansion/popcorn/refs/heads/main/assets/fallback-logo-text.svg">
 </picture>
 
+[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-popcorn-1?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-popcorn-1&n=1)
+[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-popcorn-2?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-popcorn-2&n=1)
+[![Ad](https://revive-adserver.swmansion.com/www/images/zone-gh-popcorn-3?n=1)](https://revive-adserver.swmansion.com/www/delivery/ck.php?zoneid=zone-gh-popcorn-3&n=1)
+
 **Popcorn is a library that allows you to run client-side Elixir in browsers, with JavaScript interoperability**
 
 Popcorn is early stages and may break. Please report an issue if it does. Contributions are very welcome, but please open an issue before committing too much effort.
