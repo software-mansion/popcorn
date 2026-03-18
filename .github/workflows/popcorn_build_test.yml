@@ -82,6 +82,10 @@ jobs:
           build-mode: debug-wasm
           outdir: atomvm-build/wasm
 
+      - name: Configure runtime source
+        run: |
+          printf '\nconfig :popcorn, runtime: {:path, "atomvm-build/$target"}\n' >> config/config.exs
+
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
@@ -90,10 +94,6 @@ jobs:
 
       - name: Lint
         run: mix lint
-
-      - name: Configure runtime source
-        run: |
-          echo "config :popcorn, runtime: {:path, \"atomvm-build/\$target\"}" >> config/config.exs
 
       - name: Run tests
         run: mix test
