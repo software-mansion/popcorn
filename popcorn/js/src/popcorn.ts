@@ -103,7 +103,7 @@ export class Popcorn {
   private debug = false;
   private bundleURL: string;
   private state: State = { status: "uninitialized" };
-  private _defaultReceiver: string | null = null;
+  private defaultReceiver: string | null = null;
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
@@ -112,10 +112,10 @@ export class Popcorn {
     stderr: new Set(),
   };
 
-  private _messageHandlers = new Set<MessageHandler>();
-  private _initOnMessage: MessageHandler | null = null;
-  private _mountResolve: (() => void) | null = null;
-  private _mounted = false;
+  private messageHandlers = new Set<MessageHandler>();
+  private initOnMessage: MessageHandler | null = null;
+  private mountResolve: (() => void) | null = null;
+  private mounted = false;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private reloadN = 0;
 
@@ -131,7 +131,7 @@ export class Popcorn {
     this.onReloadCallback = params.onReload ?? noop;
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
-    this._initOnMessage = params.onMessage ?? null;
+    this.initOnMessage = params.onMessage ?? null;
 
     this.bridgeConfig = {
       container: params.container,
@@ -185,23 +185,22 @@ export class Popcorn {
 
     try {
       const mountPromise = new Promise<void>((resolve) => {
-        this._mountResolve = resolve;
+        this.mountResolve = resolve;
       });
 
-      const startTime = performance.now();
-      const result = await withTimeout(
-        mountPromise.then(
-          (): CallResult => ({
-            ok: true,
-            data: null,
-            durationMs: performance.now() - startTime,
-          }),
-        ),
-        INIT_VM_TIMEOUT_MS,
-      );
-      if (!result.ok) throwError({ t: "assert" });
+      let initTimeout: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        mountPromise,
+        new Promise<never>((_, reject) => {
+          initTimeout = setTimeout(
+            () => reject(new PopcornError("timeout", "Init timed out")),
+            INIT_VM_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      clearTimeout(initTimeout);
 
-      this._mounted = true;
+      this.mounted = true;
       this.transition({ status: "ready" });
       this.trace("Main: mounted");
       this.onHeartbeat();
@@ -232,7 +231,7 @@ export class Popcorn {
     { process, timeoutMs }: CallOptions = {},
   ): Promise<CallResult> {
     this.assertStatus(["ready"]);
-    const targetProcess = process ?? this._defaultReceiver;
+    const targetProcess = process ?? this.defaultReceiver;
     if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
@@ -266,7 +265,7 @@ export class Popcorn {
    */
   cast(args: AnySerializable, { process }: CastOptions = {}): void {
     this.assertStatus(["ready"]);
-    const targetProcess = process ?? this._defaultReceiver;
+    const targetProcess = process ?? this.defaultReceiver;
     if (this.bridge === null) throwError({ t: "unmounted" });
     if (targetProcess === null) throwError({ t: "bad_target" });
 
@@ -285,22 +284,30 @@ export class Popcorn {
     if (this.bridge === null) throwError({ t: "unmounted" });
     this.trace("Main: deinit");
     this.transition({ status: "deinit" });
-    this.bridge.deinit();
-    this.bridge = null;
-    this._mountResolve = null;
-    this._mounted = false;
+    this.teardownBridge("deinitialized");
+    this.initOnMessage = null;
+    this.logListeners.stdout.clear();
+    this.logListeners.stderr.clear();
+    this.messageHandlers.clear();
+  }
+
+  private teardownBridge(errorCode: "deinitialized" | "reload") {
+    if (this.bridge) {
+      this.bridge.deinit();
+      this.bridge = null;
+    }
+    this.mountResolve = null;
+    this.mounted = false;
+    this.defaultReceiver = null;
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
       this.heartbeatTimeout = null;
     }
-    this.logListeners.stdout.clear();
-    this.logListeners.stderr.clear();
-    this._messageHandlers.clear();
     for (const callData of this.calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.resolve({
         ok: false,
-        error: new PopcornError("deinitialized"),
+        error: new PopcornError(errorCode),
         durationMs,
       });
     }
@@ -331,36 +338,48 @@ export class Popcorn {
    * Registers a catch-all event handler. Returns an unsubscribe function.
    */
   onMessage(handler: MessageHandler): () => void {
-    this._messageHandlers.add(handler);
+    this.messageHandlers.add(handler);
     return () => {
-      this._messageHandlers.delete(handler);
+      this.messageHandlers.delete(handler);
     };
   }
 
-  private _onEvent({ eventName, payload }: ElixirEvent): void {
-    if (eventName.startsWith("popcorn_")) {
+  private onEvent({ eventName, payload }: ElixirEvent): void {
+    if (eventName.startsWith("popcorn")) {
       if (eventName === EVENT_NAMES.ELIXIR_READY) {
-        this._mountResolve?.();
-        this._mountResolve = null;
+        this.mountResolve?.();
+        this.mountResolve = null;
       } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
-        this._defaultReceiver = payload.name;
+        this.defaultReceiver = payload.name;
       } else {
         this.trace("Unknown internal event:", eventName);
       }
       return;
     }
 
-    if (!this._mounted) {
-      this._initOnMessage?.(eventName, payload);
-      return;
+    if (!this.mounted) {
+      this.initOnMessage?.(eventName, payload);
     }
 
-    this._messageHandlers.forEach((handler) => handler(eventName, payload));
+    this.dispatchToHandlers(eventName, payload);
+  }
+
+  private dispatchToHandlers(
+    eventName: string,
+    payload: AnySerializable,
+  ): void {
+    this.messageHandlers.forEach((handler) => {
+      try {
+        handler(eventName, payload);
+      } catch (error) {
+        console.error(`Error in onMessage handler for '${eventName}':`, error);
+      }
+    });
   }
 
   private iframeHandler(data: IframeResponse) {
     if (data.type === MESSAGES.EVENT) {
-      this._onEvent(data.value);
+      this.onEvent(data.value);
     } else if (data.type === MESSAGES.STDOUT) {
       this.notifyLogListeners("stdout", data.value);
     } else if (data.type === MESSAGES.STDERR) {
@@ -441,23 +460,7 @@ export class Popcorn {
 
     this.trace("Main: reloading iframe");
     this.transition({ status: "reload" });
-    this.bridge.deinit();
-    this.bridge = null;
-    this._mountResolve = null;
-    this._mounted = false;
-    if (this.heartbeatTimeout) {
-      clearTimeout(this.heartbeatTimeout);
-      this.heartbeatTimeout = null;
-    }
-    for (const callData of this.calls.values()) {
-      const durationMs = performance.now() - callData.startTimeMs;
-      callData.resolve({
-        ok: false,
-        error: new PopcornError("reload"),
-        durationMs,
-      });
-    }
-    this.calls.clear();
+    this.teardownBridge("reload");
     this.onReloadCallback(reason);
     this.mount();
   }
