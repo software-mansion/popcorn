@@ -14,9 +14,10 @@ defmodule LocalLiveView do
     end
   end
   ```
-  The LocalLiveView can be added to a page with:
+  The LocalLiveView can be added to a page by adding a `local_live_view/1` component
+  to your app's `CoreComponents` (see the Getting Started guide) and using it as:
   ```
-  <div data-pop-view="DemoLive"></div>
+  <.local_live_view view="DemoLive" />
   ```
 
   During application runtime, the application creates a process that handles a LocalLiveView's state,
