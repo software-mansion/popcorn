@@ -30,10 +30,7 @@ export async function setup(liveSocket, opts = {}) {
           timeoutMs: 10_000,
         },
       );
-      console.log({
-        popcorn_call: { view: this.id, event: event, payload: payload },
-      });
-      return new Promise((resolve, reject) => {});
+      return new Promise((_resolve, _reject) => {});
     };
     view.join = function (_callback) {
       this.el.setAttribute(PHX_ROOT_ID, this.root.id);
