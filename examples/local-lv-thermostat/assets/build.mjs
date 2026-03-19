@@ -20,7 +20,7 @@ const ctx = await esbuild.context({
   ],
   plugins: [
     popcorn({
-      bundlePath: resolve(__dirname, "../priv/static/assets/js/wasm/bundle.avm"),
+      bundlePaths: [resolve(__dirname, "../priv/static/assets/js/wasm/bundle.avm")],
     }),
   ],
 });
