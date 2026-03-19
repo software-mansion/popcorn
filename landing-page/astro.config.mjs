@@ -57,7 +57,7 @@ export default defineConfig({
     }),
     buildBundle({
       wasmSrcPathDefault:
-        "../examples/local-lv-forms/priv/static/local_live_view/wasm",
+        "../examples/local-lv-forms/priv/static/assets/js/wasm",
       dir: "../examples/local-lv-forms/local",
       newBundleName: "local_forms.avm",
     }),
