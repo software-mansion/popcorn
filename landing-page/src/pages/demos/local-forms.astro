@@ -12,12 +12,13 @@ import Section from "../../components/Section.astro";
         Local Forms
       </h1>
       <p class="mx-auto max-w-2xl">
-          The following example implements phoenix forms using LocalLiveView.
+        The following example implements phoenix forms using LocalLiveView.
       </p>
       <p class="mx-auto max-w-2xl">
-        This example demonstrates uses of onchange and onsubmit form hooks.
-        Live view component stores list of users which can be changed using form component.
-        It validates that usernames are unique and emails are in correct format while typing in the form and on form submission.
+        This example demonstrates uses of onchange and onsubmit form hooks. Live
+        view component stores list of users which can be changed using form
+        component. It validates that usernames are unique and emails are in
+        correct format while typing in the form and on form submission.
       </p>
     </header>
     <style></style>
@@ -38,7 +39,7 @@ import Section from "../../components/Section.astro";
       </div>
     </div>
     <div
-            class="p-4 bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 shadow-lg"
+      class="bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 p-4 shadow-lg"
     >
       <pre>
       <code is:raw>
@@ -219,135 +220,148 @@ end
 </style>
 
 <script>
-import { Popcorn } from "@swmansion/popcorn";
+  import { Popcorn } from "@swmansion/popcorn";
 
-const events = [
-  { js_event: "click", pop_event: "pop-click" },
-  { js_event: "keydown", pop_event: "pop-keydown" },
-  { js_event: "submit", pop_event: "pop-submit" },
-  { js_event: "input", pop_event: "pop-change" },
-];
-let focused_el = document.activeElement;
+  const events = [
+    { js_event: "click", pop_event: "phx-click" },
+    { js_event: "keydown", pop_event: "phx-keydown" },
+    { js_event: "submit", pop_event: "phx-submit" },
+    { js_event: "input", pop_event: "phx-change" },
+  ];
+  let focused_el = document.activeElement;
 
-async function setup() {
-  const popcorn = await Popcorn.init({
-    debug: true,
-    bundlePath: "/wasm/local_forms.avm",
-  });
-  const views = find_predefined_views();
-  const { data, durationMs } = await popcorn.call(
-    { views: find_predefined_views() },
-    {
-      timeoutMs: 10_000,
-    },
-  );
-  views.forEach((view) => {
-    afterRenderBind(view, popcorn);
-  });
-  window.addEventListener("phx:llv_server_message", async (e) => {
-    const { data, durationMs } = await popcorn.call(
-      {
-        view: e.detail.view,
-        event: "llv_server_message",
-        payload: { event: "llv_server_message", value: e.detail.payload },
-      },
-      {
-        timeoutMs: 10_000,
-      },
-    );
-  });
-  window.addEventListener("phx:llv_rerender", async (e) => {
-    const { data, durationMs } = await popcorn.call(
-      {
-        view: e.detail.view,
-        event: "llv_rerender",
-        payload: { event: "llv_rerender" },
-      },
-      {
-        timeoutMs: 10_000,
-      },
-    );
-  });
-}
-
-async function afterRenderBind(view, popcorn) {
-  const view_element = find_element(view);
-  console.log({ ...view_element.dataset });
-  if (view_element.dataset.popcornBound) return;
-  focused_el.focus();
-  events.forEach(({ js_event: js_event, pop_event: pop_event }) => {
-    view_element.addEventListener(js_event, async (e) => {
-      const target_el = e.target.closest(`[${pop_event}]`);
-      console.log({ event: e, target_el: target_el, pop_event: pop_event });
-      if (target_el && view_element.contains(target_el)) {
-        handlePopEvent(e, target_el, pop_event, popcorn, view);
-      }
+  async function setup() {
+    const popcorn = await Popcorn.init({
+      debug: true,
+      bundlePath: "/wasm/local_forms.avm",
     });
-  });
-  view_element.dataset.popcornBound = "true";
-}
-
-async function handlePopEvent(e, target_el, pop_event, popcorn, view) {
-  focused_el = document.activeElement;
-  const value = extractElementValue(e, target_el);
-  try {
+    const views = find_predefined_views();
     const { data, durationMs } = await popcorn.call(
-      {
-        view: view,
-        event: pop_event,
-        payload: { event: target_el.getAttribute(pop_event), value: value },
-      },
+      { views: find_predefined_views() },
       {
         timeoutMs: 10_000,
       },
     );
-  } catch (error) {
-    console.log(error);
+    views.forEach((view) => {
+      afterRenderBind(view, popcorn);
+    });
+    window.addEventListener("phx:llv_server_message", async (e) => {
+      const { data, durationMs } = await popcorn.call(
+        {
+          view: e.detail.view,
+          event: "llv_server_message",
+          payload: { event: "llv_server_message", value: e.detail.payload },
+        },
+        {
+          timeoutMs: 10_000,
+        },
+      );
+    });
+    window.addEventListener("phx:llv_rerender", async (e) => {
+      const { data, durationMs } = await popcorn.call(
+        {
+          view: e.detail.view,
+          event: "llv_rerender",
+          payload: { event: "llv_rerender" },
+        },
+        {
+          timeoutMs: 10_000,
+        },
+      );
+    });
   }
-}
 
-function extractElementValue(e, el) {
-  let value;
-  if (el instanceof HTMLFormElement) {
-    e.preventDefault();
-    const inputs = el.querySelectorAll("input");
-    const inputsArray = Array.from(inputs);
-    value = inputsArray.reduce((acc, input) => {
-      acc[input.name] = input.value;
-      return acc;
-    }, {});
-  } else if (el.hasAttribute(value)) {
-    value = el.value;
+  async function afterRenderBind(view, popcorn) {
+    const view_element = find_element(view);
+    if (view_element.dataset.popcornBound) return;
+    focused_el.focus();
+    events.forEach(({ js_event: js_event, pop_event: pop_event }) => {
+      view_element.addEventListener(js_event, async (e) => {
+        const target_el = e.target.closest(`[${pop_event}]`);
+        if (target_el && view_element.contains(target_el)) {
+          handlePopEvent(e, target_el, pop_event, popcorn, view, js_event);
+        }
+      });
+    });
+    view_element.dataset.popcornBound = "true";
   }
-  return value;
-}
 
-// TODO this is a mock for heex templating inside index.html file
-function find_predefined_views() {
-  let elements = document.querySelectorAll("[data-pop-view]");
-  elements = Array.from(elements);
-  return elements.map((el) => el.getAttribute("data-pop-view"));
-}
-
-function find_view(element) {
-  while (element) {
-    if (element.hasAttribute("data-pop-view")) {
-      return element.getAttribute("data-pop-view");
+  async function handlePopEvent(
+    e,
+    target_el,
+    pop_event,
+    popcorn,
+    view,
+    js_event,
+  ) {
+    focused_el = document.activeElement;
+    const value = extractElementValue(e, target_el);
+    try {
+      let type = js_event;
+      if (target_el instanceof HTMLFormElement) {
+        type = "form";
+      }
+      const { data, durationMs } = await popcorn.call(
+        {
+          view: view,
+          event: "event",
+          payload: {
+            event: target_el.getAttribute(pop_event),
+            type: "type",
+            value: value ? value : "value",
+          },
+        },
+        {
+          timeoutMs: 10_000,
+        },
+      );
+    } catch (error) {
+      console.log(error);
     }
-    element = element.parentElement;
   }
-  return null;
-}
 
-function find_element(view) {
-  let elements = document.querySelectorAll("[data-pop-view]");
-  elements = Array.from(elements);
-  const found = elements.find(
-    (element) => element.getAttribute("data-pop-view") == view,
-  );
-  return found;
-}
+  function extractElementValue(e, el) {
+    let value;
+    if (el instanceof HTMLFormElement) {
+      e.preventDefault();
+      const inputs = el.querySelectorAll("input");
+      const inputsArray = Array.from(inputs);
+      value = inputsArray.reduce((acc, input) => {
+        acc[input.name] = input.value;
+        return acc;
+      }, {});
+    } else if (el.hasAttribute(value)) {
+      value = el.value;
+    }
+    return value;
+  }
 
-document.addEventListener("DOMContentLoaded", setup);
-document.addEventListener("astro:page-load", setup);
+  // TODO this is a mock for heex templating inside index.html file
+  function find_predefined_views() {
+    let elements = document.querySelectorAll("[data-pop-view]");
+    elements = Array.from(elements);
+    return elements.map((el) => el.getAttribute("data-pop-view"));
+  }
+
+  function find_view(element) {
+    while (element) {
+      if (element.hasAttribute("data-pop-view")) {
+        return element.getAttribute("data-pop-view");
+      }
+      element = element.parentElement;
+    }
+    return null;
+  }
+
+  function find_element(view) {
+    let elements = document.querySelectorAll("[data-pop-view]");
+    elements = Array.from(elements);
+    const found = elements.find(
+      (element) => element.getAttribute("data-pop-view") == view,
+    );
+    return found;
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+  document.addEventListener("astro:page-load", setup);
 </script>
