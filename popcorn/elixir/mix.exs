@@ -1,7 +1,7 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.2.2"
   @github "https://github.com/software-mansion/popcorn"
 
   def project do
