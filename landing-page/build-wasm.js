@@ -3,6 +3,9 @@ import { cp, rm, mkdir, readdir } from "fs/promises";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
+/**
+ * @param {{ dir: string, wasmSrcPathDefault?: string, newBundleName: string }} options
+ */
 export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
   return {
     name: "build-bundle",
