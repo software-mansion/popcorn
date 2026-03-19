@@ -15,7 +15,9 @@ config :local_thermostat, LocalThermostatWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "ncxDG5Y6MOga8LsAXggcY140VN1wY+SlYkx5gamfyzN6Ih1Y1qZxpLaeDBjI0ij8",
   watchers: [
-    node: ["build.mjs", "--watch",
+    node: [
+      "build.mjs",
+      "--watch",
       cd: Path.expand("../assets", __DIR__),
       env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
     ],
