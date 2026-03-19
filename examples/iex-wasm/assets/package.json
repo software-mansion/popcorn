@@ -6,7 +6,7 @@
   },
   "dependencies": {
     "@swmansion/popcorn": "workspace:*",
-    "@xterm/xterm": "^5.5.0"
+    "ghostty-web": "^0.4.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

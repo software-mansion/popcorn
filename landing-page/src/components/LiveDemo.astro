@@ -52,11 +52,13 @@ const exampleButtonClass =
 
 <script>
   import { Popcorn } from "@swmansion/popcorn";
-  import { Terminal } from "@xterm/xterm";
-  import { FitAddon } from "@xterm/addon-fit";
+  import { init, Terminal, FitAddon, OSC8LinkProvider, UrlRegexProvider } from "ghostty-web";
 
-  const XTERM_CONFIG = {
+  const TERMINAL_CONFIG = {
     allowTransparency: true,
+    cursorBlink: true,
+    scrollback: 10000,
+    smoothScrollDuration: 100,
     theme: {
       background: "#373129",
       foreground: "#fffdf5",
@@ -91,7 +93,7 @@ const exampleButtonClass =
     if (terminalContainer === null) {
       throw new Error("Terminal container not found");
     }
-    const { term, write } = xtermInit({
+    const { term, write } = await terminalInit({
       container: terminalContainer,
     });
 
@@ -138,13 +140,17 @@ const exampleButtonClass =
     term.write(log);
   }
 
-  type XtermOpts = { container: HTMLElement };
-  function xtermInit({ container }: XtermOpts) {
-    const term = new Terminal(XTERM_CONFIG);
+  type TerminalOpts = { container: HTMLElement };
+  async function terminalInit({ container }: TerminalOpts) {
+    await init();
+    const term = new Terminal(TERMINAL_CONFIG);
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
+    fitAddon.observeResize();
+    term.registerLinkProvider(new OSC8LinkProvider());
+    term.registerLinkProvider(new UrlRegexProvider());
 
     async function write(
       lines: string[],
@@ -159,7 +165,7 @@ const exampleButtonClass =
         view: window,
       };
 
-      const textArea = document.querySelector(".xterm-helper-textarea");
+      const textArea = term.textarea ?? null;
       if (textArea === null) throw new Error("Terminal not initialized");
 
       for (const line of lines) {

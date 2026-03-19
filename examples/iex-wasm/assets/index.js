@@ -1,5 +1,5 @@
 import { Popcorn } from "@swmansion/popcorn";
-import { Terminal } from "@xterm/xterm";
+import { init, Terminal, FitAddon, OSC8LinkProvider, UrlRegexProvider } from "ghostty-web";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const ARROW_UP_KEY_CODE = 38;
@@ -8,8 +8,19 @@ const TAB_KEY_CODE = 9;
 const IGNORED_KEYS = [ARROW_UP_KEY_CODE, ARROW_DOWN_KEY_CODE, TAB_KEY_CODE]
 
 async function setup() {
-  const term = new Terminal();
+  await init();
+  const term = new Terminal({
+    cursorBlink: true,
+    scrollback: 10000,
+    smoothScrollDuration: 100,
+  });
+  const fitAddon = new FitAddon();
+  term.loadAddon(fitAddon);
   term.open(document.getElementById(LANGUAGE + '-terminal'));
+  fitAddon.fit();
+  fitAddon.observeResize();
+  term.registerLinkProvider(new OSC8LinkProvider());
+  term.registerLinkProvider(new UrlRegexProvider());
   window.terminal = term;
 
   const popcorn = await Popcorn.init({
