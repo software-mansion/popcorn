@@ -56,6 +56,7 @@ export default defineConfig({
     buildBundle({
       wasmSrcPathDefault:
         "../examples/local-lv-thermostat/static/local_live_view/wasm",
+        "../examples/local-lv-thermostat/priv/static/assets/js/wasm",
       dir: "../examples/local-lv-thermostat",
       newBundleName: "local_thermostat.avm",
     }),
