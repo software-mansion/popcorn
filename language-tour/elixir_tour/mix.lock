@@ -1,4 +1,4 @@
 %{
   "jason": {:hex, :jason, "1.4.4", "b9226785a9aa77b6857ca22832cffa5d5011a667207eb2a0ad56adb5db443b8a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b"},
-  "popcorn": {:hex, :popcorn, "0.2.1", "125965c99cb74f17066d1726d531c9e3f72889f2a1a7a22001556a2046f73840", [:mix], [{:jason, "~> 1.4", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "73ec8d64946011bdea066585e78989bdf09f458dd547d858a3e8062a6df8bb48"},
+  "popcorn": {:hex, :popcorn, "0.2.2", "7d121503b56e4d7093e48a2ef94ed8748a916c47777257797267439a2ad3a4db", [:mix], [{:jason, "~> 1.4", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "1f4533a0edf3d360952b98743d82e83c6e5fa27745b7942be1278b277ea8d9da"},
 }
