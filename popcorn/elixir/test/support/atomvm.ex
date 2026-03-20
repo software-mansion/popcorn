@@ -164,7 +164,7 @@ defmodule Popcorn.Support.AtomVM do
 
     snippet = """
     try {
-      const result = await popcorn.call("#{args}", {});
+      const result = await popcorn.call("#{args}", {process: "main"});
       return result;
     } catch (e) {
       return {error: true}

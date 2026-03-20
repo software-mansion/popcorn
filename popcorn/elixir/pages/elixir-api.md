@@ -15,11 +15,13 @@ Represents opaque reference to JS value. Automatically cleaned up when garbage c
 
 ### `send_event(event_name, payload \\ nil)`
 
-Sends an event to the JS side. Fire-and-forget.
+Sends an event to the JS side. Fire-and-forget. Events with names starting with `popcorn` are reserved for internal use.
+
+Events sent during startup (before `Popcorn.init()` resolves on the JS side) are not delivered to `onMessage` handlers.
 
 **Parameters:**
 
-- `event_name` (string) - Name of the event.
+- `event_name` (string) - Name of the event. Must not start with `popcorn`.
 - `payload` (any, optional) - Event payload. Default: `nil`.
 
 **Returns:** `:ok`.

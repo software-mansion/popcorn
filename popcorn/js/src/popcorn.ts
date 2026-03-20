@@ -6,7 +6,6 @@ import {
   MAX_RELOAD_N,
   MESSAGES,
   EVENT_NAMES,
-  DEFAULT_RECEIVER_TIMEOUT_MS,
 } from "./types";
 import { PopcornError, PopcornInternalError, throwError } from "./errors";
 
@@ -35,8 +34,6 @@ export type PopcornInitOptions = {
   wasmDir?: string;
   /** Enable debug logging. */
   debug?: boolean;
-  /** Catch-all event handler, active from iframe start. Only receives user events (not popcorn_ prefixed). */
-  onMessage?: (eventName: string, payload: AnySerializable) => void;
 };
 
 /** Options for cast method */
@@ -114,11 +111,7 @@ export class Popcorn {
   };
 
   private messageHandlers = new Set<MessageHandler>();
-  private initOnMessage: MessageHandler | null = null;
   private mountResolve: (() => void) | null = null;
-  private mounted = false;
-  private defaultReceiverWaiter: Promise<string | null> | null = null;
-  private resolveDefaultReceiver: ((name: string) => void) | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private reloadN = 0;
 
@@ -134,7 +127,6 @@ export class Popcorn {
     this.onReloadCallback = params.onReload ?? noop;
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
-    this.initOnMessage = params.onMessage ?? null;
 
     this.bridgeConfig = {
       container: params.container,
@@ -203,7 +195,6 @@ export class Popcorn {
       ]);
       clearTimeout(initTimeout);
 
-      this.mounted = true;
       this.transition({ status: "ready" });
       this.trace("Main: mounted");
       this.onHeartbeat();
@@ -234,6 +225,8 @@ export class Popcorn {
     { process, timeoutMs }: CallOptions = {},
   ): Promise<CallResult> {
     this.assertStatus(["ready"]);
+    const targetProcess = process ?? this.defaultReceiver;
+    if (targetProcess === null) throwError({ t: "bad_target" });
     if (this.bridge === null) throwError({ t: "unmounted" });
 
     const requestId = this.requestId++;
@@ -242,20 +235,11 @@ export class Popcorn {
       this.calls.set(requestId, { acknowledged: false, startTimeMs, resolve });
     });
 
-    const targetProcess = await this.resolveTargetProcess(process);
-
-    if (targetProcess === null) {
-      this.calls.delete(requestId);
-      throwError({ t: "bad_target" });
-    }
-
-    if (this.bridge !== null) {
-      this.trace("Main: call: ", { requestId, process, args });
-      this.bridge.sendIframeRequest({
-        type: MESSAGES.CALL,
-        value: { requestId, process: targetProcess, args },
-      });
-    }
+    this.trace("Main: call: ", { requestId, process, args });
+    this.bridge.sendIframeRequest({
+      type: MESSAGES.CALL,
+      value: { requestId, process: targetProcess, args },
+    });
 
     const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
     this.calls.delete(requestId);
@@ -290,29 +274,9 @@ export class Popcorn {
     this.trace("Main: deinit");
     this.transition({ status: "deinit" });
     this.teardownBridge("deinitialized");
-    this.initOnMessage = null;
     this.logListeners.stdout.clear();
     this.logListeners.stderr.clear();
     this.messageHandlers.clear();
-  }
-
-  private async resolveTargetProcess(
-    process: string | undefined,
-  ): Promise<string | null> {
-    const target = process ?? this.defaultReceiver;
-    if (target !== null) return target;
-
-    if (this.defaultReceiverWaiter === null) {
-      this.defaultReceiverWaiter = new Promise<string | null>((resolve) => {
-        this.resolveDefaultReceiver = resolve;
-        setTimeout(() => {
-          this.resolveDefaultReceiver = null;
-          resolve(null);
-        }, DEFAULT_RECEIVER_TIMEOUT_MS);
-      });
-    }
-
-    return this.defaultReceiverWaiter;
   }
 
   private teardownBridge(errorCode: "deinitialized" | "reload") {
@@ -321,10 +285,7 @@ export class Popcorn {
       this.bridge = null;
     }
     this.mountResolve = null;
-    this.mounted = false;
     this.defaultReceiver = null;
-    this.defaultReceiverWaiter = null;
-    this.resolveDefaultReceiver = null;
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
       this.heartbeatTimeout = null;
@@ -377,25 +338,12 @@ export class Popcorn {
         this.mountResolve = null;
       } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
         this.defaultReceiver = payload.name;
-        this.resolveDefaultReceiver?.(payload.name);
-        this.resolveDefaultReceiver = null;
       } else {
         this.trace("Unknown internal event:", eventName);
       }
       return;
     }
 
-    if (!this.mounted) {
-      this.initOnMessage?.(eventName, payload);
-    }
-
-    this.dispatchToHandlers(eventName, payload);
-  }
-
-  private dispatchToHandlers(
-    eventName: string,
-    payload: AnySerializable,
-  ): void {
     this.messageHandlers.forEach((handler) => {
       try {
         handler(eventName, payload);
