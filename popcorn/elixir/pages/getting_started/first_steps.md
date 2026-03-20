@@ -74,7 +74,7 @@ import Config
 config :popcorn, out_dir: "dist/wasm"
 ```
 
-Next, fetch dependencies and compile your Elixir code to WebAssembly:
+Next, fetch dependencies and compile your Elixir code into a Popcorn `.avm` bundle:
 
 ```console
 $ mix deps.get
@@ -114,7 +114,7 @@ $ npm install --prefix assets
 $ npm run build --prefix assets
 ```
 
-The build step bundles your JavaScript, copies the WebAssembly runtime assets, and outputs everything to the `dist/` directory.
+The JavaScript build step bundles your JavaScript, copies the WebAssembly runtime assets, and outputs everything to the `dist/` directory. `mix popcorn.cook` only produces the `.avm` bundle.
 
 > #### Other bundlers {: .info}
 >

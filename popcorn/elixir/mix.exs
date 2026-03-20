@@ -22,7 +22,7 @@ defmodule Popcorn.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: [
         docs: ["docs", &generate_js_docs/1],
-        compile: ["compile", &download_artifacts/1, &patch/1],
+        compile: ["compile", &patch/1],
         lint: [
           "format --check-formatted",
           "deps.unlock --check-unused",
@@ -128,13 +128,18 @@ defmodule Popcorn.MixProject do
   end
 
   defp generate_js_docs(_) do
-    Mix.shell().cmd(
-      "npx documentation build priv/static-template/wasm/popcorn.js -f html -o doc/js-api"
-    )
+    js_dir = Path.expand("../js", __DIR__)
+    js_entry = Path.join(js_dir, "dist/popcorn.mjs")
+
+    run_cmd!("pnpm run build", cd: js_dir)
+    run_cmd!("npx documentation build #{js_entry} -f html -o doc/js-api", [])
   end
 
-  defp download_artifacts(_args) do
-    Popcorn.Utils.FetchArtifacts.download_artifacts(force: "--force" in System.argv())
+  defp run_cmd!(command, opts) do
+    case Mix.shell().cmd(command, opts) do
+      0 -> :ok
+      status -> Mix.raise("command failed with status #{status}: #{command}")
+    end
   end
 
   defp patch(_args) do

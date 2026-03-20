@@ -4,11 +4,9 @@ defmodule Popcorn do
   """
 
   alias Popcorn.Build
-  alias Popcorn.Utils.FetchArtifacts
 
   @popcorn_path Mix.Project.app_path()
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
-  @priv_dir :code.priv_dir(:popcorn)
   @api_dir Path.join(["popcorn", "api"])
 
   defmodule CookingError do
@@ -17,27 +15,19 @@ defmodule Popcorn do
   end
 
   @doc """
-  Generates static artifacts to run the project in the browser.
+  Builds a Popcorn `.avm` bundle.
 
   Options:
   - `out_dir` - The directory to write artifacts to. Required, unless provided via `config.exs`.
   - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
-  - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
-  first with `mix popcorn.build_runtime --target unix`
   - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
-  - `include_vm` - If `true`, includes the VM and supporting files in the output directory (e.g. AtomVM.wasm, AtomVM.mjs and JS glue for wasm; AtomVM binary for unix).
-
-  Instead of calling `cook/1`, you can call `ingredients/1` and then `bundle/1`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
-          | {:target, :wasm | :unix}
           | {:extra_beams, [String.t()]}
-          | {:include_vm, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
-    ingredients(Keyword.take(options, [:out_dir, :target, :include_vm]))
     bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
   end
 
@@ -70,29 +60,6 @@ defmodule Popcorn do
     after
       File.rm!(filename)
     end
-  end
-
-  @doc """
-  Generates artifacts needed to run any Popcorn-based project.
-
-  Options have the same semantics as in `cook/1`.
-  """
-  @spec ingredients([{:out_dir, String.t()} | {:target, :wasm | :unix} | {:include_vm, boolean()}]) ::
-          :ok
-  def ingredients(options \\ []) do
-    default_options = [
-      out_dir: Popcorn.Config.get(:out_dir),
-      target: :wasm,
-      include_vm: false
-    ]
-
-    options = options |> Keyword.validate!(default_options) |> Map.new()
-    ensure_option_present(options, :out_dir, "Output directory")
-
-    File.mkdir_p!(options.out_dir)
-    maybe_copy_runtime_artifacts(options)
-
-    :ok
   end
 
   defp bundled_artifacts(applications) do
@@ -171,25 +138,6 @@ defmodule Popcorn do
     src_path = to_string(module.module_info(:compile)[:source])
 
     String.contains?(src_path, @api_dir)
-  end
-
-  defp maybe_copy_runtime_artifacts(%{include_vm: false}), do: :ok
-
-  defp maybe_copy_runtime_artifacts(options) do
-    if options.target == :wasm do
-      wasm_template_files = Path.wildcard(Path.join(@priv_dir, "static-template/wasm/**"))
-      cp_gzip(wasm_template_files, options.out_dir)
-    end
-
-    paths = FetchArtifacts.fetch_artifacts(options.target)
-
-    cp_gzip(paths, options.out_dir, fn path ->
-      raise CookingError, """
-      Couldn't find runtime artifact #{Path.basename(path)} at #{path} for target `#{options.target}`. \
-      To build artifacts from source, run \
-      `mix popcorn.build_runtime --target #{options.target}`.
-      """
-    end)
   end
 
   defp ensure_option_present(options, key, name) do
@@ -318,17 +266,6 @@ defmodule Popcorn do
       |> Enum.uniq()
 
     gather_app_specs(deps, Map.merge(specs, new_specs))
-  end
-
-  defp cp_gzip(paths, out_dir, handle_missing_file \\ fn _path -> :ok end) do
-    for path <- List.wrap(paths) do
-      dest = Path.join(out_dir, Path.basename(path))
-      if not File.exists?(path), do: handle_missing_file.(path)
-      File.cp!(path, dest)
-      gzip(dest)
-    end
-
-    :ok
   end
 
   defp gzip(path) do

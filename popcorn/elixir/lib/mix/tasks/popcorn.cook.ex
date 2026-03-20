@@ -1,14 +1,11 @@
 defmodule Mix.Tasks.Popcorn.Cook do
-  @shortdoc "Generates static artifacts to run the project in the browser."
+  @shortdoc "Builds the `.avm` bundle for a Popcorn project."
   @moduledoc """
   #{@shortdoc}
 
   Accepts the following options:
   - `out_dir` - the directory to write artifacts to
-  - `target` - `wasm` (default) or `unix`. If `unix` is chosed, you need to build the runtime
-  first with `mix popcorn.build_runtime --target unix`
-  - `--include-vm` - include the VM and supporting files in the output directory.
-  Without this flag, only the `.avm` bundle is generated.
+  - `start_module` - optional module with `start/0` used as the bundle entrypoint
 
   `out_dir` is mandatory, unless provided via `config.exs`,
   for example `config :popcorn, out_dir: "dist/wasm"`
@@ -16,16 +13,23 @@ defmodule Mix.Tasks.Popcorn.Cook do
   use Mix.Task
 
   @requirements "compile"
+  @parser_config [
+    strict: [out_dir: :string, start_module: :string],
+    aliases: [d: :out_dir]
+  ]
 
   @impl true
   def run(args) do
-    parser_config = [
-      strict: [out_dir: :string, target: :string, include_vm: :boolean],
-      aliases: [d: :out_dir]
-    ]
+    {options, _rest} = OptionParser.parse!(args, @parser_config)
 
-    {options, _rest} = OptionParser.parse!(args, parser_config)
+    options
+    |> Keyword.update(:start_module, nil, &as_module/1)
+    |> Popcorn.cook()
+  end
 
-    Popcorn.cook(options)
+  defp as_module(module_name) when is_binary(module_name) do
+    module_name
+    |> String.split(".")
+    |> Module.safe_concat()
   end
 end
