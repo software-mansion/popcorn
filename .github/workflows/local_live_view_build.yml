@@ -73,15 +73,15 @@ jobs:
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
+      - name: Configure runtime source
+        run: |
+          printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs
+
       - name: Compile Hex dependencies
         run: mix deps.compile
 
       - name: Lint
         run: mix lint
-
-      - name: Configure runtime source
-        run: |
-          echo "config :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}" >> config/config.exs
 
       - name: Build
         run: mix build
