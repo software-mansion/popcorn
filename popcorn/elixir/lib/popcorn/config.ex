@@ -3,12 +3,7 @@ defmodule Popcorn.Config do
   @defaults %{
     extra_apps: [],
     out_dir: nil,
-    add_tracing: false,
-    runtime: [
-      {:url, "https://github.com/software-mansion-labs/FissionVM/releases/latest/download/",
-       target: :wasm},
-      {:path, "popcorn_runtime_source/artifacts/$target"}
-    ]
+    add_tracing: false
   }
 
   def get(key) do
