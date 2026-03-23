@@ -22,56 +22,58 @@ defmodule Popcorn.Support.Browser do
     end
 
     {_pid, browser} = Playwright.BrowserType.launch(:chromium)
-    Agent.start_link(fn -> %{browser: browser, url: url} end, name: __MODULE__)
+
+    # Create a single shared page for all tests — each test runs
+    # in its own iframe (Popcorn instance) on this page.
+    shared_page = Playwright.Browser.new_page(browser)
+    response = Playwright.Page.goto(shared_page, url, %{wait_until: :domcontentloaded})
+    assert response.status == 200
+
+    wait_for(fn ->
+      result = Playwright.Page.evaluate(shared_page, "() => typeof window.createPopcornInstance")
+      assert result == "function"
+    end)
+
+    Agent.start_link(fn -> %{browser: browser, page: shared_page} end, name: __MODULE__)
+
+    ExUnit.after_suite(fn _result ->
+      try do
+        Playwright.Browser.close(browser)
+      rescue
+        _ -> :ok
+      end
+    end)
 
     :ok
   end
 
-  def new_page(bundle_path, log_handler \\ fn _log -> :ok end) do
-    %{browser: browser, url: url} = Agent.get(__MODULE__, & &1)
-    url = "#{url}?bundlePath=#{Path.relative_to_cwd(bundle_path)}"
-    page = Playwright.Browser.new_page(browser)
+  @doc """
+  Creates a new Popcorn instance (iframe) on the shared page.
+  Returns {page, instance_id} for use with evaluate calls.
+  The instance is destroyed automatically after the test via on_exit.
+  """
+  def new_instance(bundle_path) do
+    %{page: page} = Agent.get(__MODULE__, & &1)
+    relative_path = Path.relative_to_cwd(bundle_path)
 
-    Playwright.Page.on(page, "console", fn %{params: log} ->
-      prefix =
-        cond do
-          log.location.url == "" -> ""
-          String.starts_with?(log.text, "[popcorn stdout]") -> ""
-          true -> "[#{log.location.url}:#{log.location.lineNumber}] "
-        end
-
-      log_handler.("#{prefix}#{log.text}\n")
-    end)
-
-    Playwright.Page.on(page, "pageerror", fn %{params: error} ->
-      message = Map.get(error, :message) || Map.get(error, "message") || inspect(error)
-      log_handler.("[pageerror] #{message}\n")
-    end)
+    instance_id =
+      Playwright.Page.evaluate(page, """
+      async () => await window.createPopcornInstance("#{relative_path}")
+      """)
 
     on_exit(fn ->
-      # in debug mode we want to keep the page open to allow interaction with it
-      if not debug_mode?(), do: Playwright.Page.close(page)
+      if not debug_mode?() do
+        try do
+          Playwright.Page.evaluate(page, """
+          () => window.destroyPopcornInstance("#{instance_id}")
+          """)
+        rescue
+          _ -> :ok
+        end
+      end
     end)
 
-    response = Playwright.Page.goto(page, url, %{wait_until: :domcontentloaded})
-    assert response.status == 200
-
-    # wait until sure Popcorn is initialized
-    Playwright.Page.evaluate(page, """
-    async () => {window.popcorn = await window.popcorn_promise;}
-    """)
-
-    # capture unhandled errors form the iframe window and re-log them again
-    # otherwise Playwright won't capture them
-    Playwright.Page.evaluate(page, """
-    const popcorn_iframe = document.querySelector("iframe");
-    popcorn_iframe.contentWindow.addEventListener("error", (event) => {
-      const message = event.error ? event.error.message : event.message;
-      console.log(`[${event.filename}:${event.lineno}] ${message}`, event);
-    })
-    """)
-
-    page
+    {page, instance_id}
   end
 
   def debug_mode?() do
