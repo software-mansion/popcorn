@@ -36,24 +36,19 @@ test.describe("Language Tour - All Topics", () => {
       const runButtons = page.locator("button").filter({ hasText: "Run Code" });
       await runButtons.last().click();
 
-      await expect(async () => {
-        const badges = page.locator("[data-testid='execution-state-badge']");
-        const count = await badges.count();
-        for (let i = 0; i < count; i++) {
-          const state = await badges.nth(i).getAttribute("data-state");
-          expect(state).not.toBe("running");
-          expect(state).not.toBe("queued");
-        }
-      }).toPass({ timeout: 30_000 });
-
       // TODO: support data-test-expect-failure attribute on code cells
       // to allow editors that are expected to fail
       const badges = page.locator("[data-testid='execution-state-badge']");
       const count = await badges.count();
       for (let i = 0; i < count; i++) {
-        await expect(badges.nth(i)).toHaveAttribute("data-state", "success", {
-          timeout: 180_000
-        });
+        await expect(async () => {
+          const state = await badges.nth(i).getAttribute("data-state");
+          expect(state).not.toBe("not_run");
+          expect(state).not.toBe("running");
+          expect(state).not.toBe("queued");
+        }).toPass({ timeout: 90_500 });
+
+        await expect(badges.nth(i)).toHaveAttribute("data-state", "success");
       }
 
       errorCollector.assertNoErrors();
