@@ -34,6 +34,10 @@ defmodule LocalLiveView do
 
       alias LocalLiveView.Message
       use Phoenix.Component, global_prefixes: ~w(pop-)
+
+      def handle_event("llv_server_message", %{"type" => type} = params, socket) do
+        handle_server(type, params, socket)
+      end
     end
   end
 
@@ -93,4 +97,9 @@ defmodule LocalLiveView do
 
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
+  @callback handle_server(event :: binary, unsigned_params(), socket :: Socket.t()) ::
+              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
+  @optional_callbacks handle_server: 3
 end
