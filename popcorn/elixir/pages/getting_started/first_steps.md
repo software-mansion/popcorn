@@ -44,6 +44,8 @@ end
 
 A minimal worker should set itself as the default receiver using `Popcorn.Wasm.set_default_receiver/1`:
 
+This is important because `Popcorn.init()` waits for the default receiver by default. If your worker should receive JS calls immediately after startup, register it during initialization:
+
 ```elixir
 # lib/my_app/worker.ex
 

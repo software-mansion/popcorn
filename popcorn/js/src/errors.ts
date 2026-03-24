@@ -29,7 +29,10 @@ export type PopcornInternalErrorCode =
   | "unmounted"
   | "bad_target"
   | "bad_status"
+  | "default_receiver_timeout"
   | "bundle_not_found";
+
+const DEFAULT_RECEIVER_TIMEOUT_MS = 5_000;
 
 /** Non-recoverable error indicating a bug or library misuse (always thrown) */
 export class PopcornInternalError extends Error {
@@ -57,6 +60,7 @@ type ErrorData =
       status: string;
       expectedStatus: string;
     }
+  | { t: "default_receiver_timeout" }
   | { t: "bundle_not_found"; primary: string; fallback: string };
 
 export function throwError(error: ErrorData): never {
@@ -96,6 +100,11 @@ export function throwError(error: ErrorData): never {
       throw new PopcornInternalError(
         "bad_status",
         `Operation not allowed: instance in "${error.status}" state, expected "${error.expectedStatus}"`,
+      );
+    case "default_receiver_timeout":
+      throw new PopcornInternalError(
+        "default_receiver_timeout",
+        `Default receiver was not set within ${DEFAULT_RECEIVER_TIMEOUT_MS}ms`,
       );
     case "bundle_not_found":
       throw new PopcornInternalError(

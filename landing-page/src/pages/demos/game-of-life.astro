@@ -141,6 +141,7 @@ import Section from "../../components/Section.astro";
       await Popcorn.init({
         bundlePath: "/wasm/gol.avm",
         debug: false,
+        waitForDefaultReceiver: false,
         onStdout: (text: string) => console.log(text),
         onStderr: (text: string) => console.error(text),
       });
