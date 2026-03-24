@@ -1,8 +1,5 @@
 # GenServer
 
-We learned that we can use Agents to keep state and Tasks to execute possibly long-running jobs with limited interaction.
-For more complex scenarios, that don't fit these abstractions, `GenServer` is usually the way to go.
-
 `GenServer` stands for _generic server_ and abstracts the common client-server interaction. The `GenServer` process acts as a server - it receives requests from clients and sends responses back. Any other process can be a client, and there can be multiple clients. Client can send two kinds of requests to the server:
 
 - `call` - the client sends the request and waits for response,

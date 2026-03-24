@@ -7,7 +7,7 @@ child_specs = []
 {:ok, supervisor} = Supervisor.start_link(child_specs, strategy: :one_for_one)
 ```
 
-Then, we spawn a task under the supervisor. `Task` module implements a `child_spec/1` function, so we can pass `{Task, fn -> ... end}` as a child spec:
+Then, we spawn a task under the supervisor. Task is an abstraction over spawning a process to run a specific, rather short-lived job - you can learn more about it [here](https://hexdocs.pm/elixir/Task.html). `Task` module implements a `child_spec/1` function, so we can pass `{Task, fn -> ... end}` as a child spec:
 
 ```elixir
 Supervisor.start_child(supervisor, {
