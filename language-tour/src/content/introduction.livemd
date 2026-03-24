@@ -59,6 +59,10 @@ and returns that value. You can specify a 'label' to include additional info:
 IO.inspect(1 + 2, label: "Result")
 ```
 
+Note that if you run an editor without running previous editors, the previous editors are run automatically.
+
+💡 Reload the page and run only the last editor. Previous editors should run as well.
+
 ## It runs in your browser! 🍿
 
 The code is executed inside your browser via WebAssembly, thanks to the [Popcorn project](https://popcorn.swmansion.com/).

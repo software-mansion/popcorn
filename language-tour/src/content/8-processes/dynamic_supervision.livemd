@@ -67,7 +67,7 @@ defmodule JobQueue do
       end}
 
     # Start the task under a dynamic supervisor
-    DynamicSupervisor.start_child(JobSupervisor, task_spec)
+    DynamicSupervisor.start_child(:job_supervisor, task_spec)
 
     # Despite it's handle_call, we return :noreply tuple,
     # because run_job/2 takes care of replying.
@@ -97,7 +97,7 @@ if Process.whereis(:my_app_supervisor) do
   Supervisor.stop(:my_app_supervisor)
 end
 
-child_specs = [{DynamicSupervisor, name: JobSupervisor}, JobQueue]
+child_specs = [{DynamicSupervisor, name: :job_supervisor}, JobQueue]
 Supervisor.start_link(child_specs, strategy: :one_for_one, name: :my_app_supervisor)
 ```
 
@@ -107,7 +107,7 @@ Note that job queue and job supervisor are spawned under another, top-level supe
       my_app_supervisor
        |             |
        V             V
- JobSupervisor    JobQueue
+ job_supervisor    JobQueue
  |     |     |    
  V     V     V
 Job1  Job2  Job3 ...
