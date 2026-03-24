@@ -9,7 +9,7 @@ defmodule ExApp do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.register(@process_name)
+    Popcorn.Wasm.set_default_receiver(@process_name)
     IO.puts("Hello console!")
 
     # Popcorn.Wasm.run_js("""

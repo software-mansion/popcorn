@@ -11,7 +11,7 @@ defmodule TestServer do
 
   @impl GenServer
   def init(_args) do
-    Wasm.register(@process_name)
+    Wasm.set_default_receiver(@process_name)
     {:ok, nil}
   end
 
@@ -33,6 +33,11 @@ defmodule TestServer do
   defp handle_wasm({:wasm_call, %{"action" => "stdout", "message" => msg}}, state) do
     IO.puts(msg)
     {:resolve, %{"printed" => "stdout"}, state}
+  end
+
+  defp handle_wasm({:wasm_call, %{"action" => "send_event", "name" => name, "payload" => payload}}, state) do
+    Wasm.send_event(name, payload)
+    {:resolve, %{"sent" => true}, state}
   end
 
   defp handle_wasm({:wasm_call, %{"action" => "crash"}}, _state) do

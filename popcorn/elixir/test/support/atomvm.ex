@@ -164,7 +164,7 @@ defmodule Popcorn.Support.AtomVM do
 
     snippet = """
     try {
-      const result = await popcorn.call("#{args}", {});
+      const result = await popcorn.call("#{args}", {process: "main"});
       return result;
     } catch (e) {
       return {error: true}
@@ -336,8 +336,7 @@ defmodule Popcorn.Support.AtomVM do
         @compile autoload: false, no_warn_undefined: [:atomvm, Wasm]
 
         def start() do
-          Process.register(self(), :main)
-          Wasm.register("main")
+          Wasm.set_default_receiver(:main)
 
           receive do
             wasm_msg -> Wasm.handle_message!(wasm_msg, &handle_wasm_msg/1)

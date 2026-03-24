@@ -5,11 +5,12 @@ import {
   CALL_TIMEOUT_MS,
   MAX_RELOAD_N,
   MESSAGES,
+  EVENT_NAMES,
 } from "./types";
 import { PopcornError, PopcornInternalError, throwError } from "./errors";
 
 import type { IframeBridgeArgs } from "./bridge";
-import type { IframeResponse, AnySerializable } from "./types";
+import type { IframeResponse, AnySerializable, ElixirEvent } from "./types";
 import type { PopcornErrorCode, PopcornInternalErrorCode } from "./errors";
 
 export { PopcornError, PopcornInternalError };
@@ -75,15 +76,11 @@ type CallData = {
   resolve: (result: CallResult) => void;
 };
 
-type AwaitedMessage = {
-  type: string;
-  resolve?: (value: AnySerializable) => void;
-};
+type MessageHandler = (eventName: string, payload: AnySerializable) => void;
 
 type State =
   | { status: "uninitialized" }
   | { status: "mount" }
-  | { status: "await_vm" }
   | { status: "ready" }
   | { status: "reload" }
   | { status: "deinit" };
@@ -104,7 +101,7 @@ export class Popcorn {
   private debug = false;
   private bundleURL: string;
   private state: State = { status: "uninitialized" };
-  private initProcess: string | null = null;
+  private defaultReceiver: string | null = null;
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
@@ -113,7 +110,8 @@ export class Popcorn {
     stderr: new Set(),
   };
 
-  private awaitedMessage: AwaitedMessage | null = null;
+  private messageHandlers = new Set<MessageHandler>();
+  private mountResolve: (() => void) | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private reloadN = 0;
 
@@ -132,7 +130,7 @@ export class Popcorn {
 
     this.bridgeConfig = {
       container: params.container,
-      script: { url: IFRAME_URL, entrypoint: "runIFrame" },
+      script: { url: IFRAME_URL, entrypoint: "initVm" },
       config: { "bundle-path": this.bundleURL },
       debug: true,
       onMessage: this.iframeHandler.bind(this),
@@ -145,7 +143,7 @@ export class Popcorn {
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after Elixir code calls `Popcorn.Wasm.register/1`.
+   * Returns after Elixir sends `popcorn_elixir_ready` event.
    *
    * @example
    * import { Popcorn } from "@swmansion/popcorn";
@@ -181,24 +179,24 @@ export class Popcorn {
     this.bridge = new IframeBridge(this.bridgeConfig);
 
     try {
-      await this.awaitMessage(MESSAGES.INIT);
-      this.transition({ status: "await_vm" });
-      this.trace("Main: iframe loaded");
-      const startTime = performance.now();
-      const startVmResult = await withTimeout(
-        this.awaitMessage(MESSAGES.START_VM).then(
-          (data): CallResult => ({
-            ok: true,
-            data,
-            durationMs: performance.now() - startTime,
-          }),
-        ),
-        INIT_VM_TIMEOUT_MS,
-      );
-      if (!startVmResult.ok) throwError({ t: "assert" });
-      this.initProcess = startVmResult.data as string;
+      const mountPromise = new Promise<void>((resolve) => {
+        this.mountResolve = resolve;
+      });
+
+      let initTimeout: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        mountPromise,
+        new Promise<never>((_, reject) => {
+          initTimeout = setTimeout(
+            () => reject(new PopcornError("timeout", "Init timed out")),
+            INIT_VM_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      clearTimeout(initTimeout);
+
       this.transition({ status: "ready" });
-      this.trace("Main: mounted, main process: ", this.initProcess);
+      this.trace("Main: mounted");
       this.onHeartbeat();
     } catch (error) {
       this.deinit();
@@ -211,7 +209,7 @@ export class Popcorn {
    *
    * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @example
@@ -227,25 +225,20 @@ export class Popcorn {
     { process, timeoutMs }: CallOptions = {},
   ): Promise<CallResult> {
     this.assertStatus(["ready"]);
-    const targetProcess = process ?? this.initProcess;
-    if (this.bridge === null) throwError({ t: "unmounted" });
+    const targetProcess = process ?? this.defaultReceiver;
     if (targetProcess === null) throwError({ t: "bad_target" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
 
     const requestId = this.requestId++;
     const startTimeMs = performance.now();
     const callPromise = new Promise<CallResult>((resolve) => {
-      if (this.bridge === null) throwError({ t: "unmounted" });
-      this.trace("Main: call: ", { requestId, process, args });
-      this.bridge.sendIframeRequest({
-        type: MESSAGES.CALL,
-        value: { requestId, process: targetProcess, args },
-      });
+      this.calls.set(requestId, { acknowledged: false, startTimeMs, resolve });
+    });
 
-      this.calls.set(requestId, {
-        acknowledged: false,
-        startTimeMs,
-        resolve,
-      });
+    this.trace("Main: call: ", { requestId, process, args });
+    this.bridge.sendIframeRequest({
+      type: MESSAGES.CALL,
+      value: { requestId, process: targetProcess, args },
     });
 
     const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
@@ -256,14 +249,14 @@ export class Popcorn {
   /**
    * Sends a message to an Elixir process (default or from options) and returns immediately.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.register/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
   cast(args: AnySerializable, { process }: CastOptions = {}): void {
     this.assertStatus(["ready"]);
-    const targetProcess = process ?? this.initProcess;
-    if (this.bridge === null) throwError({ t: "unmounted" });
+    const targetProcess = process ?? this.defaultReceiver;
     if (targetProcess === null) throwError({ t: "bad_target" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
 
     const requestId = this.requestId++;
     this.trace("Main: cast: ", { requestId, process, args });
@@ -280,20 +273,28 @@ export class Popcorn {
     if (this.bridge === null) throwError({ t: "unmounted" });
     this.trace("Main: deinit");
     this.transition({ status: "deinit" });
-    this.bridge.deinit();
-    this.bridge = null;
-    this.awaitedMessage = null;
+    this.teardownBridge("deinitialized");
+    this.logListeners.stdout.clear();
+    this.logListeners.stderr.clear();
+    this.messageHandlers.clear();
+  }
+
+  private teardownBridge(errorCode: "deinitialized" | "reload") {
+    if (this.bridge) {
+      this.bridge.deinit();
+      this.bridge = null;
+    }
+    this.mountResolve = null;
+    this.defaultReceiver = null;
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
       this.heartbeatTimeout = null;
     }
-    this.logListeners.stdout.clear();
-    this.logListeners.stderr.clear();
     for (const callData of this.calls.values()) {
       const durationMs = performance.now() - callData.startTimeMs;
       callData.resolve({
         ok: false,
-        error: new PopcornError("deinitialized"),
+        error: new PopcornError(errorCode),
         durationMs,
       });
     }
@@ -320,15 +321,42 @@ export class Popcorn {
     });
   }
 
-  private iframeHandler(data: IframeResponse) {
-    const awaitedMessage = this.awaitedMessage;
-    if (awaitedMessage && data.type == awaitedMessage.type) {
-      this.awaitedMessage = null;
-      awaitedMessage.resolve?.(data.value);
+  /**
+   * Registers a catch-all event handler. Returns an unsubscribe function.
+   */
+  onMessage(handler: MessageHandler): () => void {
+    this.messageHandlers.add(handler);
+    return () => {
+      this.messageHandlers.delete(handler);
+    };
+  }
+
+  private onEvent({ eventName, payload }: ElixirEvent): void {
+    if (eventName.startsWith("popcorn")) {
+      if (eventName === EVENT_NAMES.ELIXIR_READY) {
+        this.mountResolve?.();
+        this.mountResolve = null;
+      } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
+        this.defaultReceiver = payload.name;
+      } else {
+        this.trace("Unknown internal event:", eventName);
+      }
       return;
     }
 
-    if (data.type === MESSAGES.STDOUT) {
+    this.messageHandlers.forEach((handler) => {
+      try {
+        handler(eventName, payload);
+      } catch (error) {
+        console.error(`Error in onMessage handler for '${eventName}':`, error);
+      }
+    });
+  }
+
+  private iframeHandler(data: IframeResponse) {
+    if (data.type === MESSAGES.EVENT) {
+      this.onEvent(data.value);
+    } else if (data.type === MESSAGES.STDOUT) {
       this.notifyLogListeners("stdout", data.value);
     } else if (data.type === MESSAGES.STDERR) {
       this.notifyLogListeners("stderr", data.value);
@@ -408,41 +436,9 @@ export class Popcorn {
 
     this.trace("Main: reloading iframe");
     this.transition({ status: "reload" });
-    this.bridge.deinit();
-    this.bridge = null;
-    this.awaitedMessage = null;
-    if (this.heartbeatTimeout) {
-      clearTimeout(this.heartbeatTimeout);
-      this.heartbeatTimeout = null;
-    }
-    for (const callData of this.calls.values()) {
-      const durationMs = performance.now() - callData.startTimeMs;
-      callData.resolve({
-        ok: false,
-        error: new PopcornError("reload"),
-        durationMs,
-      });
-    }
-    this.calls.clear();
+    this.teardownBridge("reload");
     this.onReloadCallback(reason);
     this.mount();
-  }
-
-  private awaitMessage(type: string): Promise<AnySerializable> {
-    if (this.awaitedMessage) {
-      throwError({
-        t: "already_awaited",
-        messageType: this.awaitedMessage.type,
-        awaitedMessageType: type,
-      });
-    }
-
-    this.awaitedMessage = { type };
-
-    return new Promise((resolve) => {
-      if (!this.awaitedMessage) throwError({ t: "assert" });
-      this.awaitedMessage.resolve = resolve;
-    });
   }
 
   trace(...messages: unknown[]): void {

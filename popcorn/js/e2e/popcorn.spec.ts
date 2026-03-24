@@ -7,6 +7,8 @@ declare global {
     Popcorn: typeof Popcorn;
     captureStdout?: (msg: string) => void;
     serializeCallResult: typeof serializeCallResult;
+    receivedEvents: unknown[];
+    unsubscribeOnMessage: () => void;
   }
 }
 
@@ -198,6 +200,66 @@ test("deinit", async ({ page }) => {
   expect(callResult.error.code).toBe("deinitialized");
   expect(callResult.durationMs).toBeGreaterThanOrEqual(0);
 });
+
+test("send_event", async ({ page }) => {
+  const { sendEvent, waitForEvents } = await initPopcornWithEventListener(page);
+
+  await sendEvent("test_event", { message: "hello from elixir" });
+
+  const events = await waitForEvents(1);
+  expect(events).toEqual([
+    { name: "test_event", payload: { message: "hello from elixir" } },
+  ]);
+});
+
+test("onMessage unsubscribe", async ({ page }) => {
+  const { sendEvent, waitForEvents } = await initPopcornWithEventListener(page);
+
+  await sendEvent("event_1", null);
+  await waitForEvents(1);
+
+  await page.evaluate(() => window.unsubscribeOnMessage());
+
+  await sendEvent("event_2", null);
+  await page.waitForTimeout(500);
+
+  const events = await page.evaluate(() => window.receivedEvents);
+  expect(events).toEqual([{ name: "event_1", payload: null }]);
+});
+
+async function initPopcornWithEventListener(page: Page) {
+  const handle = await page.evaluateHandle(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const container = document.getElementById("popcorn-container")!;
+    const p = await window.Popcorn.init({ container });
+    window.receivedEvents = [];
+    window.unsubscribeOnMessage = p.onMessage(
+      (name: string, payload: unknown) => {
+        window.receivedEvents.push({ name, payload });
+      },
+    );
+    return p;
+  });
+  const popcorn = new PopcornHandle(handle);
+
+  async function sendEvent(name: string, payload: unknown) {
+    await popcorn.call({ action: "send_event", name, payload });
+  }
+
+  async function waitForEvents(count: number) {
+    const handle = await page.waitForFunction(
+      (n) => {
+        if (window.receivedEvents.length < n) return null;
+        return window.receivedEvents.slice(0, n);
+      },
+      count,
+      { timeout: 5_000 },
+    );
+    return handle.jsonValue();
+  }
+
+  return { popcorn, sendEvent, waitForEvents };
+}
 
 async function initPopcorn(page: Page): Promise<PopcornHandle> {
   const handle = await page.evaluateHandle(async () => {
