@@ -52,23 +52,17 @@ declare const globalThis: { TrackedValue: typeof TrackedValue };
 globalThis.TrackedValue = TrackedValue;
 
 export async function initVm(): Promise<void> {
-  const bundlePaths: string[] = [];
-  for (let i = 0; ; i++) {
-    const metaElement = document.querySelector(
-      `meta[name="bundle-path-${i}"]`,
-    ) as HTMLMetaElement | null;
-    if (!metaElement) break;
-    bundlePaths.push(metaElement.content);
-  }
-  if (bundlePaths.length === 0) {
-    throw new Error("Missing meta[name='bundle-path-0'] element");
-  }
+  const bundlePaths = Array.from(
+    document.querySelectorAll<HTMLMetaElement>('meta[name^="bundle-path-"]'),
+    (el) => el.content,
+  );
+
   const bundles = await Promise.all(
-    bundlePaths.map((p) =>
-      fetch(p)
-        .then((resp) => resp.arrayBuffer())
-        .then((buf) => new Int8Array(buf)),
-    ),
+    bundlePaths.map(async (p) => {
+      const resp = await fetch(p);
+      const buf = await resp.arrayBuffer();
+      return new Int8Array(buf);
+    }),
   );
 
   await startVm(bundles);

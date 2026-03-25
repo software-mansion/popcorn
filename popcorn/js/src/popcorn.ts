@@ -134,7 +134,7 @@ export class Popcorn {
 
     this.bridgeConfig = {
       container: params.container,
-      script: { url: IFRAME_URL, entrypoint: "runIFrame" },
+      script: { url: IFRAME_URL, entrypoint: "initVm" },
       config: Object.fromEntries(
         this.bundleURLs.map((url, i) => [`bundle-path-${i}`, url]),
       ),
@@ -163,9 +163,10 @@ export class Popcorn {
     const { container, ...constructorParams } = options;
     const containerWithDefault = container ?? document.documentElement;
 
-    const bundlePaths = constructorParams.bundlePaths
-      ? constructorParams.bundlePaths
-      : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
+    const bundlePaths =
+      constructorParams.bundlePaths && constructorParams.bundlePaths.length > 0
+        ? constructorParams.bundlePaths
+        : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
 
     const popcorn = new Popcorn(
       { ...constructorParams, bundlePaths, container: containerWithDefault },
