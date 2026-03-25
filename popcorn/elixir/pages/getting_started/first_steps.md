@@ -101,10 +101,10 @@ The generated `index.js` looks like this:
 // assets/index.js
 import { Popcorn } from "@swmansion/popcorn";
 
-await Popcorn.init({ bundlePath: "/wasm/bundle.avm", onStdout: console.log });
+await Popcorn.init({ bundlePaths: ["/wasm/bundle.avm"], onStdout: console.log });
 ```
 
-`bundlePath` tells Popcorn where to find the compiled Elixir bytecode, matching the `out_dir` you configured earlier. `onStdout` receives anything your Elixir code prints with `IO.puts/1`.
+`bundlePaths` tells Popcorn where to find the compiled Elixir bytecode, matching the `out_dir` you configured earlier. `onStdout` receives anything your Elixir code prints with `IO.puts/1`.
 
 Install the npm dependencies and build:
 
