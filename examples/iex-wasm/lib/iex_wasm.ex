@@ -13,7 +13,7 @@ defmodule IexWasm do
 
   @impl GenServer
   def init(_args) do
-    Wasm.set_default_receiver(@process_name)
+    Wasm.ready(@process_name)
     type = :elixir
     Shell.start_link(type: type)
     :ok = ExTTY.send_text(:"#{type}_tty", ":ok\n")
