@@ -22,6 +22,7 @@ env:
 jobs:
   build_docker_images:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -105,6 +106,7 @@ jobs:
 
   deploy_staging:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: build_docker_images
     steps:
       - name: Deploy to staging

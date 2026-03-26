@@ -33,6 +33,7 @@ jobs:
   build:
     name: Build & test
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
 
     defaults:
       run:
