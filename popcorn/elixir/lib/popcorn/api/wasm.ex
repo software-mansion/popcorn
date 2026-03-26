@@ -256,6 +256,33 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
+  Signals that the application is fully initialized and ready to accept events from JS.
+  This must be called for `Popcorn.init()` on the JS side to resolve.
+
+  Optionally registers the calling process as the default receiver under `name`,
+  which JS `call/cast` will use when no explicit process is specified.
+  """
+  @spec ready() :: :ok
+  @spec ready(atom()) :: :ok
+  def ready(name \\ nil)
+
+  def ready(nil) do
+    send_event("popcorn_app_ready", %{name: nil})
+    :ok
+  end
+
+  def ready(name) when is_atom(name) do
+    case Process.whereis(name) do
+      nil -> Process.register(self(), name)
+      pid when pid == self() -> :ok
+      _other -> raise "Name #{name} already registered to another process"
+    end
+
+    send_event("popcorn_app_ready", %{name: to_string(name)})
+    :ok
+  end
+
+  @doc """
   Sets the default receiver process for JS calls/casts.
   Registers the calling process under `name` if not already registered.
   """

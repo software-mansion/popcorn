@@ -11,7 +11,7 @@ defmodule TestServer do
 
   @impl GenServer
   def init(_args) do
-    Wasm.set_default_receiver(@process_name)
+    Wasm.ready(@process_name)
     {:ok, nil}
   end
 

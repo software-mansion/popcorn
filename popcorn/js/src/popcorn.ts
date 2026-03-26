@@ -7,7 +7,12 @@ import {
   MESSAGES,
   EVENT_NAMES,
 } from "./types";
-import { PopcornError, PopcornInternalError, throwError } from "./errors";
+import {
+  PopcornError,
+  PopcornInternalError,
+  throwError,
+  buildError,
+} from "./errors";
 
 import type { IframeBridgeArgs } from "./bridge";
 import type { IframeResponse, AnySerializable, ElixirEvent } from "./types";
@@ -34,8 +39,6 @@ export type PopcornInitOptions = {
   wasmDir?: string;
   /** Enable debug logging. */
   debug?: boolean;
-  /** Wait for Elixir to set the default receiver before init resolves. */
-  waitForDefaultReceiver?: boolean;
 };
 
 /** Options for cast method */
@@ -89,7 +92,6 @@ type State =
 
 const INIT_TOKEN = Symbol();
 const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
-const DEFAULT_RECEIVER_TIMEOUT_MS = 5_000;
 
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
@@ -105,7 +107,6 @@ export class Popcorn {
   private bundleURL: string;
   private state: State = { status: "uninitialized" };
   private defaultReceiver: string | null = null;
-  private waitForDefaultReceiver: boolean;
 
   private requestId = 0;
   private calls = new Map<number, CallData>();
@@ -116,7 +117,6 @@ export class Popcorn {
 
   private messageHandlers = new Set<MessageHandler>();
   private mountResolve: (() => void) | null = null;
-  private defaultReceiverResolve: (() => void) | null = null;
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
   private reloadN = 0;
 
@@ -132,7 +132,6 @@ export class Popcorn {
     this.onReloadCallback = params.onReload ?? noop;
     this.debug = params.debug ?? false;
     this.bundleURL = bundleURL.href;
-    this.waitForDefaultReceiver = params.waitForDefaultReceiver ?? true;
 
     this.bridgeConfig = {
       container: params.container,
@@ -149,8 +148,7 @@ export class Popcorn {
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after Elixir sends `popcorn_elixir_ready` and, if enabled,
-   * after a default receiver is registered.
+   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
    *
    * @example
    * import { Popcorn } from "@swmansion/popcorn";
@@ -195,36 +193,12 @@ export class Popcorn {
         mountPromise,
         new Promise<never>((_, reject) => {
           initTimeout = setTimeout(
-            () => reject(new PopcornError("timeout", "Init timed out")),
+            () => reject(buildError({ t: "app_ready_timeout" })),
             INIT_VM_TIMEOUT_MS,
           );
         }),
       ]);
       clearTimeout(initTimeout);
-
-      if (this.waitForDefaultReceiver && this.defaultReceiver === null) {
-        const defaultReceiverPromise = new Promise<void>((resolve) => {
-          this.defaultReceiverResolve = resolve;
-        });
-
-        let defaultReceiverTimeout: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          defaultReceiverPromise,
-          new Promise<never>((_, reject) => {
-            defaultReceiverTimeout = setTimeout(
-              () =>
-                reject(
-                  new PopcornInternalError(
-                    "default_receiver_timeout",
-                    "Default receiver was not set within 5000ms",
-                  ),
-                ),
-              DEFAULT_RECEIVER_TIMEOUT_MS,
-            );
-          }),
-        ]);
-        clearTimeout(defaultReceiverTimeout);
-      }
 
       this.transition({ status: "ready" });
       this.trace("Main: mounted");
@@ -316,7 +290,6 @@ export class Popcorn {
       this.bridge = null;
     }
     this.mountResolve = null;
-    this.defaultReceiverResolve = null;
     this.defaultReceiver = null;
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
@@ -366,12 +339,13 @@ export class Popcorn {
   private onEvent({ eventName, payload }: ElixirEvent): void {
     if (eventName.startsWith("popcorn")) {
       if (eventName === EVENT_NAMES.ELIXIR_READY) {
+        this.trace("Main: elixir VM ready");
+      } else if (eventName === EVENT_NAMES.APP_READY) {
+        this.defaultReceiver = payload.name;
         this.mountResolve?.();
         this.mountResolve = null;
       } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
         this.defaultReceiver = payload.name;
-        this.defaultReceiverResolve?.();
-        this.defaultReceiverResolve = null;
       } else {
         this.trace("Unknown internal event:", eventName);
       }

@@ -17,6 +17,7 @@ defmodule HelloPopcorn do
     }
     """)
 
+    Popcorn.Wasm.ready()
     :ignore
   end
 end

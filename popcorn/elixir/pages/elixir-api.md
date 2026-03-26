@@ -33,11 +33,36 @@ Popcorn.Wasm.send_event("processing_finished", %{id: 123})
 Popcorn.Wasm.send_event("simple_event")
 ```
 
+### `ready(name \\ nil)`
+
+Signals that the application is fully initialized and ready to accept events from JS. **Must be called** for `Popcorn.init()` on the JS side to resolve.
+
+Optionally registers the calling process as the default receiver under `name`, which JS `call`/`cast` will use when no explicit process is specified.
+
+**Parameters:**
+
+- `name` (atom, optional) - Process name to register as default receiver. Default: `nil`.
+
+**Returns:** `:ok`.
+
+**Example:**
+
+```elixir
+# Without default receiver
+Popcorn.Wasm.ready()
+
+# With default receiver
+Popcorn.Wasm.ready(:main)
+```
+
+**Notes:**
+
+- Call this once during startup after all initialization is complete.
+- If `name` is provided, the calling process is registered under that name (if not already).
+
 ### `set_default_receiver(name)`
 
 Sets the default receiver process for JS calls/casts. Registers the calling process under `name` if not already registered.
-
-By default, `Popcorn.init()` on the JS side waits for this function to be called before resolving. If your bundle does not use a default receiver, JS can opt out with `waitForDefaultReceiver: false`.
 
 **Parameters:**
 
@@ -50,11 +75,6 @@ By default, `Popcorn.init()` on the JS side waits for this function to be called
 ```elixir
 Popcorn.Wasm.set_default_receiver(:main)
 ```
-
-**Notes:**
-
-- Call this during startup if JS is expected to use the default receiver immediately after `Popcorn.init()`.
-- This function emits the internal `popcorn_set_default_receiver` event used by the JS runtime to finish initialization when `waitForDefaultReceiver` is enabled.
 
 ### `handle_message!(raw_message, handler)`
 

@@ -42,9 +42,7 @@ defmodule MyApp.Application do
 end
 ```
 
-A minimal worker should set itself as the default receiver using `Popcorn.Wasm.set_default_receiver/1`:
-
-This is important because `Popcorn.init()` waits for the default receiver by default. If your worker should receive JS calls immediately after startup, register it during initialization:
+After initialization is complete, we must call `Popcorn.Wasm.ready/1`. `Popcorn.init()` on the JS side waits until this is called before resolving. Passing a process name registers it as the default receiver for JS `call`/`cast`:
 
 ```elixir
 # lib/my_app/worker.ex
@@ -60,10 +58,9 @@ defmodule MyApp.Worker do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.set_default_receiver(@process_name)
+    Popcorn.Wasm.ready(@process_name)
     IO.puts("Hello from WASM!")
-    state = %{}
-    {:ok, state}
+    {:ok, %{}}
   end
 end
 ```
