@@ -4,8 +4,7 @@ defmodule FormDemoWeb.FormDemoLive do
   def render(assigns) do
     ~H"""
     <div class="centered-div">
-      <div data-pop-view="FormDemoLocal" phx-hook="ServerSendHook" id="FormDemoLocal"></div>
-
+      <.local_live_view view="FormDemoLocal" id="FormDemoLocal" />
       <div class="bordered">
         <h1>[Server Runtime] User List:</h1>
         <ul>
@@ -20,7 +19,6 @@ defmodule FormDemoWeb.FormDemoLive do
 
   def mount(_params, _session, socket) do
     send(self(), :sync)
-    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:ok, assign(socket, users: [])}
   end
 
@@ -31,7 +29,6 @@ defmodule FormDemoWeb.FormDemoLive do
       ) do
     new_users = socket.assigns.users ++ [user]
     Application.put_env(FormDemo, :users, new_users)
-    socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:noreply, assign(socket, users: new_users)}
   end
 

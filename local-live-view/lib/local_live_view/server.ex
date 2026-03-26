@@ -289,27 +289,37 @@ defmodule LocalLiveView.Server do
   end
 
   def rerender(socket) do
-    rendered = Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
-
-    rendered
-    |> Phoenix.HTML.Safe.to_iodata()
-    |> IO.iodata_to_binary()
-    |> LocalLiveView.Renderer.rerender(socket.view)
-
-    rendered
+    Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
   end
 
   defp reply(state, {ref, extra}, status, payload) do
     reply(state, ref, status, Map.merge(payload, extra))
   end
 
-  defp reply(state, ref, _status, _payload) when is_binary(ref) do
+  defp reply(state, _ref, _status, %{diff: diff}) do
+    push(state, "diff", diff)
+  end
+
+  defp reply(state, _ref, _status, _payload), do: state
+
+  defp push(state, "diff", diff) do
+    view_name = state.socket.view |> Module.split() |> List.last()
+    Logger.debug("!!! LLV PUSH DIFF to #{view_name} !!!")
+
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        console.log("!!! LLV run_js: pushing diff to", args.view, args.diff);
+        window.__popcornTransportReceive(args.view, args.diff);
+      }
+      """,
+      %{view: view_name, diff: diff}
+    )
+
     state
   end
 
-  defp push(state, _event, _payload) do
-    state
-  end
+  defp push(state, _event, _payload), do: state
 
   ## Mount
 
