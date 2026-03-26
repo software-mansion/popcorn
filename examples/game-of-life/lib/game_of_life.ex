@@ -18,6 +18,7 @@ defmodule GameOfLife do
   """
   def run() do
     IO.puts("Running...\n")
+    Popcorn.Wasm.ready()
     :ignore
   end
 end

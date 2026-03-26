@@ -7,7 +7,12 @@ import {
   MESSAGES,
   EVENT_NAMES,
 } from "./types";
-import { PopcornError, PopcornInternalError, throwError } from "./errors";
+import {
+  PopcornError,
+  PopcornInternalError,
+  throwError,
+  buildError,
+} from "./errors";
 
 import type { IframeBridgeArgs } from "./bridge";
 import type { IframeResponse, AnySerializable, ElixirEvent } from "./types";
@@ -143,7 +148,7 @@ export class Popcorn {
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after Elixir sends `popcorn_elixir_ready` event.
+   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
    *
    * @example
    * import { Popcorn } from "@swmansion/popcorn";
@@ -188,7 +193,7 @@ export class Popcorn {
         mountPromise,
         new Promise<never>((_, reject) => {
           initTimeout = setTimeout(
-            () => reject(new PopcornError("timeout", "Init timed out")),
+            () => reject(buildError({ t: "app_ready_timeout" })),
             INIT_VM_TIMEOUT_MS,
           );
         }),
@@ -334,6 +339,9 @@ export class Popcorn {
   private onEvent({ eventName, payload }: ElixirEvent): void {
     if (eventName.startsWith("popcorn")) {
       if (eventName === EVENT_NAMES.ELIXIR_READY) {
+        this.trace("Main: elixir VM ready");
+      } else if (eventName === EVENT_NAMES.APP_READY) {
+        this.defaultReceiver = payload.name;
         this.mountResolve?.();
         this.mountResolve = null;
       } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {

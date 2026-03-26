@@ -65,6 +65,7 @@ export const MESSAGES = {
 
 export const EVENT_NAMES = {
   ELIXIR_READY: "popcorn_elixir_ready",
+  APP_READY: "popcorn_app_ready",
   SET_DEFAULT_RECEIVER: "popcorn_set_default_receiver",
 } as const;
 

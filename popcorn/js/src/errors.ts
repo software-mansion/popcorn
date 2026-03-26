@@ -29,7 +29,10 @@ export type PopcornInternalErrorCode =
   | "unmounted"
   | "bad_target"
   | "bad_status"
+  | "app_ready_timeout"
   | "bundle_not_found";
+
+const INIT_VM_TIMEOUT_MS = 30_000;
 
 /** Non-recoverable error indicating a bug or library misuse (always thrown) */
 export class PopcornInternalError extends Error {
@@ -57,50 +60,60 @@ type ErrorData =
       status: string;
       expectedStatus: string;
     }
+  | { t: "app_ready_timeout" }
   | { t: "bundle_not_found"; primary: string; fallback: string };
 
-export function throwError(error: ErrorData): never {
+export function buildError(error: ErrorData): PopcornInternalError {
   switch (error.t) {
     case "assert":
-      throw new PopcornInternalError("assert", "Assertion error");
+      return new PopcornInternalError("assert", "Assertion error");
     case "private_constructor":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "private_constructor",
         "Don't construct the Popcorn object directly, use Popcorn.init() instead",
       );
     case "bad_call":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "bad_call",
         "Response for non-existent call",
       );
     case "no_acked_call":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "no_acked_call",
         "Response for non-acknowledged call",
       );
     case "bad_ack":
-      throw new PopcornInternalError("bad_ack", "Ack for non-existent call");
+      return new PopcornInternalError("bad_ack", "Ack for non-existent call");
     case "already_mounted":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "already_mounted",
         "Iframe already mounted",
       );
     case "unmounted":
-      throw new PopcornInternalError("unmounted", "WASM iframe not mounted");
+      return new PopcornInternalError("unmounted", "WASM iframe not mounted");
     case "bad_target":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "bad_target",
         "Unspecified target process",
       );
     case "bad_status":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "bad_status",
         `Operation not allowed: instance in "${error.status}" state, expected "${error.expectedStatus}"`,
       );
+    case "app_ready_timeout":
+      return new PopcornInternalError(
+        "app_ready_timeout",
+        `Elixir app did not call Popcorn.Wasm.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
+      );
     case "bundle_not_found":
-      throw new PopcornInternalError(
+      return new PopcornInternalError(
         "bundle_not_found",
         `Could not find a valid .avm bundle at "${error.primary}" or fallback "${error.fallback}"`,
       );
   }
+}
+
+export function throwError(error: ErrorData): never {
+  throw buildError(error);
 }

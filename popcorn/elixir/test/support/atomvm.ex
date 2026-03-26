@@ -336,7 +336,7 @@ defmodule Popcorn.Support.AtomVM do
         @compile autoload: false, no_warn_undefined: [:atomvm, Wasm]
 
         def start() do
-          Wasm.set_default_receiver(:main)
+          Wasm.ready(:main)
 
           receive do
             wasm_msg -> Wasm.handle_message!(wasm_msg, &handle_wasm_msg/1)

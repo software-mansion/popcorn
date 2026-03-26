@@ -33,6 +33,33 @@ Popcorn.Wasm.send_event("processing_finished", %{id: 123})
 Popcorn.Wasm.send_event("simple_event")
 ```
 
+### `ready(name \\ nil)`
+
+Signals that the application is fully initialized and ready to accept events from JS. **Must be called** for `Popcorn.init()` on the JS side to resolve.
+
+Optionally registers the calling process as the default receiver under `name`, which JS `call`/`cast` will use when no explicit process is specified.
+
+**Parameters:**
+
+- `name` (atom, optional) - Process name to register as default receiver. Default: `nil`.
+
+**Returns:** `:ok`.
+
+**Example:**
+
+```elixir
+# Without default receiver
+Popcorn.Wasm.ready()
+
+# With default receiver
+Popcorn.Wasm.ready(:main)
+```
+
+**Notes:**
+
+- Call this once during startup after all initialization is complete.
+- If `name` is provided, the calling process is registered under that name (if not already).
+
 ### `set_default_receiver(name)`
 
 Sets the default receiver process for JS calls/casts. Registers the calling process under `name` if not already registered.
