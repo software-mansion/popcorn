@@ -152,32 +152,29 @@ defmodule Popcorn.Support.AtomVM do
 
     log_path = Path.join(run_dir, "logs.txt")
 
-    log_task =
-      Task.async(fn ->
-        Stream.repeatedly(fn -> receive do: (log -> log) end)
-        |> Stream.take_while(&(&1 != :eof))
-        |> Stream.into(File.stream!(log_path))
-        |> Stream.run()
-      end)
+    {page, instance_id} = Popcorn.Support.Browser.new_instance(bundle_path)
 
-    page = Popcorn.Support.Browser.new_page(bundle_path, &send(log_task.pid, &1))
+    result =
+      Playwright.Page.evaluate(page, """
+      async () => {
+        const instance = window.popcornInstances.get("#{instance_id}");
+        try {
+          const result = await instance.popcorn.call("#{args}", {process: "main"});
+          if (!result.ok) {
+            return { error: true, logs: instance.logs.join("") };
+          }
+          return { data: result.data, logs: instance.logs.join("") };
+        } catch (e) {
+          return { error: true, logs: instance.logs.join("") };
+        }
+      }
+      """)
 
-    snippet = """
-    try {
-      const result = await popcorn.call("#{args}", {process: "main"});
-      return result;
-    } catch (e) {
-      return {error: true}
-    }
-    """
-
-    result = Playwright.Page.evaluate(page, "async () => {#{snippet}}")
-
-    send(log_task.pid, :eof)
-    Task.await(log_task)
+    logs = Map.get(result, :logs, "")
+    File.write!(log_path, logs)
 
     output =
-      File.read!(log_path)
+      logs
       # Only include lines prefixed with [popcorn stdout]
       |> then(&Regex.replace(~r/^(?!\[popcorn stdout\]).*\n?/m, &1, "", global: true))
       # And remove the prefix from them

@@ -64,10 +64,11 @@ export class IframeBridge {
     this.iframe.remove();
   }
 
-  private messageHandler({ data }: MessageEvent): void {
-    if (isIframeResponse(data)) {
-      this.onMessage(data);
-    }
+  private messageHandler(event: MessageEvent): void {
+    const fromOurIframe = event.source === this.iframe.contentWindow;
+    if (!fromOurIframe || !isIframeResponse(event.data)) return;
+
+    this.onMessage(event.data);
   }
 }
 
