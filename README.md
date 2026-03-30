@@ -24,6 +24,10 @@ The API documentation and guides are available at <https://hexdocs.pm/popcorn>
 
 The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples/` directory.
 
+See also third-party examples:
+- Running Popcorn on iOS/Swift: https://github.com/u9g/uno-royale
+- A collection of local Live View demos: https://petermm.github.io/popcorn_live_view/
+
 ## Repository Structure
 
 - **`popcorn/elixir/`** - Elixir library used to patch OTP and Elixir stdlib, create .avm bundles and containing JS interop API.
