@@ -75,7 +75,14 @@ defmodule LocalThermostat.MixProject do
     [
       build: ["setup"],
       dev: ["setup", "phx.server"],
-      setup: [&build_local/1, &pnpm_install/1, "deps.get", "compile", "assets.setup", "assets.build"],
+      setup: [
+        &build_local/1,
+        &pnpm_install/1,
+        "deps.get",
+        "compile",
+        "assets.setup",
+        "assets.build"
+      ],
       "assets.setup": ["tailwind.install --if-missing"],
       "assets.build": [&build_js/1, "tailwind local_thermostat"],
       "assets.deploy": [

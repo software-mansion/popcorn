@@ -15,7 +15,9 @@ config :form_demo, FormDemoWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "ln2krx2yPlRh3lIjZTQq1Ed/tXSJ976kiyzcsA4xceV8t2XF3TNeUaWBquuDcRlt",
   watchers: [
-    node: ["build.mjs", "--watch",
+    node: [
+      "build.mjs",
+      "--watch",
       cd: Path.expand("../assets", __DIR__),
       env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
     ],

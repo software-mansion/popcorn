@@ -469,4 +469,24 @@ defmodule CompareLiveViewsWeb.CoreComponents do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  @doc """
+  Renders a LocalLiveView mount point.
+
+  ## Examples
+
+      <.local_live_view view="DemoModalOffline" />
+      <.local_live_view view="DemoModalOffline" id="my-modal" />
+
+  """
+  attr :view, :string, required: true
+  attr :id, :string, default: nil
+
+  def local_live_view(assigns) do
+    assigns = assign_new(assigns, :id, fn -> assigns.view end)
+
+    ~H"""
+    <div data-pop-view={@view} id={@id}></div>
+    """
+  end
 end
