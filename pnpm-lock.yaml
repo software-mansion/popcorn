@@ -195,9 +195,18 @@ importers:
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1
+      local_live_view:
+        specifier: workspace:*
+        version: link:../local-live-view/assets
       mermaid:
         specifier: ^11.7.0
         version: 11.12.3
+      phoenix:
+        specifier: ^1.8.0
+        version: 1.8.5
+      phoenix_live_view:
+        specifier: ^1.1.0
+        version: 1.1.28
       playwright:
         specifier: ^1.53.2
         version: 1.58.2
@@ -3298,6 +3307,9 @@ packages:
   mlly@1.8.0:
     resolution: {integrity: sha512-l8D9ODSRWLe2KHJSifWGwBqpTZXIXTeo8mlKjY+E2HAakaTeNpqAyBZ8GSqLzHgw4XmHmC8whvpjJNMbFZN7/g==}
 
+  morphdom@2.7.8:
+    resolution: {integrity: sha512-D/fR4xgGUyVRbdMGU6Nejea1RFzYxYtyurG4Fbv2Fi/daKlWKuXGLOdXtl+3eIwL110cI2hz1ZojGICjjFLgTg==}
+
   mrmime@2.0.1:
     resolution: {integrity: sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ==}
     engines: {node: '>=10'}
@@ -3433,6 +3445,12 @@ packages:
 
   pend@1.2.0:
     resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
+
+  phoenix@1.8.5:
+    resolution: {integrity: sha512-Oj5nlRV/NKXkjBx8uMgCMmgMf1twd/B2qOcO30cHLH1PCGR8149o4T1lRIaqN4nq2KQJAeMqPiLdh1Asd0wQFg==}
+
+  phoenix_live_view@1.1.28:
+    resolution: {integrity: sha512-YXpMxwBE9HLCRk8fO+2p0cfYB5EIyvvTPfQeYA8PLmcX29Yu/LNy7aoqQoMAhedXMXCtx1nlPnG/TljnsA9WTQ==}
 
   piccolore@0.1.3:
     resolution: {integrity: sha512-o8bTeDWjE086iwKrROaDf31K0qC/BENdm15/uH9usSC/uZjJOKb2YGiVHfLY4GhwsERiPI1jmwI2XrA7ACOxVw==}
@@ -7846,6 +7864,8 @@ snapshots:
       pkg-types: 1.3.1
       ufo: 1.6.3
 
+  morphdom@2.7.8: {}
+
   mrmime@2.0.1: {}
 
   ms@2.1.3: {}
@@ -7987,6 +8007,12 @@ snapshots:
   pathe@2.0.3: {}
 
   pend@1.2.0: {}
+
+  phoenix@1.8.5: {}
+
+  phoenix_live_view@1.1.28:
+    dependencies:
+      morphdom: 2.7.8
 
   piccolore@0.1.3: {}
 
