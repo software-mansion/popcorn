@@ -52,7 +52,7 @@ defmodule FormDemoLocal do
     case validate(user_params, users) do
       [] ->
         blank_user = %{"email" => "", "username" => ""}
-        send_to_phoenix(%{"type" => "new_user", "user" => user_params})
+        send_to_phoenix("new_user", %{"user" => user_params})
 
         {:noreply,
          assign(socket,
@@ -72,7 +72,7 @@ defmodule FormDemoLocal do
       Enum.filter(socket.assigns.users, fn user ->
         case validate_already_existing(user, server_users) do
           [] ->
-            send_to_phoenix(%{"type" => "new_user", "user" => user})
+            send_to_phoenix("new_user", %{"user" => user})
             true
 
           _ ->
@@ -90,7 +90,7 @@ defmodule FormDemoLocal do
   end
 
   def handle_info(:sync, socket) do
-    send_to_phoenix(%{"type" => "sync_request"})
+    send_to_phoenix("sync_request", %{})
     {:noreply, socket}
   end
 
@@ -144,7 +144,7 @@ defmodule FormDemoLocal do
     end
   end
 
-  defp send_to_phoenix(message) do
-    LocalLiveView.ServerSocket.send(message, __MODULE__)
+  defp send_to_phoenix(event, payload) do
+    LocalLiveView.ServerSocket.send(event, payload, __MODULE__)
   end
 end

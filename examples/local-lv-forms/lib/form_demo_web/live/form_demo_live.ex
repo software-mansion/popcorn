@@ -24,23 +24,23 @@ defmodule FormDemoWeb.FormDemoLive do
     {:ok, assign(socket, users: [])}
   end
 
-  def handle_event("llv_local_message", %{"payload" => %{"type" => type} = payload}, socket) do
-    handle_local(type, payload, socket)
-  end
-
-  defp handle_local("new_user", %{"user" => user}, socket) do
+  def handle_event(
+        "new_user",
+        %{"payload" => %{"user" => user}},
+        socket
+      ) do
     new_users = socket.assigns.users ++ [user]
     Application.put_env(FormDemo, :users, new_users)
     socket = push_event(socket, "llv_rerender", %{"view" => "FormDemoLocal"})
     {:noreply, assign(socket, users: new_users)}
   end
 
-  defp handle_local("sync_request", _params, socket) do
+  def handle_event("sync_request", _, socket) do
     users = Application.get_env(FormDemo, :users, [])
     payload = %{"type" => "synchronize", "users" => users}
 
     socket =
-      push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
+      push_to_local(socket, "FormDemoLocal", payload)
 
     socket = assign(socket, users: users)
     {:noreply, socket}
@@ -55,7 +55,7 @@ defmodule FormDemoWeb.FormDemoLive do
     payload = %{"type" => "synchronize", "users" => users}
 
     socket =
-      push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
+      push_to_local(socket, "FormDemoLocal", payload)
 
     assign(socket, users: users)
   end
