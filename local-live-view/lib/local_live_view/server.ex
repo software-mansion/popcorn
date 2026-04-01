@@ -303,15 +303,15 @@ defmodule LocalLiveView.Server do
   defp reply(state, _ref, _status, _payload), do: state
 
   defp push(state, "diff", diff) do
-    view_name = state.socket.view |> Module.split() |> List.last()
+    llv_id = state.llv_id
 
     Popcorn.Wasm.run_js(
       """
       ({ args }) => {
-        window.__popcornTransportReceive(args.view, args.diff);
+        window.__popcornTransportReceive(args.id, args.diff);
       }
       """,
-      %{view: view_name, diff: diff}
+      %{id: llv_id, diff: diff}
     )
 
     state
@@ -369,6 +369,7 @@ defmodule LocalLiveView.Server do
     } = verified
 
     connect_params = params["params"]
+    llv_id = params["llv_id"]
 
     socket = %Socket{
       view: view
@@ -389,7 +390,7 @@ defmodule LocalLiveView.Server do
         try do
           %Socket{socket | view: view}
           |> Utils.maybe_call_live_view_mount!(view, params, verified)
-          |> build_state(phx_socket)
+          |> build_state(phx_socket, llv_id)
           |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)
         rescue
@@ -458,7 +459,7 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket) do
+  defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket, llv_id) do
     %{
       join_ref: phx_socket.join_ref,
       serializer: phx_socket.serializer,
@@ -468,7 +469,8 @@ defmodule LocalLiveView.Server do
       fingerprints: Diff.new_fingerprints(),
       redirect_count: 0,
       upload_names: %{},
-      upload_pids: %{}
+      upload_pids: %{},
+      llv_id: llv_id
     }
   end
 

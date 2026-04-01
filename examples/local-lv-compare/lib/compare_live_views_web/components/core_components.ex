@@ -480,13 +480,13 @@ defmodule CompareLiveViewsWeb.CoreComponents do
 
   """
   attr :view, :string, required: true
-  attr :id, :string, default: nil
+  attr :id, :string, doc: "stable element id, defaults to view name"
 
   def local_live_view(assigns) do
     assigns = assign_new(assigns, :id, fn -> assigns.view end)
 
     ~H"""
-    <div data-pop-view={@view} id={@id}></div>
+    <div data-pop-view={@view} id={@id} phx-update="ignore"></div>
     """
   end
 end
