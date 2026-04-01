@@ -480,12 +480,19 @@ defmodule FormDemoWeb.CoreComponents do
   """
   attr :view, :string, required: true
   attr :id, :string, doc: "stable element id, defaults to view name"
+  attr :attrs, :map, default: %{}, doc: "data passed to LocalLiveView mount/3 and update/2"
 
   def local_live_view(assigns) do
     assigns = assign_new(assigns, :id, fn -> assigns.view end)
 
     ~H"""
-    <div data-pop-view={@view} id={@id} phx-hook="ServerSendHook" phx-update="ignore"></div>
+    <div
+      data-pop-view={@view}
+      id={@id}
+      data-pop-attrs={Jason.encode!(@attrs)}
+      phx-hook="LocalLiveViewHook"
+      phx-update="ignore"
+    ></div>
     """
   end
 end

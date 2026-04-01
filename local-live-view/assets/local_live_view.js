@@ -20,6 +20,7 @@ export async function setup(liveSocket, opts = {}) {
     debug: true,
     bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
+  window.__popcorn = popcorn;
 
   const { data: initialRenderedByView } = await popcorn.call(
     { views: find_predefined_views() },
@@ -52,7 +53,7 @@ export async function setup(liveSocket, opts = {}) {
     const view = liveSocket.newRootView(pop_view_el);
     viewsById[llvId] = view;
 
-    // addHook: skip the root element — its phx-hook (e.g. ServerSendHook) was already
+    // addHook: skip the root element — its phx-hook (e.g. LocalLiveViewHook) was already
     // mounted by the parent Phoenix LiveView and has a HOOK_ID set on the element.
     // If we try to re-add it here Phoenix hits the "custom element" error path because
     // the hook exists in DOM private data but not in this view's viewHooks map.
@@ -157,5 +158,6 @@ function find_predefined_views() {
   return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) => ({
     view: el.getAttribute("data-pop-view"),
     id: el.id,
+    attrs: JSON.parse(el.getAttribute("data-pop-attrs") || "{}"),
   }));
 }

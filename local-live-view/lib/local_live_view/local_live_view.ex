@@ -39,6 +39,12 @@ defmodule LocalLiveView do
       def handle_event("llv_server_message", %{"type" => type} = params, socket) do
         handle_server_event(type, params, socket)
       end
+
+      def update(attrs, socket) do
+        {:ok, Phoenix.Component.assign(socket, attrs)}
+      end
+
+      defoverridable update: 2
     end
   end
 
@@ -99,8 +105,5 @@ defmodule LocalLiveView do
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
 
-  @callback handle_server(event :: binary, unsigned_params(), socket :: Socket.t()) ::
-              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
-
-  @optional_callbacks handle_server: 3
+  @callback update(attrs :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
 end

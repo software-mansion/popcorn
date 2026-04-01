@@ -61,6 +61,13 @@ defmodule LocalLiveView.Server do
     end
   end
 
+  def handle_info(%Message{event: "attrs_update", payload: attrs}, state) do
+    case state.socket.view.update(attrs, state.socket) do
+      {:ok, new_socket} ->
+        handle_changed(state, new_socket, nil)
+    end
+  end
+
   def handle_info(%Message{event: "event", payload: %{"event" => "llv_rerender"}}, state) do
     rerender(state.socket)
     {:noreply, state}
