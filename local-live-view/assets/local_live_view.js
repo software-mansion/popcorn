@@ -36,7 +36,7 @@ export async function setup(liveSocket, opts = {}) {
     const view = viewsByName[viewName];
     if (!view) {
       console.error(
-        "!!! LLV view not found:",
+        "LLV view not found:",
         viewName,
         "available:",
         Object.keys(viewsByName),
@@ -127,7 +127,7 @@ export async function setup(liveSocket, opts = {}) {
         view.onJoin({ rendered: initialRendered }),
       );
     } else {
-      console.error("!!! LLV no initial rendered for view !!!", viewName);
+      console.error("LLV no initial rendered for view", viewName);
     }
   });
 

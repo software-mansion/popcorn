@@ -304,12 +304,10 @@ defmodule LocalLiveView.Server do
 
   defp push(state, "diff", diff) do
     view_name = state.socket.view |> Module.split() |> List.last()
-    Logger.debug("!!! LLV PUSH DIFF to #{view_name} !!!")
 
     Popcorn.Wasm.run_js(
       """
       ({ args }) => {
-        console.log("!!! LLV run_js: pushing diff to", args.view, args.diff);
         window.__popcornTransportReceive(args.view, args.diff);
       }
       """,
