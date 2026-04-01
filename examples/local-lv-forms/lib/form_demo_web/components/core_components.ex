@@ -476,7 +476,6 @@ defmodule FormDemoWeb.CoreComponents do
   ## Examples
 
       <.local_live_view view="FormDemoLocal" />
-      <.local_live_view view="FormDemoLocal" id="my-form" />
 
   """
   attr :view, :string, required: true
