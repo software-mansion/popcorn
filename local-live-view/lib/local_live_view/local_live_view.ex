@@ -1,6 +1,6 @@
 defmodule LocalLiveView do
   @moduledoc ~S'''
-  LocalLiveView is a module that implements functionality of Phoenix.LiveView inside the browser in  
+  LocalLiveView is a module that implements functionality of Phoenix.LiveView inside the browser in
   Popcorn runtime.
   LocalLiveView should be used exactly like its Phoenix equivalent:
   ```
@@ -36,7 +36,7 @@ defmodule LocalLiveView do
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
       def handle_event("llv_server_message", %{"type" => type} = params, socket) do
-        handle_server(type, params, socket)
+        handle_server_event(type, params, socket)
       end
     end
   end

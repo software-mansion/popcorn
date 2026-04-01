@@ -67,7 +67,7 @@ defmodule FormDemoLocal do
     end
   end
 
-  def handle_server("synchronize", %{"users" => server_users}, socket) do
+  def handle_server_event("synchronize", %{"users" => server_users}, socket) do
     filtered_users =
       Enum.filter(socket.assigns.users, fn user ->
         case validate_already_existing(user, server_users) do
