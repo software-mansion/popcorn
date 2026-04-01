@@ -51,20 +51,25 @@ defmodule FormDemoLocal do
   @impl true
   def render(assigns) do
     ~H&quot;&quot;&quot;
-    &lt;.form for={@form} id=&quot;my-form&quot; pop-change=&quot;validate&quot; pop-submit=&quot;save&quot; class=&quot;bordered&quot;&gt;
-      &lt;label&gt;USERNAME&lt;/label&gt;
-      &lt;.input type=&quot;text&quot; field={@form[:username]} /&gt;
-      &lt;label&gt;EMAIL&lt;/label&gt;
-      &lt;.input type=&quot;text&quot; field={@form[:email]} /&gt;
+    &lt;div class=&quot;bordered&quot;&gt;
+      &lt;.form for={@form} id=&quot;my-form&quot; phx-change=&quot;validate&quot; phx-submit=&quot;save&quot;&gt;
+        &lt;label&gt;USERNAME&lt;/label&gt;
+        &lt;.input type=&quot;text&quot; field={@form[:username]} /&gt;
+        &lt;label&gt;EMAIL&lt;/label&gt;
+        &lt;.input type=&quot;text&quot; field={@form[:email]} /&gt;
+        &lt;div class=&quot;centered&quot;&gt;
+          &lt;button class=&quot;ghost-button&quot; disabled={@disabled}&gt;SAVE&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/.form&gt;
       &lt;div class=&quot;centered&quot;&gt;
-        &lt;button class=&quot;ghost-button&quot; disabled={@disabled}&gt;SAVE&lt;/button&gt;
+        &lt;button class=&quot;ghost-button&quot; phx-click=&quot;generate_random&quot;&gt;GENERATE RANDOM&lt;/button&gt;
       &lt;/div&gt;
-    &lt;/.form&gt;
+    &lt;/div&gt;
     &lt;%= for error &lt;- @errors do %&gt;
       &lt;p style=&quot;color:red;&quot;&gt;{error}&lt;/p&gt;
     &lt;% end %&gt;
     &lt;div class=&quot;bordered&quot;&gt;
-      &lt;h1&gt;User List:&lt;/h1&gt;
+      &lt;h1&gt;[Local Runtime] User List:&lt;/h1&gt;
       &lt;ul&gt;
         &lt;%= for user &lt;- @users do %&gt;
           &lt;li&gt;Username: {user[&quot;username&quot;]}, Email: {user[&quot;email&quot;]}&lt;/li&gt;
@@ -76,14 +81,9 @@ defmodule FormDemoLocal do
 
   @impl true
   def mount(_params, _session, socket) do
-    users = [
-      %{&quot;email&quot; =&gt; &quot;user1@example.com&quot;, &quot;username&quot; =&gt; &quot;user1&quot;},
-      %{&quot;email&quot; =&gt; &quot;user2@example.com&quot;, &quot;username&quot; =&gt; &quot;user2&quot;},
-      %{&quot;email&quot; =&gt; &quot;user3@example.com&quot;, &quot;username&quot; =&gt; &quot;user3&quot;}
-    ]
-
+    send(self(), :sync)
     user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
-    {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
+    {:ok, assign(socket, users: [], form: to_form(user), errors: [], disabled: true)}
   end
 
   @impl true
@@ -97,11 +97,12 @@ defmodule FormDemoLocal do
 
     case validate(user_params, users) do
       [] -&gt;
-        user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+        blank_user = %{&quot;email&quot; =&gt; &quot;&quot;, &quot;username&quot; =&gt; &quot;&quot;}
+        send_to_phoenix(%{&quot;type&quot; =&gt; &quot;new_user&quot;, &quot;user&quot; =&gt; user_params})
 
         {:noreply,
          assign(socket,
-           form: to_form(user),
+           form: to_form(blank_user),
            users: users ++ [user_params],
            errors: [],
            disabled: true
@@ -110,6 +111,32 @@ defmodule FormDemoLocal do
       errors -&gt;
         {:noreply, assign(socket, errors: errors, disabled: true)}
     end
+  end
+
+  def handle_event(
+        &quot;llv_server_message&quot;,
+        %{&quot;type&quot; =&gt; &quot;synchronize&quot;, &quot;users&quot; =&gt; server_users},
+        socket
+      ) do
+    filtered_users =
+      Enum.filter(socket.assigns.users, fn user -&gt;
+        case validate_already_existing(user, server_users) do
+          [] -&gt;
+            send_to_phoenix(%{&quot;type&quot; =&gt; &quot;new_user&quot;, &quot;user&quot; =&gt; user})
+            true
+
+          _ -&gt;
+            false
+        end
+      end)
+
+    {:noreply, assign(socket, users: server_users ++ filtered_users)}
+  end
+
+  def handle_event(&quot;generate_random&quot;, _params, socket) do
+    users = socket.assigns.users
+    user = generate_random_user(users)
+    handle_event(&quot;save&quot;, user, socket)
   end
 
   defp validate(user, existing_users) do
@@ -140,11 +167,10 @@ defmodule FormDemoLocal do
 
   defp validate_correctness(&quot;email&quot;, value) do
     with [name, server] &lt;- String.split(value, &quot;@&quot;),
-         true &lt;- String.length(name) &gt; 0 and String.contains?(server, &quot;.&quot;)
-      do
-        &quot;&quot;
-      else
-        _err -&gt; &quot;Email must have an email format&quot;
+         true &lt;- String.length(name) &gt; 0 and String.contains?(server, &quot;.&quot;) do
+      &quot;&quot;
+    else
+      _err -&gt; &quot;Email must have an email format&quot;
     end
   end
 end
