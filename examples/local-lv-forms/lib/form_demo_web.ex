@@ -52,6 +52,8 @@ defmodule FormDemoWeb do
     quote do
       use Phoenix.LiveView
 
+      import FormDemoWeb.LocalLiveView
+
       unquote(html_helpers())
     end
   end

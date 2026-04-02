@@ -1,5 +1,5 @@
 defmodule FormDemoWeb.FormDemoLive do
-  use Phoenix.LiveView
+  use FormDemoWeb, :live_view
 
   def render(assigns) do
     ~H"""
@@ -25,8 +25,8 @@ defmodule FormDemoWeb.FormDemoLive do
   end
 
   def handle_event(
-        "llv_local_message",
-        %{"payload" => %{"type" => "new_user", "user" => user}},
+        "new_user",
+        %{"user" => user},
         socket
       ) do
     new_users = socket.assigns.users ++ [user]
@@ -35,12 +35,12 @@ defmodule FormDemoWeb.FormDemoLive do
     {:noreply, assign(socket, users: new_users)}
   end
 
-  def handle_event("llv_local_message", %{"payload" => %{"type" => "sync_request"}}, socket) do
+  def handle_event("sync_request", _, socket) do
     users = Application.get_env(FormDemo, :users, [])
     payload = %{"type" => "synchronize", "users" => users}
 
     socket =
-      push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
+      push_to_local(socket, "FormDemoLocal", payload)
 
     socket = assign(socket, users: users)
     {:noreply, socket}
@@ -55,7 +55,7 @@ defmodule FormDemoWeb.FormDemoLive do
     payload = %{"type" => "synchronize", "users" => users}
 
     socket =
-      push_event(socket, "llv_server_message", %{"view" => "FormDemoLocal", "payload" => payload})
+      push_to_local(socket, "FormDemoLocal", payload)
 
     assign(socket, users: users)
   end

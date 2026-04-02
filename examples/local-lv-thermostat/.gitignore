@@ -35,5 +35,4 @@ local_thermostat-*.tar
 npm-debug.log
 /assets/node_modules/
 
-/priv/static/local_live_view/
 /assets/vendor/local_live_view

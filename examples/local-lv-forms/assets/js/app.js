@@ -30,13 +30,9 @@ const Hooks = {};
 Hooks.ServerSendHook = {
   mounted() {
     this.el.addEventListener("serverSend", (e) => {
-      this.pushEvent(
-        "llv_local_message",
-        { payload: e.detail.payload, view: e.detail.view },
-        (reply) => {
-          console.debug(reply.message);
-        },
-      );
+      this.pushEvent(e.detail.event_name, e.detail.payload, (reply) => {
+        console.debug(reply.message);
+      });
     });
   },
 };
