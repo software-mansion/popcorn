@@ -1,5 +1,5 @@
 defmodule FormDemoWeb.FormDemoLive do
-  use Phoenix.LiveView
+  use FormDemoWeb, :live_view
 
   def render(assigns) do
     ~H"""
@@ -26,7 +26,7 @@ defmodule FormDemoWeb.FormDemoLive do
 
   def handle_event(
         "new_user",
-        %{"payload" => %{"user" => user}},
+        %{"user" => user},
         socket
       ) do
     new_users = socket.assigns.users ++ [user]
