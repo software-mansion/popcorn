@@ -24,7 +24,10 @@
     "astro-mermaid": "^1.0.3",
     "chokidar": "^4.0.3",
     "highlight.js": "^11.11.1",
+    "local_live_view": "workspace:*",
     "mermaid": "^11.7.0",
+    "phoenix": "^1.8.0",
+    "phoenix_live_view": "^1.1.0",
     "playwright": "^1.53.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -34,6 +37,7 @@
     "three": "^0.178.0"
   },
   "devDependencies": {
+    "@types/phoenix": "^1.6.7",
     "@types/three": "^0.178.1",
     "prettier": "^3.6.2",
     "prettier-plugin-astro": "^0.14.1",
