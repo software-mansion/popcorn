@@ -1,81 +1,159 @@
 import { Popcorn } from "@swmansion/popcorn";
 
 export async function setup(liveSocket, opts = {}) {
-  const popcorn = await Popcorn.init({
+  // Register the server message listener immediately — BEFORE any awaits.
+  // push_event("llv_server_message") from Phoenix LiveView fires during the initial
+  // LiveView join, which happens before Popcorn finishes initializing. Without this,
+  // the event is dispatched on window before our listener is registered and is lost.
+  let popcorn;
+  const bufferedServerMessages = [];
+
+  window.addEventListener("phx:llv_server_message", async (e) => {
+    if (!popcorn) {
+      bufferedServerMessages.push(e.detail);
+      return;
+    }
+    await sendServerMessage(popcorn, e.detail);
+  });
+
+  popcorn = await Popcorn.init({
     debug: true,
     bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
-  const { data, durationMs } = await popcorn.call(
+
+  const { data: initialRenderedByView } = await popcorn.call(
     { views: find_predefined_views() },
-    {
-      timeoutMs: 10_000,
-    },
+    { timeoutMs: 10_000 },
   );
 
   const POP_VIEW = "data-pop-view";
-  const PHX_ROOT_ID = "data-phx-root-id";
-  const PHX_SESSION = "data-phx-session";
-  const query = `[${POP_VIEW}]`;
-  const pop_view_els = Array.from(document.querySelectorAll(query));
-  console.log({ roots: { ...liveSocket.roots }, pop_view_els: pop_view_els });
+  const pop_view_els = Array.from(document.querySelectorAll(`[${POP_VIEW}]`));
+
+  // Map from view name → view instance, used by __popcornTransportReceive
+  const viewsByName = {};
+
+  window.__popcornTransportReceive = function (viewName, diff) {
+    const view = viewsByName[viewName];
+    if (!view) {
+      console.error(
+        "LLV view not found:",
+        viewName,
+        "available:",
+        Object.keys(viewsByName),
+      );
+      return;
+    }
+    view.update(diff, []);
+  };
 
   pop_view_els.forEach((pop_view_el) => {
-    //  create a view
+    const viewName = pop_view_el.getAttribute(POP_VIEW);
+
     const view = liveSocket.newRootView(pop_view_el);
-    //  update key functions within a view to call popcorn instead of pushing to the channel
-    view.pushWithReply = async function (refGenerator, event, payload) {
-      const { data, durationMs } = await popcorn.call(
-        { view: this.id, event: event, payload: payload },
-        {
-          timeoutMs: 10_000,
-        },
-      );
-      return new Promise((_resolve, _reject) => {});
+    viewsByName[viewName] = view;
+
+    // addHook: skip the root element — its phx-hook (e.g. ServerSendHook) was already
+    // mounted by the parent Phoenix LiveView and has a HOOK_ID set on the element.
+    // If we try to re-add it here Phoenix hits the "custom element" error path because
+    // the hook exists in DOM private data but not in this view's viewHooks map.
+    const origAddHook = view.addHook.bind(view);
+    view.addHook = function (el) {
+      if (el === this.el) return;
+      return origAddHook(el);
     };
-    view.join = function (_callback) {
-      this.el.setAttribute(PHX_ROOT_ID, this.root.id);
-      this.el.setAttribute(PHX_SESSION, this.root.id);
-    };
+
+    // isConnected: we are always "connected" to Popcorn
     view.isConnected = function () {
       return true;
-    }; //  todo implement it properly so that it returns weather we are connected to popcorn
-    //  run necessary callbacks
+    };
+
+    // join: skip bindChannel + channel.join — onJoin is called below after Popcorn mounts.
+    // data-phx-root-id and data-phx-session must be set so Phoenix LiveView treats the
+    // element as mounted (the session value is unused locally but must be non-empty).
+    view.join = function (callback) {
+      this.el.setAttribute("data-phx-root-id", this.root.id);
+      this.el.setAttribute("data-phx-session", this.root.id);
+      this.showLoader(this.liveSocket.loaderTimeout);
+      this.joinCallback = (onDone) => {
+        onDone = onDone || function () {};
+        callback ? callback(this.joinCount, onDone) : onDone();
+      };
+    };
+
+    // pushWithReply: send event to Popcorn, return a resolved Promise so callers
+    // like pushInput can safely chain .then() on it.
+    // The actual diff arrives asynchronously via window.__popcornTransportReceive.
+    view.pushWithReply = function (refGenerator, event, payload) {
+      const [ref, [_el], _opts] = refGenerator
+        ? refGenerator({ payload })
+        : [null, [], {}];
+
+      if (typeof payload.cid !== "number") {
+        delete payload.cid;
+      }
+
+      const vName = this.el.dataset.popView;
+
+      popcorn
+        .call(
+          { view: vName, event: event, payload: payload },
+          { timeoutMs: 10_000 },
+        )
+        .catch((err) => console.error("LLV view.pushWithReply error", err));
+
+      // In the real Phoenix flow, undoRefs is called synchronously inside
+      // pushWithReply's channel reply handler — just before this.update(diff).
+      // Since our diff arrives asynchronously via __popcornTransportReceive,
+      // we must release the ref locks now. Otherwise DOMPatch sees PHX_REF_LOCK
+      // on the form (set by pushInput for both the input AND the form element)
+      // and applies all diff changes to a clone instead of the real DOM.
+      if (ref !== null) {
+        this.undoRefs(ref, payload.event || event);
+      }
+
+      return Promise.resolve({ resp: {}, reply: null, ref });
+    };
+
+    // maybePushComponentsDestroyed: component lifecycle is managed by Popcorn/WASM,
+    // no need to notify the server about destroyed CIDs from the JS side
+    view.maybePushComponentsDestroyed = function (_destroyedCIDs) {};
+
+    view.bindChannel = function () {};
     view.join();
+
+    const initialRendered = initialRenderedByView[viewName];
+    if (initialRendered) {
+      liveSocket.requestDOMUpdate(() =>
+        view.onJoin({ rendered: initialRendered }),
+      );
+    } else {
+      console.error("LLV no initial rendered for view", viewName);
+    }
   });
 
-  window.addEventListener("phx:llv_server_message", async (e) => {
-    const { data, durationMs } = await popcorn.call(
-      {
-        view: e.detail.view,
+  // Flush any server messages that arrived during Popcorn initialization.
+  for (const detail of bufferedServerMessages) {
+    await sendServerMessage(popcorn, detail);
+  }
+}
+
+async function sendServerMessage(popcorn, detail) {
+  await popcorn.call(
+    {
+      view: detail.view,
+      event: "llv_server_message",
+      payload: {
         event: "llv_server_message",
-        payload: {
-          event: "llv_server_message",
-          value: e.detail.payload,
-          type: "llv_server_message",
-        },
+        value: detail.payload,
+        type: "llv_server_message",
       },
-      {
-        timeoutMs: 10_000,
-      },
-    );
-  });
-  window.addEventListener("phx:llv_rerender", async (e) => {
-    liveSocket.roots[e.detail.view].join();
-    const { data, durationMs } = await popcorn.call(
-      {
-        view: e.detail.view,
-        event: "llv_rerender",
-        payload: { event: "llv_rerender", type: "llv_server_message" },
-      },
-      {
-        timeoutMs: 10_000,
-      },
-    );
-  });
+    },
+    { timeoutMs: 10_000 },
+  );
 }
 
 function find_predefined_views() {
-  let elements = document.querySelectorAll("[data-pop-view]");
-  elements = Array.from(elements);
-  return elements.map((el) => el.getAttribute("data-pop-view"));
+  return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) =>
+    el.getAttribute("data-pop-view"),
+  );
 }

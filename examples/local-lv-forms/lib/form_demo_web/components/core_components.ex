@@ -486,7 +486,7 @@ defmodule FormDemoWeb.CoreComponents do
     assigns = assign_new(assigns, :id, fn -> assigns.view end)
 
     ~H"""
-    <div data-pop-view={@view} id={@id}></div>
+    <div data-pop-view={@view} id={@id} phx-hook="ServerSendHook" phx-update="ignore"></div>
     """
   end
 end

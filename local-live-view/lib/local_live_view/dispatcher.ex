@@ -44,15 +44,21 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm({:wasm_call, %{"views" => views}}, state) do
-    views =
+    started =
       views
       |> Enum.map(fn view_string -> "Elixir." <> view_string end)
       |> Enum.map(&String.to_existing_atom/1)
       |> Enum.map(&start_local_live_view/1)
       |> Enum.filter(fn result -> result != nil end)
-      |> Map.new()
 
-    {:resolve, :ok, %{state | views: views}}
+    views_map = Map.new(started, fn {view, pid, _rendered} -> {view, pid} end)
+
+    initial_rendered =
+      Map.new(started, fn {view, _pid, rendered} ->
+        {view |> Module.split() |> List.last(), rendered}
+      end)
+
+    {:resolve, initial_rendered, %{state | views: views_map}}
   end
 
   defp start_local_live_view(view) do
@@ -66,8 +72,8 @@ defmodule LocalLiveView.Dispatcher do
       send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
 
       receive do
-        {^ref, {:ok, _reply}} ->
-          {view, pid}
+        {^ref, {:ok, rendered}} ->
+          {view, pid, rendered}
 
         {^ref, {:error, _reply}} ->
           nil
