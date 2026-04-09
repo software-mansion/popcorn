@@ -45,7 +45,7 @@ defmodule LocalLiveView.Dispatcher do
     started =
       views
       |> Enum.map(fn %{"view" => view_string, "id" => id} ->
-        view = "Elixir." <> view_string |> String.to_existing_atom()
+        view = ("Elixir." <> view_string) |> String.to_existing_atom()
         start_local_live_view(view, id)
       end)
       |> Enum.filter(fn result -> result != nil end)
