@@ -68,7 +68,7 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, initial_rendered, %{state | views: views_map}}
   end
 
-  defp start_local_live_view(view, id, attrs \\ %{}) do
+  defp start_local_live_view(view, id, attrs) do
     params = %{
       "session" => %Session{view: view},
       "llv_id" => id,
