@@ -10,6 +10,7 @@ packages:
   - "examples/local-lv-compare/assets"
   - "examples/local-lv-forms/assets"
   - "examples/local-lv-thermostat/assets"
+  - "examples/local-lv-burrito/assets"
   - "local-live-view/assets"
   - "landing-page"
   - "language-tour"

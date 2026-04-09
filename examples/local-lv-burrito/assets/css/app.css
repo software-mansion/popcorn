@@ -1,0 +1,90 @@
+/* See the Tailwind configuration guide for advanced usage
+   https://tailwindcss.com/docs/configuration */
+
+@import "tailwindcss" source(none);
+@source "../css";
+@source "../js";
+@source "../../lib/burrito_web";
+@source "../../local/lib";
+
+/* A Tailwind plugin that makes "hero-#{ICON}" classes available. */
+@plugin "../vendor/heroicons";
+
+/* Popcorn brand colors */
+@theme {
+  --color-pop-orange: #ef7c00;
+  --color-pop-orange-light: #ffe6cc;
+  --color-pop-orange-dark: #d36e00;
+  --color-pop-brown: #301b05;
+  --color-pop-brown-medium: #5f4122;
+  --color-pop-cream: #fffdf5;
+  --color-pop-cream-warm: #fffaf7;
+  --color-pop-grey: #efecea;
+}
+
+/* Add variants based on LiveView classes */
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
+
+/* Make LiveView wrapper divs transparent for layout */
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents;
+}
+
+/* Ensure the split screen fills correctly */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* LV side: show loading state on phx-click interactions */
+.lv-order-builder .phx-click-loading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* Brand-themed input accent colors per panel */
+.lv-order-builder input[type="radio"],
+.lv-order-builder input[type="checkbox"] {
+  accent-color: #301b05; /* pop-brown */
+}
+
+.llv-order-builder input[type="radio"],
+.llv-order-builder input[type="checkbox"] {
+  accent-color: #ef7c00; /* pop-orange */
+}
+
+/* Smooth transitions */
+.section {
+  transition: all 0.1s ease;
+}
+
+/* Scrollable order builders */
+.lv-order-builder,
+.llv-order-builder {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+/* Event log entry hover */
+.log-entry:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Smooth collapsible using CSS grid (no max-height lag) */
+.collapsible-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease;
+}
+
+.collapsible-grid.open {
+  grid-template-rows: 1fr;
+}
+
+.collapsible-grid > div {
+  overflow: hidden;
+}

@@ -170,6 +170,20 @@ export async function setup(liveSocket, opts = {}) {
     } else {
       console.error("LLV no initial rendered for view", llvId);
     }
+
+    // OrderLive's DOM patch on reconnect strips data-phx-root-id from the LLV
+    // container element, causing Phoenix to route LLV click events to OrderLive
+    // instead of Popcorn. Watch for the attribute being cleared and restore it
+    // immediately so the LLV keeps ownership of its subtree.
+    const observer = new MutationObserver(() => {
+      if (!pop_view_el.getAttribute("data-phx-session")) {
+        pop_view_el.setAttribute("data-phx-session", pop_view_el.id);
+      }
+    });
+    observer.observe(pop_view_el, {
+      attributes: true,
+      attributeFilter: ["data-phx-root-id", "data-phx-session"],
+    });
   });
 
   // owner: route events from inside [data-pop-view] elements to our fake views.
