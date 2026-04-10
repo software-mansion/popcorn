@@ -19,11 +19,12 @@ defmodule FormDemoWeb.FormDemoLive do
   end
 
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, users: [])}
+    {:ok, assign(socket, users: Application.get_env(:form_demo, :users, []))}
   end
 
   @impl LocalLiveView.Phoenix
   def handle_local_sync(%{"users" => new_users}, socket) do
+    Application.put_env(:form_demo, :users, new_users)
     {:noreply, assign(socket, users: new_users)}
   end
 end

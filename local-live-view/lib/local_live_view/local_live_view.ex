@@ -44,7 +44,11 @@ defmodule LocalLiveView do
         {:ok, Phoenix.Component.assign(socket, attrs)}
       end
 
-      defoverridable update: 2
+      def handle_server_event(_, _, socket) do
+        {:noreply, socket}
+      end
+
+      defoverridable update: 2, handle_server_event: 3
     end
   end
 
