@@ -4,7 +4,7 @@ defmodule FormDemoWeb.FormDemoLive do
   def render(assigns) do
     ~H"""
     <div class="centered-div">
-      <.local_live_view view="FormDemoLocal" id="FormDemoLocal" />
+      <.local_live_view view="FormDemoLocal" />
       <div class="bordered">
         <h1>[Server Runtime] User List:</h1>
         <ul>

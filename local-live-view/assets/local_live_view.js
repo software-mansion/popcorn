@@ -29,17 +29,17 @@ export async function setup(liveSocket, opts = {}) {
   const POP_VIEW = "data-pop-view";
   const pop_view_els = Array.from(document.querySelectorAll(`[${POP_VIEW}]`));
 
-  // Map from view name → view instance, used by __popcornTransportReceive
-  const viewsByName = {};
+  // Map from element id → view instance, used by __popcornTransportReceive
+  const viewsById = {};
 
-  window.__popcornTransportReceive = function (viewName, diff) {
-    const view = viewsByName[viewName];
+  window.__popcornTransportReceive = function (llvId, diff) {
+    const view = viewsById[llvId];
     if (!view) {
       console.error(
         "LLV view not found:",
-        viewName,
+        llvId,
         "available:",
-        Object.keys(viewsByName),
+        Object.keys(viewsById),
       );
       return;
     }
@@ -47,10 +47,10 @@ export async function setup(liveSocket, opts = {}) {
   };
 
   pop_view_els.forEach((pop_view_el) => {
-    const viewName = pop_view_el.getAttribute(POP_VIEW);
+    const llvId = pop_view_el.id;
 
     const view = liveSocket.newRootView(pop_view_el);
-    viewsByName[viewName] = view;
+    viewsById[llvId] = view;
 
     // addHook: skip the root element — its phx-hook (e.g. ServerSendHook) was already
     // mounted by the parent Phoenix LiveView and has a HOOK_ID set on the element.
@@ -92,11 +92,9 @@ export async function setup(liveSocket, opts = {}) {
         delete payload.cid;
       }
 
-      const vName = this.el.dataset.popView;
-
       popcorn
         .call(
-          { view: vName, event: event, payload: payload },
+          { id: this.el.id, event: event, payload: payload },
           { timeoutMs: 10_000 },
         )
         .catch((err) => console.error("LLV view.pushWithReply error", err));
@@ -121,13 +119,13 @@ export async function setup(liveSocket, opts = {}) {
     view.bindChannel = function () {};
     view.join();
 
-    const initialRendered = initialRenderedByView[viewName];
+    const initialRendered = initialRenderedByView[llvId];
     if (initialRendered) {
       liveSocket.requestDOMUpdate(() =>
         view.onJoin({ rendered: initialRendered }),
       );
     } else {
-      console.error("LLV no initial rendered for view", viewName);
+      console.error("LLV no initial rendered for view", llvId);
     }
   });
 
@@ -138,9 +136,12 @@ export async function setup(liveSocket, opts = {}) {
 }
 
 async function sendServerMessage(popcorn, detail) {
+  const el = document.querySelector(`[data-pop-view="${detail.view}"]`);
+  const llvId = el ? el.id : detail.view;
+
   await popcorn.call(
     {
-      view: detail.view,
+      id: llvId,
       event: "llv_server_message",
       payload: {
         event: "llv_server_message",
@@ -153,7 +154,8 @@ async function sendServerMessage(popcorn, detail) {
 }
 
 function find_predefined_views() {
-  return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) =>
-    el.getAttribute("data-pop-view"),
-  );
+  return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) => ({
+    view: el.getAttribute("data-pop-view"),
+    id: el.id,
+  }));
 }

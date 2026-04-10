@@ -2,9 +2,9 @@ defmodule LocalLiveView.Dispatcher do
   @moduledoc false
 
   #  This process dispatches events to different LocalLiveViews present on the page.
-  #    
+  #
   #  It uses Popcorn API and registers as a main process to handle wasm messages inside Popcorn runtime.
-  #    
+  #
   #  Uses GenServer.
 
   use GenServer
@@ -32,12 +32,10 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"event" => _type, "view" => view_string, "payload" => payload}},
+         {:wasm_call, %{"id" => id, "event" => _type, "payload" => payload}},
          state
        ) do
-    view = Module.safe_concat([view_string])
-
-    Map.get(state.views, view)
+    Map.get(state.views, id)
     |> send(%Message{payload: payload, event: "event"})
 
     {:resolve, :ok, state}
@@ -46,24 +44,23 @@ defmodule LocalLiveView.Dispatcher do
   defp handle_wasm({:wasm_call, %{"views" => views}}, state) do
     started =
       views
-      |> Enum.map(fn view_string -> "Elixir." <> view_string end)
-      |> Enum.map(&String.to_existing_atom/1)
-      |> Enum.map(&start_local_live_view/1)
+      |> Enum.map(fn %{"view" => view_string, "id" => id} ->
+        view = ("Elixir." <> view_string) |> String.to_existing_atom()
+        start_local_live_view(view, id)
+      end)
       |> Enum.filter(fn result -> result != nil end)
 
-    views_map = Map.new(started, fn {view, pid, _rendered} -> {view, pid} end)
+    views_map = Map.new(started, fn {id, pid, _rendered} -> {id, pid} end)
 
-    initial_rendered =
-      Map.new(started, fn {view, _pid, rendered} ->
-        {view |> Module.split() |> List.last(), rendered}
-      end)
+    initial_rendered = Map.new(started, fn {id, _pid, rendered} -> {id, rendered} end)
 
     {:resolve, initial_rendered, %{state | views: views_map}}
   end
 
-  defp start_local_live_view(view) do
+  defp start_local_live_view(view, id) do
     params = %{
-      "session" => %Session{view: view}
+      "session" => %Session{view: view},
+      "llv_id" => id
     }
 
     ref = make_ref()
@@ -73,7 +70,7 @@ defmodule LocalLiveView.Dispatcher do
 
       receive do
         {^ref, {:ok, rendered}} ->
-          {view, pid, rendered}
+          {id, pid, rendered}
 
         {^ref, {:error, _reply}} ->
           nil

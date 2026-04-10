@@ -72,7 +72,7 @@ defmodule FormDemoLocal do
       Enum.filter(socket.assigns.users, fn user ->
         case validate_already_existing(user, server_users) do
           [] ->
-            send_to_phoenix("new_user", %{"user" => user})
+            send_to_phoenix("new_user", %{"user" => user, "id" => socket.id})
             true
 
           _ ->
