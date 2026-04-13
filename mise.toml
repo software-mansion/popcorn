@@ -18,6 +18,10 @@ description = "Run tests"
 run = "scripts/build-atomvm.sh"
 description = "Build AtomVM"
 
+[tasks.build-openssl]
+run = "scripts/build-openssl.sh"
+description = "Build OpenSSL for WASM"
+
 [tasks.clean]
 run = "scripts/clean.sh"
 description = "Clean build artifacts"
