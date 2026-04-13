@@ -20,6 +20,7 @@ node_modules/
 
 # OTP/OpenSSL build sources
 otp/sources/
+otp/out/
 
 # Local environment
 .env

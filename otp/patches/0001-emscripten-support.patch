@@ -1,0 +1,745 @@
+diff --git a/erts/configure.ac b/erts/configure.ac
+index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e417d1095a4 100644
+--- a/erts/configure.ac
++++ b/erts/configure.ac
+@@ -522,8 +522,38 @@ dnl Special stuff regarding CFLAGS and details in the environment...
+ dnl ---------------------------------------------------------------------
+ 
+ dnl NOTE: CPPFLAGS will be included in CFLAGS at the end
++
++dnl ----------------------------------------------------------------------
++dnl Emscripten/WebAssembly detection
++dnl ----------------------------------------------------------------------
++EMSCRIPTEN=no
++case $host in
++    wasm32-*-emscripten*|wasm64-*-emscripten*)
++        EMSCRIPTEN=yes
++        AC_DEFINE(ERTS_EMSCRIPTEN, 1, [Define if targeting Emscripten/WebAssembly])
++        dnl Force disable features not supported on WASM
++        enable_jit=no
++        enable_sctp=no
++        if test "x$enable_kernel_poll" = "xunknown"; then
++            enable_kernel_poll=no
++        fi
++        dnl Override function detection for functions not in Emscripten
++        ac_cv_func_memrchr=no
++        ac_cv_func_mallopt=no
++        ac_cv_func_sbrk=no
++        ac_cv_func_brk=no
++        ac_cv_func_mremap=no
++        ac_cv_func_vsyslog=no
++        ac_cv_func_ppoll=no
++        AC_MSG_NOTICE([Configuring for Emscripten/WebAssembly])
++        AC_MSG_NOTICE([  JIT disabled (not supported on WASM)])
++        AC_MSG_NOTICE([  SCTP disabled (not supported on WASM)])
++        ;;
++esac
++AC_SUBST(EMSCRIPTEN)
++
+ case $host_os in
+-    linux*) CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE";; 
++    linux*) CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE";;
+     aix*|os400*)
+         # * _ALL_SOURCE: Required to get the winsize structure for TIOCSWINSZ.
+         # * _LINUX_SOURCE_COMPAT: Not required, but makes some libc functions
+@@ -535,6 +565,10 @@ case $host_os in
+ 	# -D_WIN32_WINNT=* from CPPFLAGS is saved in ETHR_DEFS.
+ 	CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600 -DWINVER=0x0600"
+ 	;;
++    emscripten*)
++	# Emscripten/WASM target
++	CPPFLAGS="$CPPFLAGS -DERTS_EMSCRIPTEN"
++	;;
+     *)
+ 	;;
+ esac
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 5d6c12c8a54493e3550082370288a7d0cc79aded..9b39ceff97b9b20dc26aa30b5605bd6345fa361f 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -1204,7 +1204,8 @@ OS_OBJS = \
+ 
+ DRV_OBJS = \
+ 	$(OBJDIR)/inet_drv.o \
+-	$(OBJDIR)/ram_file_drv.o
++	$(OBJDIR)/ram_file_drv.o \
++	$(OBJDIR)/js_bridge_drv.o
+ endif
+ 
+ ifneq ($(STATIC_NIFS),no)
+@@ -1291,7 +1292,7 @@ EMU_LD=$(CC)
+ endif
+ $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
+ 	$(ld_verbose) $(EMU_LD) -o $@ \
+-	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
++	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(EXTRA_EMCC_LINK_FLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
+ 	$(STATIC_NIF_LIBS) $(STATIC_DRIVER_LIBS) $(LIBS)
+ 
+ endif
+diff --git a/erts/emulator/drivers/common/js_bridge_drv.c b/erts/emulator/drivers/common/js_bridge_drv.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..09cb0c79f224c79ef1ed061b69f054920a3cfecc
+--- /dev/null
++++ b/erts/emulator/drivers/common/js_bridge_drv.c
+@@ -0,0 +1,338 @@
++#ifdef HAVE_CONFIG_H
++#  include "config.h"
++#endif
++
++#include <stddef.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "sys.h"
++#include "erl_driver.h"
++
++#ifdef ERTS_EMSCRIPTEN
++#  include <emscripten/emscripten.h>
++#endif
++
++typedef struct {
++    ErlDrvPort port;
++} JsBridgeData;
++
++static ErlDrvPort js_bridge_port = (ErlDrvPort) 0;
++
++static ErlDrvData js_bridge_start(ErlDrvPort port, char *cmd);
++static void js_bridge_stop(ErlDrvData handle);
++static void js_bridge_outputv(ErlDrvData handle, ErlIOVec *ev);
++
++static void js_bridge_send_term(ErlDrvPort port,
++                                const char *target_type,
++                                ErlDrvBinary *target_bin,
++                                ErlDrvBinary *payload_bin,
++                                ErlDrvBinary *meta_bin) {
++    ErlDrvTermData spec[32];
++    int i = 0;
++
++    spec[i++] = ERL_DRV_ATOM;
++    spec[i++] = driver_mk_atom("js_bridge_in");
++
++    spec[i++] = ERL_DRV_ATOM;
++    spec[i++] = driver_mk_atom(target_type);
++
++    spec[i++] = ERL_DRV_BINARY;
++    spec[i++] = (ErlDrvTermData) target_bin;
++    spec[i++] = target_bin ? target_bin->orig_size : 0;
++    spec[i++] = 0;
++
++    if (payload_bin != NULL) {
++        spec[i++] = ERL_DRV_BINARY;
++        spec[i++] = (ErlDrvTermData) payload_bin;
++        spec[i++] = payload_bin->orig_size;
++        spec[i++] = 0;
++    } else {
++        spec[i++] = ERL_DRV_ATOM;
++        spec[i++] = driver_mk_atom("undefined");
++    }
++
++    if (meta_bin != NULL) {
++        spec[i++] = ERL_DRV_BINARY;
++        spec[i++] = (ErlDrvTermData) meta_bin;
++        spec[i++] = meta_bin->orig_size;
++        spec[i++] = 0;
++    } else {
++        spec[i++] = ERL_DRV_ATOM;
++        spec[i++] = driver_mk_atom("undefined");
++    }
++
++    spec[i++] = ERL_DRV_TUPLE;
++    spec[i++] = 5;
++
++    erl_drv_output_term(driver_mk_port(port), spec, i);
++}
++
++#ifdef ERTS_EMSCRIPTEN
++extern void js_bridge_on_from_beam(const char *data, int len);
++extern void js_bridge_on_error(const char *data, int len);
++
++static void js_bridge_emit_error(const char *type, const char *detail) {
++    char envelope[512];
++    int written = snprintf(envelope,
++                           sizeof(envelope),
++                           "{\"type\":\"%s\",\"detail\":\"%s\"}",
++                           type,
++                           detail);
++
++    if (written <= 0) {
++        return;
++    }
++    if (written >= (int) sizeof(envelope)) {
++        written = (int) sizeof(envelope) - 1;
++    }
++    js_bridge_on_error(envelope, written);
++}
++
++EM_JS(void, js_vm_message_parse, (const char *data, int len), {
++    var msg = UTF8ToString(data, len);
++
++    function sendError(type, detail) {
++      var envelope = JSON.stringify({
++        type: type,
++        detail: detail,
++      });
++      var ptr = Module.stringToNewUTF8(envelope);
++      _js_vm_message_error(ptr, Module.lengthBytesUTF8(envelope));
++      _free(ptr);
++    }
++
++    var command;
++    try {
++      command = JSON.parse(msg);
++    } catch (_error) {
++      sendError('invalid_message', 'command is not valid JSON');
++      return;
++    }
++
++    if (command === null || typeof command !== 'object') {
++      sendError('invalid_message', 'command must be a JSON object');
++      return;
++    }
++
++    if (command.type !== 'send') {
++      sendError('invalid_message', 'command.type must be \"send\"');
++      return;
++    }
++
++    if (command.target === null || typeof command.target !== 'object') {
++      sendError('invalid_message', 'command.target must be an object');
++      return;
++    }
++
++    var targetType;
++    var targetValue;
++    if (typeof command.target.name === 'string') {
++      targetType = 'name';
++      targetValue = command.target.name;
++    } else if (typeof command.target.pid === 'string') {
++      targetType = 'pid';
++      targetValue = command.target.pid;
++    } else {
++      sendError('invalid_message', 'target must include name or pid');
++      return;
++    }
++
++    var targetTypePtr = Module.stringToNewUTF8(targetType);
++    var targetValuePtr = Module.stringToNewUTF8(targetValue);
++    var targetValueLen = Module.lengthBytesUTF8(targetValue);
++
++    var payloadPtr = 0;
++    var payloadLen = 0;
++    if (command.payload !== undefined) {
++      var payload = JSON.stringify(command.payload);
++      payloadPtr = Module.stringToNewUTF8(payload);
++      payloadLen = Module.lengthBytesUTF8(payload);
++    }
++
++    var metaPtr = 0;
++    var metaLen = 0;
++    if (command.meta !== undefined) {
++      var meta = JSON.stringify(command.meta);
++      metaPtr = Module.stringToNewUTF8(meta);
++      metaLen = Module.lengthBytesUTF8(meta);
++    }
++
++    _js_vm_message_dispatch(
++      targetTypePtr,
++      targetValuePtr,
++      targetValueLen,
++      payloadPtr,
++      payloadLen,
++      metaPtr,
++      metaLen
++    );
++
++    _free(targetTypePtr);
++    _free(targetValuePtr);
++    if (payloadPtr !== 0) {
++      _free(payloadPtr);
++    }
++    if (metaPtr !== 0) {
++      _free(metaPtr);
++    }
++});
++
++EMSCRIPTEN_KEEPALIVE
++void js_vm_message_error(const char *envelope, int len) {
++    if (envelope == NULL || len <= 0) {
++        return;
++    }
++    js_bridge_on_error(envelope, len);
++}
++
++EMSCRIPTEN_KEEPALIVE
++void js_vm_message_dispatch(const char *target_type,
++                            const char *target_value,
++                            int target_value_len,
++                            const char *payload_json,
++                            int payload_len,
++                            const char *meta_json,
++                            int meta_len) {
++    ErlDrvBinary *target_bin;
++    ErlDrvBinary *payload_bin = NULL;
++    ErlDrvBinary *meta_bin = NULL;
++
++    if (js_bridge_port == (ErlDrvPort) 0) {
++        js_bridge_emit_error("bridge_not_ready", "bridge port is not open");
++        return;
++    }
++
++    if (target_type == NULL || target_value == NULL || target_value_len <= 0) {
++        js_bridge_emit_error("invalid_message", "target is missing");
++        return;
++    }
++
++    target_bin = driver_alloc_binary(target_value_len);
++    if (target_bin == NULL) {
++        js_bridge_emit_error("bridge_error", "failed to allocate target buffer");
++        return;
++    }
++    memcpy(target_bin->orig_bytes, target_value, target_value_len);
++
++    if (payload_json != NULL && payload_len > 0) {
++        payload_bin = driver_alloc_binary(payload_len);
++        if (payload_bin == NULL) {
++            driver_free_binary(target_bin);
++            js_bridge_emit_error("bridge_error", "failed to allocate payload buffer");
++            return;
++        }
++        memcpy(payload_bin->orig_bytes, payload_json, payload_len);
++    }
++
++    if (meta_json != NULL && meta_len > 0) {
++        meta_bin = driver_alloc_binary(meta_len);
++        if (meta_bin == NULL) {
++            driver_free_binary(target_bin);
++            if (payload_bin != NULL) {
++                driver_free_binary(payload_bin);
++            }
++            js_bridge_emit_error("bridge_error", "failed to allocate meta buffer");
++            return;
++        }
++        memcpy(meta_bin->orig_bytes, meta_json, meta_len);
++    }
++
++    js_bridge_send_term(js_bridge_port, target_type, target_bin, payload_bin, meta_bin);
++
++    driver_free_binary(target_bin);
++    if (payload_bin != NULL) {
++        driver_free_binary(payload_bin);
++    }
++    if (meta_bin != NULL) {
++        driver_free_binary(meta_bin);
++    }
++}
++
++EMSCRIPTEN_KEEPALIVE
++void sendVmMessage(const char *data, int len) {
++    if (data == NULL || len <= 0) {
++        js_bridge_emit_error("invalid_message", "command must be a non-empty UTF-8 string");
++        return;
++    }
++    js_vm_message_parse(data, len);
++}
++#else
++void sendVmMessage(const char *data, int len) {
++    (void) data;
++    (void) len;
++}
++#endif
++
++static ErlDrvData js_bridge_start(ErlDrvPort port, char *cmd) {
++    JsBridgeData *data;
++    (void) cmd;
++
++    data = (JsBridgeData *) driver_alloc(sizeof(JsBridgeData));
++    if (data == NULL) {
++        return (ErlDrvData) NULL;
++    }
++
++    data->port = port;
++    js_bridge_port = port;
++    return (ErlDrvData) data;
++}
++
++static void js_bridge_stop(ErlDrvData handle) {
++    JsBridgeData *data = (JsBridgeData *) handle;
++    if (data != NULL) {
++        if (js_bridge_port == data->port) {
++            js_bridge_port = (ErlDrvPort) 0;
++        }
++        driver_free(data);
++    }
++}
++
++static void js_bridge_outputv(ErlDrvData handle, ErlIOVec *ev) {
++    char *buffer;
++    (void) handle;
++
++    if (ev == NULL || ev->size <= 0) {
++        return;
++    }
++
++    buffer = (char *) driver_alloc(ev->size + 1);
++    if (buffer == NULL) {
++        return;
++    }
++
++    driver_vec_to_buf(ev, buffer, ev->size);
++    buffer[ev->size] = '\0';
++
++#ifdef ERTS_EMSCRIPTEN
++    js_bridge_on_from_beam(buffer, (int) ev->size);
++#endif
++
++    driver_free(buffer);
++}
++
++struct erl_drv_entry js_bridge_driver_entry = {
++    NULL,
++    js_bridge_start,
++    js_bridge_stop,
++    NULL,
++    NULL,
++    NULL,
++    "js_bridge",
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    js_bridge_outputv,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    ERL_DRV_EXTENDED_MARKER,
++    ERL_DRV_EXTENDED_MAJOR_VERSION,
++    ERL_DRV_EXTENDED_MINOR_VERSION,
++    ERL_DRV_FLAG_USE_PORT_LOCKING,
++    NULL,
++    NULL,
++    NULL
++};
+diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4d3bfbe60
+--- /dev/null
++++ b/erts/emulator/js_bridge/beam-bridge.pre.js
+@@ -0,0 +1,16 @@
++var __beamBridgeOnMessage =
++  typeof Module['onBeamMessage'] === 'function' ? Module['onBeamMessage'] : null;
++var __beamBridgeOnError =
++  typeof Module['onError'] === 'function' ? Module['onError'] : null;
++
++Module['onBeamMessage'] = function(envelope) {
++  if (typeof __beamBridgeOnMessage === 'function') {
++    __beamBridgeOnMessage(envelope);
++  }
++};
++
++Module['onError'] = function(envelope) {
++  if (typeof __beamBridgeOnError === 'function') {
++    __beamBridgeOnError(envelope);
++  }
++};
+diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..0b7996e35e311aa67629a6e54df2820eac4b7438
+--- /dev/null
++++ b/erts/emulator/js_bridge/js_bridge.js
+@@ -0,0 +1,19 @@
++mergeInto(LibraryManager.library, {
++  js_bridge_on_from_beam__proxy: 'sync',
++  js_bridge_on_from_beam__sig: 'vii',
++  js_bridge_on_from_beam: function(data, len) {
++    var envelope = UTF8ToString(data, len);
++    if (typeof Module['onBeamMessage'] === 'function') {
++      Module['onBeamMessage'](envelope);
++    }
++  },
++
++  js_bridge_on_error__proxy: 'sync',
++  js_bridge_on_error__sig: 'vii',
++  js_bridge_on_error: function(data, len) {
++    var envelope = UTF8ToString(data, len);
++    if (typeof Module['onError'] === 'function') {
++      Module['onError'](envelope);
++    }
++  },
++});
+diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
+index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f5061dee6ae0 100644
+--- a/erts/emulator/sys/unix/sys.c
++++ b/erts/emulator/sys/unix/sys.c
+@@ -82,6 +82,9 @@
+ #include "erl_cpu_topology.h"
+ #include "erl_osenv.h"
+ #include "erl_dyn_lock_check.h"
++#ifdef ERTS_EMSCRIPTEN
++#include <emscripten.h>
++#endif
+ extern int  driver_interrupt(int, int);
+ extern void do_break(void);
+ 
+@@ -1105,6 +1108,9 @@ static erts_tid_t sig_dispatcher_tid;
+ static void
+ smp_sig_notify(int signum)
+ {
++#ifdef ERTS_EMSCRIPTEN
++    (void)signum; // No signal handling in Emscripten/WASM
++#else
+     int res;
+     do {
+ 	/* write() is async-signal safe (according to posix) */
+@@ -1117,6 +1123,7 @@ smp_sig_notify(int signum)
+ 	erts_silence_warn_unused_result(write(2, msg, sizeof(msg)));
+ 	abort();
+     }
++#endif
+ }
+ 
+ static void *
+@@ -1239,6 +1246,15 @@ erts_sys_main_thread(void)
+ #endif
+     smp_sig_notify(0); /* Notify initialized */
+ 
++#ifdef ERTS_EMSCRIPTEN
++    // Poll for VM halt since Emscripten has no async signal delivery.
++    while (erts_halt_code == INT_MIN) {
++        usleep(100000); // 100ms
++    }
++    emscripten_force_exit(erts_halt_code);
++    return;
++#endif
++
+     /* Wait for a signal to arrive... */
+ 
+ #ifdef __DARWIN__
+@@ -1293,8 +1309,10 @@ erl_sys_args(int* argc, char** argv)
+ 
+     max_files = erts_check_io_max_files();
+ 
++#ifndef ERTS_EMSCRIPTEN
+     init_smp_sig_notify();
+     init_smp_sig_suspend();
++#endif
+ 
+     erts_sys_env_init();
+ }
+diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
+index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..10792a788a45c28162735db4198d9e6470313f70 100644
+--- a/erts/emulator/sys/unix/sys_drivers.c
++++ b/erts/emulator/sys/unix/sys_drivers.c
+@@ -172,6 +172,7 @@ erl_sys_late_init(void)
+     SysDriverOpts opts = {0};
+     Port *port;
+ 
++#ifndef ERTS_EMSCRIPTEN
+     sys_signal(SIGPIPE, SIG_IGN); /* Ignore - we'll handle the write failure */
+ 
+     opts.packet_bytes = 0;
+@@ -191,6 +192,7 @@ erl_sys_late_init(void)
+         erts_open_driver(&forker_driver, make_internal_pid(0), "forker", &opts, NULL, NULL);
+     erts_mtx_unlock(port->lock);
+     erts_sys_unix_later_init(); /* Need to be called after forker has been started */
++#endif
+ }
+ 
+ /* II. Prototypes */
+diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
+index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
+--- a/lib/asn1/src/asn1rtt_ber.erl
++++ b/lib/asn1/src/asn1rtt_ber.erl
+@@ -129,7 +129,15 @@ ber_encode(Tlv) ->
+     asn1rt_nif:encode_ber_tlv(Tlv).
+ 
+ ber_decode_nif(B) ->
+-    asn1rt_nif:decode_ber_tlv(B).
++    try asn1rt_nif:decode_ber_tlv(B) of
++        Result ->
++            Result
++    catch
++        error:undef ->
++            ber_decode_erlang(B);
++        error:{nif_not_loaded, _, _, _} ->
++            ber_decode_erlang(B)
++    end.
+ 
+ ber_decode_erlang(B) when is_binary(B) ->
+     decode_primitive(B);
+diff --git a/lib/crypto/CONF_INFO b/lib/crypto/CONF_INFO
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ed2f3a1367182896955ca4ac4211f6119029aca
+--- /dev/null
++++ b/lib/crypto/CONF_INFO
+@@ -0,0 +1 @@
++Static linking with OpenSSL 3.0 *MAY* require special configuring of the cryptolib.
+diff --git a/lib/erl_interface/src/connect/ei_resolve.c b/lib/erl_interface/src/connect/ei_resolve.c
+index 72a9397bc1a5863dc88c1458e143ebbca708d891..14160385f06a8229d3b0611ab33e2ed511ee8d32 100644
+--- a/lib/erl_interface/src/connect/ei_resolve.c
++++ b/lib/erl_interface/src/connect/ei_resolve.c
+@@ -400,7 +400,7 @@ struct hostent *ei_gethostbyaddr_r(const char *addr,
+   return gethostbyaddr(addr, length, type);
+ #elif !defined(HAVE_GETHOSTBYNAME_R)
+   return my_gethostbyaddr_r(addr,length,type,hostp,buffer,buflen,h_errnop);
+-#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__))
++#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__EMSCRIPTEN__))
+   struct hostent *result;
+ 
+   gethostbyaddr_r(addr, length, type, hostp, buffer, buflen, &result,
+@@ -423,7 +423,7 @@ struct hostent *ei_gethostbyname_r(const char *name,
+   return gethostbyname(name);
+ #elif !defined(HAVE_GETHOSTBYNAME_R)
+   return my_gethostbyname_r(name,hostp,buffer,buflen,h_errnop);
+-#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__ANDROID__))
++#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__ANDROID__) || defined(__EMSCRIPTEN__))
+   struct hostent *result;
+   int err;
+ 
+diff --git a/lib/odbc/configure.ac b/lib/odbc/configure.ac
+index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3a503af02 100644
+--- a/lib/odbc/configure.ac
++++ b/lib/odbc/configure.ac
+@@ -70,9 +70,7 @@ _search_path=
+ 
+ AS_IF([test "$with_odbc" = "no"],
+  [
+-
+-   rm -f "$ERL_TOP/lib/odbc/SKIP"
+-
++   echo "ODBC disabled by user" > "$ERL_TOP/lib/odbc/SKIP"
+  ],
+  [
+   dnl "$with_odbc" != "no"
+diff --git a/make/autoconf/otp.m4 b/make/autoconf/otp.m4
+index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8bafa90e1 100644
+--- a/make/autoconf/otp.m4
++++ b/make/autoconf/otp.m4
+@@ -3083,6 +3083,8 @@ AC_DEFUN([LM_HARDWARE_ARCH], [
+     aarch*)	ARCH=arm;;
+     tile)	ARCH=tile;;
+     e2k)        ARCH=e2k;;
++    wasm32)	ARCH=wasm32;;
++    wasm64)	ARCH=wasm64;;
+     *)	 	ARCH=noarch;;
+     esac
+     AC_MSG_RESULT($ARCH)
+diff --git a/xcomp/erl-xcomp-wasm32-emscripten.conf b/xcomp/erl-xcomp-wasm32-emscripten.conf
+new file mode 100644
+index 0000000000000000000000000000000000000000..d9d35a2f177b97c9b324e1a83dc19138e5d51541
+--- /dev/null
++++ b/xcomp/erl-xcomp-wasm32-emscripten.conf
+@@ -0,0 +1,113 @@
++## -*-shell-script-*-
++##
++## Cross compilation configuration for WebAssembly via Emscripten
++##
++## Usage:
++##   ./otp_build configure --xcomp-conf=xcomp/erl-xcomp-wasm32-emscripten.conf
++##
++## Or manually:
++##   emconfigure ./configure --host=wasm32-unknown-emscripten --build=$(./make/autoconf/config.guess) ...
++##
++
++## -- Variables for `otp_build' Only -------------------------------------------
++
++erl_xcomp_build=guess
++erl_xcomp_host=wasm32-unknown-emscripten
++
++erl_xcomp_configure_flags="--disable-jit \
++    --disable-sctp \
++    --disable-kernel-poll \
++    --without-common_test \
++    --without-asn1 \
++    --without-diameter \
++    --without-edoc \
++    --without-eldap \
++    --without-eunit \
++    --without-ftp \
++    --without-jinterface \
++    --without-reltool \
++    --without-snmp \
++    --without-tftp \
++    --without-tools \
++    --without-termcap \
++    --without-wx \
++    --without-debugger \
++    --without-dialyzer \
++    --without-et \
++    --without-megaco \
++    --without-observer \
++    --without-odbc \
++    --without-os_mon \
++    --without-parsetools \
++    --without-public_key \
++    --without-ssh \
++    --without-ssl \
++    --without-threadnames \
++    --without-javac \
++    --enable-builtin-zlib \
++    --disable-esock \
++    --disable-dynamic-ssl-lib"
++
++## -- Cross Compiler and Other Tools -------------------------------------------
++
++CC=emcc
++CXX=em++
++LD=emcc
++AR=emar
++RANLIB=emranlib
++
++## Compiler flags
++CFLAGS="-O2 -pthread -g"
++
++## Linker flags for Emscripten
++## Note: These are passed to emcc during linking
++LDFLAGS="-pthread \
++    -sUSE_PTHREADS=1 \
++    -sPTHREAD_POOL_SIZE=4 \
++    -sPROXY_TO_PTHREAD=1 \
++    -sENVIRONMENT=web,worker,node \
++    -sEXPORT_ES6=1 \
++    -sMODULARIZE=1 \
++    -sINITIAL_MEMORY=256MB \
++    -sALLOW_MEMORY_GROWTH=1 \
++    -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8 \
++    -sEXPORTED_FUNCTIONS=['_main','_malloc','_free'] \
++    -sFORCE_FILESYSTEM=1 \
++    -sASSERTIONS=2 \
++    -sEMULATE_FUNCTION_POINTER_CASTS"
++
++## -- Cross System Root Locations ----------------------------------------------
++
++## Emscripten handles sysroot internally
++erl_xcomp_sysroot=
++
++## -- Optional Feature, and Bug Tests ------------------------------------------
++
++## These are values that cannot be determined by configure when cross-compiling.
++## We set them explicitly for WASM/Emscripten.
++
++## Endianness: WASM is little-endian
++erl_xcomp_bigendian=no
++
++## No clock_gettime for CPU time on WASM
++erl_xcomp_clock_gettime_cpu_time=no
++
++## getaddrinfo works in Emscripten (via proxy)
++erl_xcomp_getaddrinfo=no
++
++## No kqueue on WASM
++erl_xcomp_kqueue=no
++
++## No poll() - use select() instead
++erl_xcomp_poll=no
++
++## No reliable floating point exceptions
++erl_xcomp_reliable_fpe=no
++
++## posix_memalign works
++erl_xcomp_posix_memalign=yes
++
++## putenv stores a copy
++erl_xcomp_putenv_copy=yes
++
++## -----------------------------------------------------------------------------

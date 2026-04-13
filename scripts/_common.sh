@@ -67,3 +67,20 @@ install_pnpm_workspace_deps() {
     log "Installing ${label}..."
     (cd "${repo_root}" && pnpm install --frozen-lockfile)
 }
+
+# hash_inputs FILE [FILE ...]
+# Produces a stable SHA-256 over the contents of all listed files/dirs.
+# For directories, hashes every regular file inside (sorted for stability).
+hash_inputs() {
+    local items=()
+    for path in "$@"; do
+        if [[ -d "${path}" ]]; then
+            while IFS= read -r -d '' f; do
+                items+=("${f}")
+            done < <(find "${path}" -type f -print0 | sort -z)
+        elif [[ -f "${path}" ]]; then
+            items+=("${path}")
+        fi
+    done
+    cat "${items[@]}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1
+}
