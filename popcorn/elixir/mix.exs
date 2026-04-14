@@ -150,6 +150,7 @@ defmodule Popcorn.MixProject do
     [
       # {:atomvm_packbeam, github: "atomvm/atomvm_packbeam"},
       {:jason, "~> 1.4"},
+      {:treeshake, path: "/Users/matheksm/treeshake", runtime: false},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
       # Docs

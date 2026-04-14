@@ -30,7 +30,8 @@ defmodule Popcorn.Build do
     :stdlib,
     # Elixir
     :elixir,
-    :logger
+    :logger,
+    :eex
   ]
 
   @available_apps @default_apps ++ @config.extra_apps
@@ -114,14 +115,14 @@ defmodule Popcorn.Build do
   """
   def bundle_path(bundle), do: Path.join([@patches_path, "#{bundle}.avm"])
 
-  defp bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])
+  def bundle_ebin_dir(bundle), do: Path.join([@patches_path, to_string(bundle), "ebin"])
 
   defp patchable_app_beams(:popcorn_lib), do: []
 
   defp patchable_app_beams(app) do
     app
     |> Application.app_dir()
-    |> Path.join("ebin/**/*.beam")
+    |> Path.join("ebin/**/*")
     |> Path.wildcard()
   end
 
@@ -142,6 +143,7 @@ defmodule Popcorn.Build do
     {modified_srcs, cache} = update_cache(patches_srcs, cache)
 
     remaining_beams = patch(application, app_beams, modified_srcs, build_dir)
+    # remaining_beams = app_beams
     copy_beams(application, remaining_beams, build_dir)
 
     any_patched = not Enum.empty?(modified_srcs)
@@ -164,8 +166,9 @@ defmodule Popcorn.Build do
 
   defp bundle_beams(bundle) do
     bundle_ebin_dir(bundle)
-    |> Path.join("*.beam")
+    |> Path.join("*")
     |> Path.wildcard()
+    |> Enum.reject(&File.dir?/1)
   end
 
   # Updates hash of each patch and returns only paths that have different hash
@@ -212,7 +215,9 @@ defmodule Popcorn.Build do
 
     # patch files may produce multiple beams
     # the easiest way to get full set is to diff input beams and beams already in out_dir
-    out_dir_beams = Path.wildcard("#{out_dir}/*.beam") |> MapSet.new(&Path.basename/1)
+    out_dir_beams =
+      Path.wildcard("#{out_dir}/*") |> Enum.reject(&File.dir?/1) |> MapSet.new(&Path.basename/1)
+
     path_present? = fn path -> Path.basename(path) in out_dir_beams end
     remaining_beams = Enum.reject(beam_paths, path_present?)
 
@@ -250,11 +255,12 @@ defmodule Popcorn.Build do
   # but we execute it always for consistency
   # To be replaced with File.cp when we improve tracing in AtomVM
   defp do_patch(app_name, name, nil, patch, out_dir) do
-    Logger.info("Patching #{name}", app_name: app_name)
+    Logger.info("Transferring #{name}", app_name: app_name)
+    File.cp!(patch, Path.join(out_dir, name))
 
-    transform_beam_ast(patch, out_dir, fn patch_ast ->
-      maybe_add_tracing(patch_ast, @config.add_tracing)
-    end)
+    # transform_beam_ast(patch, out_dir, fn patch_ast ->
+    #   maybe_add_tracing(patch_ast, @config.add_tracing)
+    # end)
   end
 
   defp do_patch(app_name, name, beam, patch, out_dir) do
@@ -274,10 +280,10 @@ defmodule Popcorn.Build do
     process_async(beams, fn path ->
       name = Path.basename(path)
       Logger.info("Transferring #{name}", app_name: app_name)
-
-      transform_beam_ast(path, out_dir, fn ast ->
-        maybe_add_tracing(ast, @config.add_tracing)
-      end)
+      File.cp!(path, Path.join(out_dir, name))
+      # transform_beam_ast(path, out_dir, fn ast ->
+      #   maybe_add_tracing(ast, @config.add_tracing)
+      # end)
     end)
 
     :ok
@@ -285,14 +291,26 @@ defmodule Popcorn.Build do
 
   defp transform_beam_ast(beam_path, out_dir, transform) do
     name = Path.basename(beam_path)
+    # out_path = Path.join(out_dir, name) <> ".patched"
     out_path = Path.join(out_dir, name)
+    File.cp!(beam_path, out_path)
 
-    beam_path
-    |> File.read!()
-    |> CoreErlangUtils.parse()
-    |> transform.()
+    parsed =
+      beam_path
+      |> File.read!()
+      |> CoreErlangUtils.parse()
+
+    transformed =
+      parsed
+      |> transform.()
+
+    transformed
     |> CoreErlangUtils.serialize()
     |> then(&File.write!(out_path, &1))
+
+    transformed
+    |> :erlang.term_to_binary()
+    |> then(&File.write!(out_path <> ".core", &1))
   end
 
   defp maybe_add_tracing(ast, true), do: CoreErlangUtils.add_simple_tracing(ast)

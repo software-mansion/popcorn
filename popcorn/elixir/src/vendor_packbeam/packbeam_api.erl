@@ -752,6 +752,8 @@ uncompress_literals(Chunks) ->
 
 %% @private
 write_packbeam(OutputFilePath, ParsedFiles) ->
+    % FL = lists:sort([{byte_size(get_element_data(PF)), get_element_name(PF)} || PF <- ParsedFiles]),
+    % lists:foreach(fun({S, N}) -> erlang:display({string:slice(N, 0, string:length(N) - 5), S div 1024}) end, FL),
     PackedData =
         [<<?AVM_HEADER>> | [pack_data(ParsedFile) || ParsedFile <- ParsedFiles]] ++
             [create_header(0, 0, <<"end">>)],

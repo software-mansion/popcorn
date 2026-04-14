@@ -56,6 +56,89 @@ defmodule Popcorn do
 
     try do
       beams = options.extra_beams ++ bundled_artifacts(apps)
+      # dbg(beams, limit: :infinity)
+
+      force_remove =
+        [
+          Code.Formatter,
+          :prim_inet,
+          :erl_lint,
+          :erl_parse,
+          :qlc,
+          :qlc_pt,
+          :dets_v9,
+          :dets,
+          :sofs,
+          :erl_tar,
+          :epp,
+          :erl_scan,
+          :file_sorter,
+          :global,
+          :disk_log,
+          :net_kernel,
+          :zip,
+          :inet_db,
+          :edlin_expand,
+          :dets_utils
+        ]
+        |> MapSet.new(&to_string/1)
+
+      {to_remove, beams} = Enum.split_with(beams, &(Path.basename(&1, ".beam") in force_remove))
+
+      # dbg(beams, limit: :infinity)
+
+      Enum.each(to_remove, &File.rm!/1)
+
+      opts = [
+        ebin_files: beams |> Enum.filter(&(Path.basename(&1) != "prim_eval.beam")),
+        tmp_subdir: "popcorn",
+        copy_stdlibs: false,
+        check_cache: false,
+        extra_entry_points: [
+          {Elixir.Supervisor.Default, :init, 1},
+          {Application, :ensure_all_started, 2},
+          {Popcorn.Wasm, :send_event, 1}
+        ],
+        non_treeshakable_modules: [
+          :atomvm_logger_manager,
+          Popcorn.Boot
+        ]
+      ]
+
+      # call_graph = Treeshake.build_call_graph(opts)
+
+      # File.write!("call_graph/cg.bin", :erlang.term_to_binary(call_graph))
+
+      # stats = Treeshake.run([call_graph: call_graph] ++ opts)
+
+      # dbg(
+      #   Enum.sort(
+      #     stats.modules_removed ++ Enum.uniq(Enum.map(stats.functions_removed, &elem(&1, 0)))
+      #   ),
+      #   limit: :infinity,
+      #   pretty: false
+      # )
+
+      # dbg(stats.functions_removed, limit: :infinity, pretty: false)
+
+      stats = %{beams_removed: []}
+      # dbg(beams, limit: :infinity)
+
+      Enum.each(beams, fn path ->
+        if File.exists?(path <> ".core") do
+          File.rm!(path <> ".core")
+        end
+      end)
+
+      beams = beams -- stats.beams_removed
+
+      # Enum.each(beams, fn path ->
+      #   if File.exists?(path <> ".patched") do
+      #     File.rm!(path)
+      #     File.rename!(path <> ".patched", path)
+      #   end
+      # end)
+
       pack_bundle(options.out_dir, beams, module)
     after
       File.rm!(filename)
@@ -64,8 +147,10 @@ defmodule Popcorn do
 
   defp bundled_artifacts(applications) do
     builtin_apps = Build.builtin_app_names() |> MapSet.new()
+    dbg(builtin_apps)
 
     builtin_deps = Enum.filter(applications, &MapSet.member?(builtin_apps, to_string(&1)))
+    dbg(builtin_deps)
 
     available_builtin_apps = Build.available_apps() |> MapSet.new()
 
@@ -88,21 +173,30 @@ defmodule Popcorn do
 
     bundles = [:erts, :popcorn_lib | builtin_deps]
 
-    popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
+    dbg(bundles)
+
+    # popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
+    popcorn_beams =
+      Enum.flat_map(bundles, fn b ->
+        b |> Build.bundle_ebin_dir() |> Path.join("*.{app,beam}") |> Path.wildcard()
+      end)
+      |> Enum.reject(&File.dir?/1)
 
     dep_beams =
       Mix.Project.build_path()
-      |> Path.join("lib/*/ebin/*.beam")
+      |> Path.join("lib/*/ebin/*.{beam,app}")
       |> Path.wildcard()
       |> Enum.reject(fn path ->
         is_popcorn_subpath = Path.relative_to(path, @popcorn_path) != path
         is_popcorn_subpath and not beam_src_in_api_dir?(path)
       end)
 
-    consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
+    # consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
+    consolidated_beams = []
     generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
 
-    popcorn_avms ++ dep_beams ++ consolidated_beams ++ generated_beams
+    # popcorn_avms ++ dep_beams ++ consolidated_beams ++ generated_beams
+    popcorn_beams ++ dep_beams ++ consolidated_beams ++ generated_beams
   end
 
   defp pack_bundle(out_dir, beams, start_module) do
@@ -124,6 +218,9 @@ defmodule Popcorn do
       error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
+
+  @popcorn_app_path Path.join(@popcorn_path, "ebin/popcorn.app")
+  defp beam_src_in_api_dir?(@popcorn_app_path), do: false
 
   defp beam_src_in_api_dir?(beam_path) do
     module_name = Path.basename(beam_path, ".beam")
@@ -154,7 +251,7 @@ defmodule Popcorn do
     config = Mix.Project.config()
     app = Keyword.get(config, :app)
 
-    specs = gather_app_specs([:kernel, :stdlib, app], %{})
+    specs = gather_app_specs([:kernel, :stdlib, :eex, app], %{})
 
     # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
     specs = put_in(specs[:kernel][:env][:shell_history], :disabled)
@@ -211,6 +308,10 @@ defmodule Popcorn do
           Popcorn.Wasm.send_event("popcorn_elixir_ready")
 
           unquote(run)
+        rescue
+          e ->
+            :erlang.display({e, __STACKTRACE__})
+            reraise e, __STACKTRACE__
         end
       end
 

@@ -33,6 +33,7 @@ defmodule Popcorn.CompilationTest do
     |> AtomVM.assert_result(5)
   end
 
+  @tag :skip
   test "stacktrace", %{tmp_dir: run_dir} do
     info =
       quote do

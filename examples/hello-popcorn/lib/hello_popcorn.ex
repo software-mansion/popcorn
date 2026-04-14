@@ -9,6 +9,7 @@ defmodule HelloPopcorn do
 
   @impl true
   def init(_init_arg) do
+    Popcorn.Wasm.set_default_receiver(:main)
     IO.puts("Hello console!")
 
     Popcorn.Wasm.run_js("""

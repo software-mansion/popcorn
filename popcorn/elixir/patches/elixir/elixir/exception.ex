@@ -10,4 +10,6 @@ defmodule Exception do
     # end
     ""
   end
+
+  def blame_mfa(_m, _f, _a), do: :error
 end
