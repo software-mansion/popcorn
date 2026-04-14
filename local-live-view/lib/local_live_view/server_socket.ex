@@ -1,19 +1,11 @@
 defmodule LocalLiveView.ServerSocket do
   @moduledoc false
 
-  @doc false
-  def send(event, payload, view) do
-    view_name = view |> Module.split() |> List.last()
-
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        if (window.__llvSync) {
-          window.__llvSync(args.view, args.event_name, args.payload);
-        }
-      }
-      """,
-      %{payload: payload, view: view_name, event_name: event}
-    )
+  @doc """
+  Syncs the given attrs to the server-side mirror.
+  Must be called from within a LocalLiveView callback (handle_event, handle_info).
+  """
+  def mirror_sync(payload) do
+    send(self(), {:llv_mirror_sync, payload})
   end
 end

@@ -51,7 +51,7 @@ defmodule FormDemoLocal do
     case validate(user_params, users) do
       [] ->
         blank_user = %{"email" => "", "username" => ""}
-        phoenix_sync(%{"users" => users ++ [user_params]})
+        LocalLiveView.ServerSocket.mirror_sync(%{"users" => users ++ [user_params]})
 
         {:noreply,
          assign(socket,
@@ -120,9 +120,5 @@ defmodule FormDemoLocal do
       [] -> user
       _ -> generate_random_user(existing_users)
     end
-  end
-
-  defp phoenix_sync(attrs) do
-    LocalLiveView.ServerSocket.send("sync", attrs, __MODULE__)
   end
 end

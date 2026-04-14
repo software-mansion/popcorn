@@ -20,7 +20,6 @@ defmodule LocalLiveView.Channel do
 
   def handle_in("sync", payload, socket) do
     new_attrs = merge_attrs(socket.assigns.mirror_module, payload, socket.assigns.attrs)
-    push(socket, "attrs_update", new_attrs)
     {:noreply, assign(socket, attrs: new_attrs)}
   end
 

@@ -32,16 +32,6 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"id" => id, "event" => "llv_attrs_update", "payload" => attrs}},
-         state
-       ) do
-    Map.get(state.views, id)
-    |> send(%Message{payload: attrs, event: "attrs_update"})
-
-    {:resolve, :ok, state}
-  end
-
-  defp handle_wasm(
          {:wasm_call, %{"id" => id, "event" => "llv_reconnected"}},
          state
        ) do

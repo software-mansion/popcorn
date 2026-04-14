@@ -40,20 +40,11 @@ defmodule LocalLiveView do
         handle_server_event(type, params, socket)
       end
 
-      def update(attrs, socket) do
-        atomized = Map.new(attrs, fn
-          {k, v} when is_binary(k) -> {String.to_atom(k), v}
-          {k, v} -> {k, v}
-        end)
-
-        {:ok, Phoenix.Component.assign(socket, atomized)}
-      end
-
       def handle_server_event(_, _, socket) do
         {:noreply, socket}
       end
 
-      defoverridable update: 2, handle_server_event: 3
+      defoverridable handle_server_event: 3
     end
   end
 
@@ -113,6 +104,4 @@ defmodule LocalLiveView do
 
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
-
-  @callback update(attrs :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
 end

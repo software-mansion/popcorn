@@ -42,15 +42,6 @@ export async function setup(liveSocket, opts = {}) {
     const channel = llvSocket.channel(`llv:${llvId}`, { view: viewName });
     channels[llvId] = channel;
 
-    channel.on("attrs_update", (attrs) => {
-      popcorn
-        .call(
-          { id: llvId, event: "llv_attrs_update", payload: attrs },
-          { timeoutMs: 10_000 },
-        )
-        .catch((err) => console.error("LLV attrs update error", err));
-    });
-
     channel
       .join()
       .receive("ok", () => {
