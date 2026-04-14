@@ -1,5 +1,5 @@
 defmodule FormDemoLocal do
-  use LocalLiveView
+  use LocalLiveView, mirror: [:users]
   import Local.CoreComponents
 
   @impl true
@@ -51,15 +51,17 @@ defmodule FormDemoLocal do
     case validate(user_params, users) do
       [] ->
         blank_user = %{"email" => "", "username" => ""}
-        LocalLiveView.ServerSocket.mirror_sync(%{"users" => users ++ [user_params]})
 
-        {:noreply,
-         assign(socket,
-           form: to_form(blank_user),
-           users: users ++ [user_params],
-           errors: [],
-           disabled: true
-         )}
+        socket =
+          assign(socket,
+            form: to_form(blank_user),
+            users: users ++ [user_params],
+            errors: [],
+            disabled: true
+          )
+
+        mirror_sync(socket)
+        {:noreply, socket}
 
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}

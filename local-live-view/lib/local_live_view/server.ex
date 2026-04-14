@@ -61,42 +61,8 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  def handle_info({:llv_mirror_sync, payload}, state) do
-    state = %{state | sync_keys: Map.keys(payload)}
-
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        if (window.__llvSync) {
-          window.__llvSync(args.id, "sync", args.payload);
-        }
-      }
-      """,
-      %{id: state.llv_id, payload: payload}
-    )
-
-    {:noreply, state}
-  end
-
   def handle_info(%Message{event: "llv_reconnected"}, state) do
-    unless state.sync_keys == [] do
-      payload =
-        Map.new(state.sync_keys, fn key ->
-          {key, Map.get(state.socket.assigns, String.to_atom(key))}
-        end)
-
-      Popcorn.Wasm.run_js(
-        """
-        ({ args }) => {
-          if (window.__llvSync) {
-            window.__llvSync(args.id, "sync", args.payload);
-          }
-        }
-        """,
-        %{id: state.llv_id, payload: payload}
-      )
-    end
-
+    LocalLiveView.mirror_sync(state.socket)
     {:noreply, state}
   end
 
@@ -504,8 +470,7 @@ defmodule LocalLiveView.Server do
       redirect_count: 0,
       upload_names: %{},
       upload_pids: %{},
-      llv_id: llv_id,
-      sync_keys: []
+      llv_id: llv_id
     }
   end
 
