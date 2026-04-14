@@ -21,7 +21,7 @@ defmodule LocalLiveView do
   ```
 
   The `:mirror` option declares which assign keys are synced to the server-side mirror
-  channel when `LocalLiveView.mirror_sync/0` is called.
+  channel when `LocalLiveView.mirror_sync/1` is called.
 
   During application runtime, the application creates a process that handles a LocalLiveView's state,
   by storing and modifying its assigns.
