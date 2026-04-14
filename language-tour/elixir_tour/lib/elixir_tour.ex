@@ -21,7 +21,7 @@ defmodule ElixirTour do
 
   @impl GenServer
   def init(_init_arg) do
-    Wasm.set_default_receiver(@process_name)
+    Wasm.register(@process_name)
     :application.set_env(:elixir, :ansi_enabled, false)
     {:ok, %{editor_order: [], bindings: %{}}}
   end
