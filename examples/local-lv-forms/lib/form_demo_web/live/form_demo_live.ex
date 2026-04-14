@@ -1,11 +1,10 @@
 defmodule FormDemoWeb.FormDemoLive do
   use FormDemoWeb, :live_view
-  use LocalLiveView.Phoenix
 
   def render(assigns) do
     ~H"""
     <div class="centered-div">
-      <.local_live_view view="FormDemoLocal" attrs={%{users: @users}} />
+      <.local_live_view view="FormDemoLocal" />
       <div class="bordered">
         <h1>[Server Runtime] User List:</h1>
         <ul>
@@ -19,12 +18,12 @@ defmodule FormDemoWeb.FormDemoLive do
   end
 
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, users: Application.get_env(:form_demo, :users, []))}
+    Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal")
+    attrs = LocalLiveView.Channel.get_attrs("FormDemoLocal")
+    {:ok, assign(socket, users: Map.get(attrs, "users", []))}
   end
 
-  @impl LocalLiveView.Phoenix
-  def handle_local_sync(%{"users" => new_users}, socket) do
-    Application.put_env(:form_demo, :users, new_users)
-    {:noreply, assign(socket, users: new_users)}
+  def handle_info({:llv_attrs, attrs}, socket) do
+    {:noreply, assign(socket, users: Map.get(attrs, "users", []))}
   end
 end

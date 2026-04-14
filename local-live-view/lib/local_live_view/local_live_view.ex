@@ -41,7 +41,12 @@ defmodule LocalLiveView do
       end
 
       def update(attrs, socket) do
-        {:ok, Phoenix.Component.assign(socket, attrs)}
+        atomized = Map.new(attrs, fn
+          {k, v} when is_binary(k) -> {String.to_atom(k), v}
+          {k, v} -> {k, v}
+        end)
+
+        {:ok, Phoenix.Component.assign(socket, atomized)}
       end
 
       def handle_server_event(_, _, socket) do

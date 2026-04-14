@@ -27,31 +27,6 @@ import topbar from "../vendor/topbar";
 
 const Hooks = {};
 
-Hooks.LocalLiveViewHook = {
-  mounted() {
-    this.el.addEventListener("serverSend", (e) => {
-      this.pushEvent(e.detail.event_name, e.detail.payload, (reply) => {
-        console.debug(reply.message);
-      });
-    });
-  },
-  updated() {
-    this.el.setAttribute("data-phx-root-id", this.el.id);
-    this.el.setAttribute("data-phx-session", this.el.id);
-
-    const newAttrsStr = this.el.getAttribute("data-pop-attrs") || "{}";
-    if (newAttrsStr === this._prevAttrsStr) return;
-    this._prevAttrsStr = newAttrsStr;
-    const newAttrs = JSON.parse(newAttrsStr);
-    window.__popcorn
-      ?.call(
-        { id: this.el.id, event: "llv_attrs_update", payload: newAttrs },
-        { timeoutMs: 10_000 },
-      )
-      .catch((err) => console.error("LLV attrs update error", err));
-  },
-};
-
 const csrfToken = document
   .querySelector("meta[name='csrf-token']")
   .getAttribute("content");

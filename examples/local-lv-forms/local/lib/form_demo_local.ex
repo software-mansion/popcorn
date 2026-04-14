@@ -34,25 +34,9 @@ defmodule FormDemoLocal do
   end
 
   @impl true
-  def mount(%{"attrs" => %{"users" => users}}, _session, socket) do
-    user = %{"email" => "", "username" => ""}
-    {:ok, assign(socket, users: users, form: to_form(user), errors: [], disabled: true)}
-  end
-
   def mount(_params, _session, socket) do
     user = %{"email" => "", "username" => ""}
     {:ok, assign(socket, users: [], form: to_form(user), errors: [], disabled: true)}
-  end
-
-  def update(%{"users" => server_users} = _attrs, socket) do
-    IO.puts("UPDATE SERVER USERS: #{inspect(server_users)}")
-
-    filtered =
-      Enum.filter(socket.assigns.users, fn user -> validate_already_existing(user, server_users)== [] end)
-    if filtered != [] do
-      phoenix_sync(%{"users" => server_users ++ filtered})
-    end
-    {:ok, assign(socket, users: server_users ++ filtered)}
   end
 
   @impl true
@@ -67,7 +51,7 @@ defmodule FormDemoLocal do
     case validate(user_params, users) do
       [] ->
         blank_user = %{"email" => "", "username" => ""}
-        phoenix_sync(%{"users" =>  users ++ [user_params]})
+        phoenix_sync(%{"users" => users ++ [user_params]})
 
         {:noreply,
          assign(socket,
@@ -83,7 +67,6 @@ defmodule FormDemoLocal do
   end
 
   def handle_event("generate_random", _params, socket) do
-    IO.puts("gen rand")
     users = socket.assigns.users
     user = generate_random_user(users)
     handle_event("save", user, socket)

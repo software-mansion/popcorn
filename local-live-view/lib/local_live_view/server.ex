@@ -62,10 +62,34 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "attrs_update", payload: attrs}, state) do
+    state = %{state | sync_keys: Map.keys(attrs)}
+
     case state.socket.view.update(attrs, state.socket) do
       {:ok, new_socket} ->
         handle_changed(state, new_socket, nil)
     end
+  end
+
+  def handle_info(%Message{event: "llv_reconnected"}, state) do
+    unless state.sync_keys == [] do
+      payload =
+        Map.new(state.sync_keys, fn key ->
+          {key, Map.get(state.socket.assigns, String.to_atom(key))}
+        end)
+
+      Popcorn.Wasm.run_js(
+        """
+        ({ args }) => {
+          if (window.__llvSync) {
+            window.__llvSync(args.id, "sync", args.payload);
+          }
+        }
+        """,
+        %{id: state.llv_id, payload: payload}
+      )
+    end
+
+    {:noreply, state}
   end
 
   def handle_info(%Message{event: "event"} = msg, state) do
@@ -472,7 +496,8 @@ defmodule LocalLiveView.Server do
       redirect_count: 0,
       upload_names: %{},
       upload_pids: %{},
-      llv_id: llv_id
+      llv_id: llv_id,
+      sync_keys: []
     }
   end
 
