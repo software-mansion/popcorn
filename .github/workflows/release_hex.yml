@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check versions align
+        if: github.ref_type == 'tag' || inputs.tag
         shell: python
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
@@ -50,4 +51,8 @@ jobs:
         run: |
           docker run --rm -e HEX_API_KEY \
             popcorn-builder \
-            sh -c "cd /build/popcorn/popcorn/elixir && mix hex.publish --yes $DRY_RUN_FLAG"
+            sh -c "cd /build/popcorn/popcorn/elixir \
+              && mix deps.get \
+              && mix compile \
+              && mix hex.publish package --yes $DRY_RUN_FLAG \
+              && MIX_ENV=dev mix hex.publish docs --yes $DRY_RUN_FLAG"
