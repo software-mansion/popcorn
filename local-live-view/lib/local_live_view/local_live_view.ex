@@ -19,10 +19,6 @@ defmodule LocalLiveView do
   ```
   <.local_live_view view="DemoLive" />
   ```
-
-  The `:mirror` option declares which assign keys are synced to the server-side mirror
-  channel when `LocalLiveView.mirror_sync/1` is called.
-
   During application runtime, the application creates a process that handles a LocalLiveView's state,
   by storing and modifying its assigns.
   '''
@@ -32,9 +28,7 @@ defmodule LocalLiveView do
   Must be called from within a LocalLiveView callback (handle_event, handle_info)
   after assigns have been updated.
   """
-  def mirror_sync(%Phoenix.LiveView.Socket{} = socket) do
-    mirror_keys = socket.view.__llv_mirror_keys__()
-
+  def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
     payload =
       Map.new(mirror_keys, fn key ->
         {to_string(key), Map.get(socket.assigns, key)}
@@ -64,10 +58,6 @@ defmodule LocalLiveView do
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
       @before_compile LocalLiveView
-
-      @__llv_mirror_keys__ Keyword.get(opts, :mirror, [])
-      def __llv_mirror_keys__, do: @__llv_mirror_keys__
-
       alias LocalLiveView.Message
       use Phoenix.Component, global_prefixes: ~w(pop-)
 

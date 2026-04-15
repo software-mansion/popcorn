@@ -1,5 +1,5 @@
 defmodule FormDemoLocal do
-  use LocalLiveView, mirror: [:users]
+  use LocalLiveView
   import Local.CoreComponents
 
   @impl true
@@ -60,7 +60,7 @@ defmodule FormDemoLocal do
             disabled: true
           )
 
-        mirror_sync(socket)
+        mirror_sync(socket, [:users])
         {:noreply, socket}
 
       errors ->

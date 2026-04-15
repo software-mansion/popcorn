@@ -19,8 +19,8 @@ defmodule FormDemoWeb.FormDemoLive do
 
   def mount(_params, _session, socket) do
     Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal")
-    attrs = LocalLiveView.Channel.get_attrs("FormDemoLocal")
-    {:ok, assign(socket, users: Map.get(attrs, "users", []))}
+    mirror_assigns = LocalLiveView.Channel.get_mirror_assigns("FormDemoLocal")
+    {:ok, assign(socket, users: Map.get(mirror_assigns, "users", []))}
   end
 
   def handle_info({:llv_attrs, attrs}, socket) do
