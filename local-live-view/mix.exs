@@ -6,6 +6,7 @@ defmodule LocalLiveView.MixProject do
       app: :local_live_view,
       version: "0.1.0",
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -55,6 +56,9 @@ defmodule LocalLiveView.MixProject do
     ]
   end
 
+  defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
+  defp elixirc_paths(_), do: ["lib/local_live_view", "lib/stubs", "lib/server"]
+
   defp aliases() do
     [
       lint: [
@@ -64,9 +68,11 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      build: ["deps.get", &pnpm_install/1, "popcorn.cook"]
+      build: ["deps.get", &pnpm_install/1, &set_wasm_target/1, "popcorn.cook"]
     ]
   end
+
+  defp set_wasm_target(_), do: Mix.target(:wasm)
 
   defp pnpm_install(_) do
     {_, 0} =

@@ -19,10 +19,8 @@ defmodule LocalLiveView.Mirror do
   '''
 
   @doc """
-  Called when the local runtime syncs assigns to the server.
-
   Acts as a conflict resolution point between the local LiveView and its server-side mirror.
-  Receives `local_assigns` (the map of synced assign keys synced from the local runtime) and
+  Receives `local_assigns` (the map of synced assigns from the local runtime) and
   `mirror_assigns` (the current state stored in the mirror channel). Must return `{:ok, new_mirror_assigns}`.
   """
   @callback handle_sync(local_assigns :: map(), mirror_assigns :: map()) :: {:ok, map()}

@@ -1,4 +1,4 @@
-defmodule LocalLiveViewSocket do
+defmodule LocalLiveView.Socket do
   use Phoenix.Socket
 
   channel "llv:*", LocalLiveView.Channel
