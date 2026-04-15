@@ -1,6 +1,6 @@
 {
   "name": "@swmansion/popcorn",
-  "version": "0.2.2",
+  "version": "0.3.0-rc1",
   "description": "JS bindings for Popcorn",
   "type": "module",
   "license": "Apache-2.0",
