@@ -19,7 +19,9 @@ defmodule LocalLiveView.Channel do
   end
 
   def handle_in("sync", local_assigns, socket) do
-    new_mirror_assigns = merge_assigns(socket.assigns.mirror_module, local_assigns, socket.assigns.mirror_assigns)
+    new_mirror_assigns =
+      merge_assigns(socket.assigns.mirror_module, local_assigns, socket.assigns.mirror_assigns)
+
     {:noreply, assign(socket, mirror_assigns: new_mirror_assigns)}
   end
 
