@@ -11,6 +11,7 @@ packages:
   - "examples/local-lv-forms/assets"
   - "examples/local-lv-thermostat/assets"
   - "examples/local-lv-burrito/assets"
+  - "examples/local-lv-immortal-grid/assets"
   - "local-live-view/assets"
   - "landing-page"
   - "language-tour"

@@ -1,0 +1,123 @@
+/* Tailwind CSS v4 */
+@import "tailwindcss" source(none);
+@source "../css";
+@source "../js";
+@source "../../lib/immortal_grid_web";
+@source "../../local/lib";
+
+@plugin "../vendor/heroicons";
+
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+@theme {
+    /* Fonts */
+    --font-inter: "Inter Variable", system-ui;
+    --font-handjet: "Handjet Variable", system-ui;
+
+    /* Page backgrounds */
+    --color-light-20: #fffdf5;
+    --color-light-30: #fffaf7;
+
+    /* Surface / border */
+    --color-grey-10: #f5f2f0;
+    --color-grey-20: #efecea;
+    --color-white: #fff;
+
+    /* Primary — claimed cells, accents */
+    --color-orange-20: #ffe6cc;
+    --color-orange-100: #ef7c00;
+    --color-orange-200: #d36e00;
+
+    /* Text — brown scale */
+    --color-brown-header: #58330c;
+    --color-brown-100: #301b05;
+    --color-brown-90: #36220d;
+    --color-brown-80: #423221;
+    --color-brown-70: #5f4122;
+    --color-brown-gray: #696057;
+
+    /* Status: error / offline */
+    --color-red-50: #fff5f5;
+    --color-red-200: #fbbcbc;
+    --color-red-600: #cf3f3f;
+    --color-red-700: #b52e2e;
+
+    /* Status: warning / syncing / offline cells */
+    --color-yellow-50: #fffbf0;
+    --color-yellow-200: #ffe2a8;
+    --color-yellow-600: #d48f00;
+    --color-yellow-700: #b26f00;
+}
+
+/* ── Base styles ────────────────────────────────────────────────────────────── */
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: #fffdf5;
+}
+
+/* ── Grid cells — presenter view ─────────────────────────────────────────────── */
+.cell-empty {
+    background: #f5f2f0;
+    border: 1px solid #efecea;
+}
+
+.cell-claimed {
+    background: #ef7c00;
+    border: 1px solid #d36e00;
+}
+
+.cell-offline {
+    background: #d48f00;
+    border: 1px solid #b26f00;
+}
+
+/* ── Cell claim animation ─────────────────────────────────────────────────────── */
+@keyframes cell-claim {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.cell-just-claimed {
+    animation: cell-claim 0.2s ease-out;
+}
+
+/* ── LiveView disconnect / reconnect state ──────────────────────────────────── */
+
+/* phx-disconnected is added to <html> by Phoenix LiveView */
+html.phx-disconnected #grid-wrap {
+    opacity: 0.15;
+    transition: opacity 0.3s ease;
+}
+
+html.phx-disconnected #offline-overlay {
+    display: flex !important;
+}
+
+html.phx-disconnected #status-dot {
+    background: #cf3f3f !important;
+    box-shadow: 0 0 6px #cf3f3f !important;
+}
+
+/* ── Scrollbar (nice on grid overflow) ──────────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f5f2f0;
+}
+::-webkit-scrollbar-thumb {
+    background: #efecea;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #d36e00;
+}

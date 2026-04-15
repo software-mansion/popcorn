@@ -74,7 +74,7 @@ export async function setup(liveSocket, opts = {}) {
 
   const { data: initialRenderedByView } = await popcorn.call(
     { views: find_predefined_views() },
-    { timeoutMs: 10_000 },
+    { timeoutMs: 30_000 },
   );
 
   const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
