@@ -50,7 +50,7 @@ ensure_wasm_assets() {
     if [[ ! -f "${js_dir}/assets/AtomVM.wasm" ]]; then
         log "WASM assets not found, building..."
         cd "${js_dir}"
-        pnpm run assets:dev
+        pnpm run setup
     fi
 }
 
@@ -245,7 +245,7 @@ main() {
         mix popcorn.cook
 
         if [[ -n "${ATOMVM_SOURCE:-}" && -d "${ATOMVM_SOURCE}" ]]; then
-            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${js_dir}' && pnpm run assets:dev && pnpm --filter @swmansion/popcorn exec rollup -c"
+            watch dir="${ATOMVM_SOURCE}/src" exts="c,h,cpp" cmd="cd '${js_dir}' && pnpm run setup && pnpm --filter @swmansion/popcorn exec rollup -c"
         fi
         watch dir="${js_dir}/src" exts="ts,js" cmd="cd '${js_dir}' && pnpm --filter @swmansion/popcorn exec rollup -c"
         watch dir="${example_dir}/lib" exts="ex" cmd="cd '${example_dir}' && mix popcorn.cook"
