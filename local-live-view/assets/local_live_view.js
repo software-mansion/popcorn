@@ -23,48 +23,45 @@ export async function setup(liveSocket, opts = {}) {
   });
   window.__popcorn = popcorn;
 
-  const csrfToken = document
-    .querySelector("meta[name='csrf-token']")
-    ?.getAttribute("content");
-
-  const llvSocket = new Socket("/llv_socket", {
-    params: { _csrf_token: csrfToken },
-  });
-  llvSocket.connect();
-
   const channels = {};
   const viewsById = {};
 
-  document.querySelectorAll("[data-pop-view]").forEach((el) => {
-    const llvId = el.id;
-    const viewName = el.dataset.popView;
+  // Mirror channels: only created for views with a server-side Mirror module.
+  const mirrorEls = document.querySelectorAll("[data-pop-view][data-pop-mirror]");
+  if (mirrorEls.length > 0) {
+    const csrfToken = document
+      .querySelector("meta[name='csrf-token']")
+      ?.getAttribute("content");
 
-    const channel = llvSocket.channel(`llv:${llvId}`, { view: viewName });
-    channels[llvId] = channel;
+    const llvSocket = new Socket("/llv_socket", {
+      params: { _csrf_token: csrfToken },
+    });
+    llvSocket.connect();
 
-    channel
-      .join()
-      .receive("ok", () => {
-        // On rejoin (reconnect): trigger WASM to re-sync its state to the mirror.
-        // On initial join viewsById[llvId] is not yet populated (views are set up later),
-        // so this is a no-op on first connect.
-        if (viewsById[llvId]) {
-          popcorn
-            .call({ id: llvId, event: "llv_reconnected", payload: {} }, { timeoutMs: 10_000 })
-            .catch((err) => console.error("LLV reconnect sync error", err));
-        }
-      })
-      .receive("error", (err) => console.error("LLV channel join error", err));
-  });
+    mirrorEls.forEach((el) => {
+      const llvId = el.id;
+      const channel = llvSocket.channel(`llv:${llvId}`, { view: el.dataset.popView });
+      channels[llvId] = channel;
 
-  window.__llvSync = (viewName, eventName, payload) => {
-    const channel = channels[viewName];
-    if (channel) {
-      channel.push(eventName, payload);
-    } else {
-      console.warn("No LLV channel found for view:", viewName);
-    }
-  };
+      channel
+        .join()
+        .receive("ok", () => {
+          if (viewsById[llvId]) {
+            popcorn
+              .call({ id: llvId, event: "llv_reconnected", payload: {} }, { timeoutMs: 10_000 })
+              .catch((err) => console.error("LLV reconnect sync error", err));
+          }
+        })
+        .receive("error", (err) => console.error("LLV channel join error", err));
+    });
+
+    window.__llvSync = (id, eventName, payload) => {
+      const channel = channels[id];
+      if (channel) {
+        channel.push(eventName, payload);
+      }
+    };
+  }
 
   const { data: initialRenderedByView } = await popcorn.call(
     { views: find_predefined_views() },

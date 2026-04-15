@@ -1,4 +1,4 @@
-defmodule FormDemoLocal.Mirror do
+defmodule Mirror.FormDemoLocal do
   def handle_sync(%{"users" => _} = payload, _attrs) do
     Phoenix.PubSub.broadcast(FormDemo.PubSub, "llv_mirror:FormDemoLocal", {:llv_attrs, payload})
     {:ok, payload}

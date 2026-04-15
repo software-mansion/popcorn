@@ -24,7 +24,7 @@ defmodule LocalLiveView.Channel do
   end
 
   defp find_mirror_module(view_string) do
-    mirror = String.to_atom("Elixir." <> view_string <> ".Mirror")
+    mirror = String.to_atom("Elixir.Mirror." <> view_string)
 
     if Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2),
       do: mirror,
