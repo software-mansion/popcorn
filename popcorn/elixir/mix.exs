@@ -60,7 +60,7 @@ defmodule Popcorn.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      files: ["lib", "priv", "patches", "mix.exs", "README.md", "LICENSE", "src"],
+      files: ["lib", "patches", "mix.exs", "README.md", "LICENSE", "src"],
       links: %{
         "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"

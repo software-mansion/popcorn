@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check versions align
+        if: github.ref_type == 'tag' || inputs.tag
         shell: python
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
