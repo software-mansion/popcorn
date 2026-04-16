@@ -77,7 +77,7 @@ defmodule FormDemo.MixProject do
       build: ["setup"],
       dev: ["setup", "phx.server"],
       setup: [
-        &build_local/1,
+        "llv.build",
         &pnpm_install/1,
         "deps.get",
         "compile",
@@ -100,10 +100,6 @@ defmodule FormDemo.MixProject do
       ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
     ]
-  end
-
-  defp build_local(_) do
-    Mix.shell().cmd("MIX_TARGET=wasm mix build", cd: "local")
   end
 
   defp pnpm_install(_) do
