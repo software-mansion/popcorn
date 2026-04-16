@@ -27,7 +27,9 @@ export async function setup(liveSocket, opts = {}) {
   const viewsById = {};
 
   // Mirror channels: only created for views with a server-side Mirror module.
-  const mirrorEls = document.querySelectorAll("[data-pop-view][data-pop-mirror]");
+  const mirrorEls = document.querySelectorAll(
+    "[data-pop-view][data-pop-mirror]",
+  );
   if (mirrorEls.length > 0) {
     const csrfToken = document
       .querySelector("meta[name='csrf-token']")
@@ -40,7 +42,9 @@ export async function setup(liveSocket, opts = {}) {
 
     mirrorEls.forEach((el) => {
       const llvId = el.id;
-      const channel = llvSocket.channel(`llv:${llvId}`, { view: el.dataset.popView });
+      const channel = llvSocket.channel(`llv:${llvId}`, {
+        view: el.dataset.popView,
+      });
       channels[llvId] = channel;
 
       channel
@@ -48,11 +52,16 @@ export async function setup(liveSocket, opts = {}) {
         .receive("ok", () => {
           if (viewsById[llvId]) {
             popcorn
-              .call({ id: llvId, event: "llv_reconnected", payload: {} }, { timeoutMs: 10_000 })
+              .call(
+                { id: llvId, event: "llv_reconnected", payload: {} },
+                { timeoutMs: 10_000 },
+              )
               .catch((err) => console.error("LLV reconnect sync error", err));
           }
         })
-        .receive("error", (err) => console.error("LLV channel join error", err));
+        .receive("error", (err) =>
+          console.error("LLV channel join error", err),
+        );
     });
 
     window.__llvSync = (id, eventName, payload) => {

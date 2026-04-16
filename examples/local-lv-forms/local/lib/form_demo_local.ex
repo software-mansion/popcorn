@@ -109,7 +109,7 @@ defmodule FormDemoLocal do
     end
   end
 
-  defp validate_correctness(_, value) do
+  defp validate_correctness(_, _value) do
     ""
   end
 

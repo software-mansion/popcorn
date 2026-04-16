@@ -103,7 +103,7 @@ defmodule FormDemo.MixProject do
   end
 
   defp build_local(_) do
-    Mix.shell().cmd("mix build", cd: "local")
+    Mix.shell().cmd("MIX_TARGET=wasm mix build", cd: "local")
   end
 
   defp pnpm_install(_) do

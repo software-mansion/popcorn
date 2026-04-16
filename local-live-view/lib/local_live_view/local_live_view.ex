@@ -31,7 +31,7 @@ defmodule LocalLiveView do
   def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
     payload =
       Map.new(mirror_keys, fn key ->
-        {to_string(key), Map.get(socket.assigns, key)}
+        {to_string(key), socket.assigns |> Map.get(key) |> to_serializable()}
       end)
 
     unless payload == %{} do
@@ -49,6 +49,17 @@ defmodule LocalLiveView do
       )
     end
   end
+
+  defp to_serializable(value) when is_struct(value),
+    do: value |> Map.from_struct() |> to_serializable()
+
+  defp to_serializable(value) when is_map(value),
+    do: Map.new(value, fn {k, v} -> {to_string(k), to_serializable(v)} end)
+
+  defp to_serializable(value) when is_list(value),
+    do: Enum.map(value, &to_serializable/1)
+
+  defp to_serializable(value), do: value
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do

@@ -57,7 +57,7 @@ defmodule LocalLiveView.MixProject do
   end
 
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
-  defp elixirc_paths(_), do: ["lib/local_live_view", "lib/stubs", "lib/server"]
+  defp elixirc_paths(_), do: ["lib/server"]
 
   defp aliases() do
     [
@@ -68,11 +68,9 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "docs --warnings-as-errors"
       ],
-      build: ["deps.get", &pnpm_install/1, &set_wasm_target/1, "popcorn.cook"]
+      build: ["deps.get", &pnpm_install/1, "popcorn.cook"]
     ]
   end
-
-  defp set_wasm_target(_), do: Mix.target(:wasm)
 
   defp pnpm_install(_) do
     {_, 0} =
