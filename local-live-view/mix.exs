@@ -57,7 +57,7 @@ defmodule LocalLiveView.MixProject do
   end
 
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
-  defp elixirc_paths(_), do: ["lib/server"]
+  defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
 
   defp aliases() do
     [

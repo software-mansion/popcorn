@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "dependencies": {
+    "local_live_view": "file:../deps/local_live_view/assets"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
