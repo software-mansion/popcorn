@@ -61,8 +61,9 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  def handle_info(%Message{event: "event", payload: %{"event" => "llv_rerender"}}, state) do
-    rerender(state.socket)
+  def handle_info(%Message{event: "llv_reconnected"}, state) do
+    keys = Map.keys(state.socket.assigns)
+    LocalLiveView.mirror_sync(state.socket, keys)
     {:noreply, state}
   end
 

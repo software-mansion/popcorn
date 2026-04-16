@@ -476,7 +476,6 @@ defmodule FormDemoWeb.CoreComponents do
   ## Examples
 
       <.local_live_view view="FormDemoLocal" />
-      <.local_live_view view="FormDemoLocal" id="my-form" />
 
   """
   attr :view, :string, required: true
@@ -484,9 +483,21 @@ defmodule FormDemoWeb.CoreComponents do
 
   def local_live_view(assigns) do
     assigns = assign_new(assigns, :id, fn -> assigns.view end)
+    assigns = assign(assigns, :has_mirror, mirror_exists?(assigns.view))
 
     ~H"""
-    <div data-pop-view={@view} id={@id} phx-hook="ServerSendHook" phx-update="ignore"></div>
+    <div
+      data-pop-view={@view}
+      id={@id}
+      data-pop-mirror={@has_mirror || nil}
+      phx-update="ignore"
+    >
+    </div>
     """
+  end
+
+  defp mirror_exists?(view_name) do
+    mirror = Module.concat(Mirror, String.to_atom(view_name))
+    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2)
   end
 end

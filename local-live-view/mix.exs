@@ -6,6 +6,7 @@ defmodule LocalLiveView.MixProject do
       app: :local_live_view,
       version: "0.1.0",
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -54,6 +55,9 @@ defmodule LocalLiveView.MixProject do
       ]
     ]
   end
+
+  defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
+  defp elixirc_paths(_), do: ["lib/server"]
 
   defp aliases() do
     [

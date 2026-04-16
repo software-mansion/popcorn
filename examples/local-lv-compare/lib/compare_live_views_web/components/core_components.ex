@@ -476,7 +476,6 @@ defmodule CompareLiveViewsWeb.CoreComponents do
   ## Examples
 
       <.local_live_view view="DemoModalOffline" />
-      <.local_live_view view="DemoModalOffline" id="my-modal" />
 
   """
   attr :view, :string, required: true

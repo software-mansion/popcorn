@@ -27,16 +27,6 @@ import topbar from "../vendor/topbar";
 
 const Hooks = {};
 
-Hooks.ServerSendHook = {
-  mounted() {
-    this.el.addEventListener("serverSend", (e) => {
-      this.pushEvent(e.detail.event_name, e.detail.payload, (reply) => {
-        console.debug(reply.message);
-      });
-    });
-  },
-};
-
 const csrfToken = document
   .querySelector("meta[name='csrf-token']")
   .getAttribute("content");

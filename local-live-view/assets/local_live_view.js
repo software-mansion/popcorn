@@ -1,4 +1,5 @@
 import { Popcorn } from "@swmansion/popcorn";
+import { Socket } from "phoenix";
 
 export async function setup(liveSocket, opts = {}) {
   // Register the server message listener immediately — BEFORE any awaits.
@@ -17,20 +18,66 @@ export async function setup(liveSocket, opts = {}) {
   });
 
   popcorn = await Popcorn.init({
-    debug: true,
+    debug: opts.debug ?? false,
     bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
+  window.__popcorn = popcorn;
+
+  const channels = {};
+  const viewsById = {};
+
+  // Mirror channels: only created for views with a server-side Mirror module.
+  const mirrorEls = document.querySelectorAll(
+    "[data-pop-view][data-pop-mirror]",
+  );
+  if (mirrorEls.length > 0) {
+    const csrfToken = document
+      .querySelector("meta[name='csrf-token']")
+      ?.getAttribute("content");
+
+    const llvSocket = new Socket("/llv_socket", {
+      params: { _csrf_token: csrfToken },
+    });
+    llvSocket.connect();
+
+    mirrorEls.forEach((el) => {
+      const llvId = el.id;
+      const channel = llvSocket.channel(`llv:${llvId}`, {
+        view: el.dataset.popView,
+      });
+      channels[llvId] = channel;
+
+      channel
+        .join()
+        .receive("ok", () => {
+          if (viewsById[llvId]) {
+            popcorn
+              .call(
+                { id: llvId, event: "llv_reconnected", payload: {} },
+                { timeoutMs: 10_000 },
+              )
+              .catch((err) => console.error("LLV reconnect sync error", err));
+          }
+        })
+        .receive("error", (err) =>
+          console.error("LLV channel join error", err),
+        );
+    });
+
+    window.__llvSync = (id, eventName, payload) => {
+      const channel = channels[id];
+      if (channel) {
+        channel.push(eventName, payload);
+      }
+    };
+  }
 
   const { data: initialRenderedByView } = await popcorn.call(
     { views: find_predefined_views() },
     { timeoutMs: 10_000 },
   );
 
-  const POP_VIEW = "data-pop-view";
-  const pop_view_els = Array.from(document.querySelectorAll(`[${POP_VIEW}]`));
-
-  // Map from element id → view instance, used by __popcornTransportReceive
-  const viewsById = {};
+  const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
 
   window.__popcornTransportReceive = function (llvId, diff) {
     const view = viewsById[llvId];
@@ -52,10 +99,8 @@ export async function setup(liveSocket, opts = {}) {
     const view = liveSocket.newRootView(pop_view_el);
     viewsById[llvId] = view;
 
-    // addHook: skip the root element — its phx-hook (e.g. ServerSendHook) was already
-    // mounted by the parent Phoenix LiveView and has a HOOK_ID set on the element.
-    // If we try to re-add it here Phoenix hits the "custom element" error path because
-    // the hook exists in DOM private data but not in this view's viewHooks map.
+    // addHook: skip the root element to prevent Phoenix from trying to register it
+    // as a hook within this view's scope — hooks on children are still processed normally.
     const origAddHook = view.addHook.bind(view);
     view.addHook = function (el) {
       if (el === this.el) return;
@@ -68,11 +113,9 @@ export async function setup(liveSocket, opts = {}) {
     };
 
     // join: skip bindChannel + channel.join — onJoin is called below after Popcorn mounts.
-    // data-phx-root-id and data-phx-session must be set so Phoenix LiveView treats the
-    // element as mounted (the session value is unused locally but must be non-empty).
+    // No need to set data-phx-session / data-phx-root-id: owner() is overridden below
+    // to route events via [data-pop-view] lookup instead of attribute-based lookup.
     view.join = function (callback) {
-      this.el.setAttribute("data-phx-root-id", this.root.id);
-      this.el.setAttribute("data-phx-session", this.root.id);
       this.showLoader(this.liveSocket.loaderTimeout);
       this.joinCallback = (onDone) => {
         onDone = onDone || function () {};
@@ -128,6 +171,19 @@ export async function setup(liveSocket, opts = {}) {
       console.error("LLV no initial rendered for view", llvId);
     }
   });
+
+  // owner: route events from inside [data-pop-view] elements to our fake views.
+  // We never set data-phx-session on LLV elements, so Phoenix's default closestViewEl()
+  // would walk up to the parent LiveView and dispatch events there instead.
+  const origOwner = liveSocket.owner.bind(liveSocket);
+  liveSocket.owner = function (childEl, callback) {
+    const llvEl = childEl.closest?.("[data-pop-view]");
+    if (llvEl && viewsById[llvEl.id]) {
+      const view = viewsById[llvEl.id];
+      return callback ? callback(view) : view;
+    }
+    return origOwner(childEl, callback);
+  };
 
   // Flush any server messages that arrived during Popcorn initialization.
   for (const detail of bufferedServerMessages) {

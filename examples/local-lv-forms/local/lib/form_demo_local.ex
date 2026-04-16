@@ -35,7 +35,6 @@ defmodule FormDemoLocal do
 
   @impl true
   def mount(_params, _session, socket) do
-    send(self(), :sync)
     user = %{"email" => "", "username" => ""}
     {:ok, assign(socket, users: [], form: to_form(user), errors: [], disabled: true)}
   end
@@ -52,46 +51,27 @@ defmodule FormDemoLocal do
     case validate(user_params, users) do
       [] ->
         blank_user = %{"email" => "", "username" => ""}
-        send_to_phoenix("new_user", %{"user" => user_params})
 
-        {:noreply,
-         assign(socket,
-           form: to_form(blank_user),
-           users: users ++ [user_params],
-           errors: [],
-           disabled: true
-         )}
+        socket =
+          assign(socket,
+            form: to_form(blank_user),
+            users: users ++ [user_params],
+            errors: [],
+            disabled: true
+          )
+
+        mirror_sync(socket, [:users])
+        {:noreply, socket}
 
       errors ->
         {:noreply, assign(socket, errors: errors, disabled: true)}
     end
   end
 
-  def handle_server_event("synchronize", %{"users" => server_users}, socket) do
-    filtered_users =
-      Enum.filter(socket.assigns.users, fn user ->
-        case validate_already_existing(user, server_users) do
-          [] ->
-            send_to_phoenix("new_user", %{"user" => user, "id" => socket.id})
-            true
-
-          _ ->
-            false
-        end
-      end)
-
-    {:noreply, assign(socket, users: server_users ++ filtered_users)}
-  end
-
   def handle_event("generate_random", _params, socket) do
     users = socket.assigns.users
     user = generate_random_user(users)
     handle_event("save", user, socket)
-  end
-
-  def handle_info(:sync, socket) do
-    send_to_phoenix("sync_request", %{})
-    {:noreply, socket}
   end
 
   defp validate(user, existing_users) do
@@ -129,7 +109,7 @@ defmodule FormDemoLocal do
     end
   end
 
-  defp validate_correctness(_, value) do
+  defp validate_correctness(_, _value) do
     ""
   end
 
@@ -142,9 +122,5 @@ defmodule FormDemoLocal do
       [] -> user
       _ -> generate_random_user(existing_users)
     end
-  end
-
-  defp send_to_phoenix(event, payload) do
-    LocalLiveView.ServerSocket.send(event, payload, __MODULE__)
   end
 end

@@ -5,7 +5,7 @@ defmodule LocalLiveView do
   LocalLiveView should be used exactly like its Phoenix equivalent:
   ```
   defmodule MyAppWeb.DemoLive do
-    use LocalLiveView
+    use LocalLiveView, mirror: [:counter]
 
     def render(assigns) do
       ~H"""
@@ -19,26 +19,68 @@ defmodule LocalLiveView do
   ```
   <.local_live_view view="DemoLive" />
   ```
-
   During application runtime, the application creates a process that handles a LocalLiveView's state,
   by storing and modifying its assigns.
   '''
 
-  defmacro __using__(_opts) do
-    quote bind_quoted: [opts: []] do
+  @doc """
+  Syncs the declared mirror assigns to the server-side mirror channel.
+  Must be called from within a LocalLiveView callback (handle_event, handle_info)
+  after assigns have been updated.
+  """
+  def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
+    payload =
+      Map.new(mirror_keys, fn key ->
+        {to_string(key), socket.assigns |> Map.get(key) |> to_serializable()}
+      end)
+
+    unless payload == %{} do
+      view_name = socket.view |> Module.split() |> List.last()
+
+      Popcorn.Wasm.run_js(
+        """
+        ({ args }) => {
+          if (window.__llvSync) {
+            window.__llvSync(args.id, "sync", args.payload);
+          }
+        }
+        """,
+        %{id: view_name, payload: payload}
+      )
+    end
+  end
+
+  defp to_serializable(value) when is_struct(value),
+    do: value |> Map.from_struct() |> to_serializable()
+
+  defp to_serializable(value) when is_map(value),
+    do: Map.new(value, fn {k, v} -> {to_string(k), to_serializable(v)} end)
+
+  defp to_serializable(value) when is_list(value),
+    do: Enum.map(value, &to_serializable/1)
+
+  defp to_serializable(value), do: value
+
+  defmacro __using__(opts) do
+    quote bind_quoted: [opts: opts] do
       import LocalLiveView
       @behaviour LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
       @before_compile LocalLiveView
-
       alias LocalLiveView.Message
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
       def handle_event("llv_server_message", %{"type" => type} = params, socket) do
         handle_server_event(type, params, socket)
       end
+
+      def handle_server_event(_, _, socket) do
+        {:noreply, socket}
+      end
+
+      defoverridable handle_server_event: 3
     end
   end
 
@@ -98,9 +140,4 @@ defmodule LocalLiveView do
 
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
-
-  @callback handle_server(event :: binary, unsigned_params(), socket :: Socket.t()) ::
-              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
-
-  @optional_callbacks handle_server: 3
 end

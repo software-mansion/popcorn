@@ -18,42 +18,12 @@ defmodule FormDemoWeb.FormDemoLive do
   end
 
   def mount(_params, _session, socket) do
-    send(self(), :sync)
-    {:ok, assign(socket, users: [])}
+    Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal")
+    mirror_assigns = LocalLiveView.Channel.get_mirror_assigns("FormDemoLocal")
+    {:ok, assign(socket, users: Map.get(mirror_assigns, "users", []))}
   end
 
-  def handle_event(
-        "new_user",
-        %{"user" => user},
-        socket
-      ) do
-    new_users = socket.assigns.users ++ [user]
-    Application.put_env(FormDemo, :users, new_users)
-    {:noreply, assign(socket, users: new_users)}
-  end
-
-  def handle_event("sync_request", _, socket) do
-    users = Application.get_env(FormDemo, :users, [])
-    payload = %{"type" => "synchronize", "users" => users}
-
-    socket =
-      push_to_local(socket, "FormDemoLocal", payload)
-
-    socket = assign(socket, users: users)
-    {:noreply, socket}
-  end
-
-  def handle_info(:sync, socket) do
-    {:noreply, sync_local_users(socket)}
-  end
-
-  defp sync_local_users(socket) do
-    users = Application.get_env(FormDemo, :users, [])
-    payload = %{"type" => "synchronize", "users" => users}
-
-    socket =
-      push_to_local(socket, "FormDemoLocal", payload)
-
-    assign(socket, users: users)
+  def handle_info({:llv_attrs, attrs}, socket) do
+    {:noreply, assign(socket, users: Map.get(attrs, "users", []))}
   end
 end
