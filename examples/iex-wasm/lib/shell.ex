@@ -24,7 +24,7 @@ defmodule Shell do
   def handle_info({:tty_data, code_output}, state) do
     """
     ({ args }) => {
-      window.terminal.write(args.code_output)
+      if (args.code_output) window.terminal.write(args.code_output)
     }
     """
     |> Wasm.run_js(%{code_output: code_output})

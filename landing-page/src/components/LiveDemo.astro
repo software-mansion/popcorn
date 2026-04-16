@@ -52,11 +52,15 @@ const exampleButtonClass =
 
 <script>
   import { Popcorn } from "@swmansion/popcorn";
-  import { Terminal } from "@xterm/xterm";
-  import { FitAddon } from "@xterm/addon-fit";
+  import { init, Terminal, FitAddon } from "ghostty-web";
 
-  const XTERM_CONFIG = {
+  const IGNORED_SEQUENCES = new Set(["\x1b[A", "\x1b[B", "\t"]); // arrow up, arrow down, tab
+
+  const TERMINAL_CONFIG = {
     allowTransparency: true,
+    cursorBlink: true,
+    scrollback: 10000,
+    smoothScrollDuration: 100,
     theme: {
       background: "#373129",
       foreground: "#fffdf5",
@@ -91,9 +95,10 @@ const exampleButtonClass =
     if (terminalContainer === null) {
       throw new Error("Terminal container not found");
     }
-    const { term, write } = xtermInit({
+    const { term, write } = await terminalInit({
       container: terminalContainer,
     });
+    window.terminal = term;
 
     const POPCORN_CONFIG = {
       bundlePath: "/wasm/iex.avm",
@@ -103,15 +108,18 @@ const exampleButtonClass =
     };
     const popcorn = await Popcorn.init(POPCORN_CONFIG);
 
-    term.onKey(async (event: any) => {
-      if (isUpOrDownArrowKeyEvent(event)) {
-        return;
-      }
-      let key = event.key as string;
+    term.onData(async (data: string) => {
+      if (IGNORED_SEQUENCES.has(data)) return;
       try {
-        await write([key], popcorn, { withEnter: false });
+        const result = await popcorn.call(
+          { command: "code_data", language: "elixir", text: data },
+          { timeoutMs: 10_000 },
+        );
+        if (!result.ok) {
+          displayLog(`Error: ${result.error}`, { term, isError: true });
+        }
       } catch (error) {
-        displayLog(error as string, { term, isError: true });
+        displayLog(String(error), { term, isError: true });
       }
     });
 
@@ -129,66 +137,46 @@ const exampleButtonClass =
   }
 
   function displayLog(log: string, { term, isError }) {
-    const lineElement = document.createElement("span");
-
-    lineElement.textContent = log;
+    if (!log) return;
     if (isError) {
       log = "\x1b[31m" + log + "\x1b[0m\n\r";
     }
     term.write(log);
   }
 
-  type XtermOpts = { container: HTMLElement };
-  function xtermInit({ container }: XtermOpts) {
-    const term = new Terminal(XTERM_CONFIG);
+  type TerminalOpts = { container: HTMLElement };
+  async function terminalInit({ container }: TerminalOpts) {
+    await init();
+    const term = new Terminal(TERMINAL_CONFIG);
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
-
+    fitAddon.observeResize();
     async function write(
       lines: string[],
       popcorn: any,
       { withEnter = true } = {},
     ) {
-      const ENTER_EVENT = {
-        code: "Enter",
-        key: "Enter",
-        charCode: 13,
-        keyCode: 13,
-        view: window,
-      };
-
-      const textArea = document.querySelector(".xterm-helper-textarea");
-      if (textArea === null) throw new Error("Terminal not initialized");
-
       for (const line of lines) {
         await popcorn.call(
           { command: "code_data", language: "elixir", text: line },
           { timeoutMs: 10_000 },
         );
-        if (!withEnter) {
-          continue;
+        if (withEnter) {
+          await popcorn.call(
+            { command: "code_data", language: "elixir", text: "\r" },
+            { timeoutMs: 10_000 },
+          );
         }
-        const keyboardEvent = new KeyboardEvent("keydown", ENTER_EVENT);
-        textArea.dispatchEvent(keyboardEvent);
       }
     }
 
     return { term, write };
   }
 
-  function isUpOrDownArrowKeyEvent(event: any) {
-    const keycode = event.domEvent.keyCode;
-    const ARROW_UP_KEY_CODE = 38;
-    const ARROW_DOWN_KEY_CODE = 40;
-
-    return [ARROW_UP_KEY_CODE, ARROW_DOWN_KEY_CODE].includes(keycode);
-  }
-
   // Entrypoint
-  const term = await main();
-  window.terminal = term;
+  await main();
 </script>
 
 <style>

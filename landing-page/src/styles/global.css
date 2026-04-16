@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@xterm/xterm";
 @theme {
   --breakpoint-nav-wide: 74rem;
   --color-*: initial;

@@ -129,6 +129,11 @@ button:active {
     background-color: var(--swm-blue-100);
 }
 
+#elixir-terminal,
+#erlang-terminal {
+    height: 400px;
+}
+
 pre {
     white-space: pre-wrap;
 }
