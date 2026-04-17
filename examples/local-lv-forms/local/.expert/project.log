@@ -32,3 +32,5 @@ State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/
 21:10:30.627 instance_id=19DAB457945 [info] Plugins found 0 results in 0.006 ms
 
 21:10:30.812 instance_id=19DAB457945 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+21:18:49.811 instance_id=19DAB457945 [info] Resolved entity: {:call, Kernel, :defmodule, 2}

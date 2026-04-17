@@ -184,3 +184,5 @@ State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/
 21:12:28.368 instance_id=19DAB457945 [info] Plugins found 0 results in 0.003 ms
 
 21:12:28.381 instance_id=19DAB457945 [info] Plugins found 0 results in 0.005 ms
+
+21:18:49.569 instance_id=19DAB457945 [info] Plugins found 0 results in 0.005 ms
