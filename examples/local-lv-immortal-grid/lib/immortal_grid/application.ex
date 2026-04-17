@@ -9,6 +9,7 @@ defmodule ImmortalGrid.Application do
       ImmortalGridWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:immortal_grid, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ImmortalGrid.PubSub},
+      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
       ImmortalGrid.GridState,
       ImmortalGridWeb.Endpoint
     ]

@@ -1,2 +1,12 @@
-# Exclude everything, Dockerfile clones the repo anyway
+# Exclude everything by default
 **
+
+# Allow burrito deployment build context
+!examples/
+!examples/local-lv-burrito/
+!examples/local-lv-burrito/**
+!local-live-view/
+!local-live-view/**
+!popcorn/
+!popcorn/elixir/
+!popcorn/elixir/**

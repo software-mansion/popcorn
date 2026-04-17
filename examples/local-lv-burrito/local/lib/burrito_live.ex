@@ -32,11 +32,6 @@ defmodule BurritoLive do
      )}
   end
 
-  def handle_info(:sync, socket) do
-    send_to_phoenix("sync_request", %{})
-    {:noreply, socket}
-  end
-
   defp default_builder do
     %{
       base: "white_rice",
@@ -48,33 +43,6 @@ defmodule BurritoLive do
     }
   end
 
-  def handle_server_event("synchronize", %{"state" => server_state}, socket) do
-    builder_p = server_state["builder"] || %{}
-
-    builder = %{
-      base: builder_p["base"] || "white_rice",
-      protein: builder_p["protein"] || "chicken",
-      toppings: builder_p["toppings"] || [],
-      extras: builder_p["extras"] || [],
-      quantity: builder_p["quantity"] || 1,
-      notes: builder_p["notes"] || ""
-    }
-
-    cart = parse_cart(server_state["cart"] || [])
-    cart_total = parse_float(server_state["cart_total"], 0.0)
-    builder_price = parse_float(server_state["builder_price"], calculate_price(builder))
-    next_id = derive_next_id(cart)
-
-    {:noreply,
-     assign(socket,
-       builder: builder,
-       builder_price: builder_price,
-       cart: cart,
-       cart_total: cart_total,
-       next_id: next_id
-     )}
-  end
-
   def handle_event("set_base", %{"base" => base}, socket) do
     builder = %{socket.assigns.builder | base: base}
 
@@ -84,7 +52,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -97,7 +65,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -119,7 +87,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -141,7 +109,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -155,7 +123,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -169,7 +137,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -193,7 +161,7 @@ defmodule BurritoLive do
         next_id: socket.assigns.next_id + 1
       )
 
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -201,11 +169,7 @@ defmodule BurritoLive do
     cart = Enum.reject(socket.assigns.cart, &(&1.id == id))
     cart_total = Enum.sum(Enum.map(cart, & &1.price))
     socket = assign(socket, cart: cart, cart_total: cart_total)
-    send_to_phoenix("state_update", serialize_state(socket.assigns))
-    {:noreply, socket}
-  end
-
-  def handle_server_event(_event, _params, socket) do
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
     {:noreply, socket}
   end
 
@@ -244,40 +208,6 @@ defmodule BurritoLive do
     max_id + 1
   end
 
-  defp send_to_phoenix(event, payload) do
-    LocalLiveView.ServerSocket.send(event, payload, __MODULE__)
-  end
-
-  defp serialize_state(assigns) do
-    b = assigns.builder
-
-    %{
-      "builder" => %{
-        "base" => b.base,
-        "protein" => b.protein,
-        "toppings" => b.toppings,
-        "extras" => b.extras,
-        "quantity" => b.quantity,
-        "notes" => b.notes
-      },
-      "builder_price" => assigns.builder_price,
-      "cart" =>
-        Enum.map(assigns.cart, fn item ->
-          %{
-            "id" => item.id,
-            "base" => item.base,
-            "protein" => item.protein,
-            "toppings" => item.toppings,
-            "extras" => item.extras,
-            "quantity" => item.quantity,
-            "notes" => item.notes,
-            "price" => item.price
-          }
-        end),
-      "cart_total" => assigns.cart_total
-    }
-  end
-
   defp calculate_price(builder) do
     protein_add = Map.get(@protein_prices, builder.protein, 0.0)
 
@@ -305,11 +235,11 @@ defmodule BurritoLive do
     ~H"""
     <div
       id="llv-inner"
-      class="llv-order-builder p-4"
+      class="llv-order-builder pt-0 p-3 md:p-4 md:pt-0"
       data-cart-count={length(@cart)}
       data-cart-total={format_price(@cart_total)}
     >
-      <h3 class="text-base font-bold text-pop-brown my-4">Build Your Bowl</h3>
+      <h3 class="text-sm md:text-base font-bold text-pop-brown my-3 md:my-4">Build Your Burrito</h3>
 
       <div class="section mb-3 rounded-xl overflow-hidden border border-pop-orange-light bg-white shadow-sm">
         <div class="px-3 py-2.5 bg-pop-orange-light/30 border-b border-pop-orange-light/60">
@@ -351,8 +281,15 @@ defmodule BurritoLive do
                 phx-click="set_protein"
                 phx-value-protein={value}
               />
-              {label}
-              <span :if={price} class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span
+                  :if={price}
+                  class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold"
+                >
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -362,7 +299,7 @@ defmodule BurritoLive do
         <div class="px-3 py-2.5 bg-pop-orange-light/30 border-b border-pop-orange-light/60">
           <span class="text-sm font-semibold text-pop-orange-dark">Toppings</span>
         </div>
-        <div class="px-3 pb-3 pt-2 grid grid-cols-2 gap-1.5">
+        <div class="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           <%= for {label, value, price} <- [
             {"Black Beans", "black_beans", nil},
             {"Tomato Salsa", "tomato_salsa", nil},
@@ -377,8 +314,15 @@ defmodule BurritoLive do
                 phx-click="toggle_topping"
                 phx-value-topping={value}
               />
-              <span>{label}</span>
-              <span :if={price} class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span
+                  :if={price}
+                  class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold"
+                >
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -401,8 +345,12 @@ defmodule BurritoLive do
                 phx-click="toggle_extra"
                 phx-value-extra={value}
               />
-              {label}
-              <span class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold">
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -412,14 +360,14 @@ defmodule BurritoLive do
         <div class="px-3 py-2.5 bg-pop-orange-light/30 border-b border-pop-orange-light/60">
           <span class="text-sm font-semibold text-pop-orange-dark">Quantity</span>
         </div>
-        <div class="px-3 pb-3 pt-2 flex items-center gap-3">
+        <div class="justify-center sm:justify-start px-3 pb-3 pt-2 flex items-center gap-3">
           <button
             phx-click="dec_qty"
             class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors"
           >
             −
           </button>
-          <span class="text-xl font-bold text-pop-brown w-8 text-center">{@builder.quantity}</span>
+          <span class="text-lg md:text-xl font-bold text-pop-brown w-8 text-center">{@builder.quantity}</span>
           <button
             phx-click="inc_qty"
             class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors"
@@ -432,7 +380,7 @@ defmodule BurritoLive do
       <div class="price-section bg-pop-orange rounded-xl px-4 py-3.5 mb-3">
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm text-white/80 font-medium">Item Total</span>
-          <span class="text-2xl font-bold text-white">${format_price(@builder_price)}</span>
+          <span class="text-xl md:text-2xl font-bold text-white">${format_price(@builder_price)}</span>
         </div>
         <button
           phx-click="add_to_cart"
@@ -451,7 +399,7 @@ defmodule BurritoLive do
           <%= for item <- @cart do %>
             <div class="flex items-start justify-between text-xs text-pop-brown border-b border-pop-orange-light pb-2 last:border-0 last:pb-0">
               <div>
-                <span class="font-semibold">Burrito Bowl ×{item.quantity}</span>
+                <span class="font-semibold">Burrito ×{item.quantity}</span>
                 <div class="text-pop-brown-medium/60 mt-0.5">
                   {item.base |> String.replace("_", " ")} · {item.protein |> String.replace("_", " ")}
                 </div>
@@ -470,13 +418,10 @@ defmodule BurritoLive do
             </div>
           <% end %>
         </div>
-        <button class="mt-3 w-full bg-pop-orange-dark hover:bg-pop-orange text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors">
-          Place Order
-        </button>
       </div>
 
       <div :if={@cart == []} class="text-center py-6 text-pop-brown-medium text-sm">
-        Build your bowl and add to cart!
+        Build your burrito and add to cart!
       </div>
     </div>
     """

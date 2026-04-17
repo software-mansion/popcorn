@@ -9,6 +9,7 @@ defmodule Burrito.Application do
       BurritoWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:burrito, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Burrito.PubSub},
+      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
       BurritoWeb.Endpoint
     ]
 

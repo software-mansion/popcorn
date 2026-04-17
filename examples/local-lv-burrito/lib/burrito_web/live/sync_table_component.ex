@@ -1,6 +1,21 @@
 defmodule BurritoWeb.Live.SyncTableComponent do
   use BurritoWeb, :live_component
 
+  @base_price 9.50
+  @protein_prices %{
+    "chicken" => 0.0,
+    "steak" => 2.0,
+    "no_protein" => 0.0
+  }
+  @extra_prices %{
+    "extra_protein" => 3.50,
+    "chips" => 1.50,
+    "large_drink" => 2.50
+  }
+  @topping_prices %{
+    "guacamole" => 2.50
+  }
+
   def update(%{sync_params: params} = _assigns, socket) do
     builder_p = params["builder"] || %{}
 
@@ -26,23 +41,27 @@ defmodule BurritoWeb.Live.SyncTableComponent do
   end
 
   def update(assigns, socket) do
+    default_builder = default_builder()
+
     socket =
       socket
-      |> assign_new(:builder, fn ->
-        %{
-          base: "white_rice",
-          protein: "chicken",
-          toppings: [],
-          extras: [],
-          quantity: 1
-        }
-      end)
-      |> assign_new(:builder_price, fn -> 0.0 end)
+      |> assign_new(:builder, fn -> default_builder end)
+      |> assign_new(:builder_price, fn -> calculate_price(default_builder) end)
       |> assign_new(:cart, fn -> [] end)
       |> assign_new(:cart_total, fn -> 0.0 end)
       |> assign(:id, assigns.id)
 
     {:ok, socket}
+  end
+
+  defp default_builder do
+    %{
+      base: "white_rice",
+      protein: "chicken",
+      toppings: [],
+      extras: [],
+      quantity: 1
+    }
   end
 
   defp parse_cart(items) when is_list(items) do
@@ -62,6 +81,22 @@ defmodule BurritoWeb.Live.SyncTableComponent do
   defp parse_float(val, _default) when is_float(val), do: val
   defp parse_float(val, _default) when is_integer(val), do: val * 1.0
   defp parse_float(_, default), do: default
+
+  defp calculate_price(builder) do
+    protein_add = Map.get(@protein_prices, builder.protein, 0.0)
+
+    extras_add =
+      builder.extras
+      |> Enum.map(&Map.get(@extra_prices, &1, 0.0))
+      |> Enum.sum()
+
+    toppings_add =
+      builder.toppings
+      |> Enum.map(&Map.get(@topping_prices, &1, 0.0))
+      |> Enum.sum()
+
+    (@base_price + protein_add + extras_add + toppings_add) * builder.quantity
+  end
 
   defp format_price(price) do
     :erlang.float_to_binary(price * 1.0, decimals: 2)

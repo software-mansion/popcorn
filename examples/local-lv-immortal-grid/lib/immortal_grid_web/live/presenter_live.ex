@@ -13,8 +13,8 @@ defmodule ImmortalGridWeb.PresenterLive do
 
   alias ImmortalGrid.GridState
 
-  @grid_cols 20
-  @grid_rows 10
+  @grid_cols 25
+  @grid_rows 15
   @pubsub ImmortalGrid.PubSub
 
   @impl true
@@ -36,6 +36,12 @@ defmodule ImmortalGridWeb.PresenterLive do
      |> assign(:grid_cols, @grid_cols)
      |> assign(:grid_rows, @grid_rows)
      |> assign(:page_title, "Presenter — The Immortal Grid")}
+  end
+
+  @impl true
+  def handle_event("reset_grid", _, socket) do
+    GridState.clear()
+    {:noreply, socket}
   end
 
   @impl true
@@ -134,6 +140,15 @@ defmodule ImmortalGridWeb.PresenterLive do
           >
             +{@offline_count} offline
           </div>
+          <%!-- Reset button --%>
+          <button
+            phx-click="reset_grid"
+            data-confirm="Reset the entire grid? This will clear all cells for everyone."
+            class="px-3 py-1 rounded text-xs font-bold cursor-pointer"
+            style="background: #fff5f5; color: #cf3f3f; border: 1px solid #fbbcbc;"
+          >
+            Reset grid
+          </button>
         </div>
       </header>
 
@@ -196,8 +211,7 @@ defmodule ImmortalGridWeb.PresenterLive do
         class="px-6 py-2 text-sm font-medium"
         style="background: #fffbf0; color: #b26f00; border-top: 1px solid #ffe2a8;"
       >
-        ✓ Resync complete — recovered
-        <strong>{@recovered_count}</strong>
+        ✓ Resync complete — recovered <strong>{@recovered_count}</strong>
         cells ({@offline_count} claimed offline)
       </div>
 

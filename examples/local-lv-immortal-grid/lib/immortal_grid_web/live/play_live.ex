@@ -90,58 +90,6 @@ defmodule ImmortalGridWeb.PlayLive do
   def handle_info({:client_connected, _}, socket), do: {:noreply, socket}
   def handle_info({:client_disconnected, _}, socket), do: {:noreply, socket}
 
-  # ── Events from local LV (via ServerSendHook) ────────────────────────────────
-
-  @impl true
-  def handle_event("claim_cell", params, socket) do
-    x = params["x"]
-    y = params["y"]
-    nick = params["nick"] || "?"
-    owner_id = params["owner_id"] || socket.assigns.client_id
-    timestamp = params["timestamp"] || :os.system_time(:millisecond)
-    claimed_offline = params["claimed_offline"] || false
-
-    GridState.claim_cell(x, y, nick, owner_id, timestamp, claimed_offline)
-    {:noreply, socket}
-  end
-
-  def handle_event("release_cell", params, socket) do
-    x = params["x"]
-    y = params["y"]
-    owner_id = params["owner_id"] || socket.assigns.client_id
-
-    GridState.release_cell(x, y, owner_id)
-    {:noreply, socket}
-  end
-
-  def handle_event("restore_cells", %{"cells" => cells}, socket) do
-    GridState.restore_cells(cells)
-    {:noreply, socket}
-  end
-
-  def handle_event("initialize_request", _, socket) do
-    cells = GridState.get_all()
-    serialized = GridState.serialize(cells)
-
-    socket =
-      push_to_local(socket, @local_view, %{
-        "type" => "initialize",
-        "cells" => serialized,
-        "owner_id" => socket.assigns.client_id
-      })
-
-    {:noreply, socket}
-  end
-
-  def handle_event("reconnected", _, socket) do
-    # Server reconnected — ask local LV to push its local state for merging
-    socket = push_to_local(socket, @local_view, %{"type" => "restore_request"})
-    {:noreply, socket}
-  end
-
-  # Catch-all for any other events from local LV
-  def handle_event(_event, _params, socket), do: {:noreply, socket}
-
   # ── Render ───────────────────────────────────────────────────────────────────
 
   @impl true

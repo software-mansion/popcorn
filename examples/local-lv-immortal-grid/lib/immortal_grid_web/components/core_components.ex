@@ -10,16 +10,22 @@ defmodule ImmortalGridWeb.CoreComponents do
 
   def local_live_view(assigns) do
     assigns = assign_new(assigns, :id, fn -> assigns.view end)
+    assigns = assign(assigns, :has_mirror, mirror_exists?(assigns.view))
 
     ~H"""
     <div
       data-pop-view={@view}
       id={@id}
-      phx-hook="ServerSendHook"
+      data-pop-mirror={@has_mirror || nil}
       phx-update="ignore"
     >
     </div>
     """
+  end
+
+  defp mirror_exists?(view_name) do
+    mirror = Module.concat(Mirror, String.to_atom(view_name))
+    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2)
   end
 
   @doc """
@@ -48,8 +54,7 @@ defmodule ImmortalGridWeb.CoreComponents do
   def status_indicator(%{status: :syncing} = assigns) do
     ~H"""
     <div class="flex items-center gap-2">
-      <div class="w-2.5 h-2.5 rounded-full bg-[#d48f00] shadow-[0_0_6px_#d48f00] animate-pulse">
-      </div>
+      <div class="w-2.5 h-2.5 rounded-full bg-[#d48f00] shadow-[0_0_6px_#d48f00] animate-pulse"></div>
       <span class="text-xs font-medium text-[#d48f00]">syncing…</span>
     </div>
     """

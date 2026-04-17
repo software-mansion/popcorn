@@ -4,13 +4,13 @@ defmodule BurritoWeb.CoreComponents do
 
   alias Phoenix.LiveView.JS
 
-  attr :id, :string, doc: "the optional id of flash container"
-  attr :flash, :map, default: %{}, doc: "the map of flash messages to display"
-  attr :title, :string, default: nil
-  attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
-  attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
+  attr(:id, :string, doc: "the optional id of flash container")
+  attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
+  attr(:title, :string, default: nil)
+  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+  attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
-  slot :inner_block, doc: "the optional inner block that renders the flash message"
+  slot(:inner_block, doc: "the optional inner block that renders the flash message")
 
   def flash(assigns) do
     assigns = assign_new(assigns, :id, fn -> "flash-#{assigns.kind}" end)
@@ -36,8 +36,8 @@ defmodule BurritoWeb.CoreComponents do
     """
   end
 
-  attr :flash, :map, required: true
-  attr :id, :string, default: "flash-group"
+  attr(:flash, :map, required: true)
+  attr(:id, :string, default: "flash-group")
 
   def flash_group(assigns) do
     ~H"""
@@ -68,8 +68,8 @@ defmodule BurritoWeb.CoreComponents do
     """
   end
 
-  attr :name, :string, required: true
-  attr :class, :string, default: "size-4"
+  attr(:name, :string, required: true)
+  attr(:class, :string, default: "size-4")
 
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
@@ -111,23 +111,28 @@ defmodule BurritoWeb.CoreComponents do
   end
 
   @doc """
-  Renders a LocalLiveView (Popcorn/WASM) mount point with ServerSendHook.
+  Renders a LocalLiveView mount point.
   """
-  attr :view, :string, required: true
-  attr :id, :string, default: nil
+  attr(:view, :string, required: true)
+  attr(:id, :string, doc: "stable element id, defaults to view name")
 
   def local_live_view(assigns) do
-    assigns = assign(assigns, :id, assigns[:id] || assigns.view)
+    assigns = assign_new(assigns, :id, fn -> assigns.view end)
+    assigns = assign(assigns, :has_mirror, mirror_exists?(assigns.view))
 
     ~H"""
     <div
       data-pop-view={@view}
       id={@id}
-      phx-hook="ServerSendHook"
+      data-pop-mirror={@has_mirror || nil}
       phx-update="ignore"
-      data-phx-root-id={@id}
     >
     </div>
     """
+  end
+
+  defp mirror_exists?(view_name) do
+    mirror = Module.concat(Mirror, String.to_atom(view_name))
+    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2)
   end
 end

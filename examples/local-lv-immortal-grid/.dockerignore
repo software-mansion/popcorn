@@ -1,0 +1,17 @@
+# Elixir build artifacts
+_build/
+deps/
+
+# Local subproject build artifacts (pre-built WASM is in priv/static, skip rebuilding)
+local/_build/
+local/deps/
+
+# Node
+node_modules/
+assets/node_modules/
+
+# Misc
+erl_crash.dump
+*.ez
+.git/
+.DS_Store

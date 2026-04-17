@@ -64,12 +64,25 @@ defmodule ImmortalGrid.GridState do
 
   @impl true
   def handle_call({:claim_cell, x, y, nick, owner_id, timestamp, claimed_offline}, _from, cells) do
-    cell = %{nick: nick, owner_id: owner_id, timestamp: timestamp, claimed_offline: claimed_offline}
+    cell = %{
+      nick: nick,
+      owner_id: owner_id,
+      timestamp: timestamp,
+      claimed_offline: claimed_offline
+    }
+
     new_cells = Map.put(cells, {x, y}, cell)
 
     Phoenix.PubSub.broadcast(@pubsub, @topic, {
       :cell_claimed,
-      %{x: x, y: y, nick: nick, owner_id: owner_id, timestamp: timestamp, claimed_offline: claimed_offline}
+      %{
+        x: x,
+        y: y,
+        nick: nick,
+        owner_id: owner_id,
+        timestamp: timestamp,
+        claimed_offline: claimed_offline
+      }
     })
 
     {:reply, :ok, new_cells}

@@ -1,0 +1,32 @@
+# fly.toml app configuration file generated for local-lv-burrito
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'local-lv-burrito'
+primary_region = 'fra'
+kill_signal = 'SIGTERM'
+
+[build]
+
+[env]
+  PHX_HOST = 'local-lv-burrito.fly.dev'
+  PORT = '8080'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = false
+  min_machines_running = 0
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 1000
+    soft_limit = 1000
+
+[[vm]]
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256

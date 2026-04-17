@@ -20,6 +20,8 @@
   --color-pop-cream: #fffdf5;
   --color-pop-cream-warm: #fffaf7;
   --color-pop-grey: #efecea;
+  --text-xxs: 0.625rem;
+  --text-xxs--line-height: 0.875rem;
 }
 
 /* Add variants based on LiveView classes */

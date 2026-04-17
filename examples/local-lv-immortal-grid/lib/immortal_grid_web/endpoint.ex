@@ -12,6 +12,8 @@ defmodule ImmortalGridWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
+  socket "/llv_socket", LocalLiveView.Socket, websocket: true
+
   plug Plug.Static,
     at: "/",
     from: :immortal_grid,

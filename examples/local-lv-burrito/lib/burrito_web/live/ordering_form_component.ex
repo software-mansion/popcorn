@@ -142,8 +142,8 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
 
   def render(assigns) do
     ~H"""
-    <div class="lv-order-builder p-4" phx-hook="LVRoundTripHook" id="lv-order-builder-form">
-      <h3 class="text-base font-bold text-pop-brown my-4">Build Your Bowl</h3>
+    <div class="lv-order-builder pt-0 p-3 md:p-4 md:pt-0" id="lv-order-builder-form">
+      <h3 class="text-sm md:text-base font-bold text-pop-brown my-3 md:my-4">Build Your Burrito</h3>
 
       <div class="section mb-3 rounded-xl overflow-hidden border border-pop-orange-light bg-white shadow-sm">
         <div class="px-3 py-2.5 bg-pop-cream-warm border-b border-pop-orange-light/60">
@@ -187,8 +187,15 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
                 phx-value-protein={value}
                 phx-target={@myself}
               />
-              {label}
-              <span :if={price} class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span
+                  :if={price}
+                  class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold"
+                >
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -198,7 +205,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
         <div class="px-3 py-2.5 bg-pop-cream-warm border-b border-pop-orange-light/60">
           <span class="text-sm font-semibold text-pop-brown-medium">Toppings</span>
         </div>
-        <div class="px-3 pb-3 pt-2 grid grid-cols-2 gap-1.5">
+        <div class="px-3 pb-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           <%= for {label, value, price} <- [
             {"Black Beans", "black_beans", nil},
             {"Tomato Salsa", "tomato_salsa", nil},
@@ -214,8 +221,15 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
                 phx-value-topping={value}
                 phx-target={@myself}
               />
-              <span>{label}</span>
-              <span :if={price} class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span
+                  :if={price}
+                  class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold"
+                >
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -239,8 +253,12 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
                 phx-value-extra={value}
                 phx-target={@myself}
               />
-              {label}
-              <span class="text-xs text-pop-orange-dark font-semibold">{price}</span>
+              <div class="flex w-full min-w-0 items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                <span class="min-w-0">{label}</span>
+                <span class="shrink-0 text-right sm:text-left sm:ml-1 text-xs text-pop-orange-dark font-semibold">
+                  {price}
+                </span>
+              </div>
             </label>
           <% end %>
         </div>
@@ -250,7 +268,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
         <div class="px-3 py-2.5 bg-pop-cream-warm border-b border-pop-orange-light/60">
           <span class="text-sm font-semibold text-pop-brown-medium">Quantity</span>
         </div>
-        <div class="px-3 pb-3 pt-2 flex items-center gap-3">
+        <div class="justify-center sm:justify-start px-3 pb-3 pt-2 flex items-center gap-3">
           <button
             phx-click="dec_qty"
             phx-target={@myself}
@@ -259,7 +277,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
           >
             −
           </button>
-          <span class="text-xl font-bold text-pop-brown w-8 text-center">{@builder.quantity}</span>
+          <span class="text-lg md:text-xl font-bold text-pop-brown w-8 text-center">{@builder.quantity}</span>
           <button
             phx-click="inc_qty"
             phx-target={@myself}
@@ -274,7 +292,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
       <div class="price-section bg-pop-orange-light rounded-xl px-4 py-3.5 mb-3 border border-pop-orange/20">
         <div class="flex items-center justify-between mb-3">
           <span class="text-sm text-pop-brown-medium font-medium">Item Total</span>
-          <span class="text-2xl font-bold text-pop-brown">${format_price(@builder_price)}</span>
+          <span class="text-xl md:text-2xl font-bold text-pop-brown">${format_price(@builder_price)}</span>
         </div>
         <button
           phx-click="add_to_cart"
@@ -295,7 +313,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
           <%= for item <- @cart do %>
             <div class="flex items-start justify-between text-xs text-pop-brown border-b border-pop-orange-light pb-2 last:border-0 last:pb-0">
               <div>
-                <span class="font-semibold">Burrito Bowl ×{item.quantity}</span>
+                <span class="font-semibold">Burrito ×{item.quantity}</span>
                 <div class="text-pop-brown-medium/60 mt-0.5">
                   {item.base |> String.replace("_", " ")} · {item.protein |> String.replace("_", " ")}
                 </div>
@@ -315,13 +333,10 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
             </div>
           <% end %>
         </div>
-        <button class="mt-3 w-full bg-pop-brown hover:bg-pop-brown-medium text-white text-xs font-semibold py-2.5 px-4 rounded-lg transition-colors">
-          Place Order
-        </button>
       </div>
 
       <div :if={@cart == []} class="text-center py-6 text-pop-brown-medium/40 text-sm">
-        Build your bowl and add to cart!
+        Build your burrito and add to cart!
       </div>
     </div>
     """

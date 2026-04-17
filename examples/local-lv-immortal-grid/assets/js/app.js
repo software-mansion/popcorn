@@ -19,71 +19,6 @@ function setPlayOfflineBanner(offline) {
 
 const Hooks = {};
 
-/**
- * ServerSendHook — bridges Local LiveView (WASM) events to the Phoenix server.
- *
- * When offline (server dead):
- *   - Queues outgoing events. For events with the same name, only the latest
- *     is kept (full state snapshot semantics).
- *
- * On reconnect:
- *   1. Sends "reconnected" event so PlayLive can trigger restore_request on LLV
- *   2. Flushes any queued events
- */
-Hooks.ServerSendHook = {
-  mounted() {
-    this._queue = [];
-    this._connected = true;
-
-    this.el.addEventListener("serverSend", (e) => {
-      if (!this._connected || !window.liveSocket.isConnected()) {
-        // Deduplicate per cell — cell events use "event_name:x:y" so every cell
-        // gets its own slot (all offline claims are queued, not just the last one).
-        const isCellEvent =
-          e.detail.event_name === "claim_cell" ||
-          e.detail.event_name === "release_cell";
-        const dedupeKey = isCellEvent
-          ? `${e.detail.event_name}:${e.detail.payload.x}:${e.detail.payload.y}`
-          : e.detail.event_name;
-
-        this._queue = this._queue.filter((item) => item._key !== dedupeKey);
-        this._queue.push({
-          event_name: e.detail.event_name,
-          payload: e.detail.payload,
-          _key: dedupeKey,
-        });
-        setPlayOfflineBanner(true);
-        return;
-      }
-
-      this.pushEvent(e.detail.event_name, e.detail.payload);
-    });
-  },
-
-  disconnected() {
-    this._connected = false;
-    setPlayOfflineBanner(true);
-  },
-
-  reconnected() {
-    this._connected = true;
-    setPlayOfflineBanner(false);
-
-    // Step 1: Notify server we reconnected, so it can ask LLV for restore
-    this.pushEvent("reconnected", {});
-
-    // Step 2: Flush any remaining queued events
-    if (this._queue.length === 0) return;
-
-    const queue = this._queue;
-    this._queue = [];
-
-    queue.forEach(({ event_name, payload }) => {
-      this.pushEvent(event_name, payload);
-    });
-  },
-};
-
 // ─── Presenter: phx-disconnected CSS for grid fade + overlay ──────────────────
 //
 // Phoenix LiveView adds class `phx-disconnected` to the HTML root element
@@ -91,7 +26,8 @@ Hooks.ServerSendHook = {
 // this and update the presenter UI accordingly.
 
 const presenterObserver = new MutationObserver(() => {
-  const isDisconnected = document.documentElement.classList.contains("phx-disconnected");
+  const isDisconnected =
+    document.documentElement.classList.contains("phx-disconnected");
   const overlay = document.getElementById("offline-overlay");
   const gridWrap = document.getElementById("grid-wrap");
   const statusDot = document.getElementById("status-dot");
@@ -116,6 +52,16 @@ presenterObserver.observe(document.documentElement, {
   attributeFilter: ["class"],
 });
 
+const playObserver = new MutationObserver(() => {
+  setPlayOfflineBanner(
+    document.documentElement.classList.contains("phx-disconnected"),
+  );
+});
+playObserver.observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["class"],
+});
+
 // ─── Phoenix LiveSocket setup ─────────────────────────────────────────────────
 
 const csrfToken = document
@@ -128,14 +74,17 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks,
 });
 
-topbar.config({ barColors: { 0: "#ef7c00" }, shadowColor: "rgba(0, 0, 0, .3)" });
+topbar.config({
+  barColors: { 0: "#ef7c00" },
+  shadowColor: "rgba(0, 0, 0, .3)",
+});
 window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));
 window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 
 // ─── Local LiveView (Popcorn/WASM) setup ─────────────────────────────────────
 
 import { setup } from "local_live_view";
-setup(liveSocket, { bundlePath: "bundle.avm" });
+setup(liveSocket, { Socket, bundlePath: "bundle.avm" });
 
 liveSocket.connect();
 window.liveSocket = liveSocket;

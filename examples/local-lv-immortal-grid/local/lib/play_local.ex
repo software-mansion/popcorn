@@ -1,8 +1,8 @@
 defmodule PlayLocal do
   use LocalLiveView
 
-  @grid_cols 20
-  @grid_rows 10
+  @grid_cols 25
+  @grid_rows 15
 
   defp cell_key(x, y), do: x + y * @grid_cols
   defp key_to_xy(k), do: {rem(k, @grid_cols), div(k, @grid_cols)}
@@ -15,6 +15,8 @@ defmodule PlayLocal do
      |> assign(:cells, %{})
      |> assign(:my_keys, [])
      |> assign(:my_keys_set, MapSet.new())
+     # Durable local record of cells owned by this user — survives initialize resets
+     |> assign(:my_cells, %{})
      |> assign(:owner_id, "pending")
      |> assign(:nick, nil)
      |> assign(:show_nick_prompt, true)
@@ -47,6 +49,21 @@ defmodule PlayLocal do
         {Map.put(cells, k, cell_data), my_keys, my_keys_set}
       end)
 
+    # Overlay locally-owned cells that the server doesn't know about yet.
+    # This keeps the user's cells visible immediately after server restart;
+    # the restore_request flow will push them back to the server shortly after.
+    {cells, my_keys, my_keys_set} =
+      Enum.reduce(socket.assigns.my_cells, {cells, my_keys, my_keys_set}, fn {k, cell},
+                                                                             {cells, my_keys,
+                                                                              my_keys_set} ->
+        if Map.has_key?(cells, k) do
+          # Server already has this cell (another restore beat us, or it survived restart)
+          {cells, my_keys, my_keys_set}
+        else
+          {Map.put(cells, k, cell), [k | my_keys], MapSet.put(my_keys_set, k)}
+        end
+      end)
+
     {:noreply,
      socket
      |> assign(:owner_id, owner_id)
@@ -67,7 +84,7 @@ defmodule PlayLocal do
 
     is_now_mine = cell.owner_id == socket.assigns.owner_id
 
-    # If someone else claimed a cell we thought was ours, evict it from my_keys
+    # If someone else claimed a cell we thought was ours, evict it everywhere
     my_keys =
       if is_now_mine,
         do: socket.assigns.my_keys,
@@ -78,24 +95,28 @@ defmodule PlayLocal do
         do: socket.assigns.my_keys_set,
         else: MapSet.delete(socket.assigns.my_keys_set, k)
 
+    my_cells =
+      if is_now_mine,
+        do: Map.put(socket.assigns.my_cells, k, cell),
+        else: Map.delete(socket.assigns.my_cells, k)
+
     {:noreply,
      socket
      |> assign(:cells, Map.put(socket.assigns.cells, k, cell))
      |> assign(:my_keys, my_keys)
-     |> assign(:my_keys_set, my_keys_set)}
+     |> assign(:my_keys_set, my_keys_set)
+     |> assign(:my_cells, my_cells)}
   end
 
   def handle_server_event("cell_released", payload, socket) do
     k = cell_key(payload["x"], payload["y"])
-    cells = Map.delete(socket.assigns.cells, k)
-    my_keys = List.delete(socket.assigns.my_keys, k)
-    my_keys_set = MapSet.delete(socket.assigns.my_keys_set, k)
 
     {:noreply,
      socket
-     |> assign(:cells, cells)
-     |> assign(:my_keys, my_keys)
-     |> assign(:my_keys_set, my_keys_set)}
+     |> assign(:cells, Map.delete(socket.assigns.cells, k))
+     |> assign(:my_keys, List.delete(socket.assigns.my_keys, k))
+     |> assign(:my_keys_set, MapSet.delete(socket.assigns.my_keys_set, k))
+     |> assign(:my_cells, Map.delete(socket.assigns.my_cells, k))}
   end
 
   def handle_server_event("grid_reset", _payload, socket) do
@@ -103,35 +124,8 @@ defmodule PlayLocal do
      socket
      |> assign(:cells, %{})
      |> assign(:my_keys, [])
-     |> assign(:my_keys_set, MapSet.new())}
-  end
-
-  def handle_server_event("restore_request", _payload, socket) do
-    my_cell_data =
-      Enum.reduce(socket.assigns.my_keys, [], fn k, acc ->
-        case Map.get(socket.assigns.cells, k) do
-          nil ->
-            acc
-
-          cell ->
-            {x, y} = key_to_xy(k)
-
-            [
-              %{
-                "x" => x,
-                "y" => y,
-                "nick" => cell.nick,
-                "owner_id" => cell.owner_id,
-                "timestamp" => cell.timestamp,
-                "claimed_offline" => cell.claimed_offline
-              }
-              | acc
-            ]
-        end
-      end)
-
-    send_to_phoenix("restore_cells", %{"cells" => my_cell_data})
-    {:noreply, socket}
+     |> assign(:my_keys_set, MapSet.new())
+     |> assign(:my_cells, %{})}
   end
 
   def handle_server_event(_event, _payload, socket) do
@@ -164,31 +158,28 @@ defmodule PlayLocal do
       owner_id = socket.assigns.owner_id
 
       if MapSet.member?(socket.assigns.my_keys_set, k) do
-        send_to_phoenix("release_cell", %{"x" => x, "y" => y, "owner_id" => owner_id})
+        socket =
+          socket
+          |> assign(:my_keys, List.delete(socket.assigns.my_keys, k))
+          |> assign(:my_keys_set, MapSet.delete(socket.assigns.my_keys_set, k))
+          |> assign(:my_cells, Map.delete(socket.assigns.my_cells, k))
+          |> assign(:cells, Map.delete(socket.assigns.cells, k))
 
-        {:noreply,
-         socket
-         |> assign(:my_keys, List.delete(socket.assigns.my_keys, k))
-         |> assign(:my_keys_set, MapSet.delete(socket.assigns.my_keys_set, k))
-         |> assign(:cells, Map.delete(socket.assigns.cells, k))}
+        LocalLiveView.mirror_sync(socket, [:my_cells])
+        {:noreply, socket}
       else
         ts = :os.system_time(:millisecond)
         cell = %{nick: nick, owner_id: owner_id, timestamp: ts, claimed_offline: false}
 
-        send_to_phoenix("claim_cell", %{
-          "x" => x,
-          "y" => y,
-          "nick" => nick,
-          "owner_id" => owner_id,
-          "timestamp" => ts,
-          "claimed_offline" => false
-        })
+        socket =
+          socket
+          |> assign(:my_keys, [k | socket.assigns.my_keys])
+          |> assign(:my_keys_set, MapSet.put(socket.assigns.my_keys_set, k))
+          |> assign(:my_cells, Map.put(socket.assigns.my_cells, k, cell))
+          |> assign(:cells, Map.put(socket.assigns.cells, k, cell))
 
-        {:noreply,
-         socket
-         |> assign(:my_keys, [k | socket.assigns.my_keys])
-         |> assign(:my_keys_set, MapSet.put(socket.assigns.my_keys_set, k))
-         |> assign(:cells, Map.put(socket.assigns.cells, k, cell))}
+        LocalLiveView.mirror_sync(socket, [:my_cells])
+        {:noreply, socket}
       end
     end
   end
@@ -209,23 +200,23 @@ defmodule PlayLocal do
 
   def render(assigns) do
     ~H"""
-    <div id="play-root" class="min-h-screen bg-light-20 font-inter">
+    <div id="play-root" class="min-h-screen bg-light-20 font-inter flex items-center flex-col">
       <%= if @show_nick_prompt do %>
         <div class="fixed inset-0 bg-[rgba(48,27,5,0.6)] flex items-center justify-center z-[100]">
           <div class="bg-white rounded-2xl p-8 px-7 max-w-[340px] w-[90%] shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
-            <h2 class="font-handjet text-4xl text-brown-header mt-0 mb-5 tracking-[0.05em] font-semibold">Twój nick</h2>
+            <h2 class="font-handjet text-4xl text-brown-header mt-0 mb-5 tracking-[0.05em] font-semibold">Your nick</h2>
             <form phx-submit="set_nick" class="flex flex-col gap-3">
               <input
                 type="text"
                 name="nick"
                 value=""
-                placeholder="np. Ola, Dev42"
+                placeholder="nickname123"
                 autofocus
                 autocomplete="off"
                 maxlength="12"
                 class="text-xl px-4 py-3 border-2 border-grey-20 rounded-[10px] outline-none w-full box-border font-handjet text-brown-100 bg-light-30"
               />
-              <button type="submit" class="bg-orange-100 text-white border-0 rounded-[10px] py-3.5 font-semibold cursor-pointer font-handjet text-xl">Graj!</button>
+              <button type="submit" class="bg-orange-100 text-white border-0 rounded-[10px] py-3.5 font-semibold cursor-pointer font-handjet text-xl">Play!</button>
             </form>
             <%= if @nick != nil do %>
               <button phx-click="dismiss_nick_prompt" class="mt-3 w-full bg-transparent border-0 text-brown-gray text-sm cursor-pointer py-1">Anuluj</button>
@@ -234,30 +225,32 @@ defmodule PlayLocal do
         </div>
       <% end %>
 
-      <div class="px-4 py-3 flex items-center justify-between border-b border-grey-20">
-        <span class="font-handjet text-2xl text-brown-header tracking-[0.05em]">The Immortal Grid</span>
-        <div class="flex items-center gap-3">
-          <%= if @nick != nil do %>
-            <button phx-click="show_nick_prompt" class="bg-orange-20 text-brown-header border-0 rounded-full px-3 py-1 text-sm font-semibold cursor-pointer font-handjet">{@nick}</button>
-          <% end %>
-          <div id="play-status-dot" class="w-2.5 h-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_#22c55e]"></div>
+      <div class="w-full">
+        <div class="px-4 py-3 flex items-center justify-between border-b border-grey-20">
+          <span class="font-handjet text-2xl text-brown-header tracking-[0.05em]">The Immortal Grid</span>
+          <div class="flex items-center gap-3">
+            <%= if @nick != nil do %>
+              <button phx-click="show_nick_prompt" class="bg-orange-20 text-brown-header border-0 rounded-full px-3 py-1 text-sm font-semibold cursor-pointer font-handjet">{@nick}</button>
+            <% end %>
+            <div id="play-status-dot" class="w-2.5 h-2.5 rounded-full bg-[#22c55e] shadow-[0_0_6px_#22c55e]"></div>
+          </div>
         </div>
+
+        <div id="offline-banner" class="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-[0.8rem] text-yellow-700 text-center" style="display: none;">
+          Offline — zmiany zsynchronizuja sie po powrocie serwera
+        </div>
+
+        <%= if @nick == nil do %>
+          <div class="p-4 text-center text-brown-gray text-sm cursor-pointer" phx-click="show_nick_prompt">
+            Tap to set your nick and claim cells
+          </div>
+        <% end %>
       </div>
 
-      <div id="offline-banner" class="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-[0.8rem] text-yellow-700 text-center" style="display: none;">
-        Offline — zmiany zsynchronizuja sie po powrocie serwera
-      </div>
-
-      <%= if @nick == nil do %>
-        <div class="p-4 text-center text-brown-gray text-sm cursor-pointer" phx-click="show_nick_prompt">
-          Tap to set your nick and claim cells
-        </div>
-      <% end %>
-
-      <div class="p-3 overflow-x-auto">
+      <div class="p-3 w-full h-full flex items-center justify-center overflow-x-auto flex-1">
         <div class="relative">
           <%!-- Layer 1: click targets — 1 dynamic attr each (phx-value-k), always 200 divs --%>
-          <div class="grid grid-cols-[repeat(20,44px)] gap-[3px]">
+          <div class="grid gap-[3px]" style={"grid-template-columns: repeat(#{@grid_cols}, 44px);"}>
             <%= for k <- 0..(@grid_cols * @grid_rows - 1) do %>
               <div
                 phx-click="tap_cell"
@@ -268,8 +261,8 @@ defmodule PlayLocal do
           </div>
           <%!-- Layer 2: claimed cell overlays — iterates only @cells (sparse) --%>
           <div
-            class="absolute inset-0 grid grid-cols-[repeat(20,44px)] gap-[3px] pointer-events-none"
-            style={"grid-template-rows: repeat(#{@grid_rows}, 44px);"}
+            class="absolute inset-0 grid gap-[3px] pointer-events-none"
+            style={"grid-template-rows: repeat(#{@grid_rows}, 44px); grid-template-columns: repeat(#{@grid_cols}, 44px);"}
           >
             <%= for {k, cell} <- @cells do %>
               <% is_mine = MapSet.member?(@my_keys_set, k) %>
@@ -314,8 +307,4 @@ defmodule PlayLocal do
   defp cell_nick(nil), do: ""
   defp cell_nick(%{nick: nil}), do: ""
   defp cell_nick(%{nick: nick}), do: nick
-
-  defp send_to_phoenix(event, payload) do
-    LocalLiveView.ServerSocket.send(event, payload, __MODULE__)
-  end
 end
