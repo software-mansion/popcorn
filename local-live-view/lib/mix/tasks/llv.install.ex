@@ -78,7 +78,11 @@ defmodule Mix.Tasks.Llv.Install do
     if String.contains?(content, "LocalLiveView.Socket") do
       content
     else
-      inject_before(content, ~r/\n  plug /, "\n  socket \"/llv_socket\", LocalLiveView.Socket, websocket: true\n")
+      inject_before(
+        content,
+        ~r/\n  plug /,
+        "\n  socket \"/llv_socket\", LocalLiveView.Socket, websocket: true\n"
+      )
     end
   end
 
@@ -106,7 +110,13 @@ defmodule Mix.Tasks.Llv.Install do
       if String.contains?(content, "LocalLiveView.ChannelRegistry") do
         Mix.shell().info("* skipping #{path} (already configured)")
       else
-        changed = inject_after(content, ~r/children = \[\n/, "      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},\n")
+        changed =
+          inject_after(
+            content,
+            ~r/children = \[\n/,
+            "      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},\n"
+          )
+
         File.write!(path, changed)
         Mix.shell().info("* injecting #{path}")
       end
@@ -127,12 +137,24 @@ defmodule Mix.Tasks.Llv.Install do
       if String.contains?(content, "LocalLiveView.Component") do
         Mix.shell().info("* skipping #{path} (already configured)")
       else
-        changed = inject_after(content, ~r/import \w+Web\.CoreComponents[^\n]*\n/, "      import LocalLiveView.Component\n")
-        changed = if changed == content do
-          inject_after(content, ~r/import Phoenix\.HTML[^\n]*\n/, "      import LocalLiveView.Component\n")
-        else
-          changed
-        end
+        changed =
+          inject_after(
+            content,
+            ~r/import \w+Web\.CoreComponents[^\n]*\n/,
+            "      import LocalLiveView.Component\n"
+          )
+
+        changed =
+          if changed == content do
+            inject_after(
+              content,
+              ~r/import Phoenix\.HTML[^\n]*\n/,
+              "      import LocalLiveView.Component\n"
+            )
+          else
+            changed
+          end
+
         File.write!(path, changed)
         Mix.shell().info("* injecting #{path}")
       end
@@ -207,7 +229,10 @@ defmodule Mix.Tasks.Llv.Install do
       else
         changed =
           content
-          |> inject_after(~r/"dependencies": \{\n/, ~s|    "local_live_view": "file:../deps/local_live_view/assets",\n|)
+          |> inject_after(
+            ~r/"dependencies": \{\n/,
+            ~s|    "local_live_view": "file:../deps/local_live_view/assets",\n|
+          )
           |> inject_after(~r/"devDependencies": \{\n/, ~s|    "esbuild": "^0.25.0",\n|)
 
         File.write!(path, changed)
@@ -293,7 +318,7 @@ defmodule Mix.Tasks.Llv.Install do
           String.replace(
             content,
             ~r/esbuild: \{Esbuild,[^\}]+\},?\n/,
-            ~s|node: ["build.mjs", "--watch",\n        cd: Path.expand("../assets", __DIR__),\n        env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}],\n|
+            "node: [\n      \"build.mjs\",\n      \"--watch\",\n      cd: Path.expand(\"../assets\", __DIR__),\n      env: %{\"MIX_BUILD_PATH\" => Mix.Project.build_path()}\n    ],\n"
           )
         end
 
@@ -350,7 +375,7 @@ defmodule Mix.Tasks.Llv.Install do
       copy_template("config.exs", "local/config/config.exs")
       copy_template("formatter.exs", "local/.formatter.exs")
       copy_template("application.ex", "local/lib/local/application.ex")
-      copy_template("counter_local.ex", "local/lib/counter_local.ex")
+      copy_template("hello_local.ex", "local/lib/hello_local.ex")
     end
   end
 
@@ -393,7 +418,7 @@ defmodule Mix.Tasks.Llv.Install do
 
   defp inject_before_module_end(content, injection) do
     [body | _] = Regex.split(~r/\nend\s*\z/, content)
-    body <> "\n" <> injection <> "\nend\n"
+    body <> "\n\n" <> injection <> "end\n"
   end
 
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
@@ -437,10 +462,9 @@ defmodule Mix.Tasks.Llv.Install do
            setup: ["deps.get", "llv.build", ...]
 
       3. Mount the sample view in any LiveView template:
-           <.local_live_view view="CounterLocal" />
+           <.local_live_view view="HelloLocal" />
 
-    See local/lib/counter_local.ex for the generated example.
+    See local/lib/hello_local.ex for the generated example.
     """)
   end
-
 end
