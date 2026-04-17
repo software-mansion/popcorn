@@ -10,7 +10,7 @@ import Config
 config :form_demo,
   generators: [timestamp_type: :utc_datetime]
 
-# Configures the endpoint
+# Configure the endpoint
 config :form_demo, FormDemoWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
@@ -19,9 +19,9 @@ config :form_demo, FormDemoWeb.Endpoint,
     layout: false
   ],
   pubsub_server: FormDemo.PubSub,
-  live_view: [signing_salt: "qFoJwQPN"]
+  live_view: [signing_salt: "W9oOD0pa"]
 
-# Configures the mailer
+# Configure the mailer
 #
 # By default it uses the "Local" adapter which stores the emails
 # locally. You can see the emails in your browser, at "/dev/mailbox".
@@ -30,9 +30,19 @@ config :form_demo, FormDemoWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :form_demo, FormDemo.Mailer, adapter: Swoosh.Adapters.Local
 
+# Configure esbuild (the version is required)
+config :esbuild,
+  version: "0.25.4",
+  form_demo: [
+    args:
+      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ]
+
 # Configure tailwind (the version is required)
 config :tailwind,
-  version: "4.1.7",
+  version: "4.1.12",
   form_demo: [
     args: ~w(
       --input=assets/css/app.css
@@ -41,7 +51,7 @@ config :tailwind,
     cd: Path.expand("..", __DIR__)
   ]
 
-# Configures Elixir's Logger
+# Configure Elixir's Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]

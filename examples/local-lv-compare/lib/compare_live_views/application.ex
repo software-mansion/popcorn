@@ -8,6 +8,7 @@ defmodule CompareLiveViews.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
       CompareLiveViewsWeb.Telemetry,
       {DNSCluster,
        query: Application.get_env(:compare_live_views, :dns_cluster_query) || :ignore},

@@ -9,11 +9,11 @@ import Config
 config :local_thermostat, LocalThermostatWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],
+  http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "ncxDG5Y6MOga8LsAXggcY140VN1wY+SlYkx5gamfyzN6Ih1Y1qZxpLaeDBjI0ij8",
+  secret_key_base: "fWR2Rndu/VXUYTTq6WxUaQ4hyCzbxds5vreZTx5sUe6nB3a9uDCFrhYleh/zrW7t",
   watchers: [
     node: [
       "build.mjs",
@@ -47,14 +47,18 @@ config :local_thermostat, LocalThermostatWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
-# Watch static and templates for browser reloading.
+# Reload browser tabs when matching files change.
 config :local_thermostat, LocalThermostatWeb.Endpoint,
   live_reload: [
-    web_console_logger: true,
+    web_console_logger: false,
     patterns: [
-      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"priv/gettext/.*(po)$",
-      ~r"lib/local_thermostat_web/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
+      # Static assets, except user uploads
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
+      # Gettext translations
+      ~r"priv/gettext/.*\.po$",
+      # Router, Controllers, LiveViews and LiveComponents
+      ~r"lib/local_thermostat_web/router\.ex$",
+      ~r"lib/local_thermostat_web/(controllers|live|components)/.*\.(ex|heex)$"
     ]
   ]
 

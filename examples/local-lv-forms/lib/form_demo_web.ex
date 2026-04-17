@@ -17,7 +17,7 @@ defmodule FormDemoWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt local_live_view)
+  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
 
   def router do
     quote do
@@ -51,8 +51,6 @@ defmodule FormDemoWeb do
   def live_view do
     quote do
       use Phoenix.LiveView
-
-      import FormDemoWeb.LocalLiveView
 
       unquote(html_helpers())
     end
@@ -88,6 +86,7 @@ defmodule FormDemoWeb do
       import Phoenix.HTML
       # Core UI components
       import FormDemoWeb.CoreComponents
+      import LocalLiveView.Component
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

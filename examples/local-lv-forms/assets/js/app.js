@@ -25,15 +25,13 @@ import { LiveSocket } from "phoenix_live_view";
 import { hooks as colocatedHooks } from "phoenix-colocated/form_demo";
 import topbar from "../vendor/topbar";
 
-const Hooks = {};
-
 const csrfToken = document
   .querySelector("meta[name='csrf-token']")
   .getAttribute("content");
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: { _csrf_token: csrfToken },
-  hooks: Hooks,
+  hooks: { ...colocatedHooks },
 });
 
 // Show progress bar on live navigation and form submits
@@ -44,9 +42,8 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
-// setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
 import { setup } from "local_live_view";
-setup(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
@@ -74,7 +71,7 @@ if (process.env.NODE_ENV === "development") {
       //   * click with "d" key pressed to open at function component definition location
       let keyDown;
       window.addEventListener("keydown", (e) => (keyDown = e.key));
-      window.addEventListener("keyup", (e) => (keyDown = null));
+      window.addEventListener("keyup", (_e) => (keyDown = null));
       window.addEventListener(
         "click",
         (e) => {

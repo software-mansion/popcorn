@@ -8,6 +8,7 @@ defmodule LocalThermostat.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
       LocalThermostatWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:local_thermostat, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: LocalThermostat.PubSub},
