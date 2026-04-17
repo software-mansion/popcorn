@@ -1,0 +1,486 @@
+
+09:38:21.439 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:28.236 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:29.476 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:32.235 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:34.394 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:36.762 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:42.085 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:47.475 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :children}
+
+09:38:47.708 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:38:49.072 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :children}
+
+09:38:50.475 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :children}
+
+09:39:07.943 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:39:09.420 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:39:10.140 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.367 instance_id=19D97FB0F90 [info] Resolved entity: {:call, ClockLive, :render, 1}
+
+09:39:19.741 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ClockLive}
+
+09:39:19.742 instance_id=19D97FB0F90 [info] No definition found for {:module, ClockLive} with Indexer.
+
+09:39:19.894 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ClockLive}
+
+09:39:19.894 instance_id=19D97FB0F90 [info] No definition found for {:module, ClockLive} with Indexer.
+
+09:39:19.899 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ClockLive}
+
+09:39:19.899 instance_id=19D97FB0F90 [info] No definition found for {:module, ClockLive} with Indexer.
+
+09:39:19.908 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ClockLive}
+
+09:39:19.908 instance_id=19D97FB0F90 [info] No definition found for {:module, ClockLive} with Indexer.
+
+09:39:19.916 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ClockLive}
+
+09:39:19.916 instance_id=19D97FB0F90 [info] No definition found for {:module, ClockLive} with Indexer.
+
+09:39:19.925 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.925 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.933 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.933 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.941 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.941 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.949 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.949 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.957 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.958 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.966 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.966 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.969 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.969 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.977 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.977 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.985 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.985 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:19.993 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:19.993 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.001 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.001 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.010 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.010 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.018 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.018 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.027 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.027 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.043 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.043 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.107 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.108 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.135 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.136 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.160 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.160 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.185 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.185 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.215 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.216 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.258 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.258 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.291 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.292 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.312 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.313 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.328 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.328 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.345 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.346 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.354 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.354 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.358 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.359 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.367 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.367 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.376 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.376 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.386 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.388 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.397 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.398 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.401 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.402 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.411 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.412 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.421 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.421 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.428 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.429 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.436 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.437 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.438 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.439 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.458 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.458 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.459 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.459 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.462 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.463 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.476 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.477 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.482 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.483 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.502 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.502 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.654 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.717 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.718 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.742 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.743 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.750 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.750 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.754 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.754 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.765 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.765 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.777 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.777 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.794 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.794 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.810 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.811 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.819 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.819 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.826 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.827 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.847 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.848 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.853 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.854 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.863 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:20.865 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:20.888 instance_id=19D97FB0F90 [info] Resolved entity: {:call, ClockLive, :render, 1}
+
+09:39:20.889 instance_id=19D97FB0F90 [info] No definition found for {:call, ClockLive, :render, 1} with Indexer.
+
+09:39:22.094 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:39:22.266 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ThermostatLive}
+
+09:39:22.266 instance_id=19D97FB0F90 [info] No definition found for {:module, ThermostatLive} with Indexer.
+
+09:39:22.424 instance_id=19D97FB0F90 [info] Resolved entity: {:module, ThermostatLive}
+
+09:39:22.441 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.442 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.449 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.449 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.458 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.458 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.461 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.461 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.469 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.469 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.483 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.488 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.491 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.492 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.494 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.495 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.508 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.509 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.511 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.512 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.519 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.520 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.525 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.526 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.542 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.543 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.552 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.552 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.564 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.564 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.566 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.566 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.622 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:22.622 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:22.780 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.144 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.144 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.149 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.149 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.160 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.160 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.166 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.166 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.207 instance_id=19D97FB0F90 [info] Resolved entity: {:call, ThermostatLive, :render, 1}
+
+09:39:23.208 instance_id=19D97FB0F90 [info] No definition found for {:call, ThermostatLive, :render, 1} with Indexer.
+
+09:39:23.536 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.536 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.792 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.792 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.800 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.800 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.808 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.808 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.817 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.817 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.826 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.826 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.835 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.836 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.841 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.842 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.845 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.845 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.852 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.853 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.860 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.860 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.868 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.869 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.877 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.877 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.885 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.885 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.894 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.894 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.902 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.902 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.910 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.910 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:23.924 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:23.924 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:24.082 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:24.311 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:24.312 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:24.396 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:24.572 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:42:14.119 instance_id=19D97FB0F90 [info] Resolved entity: {:module_attribute, ThermostatLive, :country}
+
+21:16:25.555 instance_id=19DAB457945 [info] Resolved entity: {:module, HEAD}
+
+21:16:25.811 instance_id=19DAB457945 [info] Resolved entity: {:module, HEAD}
+
+21:16:26.947 instance_id=19DAB457945 [info] Resolved entity: {:variable, :extra_applications}
+
+21:16:28.316 instance_id=19DAB457945 [info] Resolved entity: {:variable, :applications}
+
+21:16:31.093 instance_id=19DAB457945 [info] Plugins found 0 results in 0.019 ms
+
+21:16:31.992 instance_id=19DAB457945 [info] Resolved entity: {:variable, :aliases}
+
+21:16:33.528 instance_id=19DAB457945 [info] Plugins found 0 results in 0.005 ms
+
+21:16:34.672 instance_id=19DAB457945 [info] Building local
+
+21:16:34.822 instance_id=19DAB457945 [info] Bundling started
+
+21:16:34.840 instance_id=19DAB457945 [info] Bundling finished (took 17.18ms)
+
+21:16:34.917 instance_id=19DAB457945 [info] Plugins found 0 results in 0.008 ms
+
+21:16:34.931 instance_id=19DAB457945 [info] Plugins found 0 results in 0.005 ms

@@ -1,20 +1,18 @@
 # LocalThermostat
 
-This is an example of an application that uses `LocalLiveView`. It is composed of two different views with their own separate states.
+To start your Phoenix server:
 
-## Usage
+* Run `mix setup` to install and setup dependencies
+* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
 
-From the repository root:
+Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
-```bash
-pnpm install
-mise run dev --example local-lv-thermostat
-```
+Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
-or directly from the example directory:
+## Learn more
 
-```bash
-mix dev
-```
-
-and visit [localhost:4000](http://localhost:4000)
+* Official website: https://www.phoenixframework.org/
+* Guides: https://hexdocs.pm/phoenix/overview.html
+* Docs: https://hexdocs.pm/phoenix
+* Forum: https://elixirforum.com/c/phoenix-forum
+* Source: https://github.com/phoenixframework/phoenix

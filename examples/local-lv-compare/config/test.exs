@@ -4,7 +4,7 @@ import Config
 # you can enable the server option below.
 config :compare_live_views, CompareLiveViewsWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
-  secret_key_base: "Q4VWFlD59qHXHLe1cEUbjzHVIdK9kuSFn1gxk73TQWSurpncY5ZLBn9BGAeXJ6YB",
+  secret_key_base: "zoftE1squgMw4RyhytNb0jSV6l0uVw0NBfSOSfQZX8oyJ7aG6tqTIFyKllK18htd",
   server: false
 
 # In test we don't send emails
@@ -22,3 +22,7 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+# Sort query params output of verified routes for robust url comparisons
+config :phoenix,
+  sort_verified_routes_query_params: true

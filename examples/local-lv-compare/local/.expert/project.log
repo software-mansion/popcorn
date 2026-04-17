@@ -1,0 +1,186 @@
+
+09:39:24.518 instance_id=19D97FB0F90 [info] Resolved entity: {:module, DemoModalOffline}
+
+09:39:24.518 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :use, 1}
+
+09:39:24.518 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:39:24.518 instance_id=19D97FB0F90 [info] No definition found for {:call, Kernel, :use, 1} with Indexer.
+
+09:39:24.518 instance_id=19D97FB0F90 [info] No definition found for {:module, LocalLiveView} with Indexer.
+
+09:39:24.519 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:39:24.519 instance_id=19D97FB0F90 [info] No definition found for {:call, Kernel, :defmodule, 2} with Indexer.
+
+09:39:24.519 instance_id=19D97FB0F90 [info] Resolved entity: {:call, DemoModalOffline, :render, 1}
+
+09:39:24.520 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :assigns}
+
+09:39:24.520 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :def, 2}
+
+09:39:24.521 instance_id=19D97FB0F90 [info] No definition found for {:call, Kernel, :def, 2} with Indexer.
+
+09:39:24.687 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:44:41.699 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:44:48.294 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:44:49.568 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:44:51.600 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:44:52.318 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:45:04.960 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:45:08.667 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:45:09.761 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:45:16.449 instance_id=19D97FB0F90 [info] No formatter found in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/.formatter.exs error was false
+
+09:45:16.450 instance_id=19D97FB0F90 [info] found formatter in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local
+
+09:45:16.452 instance_id=19D97FB0F90 [info] No formatter found in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/.formatter.exs error was false
+
+09:45:16.452 instance_id=19D97FB0F90 [info] found formatter in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local
+
+09:45:16.453 instance_id=19D97FB0F90 [info] No formatter found in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/.formatter.exs error was false
+
+09:45:16.453 instance_id=19D97FB0F90 [info] found formatter in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local
+
+09:45:19.762 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:152: anonymous fn/3 in XPEngine.Build.State.compile_file/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:145: XPEngine.Build.State.compile_file/2
+    (stdlib 5.0.2) maps.erl:416: :maps.fold_1/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:34: XPEngine.Build.State.on_timeout/1
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 64933}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", version: 1, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(28 lines)>, ...>}, project_compile: :none}
+
+09:45:19.768 instance_id=19D97FB0F90 [info] Build path /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/.expert/build/erl-26/elixir-1.17 was compiled on a previous erlang version. Deleting
+
+09:45:19.827 instance_id=19D97FB0F90 [info] Resolved entity: {:module, Local}
+
+09:45:19.827 instance_id=19D97FB0F90 [info] No definition found for {:module, Local} with Indexer.
+
+09:45:19.827 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:45:19.827 instance_id=19D97FB0F90 [info] No definition found for {:call, Kernel, :defmodule, 2} with Indexer.
+
+09:45:21.425 instance_id=19D97FB0F90 [info] No formatter found in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs error was false
+
+09:45:21.425 instance_id=19D97FB0F90 [info] found formatter in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local
+
+09:45:21.482 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:105: anonymous fn/3 in XPEngine.Build.State.compile_project/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:100: XPEngine.Build.State.compile_project/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:27: XPEngine.Build.State.on_timeout/1
+    (xp_engine 0.1.0) lib/engine/build.ex:100: XPEngine.Build.handle_info/2
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 64933}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", version: 1, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(28 lines)>, ...>}, project_compile: :normal}
+
+09:47:17.203 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :extra_applications}
+
+09:47:18.141 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Local.MixProject, :aliases, 0}
+
+09:47:19.683 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Mix, :compilers, 0}
+
+09:47:20.149 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Mix, :compilers, 0}
+
+09:47:22.074 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:152: anonymous fn/3 in XPEngine.Build.State.compile_file/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:145: XPEngine.Build.State.compile_file/2
+    (stdlib 5.0.2) maps.erl:416: :maps.fold_1/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:34: XPEngine.Build.State.on_timeout/1
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 64933}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", version: 2, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(27 lines)>, ...>}, project_compile: :none}
+
+09:47:22.140 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Local.MixProject, :project, 0}
+
+09:47:22.140 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :def, 2}
+
+09:47:22.140 instance_id=19D97FB0F90 [info] No definition found for {:call, Kernel, :def, 2} with Indexer.
+
+09:47:22.141 instance_id=19D97FB0F90 [info] Resolved entity: {:module, Mix}
+
+09:47:22.141 instance_id=19D97FB0F90 [info] No definition found for {:module, Mix} with Indexer.
+
+09:47:22.141 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Mix, :compilers, 0}
+
+09:47:22.141 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Mix, :env, 0}
+
+09:47:22.141 instance_id=19D97FB0F90 [info] No definition found for {:call, Mix, :compilers, 0} with Indexer.
+
+09:47:22.141 instance_id=19D97FB0F90 [info] No definition found for {:call, Mix, :env, 0} with Indexer.
+
+09:47:22.142 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Local.MixProject, :deps, 0}
+
+09:47:22.142 instance_id=19D97FB0F90 [info] Resolved entity: {:module, Mix}
+
+09:47:22.142 instance_id=19D97FB0F90 [info] No definition found for {:module, Mix} with Indexer.
+
+09:47:24.053 instance_id=19D97FB0F90 [info] No formatter found in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs error was false
+
+09:47:24.054 instance_id=19D97FB0F90 [info] found formatter in /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local
+
+09:47:24.112 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:105: anonymous fn/3 in XPEngine.Build.State.compile_project/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:100: XPEngine.Build.State.compile_project/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:27: XPEngine.Build.State.on_timeout/1
+    (xp_engine 0.1.0) lib/engine/build.ex:100: XPEngine.Build.handle_info/2
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 64933}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-compare/local/mix.exs", version: 2, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(27 lines)>, ...>}, project_compile: :normal}
+
+09:48:50.293 instance_id=19D97FB0F90 [info] Resolved entity: {:variable, :local}
+
+09:48:50.857 instance_id=19D97FB0F90 [info] Resolved entity: {:module, Local}
+
+09:48:51.304 instance_id=19D97FB0F90 [info] Resolved entity: {:module, Local}
+
+09:48:53.845 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+09:49:02.355 instance_id=19D97FB0F90 [info] Resolved entity: {:module, LocalLiveView}
+
+21:12:08.827 instance_id=19DAB457945 [info] Resolved entity: {:variable, :be}
+
+21:12:09.750 instance_id=19DAB457945 [info] Resolved entity: {:variable, :application}
+
+21:12:13.233 instance_id=19DAB457945 [info] Resolved entity: {:variable, :with}
+
+21:12:14.821 instance_id=19DAB457945 [info] Resolved entity: {:variable, :applications}
+
+21:12:24.433 instance_id=19DAB457945 [info] Plugins found 0 results in 0.013 ms
+
+21:12:27.333 instance_id=19DAB457945 [info] Plugins found 0 results in 0.008 ms
+
+21:12:28.209 instance_id=19DAB457945 [info] Building local
+
+21:12:28.271 instance_id=19DAB457945 [info] Bundling started
+
+21:12:28.290 instance_id=19DAB457945 [info] Bundling finished (took 18.81ms)
+
+21:12:28.368 instance_id=19DAB457945 [info] Plugins found 0 results in 0.003 ms
+
+21:12:28.381 instance_id=19DAB457945 [info] Plugins found 0 results in 0.005 ms

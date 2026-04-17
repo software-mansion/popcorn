@@ -1,0 +1,34 @@
+
+09:33:08.360 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:152: anonymous fn/3 in XPEngine.Build.State.compile_file/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:145: XPEngine.Build.State.compile_file/2
+    (stdlib 5.0.2) maps.erl:416: :maps.fold_1/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:34: XPEngine.Build.State.on_timeout/1
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 62996}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/lib/hello_local.ex" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/lib/hello_local.ex", version: 1, dirty?: true, lines: %Lines<"defmodule HelloLocal do..."(17 lines)>, ...>, "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs", version: 4, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(35 lines)>, ...>}, project_compile: :none}
+
+09:33:08.361 instance_id=19D97FB0F90 [info] Build path /Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/.expert/build/erl-26/elixir-1.17 was compiled on a previous erlang version. Deleting
+
+09:33:08.568 instance_id=19D97FB0F90 [info] Resolved entity: {:call, Kernel, :defmodule, 2}
+
+09:36:44.283 instance_id=19D97FB0F90 [error] GenServer XPEngine.Build terminating
+** (File.Error) could not get current working directory nil: no such file or directory
+    (elixir 1.17.3) lib/file.ex:1608: File.cwd!/0
+    (xp_engine 0.1.0) lib/engine/mix.ex:16: XPEngine.Mix.in_project/2
+    (stdlib 5.0.2) timer.erl:270: :timer.tc/2
+    (xp_engine 0.1.0) lib/engine/build/state.ex:152: anonymous fn/3 in XPEngine.Build.State.compile_file/2
+    (kernel 9.0.2) global.erl:477: :global.trans/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:145: XPEngine.Build.State.compile_file/2
+    (stdlib 5.0.2) maps.erl:416: :maps.fold_1/4
+    (xp_engine 0.1.0) lib/engine/build/state.ex:34: XPEngine.Build.State.on_timeout/1
+Last message: :timeout
+State: %XPEngine.Build.State{project: %XPForge.Project{root_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local", mix_exs_uri: "file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs", mix_project?: true, mix_env: nil, mix_target: nil, env_variables: %{}, project_module: Local.MixProject, entropy: 62996}, build_number: 0, uri_to_document: %{"file:///Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs" => #XPForge.Document<path: "/Users/franek/Desktop/Repositories/popcorn/examples/local-lv-forms/local/mix.exs", version: 5, dirty?: true, lines: %Lines<"defmodule Local.MixProject do..."(36 lines)>, ...>}, project_compile: :none}
+
+21:10:30.627 instance_id=19DAB457945 [info] Plugins found 0 results in 0.006 ms
+
+21:10:30.812 instance_id=19DAB457945 [info] Resolved entity: {:call, Kernel, :defmodule, 2}

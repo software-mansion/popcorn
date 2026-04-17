@@ -103,3 +103,21 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+.ghost-button {
+  background-color: transparent;
+  color: white;
+  border: 2px solid white;
+  padding: 12px 25px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+}
+
+.ghost-button:hover {
+  background-color: white;
+  color: #1a1a1a;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.4);
+}

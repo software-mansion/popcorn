@@ -15,10 +15,11 @@ defmodule Mix.Tasks.Llv.Install do
     * Add the LocalLiveView socket to your endpoint
     * Add COOP/COEP security headers required for WASM
     * Register the channel registry in your application supervisor
-    * Import `LocalLiveView.Component` in your CoreComponents
+    * Import `LocalLiveView.Component` in your web module html_helpers
+    * Change app.js script tag to type="module"
     * Set up the JS bridge in `assets/js/app.js`
     * Add the `local_live_view` JS package to `assets/package.json`
-    * Generate a `local/` project with a sample counter LocalLiveView
+    * Generate a `local/` project with a sample HelloLocal LocalLiveView
   """
 
   @impl Mix.Task
@@ -200,7 +201,7 @@ defmodule Mix.Tasks.Llv.Install do
           inject_after(
             content,
             ~r/liveSocket\.connect\(\);?\n/,
-            ~s|\nimport { setup } from "local_live_view";\nsetup(liveSocket, { bundlePath: "/assets/js/wasm/bundle.avm" });\n|
+            ~s|\nimport { setup } from "local_live_view";\nsetup(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });\n|
           )
 
         File.write!(path, changed)
@@ -211,7 +212,7 @@ defmodule Mix.Tasks.Llv.Install do
         warn_manual("app.js", "assets/js/app.js", """
             Add after liveSocket.connect():
               import { setup } from "local_live_view";
-              setup(liveSocket, { bundlePath: "/assets/js/wasm/bundle.avm" });
+              setup(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
         """)
     end
   end
