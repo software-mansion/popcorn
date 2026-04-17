@@ -46,7 +46,7 @@ liveSocket.connect();
 
 // setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
 import { setup } from "local_live_view";
-setup(liveSocket, { bundlePath: "bundle.avm" });
+setup(liveSocket, { Socket, bundlePath: "bundle.avm" });
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()

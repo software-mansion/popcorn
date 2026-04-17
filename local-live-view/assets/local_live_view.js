@@ -1,7 +1,7 @@
 import { Popcorn } from "@swmansion/popcorn";
-import { Socket } from "phoenix";
 
 export async function setup(liveSocket, opts = {}) {
+  const { Socket } = opts;
   // Register the server message listener immediately — BEFORE any awaits.
   // push_event("llv_server_message") from Phoenix LiveView fires during the initial
   // LiveView join, which happens before Popcorn finishes initializing. Without this,

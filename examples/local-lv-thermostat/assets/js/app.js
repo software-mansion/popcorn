@@ -39,7 +39,7 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 // setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
 import { setup } from "local_live_view"
-setup(liveSocket, { bundlePath: "bundle.avm" });
+setup(liveSocket, { Socket, bundlePath: "bundle.avm" });
 
 // connect if there are any LiveViews on the page
 liveSocket.connect()
