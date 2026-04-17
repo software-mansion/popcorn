@@ -201,7 +201,7 @@ defmodule Mix.Tasks.Llv.Install do
           inject_after(
             content,
             ~r/liveSocket\.connect\(\);?\n/,
-            ~s|\nimport { setup } from "local_live_view";\nsetup(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });\n|
+            ~s|\nimport { setup } from "local_live_view";\nsetup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });\n|
           )
 
         File.write!(path, changed)
@@ -212,7 +212,7 @@ defmodule Mix.Tasks.Llv.Install do
         warn_manual("app.js", "assets/js/app.js", """
             Add after liveSocket.connect():
               import { setup } from "local_live_view";
-              setup(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+              setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
         """)
     end
   end

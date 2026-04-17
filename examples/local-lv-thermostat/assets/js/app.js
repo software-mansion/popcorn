@@ -43,7 +43,7 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 liveSocket.connect();
 
 import { setup } from "local_live_view";
-setup(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()
