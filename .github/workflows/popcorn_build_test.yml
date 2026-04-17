@@ -68,25 +68,6 @@ jobs:
         working-directory: .
         run: pnpm install
 
-      - name: Build AtomVM Unix
-        uses: ./.github/actions/build-atomvm
-        with:
-          working-directory: popcorn/elixir
-          build-mode: debug-unix
-          outdir: atomvm-build/unix
-          cmake-opts: "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
-
-      - name: Build AtomVM WASM
-        uses: ./.github/actions/build-atomvm
-        with:
-          working-directory: popcorn/elixir
-          build-mode: debug-wasm
-          outdir: atomvm-build/wasm
-
-      - name: Configure runtime source
-        run: |
-          printf '\nconfig :popcorn, runtime: {:path, "atomvm-build/$target"}\n' >> config/config.exs
-
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
