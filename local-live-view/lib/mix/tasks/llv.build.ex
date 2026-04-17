@@ -10,7 +10,7 @@ defmodule Mix.Tasks.Llv.Build do
 
       mix llv.build
 
-  Equivalent to running `MIX_TARGET=wasm mix build` inside `local/`.
+  Equivalent to running `mix build` inside `local/`.
 
   You can also add this task to your `setup` alias in `mix.exs`:
 
@@ -27,6 +27,6 @@ defmodule Mix.Tasks.Llv.Build do
       Mix.raise("local/ directory not found. Run `mix llv.install` first.")
     end
 
-    Mix.shell().cmd("MIX_TARGET=wasm mix build", cd: "local")
+    Mix.shell().cmd("mix build", cd: "local")
   end
 end
