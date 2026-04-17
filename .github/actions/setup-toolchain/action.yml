@@ -14,6 +14,7 @@ runs:
       with:
         elixir-version: "1.17.3"
         otp-version: "26.0.2"
+        rebar3-version: "3.18.0"
 
     - name: Install AtomVM deps
       shell: bash
