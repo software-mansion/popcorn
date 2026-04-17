@@ -8,7 +8,8 @@ defmodule Local.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers()
+      compilers: Mix.compilers(),
+      aliases: aliases()
     ]
   end
 
@@ -20,6 +21,13 @@ defmodule Local.MixProject do
     [
       extra_applications: [:logger],
       mod: {Local.Application, []}
+    ]
+  end
+
+  defp aliases do
+    [
+      build: ["deps.get", "popcorn.cook"],
+      dev: ["build", "popcorn.server"]
     ]
   end
 

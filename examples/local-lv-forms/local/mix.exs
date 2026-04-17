@@ -13,6 +13,10 @@ defmodule Local.MixProject do
     ]
   end
 
+  def cli do
+    [default_target: :wasm]
+  end
+
   def application do
     [
       extra_applications: [:logger],
