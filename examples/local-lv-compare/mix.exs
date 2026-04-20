@@ -61,7 +61,8 @@ defmodule CompareLiveViews.MixProject do
       {:gettext, "~> 0.26"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:local_live_view, path: "../../local-live-view", runtime: false}
     ]
   end
 
@@ -95,13 +96,7 @@ defmodule CompareLiveViews.MixProject do
   end
 
   defp build_local(_) do
-    Mix.shell().cmd(
-      """
-      mix deps.get
-      mix popcorn.cook
-      """,
-      cd: "local"
-    )
+    Mix.shell().cmd("mix build", cd: "local")
   end
 
   defp pnpm_install(_) do

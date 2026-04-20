@@ -32,6 +32,7 @@ import Section from "../../components/Section.astro";
       <div
         data-pop-view="ClockLive"
         id="ClockLive"
+        data-phx-session="session"
         class="font-handjet text-light-20 bg-brown-header p-4 text-center text-2xl tracking-wide"
       >
       </div>
@@ -139,6 +140,7 @@ end
     });
 
     await setup(liveSocket, {
+      Socket,
       bundlePath: "/wasm/local_thermostat.avm",
     });
 

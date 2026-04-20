@@ -12,6 +12,10 @@ defmodule Local.MixProject do
     ]
   end
 
+  def cli do
+    [default_target: :wasm]
+  end
+
   # Run "mix help compile.app" to learn about applications.
   def application do
     [

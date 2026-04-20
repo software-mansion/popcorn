@@ -35,6 +35,7 @@ import Section from "../../components/Section.astro";
       <div
         data-pop-view="FormDemoLocal"
         id="FormDemoLocal"
+        data-phx-session="session"
         class="local_forms flex max-w-[412px] flex-col gap-4 p-8"
       >
       </div>
@@ -257,6 +258,7 @@ end
     });
 
     await setup(liveSocket, {
+      Socket,
       bundlePath: "/wasm/local_forms.avm",
     });
 
