@@ -19,7 +19,7 @@ export async function setup(liveSocket, opts = {}) {
 
   popcorn = await Popcorn.init({
     debug: opts.debug ?? false,
-    bundlePaths: opts.bundlePaths ?? ["wasm/bundle.avm"],
+    bundlePath: opts.bundlePath ?? "wasm/bundle.avm",
   });
   window.__popcorn = popcorn;
 
