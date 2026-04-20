@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Llv.Install do
-  use Mix.Task
+  use Igniter.Mix.Task
 
   @shortdoc "Installs LocalLiveView into a Phoenix project"
 
@@ -30,48 +30,43 @@ defmodule Mix.Tasks.Llv.Install do
 
   @popcorn_js_version "^0.3.0-rc1"
 
-  @impl Mix.Task
-  def run(_args) do
-    app = Mix.Project.config()[:app]
-    app_name = to_string(app)
+  @impl Igniter.Mix.Task
+  def igniter(igniter) do
     llv_path = llv_path_from_local()
 
-    Mix.shell().info("Installing LocalLiveView into #{app_name}...")
-
-    inject_endpoint()
-    inject_application(app_name)
-    inject_web_module()
-    inject_root_layout()
-    inject_app_js()
-    inject_package_json()
-    inject_mix_esbuild(app_name)
-    inject_dev_watcher()
-    generate_build_mjs()
-    generate_vendor()
-    generate_local_project(llv_path)
-
-    print_success()
+    igniter
+    |> inject_endpoint()
+    |> inject_application()
+    |> inject_web_module()
+    |> inject_root_layout()
+    |> inject_app_js()
+    |> inject_package_json()
+    |> inject_mix_esbuild()
+    |> inject_dev_watcher()
+    |> generate_build_mjs()
+    |> generate_vendor()
+    |> generate_local_project(llv_path)
   end
 
   # --- Endpoint ---
 
-  defp inject_endpoint do
-    with {:ok, path} <- find_file("lib/*_web/endpoint.ex"),
-         content = File.read!(path),
-         changed = inject_socket(content),
-         changed = inject_wasm_headers(changed) do
-      if changed != content do
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      else
-        Mix.shell().info("* skipping #{path} (already configured)")
-      end
-    else
-      :not_found ->
-        warn_manual("endpoint.ex", "lib/<app>_web/endpoint.ex", """
-            socket "/llv_socket", LocalLiveView.Socket, websocket: true
+  defp inject_endpoint(igniter) do
+    endpoint = Module.concat(Igniter.Libs.Phoenix.web_module(igniter), "Endpoint")
 
-          And add a plug + private function for COOP/COEP headers:
+    case Igniter.Project.Module.find_and_update_module(igniter, endpoint, fn zipper ->
+           with {:ok, zipper} <- add_llv_socket(zipper),
+                {:ok, zipper} <- add_wasm_headers(zipper) do
+             {:ok, zipper}
+           end
+         end) do
+      {:ok, igniter} ->
+        igniter
+
+      {:error, igniter} ->
+        Igniter.add_warning(igniter, """
+        Could not find endpoint module #{inspect(endpoint)}. Add manually:
+
+            socket "/llv_socket", LocalLiveView.Socket, websocket: true
 
             plug :put_wasm_security_headers
 
@@ -84,317 +79,404 @@ defmodule Mix.Tasks.Llv.Install do
     end
   end
 
-  defp inject_socket(content) do
-    if String.contains?(content, "LocalLiveView.Socket") do
-      content
+  defp add_llv_socket(zipper) do
+    if module_source_contains?(zipper, "LocalLiveView.Socket") do
+      {:ok, zipper}
     else
-      inject_before(
-        content,
-        ~r/\n  plug /,
-        "\n  socket \"/llv_socket\", LocalLiveView.Socket, websocket: true\n"
-      )
+      case Igniter.Code.Function.move_to_function_call_in_current_scope(zipper, :plug, [1, 2]) do
+        {:ok, plug_zipper} ->
+          {:ok,
+           Igniter.Code.Common.add_code(
+             plug_zipper,
+             ~s[socket "/llv_socket", LocalLiveView.Socket, websocket: true],
+             placement: :before
+           )}
+
+        :error ->
+          {:warning, "No plug call found in endpoint to insert socket before"}
+      end
     end
   end
 
-  defp inject_wasm_headers(content) do
-    if String.contains?(content, "put_wasm_security_headers") do
-      content
+  defp add_wasm_headers(zipper) do
+    if module_source_contains?(zipper, "put_wasm_security_headers") do
+      {:ok, zipper}
     else
-      content
-      |> inject_after(~r/use Phoenix\.Endpoint[^\n]*\n/, "  plug :put_wasm_security_headers\n")
-      |> inject_before_module_end("""
-        defp put_wasm_security_headers(conn, _opts) do
-          conn
-          |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
-          |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
-        end
-      """)
+      case Igniter.Code.Module.move_to_use(zipper, Phoenix.Endpoint) do
+        {:ok, use_zipper} ->
+          zipper_with_plug =
+            Igniter.Code.Common.add_code(use_zipper, "plug :put_wasm_security_headers")
+
+          last =
+            zipper_with_plug
+            |> Sourceror.Zipper.down()
+            |> Sourceror.Zipper.rightmost()
+
+          {:ok,
+           Igniter.Code.Common.add_code(last, """
+           defp put_wasm_security_headers(conn, _opts) do
+             conn
+             |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
+             |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
+           end
+           """)}
+
+        :error ->
+          {:warning, "Could not find 'use Phoenix.Endpoint' to insert WASM headers"}
+      end
     end
+  end
+
+  defp module_source_contains?(zipper, str) do
+    zipper
+    |> Sourceror.Zipper.topmost()
+    |> Sourceror.Zipper.node()
+    |> Sourceror.to_string()
+    |> String.contains?(str)
   end
 
   # --- Application ---
 
-  defp inject_application(app_name) do
-    with {:ok, path} <- find_file("lib/#{app_name}/application.ex"),
-         content = File.read!(path) do
-      if String.contains?(content, "LocalLiveView.ChannelRegistry") do
-        Mix.shell().info("* skipping #{path} (already configured)")
-      else
-        changed =
-          inject_after(
-            content,
-            ~r/children = \[\n/,
-            "      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},\n"
-          )
+  defp inject_application(igniter) do
+    Igniter.Project.Application.add_new_child(
+      igniter,
+      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry}
+    )
+  end
 
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      end
-    else
-      :not_found ->
-        warn_manual("application.ex", "lib/#{app_name}/application.ex", """
-            Add to your supervisor children:
-              {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry}
-        """)
+  # --- Web module ---
+
+  defp inject_web_module(igniter) do
+    case Path.wildcard("lib/*_web.ex") do
+      [path | _] ->
+        Igniter.update_elixir_file(igniter, path, fn zipper ->
+          if module_source_contains?(zipper, "LocalLiveView.Component") do
+            {:ok, zipper}
+          else
+            anchor =
+              find_import_by_suffix(zipper, "CoreComponents") ||
+                find_import_by_suffix(zipper, "Phoenix.HTML")
+
+            case anchor do
+              {:ok, anchor_zipper} ->
+                {:ok,
+                 Igniter.Code.Common.add_code(
+                   anchor_zipper,
+                   "import LocalLiveView.Component"
+                 )}
+
+              nil ->
+                {:warning,
+                 "Could not find html_helpers imports in #{path}. Add manually: import LocalLiveView.Component"}
+            end
+          end
+        end)
+
+      [] ->
+        Igniter.add_warning(
+          igniter,
+          "Could not find *_web.ex. Add manually to html_helpers: import LocalLiveView.Component"
+        )
     end
   end
 
-  # --- Web module (html_helpers) ---
-
-  defp inject_web_module do
-    with {:ok, path} <- find_file("lib/*_web.ex"),
-         content = File.read!(path) do
-      if String.contains?(content, "LocalLiveView.Component") do
-        Mix.shell().info("* skipping #{path} (already configured)")
-      else
-        changed =
-          inject_after(
-            content,
-            ~r/import \w+Web\.CoreComponents[^\n]*\n/,
-            "      import LocalLiveView.Component\n"
-          )
-
-        changed =
-          if changed == content do
-            inject_after(
-              content,
-              ~r/import Phoenix\.HTML[^\n]*\n/,
-              "      import LocalLiveView.Component\n"
-            )
-          else
-            changed
-          end
-
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      end
-    else
-      :not_found ->
-        warn_manual("*_web.ex", "lib/<app>_web.ex", """
-            Add to your html_helpers:
-              import LocalLiveView.Component
-        """)
+  defp find_import_by_suffix(zipper, suffix) do
+    case Igniter.Code.Function.move_to_function_call(zipper, :import, [1, 2], fn call ->
+           Igniter.Code.Function.argument_matches_predicate?(call, 0, fn arg ->
+             arg
+             |> Sourceror.Zipper.node()
+             |> Macro.to_string()
+             |> String.ends_with?(suffix)
+           end)
+         end) do
+      {:ok, z} -> {:ok, z}
+      :error -> nil
     end
   end
 
   # --- Root layout ---
 
-  defp inject_root_layout do
-    with {:ok, path} <- find_file("lib/*_web/components/layouts/root.html.heex"),
-         content = File.read!(path) do
-      if String.contains?(content, ~s|type="module"|) do
-        Mix.shell().info("* skipping #{path} (already configured)")
-      else
-        changed = String.replace(content, ~s|type="text/javascript"|, ~s|type="module"|)
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      end
-    else
-      :not_found ->
-        warn_manual("root.html.heex", "lib/<app>_web/components/layouts/root.html.heex", """
-            Change your app.js script tag to:
-              <script defer phx-track-static type="module" src={~p"/assets/js/app.js"}>
-        """)
+  defp inject_root_layout(igniter) do
+    case Path.wildcard("lib/*_web/components/layouts/root.html.heex") do
+      [path | _] ->
+        Igniter.update_file(igniter, path, fn source ->
+          content = Rewrite.Source.get(source, :content)
+
+          if String.contains?(content, ~s|type="module"|) do
+            source
+          else
+            Rewrite.Source.update(
+              source,
+              :content,
+              String.replace(content, ~s|type="text/javascript"|, ~s|type="module"|)
+            )
+          end
+        end)
+
+      [] ->
+        Igniter.add_warning(
+          igniter,
+          ~s|Could not find root.html.heex. Change app.js script tag to type="module" manually.|
+        )
     end
   end
 
   # --- app.js ---
+  defp inject_app_js(igniter) do
+    case Path.wildcard("assets/js/app.js") do
+      [path | _] ->
+        Igniter.update_file(igniter, path, fn source ->
+          content = Rewrite.Source.get(source, :content)
 
-  defp inject_app_js do
-    with {:ok, path} <- find_file("assets/js/app.js"),
-         content = File.read!(path) do
-      if String.contains?(content, "local_live_view") do
-        Mix.shell().info("* skipping #{path} (already configured)")
-      else
-        changed =
-          inject_after(
-            content,
-            ~r/liveSocket\.connect\(\);?\n/,
-            ~s|\nimport { setup } from "local_live_view";\nsetup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });\n|
-          )
+          if String.contains?(content, "local_live_view") do
+            source
+          else
+            llv_js =
+              ~s[\nimport { setup } from "vendor/local_live_view";\n] <>
+                ~s[setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] );\n]
 
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      end
-    else
-      :not_found ->
-        warn_manual("app.js", "assets/js/app.js", """
-            Add after liveSocket.connect():
-              import { setup } from "local_live_view";
-              setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+            Rewrite.Source.update(
+              source,
+              :content,
+              Regex.replace(
+                ~r/liveSocket\.connect\(\);?\n/,
+                content,
+                "liveSocket.connect();\n" <> llv_js
+              )
+            )
+          end
+        end)
+
+      [] ->
+        Igniter.add_warning(igniter, """
+        Could not find assets/js/app.js. Add after liveSocket.connect():
+            import { setup } from "vendor/local_live_view";
+            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
         """)
     end
   end
 
   # --- package.json ---
 
-  defp inject_package_json do
+  defp inject_package_json(igniter) do
     path = "assets/package.json"
 
     if File.exists?(path) do
-      content = File.read!(path)
+      Igniter.update_file(igniter, path, fn source ->
+        content = Rewrite.Source.get(source, :content)
 
-      if String.contains?(content, "@swmansion/popcorn") do
-        Mix.shell().info("* skipping #{path} (already configured)")
-      else
-        changed =
-          content
-          |> inject_after(~r/"devDependencies": \{\n/, ~s|    "@swmansion/popcorn": "#{@popcorn_js_version}",\n|)
-          |> inject_after(~r/"devDependencies": \{\n/, ~s|    "esbuild": "^0.25.0",\n|)
+        if String.contains?(content, "@swmansion/popcorn") do
+          source
+        else
+          new_content =
+            content
+            |> inject_after_pattern(
+              ~r/"devDependencies": \{\n/,
+              ~s|    "@swmansion/popcorn": "#{@popcorn_js_version}",\n|
+            )
+            |> inject_after_pattern(
+              ~r/"devDependencies": \{\n/,
+              ~s|    "esbuild": "^0.25.0",\n|
+            )
 
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      end
+          Rewrite.Source.update(source, :content, new_content)
+        end
+      end)
     else
-      copy_template("package.json", path, popcorn_version: @popcorn_js_version)
+      copy_template(igniter, "assets/package.json", "package.json",
+        popcorn_version: @popcorn_js_version
+      )
     end
   end
 
-  # --- mix.exs esbuild replacement ---
+  # --- mix.exs ---
 
-  defp inject_mix_esbuild(app_name) do
-    path = "mix.exs"
-
-    if File.exists?(path) do
-      content = File.read!(path)
-
-      if String.contains?(content, "build_js") and String.contains?(content, ~s|"llv.build"|) do
-        Mix.shell().info("* skipping #{path} esbuild (already configured)")
+  defp inject_mix_esbuild(igniter) do
+    Igniter.update_elixir_file(igniter, "mix.exs", fn zipper ->
+      if module_source_contains?(zipper, "llv.build") do
+        {:ok, zipper}
       else
-        {ecto_in_setup, ecto_aliases} =
-          if String.contains?(content, "ecto.setup") do
-            {~s|"ecto.setup", |,
-             ~s|      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],\n| <>
-               ~s|      "ecto.reset": ["ecto.drop", "ecto.setup"],\n|}
-          else
-            {"", ""}
-          end
-
-        aliases_block =
-          "  defp aliases do\n    [\n" <>
-            "      setup: [\"deps.get\", \"llv.build\", #{ecto_in_setup}\"compile\", \"assets.setup\", \"assets.build\"],\n" <>
-            ecto_aliases <>
-            "      \"assets.setup\": [\"tailwind.install --if-missing\", &npm_install/1],\n" <>
-            "      \"assets.build\": [&build_js/1, \"tailwind #{app_name}\"],\n" <>
-            "      \"assets.deploy\": [&build_js/1, \"tailwind #{app_name} --minify\", \"phx.digest\"]\n" <>
-            "    ]\n  end\n"
-
-        changed =
-          content
-          |> String.replace(~r/  defp aliases do\n.*?\n  end\n/s, aliases_block)
-          |> inject_before_module_end("""
-            defp npm_install(_) do
-              {_, 0} =
-                System.cmd("npm", ["install"],
-                  cd: Path.join(File.cwd!(), "assets"),
-                  into: IO.stream(:stdio, :line),
-                  stderr_to_stdout: true
-                )
-            end
-
-            defp build_js(_) do
-              {_, 0} =
-                System.cmd("node", ["build.mjs"],
-                  cd: Path.join(File.cwd!(), "assets"),
-                  env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
-                  into: IO.stream(:stdio, :line),
-                  stderr_to_stdout: true
-                )
-            end
-          """)
-
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
+        with {:ok, zipper} <- insert_llv_build_in_setup(zipper),
+             {:ok, zipper} <- insert_npm_in_assets_setup(Sourceror.Zipper.topmost(zipper)),
+             {:ok, zipper} <- prepend_build_js_in_assets_build(Sourceror.Zipper.topmost(zipper)),
+             {:ok, zipper} <- prepend_build_js_in_assets_deploy(Sourceror.Zipper.topmost(zipper)),
+             {:ok, zipper} <- ensure_npm_install_helper(Sourceror.Zipper.topmost(zipper)),
+             {:ok, zipper} <- ensure_build_js_helper(Sourceror.Zipper.topmost(zipper)) do
+          {:ok, zipper}
+        end
       end
-    else
-      warn_manual("mix.exs", "mix.exs", """
-          Replace defp aliases and add pnpm_install/build_js functions.
-      """)
+    end)
+  end
+
+  defp navigate_to_aliases_list(zipper) do
+    with {:ok, mod} <- Igniter.Code.Module.move_to_module_using(zipper, Mix.Project),
+         {:ok, list} <- Igniter.Code.Function.move_to_defp(mod, :aliases, 0) do
+      {:ok, list}
     end
   end
 
-  # --- config/dev.exs watcher ---
+  defp insert_llv_build_in_setup(zipper) do
+    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
+         {:ok, setup} <- Igniter.Code.Keyword.get_key(aliases, :setup) do
+      case Igniter.Code.List.move_to_list_item(setup, fn z ->
+             z |> Sourceror.Zipper.node() |> Macro.to_string() == ~s["deps.get"]
+           end) do
+        {:ok, deps_z} ->
+          {:ok, Sourceror.Zipper.insert_right(deps_z, "llv.build")}
 
-  defp inject_dev_watcher do
-    with {:ok, path} <- find_file("config/dev.exs"),
-         content = File.read!(path) do
-      changed =
-        if String.contains?(content, "build.mjs") do
-          content
-        else
-          String.replace(
-            content,
-            ~r/esbuild: \{Esbuild,[^\}]+\},?\n/,
-            "node: [\n      \"build.mjs\",\n      \"--watch\",\n      cd: Path.expand(\"../assets\", __DIR__),\n      env: %{\"MIX_BUILD_PATH\" => Mix.Project.build_path()}\n    ],\n"
-          )
-        end
-
-      changed =
-        if String.contains?(changed, "web_console_logger: false") do
-          changed
-        else
-          String.replace(changed, "web_console_logger: true", "web_console_logger: false")
-        end
-
-      if changed != content do
-        File.write!(path, changed)
-        Mix.shell().info("* injecting #{path}")
-      else
-        Mix.shell().info("* skipping #{path} (already configured)")
+        :error ->
+          Igniter.Code.List.prepend_to_list(setup, "llv.build")
       end
-    else
-      :not_found ->
-        warn_manual("dev.exs", "config/dev.exs", """
-            Replace esbuild watcher with:
-              node: ["build.mjs", "--watch",
-                cd: Path.expand("../assets", __DIR__),
-                env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}]
-
-            And set in live_reload config:
-              web_console_logger: false
-        """)
     end
+  end
+
+  defp insert_npm_in_assets_setup(zipper) do
+    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
+         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.setup") do
+      Igniter.Code.List.append_new_to_list(list, quote(do: &npm_install/1))
+    end
+  end
+
+  defp prepend_build_js_in_assets_build(zipper) do
+    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
+         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.build") do
+      Igniter.Code.List.prepend_new_to_list(list, quote(do: &build_js/1))
+    end
+  end
+
+  defp prepend_build_js_in_assets_deploy(zipper) do
+    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
+         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.deploy") do
+      Igniter.Code.List.prepend_new_to_list(list, quote(do: &build_js/1))
+    end
+  end
+
+  defp ensure_npm_install_helper(zipper) do
+    if module_source_contains?(zipper, "defp npm_install") do
+      {:ok, zipper}
+    else
+      with {:ok, mod} <- Igniter.Code.Module.move_to_module_using(zipper, Mix.Project) do
+        last = Igniter.Code.Common.rightmost(mod)
+
+        {:ok,
+         Igniter.Code.Common.add_code(last, """
+         defp npm_install(_) do
+           {_, 0} =
+             System.cmd("npm", ["install"],
+               cd: Path.join(File.cwd!(), "assets"),
+               into: IO.stream(:stdio, :line),
+               stderr_to_stdout: true
+             )
+         end
+         """)}
+      end
+    end
+  end
+
+  defp ensure_build_js_helper(zipper) do
+    if module_source_contains?(zipper, "defp build_js") do
+      {:ok, zipper}
+    else
+      with {:ok, mod} <-
+             Igniter.Code.Module.move_to_module_using(
+               Sourceror.Zipper.topmost(zipper),
+               Mix.Project
+             ) do
+        last = Igniter.Code.Common.rightmost(mod)
+
+        {:ok,
+         Igniter.Code.Common.add_code(last, """
+         defp build_js(_) do
+           {_, 0} =
+             System.cmd("node", ["build.mjs"],
+               cd: Path.join(File.cwd!(), "assets"),
+               env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
+               into: IO.stream(:stdio, :line),
+               stderr_to_stdout: true
+             )
+         end
+         """)}
+      end
+    end
+  end
+
+  # --- config/dev.exs ---
+
+  defp inject_dev_watcher(igniter) do
+    Igniter.update_elixir_file(igniter, "config/dev.exs", fn zipper ->
+      content =
+        zipper
+        |> Sourceror.Zipper.topmost()
+        |> Sourceror.Zipper.node()
+        |> Sourceror.to_string()
+
+      new_content =
+        content
+        |> replace_esbuild_watcher()
+        |> disable_web_console_logger()
+
+      if new_content == content do
+        {:ok, zipper}
+      else
+        {:ok,
+         Igniter.Code.Common.replace_code(
+           Sourceror.Zipper.topmost(zipper),
+           Sourceror.parse_string!(new_content)
+         )}
+      end
+    end)
+  end
+
+  defp replace_esbuild_watcher(content) do
+    if String.contains?(content, "build.mjs") do
+      content
+    else
+      node_watcher =
+        "node: [\n" <>
+          ~s|      "build.mjs",\n| <>
+          ~s|      "--watch",\n| <>
+          ~s|      cd: Path.expand("../assets", __DIR__),\n| <>
+          ~s|      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}\n| <>
+          "    ],\n"
+
+      String.replace(content, ~r/esbuild: \{Esbuild,[^\}]+\},?\n/, node_watcher)
+    end
+  end
+
+  defp disable_web_console_logger(content) do
+    String.replace(content, "web_console_logger: true", "web_console_logger: false")
   end
 
   # --- assets/build.mjs ---
 
-  defp generate_build_mjs do
-    path = "assets/build.mjs"
-
-    if File.exists?(path) do
-      Mix.shell().info("* skipping #{path} (already exists)")
-    else
-      copy_template("build.mjs", path)
-    end
+  defp generate_build_mjs(igniter) do
+    Igniter.create_new_file(igniter, "assets/build.mjs", read_template("build.mjs"))
   end
 
   # --- assets/vendor/local_live_view.js ---
 
-  defp generate_vendor do
+  defp generate_vendor(igniter) do
     llv_abs = Mix.Project.deps_paths()[:local_live_view]
     src = Path.join(llv_abs, "assets/local_live_view.js")
-    dest = "assets/vendor/local_live_view.js"
 
-    File.mkdir_p!("assets/vendor")
-    File.copy!(src, dest)
-    Mix.shell().info("* vendoring #{dest}")
+    Igniter.create_new_file(igniter, "assets/vendor/local_live_view.js", File.read!(src))
   end
 
-  # --- Generate local/ ---
+  # --- local/ project ---
 
-  defp generate_local_project(llv_path) do
+  defp generate_local_project(igniter, llv_path) do
     if File.exists?("local") do
-      Mix.shell().info("* skipping local/ (already exists)")
+      igniter
     else
-      Mix.shell().info("* generating local/")
       File.mkdir_p!("local/config")
       File.mkdir_p!("local/lib/local")
 
-      copy_template("mix.exs", "local/mix.exs", llv_path: llv_path)
-      copy_template("config.exs", "local/config/config.exs")
-      copy_template("formatter.exs", "local/.formatter.exs")
-      copy_template("application.ex", "local/lib/local/application.ex")
-      copy_template("hello_local.ex", "local/lib/hello_local.ex")
+      igniter
+      |> copy_template("local/mix.exs", "mix.exs", llv_path: llv_path)
+      |> copy_template("local/config/config.exs", "config.exs")
+      |> copy_template("local/.formatter.exs", "formatter.exs")
+      |> copy_template("local/lib/local/application.ex", "application.ex")
+      |> copy_template("local/lib/hello_local.ex", "hello_local.ex")
     end
   end
 
@@ -406,14 +488,7 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- Helpers ---
 
-  defp find_file(pattern) do
-    case Path.wildcard(pattern) do
-      [path | _] -> {:ok, path}
-      [] -> :not_found
-    end
-  end
-
-  defp inject_after(content, pattern, injection) do
+  defp inject_after_pattern(content, pattern, injection) do
     case Regex.run(pattern, content, return: :index) do
       [{start, len}] ->
         {before, rest} = String.split_at(content, start + len)
@@ -424,25 +499,9 @@ defmodule Mix.Tasks.Llv.Install do
     end
   end
 
-  defp inject_before(content, pattern, injection) do
-    case Regex.run(pattern, content, return: :index) do
-      [{start, _len}] ->
-        {before, rest} = String.split_at(content, start)
-        before <> injection <> rest
-
-      _ ->
-        content
-    end
-  end
-
-  defp inject_before_module_end(content, injection) do
-    [body | _] = Regex.split(~r/\nend\s*\z/, content)
-    body <> "\n\n" <> injection <> "end\n"
-  end
-
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
 
-  defp copy_template(template, dest, bindings \\ []) do
+  defp copy_template(igniter, dest, template, bindings \\ []) do
     content = File.read!(Path.join(@templates_dir, template))
 
     content =
@@ -452,34 +511,10 @@ defmodule Mix.Tasks.Llv.Install do
         EEx.eval_string(content, assigns: bindings)
       end
 
-    File.write!(dest, content)
-    Mix.shell().info("* creating #{dest}")
+    Igniter.create_new_file(igniter, dest, content)
   end
 
-  defp warn_manual(name, expected_path, instructions) do
-    Mix.shell().error("""
-    Could not find #{name} at #{expected_path}. Add manually:
-    #{instructions}
-    """)
-  end
-
-  defp print_success do
-    Mix.shell().info("""
-
-    LocalLiveView installed successfully!
-
-    Next steps:
-
-      1. Run setup (installs JS deps, builds WASM bundle, compiles):
-           mix setup
-
-      2. Start the server:
-           mix phx.server
-
-      3. Mount the sample view in any LiveView template:
-           <.local_live_view view="HelloLocal" />
-
-    See local/lib/hello_local.ex for the generated example.
-    """)
+  defp read_template(template) do
+    File.read!(Path.join(@templates_dir, template))
   end
 end
