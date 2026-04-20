@@ -4,11 +4,16 @@ defmodule Mix.Tasks.Llv.Install do
   @shortdoc "Installs LocalLiveView into a Phoenix project"
 
   @moduledoc """
-  Installs LocalLiveView boilerplate into an existing Phoenix project.
+  Installs LocalLiveView into an existing Phoenix project.
 
   ## Usage
 
+      mix phx.new my_app
+      cd my_app
+      # add {:local_live_view, ...} to mix.exs deps, then:
       mix llv.install
+      mix setup
+      mix phx.server
 
   This task will:
 
@@ -16,11 +21,14 @@ defmodule Mix.Tasks.Llv.Install do
     * Add COOP/COEP security headers required for WASM
     * Register the channel registry in your application supervisor
     * Import `LocalLiveView.Component` in your web module html_helpers
-    * Change app.js script tag to type="module"
+    * Change app.js script tag to `type="module"`
     * Set up the JS bridge in `assets/js/app.js`
-    * Add the `local_live_view` JS package to `assets/package.json`
-    * Generate a `local/` project with a sample HelloLocal LocalLiveView
+    * Configure the JS build pipeline (`assets/build.mjs`, `assets/package.json`)
+    * Vendor `local_live_view.js` into `assets/vendor/`
+    * Generate a `local/` project with a sample HelloLocal component
   """
+
+  @popcorn_js_version "^0.3.0-rc1"
 
   @impl Mix.Task
   def run(_args) do
@@ -35,10 +43,11 @@ defmodule Mix.Tasks.Llv.Install do
     inject_web_module()
     inject_root_layout()
     inject_app_js()
-    inject_package_json(app_name)
+    inject_package_json()
     inject_mix_esbuild(app_name)
     inject_dev_watcher()
     generate_build_mjs()
+    generate_vendor()
     generate_local_project(llv_path)
 
     print_success()
@@ -219,28 +228,25 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- package.json ---
 
-  defp inject_package_json(_app_name) do
+  defp inject_package_json do
     path = "assets/package.json"
 
     if File.exists?(path) do
       content = File.read!(path)
 
-      if String.contains?(content, "local_live_view") do
+      if String.contains?(content, "@swmansion/popcorn") do
         Mix.shell().info("* skipping #{path} (already configured)")
       else
         changed =
           content
-          |> inject_after(
-            ~r/"dependencies": \{\n/,
-            ~s|    "local_live_view": "file:../deps/local_live_view/assets",\n|
-          )
+          |> inject_after(~r/"devDependencies": \{\n/, ~s|    "@swmansion/popcorn": "#{@popcorn_js_version}",\n|)
           |> inject_after(~r/"devDependencies": \{\n/, ~s|    "esbuild": "^0.25.0",\n|)
 
         File.write!(path, changed)
         Mix.shell().info("* injecting #{path}")
       end
     else
-      copy_template("package.json", path)
+      copy_template("package.json", path, popcorn_version: @popcorn_js_version)
     end
   end
 
@@ -266,9 +272,9 @@ defmodule Mix.Tasks.Llv.Install do
 
         aliases_block =
           "  defp aliases do\n    [\n" <>
-            "      setup: [\"deps.get\", \"llv.build\", &pnpm_install/1, #{ecto_in_setup}\"compile\", \"assets.setup\", \"assets.build\"],\n" <>
+            "      setup: [\"deps.get\", \"llv.build\", #{ecto_in_setup}\"compile\", \"assets.setup\", \"assets.build\"],\n" <>
             ecto_aliases <>
-            "      \"assets.setup\": [\"tailwind.install --if-missing\"],\n" <>
+            "      \"assets.setup\": [\"tailwind.install --if-missing\", &npm_install/1],\n" <>
             "      \"assets.build\": [&build_js/1, \"tailwind #{app_name}\"],\n" <>
             "      \"assets.deploy\": [&build_js/1, \"tailwind #{app_name} --minify\", \"phx.digest\"]\n" <>
             "    ]\n  end\n"
@@ -277,9 +283,9 @@ defmodule Mix.Tasks.Llv.Install do
           content
           |> String.replace(~r/  defp aliases do\n.*?\n  end\n/s, aliases_block)
           |> inject_before_module_end("""
-            defp pnpm_install(_) do
+            defp npm_install(_) do
               {_, 0} =
-                System.cmd("pnpm", ["install"],
+                System.cmd("npm", ["install"],
                   cd: Path.join(File.cwd!(), "assets"),
                   into: IO.stream(:stdio, :line),
                   stderr_to_stdout: true
@@ -360,6 +366,18 @@ defmodule Mix.Tasks.Llv.Install do
     else
       copy_template("build.mjs", path)
     end
+  end
+
+  # --- assets/vendor/local_live_view.js ---
+
+  defp generate_vendor do
+    llv_abs = Mix.Project.deps_paths()[:local_live_view]
+    src = Path.join(llv_abs, "assets/local_live_view.js")
+    dest = "assets/vendor/local_live_view.js"
+
+    File.mkdir_p!("assets/vendor")
+    File.copy!(src, dest)
+    Mix.shell().info("* vendoring #{dest}")
   end
 
   # --- Generate local/ ---
@@ -452,15 +470,11 @@ defmodule Mix.Tasks.Llv.Install do
 
     Next steps:
 
-      1. Install JS dependencies:
-           npm install --prefix assets
-           # or: pnpm install
+      1. Run setup (installs JS deps, builds WASM bundle, compiles):
+           mix setup
 
-      2. Build the local WASM bundle:
-           mix llv.build
-
-         Optionally add it to your setup alias in mix.exs:
-           setup: ["deps.get", "llv.build", ...]
+      2. Start the server:
+           mix phx.server
 
       3. Mount the sample view in any LiveView template:
            <.local_live_view view="HelloLocal" />
