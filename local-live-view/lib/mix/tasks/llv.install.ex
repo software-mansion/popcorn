@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Llv.Install do
+defmodule Mix.Tasks.LLV.Install do
   use Igniter.Mix.Task
 
   @shortdoc "Installs LocalLiveView into a Phoenix project"
