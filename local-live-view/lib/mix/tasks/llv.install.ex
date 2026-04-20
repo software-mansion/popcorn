@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.LLV.Install do
+defmodule Mix.Tasks.Llv.Install do
   use Igniter.Mix.Task
 
   @shortdoc "Installs LocalLiveView into a Phoenix project"
@@ -233,7 +233,7 @@ defmodule Mix.Tasks.LLV.Install do
           else
             llv_js =
               ~s[\nimport { setup } from "vendor/local_live_view";\n] <>
-                ~s[setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] );\n]
+                ~s[setup(liveSocket, { Socket, bundlePath: "/assets/js/wasm/bundle.avm" });\n]
 
             Rewrite.Source.update(
               source,
@@ -251,7 +251,7 @@ defmodule Mix.Tasks.LLV.Install do
         Igniter.add_warning(igniter, """
         Could not find assets/js/app.js. Add after liveSocket.connect():
             import { setup } from "vendor/local_live_view";
-            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+            setup(liveSocket, { Socket, bundlePath: "/assets/js/wasm/bundle.avm" });
         """)
     end
   end

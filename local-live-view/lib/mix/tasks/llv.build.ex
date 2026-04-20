@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.LLV.Build do
+defmodule Mix.Tasks.Llv.Build do
   use Mix.Task
 
   @shortdoc "Builds the local WASM bundle"
