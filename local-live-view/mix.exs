@@ -29,6 +29,7 @@ defmodule LocalLiveView.MixProject do
   defp deps do
     [
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:igniter, ">= 0.7.0", runtime: false},
       {:popcorn, path: "../popcorn/elixir"},
       {:phoenix, "~> 1.8", runtime: false},
       {:phoenix_live_view, runtime: false},
