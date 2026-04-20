@@ -65,7 +65,7 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
   embed_text(:index_js, """
   import { Popcorn } from "@swmansion/popcorn";
 
-  await Popcorn.init({ bundlePath: "/wasm/bundle.avm", onStdout: console.log });
+  await Popcorn.init({ bundlePaths: ["/wasm/bundle.avm"], onStdout: console.log });
   """)
 
   embed_text(:index_html, """

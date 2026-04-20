@@ -52,18 +52,20 @@ declare const globalThis: { TrackedValue: typeof TrackedValue };
 globalThis.TrackedValue = TrackedValue;
 
 export async function initVm(): Promise<void> {
-  const metaElement = document.querySelector(
-    'meta[name="bundle-path"]',
-  ) as HTMLMetaElement | null;
-  if (!metaElement) {
-    throw new Error("Missing meta[name='bundle-path'] element");
-  }
-  const bundlePath = metaElement.content;
-  const bundleBuffer = await fetch(bundlePath).then((resp) =>
-    resp.arrayBuffer(),
+  const bundlePaths = Array.from(
+    document.querySelectorAll<HTMLMetaElement>('meta[name^="bundle-path-"]'),
+    (el) => el.content,
   );
-  const bundle = new Int8Array(bundleBuffer);
-  await startVm(bundle);
+
+  const bundles = await Promise.all(
+    bundlePaths.map(async (p) => {
+      const resp = await fetch(p);
+      const buf = await resp.arrayBuffer();
+      return new Int8Array(buf);
+    }),
+  );
+
+  await startVm(bundles);
 
   window.addEventListener(
     "message",
@@ -84,15 +86,18 @@ export async function initVm(): Promise<void> {
   );
 }
 
-async function startVm(avmBundle: Int8Array): Promise<void> {
+async function startVm(avmBundles: Int8Array[]): Promise<void> {
+  const bundleFilePaths = avmBundles.map((_, i) => `/data/bundle-${i}.avm`);
   const moduleInstance: AtomVMModule = await init({
     preRun: [
       function ({ FS }: { FS: EmscriptenFS }) {
         FS.mkdir("/data");
-        FS.writeFile("/data/bundle.avm", avmBundle);
+        avmBundles.forEach((bundle, i) => {
+          FS.writeFile(bundleFilePaths[i], bundle);
+        });
       },
     ],
-    arguments: ["/data/bundle.avm"],
+    arguments: bundleFilePaths,
     print(text: string) {
       sendIframeResponse(MESSAGES.STDOUT, text);
     },

@@ -7,7 +7,7 @@ window.createPopcornInstance = async function (bundlePath) {
   const logs = [];
 
   const popcorn = await Popcorn.init({
-    bundlePath,
+    bundlePaths: [bundlePath],
     onStdout: (output) => logs.push(`[popcorn stdout] ${output}\n`),
   });
 

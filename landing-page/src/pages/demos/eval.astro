@@ -133,7 +133,7 @@ end"
   async function setup() {
     try {
       popcorn = await Popcorn.init({
-        bundlePath: "/wasm/eval.avm",
+        bundlePaths: ["/wasm/eval.avm"],
         debug: true,
         onStdout: (text) => displayLog(text, { isError: false }),
         onStderr: (text) => displayLog(text, { isError: true }),

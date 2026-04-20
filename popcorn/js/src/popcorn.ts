@@ -25,8 +25,8 @@ export type { PopcornErrorCode, PopcornInternalErrorCode };
 export type PopcornInitOptions = {
   /** DOM element to mount an iframe */
   container?: HTMLElement;
-  /** Path to compiled Elixir bundle (`.avm` file). */
-  bundlePath?: string;
+  /** Paths to compiled Elixir bundles (`.avm` files). */
+  bundlePaths?: string[];
   /** Handler for stderr messages. */
   onStderr?: (message: string) => void;
   /** Handler for stdout messages. */
@@ -104,7 +104,7 @@ export class Popcorn {
   private bridge: IframeBridge | null = null;
   private bridgeConfig: IframeBridgeArgs;
   private debug = false;
-  private bundleURL: string;
+  private bundleURLs: string[];
   private state: State = { status: "uninitialized" };
   private defaultReceiver: string | null = null;
 
@@ -126,17 +126,18 @@ export class Popcorn {
   ) {
     if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
 
-    const bundlePath = params.bundlePath ?? "/bundle.avm";
-    const bundleURL = new URL(bundlePath, import.meta.url);
+    const bundlePaths = params.bundlePaths ?? ["/bundle.avm"];
+    this.bundleURLs = bundlePaths.map((p) => new URL(p, import.meta.url).href);
 
     this.onReloadCallback = params.onReload ?? noop;
     this.debug = params.debug ?? false;
-    this.bundleURL = bundleURL.href;
 
     this.bridgeConfig = {
       container: params.container,
       script: { url: IFRAME_URL, entrypoint: "initVm" },
-      config: { "bundle-path": this.bundleURL },
+      config: Object.fromEntries(
+        this.bundleURLs.map((url, i) => [`bundle-path-${i}`, url]),
+      ),
       debug: true,
       onMessage: this.iframeHandler.bind(this),
     };
@@ -162,12 +163,13 @@ export class Popcorn {
     const { container, ...constructorParams } = options;
     const containerWithDefault = container ?? document.documentElement;
 
-    const bundlePath = constructorParams.bundlePath
-      ? constructorParams.bundlePath
-      : await resolveBundleURL("/bundle.avm", "/assets/bundle.avm");
+    const bundlePaths =
+      constructorParams.bundlePaths && constructorParams.bundlePaths.length > 0
+        ? constructorParams.bundlePaths
+        : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
 
     const popcorn = new Popcorn(
-      { ...constructorParams, bundlePath, container: containerWithDefault },
+      { ...constructorParams, bundlePaths, container: containerWithDefault },
       INIT_TOKEN,
     );
     popcorn.trace("Main: init, params: ", { container, ...constructorParams });

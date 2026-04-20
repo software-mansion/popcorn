@@ -259,7 +259,7 @@ end
 
     await setup(liveSocket, {
       Socket,
-      bundlePath: "/wasm/local_forms.avm",
+      bundlePaths: ["/wasm/local_forms.avm"],
     });
 
     liveSocket.connect();
