@@ -286,7 +286,7 @@ run_configure() {
             --enable-static-nifs=yes
         )
 
-        (cd "${beam_dir}" && env \
+        (cd "${beam_dir}" && \
             erl_xcomp_sysroot="${openssl_prefix}" \
             erl_xcomp_isysroot="${openssl_prefix}" \
             LIBS="-L${openssl_prefix}/lib -lcrypto -ldl -lm" \
@@ -323,7 +323,7 @@ build_beam() {
 
     # erts/lib_src target dir is created on first build only
     if [[ ! -d "${beam_dir}/erts/lib_src/wasm32-unknown-emscripten" ]]; then
-        (cd "${beam_dir}" && env ERL_TOP="${beam_dir}" emmake make -C erts/lib_src TARGET=wasm32-unknown-emscripten)
+        (cd "${beam_dir}" && ERL_TOP="${beam_dir}" emmake make -C erts/lib_src TARGET=wasm32-unknown-emscripten)
     fi
 
     (cd "${beam_dir}" && emmake make TARGET=wasm32-unknown-emscripten -j"${jobs}")

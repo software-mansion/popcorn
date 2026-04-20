@@ -90,10 +90,10 @@ configure_openssl() {
     fi
 
     log "Cleaning previous build state..."
-    (cd "${src_dir}" && make distclean 2>/dev/null || true)
+    (cd "${src_dir}" && make distclean &> /dev/null || true)
 
     log "Running Configure (${mode})..."
-    (cd "${src_dir}" && env \
+    (cd "${src_dir}" && \
         CC=emcc \
         AR=emar \
         RANLIB=emranlib \
@@ -137,7 +137,7 @@ configure_openssl() {
             no-dsa \
             no-legacy \
             --prefix="${prefix}" \
-            --openssldir="${prefix}/ssl")
+            --openssldir="${prefix}/ssl") >&2
 }
 
 build_libs() {
@@ -145,14 +145,14 @@ build_libs() {
 
     log "Building libs..."
     local make_args=("-j" "${jobs:-$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}")
-    (cd "${src_dir}" && emmake make build_libs "${make_args[@]}")
+    (cd "${src_dir}" && emmake make build_libs "${make_args[@]}") >&2
 }
 
 install_dev() {
     local src_dir="$1"
 
     log "Installing dev artifacts..."
-    (cd "${src_dir}" && emmake make install_dev)
+    (cd "${src_dir}" && emmake make install_dev) >&2
 }
 
 copy_artifacts() {

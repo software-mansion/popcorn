@@ -1,0 +1,82 @@
+name: OTP Wasm build
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "otp/patches/**"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/patch-beam.sh"
+      - "scripts/_common.sh"
+      - ".github/workflows/otp_build.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: no-crypto
+            crypto-flag: ""
+          - name: with-crypto
+            crypto-flag: "--with-crypto"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+
+      - name: Install autoconf 2.72
+        run: |
+          git config --global user.email "ci@ci.local"
+          git config --global user.name "CI"
+          wget -q https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.gz
+          tar xzf autoconf-2.72.tar.gz
+          cd autoconf-2.72
+          ./configure --prefix=/usr/local
+          make -j$(nproc)
+          sudo make install
+
+      - name: Cache OTP clone
+        uses: actions/cache@v4
+        with:
+          path: otp/sources/otp-original
+          key: otp-clone-${{ runner.os }}-OTP-28.3.1
+
+      - name: Cache OpenSSL
+        if: matrix.name == 'with-crypto'
+        uses: actions/cache@v4
+        with:
+          path: |
+            otp/sources/openssl-3.0.15-debug
+            otp/sources/openssl-3.0.15-debug-installed
+          key: openssl-wasm-${{ runner.os }}-3.0.15-debug
+
+      - name: Diagnose environment size
+        run: |
+          printf "env: %d bytes, %d vars\n" "$(env | wc -c)" "$(env | wc -l)"
+          env | awk -F'=' '{print length($0), $1}' | sort -rn | head -15
+          printf "ulimit -s: %s  ARG_MAX: %s\n" "$(ulimit -s)" "$(getconf ARG_MAX)"
+
+      - name: Build OTP/BEAM for WASM
+        run: scripts/build-beam.sh ${{ matrix.crypto-flag }} debug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-wasm-debug-${{ matrix.name }}-${{ github.sha }}
+          path: otp/out/
+          retention-days: 30
