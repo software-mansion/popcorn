@@ -2,7 +2,7 @@ declare var Popcorn: Popcorn;
 declare var terminal: object;
 
 type InitOpts = {
-  bundlePath?: string;
+  bundlePaths?: string[];
   wasmDir?: string;
   debug?: boolean;
   onStdout?: (text: string) => void;

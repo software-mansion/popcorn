@@ -34,12 +34,15 @@ jobs:
           otp-version: "26.0.2"
           rebar3-version: "3.18.0"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
-          cache-dependency-path: language-tour/package-lock.json
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install AtomVM build deps
         run: |
@@ -56,14 +59,17 @@ jobs:
         run: mix deps.get
         working-directory: language-tour/elixir_tour
 
-      - name: Install npm dependencies
-        run: npm ci
-        working-directory: language-tour
+      - name: Install pnpm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build popcorn JS package
+        run: pnpm build:prod
+        working-directory: popcorn/js
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
         working-directory: language-tour
 
       - name: Run e2e tests
-        run: npm test
+        run: pnpm test
         working-directory: language-tour
