@@ -6,7 +6,7 @@ defmodule LocalLiveView.Mirror do
   It receives synced payloads from the local runtime via the `handle_sync/3` callback.
 
   ```
-  defmodule Mirror.MyLive do
+  defmodule Mirror.MyLocal do
     use LocalLiveView.Mirror
 
     @impl true
