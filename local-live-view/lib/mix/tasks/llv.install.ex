@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Llv.Install do
     * Generate a `local/` project with a sample HelloLocal component
   """
 
-  @popcorn_js_version "^0.3.0-rc1"
+  @popcorn_js_version "0.3.0-rc1"
 
   @impl Igniter.Mix.Task
   def igniter(igniter) do
