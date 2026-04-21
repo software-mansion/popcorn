@@ -25,6 +25,7 @@ The API documentation and guides are available at <https://hexdocs.pm/popcorn>
 The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples/` directory.
 
 See also third-party examples:
+
 - Running Popcorn on iOS (WebView based): https://github.com/u9g/uno-royale
 - A collection of local Live View demos: https://petermm.github.io/popcorn_live_view/
 
@@ -32,6 +33,7 @@ See also third-party examples:
 
 - **`popcorn/elixir/`** - Elixir library used to patch OTP and Elixir stdlib, create .avm bundles and containing JS interop API.
 - **`popcorn/js/`** - JavaScript library loads the VM in Wasm, manages its isolation, and bridges JS and Elixir.
+- **`otp/`** - temporary location for integration with BEAM/OTP.
 - **`examples/`** - Example projects showcasing Popcorn features, hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples). Examples use development version of Popcorn.
 - **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
 - **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.
@@ -63,7 +65,7 @@ Run `scripts/dev.sh --help` to see all available examples and projects.
 ### Testing
 
 ```shell
-mise run test               # Elixir unix tests (default)
+mise run test            # Elixir unix tests (default)
 mise run test --wasm     # Elixir wasm tests
 mise run test --js       # JS tests
 ```
@@ -73,7 +75,7 @@ AtomVM is built automatically if artifacts are missing. Make sure you have [Atom
 ### Other tasks
 
 ```shell
-mise run clean              # Clean build artifacts
+mise run clean           # Clean build artifacts
 mise run clean --all     # Clean everything including examples
 ```
 

@@ -18,5 +18,9 @@ node_modules/
 # MacOS specific
 .DS_Store
 
+# OTP/OpenSSL build sources
+otp/sources/
+otp/out/
+
 # Local environment
 .env

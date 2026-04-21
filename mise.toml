@@ -18,6 +18,22 @@ description = "Run tests"
 run = "scripts/build-atomvm.sh"
 description = "Build AtomVM"
 
+[tasks.build-openssl]
+run = "scripts/build-openssl.sh"
+description = "Build OpenSSL for WASM"
+
+[tasks.build-otp]
+run = "scripts/build-beam.sh"
+description = "Build OTP/BEAM for WASM"
+
+[tasks.build-otp-with-crypto]
+run = "scripts/build-beam.sh --with-crypto"
+description = "Build OTP/BEAM for WASM with crypto/asn1 NIFs"
+
+[tasks.regenerate-otp-patches]
+run = "scripts/patch-beam.sh --regen"
+description = "Regenerate OTP patches from current otp/sources/otp state"
+
 [tasks.clean]
 run = "scripts/clean.sh"
 description = "Clean build artifacts"
