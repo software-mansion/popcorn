@@ -119,31 +119,28 @@ importers:
         version: 0.25.12
 
   examples/local-lv-compare/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view/assets
     devDependencies:
+      '@swmansion/popcorn':
+        specifier: 0.3.0-rc1
+        version: 0.3.0-rc1(esbuild@0.25.12)(rollup@4.55.2)(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1))
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
 
   examples/local-lv-forms/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view/assets
     devDependencies:
+      '@swmansion/popcorn':
+        specifier: 0.3.0-rc1
+        version: 0.3.0-rc1(esbuild@0.25.12)(rollup@4.55.2)(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1))
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
 
   examples/local-lv-thermostat/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view/assets
     devDependencies:
+      '@swmansion/popcorn':
+        specifier: 0.3.0-rc1
+        version: 0.3.0-rc1(esbuild@0.25.12)(rollup@4.55.2)(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1))
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
@@ -1519,6 +1516,20 @@ packages:
 
   '@swmansion/popcorn@0.2.2':
     resolution: {integrity: sha512-S11s/+GUZqgdFqC75JTovIuGS23SyMLcNnjNG7dF7J9ZwXnwdiWvyZFlRsRpcgz1Nh0Ucw0U1UL8KOiKnPuItw==}
+    peerDependencies:
+      esbuild: '>=0.17.0'
+      rollup: '>=4.0.0'
+      vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0
+    peerDependenciesMeta:
+      esbuild:
+        optional: true
+      rollup:
+        optional: true
+      vite:
+        optional: true
+
+  '@swmansion/popcorn@0.3.0-rc1':
+    resolution: {integrity: sha512-8FiWPt1xR4lC9NzVH2G7yM9Fv+TfVi7RT1jhx5KXmuSyv/HlXlfsaGQZrP8cJ3WxPJevfRrCDO07RbeNPEKm/g==}
     peerDependencies:
       esbuild: '>=0.17.0'
       rollup: '>=4.0.0'
@@ -5289,6 +5300,12 @@ snapshots:
       esbuild: 0.27.3
       rollup: 4.55.2
       vite: 7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1)
+
+  '@swmansion/popcorn@0.3.0-rc1(esbuild@0.25.12)(rollup@4.55.2)(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1))':
+    optionalDependencies:
+      esbuild: 0.25.12
+      rollup: 4.55.2
+      vite: 7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.31.1)
 
   '@tailwindcss/node@4.2.1':
     dependencies:
