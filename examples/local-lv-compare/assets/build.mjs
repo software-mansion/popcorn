@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { popcorn } from "local_live_view/esbuild";
+import { popcorn } from "@swmansion/popcorn/esbuild";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -14,8 +14,10 @@ const ctx = await esbuild.context({
   sourcemap: isWatch ? "inline" : true,
   outdir: "../priv/static/assets/js",
   external: ["/fonts/*", "/images/*"],
+  alias: {
+    local_live_view: resolve(__dirname, "vendor/local_live_view.js"),
+  },
   nodePaths: [
-    resolve(__dirname, "../deps"),
     process.env.MIX_BUILD_PATH ?? resolve(__dirname, "../_build/dev"),
   ],
   plugins: [
