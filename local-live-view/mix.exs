@@ -58,8 +58,10 @@ defmodule LocalLiveView.MixProject do
       before_closing_body_tag: &before_closing_body_tag/1,
       extras: [
         "pages/introduction/welcome.md",
-        "pages/guides/navigation.md",
-        "README.md"
+        "pages/getting-started/installation.md",
+        "pages/guides/first-view.md",
+        "pages/guides/mirror-sync.md",
+        "pages/guides/navigation.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
