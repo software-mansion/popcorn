@@ -1,14 +1,11 @@
 {
-  "name": "local_thermostat",
   "private": true,
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch"
   },
-  "dependencies": {
-    "local_live_view": "workspace:*"
-  },
   "devDependencies": {
+    "@swmansion/popcorn": "0.3.0-rc1",
     "esbuild": "^0.25.0"
   }
 }
