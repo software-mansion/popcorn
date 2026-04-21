@@ -269,8 +269,8 @@ importers:
         specifier: ^10.17.0
         version: 10.40.0(react@19.2.3)
       '@swmansion/popcorn':
-        specifier: ^0.2.2
-        version: 0.2.2(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))
+        specifier: workspace:*
+        version: link:../popcorn/js
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.1(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))
@@ -1516,20 +1516,6 @@ packages:
     engines: {node: '>=14'}
     peerDependencies:
       '@svgr/core': '*'
-
-  '@swmansion/popcorn@0.2.2':
-    resolution: {integrity: sha512-S11s/+GUZqgdFqC75JTovIuGS23SyMLcNnjNG7dF7J9ZwXnwdiWvyZFlRsRpcgz1Nh0Ucw0U1UL8KOiKnPuItw==}
-    peerDependencies:
-      esbuild: '>=0.17.0'
-      rollup: '>=4.0.0'
-      vite: ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0
-    peerDependenciesMeta:
-      esbuild:
-        optional: true
-      rollup:
-        optional: true
-      vite:
-        optional: true
 
   '@tailwindcss/node@4.2.1':
     resolution: {integrity: sha512-jlx6sLk4EOwO6hHe1oCGm1Q4AN/s0rSrTTPBGPM0/RQ6Uylwq17FuU8IeJJKEjtc6K6O07zsvP+gDO6MMWo7pg==}
@@ -5283,12 +5269,6 @@ snapshots:
       svg-parser: 2.0.4
     transitivePeerDependencies:
       - supports-color
-
-  '@swmansion/popcorn@0.2.2(esbuild@0.27.3)(rollup@4.55.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1))':
-    optionalDependencies:
-      esbuild: 0.27.3
-      rollup: 4.55.2
-      vite: 7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1)
 
   '@tailwindcss/node@4.2.1':
     dependencies:

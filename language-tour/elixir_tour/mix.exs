@@ -23,7 +23,7 @@ defmodule ElixirTour.MixProject do
 
   defp deps do
     [
-      {:popcorn, "~> 0.2.2"}
+      {:popcorn, path: "../../popcorn/elixir"}
     ]
   end
 end
