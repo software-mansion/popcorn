@@ -26,6 +26,11 @@ description = "Build OpenSSL for WASM"
 run = "scripts/build-beam.sh"
 description = "Build OTP/BEAM for WASM"
 
+[tasks.build-otp-js]
+depends = ["build-otp debug"]
+run = "pnpm -F ./otp/js build"
+description = "Build JS part of OTP/BEAM interop"
+
 [tasks.build-otp-with-crypto]
 run = "scripts/build-beam.sh --with-crypto"
 description = "Build OTP/BEAM for WASM with crypto/asn1 NIFs"
