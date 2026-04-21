@@ -7,12 +7,12 @@ defmodule DemoModalOffline do
     <button class="show-modal-button" phx-click="show_modal">SHOW OFFLINE MODAL</button>
 
     <%= if @show_modal do %>
-    <div class="modal">
-      <div class="modal-content">
-        <span class="close" phx-click="close_modal">&times;</span>
-        <p>OFFLINE MODAL</p>
+      <div class="modal">
+        <div class="modal-content">
+          <span class="close" phx-click="close_modal">&times;</span>
+          <p>OFFLINE MODAL</p>
+        </div>
       </div>
-    </div>
     <% end %>
     """
   end
@@ -24,7 +24,7 @@ defmodule DemoModalOffline do
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, show_modal: false)}
   end
-  
+
   def handle_event("show_modal", _params, socket) do
     {:noreply, assign(socket, show_modal: true)}
   end

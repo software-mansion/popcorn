@@ -17,7 +17,7 @@ defmodule LocalThermostatWeb do
   those modules here.
   """
 
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt local_live_view)
+  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt)
 
   def router do
     quote do
@@ -86,6 +86,7 @@ defmodule LocalThermostatWeb do
       import Phoenix.HTML
       # Core UI components
       import LocalThermostatWeb.CoreComponents
+      import LocalLiveView.Component
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

@@ -9,12 +9,14 @@ defmodule Local.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: Mix.compilers(),
-      aliases: aliases(),
-      preferred_cli_env: [lintformat: :fmt]
+      aliases: aliases()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
+  def cli do
+    [default_target: :wasm]
+  end
+
   def application do
     [
       extra_applications: [:logger],
@@ -22,7 +24,6 @@ defmodule Local.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:gettext, "~> 0.26"},
@@ -33,13 +34,7 @@ defmodule Local.MixProject do
   defp aliases do
     [
       build: ["deps.get", "popcorn.cook"],
-      dev: ["build", "popcorn.server"],
-      lintformat: "format --check-formatted",
-      lint: [
-        "deps.unlock --check-unused",
-        "deps.compile",
-        "compile --force --warnings-as-errors"
-      ]
+      dev: ["build", "popcorn.server"]
     ]
   end
 end

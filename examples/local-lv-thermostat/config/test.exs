@@ -4,7 +4,7 @@ import Config
 # you can enable the server option below.
 config :local_thermostat, LocalThermostatWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
-  secret_key_base: "0OCWDao2LrhUBCmPwbe3r9JtRKhhCkZaZW9CYen1RfZ9e6rn8fx0tuuOpF1dOEGV",
+  secret_key_base: "qEDLVp77YiAITwQS0J8kaceQp1PPvUop5kpPWAx9REQyutrc0cu5Q5Smy9ySo9pe",
   server: false
 
 # In test we don't send emails
@@ -22,3 +22,7 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+# Sort query params output of verified routes for robust url comparisons
+config :phoenix,
+  sort_verified_routes_query_params: true

@@ -19,16 +19,20 @@ defmodule LocalLiveView.MixProject do
 
   # Run "mix help compile.app" to learn about applications.
   def application do
-    [
-      extra_applications: [:logger],
-      mod: {LocalLiveView.Application, []}
-    ]
+    base = [extra_applications: [:logger]]
+
+    if Mix.target() == :wasm do
+      Keyword.put(base, :mod, {LocalLiveView.Application, []})
+    else
+      base
+    end
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:igniter, ">= 0.7.0", runtime: false},
       {:popcorn, path: "../popcorn/elixir"},
       {:phoenix, "~> 1.8", runtime: false},
       {:phoenix_live_view, runtime: false},
@@ -57,7 +61,7 @@ defmodule LocalLiveView.MixProject do
   end
 
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
-  defp elixirc_paths(_), do: ["lib/server"]
+  defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
 
   defp aliases() do
     [
