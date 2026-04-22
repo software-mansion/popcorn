@@ -336,7 +336,7 @@ copy_artifacts() {
     local beam_dir="$1"
     local outdir="$2"
 
-    mkdir -p "${outdir}"
+    mkdir -p "${outdir}" "${outdir}/bin" "${outdir}/lib"
 
     local wasm_bin_dir="${beam_dir}/bin/wasm32-unknown-emscripten"
 
@@ -357,6 +357,14 @@ copy_artifacts() {
             cp "${wasm_bin_dir}/beam.${ext}" "${outdir}/"
         fi
     done
+
+    for boot in start.boot start_clean.boot no_dot_erlang.boot vm.boot; do
+        rm -f "${outdir}/bin/${boot}"
+    done
+
+    if [[ -f "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" ]]; then
+        cp "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" "${outdir}/bin/vm.boot"
+    fi
 
     success "Artifacts written to: ${outdir}"
 }
@@ -453,6 +461,16 @@ main() {
     run_configure "${beam_dir}" "${mode}" "${with_crypto}" "${openssl_prefix}"
 
     build_beam "${beam_dir}" "${mode}" "${jobs}"
+
+    local stdlib_preset="core"
+    if [[ "${with_crypto}" == "true" ]]; then
+        stdlib_preset="core-crypto"
+    fi
+
+    "${PROJECT_ROOT}/scripts/stdlib.sh" \
+        --beam-dir "${beam_dir}" \
+        --outdir "${final_outdir}/lib" \
+        --preset "${stdlib_preset}"
 
     copy_artifacts "${beam_dir}" "${final_outdir}"
 
