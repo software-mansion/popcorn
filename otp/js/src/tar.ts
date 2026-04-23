@@ -1,3 +1,5 @@
+import { assert } from "./utils";
+
 // Tar format constants.
 const T = {
   /// entire block size (bytes)
@@ -81,8 +83,4 @@ function parseOctal(value: string): number {
   const parsed = parseInt(value, 8);
   assert(!Number.isNaN(parsed));
   return parsed;
-}
-
-function assert(ok: boolean, msg?: string) {
-  if (!ok) throw new Error(msg === undefined ? "assert" : "assert: ${msg}");
 }
