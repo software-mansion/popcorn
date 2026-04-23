@@ -16,6 +16,12 @@ export type EmscriptenModule = {
     argTypes: string[],
     args: unknown[],
   ) => AnyValue;
+  print: (text: string) => void;
+  printErr: (text: string) => void;
+  onExit: (code: number) => void;
+  onAbort: (text: string) => void;
+  arguments: string[];
+  prerun: ((mod: EmscriptenModule) => void)[];
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
   onBeamMessage?: (text: string) => Promise<void>;
