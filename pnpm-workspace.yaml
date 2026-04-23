@@ -1,5 +1,6 @@
 packages:
   - "otp/js"
+  - "otp/js/e2e/setup"
   - "popcorn/js"
   - "popcorn/js/e2e/setup"
   - "popcorn/elixir/test/fixtures/wasm/assets"

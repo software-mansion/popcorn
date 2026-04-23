@@ -5,7 +5,8 @@
   "type": "module",
   "license": "Apache-2.0",
   "files": [
-    "dist"
+    "dist",
+    "assets"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -15,13 +16,20 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs"
     },
+    "./beam": {
+      "types": "./dist/beam.d.ts",
+      "import": "./dist/beam.mjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rollup -c",
-    "lint": "tsc --noEmit"
+    "setup": "./scripts/setup-assets.sh",
+    "build": "pnpm run setup && rollup -c && ./scripts/setup-assets.sh dist",
+    "lint": "tsc --noEmit",
+    "e2e": "playwright test --config e2e/playwright.config.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
     "rollup": "^4.55.1",

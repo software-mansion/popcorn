@@ -1,0 +1,107 @@
+name: Build OTP WASM
+description: Setup toolchain, restore caches, and build OTP/BEAM for WASM
+
+inputs:
+  build-mode:
+    description: Build mode passed to scripts/build-beam.sh
+    required: false
+    default: debug
+  otp-tag:
+    description: OTP git tag used for the cached clone
+    required: false
+    default: OTP-28.3.1
+  with-crypto:
+    description: Build with static OpenSSL-backed crypto/asn1 support
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Compute OTP build cache key
+      id: otp-build-cache-key
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        mapfile -t patch_files < <(find otp/patches -type f -print | sort)
+
+        if [[ "${#patch_files[@]}" -eq 0 ]]; then
+          patch_hash="no-patches"
+        else
+          patch_hash="$(sha256sum "${patch_files[@]}" | sha256sum | cut -d' ' -f1)"
+        fi
+
+        echo "key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-${patch_hash}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache built OTP output
+      id: otp-build-cache
+      uses: actions/cache@v4
+      with:
+        path: otp/out
+        key: ${{ steps.otp-build-cache-key.outputs.key }}
+
+    - name: Reuse cached OTP/BEAM build
+      if: steps.otp-build-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: echo "Using cached OTP WASM build from otp/out"
+
+    - name: Setup toolchain
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: ./.github/actions/setup-toolchain
+
+    - name: Install autoconf 2.72
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if autoconf --version | head -n 1 | grep -q "2.72"; then
+          exit 0
+        fi
+
+        git config --global user.email "ci@ci.local"
+        git config --global user.name "CI"
+        wget -q https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.gz
+        tar xzf autoconf-2.72.tar.gz
+        cd autoconf-2.72
+        ./configure --prefix=/usr/local
+        make -j"$(nproc)"
+        sudo make install
+
+    - name: Cache OTP clone
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: otp/sources/otp-original
+        key: otp-clone-${{ runner.os }}-${{ inputs.otp-tag }}
+
+    - name: Cache OpenSSL
+      if: steps.otp-build-cache.outputs.cache-hit != 'true' && inputs.with-crypto == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          otp/sources/openssl-3.0.15-${{ inputs.build-mode }}
+          otp/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
+        key: openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}
+
+    - name: Diagnose environment size
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        printf "env: %d bytes, %d vars\n" "$(env | wc -c)" "$(env | wc -l)"
+        env | awk -F'=' '{print length($0), $1}' | sort -rn | head -15
+        printf "ulimit -s: %s  ARG_MAX: %s\n" "$(ulimit -s)" "$(getconf ARG_MAX)"
+
+    - name: Build OTP/BEAM for WASM
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        build_args=("${{ inputs.build-mode }}")
+        if [[ "${{ inputs.with-crypto }}" == "true" ]]; then
+          build_args=(--with-crypto "${build_args[@]}")
+        fi
+
+        scripts/build-beam.sh "${build_args[@]}"
