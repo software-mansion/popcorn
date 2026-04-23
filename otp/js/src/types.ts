@@ -1,6 +1,7 @@
 export type EmscriptenFS = {
   mkdir: (path: string) => void;
   writeFile: (path: string, data: Uint8Array) => void;
+  readFile: (path: string, options?: { encoding?: string }) => Uint8Array | string;
 };
 
 export type AnyValue = unknown;
@@ -21,11 +22,11 @@ export type EmscriptenModule = {
   onExit: (code: number) => void;
   onAbort: (text: string) => void;
   arguments: string[];
-  prerun: ((mod: EmscriptenModule) => void)[];
+  preRun: ((mod: EmscriptenModule) => void)[];
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
-  onBeamMessage?: (text: string) => Promise<void>;
-  onError?: (text: string) => Promise<void>;
+  onBeamMessage?: (text: string) => void | Promise<void>;
+  onError?: (text: string) => void | Promise<void>;
   addRunDependency: (id: string) => void;
   removeRunDependency: (id: string) => void;
 };

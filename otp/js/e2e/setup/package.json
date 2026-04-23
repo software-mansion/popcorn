@@ -1,0 +1,11 @@
+{
+  "name": "popcorn-otp-e2e",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@swmansion/popcorn-otp": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:"
+  }
+}

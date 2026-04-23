@@ -1,6 +1,6 @@
 type BeamEmscriptenModule = import("./types").EmscriptenModule;
 
-declare module "*.emu" {
+declare module "*.mjs" {
   const createModule: (
     moduleOverrides?: Partial<BeamEmscriptenModule>,
   ) => Promise<BeamEmscriptenModule>;

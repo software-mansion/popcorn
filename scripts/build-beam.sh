@@ -352,7 +352,7 @@ copy_artifacts() {
     fi
 
     # Copy JS glue if present
-    for ext in mjs js; do
+    for ext in mjs js emu; do
         if [[ -f "${wasm_bin_dir}/beam.${ext}" ]]; then
             cp "${wasm_bin_dir}/beam.${ext}" "${outdir}/"
         fi

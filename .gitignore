@@ -22,6 +22,9 @@ node_modules/
 otp/sources/
 otp/out/
 otp/js/dist/
+otp/js/assets/
+otp/js/playwright-report/
+otp/js/test-results/
 
 # Local environment
 .env

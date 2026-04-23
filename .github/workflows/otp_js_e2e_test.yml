@@ -1,0 +1,75 @@
+name: OTP JS e2e tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "otp/js/**"
+      - "otp/patches/**"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/patch-beam.sh"
+      - "scripts/stdlib.sh"
+      - "scripts/_common.sh"
+      - ".github/workflows/otp_js_e2e_test.yml"
+      - ".github/actions/build-otp-wasm/action.yml"
+      - ".github/actions/setup-toolchain/action.yml"
+      - ".github/actions/setup-playwright/action.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  e2e:
+    name: OTP JS E2E (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: no-crypto
+            with-crypto: "false"
+          - name: with-crypto
+            with-crypto: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build OTP/BEAM for WASM
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: ${{ matrix.with-crypto }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: otp-js-e2e
+          lockfile: pnpm-lock.yaml
+          version: "1.58.2"
+
+      - name: Run e2e tests
+        run: pnpm e2e
+        working-directory: otp/js

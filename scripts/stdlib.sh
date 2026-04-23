@@ -98,6 +98,28 @@ resolve_elixir_ebin_dir() {
 }
 
 
+elixir_app_is_built() {
+    local elixir_dir="$1"
+    local app="$2"
+    local ebin
+
+    ebin=$(resolve_elixir_ebin_dir "${elixir_dir}" "${app}") || return 1
+    [[ -f "${ebin}/${app}.app" ]]
+}
+
+
+selected_elixir_apps_built() {
+    local elixir_dir="$1"
+    local app
+
+    for app in "${SELECTED_ELIXIR_APPS[@]}"; do
+        elixir_app_is_built "${elixir_dir}" "${app}" || return 1
+    done
+
+    return 0
+}
+
+
 list_available_otp_apps() {
     local beam_dir="$1"
     local app_dir
@@ -142,6 +164,11 @@ build_elixir_source() {
     local bootstrap_make_beam="${bootstrap_tools_ebin}/make.beam"
     local tools_make_source="${beam_dir}/lib/tools/src/make.erl"
 
+    if selected_elixir_apps_built "${elixir_dir}"; then
+        log "Elixir apps already built at ${elixir_dir}; skipping compile"
+        return 0
+    fi
+
     if [[ ! -x "${beam_dir}/bootstrap/bin/erl" ]] || [[ ! -x "${beam_dir}/bootstrap/bin/erlc" ]]; then
         error "OTP bootstrap binaries not found. Build bootstrap before compiling Elixir."
     fi
@@ -162,7 +189,7 @@ build_elixir_source() {
         PATH="${beam_dir}/bootstrap/bin:${PATH}" \
             ERL="${beam_dir}/bootstrap/bin/erl" \
             ERLC="${beam_dir}/bootstrap/bin/erlc" \
-            make clean compile 1>&2
+            make compile 1>&2
     )
 }
 
@@ -288,7 +315,7 @@ create_elixir_tarballs() {
     local tarball
 
     for app in "${SELECTED_ELIXIR_APPS[@]}"; do
-        resolve_elixir_ebin_dir "${elixir_dir}" "${app}" >/dev/null || {
+        elixir_app_is_built "${elixir_dir}" "${app}" || {
             error "Missing Elixir app ebin dir for '${app}' in ${elixir_dir}."
         }
 

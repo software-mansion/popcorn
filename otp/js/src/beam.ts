@@ -1,4 +1,4 @@
-import createModule from "../assets/beam.emu";
+import createModule from "../assets/beam.mjs";
 import { extractTar } from "./tar";
 import type { EmscriptenModule } from "./types";
 import {
@@ -32,15 +32,38 @@ const BASE_ARGS = [
 // must be present to load vm
 const CORE_APPS = ["kernel", "stdlib", "compiler"];
 
-export async function boot(assetsUrl: string) {
+export type BeamEvent =
+  | [type: "otp:stdout", payload: string]
+  | [type: "otp:stderr", payload: string]
+  | [type: "otp:exit", payload: number]
+  | [type: "otp:abort", payload: string]
+  | [type: "otp:error", payload: string];
+
+export type BeamBootOptions = {
+  assetsUrl: string;
+  searchPaths?: string[];
+  extraArgs?: string[];
+};
+
+type BootRet =
+  | { ok: true; module: EmscriptenModule }
+  | { ok: false; error: Error };
+
+export async function boot({
+  assetsUrl,
+  searchPaths,
+  extraArgs,
+}: BeamBootOptions): Promise<BootRet> {
+  let initError: Error | null = null;
+
   const moduleConfig: Partial<EmscriptenModule> = {
+    print: (text) => emit("otp:stdout", text),
+    printErr: (text) => emit("otp:stderr", text),
+    onExit: (code) => emit("otp:exit", code),
+    onAbort: (text) => emit("otp:abort", text),
     // TODO: add handler for onBeamMessage
-    print: (text) => emit("vm-stdout", text),
-    printErr: (text) => emit("vm-stderr", text),
-    onExit: (code) => emit("vm-exit", code),
-    onAbort: (text) => emit("vm-abort", text),
-    // TODO: pass extra args and search paths
-    arguments: buildArgs(),
+    onError: (text) => emit("otp:error", text),
+    arguments: buildArgs({ searchPaths, extra: extraArgs }),
     ENV: {
       BINDIR: "/bin",
       EMU: "beam",
@@ -48,15 +71,16 @@ export async function boot(assetsUrl: string) {
       USER: DEFAULT_USER,
       LOGNAME: DEFAULT_USER,
     },
-    prerun: [
+    preRun: [
       (mod) => {
-        (async () => {
+        void (async () => {
           mod.addRunDependency("fs");
           try {
             await initFs({ module: mod, assetsUrl });
           } catch (error) {
             assert(error instanceof Error);
-            emit("vm-abort", error.message);
+            initError = error;
+            emit("otp:abort", error.message);
           } finally {
             mod.removeRunDependency("fs");
           }
@@ -65,7 +89,12 @@ export async function boot(assetsUrl: string) {
     ],
   };
   const module = await createModule(moduleConfig);
-  return module;
+  if (initError) return { ok: false, error: initError };
+  return { ok: true, module };
+}
+
+function emit(...[type, data]: BeamEvent): void {
+  self.postMessage({ type, data });
 }
 
 type BuildArgsArgs = {
@@ -93,22 +122,21 @@ function buildArgs({ searchPaths, extra }: BuildArgsArgs = {}): string[] {
   return args;
 }
 
-function emit(type: string, data: unknown) {
-  self.postMessage({ type, data });
-}
-
 type TarballManifest = { version: string } & {
   [appName: string]: TarballManifestEntry;
 };
+
 type TarballManifestEntry = {
   tar: `/lib/${string}.tar`;
   sha256: string;
 };
+
 type InitFsArgs = {
   module: EmscriptenModule;
   assetsUrl: string;
 };
-export async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
+
+async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
   for (const dir of FS_DIRS) {
     ensureDir(module.FS, dir);
   }
@@ -119,7 +147,7 @@ export async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
   check(bootFile !== null, errorMsg("boot-script", { url: BOOT_URL }));
   module.FS.writeFile(BOOT_PATH, bootFile);
 
-  // tarballs
+  // tarballs.json
   const MANIFEST_URL = `${assetsUrl}${MANIFEST_PATH}`;
   const manifest = await fetchJson<TarballManifest>(MANIFEST_URL);
   check(manifest !== null, errorMsg("manifest", { url: MANIFEST_URL }));
@@ -131,6 +159,7 @@ export async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
     ensureDir(module.FS, dirname(path));
     module.FS.writeFile(path, content);
   };
+
   await Promise.all(
     CORE_APPS.map(async (name) => {
       const entry = manifest[name] ?? null;
@@ -146,17 +175,19 @@ type FsErrors =
   | [type: "manifest", data: { url: string }]
   | [type: "boot-script", data: { url: string }]
   | [type: "tar-missing", data: { manifest: TarballManifest; name: string }];
+
 function errorMsg(...args: FsErrors): string {
   const [type, data] = args;
+
   switch (type) {
     case "manifest":
       return `Missing tarball manifest: '${data.url}'`;
     case "boot-script":
       return `Missing boot script: '${data.url}'`;
     case "tar-missing": {
-      const only_tars = ([app, _v]: [string, unknown]) => app !== "version";
+      const onlyTars = ([app, _value]: [string, unknown]) => app !== "version";
       const tarballs = Object.entries(data.manifest)
-        .filter(only_tars)
+        .filter(onlyTars)
         .join(", ");
       return `Missing tarball: '${data.name}'. Available tarballs: ${tarballs}`;
     }
