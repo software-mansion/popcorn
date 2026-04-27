@@ -1,4 +1,4 @@
-import { assert } from "./utils";
+import { check } from "./utils";
 
 // Tar format constants.
 const T = {
@@ -30,7 +30,7 @@ export function extractTar(
   onDir: OnDir,
   onFile: OnFile,
 ): void {
-  assert(data.length % T.BLK_N === 0, "malformed archive");
+  check(data.length % T.BLK_N === 0, "tar:bad_chunk");
   const decoder = new TextDecoder();
   let offset = 0;
 
@@ -71,7 +71,7 @@ function readString(
   start: number,
   length: number,
 ): string {
-  assert(length > 0);
+  check(length > 0, "tar:bad_string");
   let end = start;
   const max = start + length;
   while (end < max && data[end] !== 0) end++;
@@ -81,6 +81,6 @@ function readString(
 
 function parseOctal(value: string): number {
   const parsed = parseInt(value, 8);
-  assert(!Number.isNaN(parsed));
+  check(!Number.isNaN(parsed), "tar:bad_octal");
   return parsed;
 }

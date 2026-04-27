@@ -1,114 +1,71 @@
 import { test, expect, type Page } from "@playwright/test";
+import type { Popcorn } from "@swmansion/popcorn-otp";
 
-type SerializedError = {
-  name: string;
-  message: string;
-};
-
-type BootEvent = { type: string; data: unknown };
-
-type BootResult = {
-  ok: boolean;
-  events: Array<BootEvent>;
-  module: { args: string[] } | null;
-  error: SerializedError | null;
-};
-
-const WORKER_URL = "/otp-worker.ts";
-
-function getAbortEvent(events: BootEvent[]) {
-  return events.find((event) => event.type === "otp:abort") ?? null;
+declare global {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface Window {
+    Popcorn: typeof Popcorn;
+  }
 }
 
-test("boots with the packaged OTP assets", async ({ page }) => {
-  await page.goto("/");
-  const result = await bootInWorker(page, "/otp-assets");
+type InitSnapshot =
+  | { ok: true }
+  | {
+      ok: false;
+      error: {
+        kind: string;
+        message: string;
+        metadata: Record<string, unknown>;
+      };
+    };
 
-  expect(result.ok).toBe(true);
-  expect(result.module).not.toBeNull();
-  assert(result.module !== null);
-  expect(result.module.args).toContain("-boot");
-  expect(result.module.args).toContain("vm");
-  expect(getAbortEvent(result.events)).toBeNull();
+test.beforeEach(async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => window.Popcorn !== undefined);
 });
 
-test("reports a missing boot script when assets are absent", async ({
+test("boots with the packaged OTP assets through Popcorn.init", async ({
   page,
 }) => {
-  await page.goto("/");
-  const result = await bootInWorker(page, "/otp-assets/missing");
+  const result = await initPopcorn(page, "/otp-assets");
 
-  expect(result.error).not.toBeNull();
-  assert(result.error !== null);
-  expect(result.error.message).toContain(
-    "Missing boot script: '/otp-assets/missing/bin/vm.boot'",
-  );
-  expect(result.events).toContainEqual({
-    type: "otp:abort",
-    data: "Missing boot script: '/otp-assets/missing/bin/vm.boot'",
-  });
+  expect(result.ok).toBe(true);
 });
 
-async function bootInWorker(
+test("reports a missing boot script through Popcorn.init", async ({ page }) => {
+  const result = await initPopcorn(page, "/otp-assets/missing");
+
+  expect(result.ok).toBe(false);
+  check(!result.ok);
+  expect(result.error.kind).toBe("boot-failed");
+  expect(result.error.metadata.reason).toBe("missing-boot-script");
+  expect(result.error.metadata.url).toBe("/otp-assets/missing/bin/vm.boot");
+});
+
+async function initPopcorn(
   page: Page,
   assetsUrl: string,
-): Promise<BootResult> {
-  return await page.evaluate(
-    async ({ workerUrl, assetsUrl }): Promise<BootResult> => {
-      const worker = new Worker(workerUrl, { type: "module" });
-      const events: Array<BootEvent> = [];
+): Promise<InitSnapshot> {
+  return await page.evaluate(async (beamAssetsUrl): Promise<InitSnapshot> => {
+    const result = await window.Popcorn.init({
+      beam: { assetsUrl: beamAssetsUrl },
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: {
+          kind: result.error.kind,
+          message: result.error.message,
+          metadata: result.error.metadata,
+        },
+      };
+    }
 
-      return await new Promise<BootResult>((resolve) => {
-        worker.addEventListener(
-          "message",
-          ({ data: { type, data } }: MessageEvent<BootEvent>) => {
-            if (type === "boot:ok") {
-              worker.terminate();
-              const payload = {
-                ok: true,
-                events,
-                module: data as BootResult["module"],
-                error: null,
-              };
-              resolve(payload);
-              return;
-            } else if (type === "boot:error") {
-              worker.terminate();
-              const payload = {
-                ok: false,
-                events,
-                module: null,
-                error: data as SerializedError,
-              };
-              resolve(payload);
-              return;
-            }
-
-            events.push({ type, data });
-          },
-        );
-
-        worker.addEventListener("error", (event) => {
-          worker.terminate();
-          const payload = {
-            ok: false,
-            events,
-            module: null,
-            error: {
-              name: "WorkerError",
-              message: event.message || "Worker failed to load",
-            },
-          };
-          resolve(payload);
-        });
-
-        worker.postMessage({ type: "boot", assetsUrl });
-      });
-    },
-    { workerUrl: WORKER_URL, assetsUrl },
-  );
+    result.popcorn.deinit();
+    return { ok: true };
+  }, assetsUrl);
 }
 
-function assert(ok: boolean): asserts ok {
-  if (!ok) throw Error("assert");
+function check(ok: boolean): asserts ok {
+  if (!ok) throw new Error("assert");
 }
