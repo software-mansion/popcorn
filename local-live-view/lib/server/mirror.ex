@@ -6,12 +6,12 @@ defmodule LocalLiveView.Mirror do
   It receives synced payloads from the local runtime via the `handle_sync/2` callback.
 
   ```
-  defmodule Mirror.MyLive do
+  defmodule Mirror.MyLocal do
     use LocalLiveView.Mirror
 
     @impl true
     def handle_sync(local_assigns, _mirror_assigns) do
-      Phoenix.PubSub.broadcast(MyApp.PubSub, "llv_mirror:MyLive", {:llv_attrs, local_assigns})
+      Phoenix.PubSub.broadcast(MyApp.PubSub, "llv_mirror:MyLocal", {:llv_attrs, local_assigns})
       {:ok, local_assigns}
     end
   end

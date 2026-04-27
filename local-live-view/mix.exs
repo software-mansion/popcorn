@@ -47,11 +47,14 @@ defmodule LocalLiveView.MixProject do
       filter_modules: ~r/^(?!Elixir.Phoenix\.).*/,
       extras: [
         "pages/introduction/welcome.md",
-        "README.md"
+        "pages/getting-started/installation.md",
+        "pages/guides/first-view.md",
+        "pages/guides/mirror-sync.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
-        "Getting started": "README.md"
+        "Getting started": ~r"/getting-started/",
+        Guides: ~r"/guides/"
       ]
     ]
   end
