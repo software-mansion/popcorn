@@ -8,8 +8,8 @@ import { check } from "./utils";
 let instance: EmscriptenModule | null = null;
 
 self.onmessage = async (event: MessageEvent<unknown>) => {
-  check(isPopcornEvent(event), "beam:bad-message");
-  check(instance === null, "beam:double-init");
+  check(isPopcornEvent(event));
+  check(instance === null);
 
   const result = await boot({
     assetsUrl: event.data.payload.assetsUrl,
@@ -20,13 +20,14 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       // TODO: pass it to main context. For now, swallow all events.
     },
   });
-  if (result.ok) {
-    instance = result.module;
-    toMain({ type: "popcorn:boot-end", payload: null });
-  } else {
+  if (!result.ok) {
     toMain({
       type: "popcorn:boot-fail",
       payload: result.error.serialize(),
     });
+    return;
   }
+
+  instance = result.data;
+  toMain({ type: "popcorn:boot-end", payload: {} });
 };

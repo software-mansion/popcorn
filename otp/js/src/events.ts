@@ -10,7 +10,7 @@ export type WorkerEvent =
   | { type: "otp:abort"; payload: string }
   | { type: "otp:error"; payload: string }
   // response for `popcorn:boot`
-  | { type: "popcorn:boot-end"; payload: null }
+  | { type: "popcorn:boot-end"; payload: {} }
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
 export type PopcornEvent = {

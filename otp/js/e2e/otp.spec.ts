@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import type { Popcorn, SerializedError } from "@swmansion/popcorn-otp";
+import type {
+  Popcorn,
+  SerializedError,
+} from "@swmansion/popcorn-otp";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
@@ -9,11 +12,8 @@ declare global {
 }
 
 type InitSnapshot =
-  | { ok: true }
-  | {
-      ok: false;
-      error: SerializedError;
-    };
+  | { ok: true; data: null }
+  | { ok: false; error: SerializedError };
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -25,35 +25,65 @@ test("boots with the packaged OTP assets through Popcorn.init", async ({
 }) => {
   const result = await initPopcorn(page, "/otp-assets");
 
-  expect(result.ok).toBe(true);
+  expect(result).toEqual({ ok: true, data: null });
 });
 
-test("reports a missing boot script through Popcorn.init", async ({ page }) => {
-  const result = await initPopcorn(page, "/otp-assets/missing");
-  expect(result.ok).toBe(false);
-  if (result.ok) {
-    throw new Error("expected Popcorn.init to fail");
-  }
+test("returns timeout:init through Popcorn.init", async ({ page }) => {
+  const result = await initPopcorn(page, "/otp-assets", 1);
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      t: "timeout:init",
+      data: {
+        timeoutMs: 1,
+      },
+    },
+  });
+});
 
-  expect(result.error).toEqual({
-    t: "worker:load",
-    message: "bad-fs",
+test("returns beam:missing-boot-script through Popcorn.init for setup failures", async ({
+  page,
+}) => {
+  const result = await initPopcorn(page, "/otp-assets/missing");
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      t: "beam:missing-boot-script",
+      data: {
+        url: "/otp-assets/missing/bin/vm.boot",
+      },
+    },
   });
 });
 
 async function initPopcorn(
   page: Page,
   assetsUrl: string,
+  bootTimeoutMs?: number,
 ): Promise<InitSnapshot> {
-  return await page.evaluate(async (beamAssetsUrl): Promise<InitSnapshot> => {
-    const result = await window.Popcorn.init({
-      beam: { assetsUrl: beamAssetsUrl },
-    });
-    if (!result.ok) {
-      return { ok: false, error: result.error.serialize() };
-    }
+  return await page.evaluate(
+    async ({
+      beamAssetsUrl,
+      initTimeoutMs,
+    }: {
+      beamAssetsUrl: string;
+      initTimeoutMs?: number;
+    }): Promise<InitSnapshot> => {
+      const result = await window.Popcorn.init({
+        beam: { assetsUrl: beamAssetsUrl },
+        timeoutsMs:
+          initTimeoutMs === undefined ? undefined : { boot: initTimeoutMs },
+      });
+      if (!result.ok) {
+        return { ok: false, error: result.error.serialize() };
+      }
 
-    result.popcorn.deinit();
-    return { ok: true };
-  }, assetsUrl);
+      result.data.deinit();
+      return { ok: true, data: null };
+    },
+    {
+      beamAssetsUrl: assetsUrl,
+      initTimeoutMs: bootTimeoutMs,
+    },
+  );
 }

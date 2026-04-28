@@ -1,4 +1,4 @@
-import { PopcornError } from "./errors";
+import { err } from "./errors";
 import type { EmscriptenFS } from "./types";
 
 export function ensureDir(FS: EmscriptenFS, path: string): void {
@@ -52,11 +52,11 @@ export async function decompressGzip(data: Uint8Array): Promise<Uint8Array> {
 }
 
 export function check(ok: boolean, msg?: string): asserts ok {
-  if (!ok) throw new PopcornError({ t: "internal:check", detail: msg });
+  if (!ok) throw err("internal:check", { detail: msg });
 }
 
 export function unreachable(): never {
-  throw new PopcornError({ t: "internal:unreachable" });
+  throw err("internal:unreachable", {});
 }
 
 export function objectWithKeys<K extends string>(
