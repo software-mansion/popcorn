@@ -1,4 +1,4 @@
-import type { SerializedPopcornError } from "./errors";
+import type { SerializedError } from "./errors";
 import type { BeamBootOptions } from "./types";
 import { objectWithKeys } from "./utils";
 
@@ -11,7 +11,7 @@ export type WorkerEvent =
   | { type: "otp:error"; payload: string }
   // response for `popcorn:boot`
   | { type: "popcorn:boot-end"; payload: null }
-  | { type: "popcorn:boot-fail"; payload: SerializedPopcornError };
+  | { type: "popcorn:boot-fail"; payload: SerializedError };
 
 export type PopcornEvent = {
   type: "popcorn:boot";

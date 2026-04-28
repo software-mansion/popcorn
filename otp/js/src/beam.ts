@@ -1,4 +1,4 @@
-import { buildPopcornError, toPopcornError, type PopcornError } from "./errors";
+import { PopcornError, type AnyPopcornError } from "./errors";
 import { extractTar } from "./tar";
 import type { BeamBootOptions, EmscriptenModule } from "./types";
 import {
@@ -33,7 +33,7 @@ const CORE_APPS = ["kernel", "stdlib", "compiler"];
 
 type BootRet =
   | { ok: true; module: EmscriptenModule }
-  | { ok: false; error: PopcornError };
+  | { ok: false; error: AnyPopcornError };
 
 export async function boot({
   assetsUrl,
@@ -42,7 +42,7 @@ export async function boot({
   createModule,
   emit,
 }: BeamBootOptions): Promise<BootRet> {
-  let initError: PopcornError | null = null;
+  let initError: AnyPopcornError | null = null;
 
   const moduleConfig: Partial<EmscriptenModule> = {
     print: (text) => emit({ type: "otp:stdout", payload: text }),
@@ -66,8 +66,16 @@ export async function boot({
           try {
             await initFs({ module: mod, assetsUrl });
           } catch (error) {
-            initError = toPopcornError(error, { t: "internal-boot-failure" });
-            emit({ type: "otp:abort", payload: initError.message });
+            // TODO: make it better
+            const err = new PopcornError({
+              t: "worker:load",
+              message: "bad-fs",
+            });
+            initError = err;
+            emit({
+              type: "otp:abort",
+              payload: err.message,
+            });
           } finally {
             mod.removeRunDependency("fs");
           }
@@ -129,7 +137,7 @@ async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
   const BOOT_URL = `${assetsUrl}${BOOT_PATH}`;
   const bootFile = await fetchBinary(BOOT_URL);
   if (bootFile === null) {
-    throw buildPopcornError({ t: "missing-boot-script", url: BOOT_URL });
+    throw new PopcornError({ t: "beam:missing-boot-script", url: BOOT_URL });
   }
   module.FS.writeFile(BOOT_PATH, bootFile);
 
@@ -137,7 +145,7 @@ async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
   const MANIFEST_URL = `${assetsUrl}${MANIFEST_PATH}`;
   const manifest = await fetchJson<TarballManifest>(MANIFEST_URL);
   if (manifest === null) {
-    throw buildPopcornError({ t: "missing-manifest", url: MANIFEST_URL });
+    throw new PopcornError({ t: "beam:missing-manifest", url: MANIFEST_URL });
   }
 
   const createDir = (dirPath: string) => {
@@ -152,16 +160,16 @@ async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
     CORE_APPS.map(async (name) => {
       const entry = manifest[name] ?? null;
       if (entry === null) {
-        throw buildPopcornError({
-          t: "missing-tarball",
+        throw new PopcornError({
+          t: "beam:missing-tarball",
           name,
           availableTarballs: tarballNames(manifest),
         });
       }
       const tar = await fetchBinary(`${assetsUrl}${entry.tar}`);
       if (tar === null) {
-        throw buildPopcornError({
-          t: "missing-tarball",
+        throw new PopcornError({
+          t: "beam:missing-tarball",
           name,
           availableTarballs: tarballNames(manifest),
         });

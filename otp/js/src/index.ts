@@ -3,4 +3,11 @@ export { PopcornError } from "./errors";
 export { Popcorn } from "./popcorn";
 export type { PopcornInitResult, PopcornOpts } from "./popcorn";
 export type { BeamBootOptions, BeamEvent } from "./types";
-export type { PopcornErrorKind, PopcornErrorMetadata } from "./errors";
+export type {
+  AnyPopcornError,
+  PopcornErrors,
+  ErrorPayload,
+  ErrorPayloadFor,
+  ErrorType,
+  SerializedError,
+} from "./errors";

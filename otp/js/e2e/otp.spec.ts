@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import type { Popcorn } from "@swmansion/popcorn-otp";
+import type { Popcorn, SerializedError } from "@swmansion/popcorn-otp";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
@@ -12,11 +12,7 @@ type InitSnapshot =
   | { ok: true }
   | {
       ok: false;
-      error: {
-        kind: string;
-        message: string;
-        metadata: Record<string, unknown>;
-      };
+      error: SerializedError;
     };
 
 test.beforeEach(async ({ page }) => {
@@ -34,12 +30,15 @@ test("boots with the packaged OTP assets through Popcorn.init", async ({
 
 test("reports a missing boot script through Popcorn.init", async ({ page }) => {
   const result = await initPopcorn(page, "/otp-assets/missing");
-
   expect(result.ok).toBe(false);
-  check(!result.ok);
-  expect(result.error.kind).toBe("boot-failed");
-  expect(result.error.metadata.reason).toBe("missing-boot-script");
-  expect(result.error.metadata.url).toBe("/otp-assets/missing/bin/vm.boot");
+  if (result.ok) {
+    throw new Error("expected Popcorn.init to fail");
+  }
+
+  expect(result.error).toEqual({
+    t: "worker:load",
+    message: "bad-fs",
+  });
 });
 
 async function initPopcorn(
@@ -51,21 +50,10 @@ async function initPopcorn(
       beam: { assetsUrl: beamAssetsUrl },
     });
     if (!result.ok) {
-      return {
-        ok: false,
-        error: {
-          kind: result.error.kind,
-          message: result.error.message,
-          metadata: result.error.metadata,
-        },
-      };
+      return { ok: false, error: result.error.serialize() };
     }
 
     result.popcorn.deinit();
     return { ok: true };
   }, assetsUrl);
-}
-
-function check(ok: boolean): asserts ok {
-  if (!ok) throw new Error("assert");
 }

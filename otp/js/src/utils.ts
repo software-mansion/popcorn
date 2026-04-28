@@ -1,4 +1,4 @@
-import { PopcornInternalError } from "./internal-error";
+import { PopcornError } from "./errors";
 import type { EmscriptenFS } from "./types";
 
 export function ensureDir(FS: EmscriptenFS, path: string): void {
@@ -38,10 +38,7 @@ export async function fetchJson<T>(url: string): Promise<T | null> {
 
 export function isGzip(data: Uint8Array): boolean {
   return (
-    data.length >= 3 &&
-    data[0] === 0x1f &&
-    data[1] === 0x8b &&
-    data[2] === 0x08
+    data.length >= 3 && data[0] === 0x1f && data[1] === 0x8b && data[2] === 0x08
   );
 }
 
@@ -55,11 +52,11 @@ export async function decompressGzip(data: Uint8Array): Promise<Uint8Array> {
 }
 
 export function check(ok: boolean, msg?: string): asserts ok {
-  if (!ok) throw new PopcornInternalError("check", msg);
+  if (!ok) throw new PopcornError({ t: "internal:check", detail: msg });
 }
 
 export function unreachable(): never {
-  throw new PopcornInternalError("unreachable");
+  throw new PopcornError({ t: "internal:unreachable" });
 }
 
 export function objectWithKeys<K extends string>(

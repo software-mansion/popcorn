@@ -1,8 +1,4 @@
-import {
-  PopcornError,
-  buildPopcornError,
-  deserializePopcornError,
-} from "./errors";
+import { PopcornError, type AnyPopcornError } from "./errors";
 import { toVm } from "./events";
 import type { BeamBootOptions } from "./types";
 import { check, objectWithKeys, unreachable } from "./utils";
@@ -16,7 +12,7 @@ export type PopcornOpts = {
 
 export type PopcornInitResult =
   | { ok: true; popcorn: Popcorn }
-  | { ok: false; error: PopcornError };
+  | { ok: false; error: AnyPopcornError };
 
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
@@ -55,8 +51,8 @@ export class Popcorn {
       const timer = setTimeout(() => {
         settle({
           ok: false,
-          error: buildPopcornError({
-            t: "boot-timeout",
+          error: new PopcornError({
+            t: "timeout:boot",
             timeoutMs: timeoutsMs.boot,
           }),
         });
@@ -65,8 +61,8 @@ export class Popcorn {
       const onError = (event: ErrorEvent) => {
         settle({
           ok: false,
-          error: buildPopcornError({
-            t: "worker-load",
+          error: new PopcornError({
+            t: "worker:load",
             message: event.message ?? "Worker failed to load",
           }),
         });
@@ -82,7 +78,7 @@ export class Popcorn {
           case "popcorn:boot-fail": {
             settle({
               ok: false,
-              error: deserializePopcornError(data.payload),
+              error: PopcornError.deserialize(data.payload),
             });
             break;
           }
