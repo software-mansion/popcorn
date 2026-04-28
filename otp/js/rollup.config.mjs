@@ -3,7 +3,10 @@ import typescript from "@rollup/plugin-typescript";
 export default [
   // Main library
   {
-    input: "src/index.ts",
+    input: {
+      index: "src/index.ts",
+      worker: "src/worker.ts",
+    },
     output: {
       dir: "dist",
       format: "esm",

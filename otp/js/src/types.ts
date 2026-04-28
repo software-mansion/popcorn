@@ -1,7 +1,29 @@
+type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
+
+export type BeamBootOptions = {
+  assetsUrl: string;
+  searchPaths: string[];
+  extraArgs: string[];
+  createModule: CreateModuleFn<EmscriptenModule>;
+  emit: (event: BeamEvent) => void;
+};
+
+export type BeamEvent =
+  | { type: "otp:stdout"; payload: string }
+  | { type: "otp:stderr"; payload: string }
+  | { type: "otp:exit"; payload: number }
+  | { type: "otp:abort"; payload: string }
+  | { type: "otp:error"; payload: string }
+  | { type: "popcorn:boot"; payload: BeamBootOptions }
+  | { type: "popcorn:boot-end"; payload: void };
+
 export type EmscriptenFS = {
   mkdir: (path: string) => void;
   writeFile: (path: string, data: Uint8Array) => void;
-  readFile: (path: string, options?: { encoding?: string }) => Uint8Array | string;
+  readFile: (
+    path: string,
+    options?: { encoding?: string },
+  ) => Uint8Array | string;
 };
 
 export type AnyValue = unknown;
