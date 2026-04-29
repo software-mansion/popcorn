@@ -1,5 +1,9 @@
 type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
 
+export type AnyValue = unknown;
+
+export type BeamTarget = { name: string } | { pid: string };
+
 export type BeamBootOptions = {
   assetsUrl: string;
   searchPaths: string[];
@@ -14,8 +18,7 @@ export type BeamEvent =
   | { type: "otp:exit"; payload: number }
   | { type: "otp:abort"; payload: string }
   | { type: "otp:error"; payload: string }
-  | { type: "popcorn:boot"; payload: BeamBootOptions }
-  | { type: "popcorn:boot-end"; payload: void };
+  | { type: "otp:message"; payload: AnyValue };
 
 export type EmscriptenFS = {
   mkdir: (path: string) => void;
@@ -25,8 +28,6 @@ export type EmscriptenFS = {
     options?: { encoding?: string },
   ) => Uint8Array | string;
 };
-
-export type AnyValue = unknown;
 
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
