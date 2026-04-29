@@ -1,151 +1,178 @@
-import { check, objectWithKeys, unreachable } from "./utils";
+export type Result<T, E extends Tag = Tag> =
+  | { ok: true; data: T }
+  | { ok: false; error: PopcornError<E> };
 
-export type PopcornErrorKind =
-  | "boot-failed"
-  | "worker-failed"
-  | "timeout"
-  | "protocol-error";
-
-export type PopcornErrorMetadata = Record<string, unknown>;
-
-export class PopcornError extends Error {
-  constructor(
-    public readonly kind: PopcornErrorKind,
-    message: string,
-    public readonly metadata: PopcornErrorMetadata = {},
-  ) {
-    super(message);
-    this.name = "PopcornError";
-  }
-}
-
-export type SerializedPopcornError = {
-  kind: PopcornErrorKind;
-  message: string;
-  metadata: PopcornErrorMetadata;
+type Tag = keyof PopcornErrors;
+export type PopcornErrors = {
+  "timeout:init": { timeoutMs: number };
+  "worker:load": { message: string };
+  "bridge:not-started": EmptyData;
+  "beam:missing-boot-script": { url: string };
+  "beam:missing-manifest": { url: string };
+  "beam:missing-tarball": { name: string; all: string[] };
+  "internal:check": { detail?: string };
+  "internal:unreachable": EmptyData;
 };
 
-type PopcornErrorData =
-  | { t: "boot-timeout"; timeoutMs: number }
-  | { t: "worker-load"; message: string }
-  | { t: "protocol"; reason: string; type?: string }
-  | { t: "missing-boot-script"; url: string }
-  | { t: "missing-manifest"; url: string }
-  | { t: "missing-tarball"; name: string; availableTarballs: string[] }
-  | { t: "internal-boot-failure" }
-  | { t: "internal-worker-failure" };
+export type SerializedError<T extends Tag = Tag> = {
+  [K in T]: { t: K; data: PopcornErrors[K] };
+}[T];
 
-export function buildPopcornError(data: PopcornErrorData): PopcornError {
-  switch (data.t) {
-    case "boot-timeout":
-      return new PopcornError("timeout", "boot timeout", {
-        operation: "boot",
-        timeoutMs: data.timeoutMs,
-      });
-    case "worker-load":
-      return new PopcornError("worker-failed", data.message, {
-        reason: "load_error",
-      });
-    case "protocol":
-      return new PopcornError(
-        "protocol-error",
-        data.type === undefined
-          ? "Invalid worker event during init"
-          : `Unexpected worker event during init: ${data.type}`,
-        data.type === undefined
-          ? { reason: data.reason }
-          : { reason: data.reason, type: data.type },
-      );
-    case "missing-boot-script":
-      return new PopcornError(
-        "boot-failed",
-        `Missing boot script: '${data.url}'`,
-        {
-          reason: "missing-boot-script",
-          url: data.url,
-        },
-      );
-    case "missing-manifest":
-      return new PopcornError(
-        "boot-failed",
-        `Missing tarball manifest: '${data.url}'`,
-        {
-          reason: "missing-manifest",
-          url: data.url,
-        },
-      );
-    case "missing-tarball":
-      return new PopcornError(
-        "boot-failed",
-        `Missing tarball: '${data.name}'. Available tarballs: ${data.availableTarballs.join(", ")}`,
-        {
-          reason: "missing-tarball",
-          app: data.name,
-          availableTarballs: data.availableTarballs,
-        },
-      );
-    case "internal-boot-failure":
-      return new PopcornError("boot-failed", "OTP boot failed", {
-        reason: "unknown-error",
-      });
-    case "internal-worker-failure":
-      return new PopcornError(
-        "worker-failed",
-        "Popcorn worker failed during init",
-        {
-          reason: "internal-error",
-        },
-      );
-  }
+type EmptyData = Record<never, never>;
+
+export function err<T extends Tag>(
+  t: T,
+  data: PopcornErrors[T],
+): PopcornError<T> {
+  return new PopcornError({ t, data });
 }
 
-export function serializePopcornError(
-  error: PopcornError,
-): SerializedPopcornError {
-  return {
-    kind: error.kind,
-    message: error.message,
-    metadata: error.metadata,
-  };
-}
-
-export function deserializePopcornError(value: unknown): PopcornError {
-  const data = objectWithKeys(value, ["kind", "message", "metadata"]);
-  check(data !== null);
-  check(isMetadata(data.metadata));
-  check(typeof data.message === "string");
-
-  return new PopcornError(
-    toPopcornErrorKind(data.kind),
-    data.message,
-    data.metadata,
-  );
-}
-
-export function toPopcornError(
+export function isErr<T extends Tag = Tag>(
   error: unknown,
-  fallback: PopcornErrorData,
-): PopcornError {
-  if (error instanceof PopcornError) {
-    return error;
-  }
-
-  return buildPopcornError(fallback);
+  t?: T,
+): error is PopcornError<T> {
+  const isInstance = error instanceof PopcornError;
+  if (!isInstance) return false;
+  if (t === undefined) return true;
+  if (error.t === t) return true;
+  return false;
 }
 
-function toPopcornErrorKind(value: unknown): PopcornErrorKind {
-  switch (value) {
-    case "boot-failed":
-    case "worker-failed":
-    case "timeout":
-    case "protocol-error":
-      return value;
+export class PopcornError<T extends Tag = Tag> extends Error {
+  declare readonly cause: SerializedError<T>;
+  private readonly serialized: SerializedError<T>;
+
+  constructor(cause: SerializedError<T>) {
+    super(message(cause), { cause });
+    this.name = "PopcornError";
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.serialized = cause;
+  }
+
+  public get t(): T {
+    return this.serialized.t;
+  }
+
+  public get data(): PopcornErrors[T] {
+    return this.serialized.data;
+  }
+
+  public serialize(): SerializedError<T> {
+    return {
+      t: this.serialized.t,
+      data: { ...this.serialized.data },
+    };
+  }
+
+  public static deserialize(value: unknown): PopcornError {
+    return new PopcornError(parse(value));
+  }
+}
+
+function message<T extends Tag>(error: SerializedError<T>): string;
+function message(error: SerializedError): string {
+  switch (error.t) {
+    case "timeout:init":
+      return `Init timed out after ${error.data.timeoutMs}ms`;
+    case "worker:load":
+      return error.data.message;
+    case "bridge:not-started":
+      return "Bridge did not start";
+    case "beam:missing-boot-script":
+      return `Missing boot script: '${error.data.url}'`;
+    case "beam:missing-manifest":
+      return `Missing tarball manifest: '${error.data.url}'`;
+    case "beam:missing-tarball":
+      return `Missing tarball: '${error.data.name}'. Available tarballs: ${error.data.all.join(", ")}`;
+    case "internal:check":
+      return error.data.detail === undefined
+        ? "Check failed"
+        : `Check failed: ${error.data.detail}`;
+    case "internal:unreachable":
+      return "Entered unreachable code";
     default:
-      unreachable();
+      return unreachable();
   }
 }
 
-function isMetadata(value: unknown): value is PopcornErrorMetadata {
-  const metadata = objectWithKeys(value, []);
-  return metadata !== null;
+function parse(value: unknown): SerializedError {
+  check(objectWithKeys(value, ["t", "data"]));
+  switch (value.t) {
+    case "timeout:init":
+      check(isTimeoutInitData(value.data));
+      return { t: value.t, data: value.data };
+    case "worker:load":
+      check(isWorkerLoadData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:not-started":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "beam:missing-boot-script":
+    case "beam:missing-manifest":
+      check(isUrlData(value.data));
+      return { t: value.t, data: value.data };
+    case "beam:missing-tarball":
+      check(isMissingTarballData(value.data));
+      return { t: value.t, data: value.data };
+    case "internal:check":
+      check(isInternalCheckData(value.data));
+      return { t: value.t, data: value.data };
+    case "internal:unreachable":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    default:
+      return unreachable();
+  }
+}
+
+function isTimeoutInitData(
+  value: unknown,
+): value is PopcornErrors["timeout:init"] {
+  return objectWithKeys(value, ["timeoutMs"]) !== null;
+}
+
+function isWorkerLoadData(
+  value: unknown,
+): value is PopcornErrors["worker:load"] {
+  return objectWithKeys(value, ["message"]) !== null;
+}
+
+function isUrlData(
+  value: unknown,
+): value is PopcornErrors["beam:missing-boot-script"] {
+  return objectWithKeys(value, ["url"]) !== null;
+}
+
+function isMissingTarballData(
+  value: unknown,
+): value is PopcornErrors["beam:missing-tarball"] {
+  return objectWithKeys(value, ["name", "all"]) !== null;
+}
+
+function isInternalCheckData(
+  value: unknown,
+): value is PopcornErrors["internal:check"] {
+  return objectWithKeys(value, []) !== null;
+}
+
+function isEmptyData(value: unknown): value is EmptyData {
+  return objectWithKeys(value, []) !== null;
+}
+
+function objectWithKeys<K extends string>(
+  value: unknown,
+  keys: readonly K[],
+): value is Record<K, unknown> {
+  const isObject = value !== null && typeof value === "object";
+  return isObject && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function unreachable(): never {
+  throw err("internal:unreachable", {});
+}
+
+function check(ok: boolean, msg?: string): asserts ok {
+  if (!ok) {
+    throw err("internal:check", { detail: msg });
+  }
 }

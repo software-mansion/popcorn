@@ -1,8 +1,4 @@
-import {
-  PopcornError,
-  buildPopcornError,
-  deserializePopcornError,
-} from "./errors";
+import { PopcornError, err, type Result } from "./errors";
 import { toVm } from "./events";
 import type { BeamBootOptions } from "./types";
 import { check, objectWithKeys, unreachable } from "./utils";
@@ -13,10 +9,6 @@ export type PopcornOpts = {
     boot?: number;
   };
 };
-
-export type PopcornInitResult =
-  | { ok: true; popcorn: Popcorn }
-  | { ok: false; error: PopcornError };
 
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
@@ -30,18 +22,17 @@ export class Popcorn {
     this.vmWorker = vmWorker;
   }
 
-  public static async init(opts: PopcornOpts): Promise<PopcornInitResult> {
+  public static async init(opts: PopcornOpts): Promise<Result<Popcorn>> {
     const vmWorkerUrl = new URL("./worker.mjs", import.meta.url);
     const vmWorker = new Worker(vmWorkerUrl, { type: "module" });
 
-    return await new Promise<PopcornInitResult>((resolve) => {
+    return await new Promise<Result<Popcorn>>((resolve) => {
       let isSettled = false;
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...opts.timeoutsMs };
       const cleanup = () => {
         vmWorker.removeEventListener("message", onMessage);
-        vmWorker.removeEventListener("error", onError);
       };
-      const settle = (result: PopcornInitResult) => {
+      const settle = (result: Result<Popcorn>) => {
         if (isSettled) return;
         isSettled = true;
         clearTimeout(timer);
@@ -55,34 +46,22 @@ export class Popcorn {
       const timer = setTimeout(() => {
         settle({
           ok: false,
-          error: buildPopcornError({
-            t: "boot-timeout",
-            timeoutMs: timeoutsMs.boot,
-          }),
+          error: err("timeout:init", { timeoutMs: timeoutsMs.boot }),
         });
       }, timeoutsMs.boot);
 
-      const onError = (event: ErrorEvent) => {
-        settle({
-          ok: false,
-          error: buildPopcornError({
-            t: "worker-load",
-            message: event.message ?? "Worker failed to load",
-          }),
-        });
-      };
       const onMessage = (event: MessageEvent<unknown>) => {
         const data = objectWithKeys(event.data, ["type", "payload"]);
         check(data !== null);
 
         switch (data.type) {
           case "popcorn:boot-end":
-            settle({ ok: true, popcorn: new Popcorn(vmWorker) });
+            settle({ ok: true, data: new Popcorn(vmWorker) });
             break;
           case "popcorn:boot-fail": {
             settle({
               ok: false,
-              error: deserializePopcornError(data.payload),
+              error: PopcornError.deserialize(data.payload),
             });
             break;
           }
@@ -92,7 +71,6 @@ export class Popcorn {
       };
 
       vmWorker.addEventListener("message", onMessage);
-      vmWorker.addEventListener("error", onError);
       toVm(vmWorker, { type: "popcorn:boot", payload: opts.beam });
     });
   }
