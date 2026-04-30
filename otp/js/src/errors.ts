@@ -7,6 +7,7 @@ export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
   "worker:load": { message: string };
   "bridge:not-started": EmptyData;
+  "bridge:unserializable": EmptyData;
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
@@ -78,6 +79,8 @@ function message(error: SerializedError): string {
       return error.data.message;
     case "bridge:not-started":
       return "Bridge did not start";
+    case "bridge:unserializable":
+      return "Message can't be serialized to string";
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
@@ -105,6 +108,9 @@ function parse(value: unknown): SerializedError {
       check(isWorkerLoadData(value.data));
       return { t: value.t, data: value.data };
     case "bridge:not-started":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:unserializable":
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     case "beam:missing-boot-script":

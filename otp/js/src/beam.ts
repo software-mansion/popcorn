@@ -1,4 +1,5 @@
 import { PopcornError, err, isErr, type Result } from "./errors";
+import { deserializeBridgeMessage } from "./events";
 import { extractTar } from "./tar";
 import type { BeamBootOptions, EmscriptenModule } from "./types";
 import {
@@ -46,7 +47,9 @@ export async function boot({
     printErr: (text) => emit({ type: "otp:stderr", payload: text }),
     onExit: (code) => emit({ type: "otp:exit", payload: code }),
     onAbort: (text) => emit({ type: "otp:abort", payload: text }),
-    // TODO: add handler for onBeamMessage
+    onBeamMessage: (text) => {
+      emit({ type: "otp:message", payload: deserializeBridgeMessage(text) });
+    },
     onError: (text) => emit({ type: "otp:error", payload: text }),
     arguments: buildArgs({ searchPaths, extra: extraArgs }),
     ENV: {
@@ -184,4 +187,22 @@ async function maybeDecompressTar(tar: Uint8Array): Promise<Uint8Array> {
   }
 
   return decompressGzip(tar);
+}
+
+export function send(
+  module: EmscriptenModule | null,
+  command: string,
+): Result<null> {
+  if (module === null) {
+    return { ok: false, error: err("bridge:not-started", {}) };
+  }
+
+  const byteLength = new TextEncoder().encode(command).length;
+  module.ccall(
+    "sendVmMessage",
+    null,
+    ["string", "number"],
+    [command, byteLength],
+  );
+  return { ok: true, data: null };
 }
