@@ -51,7 +51,10 @@ export async function boot({
       emit({ type: "otp:message", payload: deserializeBridgeMessage(text) });
     },
     onError: (text) => emit({ type: "otp:error", payload: text }),
-    arguments: buildArgs({ searchPaths, extra: extraArgs }),
+    arguments: buildArgs({
+      searchPaths: searchPaths ?? [],
+      extra: extraArgs ?? [],
+    }),
     ENV: {
       BINDIR: "/bin",
       EMU: "beam",

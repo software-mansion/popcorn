@@ -4,7 +4,7 @@ import { objectWithKeys } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
-  payload: Pick<BeamBootOptions, "assetsUrl">;
+  payload: Pick<BeamBootOptions, "assetsUrl" | "searchPaths" | "extraArgs">;
 };
 
 type SendEvent = {

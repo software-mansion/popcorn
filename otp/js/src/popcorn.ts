@@ -9,7 +9,7 @@ import type { AnyValue, BeamBootOptions } from "./types";
 import { check } from "./utils";
 
 export type PopcornOpts = {
-  beam: Pick<BeamBootOptions, "assetsUrl">;
+  beam: Pick<BeamBootOptions, "assetsUrl" | "searchPaths" | "extraArgs">;
   timeoutsMs?: {
     boot?: number;
   };
@@ -24,10 +24,13 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
 };
 
+type MessageHandler = (message: AnyValue) => void;
+
 export class Popcorn {
   private vmWorker: Worker;
   private isBooted = false;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
+  private readonly messageHandlers = new Set<MessageHandler>();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
     check(data !== null);
@@ -35,6 +38,10 @@ export class Popcorn {
     switch (data.type) {
       case "popcorn:boot-end":
       case "popcorn:boot-fail":
+        return;
+      case "otp:message":
+        this.emit(data);
+        this.emitMessage(data.payload);
         return;
       default:
         this.emit(data);
@@ -137,16 +144,30 @@ export class Popcorn {
     };
   }
 
+  public onMessage(handler: MessageHandler): () => void {
+    this.messageHandlers.add(handler);
+    return () => {
+      this.messageHandlers.delete(handler);
+    };
+  }
+
   public deinit(): void {
     this.isBooted = false;
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.eventHandlers.clear();
+    this.messageHandlers.clear();
     this.vmWorker.terminate();
   }
 
   private emit(event: PopcornEvent): void {
     for (const handler of this.eventHandlers) {
       handler(event);
+    }
+  }
+
+  private emitMessage(message: AnyValue): void {
+    for (const handler of this.messageHandlers) {
+      handler(message);
     }
   }
 }

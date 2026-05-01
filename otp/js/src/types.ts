@@ -6,8 +6,8 @@ export type BeamTarget = { name: string } | { pid: string };
 
 export type BeamBootOptions = {
   assetsUrl: string;
-  searchPaths: string[];
-  extraArgs: string[];
+  searchPaths?: string[];
+  extraArgs?: string[];
   createModule: CreateModuleFn<EmscriptenModule>;
   emit: (event: BeamEvent) => void;
 };
