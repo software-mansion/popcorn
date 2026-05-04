@@ -1,7 +1,7 @@
 import { PopcornError, err, type Result } from "./errors";
 import {
   readWorkerEvent,
-  serializeSendCommand,
+  serializeSendPayload,
   toVm,
   type PopcornEvent,
 } from "./events";
@@ -24,13 +24,12 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
 };
 
-type MessageHandler = (message: AnyValue) => void;
+const LOG_PREFIX = "[Popcorn]";
 
 export class Popcorn {
   private vmWorker: Worker;
   private isBooted = false;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
-  private readonly messageHandlers = new Set<MessageHandler>();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
     check(data !== null);
@@ -40,11 +39,28 @@ export class Popcorn {
       case "popcorn:boot-fail":
         return;
       case "otp:message":
-        this.emit(data);
-        this.emitMessage(data.payload);
+        this.emit(data.payload);
         return;
-      default:
-        this.emit(data);
+      case "otp:stdout":
+        console.log(`${LOG_PREFIX} stdout:`, data.payload);
+        return;
+      case "otp:stderr":
+        console.error(`${LOG_PREFIX} stderr:`, data.payload);
+        return;
+      case "otp:abort":
+        console.error(`${LOG_PREFIX} abort:`, data.payload);
+        return;
+      case "otp:error":
+        console.error(`${LOG_PREFIX} error:`, data.payload);
+        return;
+      case "otp:exit":
+        console.info(`${LOG_PREFIX} exit:`, data.payload);
+        return;
+      case "popcorn:send-fail":
+        console.error(
+          `${LOG_PREFIX} send failed:`,
+          PopcornError.deserialize(data.payload),
+        );
         return;
     }
   };
@@ -121,8 +137,8 @@ export class Popcorn {
       return { ok: false, error: err("bridge:not-started", {}) };
     }
 
-    const command = serializeSendCommand(
-      { name: target },
+    const command = serializeSendPayload(
+      target,
       payload ?? {},
       opts?.meta ?? {},
     );
@@ -132,7 +148,7 @@ export class Popcorn {
 
     toVm(this.vmWorker, {
       type: "popcorn:send",
-      payload: { command: command.data },
+      payload: command.data,
     });
     return { ok: true, data: null };
   }
@@ -144,30 +160,16 @@ export class Popcorn {
     };
   }
 
-  public onMessage(handler: MessageHandler): () => void {
-    this.messageHandlers.add(handler);
-    return () => {
-      this.messageHandlers.delete(handler);
-    };
-  }
-
   public deinit(): void {
     this.isBooted = false;
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.eventHandlers.clear();
-    this.messageHandlers.clear();
     this.vmWorker.terminate();
   }
 
   private emit(event: PopcornEvent): void {
     for (const handler of this.eventHandlers) {
       handler(event);
-    }
-  }
-
-  private emitMessage(message: AnyValue): void {
-    for (const handler of this.messageHandlers) {
-      handler(message);
     }
   }
 }

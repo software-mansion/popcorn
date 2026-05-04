@@ -4,6 +4,12 @@ export type AnyValue = unknown;
 
 export type BeamTarget = { name: string } | { pid: string };
 
+export type BeamSendPayload = {
+  targetName: string;
+  payloadJson: string;
+  metaJson: string;
+};
+
 export type BeamBootOptions = {
   assetsUrl: string;
   searchPaths?: string[];

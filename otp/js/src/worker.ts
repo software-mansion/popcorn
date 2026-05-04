@@ -35,7 +35,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       return;
     }
     case "popcorn:send": {
-      const result = send(instance, data.payload.command);
+      const result = send(instance, data.payload);
       if (!result.ok) {
         toMain({
           type: "popcorn:send-fail",

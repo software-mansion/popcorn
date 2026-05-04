@@ -83,12 +83,8 @@ test("round-trips through the native bridge when a wasm listener is registered",
     },
     { settleMs: 250 },
     async ({ popcorn, settleMs }) => {
-      const messages: unknown[] = [];
       const events: Array<PopcornEvent> = [];
-      const unsubscribe = popcorn.onMessage((message) => {
-        messages.push(message);
-      });
-      const unsubscribeEvents = popcorn.onEvent((event) => {
+      const unsubscribe = popcorn.onEvent((event) => {
         events.push(event);
       });
 
@@ -100,11 +96,11 @@ test("round-trips through the native bridge when a wasm listener is registered",
         await new Promise((resolve) => setTimeout(resolve, settleMs));
 
         if (
-          messages.some(
-            (message) =>
-              typeof message === "object" &&
-              message !== null &&
-              "reply" in message,
+          events.some(
+            (event) =>
+              typeof event === "object" &&
+              event !== null &&
+              "reply" in event,
           )
         ) {
           break;
@@ -116,12 +112,10 @@ test("round-trips through the native bridge when a wasm listener is registered",
       }
 
       unsubscribe();
-      unsubscribeEvents();
       return {
         send: sendResult.ok
           ? { ok: true }
           : { ok: false, error: sendResult.error.serialize() },
-        messages,
         events,
       };
     },
@@ -130,24 +124,30 @@ test("round-trips through the native bridge when a wasm listener is registered",
   assert(result.ok);
   assert(result.data.send.ok);
   if (
-    !result.data.messages.some(
-      (message) =>
-        typeof message === "object" &&
-        message !== null &&
-        "reply" in message,
+    !result.data.events.some(
+      (event) =>
+        typeof event === "object" &&
+        event !== null &&
+        "reply" in event,
     )
   ) {
-    throw new Error(
-      `No bridge reply received. Events: ${JSON.stringify(result.data.events)}`,
-    );
+    throw new Error(`No bridge reply received: ${JSON.stringify(result.data.events)}`);
   }
-  expect(result.data.messages).toContainEqual({
+  expect(result.data.events).toContainEqual({
     reply: { ping: true },
     meta: { requestId: "req-1" },
   });
 });
 
 test("surfaces listener lookup failures from popcorn.send", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const onConsole = (message: { type: () => string; text: () => string }) => {
+    if (message.type() === "error" && message.text().includes("[Popcorn]")) {
+      consoleErrors.push(message.text());
+    }
+  };
+  page.on("console", onConsole);
+
   const result = await withPopcorn(
     page,
     {
@@ -158,30 +158,22 @@ test("surfaces listener lookup failures from popcorn.send", async ({ page }) => 
     },
     { settleMs: 250 },
     async ({ popcorn, settleMs }) => {
-      const events: Array<PopcornEvent> = [];
-      const unsubscribe = popcorn.onEvent((event) => {
-        events.push(event);
-      });
-
       await new Promise((resolve) => setTimeout(resolve, settleMs));
       const sendResult = popcorn.send("missing-listener", { ping: true });
       await new Promise((resolve) => setTimeout(resolve, settleMs));
 
-      unsubscribe();
       return {
         send: sendResult.ok
           ? { ok: true }
           : { ok: false, error: sendResult.error.serialize() },
-        events,
       };
     },
   );
+  page.off("console", onConsole);
 
   assert(result.ok);
   assert(result.data.send.ok);
-  expect(result.data.events).toContainEqual({
-    type: "otp:error",
-    payload:
-      '{"type":"listener_not_found","detail":"target listener is not registered"}',
-  });
+  expect(consoleErrors.some((text) => text.includes("listener_not_found"))).toBe(
+    true,
+  );
 });

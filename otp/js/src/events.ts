@@ -1,5 +1,10 @@
 import { err, type Result, type SerializedError } from "./errors";
-import type { AnyValue, BeamBootOptions, BeamEvent, BeamTarget } from "./types";
+import type {
+  AnyValue,
+  BeamBootOptions,
+  BeamEvent,
+  BeamSendPayload,
+} from "./types";
 import { objectWithKeys } from "./utils";
 
 type BootEvent = {
@@ -9,9 +14,7 @@ type BootEvent = {
 
 type SendEvent = {
   type: "popcorn:send";
-  payload: {
-    command: string;
-  };
+  payload: BeamSendPayload;
 };
 
 type BootEndEvent =
@@ -25,9 +28,11 @@ type SendFailEvent = {
 
 export type MainToVmEvent = BootEvent | SendEvent;
 
-export type PopcornEvent = BeamEvent | SendFailEvent;
+export type PopcornEvent = AnyValue;
 
-export type VmToMainEvent = PopcornEvent | BootEndEvent;
+type RuntimeEvent = BeamEvent | SendFailEvent;
+
+export type VmToMainEvent = RuntimeEvent | BootEndEvent;
 
 type BridgeEnvelope = {
   type: "vm_message";
@@ -71,23 +76,26 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
   }
 }
 
-export function serializeSendCommand(
-  target: BeamTarget,
+export function serializeSendPayload(
+  targetName: string,
   payload: AnyValue,
   meta: AnyValue,
-): Result<string> {
+): Result<BeamSendPayload> {
+  if (targetName.length === 0) {
+    return { ok: false, error: err("bridge:invalid-target", {}) };
+  }
+
   try {
     return {
       ok: true,
-      data: JSON.stringify({
-        type: "send",
-        target: target,
-        payload: payload,
-        meta: meta,
-      }),
+      data: {
+        targetName,
+        payloadJson: serializeJson(payload),
+        metaJson: serializeJson(meta),
+      },
     };
   } catch {
-    const error = err("bridge:unserializable", { message: payload });
+    const error = err("bridge:unserializable", {});
     return { ok: false, error };
   }
 }
@@ -115,4 +123,9 @@ export function toMain(event: VmToMainEvent): void {
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
   const data = objectWithKeys(value, ["type"]);
   return data !== null && data.type === "vm_message";
+}
+
+function serializeJson(value: AnyValue): string {
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? "null" : serialized;
 }

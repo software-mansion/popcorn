@@ -1,7 +1,11 @@
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
 import { extractTar } from "./tar";
-import type { BeamBootOptions, EmscriptenModule } from "./types";
+import type {
+  BeamBootOptions,
+  BeamSendPayload,
+  EmscriptenModule,
+} from "./types";
 import {
   check,
   decompressGzip,
@@ -18,6 +22,7 @@ const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
 const MANIFEST_PATH = "/lib/tarballs.json";
+const UTF8 = new TextEncoder();
 const BASE_ARGS = [
   "--",
   "-root",
@@ -194,18 +199,28 @@ async function maybeDecompressTar(tar: Uint8Array): Promise<Uint8Array> {
 
 export function send(
   module: EmscriptenModule | null,
-  command: string,
+  message: BeamSendPayload,
 ): Result<null> {
   if (module === null) {
     return { ok: false, error: err("bridge:not-started", {}) };
   }
 
-  const byteLength = new TextEncoder().encode(command).length;
   module.ccall(
     "sendVmMessage",
     null,
-    ["string", "number"],
-    [command, byteLength],
+    ["string", "number", "string", "number", "string", "number"],
+    [
+      message.targetName,
+      utf8Length(message.targetName),
+      message.payloadJson,
+      utf8Length(message.payloadJson),
+      message.metaJson,
+      utf8Length(message.metaJson),
+    ],
   );
   return { ok: true, data: null };
+}
+
+function utf8Length(text: string): number {
+  return UTF8.encode(text).length;
 }
