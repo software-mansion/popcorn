@@ -15,6 +15,10 @@ on:
       - ".github/actions/build-otp-wasm/action.yml"
       - ".github/actions/setup-toolchain/action.yml"
       - ".github/actions/setup-playwright/action.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -68,7 +72,7 @@ jobs:
         with:
           cache-prefix: otp-js-e2e
           lockfile: pnpm-lock.yaml
-          version: "1.58.2"
+          version: "1.59.1"
 
       - name: Run e2e tests
         run: pnpm e2e

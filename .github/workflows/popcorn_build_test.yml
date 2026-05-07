@@ -16,6 +16,10 @@ on:
       - "!.github/workflows/local_*"
       - "!.github/workflows/release_*"
       - ".github/workflows/popcorn_build_test.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

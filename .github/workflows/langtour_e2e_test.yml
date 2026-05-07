@@ -6,6 +6,10 @@ on:
     paths:
       - "language-tour/**"
       - ".github/workflows/langtour_e2e_test.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 permissions:
   contents: read

@@ -14,6 +14,10 @@ on:
       - "docker/landing.Dockerfile"
       - "docker/langtour.Dockerfile"
       - ".github/workflows/demo_staging_build_and_deploy.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 env:
   REGISTRY: ghcr.io
