@@ -3,7 +3,6 @@ import { defineConfig } from "astro/config";
 
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
-import icon from "astro-icon";
 // used for build-time generation of diagrams
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
@@ -30,7 +29,6 @@ export default defineConfig({
   },
   integrations: [
     react(),
-    icon(),
     mermaid({
       autoTheme: true,
       mermaidConfig: {
