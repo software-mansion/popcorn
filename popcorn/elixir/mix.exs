@@ -1,8 +1,10 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
-  @version "0.3.0-rc1"
+  @version "0.3.0-rc2"
   @github "https://github.com/software-mansion/popcorn"
+  @repo_root "../.."
+  @package_metadata_files ~w(README.md LICENSE)
 
   def project do
     otp_version =
@@ -23,6 +25,8 @@ defmodule Popcorn.MixProject do
       aliases: [
         docs: ["docs", &generate_js_docs/1],
         compile: ["compile", &patch/1],
+        "hex.build": [&copy_meta/1, "hex.build"],
+        "hex.publish": [&copy_meta/1, "hex.publish"],
         lint: [
           "format --check-formatted",
           "deps.unlock --check-unused",
@@ -125,6 +129,17 @@ defmodule Popcorn.MixProject do
       });
     </script>
     """
+  end
+
+  defp copy_meta(_) do
+    repo_root = Path.expand(@repo_root, __DIR__)
+
+    for filename <- @package_metadata_files do
+      source_path = Path.join(repo_root, filename)
+      target_path = Path.expand(filename, __DIR__)
+
+      File.cp!(source_path, target_path)
+    end
   end
 
   defp generate_js_docs(_) do
