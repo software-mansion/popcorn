@@ -23,7 +23,7 @@ defmodule Mix.Tasks.Llv.Build do
 
   @impl Mix.Task
   def run(_args) do
-    unless File.exists?("local") do
+    unless File.dir?("local") do
       Mix.raise("local/ directory not found. Run `mix llv.install` first.")
     end
 

@@ -29,6 +29,7 @@ defmodule Mix.Tasks.Llv.Install do
   """
 
   @popcorn_js_version "0.3.0-rc1"
+  @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
 
   @impl Igniter.Mix.Task
   def igniter(igniter) do
@@ -48,82 +49,58 @@ defmodule Mix.Tasks.Llv.Install do
     |> generate_local_project(llv_path)
   end
 
+  defp llv_path_from_local do
+    llv_abs = Mix.Project.deps_paths()[:local_live_view]
+    local_abs = Path.join(File.cwd!(), "local")
+    Path.relative_to(llv_abs, local_abs, force: true)
+  end
+
   # --- Endpoint ---
 
   defp inject_endpoint(igniter) do
-    endpoint = Module.concat(Igniter.Libs.Phoenix.web_module(igniter), "Endpoint")
+    endpoint = Igniter.Libs.Phoenix.web_module_name(igniter, "Endpoint")
 
-    case Igniter.Project.Module.find_and_update_module(igniter, endpoint, fn zipper ->
-           with {:ok, zipper} <- add_llv_socket(zipper),
-                {:ok, zipper} <- add_wasm_headers(zipper) do
-             {:ok, zipper}
-           end
-         end) do
+    case Igniter.Project.Module.find_and_update_module(igniter, endpoint, &update_endpoint/1) do
       {:ok, igniter} ->
         igniter
 
       {:error, igniter} ->
-        Igniter.add_warning(igniter, """
-        Could not find endpoint module #{inspect(endpoint)}. Add manually:
+        Igniter.add_warning(
+          igniter,
+          "Could not find module #{inspect(endpoint)}. Add security headers config manually."
+        )
+    end
+  end
 
-            socket "/llv_socket", LocalLiveView.Socket, websocket: true
-
-            plug :put_wasm_security_headers
-
-            defp put_wasm_security_headers(conn, _opts) do
-              conn
-              |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
-              |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
-            end
-        """)
+  defp update_endpoint(zipper) do
+    with {:ok, zipper} <- add_llv_socket(zipper),
+         {:ok, zipper} <- add_wasm_headers_plug(zipper),
+         {:ok, zipper} <- add_wasm_headers_function(zipper) do
+      {:ok, zipper}
     end
   end
 
   defp add_llv_socket(zipper) do
-    if module_source_contains?(zipper, "LocalLiveView.Socket") do
-      {:ok, zipper}
-    else
-      case Igniter.Code.Function.move_to_function_call_in_current_scope(zipper, :plug, [1, 2]) do
-        {:ok, plug_zipper} ->
-          {:ok,
-           Igniter.Code.Common.add_code(
-             plug_zipper,
-             ~s[socket "/llv_socket", LocalLiveView.Socket, websocket: true],
-             placement: :before
-           )}
+    socket_code = """
+    socket "/llv_socket", LocalLiveView.Socket, websocket: true
+    """
 
-        :error ->
-          {:warning, "No plug call found in endpoint to insert socket before"}
-      end
-    end
+    add_code_after_function(zipper, socket_code, :socket)
   end
 
-  defp add_wasm_headers(zipper) do
-    if module_source_contains?(zipper, "put_wasm_security_headers") do
-      {:ok, zipper}
+  defp add_code_after_function(zipper, code, function_name) do
+    with false <- module_source_contains?(zipper, code),
+         {:ok, zipper} <- move_to_last_function_call(zipper, function_name) do
+      {:ok,
+       Igniter.Code.Common.add_code(
+         zipper,
+         code,
+         placement: :after
+       )}
     else
-      case Igniter.Code.Module.move_to_use(zipper, Phoenix.Endpoint) do
-        {:ok, use_zipper} ->
-          zipper_with_plug =
-            Igniter.Code.Common.add_code(use_zipper, "plug :put_wasm_security_headers")
-
-          last =
-            zipper_with_plug
-            |> Sourceror.Zipper.down()
-            |> Sourceror.Zipper.rightmost()
-
-          {:ok,
-           Igniter.Code.Common.add_code(last, """
-           defp put_wasm_security_headers(conn, _opts) do
-             conn
-             |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
-             |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
-           end
-           """)}
-
-        :error ->
-          {:warning, "Could not find 'use Phoenix.Endpoint' to insert WASM headers"}
-      end
+      error ->
+        {:warning,
+         "Cannot add code #{inspect(code)} after function #{inspect(function_name)}.\n #{inspect(error)}"}
     end
   end
 
@@ -133,6 +110,33 @@ defmodule Mix.Tasks.Llv.Install do
     |> Sourceror.Zipper.node()
     |> Sourceror.to_string()
     |> String.contains?(str)
+  end
+
+  defp move_to_last_function_call(zipper, name) do
+    predicate = fn zipper -> Igniter.Code.Function.function_call?(zipper, name) end
+
+    zipper
+    |> Igniter.Code.Common.move_to_last(predicate)
+  end
+
+  defp add_wasm_headers_plug(zipper) do
+    headers_code = """
+    plug :put_wasm_security_headers
+    """
+
+    add_code_after_function(zipper, headers_code, :plug)
+  end
+
+  defp add_wasm_headers_function(zipper) do
+    headers_code = """
+    defp put_wasm_security_headers(conn, _opts) do
+      conn
+      |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
+      |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
+    end
+    """
+
+    add_code_after_function(zipper, headers_code, :plug)
   end
 
   # --- Application ---
@@ -453,6 +457,10 @@ defmodule Mix.Tasks.Llv.Install do
     Igniter.create_new_file(igniter, "assets/build.mjs", read_template("build.mjs"))
   end
 
+  defp read_template(template) do
+    File.read!(Path.join(@templates_dir, template))
+  end
+
   # --- assets/vendor/local_live_view.js ---
 
   defp generate_vendor(igniter) do
@@ -468,9 +476,6 @@ defmodule Mix.Tasks.Llv.Install do
     if File.exists?("local") do
       igniter
     else
-      File.mkdir_p!("local/config")
-      File.mkdir_p!("local/lib/local")
-
       igniter
       |> copy_template("local/mix.exs", "mix.exs", llv_path: llv_path)
       |> copy_template("local/config/config.exs", "config.exs")
@@ -479,27 +484,6 @@ defmodule Mix.Tasks.Llv.Install do
       |> copy_template("local/lib/hello_local.ex", "hello_local.ex")
     end
   end
-
-  defp llv_path_from_local do
-    llv_abs = Mix.Project.deps_paths()[:local_live_view]
-    local_abs = Path.join(File.cwd!(), "local")
-    Path.relative_to(llv_abs, local_abs, force: true)
-  end
-
-  # --- Helpers ---
-
-  defp inject_after_pattern(content, pattern, injection) do
-    case Regex.run(pattern, content, return: :index) do
-      [{start, len}] ->
-        {before, rest} = String.split_at(content, start + len)
-        before <> injection <> rest
-
-      _ ->
-        content
-    end
-  end
-
-  @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
 
   defp copy_template(igniter, dest, template, bindings \\ []) do
     content = File.read!(Path.join(@templates_dir, template))
@@ -514,7 +498,16 @@ defmodule Mix.Tasks.Llv.Install do
     Igniter.create_new_file(igniter, dest, content)
   end
 
-  defp read_template(template) do
-    File.read!(Path.join(@templates_dir, template))
+  # --- Helpers ---
+
+  defp inject_after_pattern(content, pattern, injection) do
+    case Regex.run(pattern, content, return: :index) do
+      [{start, len}] ->
+        {before, rest} = String.split_at(content, start + len)
+        before <> injection <> rest
+
+      _ ->
+        content
+    end
   end
 end
