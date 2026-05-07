@@ -56,12 +56,11 @@ export class Popcorn {
       case "otp:exit":
         console.info(`${LOG_PREFIX} exit:`, data.payload);
         return;
-      case "popcorn:send-fail":
-        console.error(
-          `${LOG_PREFIX} send failed:`,
-          PopcornError.deserialize(data.payload),
-        );
+      case "popcorn:send-fail": {
+        const error = PopcornError.deserialize(data.payload);
+        console.error(`${LOG_PREFIX} send failed:`, error.message, error);
         return;
+      }
     }
   };
 

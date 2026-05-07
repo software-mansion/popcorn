@@ -363,7 +363,9 @@ copy_artifacts() {
     done
 
     if [[ -f "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" ]]; then
-        cp "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" "${outdir}/bin/vm.boot"
+        escript "${PROJECT_ROOT}/scripts/ensure-wasm-boot.escript" \
+            "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" \
+            "${outdir}/bin/vm.boot"
     fi
 
     success "Artifacts written to: ${outdir}"

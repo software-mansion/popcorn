@@ -34,10 +34,15 @@ type RuntimeEvent = BeamEvent | SendFailEvent;
 
 export type VmToMainEvent = RuntimeEvent | BootEndEvent;
 
-type BridgeEnvelope = {
-  type: "vm_message";
-  data?: AnyValue;
-};
+type BridgeEnvelope =
+  | {
+      type: "vm_message";
+      data?: AnyValue;
+    }
+  | {
+      type: "vm_error";
+      data?: unknown;
+    };
 
 export function readMainEvent(value: unknown): MainToVmEvent | null {
   const data = objectWithKeys(value, ["type", "payload"]);
@@ -100,11 +105,25 @@ export function serializeSendPayload(
   }
 }
 
-export function deserializeBridgeMessage(text: string): AnyValue | null {
+export function deserializeBridgeMessage(
+  text: string,
+): Extract<BeamEvent, { type: "otp:message" | "otp:error" }> | null {
   try {
     const parsed = JSON.parse(text) as unknown;
     if (!isBridgeEnvelope(parsed)) return null;
-    return parsed.data;
+
+    switch (parsed.type) {
+      case "vm_message":
+        return { type: "otp:message", payload: parsed.data };
+      case "vm_error":
+        return {
+          type: "otp:error",
+          payload:
+            typeof parsed.data === "string" ? parsed.data : "unknown_vm_error",
+        };
+      default:
+        return null;
+    }
   } catch {
     return null;
   }
@@ -122,7 +141,10 @@ export function toMain(event: VmToMainEvent): void {
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
   const data = objectWithKeys(value, ["type"]);
-  return data !== null && data.type === "vm_message";
+  return (
+    data !== null &&
+    (data.type === "vm_message" || data.type === "vm_error")
+  );
 }
 
 function serializeJson(value: AnyValue): string {

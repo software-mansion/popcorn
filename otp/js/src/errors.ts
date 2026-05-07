@@ -9,6 +9,7 @@ export type PopcornErrors = {
   "bridge:not-started": EmptyData;
   "bridge:invalid-target": EmptyData;
   "bridge:unserializable": EmptyData;
+  "bridge:listener-not-found": { targetName: string };
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
@@ -84,6 +85,8 @@ function message(error: SerializedError): string {
       return "Target name must not be empty";
     case "bridge:unserializable":
       return "Message can't be serialized to string";
+    case "bridge:listener-not-found":
+      return `Target listener not found: '${error.data.targetName}'`;
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
@@ -119,6 +122,9 @@ function parse(value: unknown): SerializedError {
     case "bridge:unserializable":
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
+    case "bridge:listener-not-found":
+      check(isListenerNotFoundData(value.data));
+      return { t: value.t, data: value.data };
     case "beam:missing-boot-script":
     case "beam:missing-manifest":
       check(isUrlData(value.data));
@@ -147,6 +153,12 @@ function isWorkerLoadData(
   value: unknown,
 ): value is PopcornErrors["worker:load"] {
   return objectWithKeys(value, ["message"]) !== null;
+}
+
+function isListenerNotFoundData(
+  value: unknown,
+): value is PopcornErrors["bridge:listener-not-found"] {
+  return objectWithKeys(value, ["targetName"]) !== null;
 }
 
 function isUrlData(

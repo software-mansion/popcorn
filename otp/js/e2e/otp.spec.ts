@@ -17,7 +17,17 @@ const BRIDGE_BOOT_EVAL = [
   "end).",
 ].join(" ");
 
-const WASM_LOAD_EVAL = "code:ensure_loaded(wasm).";
+const SEND_TO_JS_BOOT_EVAL = [
+  "spawn(fun() ->",
+  "  ok = wasm:register_listener(direct_sender),",
+  "  receive",
+  "    {wasm, _PayloadJson, _MetaJson} ->",
+  "      ok = wasm:send(#{direct => true, nested => #{count => 1}})",
+  "  end",
+  "end).",
+].join(" ");
+
+test.describe.configure({ mode: "serial" });
 
 test("boots with the packaged OTP assets through Popcorn.init", async ({
   page,
@@ -139,6 +149,59 @@ test("round-trips through the native bridge when a wasm listener is registered",
   });
 });
 
+test("emits wasm:send envelopes as Popcorn events", async ({ page }) => {
+  const result = await withPopcorn(
+    page,
+    {
+      beam: {
+        assetsUrl: "/otp-assets",
+        extraArgs: ["-eval", SEND_TO_JS_BOOT_EVAL],
+      },
+    },
+    { settleMs: 250 },
+    async ({ popcorn, settleMs }) => {
+      const events: Array<PopcornEvent> = [];
+      const unsubscribe = popcorn.onEvent((event) => {
+        events.push(event);
+      });
+
+      let sendResult = popcorn.send("direct_sender");
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, settleMs));
+
+        if (
+          events.some(
+            (event) =>
+              typeof event === "object" &&
+              event !== null &&
+              "direct" in event,
+          )
+        ) {
+          break;
+        }
+
+        sendResult = popcorn.send("direct_sender");
+      }
+
+      unsubscribe();
+      return {
+        send: sendResult.ok
+          ? { ok: true }
+          : { ok: false, error: sendResult.error.serialize() },
+        events,
+      };
+    },
+  );
+
+  assert(result.ok);
+  assert(result.data.send.ok);
+  expect(result.data.events).toContainEqual({
+    direct: true,
+    nested: { count: 1 },
+  });
+});
+
 test("surfaces listener lookup failures from popcorn.send", async ({ page }) => {
   const consoleErrors: string[] = [];
   const onConsole = (message: { type: () => string; text: () => string }) => {
@@ -153,7 +216,6 @@ test("surfaces listener lookup failures from popcorn.send", async ({ page }) => 
     {
       beam: {
         assetsUrl: "/otp-assets",
-        extraArgs: ["-eval", WASM_LOAD_EVAL],
       },
     },
     { settleMs: 250 },
@@ -173,7 +235,8 @@ test("surfaces listener lookup failures from popcorn.send", async ({ page }) => 
 
   assert(result.ok);
   assert(result.data.send.ok);
-  expect(consoleErrors.some((text) => text.includes("listener_not_found"))).toBe(
-    true,
-  );
+  const sendErrors = consoleErrors.join("\n");
+  expect(sendErrors).toContain("send failed");
+  expect(sendErrors).toContain("Target listener not found");
+  expect(sendErrors).toContain("missing-listener");
 });

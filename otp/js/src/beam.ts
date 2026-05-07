@@ -53,7 +53,10 @@ export async function boot({
     onExit: (code) => emit({ type: "otp:exit", payload: code }),
     onAbort: (text) => emit({ type: "otp:abort", payload: text }),
     onBeamMessage: (text) => {
-      emit({ type: "otp:message", payload: deserializeBridgeMessage(text) });
+      const event = deserializeBridgeMessage(text);
+      if (event !== null) {
+        emit(event);
+      }
     },
     onError: (text) => emit({ type: "otp:error", payload: text }),
     arguments: buildArgs({
@@ -205,9 +208,9 @@ export function send(
     return { ok: false, error: err("bridge:not-started", {}) };
   }
 
-  module.ccall(
+  const status = module.ccall(
     "sendVmMessage",
-    null,
+    "number",
     ["string", "number", "string", "number", "string", "number"],
     [
       message.targetName,
@@ -218,7 +221,26 @@ export function send(
       utf8Length(message.metaJson),
     ],
   );
-  return { ok: true, data: null };
+
+  if (status === 0) {
+    return { ok: true, data: null };
+  }
+
+  if (status === 1) {
+    return {
+      ok: false,
+      error: err("bridge:listener-not-found", {
+        targetName: message.targetName,
+      }),
+    };
+  }
+
+  return {
+    ok: false,
+    error: err("internal:check", {
+      detail: `Unexpected sendVmMessage status: ${String(status)}`,
+    }),
+  };
 }
 
 function utf8Length(text: string): number {

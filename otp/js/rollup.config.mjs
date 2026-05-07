@@ -15,6 +15,7 @@ export default [
       preserveModulesRoot: "src",
     },
     cache: false,
+    external: (id) => id.startsWith("node:"),
     plugins: [
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
     ],
