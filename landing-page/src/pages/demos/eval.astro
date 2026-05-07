@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import Section from "../../components/Section.astro";
-import { Icon } from "astro-icon/components";
+import DeleteForever from "../../icons/delete-forever.svg";
 ---
 
 <Layout>
@@ -70,10 +70,9 @@ end"
           id="logs"
           class="scrollbar-color flex max-h-64 min-h-24 flex-col overflow-y-auto rounded-lg font-mono text-sm whitespace-pre-wrap">
         </pre>
-        <Icon
+        <DeleteForever
           id="clear"
           class="self-end transition-colors duration-200 hover:text-orange-100"
-          name="material-symbols-light:delete-forever-outline-rounded"
           width="24"
           height="24"
         />
