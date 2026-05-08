@@ -30,7 +30,7 @@ RUN install -dm 755 /etc/apt/keyrings && \
     apt install -y mise
 
 RUN mise use --global node@"${NODE_VERSION}" && mise install
-RUN mise use --global pnpm@10 && mise install
+RUN mise use --global pnpm@11 && mise install
 RUN mise use --global erlang@"${ERLANG_VERSION}" && mise install
 RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
     mise install && \

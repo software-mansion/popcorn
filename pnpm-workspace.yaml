@@ -16,6 +16,10 @@ packages:
   - "landing-page"
   - "language-tour"
 
+allowBuilds:
+  esbuild: true
+  sharp: true
+
 catalog:
   "@types/node": ^25.0.8
   vite: ^7.3.1
