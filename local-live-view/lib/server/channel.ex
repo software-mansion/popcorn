@@ -8,8 +8,22 @@ defmodule LocalLiveView.Channel do
     end
   end
 
+  def get_all_mirror_assigns(llv_id) do
+    Registry.select(LocalLiveView.ChannelRegistry, [
+      {{:"$1", :"$2", :"$3"}, [{:==, :"$3", llv_id}], [:"$2"]}
+    ])
+    |> Enum.map(&GenServer.call(&1, :get_mirror_assigns))
+  end
+
+  def set_mirror_assigns(llv_id, assigns) do
+    case Registry.lookup(LocalLiveView.ChannelRegistry, llv_id) do
+      [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
+      [] -> {:error, :not_found}
+    end
+  end
+
   def join("llv:" <> llv_id, %{"view" => view_string}, socket) do
-    Registry.register(LocalLiveView.ChannelRegistry, llv_id, nil)
+    Registry.register(LocalLiveView.ChannelRegistry, llv_id, view_string)
     mirror_module = find_mirror_module(view_string)
     {:ok, assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
   end
@@ -18,9 +32,16 @@ defmodule LocalLiveView.Channel do
     {:reply, socket.assigns.mirror_assigns, socket}
   end
 
+  def handle_call({:set_mirror_assigns, assigns}, _from, socket) do
+    push(socket, "set_assigns", assigns)
+    {:reply, :ok, socket}
+  end
+
   def handle_in("sync", local_assigns, socket) do
+    enriched = Map.put(local_assigns, "_llv_id", socket.assigns.llv_id)
+
     new_mirror_assigns =
-      merge_assigns(socket.assigns.mirror_module, local_assigns, socket.assigns.mirror_assigns)
+      merge_assigns(socket.assigns.mirror_module, enriched, socket.assigns.mirror_assigns)
 
     {:noreply, assign(socket, mirror_assigns: new_mirror_assigns)}
   end
