@@ -14,6 +14,10 @@ on:
       - "examples/local-lv-compare/**"
       - "examples/local-lv-forms/**"
       - ".github/workflows/local_live_view_build.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -11,6 +11,10 @@ on:
     paths:
       - "examples/eval-in-wasm/**"
       - ".github/workflows/eval_in_wasm_build_test.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
