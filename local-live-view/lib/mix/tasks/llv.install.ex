@@ -71,34 +71,33 @@ defmodule Mix.Tasks.Llv.Install do
   end
 
   defp update_endpoint(zipper) do
-    with {:ok, zipper} <- add_llv_socket(zipper),
-         {:ok, zipper} <- add_wasm_headers_plug(zipper),
-         {:ok, zipper} <- add_wasm_headers_function(zipper) do
+    if module_source_contains?(zipper, "llv_socket") do
       {:ok, zipper}
-    end
-  end
-
-  defp add_llv_socket(zipper) do
-    socket_code = """
-    socket "/llv_socket", LocalLiveView.Socket, websocket: true
-    """
-
-    add_code_after_function(zipper, socket_code, :socket)
-  end
-
-  defp add_code_after_function(zipper, code, function_name) do
-    with false <- module_source_contains?(zipper, code),
-         {:ok, zipper} <- move_to_last_function_call(zipper, function_name) do
-      {:ok,
-       Igniter.Code.Common.add_code(
-         zipper,
-         code,
-         placement: :after
-       )}
     else
-      error ->
-        {:warning,
-         "Cannot add code #{inspect(code)} after function #{inspect(function_name)}.\n #{inspect(error)}"}
+      case Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2]) do
+        {:ok, use_zipper} ->
+          {:ok,
+           Igniter.Code.Common.add_code(
+             use_zipper,
+             """
+
+             plug :put_wasm_security_headers
+
+             socket "/llv_socket", LocalLiveView.Socket, websocket: true
+
+             defp put_wasm_security_headers(conn, _opts) do
+               conn
+               |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
+               |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
+             end
+             """,
+             placement: :after
+           )}
+
+        :error ->
+          {:warning,
+           "Could not find use Phoenix.Endpoint in endpoint. Add LLV socket and WASM security headers manually."}
+      end
     end
   end
 
@@ -108,33 +107,6 @@ defmodule Mix.Tasks.Llv.Install do
     |> Sourceror.Zipper.node()
     |> Sourceror.to_string()
     |> String.contains?(str)
-  end
-
-  defp move_to_last_function_call(zipper, name) do
-    predicate = fn zipper -> Igniter.Code.Function.function_call?(zipper, name) end
-
-    zipper
-    |> Igniter.Code.Common.move_to_last(predicate)
-  end
-
-  defp add_wasm_headers_plug(zipper) do
-    headers_code = """
-    plug :put_wasm_security_headers
-    """
-
-    add_code_after_function(zipper, headers_code, :plug)
-  end
-
-  defp add_wasm_headers_function(zipper) do
-    headers_code = """
-    defp put_wasm_security_headers(conn, _opts) do
-      conn
-      |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
-      |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
-    end
-    """
-
-    add_code_after_function(zipper, headers_code, :plug)
   end
 
   # --- Web module ---
