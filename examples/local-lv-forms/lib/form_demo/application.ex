@@ -8,7 +8,6 @@ defmodule FormDemo.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
       FormDemoWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:form_demo, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: FormDemo.PubSub},

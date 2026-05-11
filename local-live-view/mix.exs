@@ -24,7 +24,7 @@ defmodule LocalLiveView.MixProject do
     if Mix.target() == :wasm do
       Keyword.put(base, :mod, {LocalLiveView.Application, []})
     else
-      base
+      Keyword.put(base, :mod, {LocalLiveView.Application.Host, []})
     end
   end
 

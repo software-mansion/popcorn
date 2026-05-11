@@ -19,7 +19,6 @@ defmodule Mix.Tasks.Llv.Install do
 
     * Add the LocalLiveView socket to your endpoint
     * Add COOP/COEP security headers required for WASM
-    * Register the channel registry in your application supervisor
     * Import `LocalLiveView.Component` in your web module html_helpers
     * Change app.js script tag to `type="module"`
     * Set up the JS bridge in `assets/js/app.js`
@@ -37,7 +36,6 @@ defmodule Mix.Tasks.Llv.Install do
 
     igniter
     |> inject_endpoint()
-    |> inject_application()
     |> inject_web_module()
     |> inject_root_layout()
     |> inject_app_js()
@@ -137,15 +135,6 @@ defmodule Mix.Tasks.Llv.Install do
     """
 
     add_code_after_function(zipper, headers_code, :plug)
-  end
-
-  # --- Application ---
-
-  defp inject_application(igniter) do
-    Igniter.Project.Application.add_new_child(
-      igniter,
-      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry}
-    )
   end
 
   # --- Web module ---
