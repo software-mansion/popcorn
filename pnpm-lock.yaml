@@ -376,6 +376,9 @@ importers:
       '@playwright/test':
         specifier: ^1.56.1
         version: 1.59.1
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: ^24.9.1
         version: 24.12.2
