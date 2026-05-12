@@ -144,14 +144,17 @@ defmodule Mix.Tasks.Llv.Install do
   end
 
   defp find_import_by_suffix(zipper, suffix) do
-    case Igniter.Code.Function.move_to_function_call(zipper, :import, [1, 2], fn call ->
-           Igniter.Code.Function.argument_matches_predicate?(call, 0, fn arg ->
-             arg
-             |> Sourceror.Zipper.node()
-             |> Macro.to_string()
-             |> String.ends_with?(suffix)
-           end)
-         end) do
+    result =
+      Igniter.Code.Function.move_to_function_call(zipper, :import, [1, 2], fn call ->
+        Igniter.Code.Function.argument_matches_predicate?(call, 0, fn arg ->
+          arg
+          |> Sourceror.Zipper.node()
+          |> Macro.to_string()
+          |> String.ends_with?(suffix)
+        end)
+      end)
+
+    case result do
       {:ok, z} -> {:ok, z}
       :error -> nil
     end
@@ -162,7 +165,13 @@ defmodule Mix.Tasks.Llv.Install do
   defp inject_root_layout(igniter) do
     case Path.wildcard("lib/*_web/components/layouts/root.html.heex") do
       [path | _] ->
-        replace_in_file(igniter, path, ~s|type="module"|, ~s|type="text/javascript"|, ~s|type="module"|)
+        replace_in_file(
+          igniter,
+          path,
+          ~s|type="module"|,
+          ~s|type="text/javascript"|,
+          ~s|type="module"|
+        )
 
       [] ->
         Igniter.add_warning(
