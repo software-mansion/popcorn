@@ -162,19 +162,7 @@ defmodule Mix.Tasks.Llv.Install do
   defp inject_root_layout(igniter) do
     case Path.wildcard("lib/*_web/components/layouts/root.html.heex") do
       [path | _] ->
-        Igniter.update_file(igniter, path, fn source ->
-          content = Rewrite.Source.get(source, :content)
-
-          if String.contains?(content, ~s|type="module"|) do
-            source
-          else
-            Rewrite.Source.update(
-              source,
-              :content,
-              String.replace(content, ~s|type="text/javascript"|, ~s|type="module"|)
-            )
-          end
-        end)
+        replace_in_file(igniter, path, ~s|type="module"|, ~s|type="text/javascript"|, ~s|type="module"|)
 
       [] ->
         Igniter.add_warning(
@@ -186,6 +174,11 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- app.js ---
 
+  @llv_js """
+  import { setup } from "../vendor/local_live_view.js";
+  setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  """
+
   defp inject_app_js(igniter) do
     case Path.wildcard("assets/js/app.js") do
       [path | _] ->
@@ -195,19 +188,13 @@ defmodule Mix.Tasks.Llv.Install do
           if String.contains?(content, "local_live_view") do
             source
           else
-            llv_js = """
-
-            import { setup } from "../vendor/local_live_view.js";
-            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
-            """
-
             Rewrite.Source.update(
               source,
               :content,
               Regex.replace(
                 ~r/liveSocket\.connect\(\);?\n/,
                 content,
-                "liveSocket.connect();\n" <> llv_js
+                "liveSocket.connect();\n\n" <> @llv_js
               )
             )
           end
@@ -216,8 +203,7 @@ defmodule Mix.Tasks.Llv.Install do
       [] ->
         Igniter.add_warning(igniter, """
         Could not find assets/js/app.js. Add after liveSocket.connect():
-            import { setup } from "../vendor/local_live_view.js";
-            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+        #{@llv_js}
         """)
     end
   end
@@ -233,26 +219,22 @@ defmodule Mix.Tasks.Llv.Install do
 
   defp inject_esbuild_format_in(igniter, path) do
     if File.exists?(path) do
-      Igniter.update_file(igniter, path, fn source ->
-        content = Rewrite.Source.get(source, :content)
-
-        if String.contains?(content, "--format=esm") do
-          source
-        else
-          Rewrite.Source.update(
-            source,
-            :content,
-            String.replace(
-              content,
-              "--bundle",
-              "--bundle --format=esm"
-            )
-          )
-        end
-      end)
+      replace_in_file(igniter, path, "--format=esm", "--bundle", "--bundle --format=esm")
     else
       igniter
     end
+  end
+
+  defp replace_in_file(igniter, path, sentinel, find, replacement) do
+    Igniter.update_file(igniter, path, fn source ->
+      content = Rewrite.Source.get(source, :content)
+
+      if String.contains?(content, sentinel) do
+        source
+      else
+        Rewrite.Source.update(source, :content, String.replace(content, find, replacement))
+      end
+    end)
   end
 
   # --- mix.exs setup alias ---
