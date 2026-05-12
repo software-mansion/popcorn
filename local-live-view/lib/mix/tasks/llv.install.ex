@@ -17,17 +17,18 @@ defmodule Mix.Tasks.Llv.Install do
 
   This task will:
 
-    * Add the LocalLiveView socket to your endpoint
-    * Add COOP/COEP security headers required for WASM
+    * Add the LocalLiveView socket and COOP/COEP headers to your endpoint
     * Import `LocalLiveView.Component` in your web module html_helpers
     * Change app.js script tag to `type="module"`
     * Set up the JS bridge in `assets/js/app.js`
-    * Configure the JS build pipeline (`assets/build.mjs`, `assets/package.json`)
-    * Vendor `local_live_view.js` into `assets/vendor/`
+    * Configure esbuild to output ESM format
+    * Add `mix llv.build` to your setup alias
     * Generate a `local/` project with a sample HelloLocal component
+
+  `mix setup` will then run `mix llv.build` which bundles the JS assets
+  and builds the WASM bundle from `local/`.
   """
 
-  @popcorn_js_version "0.3.0-rc1"
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
 
   @impl Igniter.Mix.Task
@@ -39,11 +40,8 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_web_module()
     |> inject_root_layout()
     |> inject_app_js()
-    |> inject_package_json()
-    |> inject_mix_esbuild()
-    |> inject_dev_watcher()
-    |> generate_build_mjs()
-    |> generate_vendor()
+    |> inject_esbuild_format()
+    |> inject_setup_alias()
     |> generate_local_project(llv_path)
   end
 
@@ -187,6 +185,7 @@ defmodule Mix.Tasks.Llv.Install do
   end
 
   # --- app.js ---
+
   defp inject_app_js(igniter) do
     case Path.wildcard("assets/js/app.js") do
       [path | _] ->
@@ -196,9 +195,11 @@ defmodule Mix.Tasks.Llv.Install do
           if String.contains?(content, "local_live_view") do
             source
           else
-            llv_js =
-              ~s[\nimport { setup } from "vendor/local_live_view";\n] <>
-                ~s[setup(liveSocket, { Socket, bundlePath: "/assets/js/wasm/bundle.avm" });\n]
+            llv_js = """
+
+            import { setup } from "../vendor/local_live_view.js";
+            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+            """
 
             Rewrite.Source.update(
               source,
@@ -215,59 +216,63 @@ defmodule Mix.Tasks.Llv.Install do
       [] ->
         Igniter.add_warning(igniter, """
         Could not find assets/js/app.js. Add after liveSocket.connect():
-            import { setup } from "vendor/local_live_view";
-            setup(liveSocket, { Socket, bundlePath: "/assets/js/wasm/bundle.avm" });
+            import { setup } from "../vendor/local_live_view.js";
+            setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
         """)
     end
   end
 
-  # --- package.json ---
+  # --- esbuild ESM format ---
 
-  defp inject_package_json(igniter) do
-    path = "assets/package.json"
+  defp inject_esbuild_format(igniter) do
+    igniter
+    |> inject_esbuild_format_in("config/config.exs")
+    |> inject_esbuild_format_in("config/dev.exs")
+    |> inject_esbuild_format_in("config/prod.exs")
+  end
 
+  defp inject_esbuild_format_in(igniter, path) do
     if File.exists?(path) do
       Igniter.update_file(igniter, path, fn source ->
         content = Rewrite.Source.get(source, :content)
 
-        if String.contains?(content, "@swmansion/popcorn") do
+        if String.contains?(content, "--format=esm") do
           source
         else
-          new_content =
-            content
-            |> inject_after_pattern(
-              ~r/"devDependencies": \{\n/,
-              ~s|    "@swmansion/popcorn": "#{@popcorn_js_version}",\n|
+          Rewrite.Source.update(
+            source,
+            :content,
+            String.replace(
+              content,
+              "--bundle",
+              "--bundle --format=esm"
             )
-            |> inject_after_pattern(
-              ~r/"devDependencies": \{\n/,
-              ~s|    "esbuild": "^0.25.0",\n|
-            )
-
-          Rewrite.Source.update(source, :content, new_content)
+          )
         end
       end)
     else
-      copy_template(igniter, "assets/package.json", "package.json",
-        popcorn_version: @popcorn_js_version
-      )
+      igniter
     end
   end
 
-  # --- mix.exs ---
+  # --- mix.exs setup alias ---
 
-  defp inject_mix_esbuild(igniter) do
+  defp inject_setup_alias(igniter) do
     Igniter.update_elixir_file(igniter, "mix.exs", fn zipper ->
       if module_source_contains?(zipper, "llv.build") do
         {:ok, zipper}
       else
-        with {:ok, zipper} <- insert_llv_build_in_setup(zipper),
-             {:ok, zipper} <- insert_npm_in_assets_setup(Sourceror.Zipper.topmost(zipper)),
-             {:ok, zipper} <- prepend_build_js_in_assets_build(Sourceror.Zipper.topmost(zipper)),
-             {:ok, zipper} <- prepend_build_js_in_assets_deploy(Sourceror.Zipper.topmost(zipper)),
-             {:ok, zipper} <- ensure_npm_install_helper(Sourceror.Zipper.topmost(zipper)),
-             {:ok, zipper} <- ensure_build_js_helper(Sourceror.Zipper.topmost(zipper)) do
-          {:ok, zipper}
+        with {:ok, aliases} <- navigate_to_aliases_list(zipper),
+             {:ok, setup} <- Igniter.Code.Keyword.get_key(aliases, :setup) do
+          case Igniter.Code.List.move_to_list_item(setup, fn z ->
+                 z |> Sourceror.Zipper.node() |> Macro.to_string() == ~s["deps.get"]
+               end) do
+            {:ok, deps_z} ->
+              {:ok, Sourceror.Zipper.insert_right(deps_z, "llv.build")}
+
+            :error ->
+              Igniter.Code.List.prepend_to_list(setup, "llv.build")
+          end
         end
       end
     end)
@@ -278,157 +283,6 @@ defmodule Mix.Tasks.Llv.Install do
          {:ok, list} <- Igniter.Code.Function.move_to_defp(mod, :aliases, 0) do
       {:ok, list}
     end
-  end
-
-  defp insert_llv_build_in_setup(zipper) do
-    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
-         {:ok, setup} <- Igniter.Code.Keyword.get_key(aliases, :setup) do
-      case Igniter.Code.List.move_to_list_item(setup, fn z ->
-             z |> Sourceror.Zipper.node() |> Macro.to_string() == ~s["deps.get"]
-           end) do
-        {:ok, deps_z} ->
-          {:ok, Sourceror.Zipper.insert_right(deps_z, "llv.build")}
-
-        :error ->
-          Igniter.Code.List.prepend_to_list(setup, "llv.build")
-      end
-    end
-  end
-
-  defp insert_npm_in_assets_setup(zipper) do
-    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
-         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.setup") do
-      Igniter.Code.List.append_new_to_list(list, quote(do: &npm_install/1))
-    end
-  end
-
-  defp prepend_build_js_in_assets_build(zipper) do
-    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
-         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.build") do
-      Igniter.Code.List.prepend_new_to_list(list, quote(do: &build_js/1))
-    end
-  end
-
-  defp prepend_build_js_in_assets_deploy(zipper) do
-    with {:ok, aliases} <- navigate_to_aliases_list(zipper),
-         {:ok, list} <- Igniter.Code.Keyword.get_key(aliases, :"assets.deploy") do
-      Igniter.Code.List.prepend_new_to_list(list, quote(do: &build_js/1))
-    end
-  end
-
-  defp ensure_npm_install_helper(zipper) do
-    if module_source_contains?(zipper, "defp npm_install") do
-      {:ok, zipper}
-    else
-      with {:ok, mod} <- Igniter.Code.Module.move_to_module_using(zipper, Mix.Project) do
-        last = Igniter.Code.Common.rightmost(mod)
-
-        {:ok,
-         Igniter.Code.Common.add_code(last, """
-         defp npm_install(_) do
-           {_, 0} =
-             System.cmd("npm", ["install"],
-               cd: Path.join(File.cwd!(), "assets"),
-               into: IO.stream(:stdio, :line),
-               stderr_to_stdout: true
-             )
-         end
-         """)}
-      end
-    end
-  end
-
-  defp ensure_build_js_helper(zipper) do
-    if module_source_contains?(zipper, "defp build_js") do
-      {:ok, zipper}
-    else
-      with {:ok, mod} <-
-             Igniter.Code.Module.move_to_module_using(
-               Sourceror.Zipper.topmost(zipper),
-               Mix.Project
-             ) do
-        last = Igniter.Code.Common.rightmost(mod)
-
-        {:ok,
-         Igniter.Code.Common.add_code(last, """
-         defp build_js(_) do
-           {_, 0} =
-             System.cmd("node", ["build.mjs"],
-               cd: Path.join(File.cwd!(), "assets"),
-               env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
-               into: IO.stream(:stdio, :line),
-               stderr_to_stdout: true
-             )
-         end
-         """)}
-      end
-    end
-  end
-
-  # --- config/dev.exs ---
-
-  defp inject_dev_watcher(igniter) do
-    Igniter.update_elixir_file(igniter, "config/dev.exs", fn zipper ->
-      content =
-        zipper
-        |> Sourceror.Zipper.topmost()
-        |> Sourceror.Zipper.node()
-        |> Sourceror.to_string()
-
-      new_content =
-        content
-        |> replace_esbuild_watcher()
-        |> disable_web_console_logger()
-
-      if new_content == content do
-        {:ok, zipper}
-      else
-        {:ok,
-         Igniter.Code.Common.replace_code(
-           Sourceror.Zipper.topmost(zipper),
-           Sourceror.parse_string!(new_content)
-         )}
-      end
-    end)
-  end
-
-  defp replace_esbuild_watcher(content) do
-    if String.contains?(content, "build.mjs") do
-      content
-    else
-      node_watcher =
-        "node: [\n" <>
-          ~s|      "build.mjs",\n| <>
-          ~s|      "--watch",\n| <>
-          ~s|      cd: Path.expand("../assets", __DIR__),\n| <>
-          ~s|      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}\n| <>
-          "    ],\n"
-
-      String.replace(content, ~r/esbuild: \{Esbuild,[^\}]+\},?\n/, node_watcher)
-    end
-  end
-
-  defp disable_web_console_logger(content) do
-    String.replace(content, "web_console_logger: true", "web_console_logger: false")
-  end
-
-  # --- assets/build.mjs ---
-
-  defp generate_build_mjs(igniter) do
-    Igniter.create_new_file(igniter, "assets/build.mjs", read_template("build.mjs"))
-  end
-
-  defp read_template(template) do
-    File.read!(Path.join(@templates_dir, template))
-  end
-
-  # --- assets/vendor/local_live_view.js ---
-
-  defp generate_vendor(igniter) do
-    llv_abs = Mix.Project.deps_paths()[:local_live_view]
-    src = Path.join(llv_abs, "assets/local_live_view.js")
-
-    Igniter.create_new_file(igniter, "assets/vendor/local_live_view.js", File.read!(src))
   end
 
   # --- local/ project ---
@@ -457,18 +311,5 @@ defmodule Mix.Tasks.Llv.Install do
       end
 
     Igniter.create_new_file(igniter, dest, content)
-  end
-
-  # --- Helpers ---
-
-  defp inject_after_pattern(content, pattern, injection) do
-    case Regex.run(pattern, content, return: :index) do
-      [{start, len}] ->
-        {before, rest} = String.split_at(content, start + len)
-        before <> injection <> rest
-
-      _ ->
-        content
-    end
   end
 end

@@ -6,6 +6,7 @@
     "./esbuild": "./esbuild.mjs"
   },
   "dependencies": {
-    "@swmansion/popcorn": "workspace:*"
+    "@swmansion/popcorn": "^0.3.0-rc2",
+    "esbuild": "^0.28.0"
   }
 }
