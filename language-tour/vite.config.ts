@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import { livemdPlugin } from "./src/plugins/livemd";
 import { cookOnChange } from "./src/plugins/cook";
+import { cookieScriptProxy } from "./src/plugins/cookieScriptProxy";
 import { popcorn } from "@swmansion/popcorn/vite";
 
 // https://vite.dev/config/
@@ -30,7 +31,8 @@ export default defineConfig({
     }),
     svgr(),
     popcorn({ bundlePaths: ["./public/wasm/bundle.avm"] }),
-    cookOnChange()
+    cookOnChange(),
+    cookieScriptProxy()
   ],
   server: {
     headers: {
