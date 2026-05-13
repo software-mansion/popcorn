@@ -28,20 +28,6 @@ defmodule Popcorn do
           | {:extra_beams, [String.t()]}
         ]) :: :ok
   def cook(options \\ []) do
-    bundle(Keyword.take(options, [:out_dir, :start_module, :extra_beams]))
-  end
-
-  @doc """
-  Bundles compiled project code into an `.avm` file.
-
-  Options have the same semantics as in `cook/1`.
-  """
-  @spec bundle([
-          {:out_dir, String.t()}
-          | {:start_module, module}
-          | {:extra_beams, [String.t()]}
-        ]) :: :ok
-  def bundle(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       start_module: nil,
@@ -55,23 +41,19 @@ defmodule Popcorn do
     {module, filename, apps} = create_boot_module(options.start_module)
 
     try do
-      beams = options.extra_beams ++ bundled_artifacts(apps)
-      pack_bundle(options.out_dir, beams, module)
+      ebins = options.extra_beams ++ get_all_ebins(apps)
+      beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
+      pack_bundle(options.out_dir, beams, module, false)
     after
       File.rm!(filename)
     end
   end
 
-  defp bundled_artifacts(applications) do
-    builtin_apps = Build.builtin_app_names() |> MapSet.new()
+  defp get_all_ebins(applications) do
+    builtin_apps = Build.builtin_apps() |> MapSet.new()
+    builtin_deps = Enum.filter(applications, &(&1 in builtin_apps))
 
-    builtin_deps = Enum.filter(applications, &MapSet.member?(builtin_apps, to_string(&1)))
-
-    available_builtin_apps = Build.available_apps() |> MapSet.new()
-
-    builtin_deps
-    |> Enum.reject(&MapSet.member?(available_builtin_apps, &1))
-    |> case do
+    case builtin_deps -- Build.available_apps() do
       [] ->
         :ok
 
@@ -86,26 +68,27 @@ defmodule Popcorn do
         """
     end
 
-    bundles = [:erts, :popcorn_lib | builtin_deps]
+    builtin_apps = [:erts, :popcorn_lib | builtin_deps]
 
-    popcorn_avms = Enum.map(bundles, &Build.bundle_path/1)
+    builtin_ebins =
+      Enum.flat_map(builtin_apps, fn app -> app |> Build.patched_ebin_dir() |> ls_paths() end)
 
-    dep_beams =
+    dep_ebins =
       Mix.Project.build_path()
-      |> Path.join("lib/*/ebin/*.beam")
+      |> Path.join("lib/*/ebin/*")
       |> Path.wildcard()
       |> Enum.reject(fn path ->
         is_popcorn_subpath = Path.relative_to(path, @popcorn_path) != path
         is_popcorn_subpath and not beam_src_in_api_dir?(path)
       end)
 
-    consolidated_beams = Path.wildcard(Path.join([Mix.Project.consolidation_path(), "*.beam"]))
-    generated_beams = Path.wildcard(Path.join([@popcorn_generated_path, "*.beam"]))
+    consolidated_ebins = ls_paths(Mix.Project.consolidation_path())
+    generated_ebins = ls_paths(@popcorn_generated_path)
 
-    popcorn_avms ++ dep_beams ++ consolidated_beams ++ generated_beams
+    builtin_ebins ++ dep_ebins ++ consolidated_ebins ++ generated_ebins
   end
 
-  defp pack_bundle(out_dir, beams, start_module) do
+  defp pack_bundle(out_dir, beams, start_module, drop_lines) do
     bundle_path = Path.join(out_dir, "bundle.avm")
 
     # packbeam appends to the bundle if output exists, we need to delete it first
@@ -113,7 +96,11 @@ defmodule Popcorn do
     bundle_path = to_charlist(bundle_path)
     beams = Enum.map(beams, &String.to_charlist/1)
 
-    :packbeam_api.create(bundle_path, beams, %{start_module: start_module})
+    :packbeam_api.create(bundle_path, beams, %{
+      start_module: start_module,
+      include_lines: not drop_lines
+    })
+
     gzip(bundle_path)
   end
 
@@ -124,6 +111,9 @@ defmodule Popcorn do
       error -> raise CookingError, "Couldn't remove old bundle, reason: #{inspect(error)}"
     end
   end
+
+  @popcorn_app_path Path.join(@popcorn_path, "ebin/popcorn.app")
+  defp beam_src_in_api_dir?(@popcorn_app_path), do: false
 
   defp beam_src_in_api_dir?(beam_path) do
     module_name = Path.basename(beam_path, ".beam")
@@ -189,11 +179,20 @@ defmodule Popcorn do
         @compile autoload: false, no_warn_undefined: unquote(no_warn_undefined)
 
         def start() do
+          start_apps()
+          Popcorn.Wasm.send_event("popcorn_elixir_ready")
+          unquote(run)
+        rescue
+          e ->
+            :erlang.display({e, __STACKTRACE__})
+            reraise e, __STACKTRACE__
+        end
+
+        defp start_apps() do
           # TODO: Default boot script starts `:heart` process, but unless -heart flag is passed, it will return `:ignore`
           # :ignore = :heart.start()
           # TODO: Default boot script starts :logger_server, uncomment line below when :logger app is supported
           # {:ok, _pid} = :logger_server.start_link()
-
           specs = unquote(Macro.escape(specs))
 
           {:ok, _ac} =
@@ -206,11 +205,9 @@ defmodule Popcorn do
           :ok = :application.start_boot(:kernel, :permanent)
           :ok = :application.start_boot(:stdlib, :permanent)
 
-          {:ok, _apps} = Application.ensure_all_started(unquote(app), :permanent)
+          {:ok, _apps} = :application.ensure_all_started(unquote(app), :permanent)
 
-          Popcorn.Wasm.send_event("popcorn_elixir_ready")
-
-          unquote(run)
+          :ok
         end
       end
 
@@ -272,5 +269,9 @@ defmodule Popcorn do
 
   defp gzip(path) do
     File.read!(path) |> :zlib.gzip() |> then(&File.write!("#{path}.gz", &1))
+  end
+
+  defp ls_paths(path) do
+    Path.wildcard(Path.join(path, "*"))
   end
 end

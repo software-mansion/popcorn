@@ -90,7 +90,10 @@ defmodule Popcorn.Internal.PatchingTest do
       |> Code.compile_quoted(tmp_dir)
 
     beam =
-      CoreErlangUtils.merge_modules(CoreErlangUtils.parse(orig), CoreErlangUtils.parse(patch))
+      CoreErlangUtils.merge_modules(
+        CoreErlangUtils.parse(orig),
+        CoreErlangUtils.parse(patch)
+      )
       |> CoreErlangUtils.serialize()
 
     assert {:module, ^module} = :code.load_binary(module, ~c"#{inspect(module)}.ex", beam)

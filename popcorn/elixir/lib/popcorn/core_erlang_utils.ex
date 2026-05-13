@@ -18,7 +18,7 @@ defmodule Popcorn.CoreErlangUtils do
   for mysterious reasons.
   """
   def serialize(ast) do
-    {:ok, _module, beam} = :compile.noenv_forms(ast, [:from_core])
+    {:ok, _module, beam} = :compile.noenv_forms(ast, [:from_core, debug_info: {:core_v1, ast}])
     beam
   end
 
