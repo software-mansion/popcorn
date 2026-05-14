@@ -42,7 +42,7 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
-import { setup } from "local_live_view";
+import { setup } from "../vendor/local_live_view.js";
 
 setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
 liveSocket.enableLatencySim(500);

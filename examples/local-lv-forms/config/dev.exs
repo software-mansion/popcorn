@@ -15,12 +15,7 @@ config :form_demo, FormDemoWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "rRGOqyCwCzmxVijkuEj4u0PqB0YQh0ULf06ljS2woBLgFbIHSZH221B2MlLMK+Zj",
   watchers: [
-    node: [
-      "build.mjs",
-      "--watch",
-      cd: Path.expand("../assets", __DIR__),
-      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
-    ],
+    esbuild: {Esbuild, :install_and_run, [:form_demo, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:form_demo, ~w(--watch)]}
   ]
 
