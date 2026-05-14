@@ -76,6 +76,15 @@ defmodule LocalLiveView.Server do
     |> handle_result({:handle_event, 3, msg.ref}, state)
   end
 
+  def handle_info(
+        %Message{event: "js_push", payload: %{"event" => event, "payload" => payload}},
+        %{socket: socket} = state
+      ) do
+    {:js_push, event, payload}
+    |> view_handle_info(socket)
+    |> handle_result({:handle_info, 2, nil}, state)
+  end
+
   def handle_info(msg, %{socket: socket} = state) do
     msg
     |> view_handle_info(socket)

@@ -80,7 +80,11 @@ defmodule LocalLiveView do
         {:noreply, socket}
       end
 
-      defoverridable handle_server_event: 3
+      def handle_info(_msg, socket) do
+        {:noreply, socket}
+      end
+
+      defoverridable handle_server_event: 3, handle_info: 2
     end
   end
 

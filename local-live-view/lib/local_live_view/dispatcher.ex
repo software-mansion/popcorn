@@ -42,6 +42,16 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
+         {:wasm_call, %{"id" => id, "event" => "llv_push", "payload" => payload}},
+         state
+       ) do
+    Map.get(state.views, id)
+    |> send(%Message{event: "js_push", payload: payload})
+
+    {:resolve, :ok, state}
+  end
+
+  defp handle_wasm(
          {:wasm_call, %{"id" => id, "event" => _type, "payload" => payload}},
          state
        ) do

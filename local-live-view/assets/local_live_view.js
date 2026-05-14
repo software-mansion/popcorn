@@ -21,6 +21,11 @@ export async function setup(liveSocket, opts = {}) {
     debug: opts.debug ?? false,
     bundlePaths: opts.bundlePaths ?? ["wasm/bundle.avm"],
   });
+
+  if (opts.eventHandler) {
+    popcorn.onMessage(opts.eventHandler);
+  }
+
   window.__popcorn = popcorn;
 
   const channels = {};
@@ -189,6 +194,25 @@ export async function setup(liveSocket, opts = {}) {
   for (const detail of bufferedServerMessages) {
     await sendServerMessage(popcorn, detail);
   }
+
+  const pushEvent = async (viewId, event, payload = {}) => {
+    const el = document.querySelector(`[data-pop-view="${viewId}"]`);
+    const llvId = el ? el.id : viewId;
+
+    const result = await popcorn.call(
+      { id: llvId, event: "llv_push", payload: { event, payload } },
+      { timeoutMs: 10_000 },
+    );
+
+    if (!result.ok) {
+      console.error(
+        `LLV pushEvent error for view "${viewId}", event "${event}":`,
+        result,
+      );
+    }
+  };
+
+  return { pushEvent };
 }
 
 async function sendServerMessage(popcorn, detail) {
