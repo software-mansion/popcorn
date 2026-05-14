@@ -3,6 +3,7 @@ FROM ubuntu:noble
 ENV ERLANG_VERSION="26.0.2"
 ENV ELIXIR_VERSION="1.17.3-otp-26"
 ENV NODE_VERSION="22"
+ENV PNPM_VERSION="11.0.8"
 ENV EMSDK_VERSION="4.0.8"
 ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
@@ -28,7 +29,7 @@ RUN install -dm 755 /etc/apt/keyrings && \
     apt install -y mise
 
 RUN mise use --global node@"${NODE_VERSION}" && mise install
-RUN mise use --global pnpm@11 && mise install
+RUN mise use --global pnpm@"${PNPM_VERSION}" && mise install
 
 RUN mise use --global erlang@"${ERLANG_VERSION}" && mise install
 RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
@@ -48,7 +49,7 @@ RUN git clone --depth 1 --branch "${GIT_REF}" "${GIT_REPO}" /build/popcorn && \
 ENV RUNTIME_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm'
 
 WORKDIR /build/popcorn
-RUN pnpm config set enable-pre-post-scripts true && \
+RUN pnpm config set --location project enablePrePostScripts true && \
     pnpm install --frozen-lockfile
 
 RUN pnpm -F popcorn build:prod
