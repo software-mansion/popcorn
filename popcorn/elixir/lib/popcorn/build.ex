@@ -248,18 +248,19 @@ defmodule Popcorn.Build do
   # but we execute it always for consistency
   # To be removed when we improve tracing in AtomVM
   defp copy_ebins(app_name, ebins, out_dir) do
-    process_async(ebins, fn path ->
-      name = Path.basename(path)
-      Logger.info("Transferring #{name}", app_name: app_name)
-
-      if @config.add_tracing and Path.extname(path) == ".beam" do
-        transform_beam_ast(path, out_dir, fn ast -> CoreErlangUtils.add_simple_tracing(ast) end)
-      else
-        File.cp!(path, Path.join(out_dir, name))
-      end
-    end)
-
+    process_async(ebins, &copy_ebin(app_name, &1, out_dir))
     :ok
+  end
+
+  defp copy_ebin(app_name, path, out_dir) do
+    name = Path.basename(path)
+    Logger.info("Transferring #{name}", app_name: app_name)
+
+    if @config.add_tracing and Path.extname(path) == ".beam" do
+      transform_beam_ast(path, out_dir, fn ast -> CoreErlangUtils.add_simple_tracing(ast) end)
+    else
+      File.cp!(path, Path.join(out_dir, name))
+    end
   end
 
   defp transform_beam_ast(beam_path, out_dir, transform) do

@@ -3,7 +3,8 @@ defmodule Popcorn.Config do
   @defaults %{
     extra_apps: [],
     out_dir: nil,
-    add_tracing: false
+    add_tracing: false,
+    treeshake: false
   }
 
   def get(key) do

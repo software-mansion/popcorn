@@ -7,6 +7,7 @@ defmodule Popcorn do
 
   @popcorn_path Mix.Project.app_path()
   @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
+  @popcorn_treeshaked_path Path.join(@popcorn_path, "popcorn_treeshaked_ebin")
   @api_dir Path.join(["popcorn", "api"])
 
   defmodule CookingError do
@@ -21,15 +22,20 @@ defmodule Popcorn do
   - `out_dir` - The directory to write artifacts to. Required, unless provided via `config.exs`.
   - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
   - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
+  - `treeshake` - [Experimental] When `true`, removes unused modules and functions to reduce bundle size.
+    Also removes location data (files and line numbers), which results in less useful stack traces.
+    Defaults to `false`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:extra_beams, [String.t()]}
+          | {:treeshake, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
+      treeshake: Popcorn.Config.get(:treeshake),
       start_module: nil,
       extra_beams: []
     ]
@@ -42,11 +48,79 @@ defmodule Popcorn do
 
     try do
       ebins = options.extra_beams ++ get_all_ebins(apps)
+      ebins = if options.treeshake, do: treeshake(ebins), else: ebins
       beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
-      pack_bundle(options.out_dir, beams, module, false)
+      pack_bundle(options.out_dir, beams, module, options.treeshake)
     after
       File.rm!(filename)
     end
+  end
+
+  defp treeshake(ebin_files) do
+    File.rm_rf!(@popcorn_treeshaked_path)
+    File.mkdir!(@popcorn_treeshaked_path)
+
+    opts = [
+      ebin_files: ebin_files,
+      verbose: true,
+      output_dir: @popcorn_treeshaked_path,
+      # stub_removed_functions: true,
+      keep: [
+        Popcorn.Boot,
+        %{behaviour_impls: LocalLiveView}
+      ],
+      ignore: [
+        {Popcorn.Boot, :start_apps, 0}
+      ],
+      drop: [
+        Code.Formatter,
+        :elixir_parser,
+        :elixir_tokenizer,
+        :erl_lint,
+        :erl_parse,
+        :erl_eval,
+        # TODO why logger needs these?
+        # :epp,
+        # :erl_scan,
+        :prim_inet,
+        :qlc,
+        :qlc_pt,
+        :dets_v9,
+        :dets,
+        :sofs,
+        :erl_tar,
+        :file_sorter,
+        :global,
+        :disk_log,
+        :disk_log_1,
+        :net_kernel,
+        :zip,
+        :inet_db,
+        :shell,
+        :edlin,
+        :edlin_expand,
+        :edlin_type_suggestion,
+        :edlin_context,
+        :dets_utils,
+        :gen_tcp_socket,
+        :socket,
+        :prim_socket,
+        :eval_bits,
+        :inet_dns,
+        :net,
+        :rpc,
+        :gen_udp_socket,
+        :dist_util,
+        :win32reg
+      ]
+    ]
+
+    stats = Treeshake.run(opts)
+    File.mkdir_p!("call_graph")
+    File.write!("call_graph/.gitignore", "*")
+    File.write!("call_graph/cg.bin", :erlang.term_to_binary(stats.call_graph))
+
+    ls_paths(@popcorn_treeshaked_path)
   end
 
   defp get_all_ebins(applications) do
@@ -188,6 +262,12 @@ defmodule Popcorn do
             reraise e, __STACKTRACE__
         end
 
+        # TODO start_apps is a separate function so that it can be ignored
+        # in tree-shaking for the following reasons:
+        # - application.start references a lot of code that it doesn't use,
+        #   we need to figure out if we can avoid keeping it
+        # - the apps specs list all modules in the app and it makes tree-shaker
+        #   mark them as referenced, while they're actually aren't
         defp start_apps() do
           # TODO: Default boot script starts `:heart` process, but unless -heart flag is passed, it will return `:ignore`
           # :ignore = :heart.start()

@@ -3,20 +3,17 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Popcorn build & test
+name: Popcorn tree-shake test
 
 on:
   push:
     branches: ["**"]
     paths:
-      - "popcorn/elixir/**"
-      - "popcorn/js/**"
+      - "popcorn/elixir/lib/treeshake/**"
+      - "popcorn/elixir/test/treeshake/**"
+      - "popcorn/elixir/test/fixtures/treeshake/**"
       - ".github/**"
-      - ".github/workflows/popcorn_build_test.yml"
-      - "pnpm-workspace.yaml"
-      - "pnpm-lock.yaml"
-      - "package.json"
-      - ".npmrc"
+      - ".github/workflows/popcorn_treeshake_build_test.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -69,17 +66,6 @@ jobs:
         working-directory: .
         run: pnpm install
 
-      - name: Setup Playwright
-        uses: ./.github/actions/setup-playwright
-        with:
-          cache-prefix: popcorn-root
-          lockfile: popcorn/elixir/mix.lock
-
-      - name: Lint
-        run: mix lint
-
       - name: Run tests
-        run: mix test
-
-      - name: Run WASM tests
-        run: TARGET=wasm mix test
+        # Limiting to test/treeshake avoids compiling other tests
+        run: mix test test/treeshake --only treeshake

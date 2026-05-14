@@ -63,5 +63,15 @@ case target do
     ensure_unix_fixture_runtime.()
 end
 
+{_output, 0} =
+  System.cmd("mix", ~w(compile --force),
+    cd: "test/fixtures/treeshake/demo_app",
+    env: [{"MIX_ENV", "prod"}],
+    stderr_to_stdout: true
+  )
+
 ci_opts = if System.get_env("CI") == "true", do: [max_cases: 1], else: []
-ExUnit.start([capture_log: true, exclude: [:long_running, skip_target: target]] ++ ci_opts)
+
+ExUnit.start(
+  [capture_log: true, exclude: [:long_running, :treeshake, skip_target: target]] ++ ci_opts
+)
