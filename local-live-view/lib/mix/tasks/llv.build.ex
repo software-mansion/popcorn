@@ -37,31 +37,10 @@ defmodule Mix.Tasks.Llv.Build do
     assets_path = Path.join(llv_path, "assets")
 
     Mix.shell().info("[llv] Installing JS dependencies...")
-
-    {_, 0} =
-      System.cmd(
-        "npm",
-        [
-          "install",
-          "--prefix",
-          assets_path,
-          "@swmansion/popcorn@#{@popcorn_npm_version}",
-          "esbuild"
-        ],
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
+    0 = Mix.shell().cmd("npm install --prefix \"#{assets_path}\" @swmansion/popcorn@#{@popcorn_npm_version} esbuild")
 
     Mix.shell().info("[llv] Building JS assets...")
-
-    {_, 0} =
-      System.cmd(
-        "node",
-        [Path.join(assets_path, "bundle.mjs")],
-        env: [{"LLV_PROJECT_DIR", File.cwd!()}],
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
+    0 = Mix.shell().cmd("node \"#{Path.join(assets_path, "bundle.mjs")}\"", env: [{"LLV_PROJECT_DIR", File.cwd!()}])
 
     Mix.shell().info("[llv] Building WASM bundle...")
     Mix.shell().cmd("mix build", cd: "local")
