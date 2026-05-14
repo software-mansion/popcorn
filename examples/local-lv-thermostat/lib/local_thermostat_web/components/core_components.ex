@@ -498,6 +498,6 @@ defmodule LocalThermostatWeb.CoreComponents do
 
   defp mirror_exists?(view_name) do
     mirror = Module.concat(Mirror, String.to_atom(view_name))
-    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2)
+    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3)
   end
 end

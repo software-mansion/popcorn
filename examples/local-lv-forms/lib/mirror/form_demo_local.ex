@@ -2,7 +2,7 @@ defmodule Mirror.FormDemoLocal do
   use LocalLiveView.Mirror
 
   @impl true
-  def handle_sync(%{"users" => _, "_llv_id" => llv_id} = local_assigns, _mirror_assigns) do
+  def handle_sync(%{"users" => _} = local_assigns, _mirror_assigns, %{llv_id: llv_id}) do
     Phoenix.PubSub.broadcast(
       FormDemo.PubSub,
       "llv_mirror:FormDemoLocal:#{llv_id}",

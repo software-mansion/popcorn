@@ -8,13 +8,6 @@ defmodule LocalLiveView.Channel do
     end
   end
 
-  def get_all_mirror_assigns(llv_id) do
-    Registry.select(LocalLiveView.ChannelRegistry, [
-      {{:"$1", :"$2", :"$3"}, [{:==, :"$3", llv_id}], [:"$2"]}
-    ])
-    |> Enum.map(&GenServer.call(&1, :get_mirror_assigns))
-  end
-
   def set_mirror_assigns(llv_id, assigns) do
     case Registry.lookup(LocalLiveView.ChannelRegistry, llv_id) do
       [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
@@ -38,10 +31,15 @@ defmodule LocalLiveView.Channel do
   end
 
   def handle_in("sync", local_assigns, socket) do
-    enriched = Map.put(local_assigns, "_llv_id", socket.assigns.llv_id)
+    session = %{llv_id: socket.assigns.llv_id}
 
     new_mirror_assigns =
-      merge_assigns(socket.assigns.mirror_module, enriched, socket.assigns.mirror_assigns)
+      merge_assigns(
+        socket.assigns.mirror_module,
+        local_assigns,
+        socket.assigns.mirror_assigns,
+        session
+      )
 
     {:noreply, assign(socket, mirror_assigns: new_mirror_assigns)}
   end
@@ -49,15 +47,15 @@ defmodule LocalLiveView.Channel do
   defp find_mirror_module(view_string) do
     mirror = Module.concat(Mirror, view_string)
 
-    if Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 2),
+    if Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3),
       do: mirror,
       else: nil
   end
 
-  defp merge_assigns(nil, local_assigns, _mirror_assigns), do: local_assigns
+  defp merge_assigns(nil, local_assigns, _mirror_assigns, _session), do: local_assigns
 
-  defp merge_assigns(mirror, local_assigns, mirror_assigns) do
-    {:ok, new_mirror_assigns} = mirror.handle_sync(local_assigns, mirror_assigns)
+  defp merge_assigns(mirror, local_assigns, mirror_assigns, session) do
+    {:ok, new_mirror_assigns} = mirror.handle_sync(local_assigns, mirror_assigns, session)
     new_mirror_assigns
   end
 end
