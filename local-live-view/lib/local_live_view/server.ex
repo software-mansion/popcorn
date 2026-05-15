@@ -383,7 +383,7 @@ defmodule LocalLiveView.Server do
         socket = %{
           socket
           | id: "phx-",
-            private: mount_priv,
+            private: Map.put(mount_priv, :llv_id, llv_id),
             assigns: Map.merge(socket.assigns, %{live_action: nil, flash: nil}),
             host_uri: :not_mounted_at_router
         }

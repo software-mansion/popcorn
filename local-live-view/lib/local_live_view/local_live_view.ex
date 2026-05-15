@@ -35,8 +35,6 @@ defmodule LocalLiveView do
       end)
 
     unless payload == %{} do
-      view_name = socket.view |> Module.split() |> List.last()
-
       Popcorn.Wasm.run_js(
         """
         ({ args }) => {
@@ -45,7 +43,7 @@ defmodule LocalLiveView do
           }
         }
         """,
-        %{id: view_name, payload: payload}
+        %{id: socket.private[:llv_id], payload: payload}
       )
     end
   end
