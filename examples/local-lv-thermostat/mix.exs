@@ -75,29 +75,16 @@ defmodule LocalThermostat.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "llv.build", &pnpm_install/1, "compile", "assets.setup", "assets.build"],
-      "assets.setup": ["tailwind.install --if-missing"],
-      "assets.build": [&build_js/1, "tailwind local_thermostat"],
-      "assets.deploy": [&build_js/1, "tailwind local_thermostat --minify", "phx.digest"]
+      build: ["setup"],
+      dev: ["setup", "phx.server"],
+      setup: ["deps.get", "llv.build", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["compile", "tailwind local_thermostat", "esbuild local_thermostat"],
+      "assets.deploy": [
+        "tailwind local_thermostat --minify",
+        "esbuild local_thermostat --minify",
+        "phx.digest"
+      ]
     ]
-  end
-
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: Path.join(File.cwd!(), "assets"),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
-    {_, 0} =
-      System.cmd("node", ["build.mjs"],
-        cd: Path.join(File.cwd!(), "assets"),
-        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
   end
 end

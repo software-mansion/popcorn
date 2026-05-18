@@ -75,10 +75,12 @@ defmodule FormDemo.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
+      build: ["setup"],
+      dev: ["setup", "phx.server"],
       setup: ["deps.get", "llv.build", "assets.setup", "assets.build"],
-      "assets.setup": ["tailwind.install --if-missing"],
-      "assets.build": ["compile", "tailwind form_demo"],
-      "assets.deploy": ["tailwind form_demo --minify", "phx.digest"]
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["compile", "tailwind form_demo", "esbuild form_demo"],
+      "assets.deploy": ["tailwind form_demo --minify", "esbuild form_demo --minify", "phx.digest"]
     ]
   end
 
