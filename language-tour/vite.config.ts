@@ -13,7 +13,11 @@ import { popcorn } from "@swmansion/popcorn/vite";
 const logger = createLogger();
 const originalWarn = logger.warn.bind(logger);
 logger.warn = (msg, options) => {
-  if (msg.includes(".livemd.mdx") && msg.includes("points to missing source files")) return;
+  if (
+    msg.includes(".livemd.mdx") &&
+    msg.includes("points to missing source files")
+  )
+    return;
   originalWarn(msg, options);
 };
 

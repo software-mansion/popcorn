@@ -14,6 +14,7 @@ tmp/
 
 # Node
 node_modules/
+.pnpm-store/
 
 # MacOS specific
 .DS_Store

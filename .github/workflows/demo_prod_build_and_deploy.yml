@@ -62,6 +62,7 @@ jobs:
           file: ./docker/landing.Dockerfile
           build-args: |
             POPCORN_BASE_TAG=latest
+            SYNC_THIRD_PARTY_ASSETS=true
           pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -79,6 +80,7 @@ jobs:
           # Sentry DSN is embedded in built JS, not really a secret
           build-args: |
             POPCORN_BASE_TAG=latest
+            SYNC_THIRD_PARTY_ASSETS=true
             SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
             SENTRY_MODE=production
             APP_VERSION=${{ github.sha }}

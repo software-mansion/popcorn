@@ -53,6 +53,7 @@ import Header from "../components/Header.astro";
       content="MrHmopnx2sLR0JbXEt14AR86iBeYXaxklQA2tLiMoXE"
     />
     <meta name="generator" content={Astro.generator} />
+    {import.meta.env.PROD && <script is:inline src="/cookie-script.js" />}
     <!-- Google Tag Manager -->
 		{
 			import.meta.env.PROD && (
