@@ -6,8 +6,6 @@ defmodule Popcorn do
   alias Popcorn.Build
 
   @popcorn_path Mix.Project.app_path()
-  @popcorn_generated_path Path.join(@popcorn_path, "popcorn_generated_ebin")
-  @popcorn_treeshaked_path Path.join(@popcorn_path, "popcorn_treeshaked_ebin")
   @api_dir Path.join(["popcorn", "api"])
 
   defmodule CookingError do
@@ -42,49 +40,67 @@ defmodule Popcorn do
 
     options = options |> Keyword.validate!(default_options) |> Map.new()
     ensure_option_present(options, :out_dir, "Output directory")
-
     File.mkdir_p!(options.out_dir)
-    app = Mix.Project.config() |> Keyword.get(:app)
-    apps_specs = gather_app_specs([:kernel, :stdlib, app], %{})
-    apps = Map.keys(apps_specs)
-    appconfig_module_path = create_appconfig_module(app, options.start_module, apps_specs)
+
+    # Unique tmp_dir prevents parallel cooks from interefering with one another
+    # Parallel cooks happen frequently in tests
+    tmp_dir =
+      Path.join(@popcorn_path, "popcorn_tmp_") <>
+        Calendar.strftime(DateTime.utc_now(), "%Y%m%d-%H%M%S_") <>
+        to_string(System.unique_integer([:monotonic, :positive]))
+
+    File.mkdir!(tmp_dir)
 
     try do
-      ebins = options.extra_beams ++ get_all_ebins(apps)
-      ebins = if options.treeshake, do: treeshake(ebins, options.start_module), else: ebins
-      beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
-      pack_bundle(options.out_dir, beams, options.treeshake)
+      do_cook(options, tmp_dir)
     after
-      File.rm!(appconfig_module_path)
+      File.rm_rf!(tmp_dir)
     end
   end
 
-  defp treeshake(ebin_files, start_module) do
-    File.rm_rf!(@popcorn_treeshaked_path)
-    File.mkdir!(@popcorn_treeshaked_path)
+  defp do_cook(options, tmp_dir) do
+    %{start_module: start_module} = options
+    app = Mix.Project.config() |> Keyword.get(:app)
+    apps_specs = gather_app_specs([:kernel, :stdlib, app], %{})
+    apps = Map.keys(apps_specs)
+    generated_ebin_dir = Path.join(tmp_dir, "generated_ebin")
+    File.mkdir(generated_ebin_dir)
+    boot_module = create_boot_module(app, start_module, apps_specs, generated_ebin_dir)
+    ebins = options.extra_beams ++ get_all_ebins(apps, generated_ebin_dir)
+
+    ebins =
+      if options.treeshake, do: treeshake(ebins, boot_module, start_module, tmp_dir), else: ebins
+
+    beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
+    pack_bundle(options.out_dir, beams, boot_module, options.treeshake)
+  end
+
+  defp treeshake(ebin_files, boot_module, start_module, tmp_dir) do
+    treeshaked_dir = Path.join(tmp_dir, "treeshaked_ebin")
+    File.mkdir!(treeshaked_dir)
 
     start_fun = if start_module, do: [{start_module, :start, 0}], else: []
 
     opts = [
       ebin_files: ebin_files,
       # verbose: true,
-      output_dir: @popcorn_treeshaked_path,
+      output_dir: treeshaked_dir,
       # stub_removed_functions: true,
       keep: [
-        Popcorn.Boot,
+        Popcorn.Init,
         %{behaviour_impls: LocalLiveView}
         | start_fun
       ],
       ignore: [
-        # AppConfig is ignored because it contains hardcoded list of all modules
+        # Boot module is ignored because it contains hardcoded list of all modules
         # of all apps, making treeshake think they're referenced, while they aren't
-        Popcorn.AppConfig,
+        boot_module,
         # TODO application_controller references a lot of code that it doesn't use,
         # we need to figure out if we can avoid keeping it
         :application_controller
       ],
       leave: [
-        Popcorn.AppConfig,
+        boot_module,
         :application_controller
       ],
       drop: [
@@ -130,15 +146,11 @@ defmodule Popcorn do
       ]
     ]
 
-    stats = Treeshake.run(opts)
-    File.mkdir_p!("call_graph")
-    File.write!("call_graph/.gitignore", "*")
-    File.write!("call_graph/cg.bin", :erlang.term_to_binary(stats.call_graph))
-
-    ls_paths(@popcorn_treeshaked_path)
+    Treeshake.run(opts)
+    ls_paths(treeshaked_dir)
   end
 
-  defp get_all_ebins(applications) do
+  defp get_all_ebins(applications, generated_ebin_dir) do
     builtin_apps = Build.builtin_apps() |> MapSet.new()
     builtin_deps = Enum.filter(applications, &(&1 in builtin_apps))
 
@@ -172,12 +184,12 @@ defmodule Popcorn do
       end)
 
     consolidated_ebins = ls_paths(Mix.Project.consolidation_path())
-    generated_ebins = ls_paths(@popcorn_generated_path)
+    generated_ebins = ls_paths(generated_ebin_dir)
 
     builtin_ebins ++ dep_ebins ++ consolidated_ebins ++ generated_ebins
   end
 
-  defp pack_bundle(out_dir, beams, drop_lines) do
+  defp pack_bundle(out_dir, beams, boot_module, drop_lines) do
     bundle_path = Path.join(out_dir, "bundle.avm")
 
     # packbeam appends to the bundle if output exists, we need to delete it first
@@ -186,7 +198,7 @@ defmodule Popcorn do
     beams = Enum.map(beams, &String.to_charlist/1)
 
     :packbeam_api.create(bundle_path, beams, %{
-      start_module: Popcorn.Boot,
+      start_module: boot_module,
       include_lines: not drop_lines
     })
 
@@ -229,32 +241,35 @@ defmodule Popcorn do
     end
   end
 
-  defp create_appconfig_module(app, start_module, apps_specs) do
+  defp create_boot_module(app, start_module, apps_specs, generated_ebin_dir) do
     # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
     apps_specs = put_in(apps_specs[:kernel][:env][:shell_history], :disabled)
 
     contents =
       quote location: :keep do
-        @compile autoload: false
+        @compile autoload: false, no_warn_undefined: [Popcorn.Init]
 
-        def get_config() do
-          %{
-            app: unquote(app),
-            start_module: unquote(start_module),
-            apps_specs: unquote(Macro.escape(apps_specs))
-          }
+        def start() do
+          config =
+            %{
+              app: unquote(app),
+              start_module: unquote(start_module),
+              apps_specs: unquote(Macro.escape(apps_specs))
+            }
+
+          Popcorn.Init.init(config)
         end
       end
 
-    module_name = Popcorn.AppConfig
+    # Unique module name avoids 'module is already being compiled' errors when running in parallel
+    module_name = Module.concat(Popcorn, "Boot#{System.unique_integer([:positive, :monotonic])}")
 
     {:module, _module_name, binary_content, _term} =
       Module.create(module_name, contents, Macro.Env.location(__ENV__))
 
-    File.mkdir_p!(@popcorn_generated_path)
-    path = Path.join(@popcorn_generated_path, "#{module_name}.beam")
+    path = Path.join(generated_ebin_dir, "#{module_name}.beam")
     File.write!(path, binary_content)
-    path
+    module_name
   end
 
   defp gather_app_specs([], specs), do: specs
