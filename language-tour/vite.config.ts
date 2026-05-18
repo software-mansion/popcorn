@@ -7,14 +7,17 @@ import rehypeHighlight from "rehype-highlight";
 import elixir from "highlight.js/lib/languages/elixir";
 import { livemdPlugin } from "./src/plugins/livemd";
 import { cookOnChange } from "./src/plugins/cook";
-import { cookieScriptProxy } from "./src/plugins/cookieScriptProxy";
 import { popcorn } from "@swmansion/popcorn/vite";
 
 // https://vite.dev/config/
 const logger = createLogger();
 const originalWarn = logger.warn.bind(logger);
 logger.warn = (msg, options) => {
-  if (msg.includes(".livemd.mdx") && msg.includes("points to missing source files")) return;
+  if (
+    msg.includes(".livemd.mdx") &&
+    msg.includes("points to missing source files")
+  )
+    return;
   originalWarn(msg, options);
 };
 
@@ -31,8 +34,7 @@ export default defineConfig({
     }),
     svgr(),
     popcorn({ bundlePaths: ["./public/wasm/bundle.avm"] }),
-    cookOnChange(),
-    cookieScriptProxy()
+    cookOnChange()
   ],
   server: {
     headers: {
