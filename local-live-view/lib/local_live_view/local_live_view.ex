@@ -46,6 +46,8 @@ defmodule LocalLiveView do
         %{id: socket.private[:llv_id], payload: payload}
       )
     end
+
+    socket
   end
 
   defp to_serializable(value) when is_struct(value),

@@ -9,18 +9,13 @@ import Config
 config :compare_live_views, CompareLiveViewsWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],
+  http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "kkoz3bWTFeKbaSGq3oqEQwL7bpFAR4f0ejreK+rg71pTgpW8WCFdz+rksVqa6MAE",
+  secret_key_base: "1ZwGNw8g5wbOjM6J786kxNdYjMwAY7TNIjGE7AIL958JGeOzE5VOxU8LRSDmNhP2",
   watchers: [
-    node: [
-      "build.mjs",
-      "--watch",
-      cd: Path.expand("../assets", __DIR__),
-      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
-    ],
+    esbuild: {Esbuild, :install_and_run, [:compare_live_views, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:compare_live_views, ~w(--watch)]}
   ]
 
@@ -47,16 +42,20 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
-# Watch static and templates for browser reloading.
-# config :compare_live_views, CompareLiveViewsWeb.Endpoint,
-#  live_reload: [
-#    web_console_logger: true,
-#    patterns: [
-#      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-#      ~r"priv/gettext/.*(po)$",
-#      ~r"lib/compare_live_views_web/(?:controllers|live|components|router)/?.*\.(ex|heex)$"
-#    ]
-#  ]
+# Reload browser tabs when matching files change.
+config :compare_live_views, CompareLiveViewsWeb.Endpoint,
+  live_reload: [
+    web_console_logger: false,
+    patterns: [
+      # Static assets, except user uploads
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
+      # Gettext translations
+      ~r"priv/gettext/.*\.po$",
+      # Router, Controllers, LiveViews and LiveComponents
+      ~r"lib/compare_live_views_web/router\.ex$",
+      ~r"lib/compare_live_views_web/(controllers|live|components)/.*\.(ex|heex)$"
+    ]
+  ]
 
 # Enable dev routes for dashboard and mailbox
 config :compare_live_views, dev_routes: true

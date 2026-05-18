@@ -8,7 +8,8 @@ defmodule Local.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: Mix.compilers()
+      compilers: Mix.compilers(),
+      aliases: aliases()
     ]
   end
 
@@ -16,7 +17,6 @@ defmodule Local.MixProject do
     [default_target: :wasm]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger],
@@ -24,7 +24,13 @@ defmodule Local.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  defp aliases do
+    [
+      build: ["deps.get", "popcorn.cook"],
+      dev: ["build", "popcorn.server"]
+    ]
+  end
+
   defp deps do
     [
       {:local_live_view, path: "../../../local-live-view"}

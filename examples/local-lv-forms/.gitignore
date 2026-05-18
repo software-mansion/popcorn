@@ -35,4 +35,3 @@ form_demo-*.tar
 npm-debug.log
 /assets/node_modules/
 
-/assets/vendor/local_live_view

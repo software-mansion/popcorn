@@ -11,7 +11,9 @@ defmodule FormDemo.Application do
       FormDemoWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:form_demo, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: FormDemo.PubSub},
-      {Registry, keys: :unique, name: LocalLiveView.ChannelRegistry},
+      # Start a worker by calling: FormDemo.Worker.start_link(arg)
+      # {FormDemo.Worker, arg},
+      # Start to serve requests, typically the last entry
       FormDemoWeb.Endpoint
     ]
 

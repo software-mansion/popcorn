@@ -86,6 +86,7 @@ defmodule CompareLiveViewsWeb do
       import Phoenix.HTML
       # Core UI components
       import CompareLiveViewsWeb.CoreComponents
+      import LocalLiveView.Component
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

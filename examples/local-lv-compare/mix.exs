@@ -40,12 +40,13 @@ defmodule CompareLiveViews.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:phoenix, "~> 1.8.0"},
+      {:phoenix, "~> 1.8.5"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.1.0"},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
       {:heroicons,
        github: "tailwindlabs/heroicons",
@@ -58,7 +59,7 @@ defmodule CompareLiveViews.MixProject do
       {:req, "~> 0.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 0.26"},
+      {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
@@ -74,35 +75,17 @@ defmodule CompareLiveViews.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      build: ["setup"],
-      dev: ["phx.server"],
-      setup: [
-        &build_local/1,
-        &pnpm_install/1,
-        "deps.get",
-        "compile",
-        "assets.setup",
-        "assets.build"
-      ],
+      setup: ["deps.get", "llv.build", &pnpm_install/1, "compile", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing"],
       "assets.build": [&build_js/1, "tailwind compare_live_views"],
-      "assets.deploy": [
-        &build_js/1,
-        "tailwind compare_live_views --minify",
-        "phx.digest"
-      ],
-      precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
+      "assets.deploy": [&build_js/1, "tailwind compare_live_views --minify", "phx.digest"]
     ]
-  end
-
-  defp build_local(_) do
-    Mix.shell().cmd("mix build", cd: "local")
   end
 
   defp pnpm_install(_) do
     {_, 0} =
       System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
+        cd: Path.join(File.cwd!(), "assets"),
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )
@@ -110,7 +93,7 @@ defmodule CompareLiveViews.MixProject do
 
   defp build_js(_) do
     {_, 0} =
-      System.cmd("pnpm", ["run", "build"],
+      System.cmd("node", ["build.mjs"],
         cd: Path.join(File.cwd!(), "assets"),
         env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
         into: IO.stream(:stdio, :line),
