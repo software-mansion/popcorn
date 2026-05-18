@@ -21,6 +21,7 @@ defmodule Popcorn.Build do
   @app_path Mix.Project.app_path()
   @patches_path "#{@app_path}/popcorn_patches"
   @src_wildcard "*.{ex,erl,yrl,S}"
+  @ebin_wildcard "*.{beam,app}"
 
   # A minimal set of apps to start Popcorn-based app
   @default_apps [
@@ -117,7 +118,7 @@ defmodule Popcorn.Build do
   defp patchable_app_ebins(app) do
     app
     |> Application.app_dir()
-    |> Path.join("ebin/*")
+    |> Path.join("ebin/#{@ebin_wildcard}")
     |> Path.wildcard()
   end
 

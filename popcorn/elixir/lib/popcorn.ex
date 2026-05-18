@@ -8,6 +8,8 @@ defmodule Popcorn do
   @popcorn_path Mix.Project.app_path()
   @api_dir Path.join(["popcorn", "api"])
 
+  @ebin_wildcard "*.{beam,app}"
+
   defmodule CookingError do
     @moduledoc false
     defexception [:message]
@@ -176,14 +178,14 @@ defmodule Popcorn do
 
     dep_ebins =
       Mix.Project.build_path()
-      |> Path.join("lib/*/ebin/*")
+      |> Path.join("lib/*/ebin/#{@ebin_wildcard}")
       |> Path.wildcard()
       |> Enum.reject(fn path ->
         is_popcorn_subpath = Path.relative_to(path, @popcorn_path) != path
         is_popcorn_subpath and not beam_src_in_api_dir?(path)
       end)
 
-    consolidated_ebins = ls_paths(Mix.Project.consolidation_path())
+    consolidated_ebins = ls_paths(Mix.Project.consolidation_path(), @ebin_wildcard)
     generated_ebins = ls_paths(generated_ebin_dir)
 
     builtin_ebins ++ dep_ebins ++ consolidated_ebins ++ generated_ebins
@@ -321,7 +323,7 @@ defmodule Popcorn do
     File.read!(path) |> :zlib.gzip() |> then(&File.write!("#{path}.gz", &1))
   end
 
-  defp ls_paths(path) do
-    Path.wildcard(Path.join(path, "*"))
+  defp ls_paths(path, wildcard \\ "*") do
+    Path.wildcard(Path.join(path, wildcard))
   end
 end
