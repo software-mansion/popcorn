@@ -7,8 +7,11 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
 
   @ebin "test/fixtures/treeshake/demo_app/_build/prod/lib/demo_app/ebin"
 
-  defp analyze(module, dir \\ @ebin) do
-    beam_path = Path.join(dir, "#{module}.beam")
+  defp analyze(module) when is_atom(module) do
+    analyze(Path.join(@ebin, "#{module}.beam"))
+  end
+
+  defp analyze(beam_path) do
     {module, core} = Treeshake.Utils.BeamReader.read_core!(beam_path)
     BeamAnalyzer.analyze(module, core)
   end
@@ -244,7 +247,7 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
 
   @tag :task
   test "hardcoded MFA tuple {Mod, :fun, arity} appears in calls" do
-    info = analyze(Task, "test/fixtures/treeshake/ebin")
+    info = analyze(:code.which(Task))
     child_spec = Enum.find(info.functions, &(&1.name == :child_spec))
 
     # Task.child_spec/1 contains the literal {Task, :start_link, [arg]} — arity 1
@@ -256,7 +259,7 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
   end
 
   test "task" do
-    info = analyze(Task, "test/fixtures/treeshake/ebin")
+    info = analyze(:code.which(Task))
 
     assert child_spec = Enum.find(info.functions, &(&1.name == :child_spec))
 

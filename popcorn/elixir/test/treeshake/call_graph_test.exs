@@ -11,7 +11,7 @@ defmodule Treeshake.CallGraphTest do
       |> then(& &1.call_graph)
 
     if System.get_env("RESNAPSHOT") do
-      graph_bin = :erlang.term_to_binary(graph, [:deterministic])
+      graph_bin = :erlang.term_to_binary(graph, [:deterministic, :compressed])
       File.write!("test/fixtures/treeshake/call_graph.bin", graph_bin)
     end
 

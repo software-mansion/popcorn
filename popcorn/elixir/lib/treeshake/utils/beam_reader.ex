@@ -14,7 +14,7 @@ defmodule Treeshake.Utils.BeamReader do
   end
 
   defp read_core_from_abstract_code(beam_path) do
-    case :beam_lib.chunks(String.to_charlist(beam_path), [:abstract_code]) do
+    case :beam_lib.chunks(~c"#{beam_path}", [:abstract_code]) do
       {:ok, {module, [{:abstract_code, {:raw_abstract_v1, abstract_forms}}]}} ->
         case :compile.noenv_forms(abstract_forms, [:to_core]) do
           {:ok, ^module, core} -> {:ok, module, core}
@@ -28,7 +28,7 @@ defmodule Treeshake.Utils.BeamReader do
   end
 
   defp read_core_from_custom_debug_info(beam_path) do
-    case :beam_lib.chunks(String.to_charlist(beam_path), [:debug_info]) do
+    case :beam_lib.chunks(~c"#{beam_path}", [:debug_info]) do
       {:ok, {module, [debug_info: {:debug_info_v1, :core_v1, core}]}} -> {:ok, module, core}
       _other -> :error
     end
