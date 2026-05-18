@@ -33,7 +33,6 @@ defmodule Popcorn.CompilationTest do
     |> AtomVM.assert_result(5)
   end
 
-  @tag :skip
   test "stacktrace", %{tmp_dir: run_dir} do
     info =
       quote do
@@ -56,7 +55,8 @@ defmodule Popcorn.CompilationTest do
              | rest
            ] = stacktrace
 
-    assert {RunExpr, :start, 0, [file: ^code_file, line: start_line]} = List.last(rest)
+    run_expr_call = Enum.find(rest, &(elem(&1, 0) == RunExpr))
+    assert {RunExpr, :start, 0, [file: ^code_file, line: start_line]} = run_expr_call
 
     lines = [1, start_line, run_line, 1000]
     assert lines == Enum.sort(lines)

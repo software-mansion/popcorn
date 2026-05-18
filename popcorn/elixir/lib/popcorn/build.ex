@@ -98,6 +98,7 @@ defmodule Popcorn.Build do
 
     elixir_apps = Path.expand("..", Application.app_dir(:elixir)) |> File.ls!()
 
+    # App names can be safely to converted to atoms
     Enum.map(otp_apps ++ elixir_apps, &String.to_atom/1)
   end
 

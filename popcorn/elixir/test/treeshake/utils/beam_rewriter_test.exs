@@ -4,6 +4,7 @@ defmodule Treeshake.Utils.BeamRewriterTest do
   alias Treeshake.Utils.BeamRewriter
 
   @moduletag :treeshake
+  @moduletag :tmp_dir
 
   @ebin "test/fixtures/treeshake/demo_app/_build/prod/lib/demo_app/ebin"
 
@@ -11,20 +12,16 @@ defmodule Treeshake.Utils.BeamRewriterTest do
 
   # Reads all function entries from the compiled bytecode via beam_disasm.
   # Works regardless of debug_info format, including beams compiled from core erlang.
-  defp all_funs(binary) when is_binary(binary) do
-    tmp = Path.join(System.tmp_dir!(), "bf#{:erlang.unique_integer([:positive])}.beam")
+  defp all_funs(binary, tmp_dir) when is_binary(binary) do
+    tmp = Path.join(tmp_dir, "bf#{:erlang.unique_integer([:positive])}.beam")
     File.write!(tmp, binary)
 
-    try do
-      case :beam_disasm.file(String.to_charlist(tmp)) do
-        {:beam_file, _, _, _, _, code} ->
-          for {:function, name, arity, _, _} <- code, do: {name, arity}
+    case :beam_disasm.file(String.to_charlist(tmp)) do
+      {:beam_file, _, _, _, _, code} ->
+        for {:function, name, arity, _, _} <- code, do: {name, arity}
 
-        {:error, :beam_disasm, _} ->
-          []
-      end
-    after
-      File.rm(tmp)
+      {:error, :beam_disasm, _} ->
+        []
     end
   end
 
@@ -50,14 +47,14 @@ defmodule Treeshake.Utils.BeamRewriterTest do
       assert is_list(removed)
     end
 
-    test "kept function is present in abstract code" do
+    test "kept function is present in abstract code", %{tmp_dir: tmp_dir} do
       {binary, _} = BeamRewriter.keep_funs(beam("Elixir.DemoApp.Worker"), @worker_process_funs)
-      assert {:process, 1} in all_funs(binary)
+      assert {:process, 1} in all_funs(binary, tmp_dir)
     end
 
-    test "non-kept function is absent from abstract code" do
+    test "non-kept function is absent from abstract code", %{tmp_dir: tmp_dir} do
       {binary, _} = BeamRewriter.keep_funs(beam("Elixir.DemoApp.Worker"), @worker_process_funs)
-      refute {:unused, 1} in all_funs(binary)
+      refute {:unused, 1} in all_funs(binary, tmp_dir)
     end
 
     test "kept function is present in exports" do
@@ -82,7 +79,7 @@ defmodule Treeshake.Utils.BeamRewriterTest do
   end
 
   describe "keep_funs/2 - multiple functions" do
-    test "all listed functions are present" do
+    test "all listed functions are present", %{tmp_dir: tmp_dir} do
       {binary, _} =
         BeamRewriter.keep_funs(beam("Elixir.DemoApp.Worker"),
           process: 1,
@@ -91,7 +88,7 @@ defmodule Treeshake.Utils.BeamRewriterTest do
           wrap: 1
         )
 
-      funs = all_funs(binary)
+      funs = all_funs(binary, tmp_dir)
       assert {:process, 1} in funs
       assert {:unused, 1} in funs
     end
@@ -104,10 +101,10 @@ defmodule Treeshake.Utils.BeamRewriterTest do
   end
 
   describe "keep_funs/2 - empty list" do
-    test "returns binary with no user-defined functions and all as removed" do
+    test "returns binary with no user-defined functions and all as removed", %{tmp_dir: tmp_dir} do
       {binary, removed} = BeamRewriter.keep_funs(beam("Elixir.DemoApp.Worker"), [])
       assert is_binary(binary)
-      assert all_funs(binary) == []
+      assert all_funs(binary, tmp_dir) == []
       assert {:unused, 1} in removed
       assert {:process, 1} in removed
     end
@@ -133,7 +130,7 @@ defmodule Treeshake.Utils.BeamRewriterTest do
       end
     end
 
-    test "raises for a file with no debug_info" do
+    test "raises for a file with no debug_info", %{tmp_dir: tmp_dir} do
       forms = [
         {:attribute, 1, :module, :NoDebugInfoMod},
         {:attribute, 2, :export, [{:hello, 0}]},
@@ -143,11 +140,8 @@ defmodule Treeshake.Utils.BeamRewriterTest do
       {:ok, :NoDebugInfoMod, binary, _} =
         :compile.forms(forms, [:return_errors, :return_warnings])
 
-      tmp =
-        Path.join(System.tmp_dir!(), "no_debug_info_#{:erlang.unique_integer([:positive])}.beam")
-
+      tmp = Path.join(tmp_dir, "no_debug_info.beam")
       File.write!(tmp, binary)
-      on_exit(fn -> File.rm(tmp) end)
 
       assert_raise RuntimeError, fn ->
         BeamRewriter.keep_funs(tmp, hello: 0)
