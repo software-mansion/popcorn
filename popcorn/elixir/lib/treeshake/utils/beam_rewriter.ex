@@ -11,7 +11,7 @@ defmodule Treeshake.Utils.BeamRewriter do
     to_keep = MapSet.new(functions)
     stub_removed_public = Keyword.get(opts, :stub_removed_public, false)
 
-    {:ok, module, core} = Treeshake.Utils.BeamReader.read_core(beam_path)
+    {module, core} = Treeshake.Utils.BeamReader.read_core!(beam_path)
 
     {:c_module, anno, name, exports, attrs, defs} = core
 

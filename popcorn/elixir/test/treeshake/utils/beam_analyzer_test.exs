@@ -9,7 +9,7 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
 
   defp analyze(module, dir \\ @ebin) do
     beam_path = Path.join(dir, "#{module}.beam")
-    {:ok, module, core} = Treeshake.Utils.BeamReader.read_core(beam_path)
+    {module, core} = Treeshake.Utils.BeamReader.read_core!(beam_path)
     BeamAnalyzer.analyze(module, core)
   end
 

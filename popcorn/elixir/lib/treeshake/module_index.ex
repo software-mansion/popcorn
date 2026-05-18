@@ -18,7 +18,7 @@ defmodule Treeshake.ModuleIndex do
   end
 
   defp build_entry(path, hardcoded, ignore_funs) do
-    {:ok, module, core} = Treeshake.Utils.BeamReader.read_core(path)
+    {module, core} = Treeshake.Utils.BeamReader.read_core!(path)
     info = Treeshake.Utils.BeamAnalyzer.analyze(module, core)
 
     info =

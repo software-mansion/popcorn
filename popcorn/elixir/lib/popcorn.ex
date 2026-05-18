@@ -44,33 +44,48 @@ defmodule Popcorn do
     ensure_option_present(options, :out_dir, "Output directory")
 
     File.mkdir_p!(options.out_dir)
-    {module, filename, apps} = create_boot_module(options.start_module)
+    app = Mix.Project.config() |> Keyword.get(:app)
+    apps_specs = gather_app_specs([:kernel, :stdlib, app], %{})
+    apps = Map.keys(apps_specs)
+    appconfig_module_path = create_appconfig_module(app, options.start_module, apps_specs)
 
     try do
       ebins = options.extra_beams ++ get_all_ebins(apps)
-      ebins = if options.treeshake, do: treeshake(ebins), else: ebins
+      ebins = if options.treeshake, do: treeshake(ebins, options.start_module), else: ebins
       beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
-      pack_bundle(options.out_dir, beams, module, options.treeshake)
+      pack_bundle(options.out_dir, beams, options.treeshake)
     after
-      File.rm!(filename)
+      File.rm!(appconfig_module_path)
     end
   end
 
-  defp treeshake(ebin_files) do
+  defp treeshake(ebin_files, start_module) do
     File.rm_rf!(@popcorn_treeshaked_path)
     File.mkdir!(@popcorn_treeshaked_path)
 
+    start_fun = if start_module, do: [{start_module, :start, 0}], else: []
+
     opts = [
       ebin_files: ebin_files,
-      verbose: true,
+      # verbose: true,
       output_dir: @popcorn_treeshaked_path,
       # stub_removed_functions: true,
       keep: [
         Popcorn.Boot,
         %{behaviour_impls: LocalLiveView}
+        | start_fun
       ],
       ignore: [
-        {Popcorn.Boot, :start_apps, 0}
+        # AppConfig is ignored because it contains hardcoded list of all modules
+        # of all apps, making treeshake think they're referenced, while they aren't
+        Popcorn.AppConfig,
+        # TODO application_controller references a lot of code that it doesn't use,
+        # we need to figure out if we can avoid keeping it
+        :application_controller
+      ],
+      leave: [
+        Popcorn.AppConfig,
+        :application_controller
       ],
       drop: [
         Code.Formatter,
@@ -162,7 +177,7 @@ defmodule Popcorn do
     builtin_ebins ++ dep_ebins ++ consolidated_ebins ++ generated_ebins
   end
 
-  defp pack_bundle(out_dir, beams, start_module, drop_lines) do
+  defp pack_bundle(out_dir, beams, drop_lines) do
     bundle_path = Path.join(out_dir, "bundle.avm")
 
     # packbeam appends to the bundle if output exists, we need to delete it first
@@ -171,7 +186,7 @@ defmodule Popcorn do
     beams = Enum.map(beams, &String.to_charlist/1)
 
     :packbeam_api.create(bundle_path, beams, %{
-      start_module: start_module,
+      start_module: Popcorn.Boot,
       include_lines: not drop_lines
     })
 
@@ -214,92 +229,32 @@ defmodule Popcorn do
     end
   end
 
-  defp create_boot_module(start_module) do
-    config = Mix.Project.config()
-    app = Keyword.get(config, :app)
-
-    specs = gather_app_specs([:kernel, :stdlib, app], %{})
-
+  defp create_appconfig_module(app, start_module, apps_specs) do
     # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
-    specs = put_in(specs[:kernel][:env][:shell_history], :disabled)
+    apps_specs = put_in(apps_specs[:kernel][:env][:shell_history], :disabled)
 
-    run =
-      if start_module != nil do
-        quote do
-          unquote(start_module).start()
-        end
-      else
-        quote do
-          case :application.get_supervisor(unquote(app)) do
-            :undefined ->
-              :ok
-
-            {:ok, pid} ->
-              ref = Process.monitor(pid)
-
-              receive do
-                {:DOWN, ^ref, :process, _object, reason} ->
-                  reason
-              end
-          end
-        end
-      end
-
-    no_warn_undefined = [:atomvm, Popcorn.Wasm | List.wrap(start_module)]
-
-    # The module below tries to mimic BEAMs boot script, then start user's app
     contents =
       quote location: :keep do
-        @compile autoload: false, no_warn_undefined: unquote(no_warn_undefined)
+        @compile autoload: false
 
-        def start() do
-          start_apps()
-          Popcorn.Wasm.send_event("popcorn_elixir_ready")
-          unquote(run)
-        rescue
-          e ->
-            :erlang.display({e, __STACKTRACE__})
-            reraise e, __STACKTRACE__
-        end
-
-        # TODO start_apps is a separate function so that it can be ignored
-        # in tree-shaking for the following reasons:
-        # - application.start references a lot of code that it doesn't use,
-        #   we need to figure out if we can avoid keeping it
-        # - the apps specs list all modules in the app and it makes tree-shaker
-        #   mark them as referenced, while they're actually aren't
-        defp start_apps() do
-          # TODO: Default boot script starts `:heart` process, but unless -heart flag is passed, it will return `:ignore`
-          # :ignore = :heart.start()
-          # TODO: Default boot script starts :logger_server, uncomment line below when :logger app is supported
-          # {:ok, _pid} = :logger_server.start_link()
-          specs = unquote(Macro.escape(specs))
-
-          {:ok, _ac} =
-            :application_controller.start({:application, :kernel, specs[:kernel]})
-
-          for {app, spec} <- specs, app != :kernel do
-            :ok = :application.load({:application, app, spec})
-          end
-
-          :ok = :application.start_boot(:kernel, :permanent)
-          :ok = :application.start_boot(:stdlib, :permanent)
-
-          {:ok, _apps} = :application.ensure_all_started(unquote(app), :permanent)
-
-          :ok
+        def get_config() do
+          %{
+            app: unquote(app),
+            start_module: unquote(start_module),
+            apps_specs: unquote(Macro.escape(apps_specs))
+          }
         end
       end
 
-    module_name = Popcorn.Boot
+    module_name = Popcorn.AppConfig
 
     {:module, _module_name, binary_content, _term} =
       Module.create(module_name, contents, Macro.Env.location(__ENV__))
 
     File.mkdir_p!(@popcorn_generated_path)
-    filename = Path.join(@popcorn_generated_path, "#{module_name}.beam")
-    File.write!(filename, binary_content)
-    {module_name, filename, Map.keys(specs)}
+    path = Path.join(@popcorn_generated_path, "#{module_name}.beam")
+    File.write!(path, binary_content)
+    path
   end
 
   defp gather_app_specs([], specs), do: specs
