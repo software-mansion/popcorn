@@ -1,28 +1,37 @@
 defmodule Popdoc.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/software-mansion/popcorn/popdoc"
+
   def project do
     [
       app: :popdoc,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.17",
-      start_permanent: Mix.env() == :prod,
+      start_permanent: false,
+      name: "Popdoc",
+      description: "ExDoc extension for interactive Elixir code evaluation, using Popcorn.",
+      source_url: @source_url,
+      package: package(),
       deps: deps()
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
+    []
+  end
+
+  defp package do
     [
-      extra_applications: [:logger]
+      name: "popdoc",
+      files: ~w(lib assets mix.exs README.md LICENSE.md),
+      licenses: ["Apache-2.0"],
+      links: %{"Github" => @source_url}
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
-    [
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
-    ]
+    []
   end
 end
