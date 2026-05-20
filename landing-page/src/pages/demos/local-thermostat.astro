@@ -139,10 +139,12 @@ end
       params: {},
     });
 
-    await LLVEngine.create(liveSocket, {
+    const llv = await LLVEngine.create(liveSocket, {
       Socket,
       bundlePaths: ["/wasm/local_thermostat.avm"],
     });
+
+    liveSocket.connect();
   }
 
   document.addEventListener("DOMContentLoaded", init);

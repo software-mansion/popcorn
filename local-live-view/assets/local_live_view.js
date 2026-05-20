@@ -217,8 +217,6 @@ export class LLVEngine {
       await sendServerMessage(popcorn, detail);
     }
 
-    liveSocket.connect();
-
     return new LLVEngine(popcorn);
   }
 

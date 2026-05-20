@@ -42,6 +42,9 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 // setup local live views, which will override the default pushWithReply and join functions of the live view to instead call popcorn
 import { LLVEngine } from "local_live_view"
 await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+
+// connect if there are any LiveViews on the page
+liveSocket.connect()
 liveSocket.enableLatencySim(500)
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()

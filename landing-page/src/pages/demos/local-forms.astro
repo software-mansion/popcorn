@@ -261,6 +261,8 @@ end
       Socket,
       bundlePaths: ["/wasm/local_forms.avm"],
     });
+
+    liveSocket.connect();
   }
 
   document.addEventListener("DOMContentLoaded", init);
