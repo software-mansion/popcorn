@@ -32,6 +32,8 @@ defmodule Popdoc.MixProject do
   end
 
   defp deps do
-    []
+    [
+      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true}
+    ]
   end
 end

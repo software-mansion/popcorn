@@ -1,18 +1,12 @@
 defmodule Popdoc do
   @moduledoc """
-  Documentation for `Popdoc`.
+  ExDoc extension for interactive Elixir code evaluation via Popcorn.
   """
 
   @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Popdoc.hello()
-      :world
-
+  Adds Popdoc's options to ExDoc options.
   """
-  def hello do
-    :world
+  def config(user_opts \\ []) do
+    Keyword.put(user_opts, :markdown_processor, Popdoc.Markdown)
   end
 end
