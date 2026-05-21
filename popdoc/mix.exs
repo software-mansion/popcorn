@@ -25,7 +25,7 @@ defmodule Popdoc.MixProject do
   defp package do
     [
       name: "popdoc",
-      files: ~w(lib assets mix.exs README.md LICENSE.md),
+      files: ~w(lib assets docs_assets mix.exs README.md LICENSE.md),
       licenses: ["Apache-2.0"],
       links: %{"Github" => @source_url}
     ]
@@ -33,7 +33,7 @@ defmodule Popdoc.MixProject do
 
   defp deps do
     [
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true}
+      {:ex_doc, ">= 0.34.0 and < 1.0.0", optional: true, runtime: false, warn_if_outdated: true}
     ]
   end
 end

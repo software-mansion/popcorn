@@ -3,6 +3,12 @@ defmodule Popdoc.MarkdownTest do
 
   alias Popdoc.Markdown
 
+  describe "available?/0" do
+    test "returns true when ExDoc's Earmark adapter is available" do
+      assert Markdown.available?()
+    end
+  end
+
   describe "to_ast/2" do
     test "adds the eval class to code blocks marked by the HTML comment" do
       ast =

@@ -2,20 +2,24 @@ defmodule Popdoc.Markdown do
   @moduledoc """
   ExDoc markdown processor that tags fenced code blocks preceded by
   `<!-- popcorn:eval -->` with the `popcorn-eval` class.
-  """
 
-  @behaviour ExDoc.Markdown
+  It intentionally resolves ExDoc's markdown adapter at runtime so consumers
+  can provide their own `:ex_doc` dependency.
+  """
 
   @marker "popcorn:eval"
   @eval_class "popcorn-eval"
 
-  @impl true
-  def available?, do: ExDoc.Markdown.Earmark.available?()
+  def available? do
+    case earmark_adapter() do
+      {:ok, module} -> apply(module, :available?, [])
+      :error -> false
+    end
+  end
 
-  @impl true
   def to_ast(text, opts) do
-    text
-    |> ExDoc.Markdown.Earmark.to_ast(opts)
+    earmark_adapter!()
+    |> apply(:to_ast, [text, opts])
     |> walk()
   end
 
@@ -46,6 +50,29 @@ defmodule Popdoc.Markdown do
     case List.keytake(attrs, :class, 0) do
       nil -> [{:class, class} | attrs]
       {{:class, existing}, rest} -> [{:class, "#{existing} #{class}"} | rest]
+    end
+  end
+
+  defp earmark_adapter do
+    module = Module.concat([ExDoc, Markdown, Earmark])
+
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      :error
+    end
+  end
+
+  defp earmark_adapter! do
+    case earmark_adapter() do
+      {:ok, module} ->
+        module
+
+      :error ->
+        raise """
+        Popdoc requires ExDoc's Earmark adapter at docs runtime.
+        Add `:ex_doc` to the consuming project's dependencies before running `mix docs`.
+        """
     end
   end
 end
