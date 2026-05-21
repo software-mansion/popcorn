@@ -497,6 +497,16 @@ importers:
         specifier: 'catalog:'
         version: 7.3.2(@types/node@25.6.0)(jiti@2.7.0)(lightningcss@1.32.0)
 
+  popdoc/js:
+    dependencies:
+      '@swmansion/popcorn':
+        specifier: workspace:*
+        version: link:../../popcorn/js
+    devDependencies:
+      esbuild:
+        specifier: 0.28.0
+        version: 0.28.0
+
 packages:
 
   '@antfu/install-pkg@1.1.0':
