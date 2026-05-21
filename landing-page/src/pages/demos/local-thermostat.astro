@@ -132,14 +132,14 @@ end
 <script>
   import { Socket } from "phoenix";
   import { LiveSocket } from "phoenix_live_view";
-  import { setup } from "local_live_view";
+  import { LLVEngine } from "local_live_view";
 
   async function init() {
     const liveSocket = new LiveSocket("/live", Socket, {
       params: {},
     });
 
-    await setup(liveSocket, {
+    const llv = await LLVEngine.create(liveSocket, {
       Socket,
       bundlePaths: ["/wasm/local_thermostat.avm"],
     });
