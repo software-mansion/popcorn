@@ -51,6 +51,6 @@ defmodule Mix.Tasks.Llv.Build do
       )
 
     Mix.shell().info("[llv] Building WASM bundle...")
-    Mix.shell().cmd("mix build", cd: "local")
+    0 = Mix.shell().cmd("mix build", cd: "local")
   end
 end

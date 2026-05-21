@@ -8,9 +8,10 @@ module = :telemetry
   path -> File.rm(path)
 end
 
+:code.delete(module)
 :code.purge(module)
 
-defmodule :telemetry do
+defmodule module do
   def execute(_event, _measurements, _metadata \\ %{}), do: :ok
 
   def span(_event, _metadata, fun) do
