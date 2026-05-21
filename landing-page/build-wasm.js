@@ -4,9 +4,9 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
 /**
- * @param {{ dir: string, wasmSrcPathDefault?: string, newBundleName: string }} options
+ * @param {{ dir: string, wasmSrcPathDefault?: string, newBundleName: string, extraEnv?: Record<string, string> }} options
  */
-export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
+export function buildBundle({ dir, wasmSrcPathDefault, newBundleName, extraEnv = {} }) {
   return {
     name: "build-bundle",
     hooks: {
@@ -15,7 +15,7 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
         const wasmSrcPath = wasmSrcPathDefault ?? join(dir, "dist", "wasm");
         const wasmDestPath = wasmDir(config);
 
-        await run("mix", ["build"], { dir });
+        await run("mix", ["build"], { dir, env: extraEnv });
 
         const srcFiles = await readdir(wasmSrcPath);
         const [avm] = srcFiles.filter((path) => path.endsWith(".avm"));
@@ -53,13 +53,14 @@ function wasmDir(config) {
   return join(publicPath, "wasm");
 }
 
-function run(cmd, args, { dir }) {
+function run(cmd, args, { dir, env = {} }) {
   const strCmd = `${cmd} ${args.join(" ")}`;
 
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd: dir,
       stdio: "inherit",
+      env: { ...process.env, ...env },
     });
 
     child.on("close", (code) => {

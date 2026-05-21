@@ -54,12 +54,14 @@ export default defineConfig({
         "../examples/local-lv-thermostat/priv/static/assets/js/wasm",
       dir: "../examples/local-lv-thermostat",
       newBundleName: "local_thermostat.avm",
+      extraEnv: { LLV_LANDING_PATCH: "true" },
     }),
     buildBundle({
       wasmSrcPathDefault:
         "../examples/local-lv-forms/priv/static/assets/js/wasm",
       dir: "../examples/local-lv-forms",
       newBundleName: "local_forms.avm",
+      extraEnv: { LLV_LANDING_PATCH: "true" },
     }),
   ],
   markdown: {
