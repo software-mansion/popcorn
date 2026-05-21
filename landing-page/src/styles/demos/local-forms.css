@@ -1,0 +1,85 @@
+@reference "../global.css";
+
+[data-value="users-list"],
+[data-value="errors-list"] {
+  @apply transition-colors duration-300;
+}
+
+[data-value="errors-list"] {
+  @apply border border-transparent rounded-lg px-2 flex flex-col gap-2;
+}
+
+[data-value="users-list"] {
+  @apply mb-4 text-[0.8rem];
+}
+
+[data-value="users-list"] p {
+  @apply italic;
+}
+
+[data-pop-view].hl-users-list [data-value="users-list"],
+[data-pop-view].hl-errors-list [data-value="errors-list"] {
+  @apply border-orange-100! bg-orange-100/6!;
+}
+
+.local_forms {
+  @apply flex flex-col gap-4 text-black bg-light-20 border-2 border-brown-header rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(48,27,5,0.1)];
+}
+
+.local_forms > div {
+  @apply px-6;
+}
+
+.local_forms .header {
+  @apply bg-brown-header text-light-20 text-center py-2;
+}
+
+.local_forms h2 {
+  @apply font-handjet text-xl mb-2;
+}
+
+.local_forms form {
+  @apply flex flex-col gap-2;
+}
+
+.local_forms label {
+  @apply font-semibold text-brown-header text-xs tracking-wider;
+}
+
+.local_forms .input {
+  @apply w-full border-2 border-brown-header rounded-lg px-4 py-3 bg-light-20 text-black transition-all duration-200;
+}
+
+.local_forms .input:focus {
+  @apply outline-none border-orange-100 shadow-[0_0_0_3px_rgba(239,124,0,0.1)];
+}
+
+.local_forms .input::placeholder {
+  @apply font-normal text-brown-60;
+}
+
+.local_forms .buttons {
+  @apply flex gap-4;
+}
+
+.local_forms ul {
+  @apply list-none p-0 m-0 flex flex-col gap-1 text-llv-brown-50;
+}
+
+.ghost-button {
+  @apply px-5 border-2 border-brown-header bg-transparent text-brown-header rounded-lg cursor-pointer transition-all duration-200 text-sm font-semibold tracking-[0.04em];
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.ghost-button:hover {
+  @apply bg-orange-100 border-orange-100 text-light-20;
+}
+
+.ghost-button:disabled {
+  @apply border-dashed opacity-50 cursor-not-allowed;
+}
+
+.ghost-button:disabled:hover {
+  @apply bg-transparent border-brown-header text-brown-header;
+}
