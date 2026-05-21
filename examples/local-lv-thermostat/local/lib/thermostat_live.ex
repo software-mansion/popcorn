@@ -3,25 +3,20 @@ defmodule ThermostatLive do
 
   def render(assigns) do
     ~H"""
-    <p>Current temperature: {@temperature}°C</p>
-    <div class="thermostat-controls">
-      <button phx-click="inc_temperature" class="ghost-button">+</button>
-      <button phx-click="dec_temperature" class="ghost-button">-</button>
+    <div class="thermostat-wrapper">
+      <p class="thermostat-temp-label">Current temperature</p>
+      <p class="thermostat-temp-value" data-value="temperature">{@temperature}°C</p>
+      <div class="thermostat-controls">
+        <button phx-click="inc_temperature" class="ghost-button">+</button>
+        <button phx-click="dec_temperature" class="ghost-button">-</button>
+      </div>
+      <p class="thermostat-country">Country: {@country}</p>
     </div>
-    <p>Country: {@country}</p>
     """
   end
 
   def mount(_params, _session, socket) do
-    temperature = 25
-    country = "Poland"
-
-    socket =
-      socket
-      |> assign(:temperature, temperature)
-      |> assign(:country, country)
-
-    {:ok, socket}
+    {:ok, socket |> assign(:temperature, 25) |> assign(:country, "Poland")}
   end
 
   def handle_event("inc_temperature", _params, socket) do
@@ -31,4 +26,5 @@ defmodule ThermostatLive do
   def handle_event("dec_temperature", _params, socket) do
     {:noreply, update(socket, :temperature, &(&1 - 1))}
   end
+
 end
