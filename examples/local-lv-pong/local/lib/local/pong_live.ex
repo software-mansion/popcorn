@@ -9,20 +9,19 @@ defmodule Local.PongLive do
   @bs 10
   @win 7
 
-  @fps 120
-  @tick div(1000, @fps)
-  @dt 1 / @fps
+  @default_fps 120
+  @fps_options [30, 60, 120, 240]
 
-  # Speeds in pixels per second; multiplied by @dt per tick.
+  # Speeds in pixels per second; multiplied by dt per tick.
   @ps 480
   @bots 300
   @v 300
-  @speedup 18
+  @speedup 30
   @maxv 720
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket |> assign(:timer, nil) |> reset()}
+    {:ok, socket |> assign(timer: nil, fps: @default_fps, fps_options: @fps_options) |> reset()}
   end
 
   defp reset(socket) do
@@ -30,6 +29,7 @@ defmodule Local.PongLive do
     |> assign(py: (@h - @ph) / 2, by: (@h - @ph) / 2)
     |> assign(up: false, down: false)
     |> assign(ps: 0, bs: 0, status: :waiting)
+    |> assign(fps_started_at: nil, fps_ticks: 0, current_fps: 0)
     |> ball(-1)
   end
 
@@ -38,8 +38,9 @@ defmodule Local.PongLive do
   end
 
   defp start_timer(socket) do
-    {:ok, ref} = :timer.send_interval(@tick, :tick)
-    assign(socket, :timer, ref)
+    tick = div(1000, socket.assigns.fps)
+    {:ok, ref} = :timer.send_interval(tick, :tick)
+    assign(socket, timer: ref, fps_started_at: nil, fps_ticks: 0)
   end
 
   defp stop_timer(%{assigns: %{timer: nil}} = socket), do: socket
@@ -50,6 +51,20 @@ defmodule Local.PongLive do
   end
 
   @impl true
+  def handle_event("set_fps", %{"fps" => fps}, socket) do
+    fps = String.to_integer(fps)
+    socket = assign(socket, :fps, fps)
+
+    socket =
+      if socket.assigns.timer do
+        socket |> stop_timer() |> start_timer()
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_event(e, %{"key" => k}, socket) when e in ["d", "u"] do
     down? = e == "d"
 
@@ -75,20 +90,43 @@ defmodule Local.PongLive do
 
   @impl true
   def handle_info(:tick, %{assigns: %{status: :playing}} = s) do
-    {:noreply, s |> player() |> bot() |> ball_step() |> win()}
+    {:noreply, s |> measure_fps() |> player() |> bot() |> ball_step() |> win()}
   end
 
   def handle_info(:tick, s), do: {:noreply, s}
 
+  defp measure_fps(s) do
+    now = System.monotonic_time(:millisecond)
+    ticks = s.assigns.fps_ticks + 1
+    update_freq = 100
+
+    case s.assigns.fps_started_at do
+      nil ->
+        assign(s, fps_started_at: now, fps_ticks: 0)
+
+      started when now - started >= update_freq ->
+        assign(s,
+          fps_started_at: now,
+          fps_ticks: 0,
+          current_fps: round(ticks * 1000 / (now - started))
+        )
+
+      _started ->
+        assign(s, :fps_ticks, ticks)
+    end
+  end
+
+  defp dt(s), do: 1 / s.assigns.fps
+
   defp player(s) do
-    step = @ps * @dt
+    step = @ps * dt(s)
     d = if(s.assigns.down, do: step, else: 0) - if(s.assigns.up, do: step, else: 0)
     assign(s, :py, clamp(s.assigns.py + d, 0, @h - @ph))
   end
 
   defp bot(s) do
     diff = s.assigns.by_ - @ph / 2 - s.assigns.by
-    step = @bots * @dt
+    step = @bots * dt(s)
 
     d =
       cond do
@@ -102,8 +140,8 @@ defmodule Local.PongLive do
 
   defp ball_step(s) do
     %{bx: bx, by_: by, vx: vx, vy: vy, py: py, by: byp, ps: ps, bs: bs} = s.assigns
-    bx2 = bx + vx * @dt
-    by2 = by + vy * @dt
+    bx2 = bx + vx * dt(s)
+    by2 = by + vy * dt(s)
     {by2, vy} = if by2 < 0 or by2 > @h - @bs, do: {clamp(by2, 0, @h - @bs), -vy}, else: {by2, vy}
 
     cond do
@@ -127,10 +165,10 @@ defmodule Local.PongLive do
   end
 
   defp win(s) do
-    cond do
-      s.assigns.ps >= @win -> s |> stop_timer() |> assign(:status, :over)
-      s.assigns.bs >= @win -> s |> stop_timer() |> assign(:status, :over)
-      true -> s
+    if s.assigns.ps >= @win or s.assigns.bs >= @win do
+      s |> stop_timer() |> assign(:status, :over)
+    else
+      s
     end
   end
 
@@ -147,7 +185,7 @@ defmodule Local.PongLive do
   def render(assigns) do
     ~H"""
     <div phx-window-keydown="d" phx-window-keyup="u" style="font-family:monospace;text-align:center;padding:1em">
-      <div>{@ps} : {@bs}</div>
+      <div><span :if={@status == :over}>{if @ps > @bs, do: "You won!", else: "You lost!"} </span>{@ps} : {@bs}</div>
       <div style="position:relative;width:600px;height:400px;background:#111;margin:1em auto">
         <div style={"position:absolute;left:20px;top:#{@py}px;width:10px;height:70px;background:#fff"}></div>
         <div style={"position:absolute;left:570px;top:#{@by}px;width:10px;height:70px;background:#fff"}></div>
@@ -155,6 +193,22 @@ defmodule Local.PongLive do
       </div>
       <div>
         Press space to play/pause, W/S or ↑/↓ to move
+      </div>
+      <div style="font-size:0.8em;margin-top:1em;color:#888;">
+        <div :if={@status == :playing}>
+          FPS: {@current_fps}
+        </div>
+        <div :if={@status != :playing}>
+          Target FPS:
+          <%= for opt <- @fps_options do %>
+            <button
+              type="button"
+              phx-click="set_fps"
+              phx-value-fps={opt}
+              style={"margin:0 2px;padding:2px 8px;background:#{if @fps == opt, do: "#444", else: "#222"};color:#fff;border:1px solid #555;border-radius:3px;cursor:pointer"}
+            >{opt}</button>
+          <% end %>
+        </div>
       </div>
     </div>
     """
