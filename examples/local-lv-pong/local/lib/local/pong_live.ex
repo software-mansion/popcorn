@@ -22,7 +22,7 @@ defmodule Local.PongLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, reset(socket)}
+    {:ok, socket |> assign(:timer, nil) |> reset()}
   end
 
   defp reset(socket) do
@@ -35,6 +35,18 @@ defmodule Local.PongLive do
 
   defp ball(socket, dir) do
     assign(socket, bx: @w / 2, by_: @h / 2, vx: dir * @v, vy: (:rand.uniform() - 0.5) * @v)
+  end
+
+  defp start_timer(socket) do
+    {:ok, ref} = :timer.send_interval(@tick, :tick)
+    assign(socket, :timer, ref)
+  end
+
+  defp stop_timer(%{assigns: %{timer: nil}} = socket), do: socket
+
+  defp stop_timer(%{assigns: %{timer: ref}} = socket) do
+    :timer.cancel(ref)
+    assign(socket, :timer, nil)
   end
 
   @impl true
@@ -52,21 +64,17 @@ defmodule Local.PongLive do
     {:noreply, socket}
   end
 
-  defp space(%{assigns: %{status: :playing}} = s), do: assign(s, :status, :paused)
+  defp space(%{assigns: %{status: :playing}} = s),
+    do: s |> stop_timer() |> assign(:status, :paused)
 
-  defp space(%{assigns: %{status: :paused}} = s) do
-    Process.send_after(self(), :tick, @tick)
-    assign(s, :status, :playing)
-  end
+  defp space(%{assigns: %{status: :paused}} = s),
+    do: s |> start_timer() |> assign(:status, :playing)
 
-  defp space(s) do
-    Process.send_after(self(), :tick, @tick)
-    reset(s) |> assign(:status, :playing)
-  end
+  defp space(s),
+    do: s |> reset() |> assign(:status, :playing) |> start_timer()
 
   @impl true
   def handle_info(:tick, %{assigns: %{status: :playing}} = s) do
-    Process.send_after(self(), :tick, @tick)
     {:noreply, s |> player() |> bot() |> ball_step() |> win()}
   end
 
@@ -120,8 +128,8 @@ defmodule Local.PongLive do
 
   defp win(s) do
     cond do
-      s.assigns.ps >= @win -> assign(s, status: :over)
-      s.assigns.bs >= @win -> assign(s, status: :over)
+      s.assigns.ps >= @win -> s |> stop_timer() |> assign(:status, :over)
+      s.assigns.bs >= @win -> s |> stop_timer() |> assign(:status, :over)
       true -> s
     end
   end
