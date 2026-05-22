@@ -7,6 +7,7 @@ Minimal Popdoc fixture for manual docs checks.
 ```elixir
 Example.hello()
 Example.add(20, 22)
+Process.sleep(2000)
 ```
 
 Build the docs with:

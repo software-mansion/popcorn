@@ -1,0 +1,43 @@
+:root {
+  --popdoc-space: 0.25rem;
+  --popdoc-output-border-color: currentColor;
+  --popdoc-output-error-color: #b91c1c;
+  --popdoc-output-pulse-color: #2563eb;
+}
+
+.popdoc-block {
+  margin: var(--baseLineHeight, 1rem) 0;
+}
+
+.popdoc-run {
+  margin: 0 0 var(--popdoc-space);
+  padding: var(--popdoc-space) calc(var(--popdoc-space) * 3);
+  font: inherit;
+  cursor: pointer;
+}
+
+.popdoc-run:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.popdoc-output {
+  margin-top: calc(var(--popdoc-space) * 2);
+  padding: calc(var(--popdoc-space) * 3);
+  border-left: 3px solid var(--popdoc-output-border-color);
+  white-space: pre-wrap;
+}
+
+.popdoc-output-pending {
+  animation: popdoc-output-pulse 1.4s ease-in-out infinite;
+}
+
+.popdoc-output-error {
+  color: var(--popdoc-output-error-color);
+}
+
+@keyframes popdoc-output-pulse {
+  50% {
+    border-left-color: var(--popdoc-output-pulse-color);
+  }
+}
