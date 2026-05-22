@@ -21,4 +21,5 @@ async function initPopcorn() {
 
 window.addEventListener("exdoc:loaded", async () => {
   const popcorn = await initPopcorn();
+  window.popcorn = popcorn;
 });

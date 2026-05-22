@@ -27,6 +27,10 @@ defmodule PopdocWasm do
   @impl true
   def handle_info(_msg, state), do: {:noreply, state}
 
+  defp handle_wasm({:wasm_call, code}, state) when is_binary(code) do
+    handle_wasm({:wasm_call, ["eval_elixir", code, "default"]}, state)
+  end
+
   defp handle_wasm({:wasm_call, ["eval_elixir", code]}, state) do
     handle_wasm({:wasm_call, ["eval_elixir", code, "default"]}, state)
   end
