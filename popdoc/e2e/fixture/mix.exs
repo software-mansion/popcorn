@@ -31,7 +31,7 @@ defmodule Example.MixProject do
     Popdoc.config(
       main: "readme",
       extras: ["README.md"],
-      coi_serviceworker: Mix.env() == :dev
+      popdoc: [coi_serviceworker: Mix.env() == :dev]
     )
   end
 end

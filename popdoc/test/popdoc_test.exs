@@ -11,7 +11,7 @@ defmodule PopdocTest do
   end
 
   test "config/1 adds emulation for CORS/COEP headers if requested" do
-    opts = Popdoc.config(main: "readme", coi_serviceworker: true)
+    opts = Popdoc.config(main: "readme", popdoc: [coi_serviceworker: true])
 
     assert Map.has_key?(opts[:assets], Path.expand("../docs_assets", __DIR__))
     assert opts[:before_closing_head_tag].(:html) =~ "coi-serviceworker.js"

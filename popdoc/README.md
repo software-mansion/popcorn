@@ -32,7 +32,7 @@ defp docs do
   Popdoc.config(
     main: "readme",
     extras: ["README.md"],
-    coi_serviceworker: Mix.env() == :dev
+    popdoc: [coi_serviceworker: Mix.env() == :dev]
   )
 end
 ```
@@ -45,7 +45,7 @@ mix docs
 mix popdoc.server
 ```
 
-`coi_serviceworker: true` is useful for local/debug docs hosting on `localhost`
+`popdoc: [coi_serviceworker: true]` is useful for local/debug docs hosting on `localhost`
 when you cannot control response headers directly. For production deployments,
 leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp` headers from the web server.

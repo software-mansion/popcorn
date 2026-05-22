@@ -33,7 +33,8 @@ defmodule Popdoc.MixProject do
 
   defp deps do
     [
-      {:ex_doc, ">= 0.34.0 and < 1.0.0", optional: true, runtime: false, warn_if_outdated: true}
+      {:ex_doc, ">= 0.34.0 and < 1.0.0", optional: true, runtime: false, warn_if_outdated: true},
+      {:atomvm_packbeam, "~> 0.8.2", runtime: false}
     ]
   end
 end
