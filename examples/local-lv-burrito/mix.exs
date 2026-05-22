@@ -65,7 +65,7 @@ defmodule Burrito.MixProject do
   defp aliases do
     [
       build: ["setup"],
-      dev: ["phx.server"],
+      dev: ["setup", "phx.server"],
       setup: [
         &build_local/1,
         &pnpm_install/1,
