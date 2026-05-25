@@ -179,6 +179,19 @@
   width: 1em;
 }
 
+.popdoc-stacktrace {
+  margin: var(--popdoc-space) 0 0;
+  padding: calc(var(--popdoc-space) * 2);
+  background: var(--popdoc-bg);
+  border: 1px solid var(--popdoc-border);
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--popdoc-err);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
 .popdoc-list {
   display: none;
   margin-top: var(--popdoc-space);

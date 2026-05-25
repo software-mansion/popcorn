@@ -111,7 +111,7 @@ defmodule PopdocWasm do
          kind: :error,
          type: inspect(err.__struct__),
          message: Exception.message(err),
-         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+         stacktrace: format_user_stacktrace(__STACKTRACE__)
        }}
   catch
     kind, reason ->
@@ -120,8 +120,33 @@ defmodule PopdocWasm do
          kind: kind,
          type: nil,
          message: inspect(reason),
-         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+         stacktrace: format_user_stacktrace(__STACKTRACE__)
        }}
+  end
+
+  defp format_user_stacktrace(stacktrace) do
+    frames =
+      stacktrace
+      |> Enum.take_while(fn
+        {:elixir, :eval_external_handler, _, _} -> false
+        _ -> true
+      end)
+      |> Enum.reject(fn
+        {:erlang, :apply, _, _} -> true
+        _ -> false
+      end)
+
+    if length(frames) >= 2 do
+      frames
+      |> Exception.format_stacktrace()
+      |> String.split("\n")
+      |> Enum.map_join("\n", fn
+        "    " <> rest -> rest
+        line -> line
+      end)
+    else
+      ""
+    end
   end
 
   defp start_line({_, meta, _}) when is_list(meta), do: Keyword.get(meta, :line, 1)

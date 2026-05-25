@@ -66,6 +66,17 @@ const TPL_ERROR_TOP = tpl(`
   </div>
 `);
 
+const TPL_STACKTRACE_TOGGLE = tpl(`
+  <button type="button" class="popdoc-toggle popdoc-stacktrace-toggle">
+    <span class="popdoc-chev">▸</span>
+    <span>show stacktrace</span>
+  </button>
+`);
+
+const TPL_STACKTRACE = tpl(`
+  <pre class="popdoc-stacktrace" hidden></pre>
+`);
+
 function instantiate(template) {
   return template.content.firstElementChild.cloneNode(true);
 }
@@ -225,13 +236,27 @@ function buildScaffold(output, expressions) {
         cell.classList.add("popdoc-result-err");
         cell.textContent = formatError(error);
       }
-      output.classList.add("popdoc-expanded");
-
       const errorTop = instantiate(TPL_ERROR_TOP);
       errorTop.querySelector(".popdoc-cell-snippet").textContent = expr.snippet;
       errorTop.querySelector(".popdoc-cell-result").textContent = formatError(error);
       topResult.replaceWith(errorTop);
       topResult = errorTop;
+
+      if (error.stacktrace && error.stacktrace.length > 0) {
+        const toggle = instantiate(TPL_STACKTRACE_TOGGLE);
+        const trace = instantiate(TPL_STACKTRACE);
+        trace.textContent = error.stacktrace;
+        const chev = toggle.querySelector(".popdoc-chev");
+        const label = toggle.lastElementChild;
+        toggle.addEventListener("click", () => {
+          const shown = trace.hidden;
+          trace.hidden = !shown;
+          chev.textContent = shown ? "▾" : "▸";
+          label.textContent = shown ? "hide stacktrace" : "show stacktrace";
+        });
+        top.appendChild(toggle);
+        top.appendChild(trace);
+      }
     },
     appendStdio(entries) {
       const stdout = entries.flatMap((e) => e.logs.stdout).join("");
