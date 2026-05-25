@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Llv.Install do
     * Change app.js script tag to `type="module"`
     * Set up the JS bridge in `assets/js/app.js`
     * Configure esbuild to output ESM format
+    * Add the LocalLiveView watcher to your endpoint config in `config/dev.exs`
     * Add `mix llv.build` to your setup alias
     * Generate a `local/` project with a sample HelloLocal component
 
@@ -41,6 +42,7 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_root_layout()
     |> inject_app_js()
     |> inject_esbuild_format()
+    |> inject_dev_watcher()
     |> inject_setup_alias()
     |> generate_local_project(llv_path)
   end
@@ -244,6 +246,22 @@ defmodule Mix.Tasks.Llv.Install do
         Rewrite.Source.update(source, :content, String.replace(content, find, replacement))
       end
     end)
+  end
+
+  # --- add watcher to config/dev.exs  ---
+
+  defp inject_dev_watcher(igniter) do
+    app_name = Igniter.Project.Application.app_name(igniter)
+    endpoint = Igniter.Libs.Phoenix.web_module_name(igniter, "Endpoint")
+
+    Igniter.Project.Config.configure(
+      igniter,
+      "dev.exs",
+      app_name,
+      [endpoint, :watchers, :local_live_view],
+      {:code, Sourceror.parse_string!("{LocalLiveView.Watcher, :start_link, []}")},
+      updater: &{:ok, &1}
+    )
   end
 
   # --- mix.exs setup alias ---

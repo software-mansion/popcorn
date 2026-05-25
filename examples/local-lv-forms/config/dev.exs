@@ -16,7 +16,8 @@ config :form_demo, FormDemoWeb.Endpoint,
   secret_key_base: "rRGOqyCwCzmxVijkuEj4u0PqB0YQh0ULf06ljS2woBLgFbIHSZH221B2MlLMK+Zj",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:form_demo, ~w(--watch)]},
-    tailwind: {Tailwind, :install_and_run, [:form_demo, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:form_demo, ~w(--watch)]},
+    local_live_view: {LocalLiveView.Watcher, :start_link, []}
   ]
 
 # ## SSL Support
