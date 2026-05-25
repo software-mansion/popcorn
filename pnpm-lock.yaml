@@ -497,6 +497,18 @@ importers:
         specifier: 'catalog:'
         version: 7.3.2(@types/node@25.6.0)(jiti@2.7.0)(lightningcss@1.32.0)
 
+  popdoc/e2e:
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.59.1
+        version: 1.59.1
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   popdoc/js:
     dependencies:
       '@swmansion/popcorn':

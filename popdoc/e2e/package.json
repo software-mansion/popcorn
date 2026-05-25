@@ -1,0 +1,13 @@
+{
+  "name": "popdoc-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test --config playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

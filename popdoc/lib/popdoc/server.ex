@@ -18,6 +18,7 @@ defmodule Popdoc.Server do
   def script do
     quote do
       Mix.install([:bandit, :plug])
+      Logger.configure(level: :warning)
 
       defmodule Popdoc.DevServer.Router do
         @behaviour Plug
@@ -33,15 +34,13 @@ defmodule Popdoc.Server do
         def init(static_dir) do
           %{
             static_dir: static_dir,
-            static: Plug.Static.init(from: static_dir, at: "/", gzip: true),
-            logger: Plug.Logger.init([])
+            static: Plug.Static.init(from: static_dir, at: "/", gzip: true)
           }
         end
 
         @impl true
-        def call(conn, %{static_dir: dir, static: static, logger: logger}) do
+        def call(conn, %{static_dir: dir, static: static}) do
           conn
-          |> Plug.Logger.call(logger)
           |> Plug.Conn.merge_resp_headers(@headers)
           |> Plug.Static.call(static)
           |> serve(dir)

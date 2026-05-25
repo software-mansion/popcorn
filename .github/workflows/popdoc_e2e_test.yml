@@ -1,0 +1,64 @@
+name: Popdoc e2e tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "popdoc/**"
+      - ".github/workflows/popdoc_e2e_test.yml"
+      - ".github/actions/setup-playwright/action.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+      - "scripts/test.sh"
+      - "scripts/_common.sh"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  e2e:
+    name: Popdoc E2E tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.17.3"
+          otp-version: "26.0.2"
+          rebar3-version: "3.18.0"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: popdoc-e2e
+          lockfile: pnpm-lock.yaml
+          version: "1.59.1"
+
+      - name: Run e2e tests
+        run: bash scripts/test.sh --popdoc

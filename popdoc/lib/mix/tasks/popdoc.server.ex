@@ -59,7 +59,7 @@ defmodule Mix.Tasks.Popdoc.Server do
   defp forward_output(child) do
     receive do
       {^child, {:data, data}} ->
-        IO.write(data)
+        IO.binwrite(data)
         forward_output(child)
 
       {^child, {:exit_status, _status}} ->
