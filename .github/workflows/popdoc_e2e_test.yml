@@ -33,12 +33,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Elixir
-        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
-        with:
-          elixir-version: "1.17.3"
-          otp-version: "26.0.2"
-          rebar3-version: "3.18.0"
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -53,6 +49,14 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install
 
+      - name: Build popcorn JS package
+        run: pnpm build:prod
+        working-directory: popcorn/js
+
+      - name: Build popdoc runtime assets
+        run: mix popdoc.build
+        working-directory: popdoc
+
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
@@ -62,3 +66,13 @@ jobs:
 
       - name: Run e2e tests
         run: bash scripts/test.sh --popdoc
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: popdoc-playwright-report
+          path: |
+            popdoc/e2e/playwright-report/
+            popdoc/e2e/test-results/
+          retention-days: 7
