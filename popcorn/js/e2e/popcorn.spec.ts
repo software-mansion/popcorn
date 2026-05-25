@@ -212,6 +212,20 @@ test("send_event", async ({ page }) => {
   ]);
 });
 
+test("trackWithCleanup and releaseTracked", async ({ page }) => {
+  const popcorn = await initPopcorn(page);
+
+  const result = await popcorn.call({ action: "track_cleanup_test" });
+
+  expect(result.ok).toBe(true);
+  assert(result.ok);
+  expect(result.data).toEqual({
+    callsBefore: [],
+    callsAfterFirstRelease: ["fired"],
+    callsAfterSecondRelease: ["fired"],
+  });
+});
+
 test("onMessage unsubscribe", async ({ page }) => {
   const { sendEvent, waitForEvents } = await initPopcornWithEventListener(page);
 
