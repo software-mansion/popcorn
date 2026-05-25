@@ -184,8 +184,8 @@ defmodule Mix.Tasks.Llv.Install do
   # --- app.js ---
 
   @llv_js """
-  import { setup } from "../vendor/local_live_view.js";
-  setup(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  import { LLVEngine } from "../vendor/local_live_view.js";
+  await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
   """
 
   defp inject_app_js(igniter) do
