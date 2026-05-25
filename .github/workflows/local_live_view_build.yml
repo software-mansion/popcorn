@@ -88,5 +88,8 @@ jobs:
       - name: Lint
         run: mix lint
 
+      - name: Test
+        run: mix test
+
       - name: Build
         run: mix build
