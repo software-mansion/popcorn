@@ -58,9 +58,10 @@ defmodule PopdocWasm do
          {_source, quoted} <- Enum.at(session.exprs, index) do
       case eval_quoted(quoted, session.binding, session.env) do
         {:ok, result, new_binding, new_env} ->
+          bindings = diff_binding(session.binding, new_binding)
           updated = %{session | binding: new_binding, env: new_env}
           new_state = put_in(state.sessions[block_id], updated)
-          {:resolve, %{index: index, result: result}, new_state}
+          {:resolve, %{index: index, result: result, bindings: bindings}, new_state}
 
         {:error, error_map} ->
           {:resolve, %{index: index, error: error_map}, state}
@@ -76,6 +77,14 @@ defmodule PopdocWasm do
   end
 
   defp handle_wasm({:wasm_cast, _message}, state), do: state
+
+  defp diff_binding(old, new) do
+    old_map = Map.new(old)
+
+    for {name, value} <- new, is_atom(name), Map.get(old_map, name) !== value do
+      %{name: Atom.to_string(name), value: inspect(value, charlists: :as_lists)}
+    end
+  end
 
   defp fresh_env do
     %Macro.Env{

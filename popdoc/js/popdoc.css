@@ -118,8 +118,10 @@
     gap: var(--popdoc-space);
 }
 
-.popdoc-result {
+.popdoc-result,
+.popdoc-cell-result {
     color: var(--popdoc-accent);
+    white-space: pre-wrap;
 }
 
 .popdoc-result::before,

@@ -82,12 +82,24 @@ function instantiate(template) {
 }
 
 function hasMultipleExpressions(code) {
-  return code.trim().split(/\n+/).filter((l) => l.trim().length > 0).length > 1;
+  return (
+    code
+      .trim()
+      .split(/\n+/)
+      .filter((l) => l.trim().length > 0).length > 1
+  );
+}
+
+function displayResult({ result, bindings }) {
+  if (!bindings || bindings.length === 0) return result;
+  return bindings.map((b) => `${b.name} = ${b.value}`).join(", ");
 }
 
 function formatError(error) {
   if (error === null) return "";
-  return error.type !== null ? `${error.type}: ${error.message}` : error.message;
+  return error.type !== null
+    ? `${error.type}: ${error.message}`
+    : error.message;
 }
 
 async function runCode(popcorn, block) {
@@ -114,13 +126,20 @@ async function runCode(popcorn, block) {
   const remaining = () => Math.max(0, deadline - performance.now());
   const startedAt = performance.now();
 
-  const parsed = await popcorn.call(["parse_elixir", code, blockId], { timeoutMs: remaining() });
+  const parsed = await popcorn.call(["parse_elixir", code, blockId], {
+    timeoutMs: remaining(),
+  });
 
   clearTimeout(pendingTimer);
   output.classList.remove("popdoc-output-pending");
 
   if (!parsed.ok) {
-    const parseError = { kind: "error", type: null, message: parsed.error.message, stacktrace: "" };
+    const parseError = {
+      kind: "error",
+      type: null,
+      message: parsed.error.message,
+      stacktrace: "",
+    };
     output.hidden = false;
     output.replaceChildren();
     const top = instantiate(TPL_TOP);
@@ -128,7 +147,10 @@ async function runCode(popcorn, block) {
     resultRow.classList.add("popdoc-result-err");
     resultRow.textContent = formatError(parseError);
     output.appendChild(top);
-    renderStatus(status, { error: parseError, elapsedMs: Math.round(performance.now() - startedAt) });
+    renderStatus(status, {
+      error: parseError,
+      elapsedMs: Math.round(performance.now() - startedAt),
+    });
     button.disabled = false;
     return;
   }
@@ -143,17 +165,29 @@ async function runCode(popcorn, block) {
   for (let i = 0; i < expressions.length; i++) {
     const budget = remaining();
     if (budget === 0) {
-      error = { kind: "error", type: null, message: `Evaluation timed out after ${EVAL_TIMEOUT_MS}ms`, stacktrace: "" };
+      error = {
+        kind: "error",
+        type: null,
+        message: `Evaluation timed out after ${EVAL_TIMEOUT_MS}ms`,
+        stacktrace: "",
+      };
       scaffold.markError(i, expressions[i], error);
       break;
     }
 
     const stopLogCapture = startLogCapture(popcorn);
-    const step = await popcorn.call(["eval_one", blockId, i], { timeoutMs: budget });
+    const step = await popcorn.call(["eval_one", blockId, i], {
+      timeoutMs: budget,
+    });
     const logs = stopLogCapture();
 
     if (!step.ok) {
-      error = { kind: "error", type: null, message: step.error.message, stacktrace: "" };
+      error = {
+        kind: "error",
+        type: null,
+        message: step.error.message,
+        stacktrace: "",
+      };
       scaffold.markError(i, expressions[i], error);
       break;
     }
@@ -167,14 +201,17 @@ async function runCode(popcorn, block) {
       break;
     }
 
-    scaffold.markSuccess(i, step.data.result);
+    scaffold.markSuccess(i, displayResult(step.data));
   }
 
   if (error === null && entries.length > 0) {
-    scaffold.finalize(entries[entries.length - 1].result);
+    scaffold.finalize(displayResult(entries[entries.length - 1]));
   }
   scaffold.appendStdio(entries);
-  renderStatus(status, { error, elapsedMs: Math.round(performance.now() - startedAt) });
+  renderStatus(status, {
+    error,
+    elapsedMs: Math.round(performance.now() - startedAt),
+  });
   button.disabled = false;
 }
 
@@ -238,7 +275,8 @@ function buildScaffold(output, expressions) {
       }
       const errorTop = instantiate(TPL_ERROR_TOP);
       errorTop.querySelector(".popdoc-cell-snippet").textContent = expr.snippet;
-      errorTop.querySelector(".popdoc-cell-result").textContent = formatError(error);
+      errorTop.querySelector(".popdoc-cell-result").textContent =
+        formatError(error);
       topResult.replaceWith(errorTop);
       topResult = errorTop;
 
@@ -262,7 +300,8 @@ function buildScaffold(output, expressions) {
       const stdout = joinLogs(entries.flatMap((e) => e.logs.stdout));
       const stderr = joinLogs(entries.flatMap((e) => e.logs.stderr));
       if (stdout.length > 0) top.appendChild(stdioRow("STDOUT", stdout));
-      if (stderr.length > 0) top.appendChild(stdioRow("STDERR", stderr, "popdoc-stderr"));
+      if (stderr.length > 0)
+        top.appendChild(stdioRow("STDERR", stderr, "popdoc-stderr"));
     },
   };
 }
@@ -270,7 +309,9 @@ function buildScaffold(output, expressions) {
 function renderStatus(status, { error, elapsedMs }) {
   const node = instantiate(TPL_STATUS);
   const hasError = error !== null;
-  node.querySelector(".popdoc-dot").classList.add(hasError ? "popdoc-dot-err" : "popdoc-dot-ok");
+  node
+    .querySelector(".popdoc-dot")
+    .classList.add(hasError ? "popdoc-dot-err" : "popdoc-dot-ok");
   node.lastElementChild.textContent = `${hasError ? "error" : "ok"} · ${elapsedMs} ms`;
   status.hidden = false;
   status.replaceChildren(...node.children);
@@ -291,7 +332,9 @@ function stdioRow(labelText, body, cls = null) {
 // then drop any trailing newline once joined.
 function joinLogs(messages) {
   if (messages.length === 0) return "";
-  const joined = messages.map((m) => (m.endsWith("\n") ? m : m + "\n")).join("");
+  const joined = messages
+    .map((m) => (m.endsWith("\n") ? m : m + "\n"))
+    .join("");
   return joined.endsWith("\n") ? joined.slice(0, -1) : joined;
 }
 
@@ -304,7 +347,8 @@ function decorateBlocks() {
     if (preEl === null || preEl.dataset.popdocProcessed === "true") continue;
 
     preEl.dataset.popdocProcessed = "true";
-    const blockId = preEl.id.length > 0 ? preEl.id : `popdoc-eval-${++blockIndex}`;
+    const blockId =
+      preEl.id.length > 0 ? preEl.id : `popdoc-eval-${++blockIndex}`;
 
     const wrapper = instantiate(TPL_BLOCK);
     preEl.insertAdjacentElement("afterend", wrapper);

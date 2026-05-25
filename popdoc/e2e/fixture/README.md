@@ -32,6 +32,7 @@ end
 ```elixir
 a = 1
 b = 0
+all = {c, d} = {10, 20}
 Process.sleep(2000)
 div(a, b)
 Example.hello()
