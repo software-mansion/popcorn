@@ -45,6 +45,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install JS dependencies
+        env:
+          CXXFLAGS: "-std=c++20"
         run: pnpm install
 
       - name: Build popcorn JS package
