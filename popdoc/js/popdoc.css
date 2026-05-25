@@ -9,6 +9,20 @@
     --popdoc-err: var(--errorHeading);
 }
 
+body.dark {
+    --popdoc-text-tertiary: var(--gray400);
+    --popdoc-border: var(--gray700);
+    --popdoc-err: #ff5385;
+}
+
+body.dark .popdoc-result:not(.popdoc-result-err),
+body.dark .popdoc-cell-result:not(.popdoc-result-err) {
+    color: var(--textBody);
+}
+
+body.dark .popdoc-stacktrace {
+    background: var(--gray800);
+}
 .popdoc-block {
     margin: var(--baseLineHeight, 1rem) 0;
 }
