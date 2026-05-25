@@ -259,8 +259,8 @@ function buildScaffold(output, expressions) {
       }
     },
     appendStdio(entries) {
-      const stdout = entries.flatMap((e) => e.logs.stdout).join("");
-      const stderr = entries.flatMap((e) => e.logs.stderr).join("");
+      const stdout = joinLogs(entries.flatMap((e) => e.logs.stdout));
+      const stderr = joinLogs(entries.flatMap((e) => e.logs.stderr));
       if (stdout.length > 0) top.appendChild(stdioRow("STDOUT", stdout));
       if (stderr.length > 0) top.appendChild(stdioRow("STDERR", stderr, "popdoc-stderr"));
     },
@@ -280,8 +280,19 @@ function stdioRow(labelText, body, cls = null) {
   const row = instantiate(TPL_STDIO);
   if (cls !== null) row.classList.add(cls);
   row.querySelector(".popdoc-label").textContent = labelText;
-  row.lastElementChild.textContent = body;
+  const bodyEl = row.lastElementChild;
+  bodyEl.classList.add("popdoc-stdio-body");
+  bodyEl.textContent = body;
   return row;
+}
+
+// Popcorn's log listener may fire per-line without the trailing newline,
+// or per-write with the newline kept. Normalize so each entry ends with "\n",
+// then drop any trailing newline once joined.
+function joinLogs(messages) {
+  if (messages.length === 0) return "";
+  const joined = messages.map((m) => (m.endsWith("\n") ? m : m + "\n")).join("");
+  return joined.endsWith("\n") ? joined.slice(0, -1) : joined;
 }
 
 function decorateBlocks() {
