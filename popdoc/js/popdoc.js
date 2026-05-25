@@ -3,6 +3,7 @@ import { Popcorn } from "@swmansion/popcorn";
 const BUNDLES_SEL = 'meta[name="popcorn-user-bundle"]';
 const EVAL_BLOCK_SEL = "pre.popcorn-eval code";
 const PENDING_DELAY_MS = 200;
+const EVAL_TIMEOUT_MS = 30_000;
 
 function assert(condition) {
   if (!condition) {
@@ -13,32 +14,57 @@ function assert(condition) {
 async function runCode(popcorn, { code, blockId, button, output }) {
   button.disabled = true;
   output.classList.remove("popdoc-output-error");
+  output.classList.remove("popdoc-output-pending");
+  output.hidden = true;
+  output.textContent = "";
 
-  const stopLogCapture = startLogCapture(popcorn);
   const pendingTimer = setTimeout(() => {
     output.hidden = false;
     output.textContent = "Evaluating...";
     output.classList.add("popdoc-output-pending");
   }, PENDING_DELAY_MS);
 
-  let result;
-  let logs;
+  const entries = [];
+  let error = null;
+  const deadline = performance.now() + EVAL_TIMEOUT_MS;
+  const remaining = () => Math.max(0, deadline - performance.now());
 
-  try {
-    result = await popcorn.call(["eval_elixir", code, blockId], {
-      timeoutMs: 30_000,
-    });
-  } catch (error) {
-    assert(error instanceof Error);
-    result = { ok: false, error };
-  } finally {
-    logs = stopLogCapture();
-    clearTimeout(pendingTimer);
-    output.classList.remove("popdoc-output-pending");
-    button.disabled = false;
+  const parsed = await popcorn.call(["parse_elixir", code, blockId], {
+    timeoutMs: remaining(),
+  });
+
+  if (parsed.ok) {
+    const { expressions } = parsed.data;
+    for (let i = 0; i < expressions.length; i++) {
+      const budget = remaining();
+      if (budget === 0) {
+        error = `Evaluation timed out after ${EVAL_TIMEOUT_MS}ms`;
+        break;
+      }
+
+      const stopLogCapture = startLogCapture(popcorn);
+      const step = await popcorn.call(["eval_one", blockId, i], { timeoutMs: budget });
+      const logs = stopLogCapture();
+
+      if (!step.ok) {
+        error = step.error.message;
+        break;
+      }
+
+      entries.push({ ...step.data, logs });
+      if (step.data.error) {
+        error = step.data.error;
+        break;
+      }
+    }
+  } else {
+    error = parsed.error.message;
   }
 
-  renderOutput(output, { result, logs });
+  clearTimeout(pendingTimer);
+  output.classList.remove("popdoc-output-pending");
+  button.disabled = false;
+  renderOutput(output, { entries, error });
 }
 
 function decorateBlocks() {
@@ -123,30 +149,18 @@ function startLogCapture(popcorn) {
   };
 }
 
-function renderOutput(output, { result, logs }) {
-  const lines = [];
+function renderOutput(output, { entries, error }) {
+  const lines = entries.flatMap((e) => [...e.logs.stdout, ...e.logs.stderr]);
+  const last = entries[entries.length - 1];
 
-  if (logs.stdout.length > 0) {
-    lines.push(...logs.stdout);
+  if (error) {
+    lines.push(error);
+  } else if (last) {
+    lines.push(last.result);
   }
 
-  if (logs.stderr.length > 0) {
-    lines.push(...logs.stderr);
-  }
-
-  if (result.ok) {
-    assert(typeof result.data === "string");
-
-    lines.push(result.data);
-    output.classList.remove("popdoc-output-error");
-  } else {
-    assert(result.error instanceof Error);
-
-    lines.push(result.error.message);
-    output.classList.add("popdoc-output-error");
-  }
-
-  output.hidden = false;
+  output.classList.toggle("popdoc-output-error", Boolean(error));
+  output.hidden = lines.length === 0;
   output.textContent = lines.join("\n");
 }
 
