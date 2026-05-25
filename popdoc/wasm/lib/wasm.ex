@@ -5,6 +5,8 @@ defmodule PopdocWasm do
   alias Popcorn.Wasm
 
   @process_name :main
+  @ellipsis_sentinel :__popdoc_ellipsis__
+  @snippet_max_len 40
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: @process_name)
@@ -30,10 +32,21 @@ defmodule PopdocWasm do
   defp handle_wasm({:wasm_call, ["parse_elixir", code, block_id]}, state) do
     case parse(code) do
       {:ok, exprs} ->
-        sources = Enum.map(exprs, fn {source, _quoted} -> source end)
+        expressions =
+          exprs
+          |> Enum.with_index()
+          |> Enum.map(fn {{source, quoted}, index} ->
+            %{
+              index: index,
+              source: source,
+              snippet: snippet(quoted),
+              start_line: start_line(quoted)
+            }
+          end)
+
         session = %{exprs: exprs, binding: [], env: fresh_env()}
         new_state = put_in(state.sessions[block_id], session)
-        {:resolve, %{expressions: sources}, new_state}
+        {:resolve, %{expressions: expressions}, new_state}
 
       {:error, message} ->
         {:reject, message, state}
@@ -42,15 +55,15 @@ defmodule PopdocWasm do
 
   defp handle_wasm({:wasm_call, ["eval_one", block_id, index]}, state) when index >= 0 do
     with {:ok, session} <- Map.fetch(state.sessions, block_id),
-         {source, quoted} <- Enum.at(session.exprs, index) do
+         {_source, quoted} <- Enum.at(session.exprs, index) do
       case eval_quoted(quoted, session.binding, session.env) do
         {:ok, result, new_binding, new_env} ->
           updated = %{session | binding: new_binding, env: new_env}
           new_state = put_in(state.sessions[block_id], updated)
-          {:resolve, %{index: index, code: source, result: result}, new_state}
+          {:resolve, %{index: index, result: result}, new_state}
 
-        {:error, message} ->
-          {:resolve, %{index: index, code: source, error: message}, state}
+        {:error, error_map} ->
+          {:resolve, %{index: index, error: error_map}, state}
       end
     else
       :error -> {:reject, "no active session for block #{inspect(block_id)}", state}
@@ -90,10 +103,67 @@ defmodule PopdocWasm do
 
   defp eval_quoted(quoted, binding, env) do
     {value, new_binding, new_env} = Code.eval_quoted_with_env(quoted, binding, env)
-    {:ok, inspect(value), new_binding, new_env}
+    {:ok, inspect(value, charlists: :as_lists), new_binding, new_env}
   rescue
-    err -> {:error, Exception.format(:error, err)}
+    err ->
+      {:error,
+       %{
+         kind: :error,
+         type: inspect(err.__struct__),
+         message: Exception.message(err),
+         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+       }}
   catch
-    kind, reason -> {:error, Exception.format(kind, reason, __STACKTRACE__)}
+    kind, reason ->
+      {:error,
+       %{
+         kind: kind,
+         type: nil,
+         message: inspect(reason),
+         stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+       }}
+  end
+
+  defp start_line({_, meta, _}) when is_list(meta), do: Keyword.get(meta, :line, 1)
+  defp start_line(_), do: 1
+
+  defp snippet(quoted) do
+    collapsed = collapse(quoted)
+
+    rendered =
+      collapsed
+      |> Macro.to_string()
+      |> String.replace(inspect(@ellipsis_sentinel), "…")
+
+    truncate(rendered, @snippet_max_len)
+  end
+
+  defp collapse(quoted) do
+    Macro.prewalk(quoted, fn
+      # fn -> body end and other -> arms: collapse the RHS body
+      {:->, meta, [lhs, _body]} ->
+        {:->, meta, [lhs, @ellipsis_sentinel]}
+
+      # keyword block args: do:/else:/after:/rescue:/catch:
+      list when is_list(list) ->
+        Enum.map(list, fn
+          {key, _val} when key in [:do, :else, :after, :rescue, :catch] ->
+            {key, @ellipsis_sentinel}
+
+          other ->
+            other
+        end)
+
+      other ->
+        other
+    end)
+  end
+
+  defp truncate(string, max) do
+    if String.length(string) > max do
+      String.slice(string, 0, max - 1) <> "…"
+    else
+      string
+    end
   end
 end
