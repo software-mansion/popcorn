@@ -47,7 +47,9 @@ defmodule Mix.Tasks.Popdoc.Build do
       :ok
     else
       step("Installing JS deps", fn ->
-        cmd!(pnpm, ["install"], @js_dir)
+        # CI=true so pnpm won't prompt to purge an incompatible node_modules
+        # dir (System.cmd has no TTY, so the prompt aborts the install).
+        cmd!(pnpm, ["install"], @js_dir, [{"CI", "true"}])
       end)
     end
   end
@@ -57,8 +59,8 @@ defmodule Mix.Tasks.Popdoc.Build do
     fun.()
   end
 
-  defp cmd!(exe, args, dir) do
-    case System.cmd(exe, args, cd: dir, into: IO.stream(), stderr_to_stdout: true) do
+  defp cmd!(exe, args, dir, env \\ []) do
+    case System.cmd(exe, args, cd: dir, env: env, into: IO.stream(), stderr_to_stdout: true) do
       {_, 0} -> :ok
       {_, code} -> Mix.raise("`#{exe} #{Enum.join(args, " ")}` failed (exit #{code})")
     end
