@@ -37,15 +37,21 @@ defp docs do
 end
 ```
 
+To make block runnable, please add `<!-- popcorn:eval -->` before codeblock, for example:
+
+````
+<!-- popcorn:eval -->
+```elixir
+1+2
+```
+````
+
 Then generate docs normally:
 
 ```bash
 mix deps.get
 mix docs
-mix popdoc.server
+mix popdoc.server # to serve the docs locally. It's needed for CORS headers.
 ```
 
-`popdoc: [coi_serviceworker: true]` is useful for local/debug docs hosting on `localhost`
-when you cannot control response headers directly. For production deployments,
-leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp` headers from the web server.
+`popdoc: [coi_serviceworker: true]` is useful for docs hosting when you cannot control response headers directly (i.e. Github pages, Hexdocs). For production deployments, leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers from the web server.
