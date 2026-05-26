@@ -56,7 +56,7 @@
     16#00
 ).
 -define(ALLOWED_CHUNKS, [
-    "AtU8", "Code", "ExpT", "LocT", "ImpT", "LitU", "FunT", "StrT", "LitT"
+    "AtU8", "Code", "ExpT", "ImpT", "LitU", "FunT", "StrT", "LitT"
 ]).
 -define(BEAM_START_FLAG, 1).
 -define(BEAM_CODE_FLAG, 2).
@@ -792,15 +792,24 @@ ends_with(String, Suffix) ->
 %% @private
 filter_chunks(Chunks, IncludeLines) ->
     AllowedChunks = allowed_chunks(IncludeLines),
-    lists:filter(
-        fun({Tag, _Data}) -> lists:member(Tag, AllowedChunks) end,
+    lists:flatmap(
+        fun({Tag, _Data} = Chunk) ->
+            IsAllowed = lists:member(Tag, AllowedChunks),
+            if
+                IsAllowed -> [Chunk];
+                % LocT chunk can normally be removed, but AtomVM crashes
+                % when it's absent, so we make it empty instead of removing
+                Tag == "LocT" -> [{Tag, <<0:32>>}];
+                true -> []
+            end
+        end,
         Chunks
     ).
 
 allowed_chunks(false) ->
     ?ALLOWED_CHUNKS;
 allowed_chunks(true) ->
-    ["Line" | ?ALLOWED_CHUNKS].
+    ["Line", "LocT" | ?ALLOWED_CHUNKS].
 
 %% @private
 remove_names(Names, ParsedFiles) ->

@@ -55,7 +55,8 @@ defmodule Popcorn.CompilationTest do
              | rest
            ] = stacktrace
 
-    assert {RunExpr, :start, 0, [file: ^code_file, line: start_line]} = List.last(rest)
+    run_expr_call = rest |> Enum.reverse() |> Enum.find(&(elem(&1, 0) == RunExpr))
+    assert {RunExpr, :start, 0, [file: ^code_file, line: start_line]} = run_expr_call
 
     lines = [1, start_line, run_line, 1000]
     assert lines == Enum.sort(lines)

@@ -211,7 +211,7 @@ defmodule Popcorn.Support.AtomVM do
   Appends passed ast to common code that reads input from args.bin and writing to result.bin.
   Ast may reference `args` variable that is read from input file while calling `run/3`.
   """
-  def compile_quoted(ast) do
+  def compile_quoted(ast, opts \\ []) do
     target = test_target()
     module_ast = module(ast, target)
     bundle_path = bundle_path(module_ast, target)
@@ -228,10 +228,9 @@ defmodule Popcorn.Support.AtomVM do
 
     beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
 
-    Popcorn.bundle(
-      extra_beams: beam_paths,
-      start_module: RunExpr,
-      out_dir: build_dir
+    Popcorn.cook(
+      [extra_beams: beam_paths, start_module: RunExpr, out_dir: build_dir] ++
+        Keyword.take(opts, [:treeshake])
     )
 
     bundle_path

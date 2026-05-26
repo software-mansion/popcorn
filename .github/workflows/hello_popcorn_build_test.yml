@@ -9,12 +9,8 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "**"
-      - "!landing-page/**"
-      - "!language-tour/**"
-      - "!local-live-view/**"
-      - "!examples/**"
       - "examples/hello-popcorn/**"
+      - "popcorn/**"
       - "!.github/**"
       - ".github/workflows/hello_popcorn_build_test.yml"
 
@@ -77,10 +73,6 @@ jobs:
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
-      - name: Configure runtime source
-        run: |
-          printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs
-
       - name: Compile Hex dependencies
         run: mix deps.compile
 
@@ -95,3 +87,8 @@ jobs:
 
       - name: Run tests
         run: mix test --no-start
+
+      - name: Run tests with treeshaking
+        # We need to change the port as the default one is allocated by the previous
+        # mix test job and not freed fast enough
+        run: TEST_SERVER_PORT=9877 POPCORN_TREESHAKE=true mix test --no-start
