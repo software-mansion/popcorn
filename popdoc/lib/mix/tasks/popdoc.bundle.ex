@@ -21,34 +21,39 @@ defmodule Mix.Tasks.Popdoc.Bundle do
     end)
 
     step("Building bundle files for #{app_name}", fn ->
-      app_name
-      |> runtime_bundle_apps!(build_lib_dir)
+      {apps, optional_apps} = runtime_bundle_apps!(app_name, build_lib_dir)
+
+      apps
       |> Enum.filter(&app_in_build?(&1, build_lib_dir))
-      |> beam_paths_for_apps!(build_lib_dir)
-      |> pack_beams!(bundle_root)
+      |> beam_paths_by_app!(build_lib_dir)
+      |> pack_beams!(bundle_root, optional_apps)
     end)
   end
 
   defp runtime_bundle_apps!(root_app, build_lib_dir) do
-    root_app
-    |> app_dependencies!(build_lib_dir)
-    |> Enum.reduce(MapSet.new([root_app]), fn app, acc ->
-      collect_dependency_apps(app, build_lib_dir, acc)
-    end)
-    |> MapSet.to_list()
-    |> Enum.sort()
+    {apps, optional} =
+      root_app
+      |> app_dependencies!(build_lib_dir)
+      |> Enum.reduce(
+        {MapSet.new([root_app]), optional_dependencies!(root_app, build_lib_dir)},
+        fn app, acc -> collect_dependency_apps(app, build_lib_dir, acc) end
+      )
+
+    {apps |> MapSet.to_list() |> Enum.sort(), optional}
   end
 
   defp collect_dependency_apps(app, _build_lib_dir, acc) when app in @excluded_dependency_apps,
     do: acc
 
-  defp collect_dependency_apps(app, build_lib_dir, acc) do
-    if MapSet.member?(acc, app) or not app_in_build?(app, build_lib_dir) do
+  defp collect_dependency_apps(app, build_lib_dir, {seen, optional} = acc) do
+    if MapSet.member?(seen, app) or not app_in_build?(app, build_lib_dir) do
       acc
     else
+      optional = MapSet.union(optional, optional_dependencies!(app, build_lib_dir))
+
       app
       |> app_dependencies!(build_lib_dir)
-      |> Enum.reduce(MapSet.put(acc, app), fn dep_app, nested_acc ->
+      |> Enum.reduce({MapSet.put(seen, app), optional}, fn dep_app, nested_acc ->
         collect_dependency_apps(dep_app, build_lib_dir, nested_acc)
       end)
     end
@@ -58,6 +63,13 @@ defmodule Mix.Tasks.Popdoc.Bundle do
     app
     |> app_spec!(build_lib_dir)
     |> then(&(Keyword.get(&1, :applications, []) ++ Keyword.get(&1, :included_applications, [])))
+  end
+
+  defp optional_dependencies!(app, build_lib_dir) do
+    app
+    |> app_spec!(build_lib_dir)
+    |> Keyword.get(:optional_applications, [])
+    |> MapSet.new()
   end
 
   defp app_spec!(app, build_lib_dir) do
@@ -86,8 +98,8 @@ defmodule Mix.Tasks.Popdoc.Bundle do
     Path.join([build_lib_dir, to_string(app), "ebin", "#{app}.app"])
   end
 
-  defp beam_paths_for_apps!(apps, build_lib_dir) do
-    Enum.flat_map(apps, fn app ->
+  defp beam_paths_by_app!(apps, build_lib_dir) do
+    Enum.map(apps, fn app ->
       beam_glob = Path.join([build_lib_dir, to_string(app), "ebin", "*.beam"])
       beam_paths = Path.wildcard(beam_glob)
 
@@ -95,20 +107,21 @@ defmodule Mix.Tasks.Popdoc.Bundle do
         Mix.raise("Popdoc expected compiled beams for #{inspect(app)} under #{beam_glob}.")
       end
 
-      beam_paths
+      {app, beam_paths}
     end)
   end
 
-  defp pack_beams!(beam_paths, bundle_root) do
+  defp pack_beams!(beams_by_app, bundle_root, optional_apps) do
     bundle_path = Path.join(bundle_root, "consumer.avm")
     File.mkdir_p!(bundle_root)
     File.rm(bundle_path)
 
-    beam_charlists = Enum.map(beam_paths, &String.to_charlist/1)
+    all_beams = Enum.flat_map(beams_by_app, fn {_app, paths} -> paths end)
+    beam_charlists = Enum.map(all_beams, &String.to_charlist/1)
 
     case :packbeam_api.create(String.to_charlist(bundle_path), beam_charlists) do
       :ok ->
-        print_bundle_report(beam_paths, bundle_path)
+        print_bundle_report(beams_by_app, optional_apps, bundle_path)
         [bundle_path]
 
       other ->
@@ -118,24 +131,46 @@ defmodule Mix.Tasks.Popdoc.Bundle do
     end
   end
 
-  defp print_bundle_report(beam_paths, bundle_path) do
-    Mix.shell().info("Source BEAMs:")
+  defp print_bundle_report(beams_by_app, optional_apps, bundle_path) do
+    entries_by_app =
+      Enum.map(beams_by_app, fn {app, paths} ->
+        entries =
+          paths
+          |> Enum.map(fn p ->
+            name = Path.basename(p)
+            size = File.stat!(p).size
+            parent = name |> String.trim_trailing(".beam") |> drop_last_segment()
+            {parent, -size, name, size}
+          end)
+          |> Enum.sort()
+          |> Enum.map(fn {_parent, _neg_size, name, size} -> {name, size} end)
 
-    entries =
-      Enum.map(beam_paths, fn beam_path ->
-        {Path.basename(beam_path), format_bytes(File.stat!(beam_path).size)}
+        total = entries |> Enum.map(fn {_n, s} -> s end) |> Enum.sum()
+        {app, entries, total}
       end)
 
     name_width =
-      entries
-      |> Enum.map(fn {name, _size} -> String.length(name) end)
+      entries_by_app
+      |> Enum.flat_map(fn {_app, entries, _t} -> Enum.map(entries, fn {n, _s} -> String.length(n) end) end)
       |> Enum.max(fn -> 0 end)
 
-    Enum.each(entries, fn {name, size} ->
-      Mix.shell().info("  #{String.pad_trailing(name, name_width)} | #{size}")
+    Enum.each(entries_by_app, fn {app, entries, total} ->
+      optional_tag = if MapSet.member?(optional_apps, app), do: "optional dep, ", else: ""
+      Mix.shell().info("Source BEAMs for #{app} (#{optional_tag}#{format_bytes(total)} total):")
+
+      Enum.each(entries, fn {name, size} ->
+        Mix.shell().info("  #{String.pad_trailing(name, name_width)} | #{format_bytes(size)}")
+      end)
     end)
 
-    Mix.shell().info("Packed .avm bundle: #{format_bytes(File.stat!(bundle_path).size)}\n")
+    Mix.shell().info("\nTotal compressed bundle size: #{format_bytes(File.stat!(bundle_path).size)}\n")
+  end
+
+  defp drop_last_segment(name) do
+    case String.split(name, ".") do
+      [_] -> ""
+      parts -> parts |> Enum.drop(-1) |> Enum.join(".")
+    end
   end
 
   defp format_bytes(bytes) when bytes < 1024, do: "#{bytes} B"
