@@ -12,15 +12,17 @@ Usage: $0 [OPTIONS] [path]
 Run tests.
 
 Options:
-  --unix    Run Elixir tests with unix target (default)
-  --wasm    Run Elixir tests with wasm target
-  --js      Run JS tests
-  -h        Show this help
+  --unix              Run Elixir tests with unix target (default)
+  --wasm              Run Elixir tests with wasm target
+  --js                Run popcorn JS e2e tests
+  --popdoc            Run popdoc e2e tests
+  -h                  Show this help
 
 Examples:
   $0                          # Run unix Elixir tests
   $0 --wasm                   # Run wasm Elixir tests
-  $0 --js                     # Run JS tests
+  $0 --js                     # Run popcorn JS e2e tests
+  $0 --popdoc                 # Run popdoc e2e tests
   $0 test/some_test.exs       # Run specific test file
   $0 --wasm test/some_test.exs
 EOF
@@ -37,6 +39,7 @@ main() {
             --unix) MODE="unix"; shift ;;
             --wasm) MODE="wasm"; shift ;;
             --js) MODE="js"; shift ;;
+            --popdoc) MODE="popdoc"; shift ;;
             *)
                 if [[ -z "${TEST_PATH}" ]]; then
                     TEST_PATH="$1"
@@ -67,6 +70,13 @@ main() {
             log "Running JS e2e tests"
             install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
             cd "${PROJECT_ROOT}/popcorn/js"
+            pnpm test:e2e ${TEST_PATH}
+            ;;
+        popdoc)
+            log "Running popdoc e2e tests"
+            install_elixir_deps "${PROJECT_ROOT}/popdoc/e2e/fixture" "popdoc fixture deps"
+            install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
+            cd "${PROJECT_ROOT}/popdoc/e2e"
             pnpm test:e2e ${TEST_PATH}
             ;;
     esac

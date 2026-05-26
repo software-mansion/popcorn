@@ -1,0 +1,82 @@
+name: Popdoc e2e tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "popdoc/**"
+      - ".github/workflows/popdoc_e2e_test.yml"
+      - ".github/actions/setup-playwright/action.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+      - "scripts/test.sh"
+      - "scripts/_common.sh"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  e2e:
+    name: Popdoc E2E tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup-toolchain
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      - name: Build popcorn JS package
+        run: pnpm build:prod
+        working-directory: popcorn/js
+
+      - name: Fetch Elixir dependencies
+        run: mix deps.get
+        working-directory: popdoc
+
+      - name: Build popdoc runtime assets
+        run: mix popdoc.build
+        working-directory: popdoc
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: popdoc-e2e
+          lockfile: pnpm-lock.yaml
+          version: "1.59.1"
+
+      - name: Run e2e tests
+        run: bash scripts/test.sh --popdoc
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: popdoc-playwright-report
+          path: |
+            popdoc/e2e/playwright-report/
+            popdoc/e2e/test-results/
+          retention-days: 7

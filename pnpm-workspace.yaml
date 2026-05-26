@@ -3,6 +3,8 @@ packages:
   - otp/js/e2e/setup
   - popcorn/js
   - popcorn/js/e2e/setup
+  - popdoc/js
+  - popdoc/e2e
   - popcorn/elixir/test/fixtures/wasm/assets
   - examples/hello-react
   - examples/hello-popcorn/assets
