@@ -53,6 +53,10 @@ jobs:
         run: pnpm build:prod
         working-directory: popcorn/js
 
+      - name: Fetch Elixir dependencies
+        run: mix deps.get
+        working-directory: popdoc
+
       - name: Build popdoc runtime assets
         run: mix popdoc.build
         working-directory: popdoc
