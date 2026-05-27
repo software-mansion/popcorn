@@ -17,7 +17,7 @@ config :local_thermostat, LocalThermostatWeb.Endpoint,
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:local_thermostat, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:local_thermostat, ~w(--watch)]},
-    local_live_view: {LocalLiveView.Watcher, :start_link, []}
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support

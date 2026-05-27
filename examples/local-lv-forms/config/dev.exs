@@ -17,7 +17,7 @@ config :form_demo, FormDemoWeb.Endpoint,
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:form_demo, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:form_demo, ~w(--watch)]},
-    local_live_view: {LocalLiveView.Watcher, :start_link, []}
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support

@@ -259,7 +259,7 @@ defmodule Mix.Tasks.Llv.Install do
       "dev.exs",
       app_name,
       [endpoint, :watchers, :local_live_view],
-      {:code, Sourceror.parse_string!("{LocalLiveView.Watcher, :start_link, []}")},
+      {:code, Sourceror.parse_string!("{LocalLiveView.Watcher, :run, []}")},
       updater: &{:ok, &1}
     )
   end

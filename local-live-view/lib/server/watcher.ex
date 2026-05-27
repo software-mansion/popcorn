@@ -22,7 +22,16 @@ defmodule LocalLiveView.Watcher do
 
   @trigger_events [:created, :modified, [:modified, :closed], [:inodemetamod, :modified]]
 
-  @spec start_link([{:dirs, [Path.t()]}]) :: GenServer.on_start()
+  @type option :: {:dirs, [Path.t()]}
+
+  @spec run([option]) :: :ok
+  def run(opts \\ []) do
+    cook()
+    {:ok, _watcher} = start_link(opts)
+    :ok
+  end
+
+  @spec start_link([option]) :: GenServer.on_start()
   def start_link(opts \\ []) do
     opts = Keyword.validate!(opts, dirs: [Path.absname("local")])
     GenServer.start_link(__MODULE__, opts)
@@ -47,7 +56,7 @@ defmodule LocalLiveView.Watcher do
         {:noreply, %{state | cook_queued: true}}
 
       true ->
-        cook()
+        cook_async()
         {:noreply, %{state | cooking: true}}
     end
   end
@@ -71,17 +80,21 @@ defmodule LocalLiveView.Watcher do
     {:noreply, state}
   end
 
-  defp cook() do
-    channel = self()
+  defp cook_async() do
+    reply_to = self()
 
     {:ok, _pid} =
       Task.start_link(fn ->
-        Logger.debug("Cooking local project")
-        {_output, status} = System.shell("mix popcorn.cook", cd: "local")
-        if status != 0, do: Logger.warning("Failed to cook local project")
-        send(channel, :cooked)
+        cook()
+        send(reply_to, :cooked)
       end)
 
     :ok
+  end
+
+  defp cook() do
+    Logger.debug("Cooking local project")
+    {_output, status} = System.shell("mix popcorn.cook", cd: "local")
+    if status != 0, do: Logger.warning("Failed to cook local project")
   end
 end

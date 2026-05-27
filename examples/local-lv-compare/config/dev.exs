@@ -17,7 +17,7 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:compare_live_views, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:compare_live_views, ~w(--watch)]},
-    local_live_view: {LocalLiveView.Watcher, :start_link, []}
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support
