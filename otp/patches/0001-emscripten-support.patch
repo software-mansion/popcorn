@@ -74,6 +74,18 @@ index 5d6c12c8a54493e3550082370288a7d0cc79aded..170b833e8f5c20fab52426010083a9b6
  	$(STATIC_NIF_LIBS) $(STATIC_DRIVER_LIBS) $(LIBS)
  
  endif
+diff --git a/erts/emulator/beam/erl_bif_chksum.c b/erts/emulator/beam/erl_bif_chksum.c
+index a09675e3552f985b3f416dd83f07824f0e5d3860..80e625774c76ad03b804dcc15e9c7162a74114fc 100644
+--- a/erts/emulator/beam/erl_bif_chksum.c
++++ b/erts/emulator/beam/erl_bif_chksum.c
+@@ -34,7 +34,6 @@
+ #include "zlib.h"
+ #include "erl_md5.h"
+ 
+-
+ typedef void (*ChksumFun)(void *sum_in_out, const byte *buf,
+ 			  unsigned buflen);
+ 
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
 index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4d3bfbe60
@@ -130,10 +142,10 @@ index 0000000000000000000000000000000000000000..0b446eedf17294c0c47c2b872bf2fb44
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae6a7c6505
+index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb4173b9b9b10
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,743 @@
+@@ -0,0 +1,742 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -238,9 +250,9 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +static wasm_state_t *erts_wasm_state = NULL;
 +
 +#ifdef ERTS_EMSCRIPTEN
-+void sendVmMessage(const char *target_name, int target_name_len,
-+                   const char *payload_json, int payload_len,
-+                   const char *meta_json, int meta_len);
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len);
 +#endif
 +
 +static void init_atoms(ErlNifEnv *env) {
@@ -382,24 +394,16 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +
 +static int listener_registered_name_is_current(ErlNifEnv *env,
 +                                               wasm_listener_t *listener) {
-+  ERL_NIF_TERM registered_name;
-+  ErlNifPid current_pid;
++  (void)env;
++  (void)listener;
 +
-+  if (listener->name_kind != WASM_LISTENER_NAME_REGISTERED) {
-+    return 1;
-+  }
-+
-+  if (!enif_make_existing_atom_len(env, (const char *)listener->name.data,
-+                                   listener->name.size, &registered_name,
-+                                   ERL_NIF_UTF8)) {
-+    return 0;
-+  }
-+
-+  if (!enif_whereis_pid(env, registered_name, &current_pid)) {
-+    return 0;
-+  }
-+
-+  return same_pid(&listener->pid, &current_pid);
++  /*
++   * `wasm:register_listener/1` creates an explicit bridge alias for the
++   * current pid. Atom names are labels for JS callers and should not be tied
++   * to `register/2` ownership, otherwise a listener registered as
++   * `wasm:register_listener(bridge)` is discarded before the first lookup.
++   */
++  return 1;
 +}
 +
 +static int listener_is_stale(ErlNifEnv *env, wasm_listener_t *listener) {
@@ -778,6 +782,7 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +
 +  js_bridge_on_from_beam_async(copy, (int)size);
 +}
++
 +#endif
 +
 +static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
@@ -798,9 +803,9 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +
 +#ifdef ERTS_EMSCRIPTEN
 +EMSCRIPTEN_KEEPALIVE
-+void sendVmMessage(const char *target_name, int target_name_len,
-+                   const char *payload_json, int payload_len,
-+                   const char *meta_json, int meta_len) {
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len) {
 +  ErlNifEnv *env;
 +  wasm_state_t *state;
 +  wasm_listener_t *listener;
@@ -812,17 +817,17 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +  if (target_name == NULL || target_name_len <= 0 || payload_len < 0 ||
 +      meta_len < 0 || (payload_json == NULL && payload_len > 0) ||
 +      (meta_json == NULL && meta_len > 0)) {
-+    return;
++    return 2;
 +  }
 +
 +  env = enif_alloc_env();
 +  if (env == NULL) {
-+    return;
++    return 2;
 +  }
 +
 +  if (erts_wasm_state_lock == NULL) {
 +    enif_free_env(env);
-+    return;
++    return 1;
 +  }
 +
 +  enif_mutex_lock(erts_wasm_state_lock);
@@ -830,7 +835,7 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +  if (state == NULL) {
 +    enif_mutex_unlock(erts_wasm_state_lock);
 +    enif_free_env(env);
-+    return;
++    return 1;
 +  }
 +
 +  listener = find_listener_by_pid_token_locked(
@@ -849,7 +854,7 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +
 +  if (listener == NULL) {
 +    enif_free_env(env);
-+    return;
++    return 1;
 +  }
 +
 +  if (!make_binary_copy(env, payload_json != NULL ? payload_json : "",
@@ -857,28 +862,34 @@ index 0000000000000000000000000000000000000000..1ddc7e33577a23a17fbb3230086ac9ae
 +      !make_binary_copy(env, meta_json != NULL ? meta_json : "",
 +                        (size_t)meta_len, &meta_term)) {
 +    enif_free_env(env);
-+    return;
++    return 2;
 +  }
 +
 +  message = enif_make_tuple3(env, am_wasm, payload_term, meta_term);
 +
-+  (void)enif_send(NULL, &pid, env, message);
++  if (!enif_send(NULL, &pid, env, message)) {
++    enif_free_env(env);
++    return 1;
++  }
++
 +  enif_free_env(env);
++  return 0;
 +}
 +#else
-+void sendVmMessage(const char *target_name, int target_name_len,
-+                   const char *payload_json, int payload_len,
-+                   const char *meta_json, int meta_len) {
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len) {
 +  (void)target_name;
 +  (void)target_name_len;
 +  (void)payload_json;
 +  (void)payload_len;
 +  (void)meta_json;
 +  (void)meta_len;
++  return 2;
 +}
 +#endif
 diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
-index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f5061dee6ae0 100644
+index 4663b680c0a24684c6bcd171129420df24e753c5..efd4ce6c49cc2d1a0276af562618308b81a43059 100644
 --- a/erts/emulator/sys/unix/sys.c
 +++ b/erts/emulator/sys/unix/sys.c
 @@ -82,6 +82,9 @@
@@ -891,7 +902,56 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
  extern int  driver_interrupt(int, int);
  extern void do_break(void);
  
-@@ -1105,6 +1108,9 @@ static erts_tid_t sig_dispatcher_tid;
+@@ -102,7 +105,9 @@ static erts_atomic32_t have_prepared_crash_dump;
+ erts_atomic_t sys_misc_mem_sz;
+ 
+ static void smp_sig_notify(int signum);
++#ifndef ERTS_EMSCRIPTEN
+ static int sig_notify_fds[2] = {-1, -1};
++#endif
+ 
+ #ifdef ERTS_SYS_SUSPEND_SIGNAL
+ static int sig_suspend_fds[2] = {-1, -1};
+@@ -586,6 +591,7 @@ int erts_sys_prepare_crash_dump(int secs)
+     return prepare_crash_dump(secs);
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static void signal_notify_requested(Eterm type) {
+     Process* p = NULL;
+     Eterm msg, *hp;
+@@ -622,6 +628,7 @@ break_requested(void)
+   /* Wake aux thread to get handle break */
+   erts_aux_thread_poke();
+ }
++#endif
+ 
+ static RETSIGTYPE request_break(int signum)
+ {
+@@ -720,6 +727,7 @@ signalterm_to_signum(Eterm signal)
+     }
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static ERTS_INLINE Eterm
+ signum_to_signalterm(int signum)
+ {
+@@ -745,6 +753,7 @@ signum_to_signalterm(int signum)
+     default:      return am_error;
+     }
+ }
++#endif
+ 
+ static RETSIGTYPE generic_signal_handler(int signum)
+ {
+@@ -1100,11 +1109,16 @@ erl_debug(char* fmt, ...)
+ 
+ #endif /* DEBUG */
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static erts_tid_t sig_dispatcher_tid;
++#endif
+ 
  static void
  smp_sig_notify(int signum)
  {
@@ -901,15 +961,26 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      int res;
      do {
  	/* write() is async-signal safe (according to posix) */
-@@ -1117,6 +1123,7 @@ smp_sig_notify(int signum)
+@@ -1117,8 +1131,10 @@ smp_sig_notify(int signum)
  	erts_silence_warn_unused_result(write(2, msg, sizeof(msg)));
  	abort();
      }
 +#endif
  }
  
++#ifndef ERTS_EMSCRIPTEN
  static void *
-@@ -1239,6 +1246,15 @@ erts_sys_main_thread(void)
+ signal_dispatcher_thread_func(void *unused)
+ {
+@@ -1211,6 +1227,7 @@ init_smp_sig_suspend(void) {
+   }
+ #endif
+ }
++#endif
+ 
+ #ifdef __DARWIN__
+ 
+@@ -1239,6 +1256,15 @@ erts_sys_main_thread(void)
  #endif
      smp_sig_notify(0); /* Notify initialized */
  
@@ -925,7 +996,7 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      /* Wait for a signal to arrive... */
  
  #ifdef __DARWIN__
-@@ -1293,8 +1309,10 @@ erl_sys_args(int* argc, char** argv)
+@@ -1293,8 +1319,10 @@ erl_sys_args(int* argc, char** argv)
  
      max_files = erts_check_io_max_files();
  
@@ -937,17 +1008,17 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      erts_sys_env_init();
  }
 diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
-index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..10792a788a45c28162735db4198d9e6470313f70 100644
+index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d8c1dc066 100644
 --- a/erts/emulator/sys/unix/sys_drivers.c
 +++ b/erts/emulator/sys/unix/sys_drivers.c
-@@ -172,6 +172,7 @@ erl_sys_late_init(void)
+@@ -169,6 +169,7 @@ typedef struct driver_data {
+ void
+ erl_sys_late_init(void)
+ {
++#ifndef ERTS_EMSCRIPTEN
      SysDriverOpts opts = {0};
      Port *port;
  
-+#ifndef ERTS_EMSCRIPTEN
-     sys_signal(SIGPIPE, SIG_IGN); /* Ignore - we'll handle the write failure */
- 
-     opts.packet_bytes = 0;
 @@ -191,6 +192,7 @@ erl_sys_late_init(void)
          erts_open_driver(&forker_driver, make_internal_pid(0), "forker", &opts, NULL, NULL);
      erts_mtx_unlock(port->lock);
