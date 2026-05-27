@@ -859,4 +859,13 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.eval(:elixir, run_dir: dir)
     |> AtomVM.assert_result("21.37")
   end
+
+  async_test "Map.pop", %{tmp_dir: dir} do
+    quote do
+      Map.pop(%{a: 1, b: 2}, :b)
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({2, %{a: 1}})
+  end
 end

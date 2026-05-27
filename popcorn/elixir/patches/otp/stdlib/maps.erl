@@ -494,8 +494,8 @@ remove(_Key, Map) when not is_map(Map) ->
 take(Key, Map) when is_map(Map) ->
     case ?MODULE:is_key(Key, Map) of
         true ->
-            {_K, V, _It} = Next = maps:next(maps:iterator(Map)),
-            Map2 = iterate_remove(Key, Next, ?MODULE:new()),
+            V = ?MODULE:get(Key, Map),
+            Map2 = iterate_remove(Key, maps:next(maps:iterator(Map)), ?MODULE:new()),
             {V, Map2};
         _ ->
             Map
