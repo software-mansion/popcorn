@@ -16,7 +16,8 @@ config :compare_live_views, CompareLiveViewsWeb.Endpoint,
   secret_key_base: "1ZwGNw8g5wbOjM6J786kxNdYjMwAY7TNIjGE7AIL958JGeOzE5VOxU8LRSDmNhP2",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:compare_live_views, ~w(--watch)]},
-    tailwind: {Tailwind, :install_and_run, [:compare_live_views, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:compare_live_views, ~w(--watch)]},
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support

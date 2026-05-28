@@ -16,7 +16,8 @@ config :local_thermostat, LocalThermostatWeb.Endpoint,
   secret_key_base: "fWR2Rndu/VXUYTTq6WxUaQ4hyCzbxds5vreZTx5sUe6nB3a9uDCFrhYleh/zrW7t",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:local_thermostat, ~w(--watch)]},
-    tailwind: {Tailwind, :install_and_run, [:local_thermostat, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:local_thermostat, ~w(--watch)]},
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support

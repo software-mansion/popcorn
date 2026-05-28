@@ -16,7 +16,8 @@ config :local_lv_pong, LocalLvPongWeb.Endpoint,
   secret_key_base: "T8UJaloYtW7QyanaLJdHFjgECjzWGpEDKpCIphNmNI97LP/X4ViVGsSnJhNKaPkD",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:local_lv_pong, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:local_lv_pong, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:local_lv_pong, ~w(--watch)]},
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 # ## SSL Support
