@@ -2,22 +2,7 @@ defmodule BurritoWeb.OrderLive do
   use BurritoWeb, :live_view
 
   def mount(_params, _session, socket) do
-    llv_id = "burrito-live-#{socket.id}"
-
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{llv_id}")
-    end
-
-    {:ok, assign(socket, last_state: nil, llv_id: llv_id)}
-  end
-
-  def handle_info({:llv_attrs, attrs}, socket) do
-    Phoenix.LiveView.send_update(BurritoWeb.Live.SyncTableComponent,
-      id: "sync-table",
-      sync_params: attrs
-    )
-
-    {:noreply, assign(socket, last_state: attrs)}
+    {:ok, assign(socket, llv_id: "burrito-live-#{socket.id}")}
   end
 
   def render(assigns) do
@@ -127,7 +112,7 @@ defmodule BurritoWeb.OrderLive do
         </button>
         <div id="sync-panel-content" class="collapsible-grid open">
           <div>
-            <.live_component module={BurritoWeb.Live.SyncTableComponent} id="sync-table" />
+            <%= live_render @socket, BurritoWeb.Live.SyncTableLive, id: "sync-table", sticky: true, session: %{"llv_id" => @llv_id} %>
           </div>
         </div>
       </div>

@@ -52,7 +52,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -65,7 +65,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -87,7 +87,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -109,7 +109,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -123,7 +123,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -137,7 +137,7 @@ defmodule BurritoLive do
         builder_price: calculate_price(builder)
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -161,7 +161,7 @@ defmodule BurritoLive do
         next_id: socket.assigns.next_id + 1
       )
 
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
   end
 
@@ -169,8 +169,12 @@ defmodule BurritoLive do
     cart = Enum.reject(socket.assigns.cart, &(&1.id == id))
     cart_total = Enum.sum(Enum.map(cart, & &1.price))
     socket = assign(socket, cart: cart, cart_total: cart_total)
-    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
+    sync(socket)
     {:noreply, socket}
+  end
+
+  defp sync(socket) do
+    LocalLiveView.mirror_sync(socket, [:builder, :builder_price, :cart, :cart_total, :next_id])
   end
 
   defp parse_cart(items) when is_list(items) do

@@ -1,5 +1,5 @@
-defmodule BurritoWeb.Live.SyncTableComponent do
-  use BurritoWeb, :live_component
+defmodule BurritoWeb.Live.SyncTableLive do
+  use BurritoWeb, :live_view
 
   @base_price 9.50
   @protein_prices %{
@@ -16,8 +16,32 @@ defmodule BurritoWeb.Live.SyncTableComponent do
     "guacamole" => 2.50
   }
 
-  def update(%{sync_params: params} = _assigns, socket) do
-    builder_p = params["builder"] || %{}
+  def mount(_params, %{"llv_id" => llv_id}, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{llv_id}")
+    end
+
+    attrs = if connected?(socket), do: LocalLiveView.Channel.get_mirror_assigns(llv_id), else: %{}
+    {:ok, apply_attrs(socket, attrs)}
+  end
+
+  def handle_info({:llv_attrs, attrs}, socket) do
+    {:noreply, apply_attrs(socket, attrs)}
+  end
+
+  defp apply_attrs(socket, attrs) when map_size(attrs) == 0 do
+    default = default_builder()
+
+    assign(socket,
+      builder: default,
+      builder_price: calculate_price(default),
+      cart: [],
+      cart_total: 0.0
+    )
+  end
+
+  defp apply_attrs(socket, attrs) do
+    builder_p = attrs["builder"] || %{}
 
     builder = %{
       base: builder_p["base"] || "white_rice",
@@ -27,31 +51,16 @@ defmodule BurritoWeb.Live.SyncTableComponent do
       quantity: builder_p["quantity"] || 1
     }
 
-    cart = parse_cart(params["cart"] || [])
+    cart = parse_cart(attrs["cart"] || [])
     cart_total = Enum.sum(Enum.map(cart, & &1.price))
-    builder_price = parse_float(params["builder_price"], 0.0)
+    builder_price = parse_float(attrs["builder_price"], 0.0)
 
-    {:ok,
-     assign(socket,
-       builder: builder,
-       builder_price: builder_price,
-       cart: cart,
-       cart_total: cart_total
-     )}
-  end
-
-  def update(assigns, socket) do
-    default_builder = default_builder()
-
-    socket =
-      socket
-      |> assign_new(:builder, fn -> default_builder end)
-      |> assign_new(:builder_price, fn -> calculate_price(default_builder) end)
-      |> assign_new(:cart, fn -> [] end)
-      |> assign_new(:cart_total, fn -> 0.0 end)
-      |> assign(:id, assigns.id)
-
-    {:ok, socket}
+    assign(socket,
+      builder: builder,
+      builder_price: builder_price,
+      cart: cart,
+      cart_total: cart_total
+    )
   end
 
   defp default_builder do
