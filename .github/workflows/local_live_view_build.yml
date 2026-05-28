@@ -88,6 +88,10 @@ jobs:
       - name: Lint
         run: mix lint
 
+      - name: Install Phoenix installer (needed by Igniter.Test.phx_test_project)
+        run: mix archive.install hex phx_new --force
+        working-directory: .
+
       - name: Test
         run: mix test
 
