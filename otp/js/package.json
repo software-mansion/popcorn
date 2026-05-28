@@ -26,6 +26,7 @@
     "setup": "./scripts/setup-assets.sh",
     "build": "pnpm run setup && rollup -c && ./scripts/setup-assets.sh dist",
     "lint": "tsc --noEmit",
+    "lint:e2e": "tsc -p e2e/tsconfig.json",
     "e2e": "env -u FORCE_COLOR -u NO_COLOR playwright test --config e2e/playwright.config.ts"
   },
   "devDependencies": {

@@ -26,9 +26,12 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
 
 const LOG_PREFIX = "[Popcorn]";
 
+type PopcornState = "created" | "booting" | "booted";
+
 export class Popcorn {
   private vmWorker: Worker;
-  private isBooted = false;
+  private state: PopcornState = "created";
+  private readonly opts: PopcornOpts;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
@@ -64,24 +67,46 @@ export class Popcorn {
     }
   };
 
-  private constructor(vmWorker: Worker) {
-    this.vmWorker = vmWorker;
-  }
-
-  private startEventLoop(): void {
+  public constructor(opts: PopcornOpts) {
+    const vmWorkerUrl = new URL("./worker.mjs", import.meta.url);
+    this.vmWorker = new Worker(vmWorkerUrl, { type: "module" });
+    this.opts = opts;
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
   }
 
   public static async init(opts: PopcornOpts): Promise<Result<Popcorn>> {
-    const vmWorkerUrl = new URL("./worker.mjs", import.meta.url);
-    const vmWorker = new Worker(vmWorkerUrl, { type: "module" });
-    const popcorn = new Popcorn(vmWorker);
+    const popcorn = new Popcorn(opts);
+    const result = await popcorn.boot();
+
+    if (!result.ok) {
+      return result;
+    }
+
+    return { ok: true, data: popcorn };
+  }
+
+  public async boot(): Promise<Result<Popcorn>> {
+    if (this.state === "booted") {
+      return { ok: true, data: this };
+    }
+
+    if (this.state === "booting") {
+      return {
+        ok: false,
+        error: err("internal:check", { detail: "Boot already in progress" }),
+      };
+    }
+
+    this.state = "booting";
 
     return await new Promise<Result<Popcorn>>((resolve) => {
       let isSettled = false;
-      const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...opts.timeoutsMs };
+      const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
       const cleanup = () => {
-        vmWorker.removeEventListener("message", onInitMessage);
+        this.vmWorker.removeEventListener("message", onBootMessage);
+        if (this.state === "booting") {
+          this.state = "created";
+        }
       };
       const settle = (result: Result<Popcorn>) => {
         if (isSettled) return;
@@ -89,7 +114,7 @@ export class Popcorn {
         clearTimeout(timer);
         cleanup();
         if (!result.ok) {
-          popcorn.deinit();
+          this.deinit();
         }
         resolve(result);
       };
@@ -99,15 +124,14 @@ export class Popcorn {
         settle({ ok: false, error });
       }, timeoutsMs.boot);
 
-      const onInitMessage = (event: MessageEvent<unknown>) => {
+      const onBootMessage = (event: MessageEvent<unknown>) => {
         const data = readWorkerEvent(event.data);
         check(data !== null);
 
         switch (data.type) {
           case "popcorn:boot-end":
-            popcorn.isBooted = true;
-            popcorn.startEventLoop();
-            settle({ ok: true, data: popcorn });
+            this.state = "booted";
+            settle({ ok: true, data: this });
             break;
           case "popcorn:boot-fail": {
             const error = PopcornError.deserialize(data.payload);
@@ -115,15 +139,13 @@ export class Popcorn {
             break;
           }
           default:
-            // TODO: decide whether pre-init VM events should be buffered,
-            // exposed, or whether init should wait for a dedicated bridge-ready
-            // message emitted from BEAM.
+            // User-level VM events are handled by the main worker listener.
             break;
         }
       };
 
-      vmWorker.addEventListener("message", onInitMessage);
-      toVm(vmWorker, { type: "popcorn:boot", payload: opts.beam });
+      this.vmWorker.addEventListener("message", onBootMessage);
+      toVm(this.vmWorker, { type: "popcorn:boot", payload: this.opts.beam });
     });
   }
 
@@ -132,7 +154,7 @@ export class Popcorn {
     payload?: AnyValue,
     opts?: PopcornSendOpts,
   ): Result<null> {
-    if (!this.isBooted) {
+    if (this.state !== "booted") {
       return { ok: false, error: err("bridge:not-started", {}) };
     }
 
@@ -160,7 +182,7 @@ export class Popcorn {
   }
 
   public deinit(): void {
-    this.isBooted = false;
+    this.state = "created";
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.eventHandlers.clear();
     this.vmWorker.terminate();
