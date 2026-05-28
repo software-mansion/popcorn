@@ -182,6 +182,7 @@ run_timer(MgrPid, Time, TimerRef, Dest, Msg) ->
 
 %% @private
 run_interval(MgrPid, Time, _TimerRef, Dest, Msg) ->
+    erlang:monitor(process, Dest),
     Start = erlang:system_time(millisecond),
     do_run_interval(MgrPid, Start, Time, 0, Dest, Msg).
 
@@ -192,7 +193,11 @@ do_run_interval(MgrPid, Start, Time, Iteration, Dest, Msg) ->
     receive
         {cancel, From} ->
             MgrPid ! {canceled, self()},
-            gen_server:reply(From, true)
+            gen_server:reply(From, true);
+        {'DOWN', _MonitorRef, process, Dest, _Reason} ->
+            % Sending 'cancelled' assumes that the manager sent 'cancel',
+            % thus we send 'fired'
+            MgrPid ! {fired, self()}
     after Wait ->
         Dest ! Msg,
         do_run_interval(MgrPid, Start, Time, Iteration + 1, Dest, Msg)
