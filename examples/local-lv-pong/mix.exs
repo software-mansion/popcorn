@@ -75,6 +75,7 @@ defmodule LocalLvPong.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
+      dev: ["setup", "phx.server"],
       setup: ["deps.get", "llv.build", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind local_lv_pong", "esbuild local_lv_pong"],

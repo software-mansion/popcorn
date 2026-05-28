@@ -1,18 +1,28 @@
-# LocalLvPong
+# Pong game (Local LiveView demo)
 
-To start your Phoenix server:
+Pong game implemented fully in Local Live View - see [pong_live.ex](local/lib/local/pong_live.ex).
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+![](pong.png)
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+## Usage
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+From the repository root:
 
-## Learn more
+```bash
+pnpm install
+mise run dev --example local-lv-pong
+```
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+or directly from the example directory:
+
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000).
+
+**Important: when the browser console is opened, the game slows down dramatically.**
+That's because the browser switches WASM engine to a debug-friendly one, which
+is very slow. Closing the console may not help - you may have to reload the page
+or even reopen the tab.
+
