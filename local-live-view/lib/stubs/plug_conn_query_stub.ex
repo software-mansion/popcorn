@@ -8,9 +8,10 @@ module = Plug.Conn.Query
   path -> File.rm(path)
 end
 
+:code.delete(module)
 :code.purge(module)
 
-defmodule Plug.Conn.Query do
+defmodule module do
   def decode(
         query,
         initial \\ [],

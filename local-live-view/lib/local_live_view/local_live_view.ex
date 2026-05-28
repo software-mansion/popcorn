@@ -50,6 +50,13 @@ defmodule LocalLiveView do
     socket
   end
 
+  @doc """
+  Mimics `Phoenix.LiveView.connected?/1`. Always returns `true`.
+
+  Helps code reusability between server and local LiveViews.
+  """
+  def connected?(_socket), do: true
+
   defp to_serializable(value) when is_struct(value),
     do: value |> Map.from_struct() |> to_serializable()
 
@@ -88,6 +95,7 @@ defmodule LocalLiveView do
     end
   end
 
+  @doc false
   defmacro __before_compile__(env) do
     opts = Module.get_attribute(env.module, :phoenix_live_opts)
 
@@ -106,6 +114,7 @@ defmodule LocalLiveView do
     end
   end
 
+  @doc false
   def __live__(opts \\ []) do
     on_mount = opts[:on_mount] || []
 
@@ -144,4 +153,6 @@ defmodule LocalLiveView do
 
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
+  @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
 end
