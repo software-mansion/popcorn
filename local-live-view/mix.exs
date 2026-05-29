@@ -32,6 +32,10 @@ defmodule LocalLiveView.MixProject do
   defp deps do
     [
       {:popcorn, path: "../popcorn/elixir", targets: :wasm},
+      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:igniter, ">= 0.7.0", runtime: false},
+      {:playwright,
+       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test},
       {:phoenix, "~> 1.8", runtime: false},
       {:phoenix_live_view, runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},

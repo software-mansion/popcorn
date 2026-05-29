@@ -88,11 +88,20 @@ jobs:
       - name: Compile Hex dependencies
         run: mix deps.compile
 
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: local-live-view
+          lockfile: local-live-view/mix.lock
+
       - name: Lint
         run: mix lint
 
       - name: Test
         run: mix test
+
+      - name: E2E test
+        run: mix test --only e2e
 
       - name: Build
         run: mix build
