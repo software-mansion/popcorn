@@ -3,7 +3,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: LocalLiveView - Build
+name: LocalLiveView Build & test
 
 on:
   push:
@@ -32,7 +32,7 @@ env:
 
 jobs:
   build:
-    name: Build
+    name: Build & test
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
@@ -88,11 +88,22 @@ jobs:
       - name: Compile Hex dependencies
         run: mix deps.compile
 
-      - name: Setup Playwright
-        uses: ./.github/actions/setup-playwright
+      # Inlined instead of using ./.github/actions/setup-playwright — that action
+      # has a broad `Linux-playwright-` restore-key fallback that pulls in another
+      # workflow's cache (different chromium version) on first run for a new prefix,
+      # which then hangs trying to clean up + reinstall on top. We only restore our
+      # own cache; on miss we do a clean install.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
         with:
-          cache-prefix: local-live-view
-          lockfile: local-live-view/mix.lock
+          path: ~/.cache/ms-playwright
+          key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpx playwright@1.49.1 install chromium
+        working-directory: .
 
       - name: Lint
         run: mix lint
