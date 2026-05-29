@@ -95,11 +95,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
 
-      # `pnpx playwright install` hangs after the chromium download finishes (~28min in
-      # our CI runs). Using `npx --yes` works; root cause unclear, possibly pnpx waiting
-      # on an interactive prompt that never comes in a non-TTY context.
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        env:
+          DEBUG: pw:install
         run: npx --yes playwright@1.49.1 install --with-deps chromium
         working-directory: .
 
