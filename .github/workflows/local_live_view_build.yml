@@ -95,6 +95,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
 
+      - name: Debug — disk + mem before Playwright install
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: |
+          df -h
+          free -h
+          ls -la ~/.cache/ms-playwright/ 2>/dev/null || echo "no ms-playwright dir yet"
+
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         env:
