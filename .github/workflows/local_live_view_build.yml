@@ -3,21 +3,16 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: LocalLiveView Build & test
+name: Hello Popcorn - Build & test
 
 on:
   push:
     branches: ["**"]
     paths:
-      - "local-live-view/**"
-      - "examples/local-lv-thermostat/**"
-      - "examples/local-lv-compare/**"
-      - "examples/local-lv-forms/**"
-      - ".github/workflows/local_live_view_build.yml"
-      - "pnpm-workspace.yaml"
-      - "pnpm-lock.yaml"
-      - "package.json"
-      - ".npmrc"
+      - "examples/hello-popcorn/**"
+      - "popcorn/**"
+      - "!.github/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,7 +33,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: local-live-view
+        working-directory: examples/hello-popcorn
 
     steps:
       - uses: actions/checkout@v4
@@ -63,75 +58,37 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: local-live-view/deps
-          key: ${{ runner.os }}-mix-local_live_view-${{ hashFiles('local-live-view/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_live_view-
+          path: examples/hello-popcorn/deps
+          key: ${{ runner.os }}-mix-hello_popcorn-${{ hashFiles('examples/hello-popcorn/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-hello_popcorn-
 
       - name: Install Hex dependencies
         run: mix deps.get
 
-      - name: Install Phoenix installer (needed by Igniter.Test.phx_test_project)
-        run: mix archive.install hex phx_new --force
-
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: local-live-view
+          working-directory: examples/hello-popcorn
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
-      - name: Configure runtime source
-        run: |
-          printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs
-
       - name: Compile Hex dependencies
         run: mix deps.compile
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
-          save-always: true
-
-      # Workaround: `playwright install` hangs at archive extraction on GH runners
-      # (disk is fine, just stuck). Download + unzip with system tools instead,
-      # then create the marker file Playwright expects.
-      # TODO: switch to shared ./.github/actions/setup-playwright once our primary
-      # cache key is populated (it'll skip install entirely on cache hit).
-      - name: Install Chromium for Playwright (manual)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-            libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libpango-1.0-0 libcairo2
-
-          install_browser() {
-            local dir_name="$1" url="$2"
-            local target="$HOME/.cache/ms-playwright/$dir_name"
-            mkdir -p "$target"
-            curl -L --fail -o /tmp/browser.zip "$url"
-            unzip -q /tmp/browser.zip -d "$target"
-            touch "$target/INSTALLATION_COMPLETE"
-            rm /tmp/browser.zip
-          }
-
-          install_browser chromium-1148 \
-            https://playwright.azureedge.net/builds/chromium/1148/chromium-linux.zip
-          install_browser chromium_headless_shell-1148 \
-            https://playwright.azureedge.net/builds/chromium/1148/chromium-headless-shell-linux.zip
-
-      - name: Lint
-        run: mix lint
-
-      - name: Test
-        run: mix test
-
-      - name: E2E test
-        run: mix test --only e2e
+          cache-prefix: examples-hello-popcorn
+          lockfile: examples/hello-popcorn/mix.lock
 
       - name: Build
         run: mix build
+
+      - name: Run tests
+        run: mix test --no-start
+
+      - name: Run tests with treeshaking
+        # We need to change the port as the default one is allocated by the previous
+        # mix test job and not freed fast enough
+        run: TEST_SERVER_PORT=9877 POPCORN_TREESHAKE=true mix test --no-start
