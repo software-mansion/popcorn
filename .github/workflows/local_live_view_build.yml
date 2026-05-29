@@ -95,19 +95,25 @@ jobs:
           path: ~/.cache/ms-playwright
           key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
 
-      - name: Debug — disk + mem before Playwright install
+      # Workaround: `playwright install` hangs at archive extraction on GH runners
+      # (disk is fine, just stuck). Download + unzip with system tools instead,
+      # then create the marker file Playwright expects.
+      - name: Install Chromium for Playwright (manual)
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          df -h
-          free -h
-          ls -la ~/.cache/ms-playwright/ 2>/dev/null || echo "no ms-playwright dir yet"
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        env:
-          DEBUG: pw:install
-        run: npx --yes playwright@1.49.1 install --with-deps chromium
-        working-directory: .
+          set -euxo pipefail
+          sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libpango-1.0-0 libcairo2
+          BROWSER_DIR="$HOME/.cache/ms-playwright/chromium-1148"
+          mkdir -p "$BROWSER_DIR"
+          curl -L --fail \
+            -o /tmp/chromium.zip \
+            https://playwright.azureedge.net/builds/chromium/1148/chromium-linux.zip
+          unzip -q /tmp/chromium.zip -d "$BROWSER_DIR"
+          touch "$BROWSER_DIR/INSTALLATION_COMPLETE"
+          rm /tmp/chromium.zip
+          ls -la "$BROWSER_DIR"
 
       - name: Lint
         run: mix lint
