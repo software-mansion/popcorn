@@ -108,14 +108,21 @@ jobs:
           set -euxo pipefail
           sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
             libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libpango-1.0-0 libcairo2
-          BROWSER_DIR="$HOME/.cache/ms-playwright/chromium-1148"
-          mkdir -p "$BROWSER_DIR"
-          curl -L --fail \
-            -o /tmp/chromium.zip \
+
+          install_browser() {
+            local dir_name="$1" url="$2"
+            local target="$HOME/.cache/ms-playwright/$dir_name"
+            mkdir -p "$target"
+            curl -L --fail -o /tmp/browser.zip "$url"
+            unzip -q /tmp/browser.zip -d "$target"
+            touch "$target/INSTALLATION_COMPLETE"
+            rm /tmp/browser.zip
+          }
+
+          install_browser chromium-1148 \
             https://playwright.azureedge.net/builds/chromium/1148/chromium-linux.zip
-          unzip -q /tmp/chromium.zip -d "$BROWSER_DIR"
-          touch "$BROWSER_DIR/INSTALLATION_COMPLETE"
-          rm /tmp/chromium.zip
+          install_browser chromium_headless_shell-1148 \
+            https://playwright.azureedge.net/builds/chromium/1148/chromium-headless-shell-linux.zip
 
       - name: Lint
         run: mix lint
