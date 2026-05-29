@@ -42,7 +42,12 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     start_phoenix_server(project_dir)
 
     page = Playwright.Browser.new_page(browser)
-    wait_for(fn -> assert %{status: 200} = Playwright.Page.goto(page, @url) end, @server_ready_timeout)
+
+    wait_for(
+      fn -> assert %{status: 200} = Playwright.Page.goto(page, @url) end,
+      @server_ready_timeout
+    )
+
     Playwright.Page.close(page)
 
     [browser: browser]
@@ -86,18 +91,21 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     content = File.read!(mix_path)
 
     # Insert the local_live_view dep at the top of the `defp deps do [ ... ]` list.
-    new = String.replace(
-      content,
-      ~r/(defp deps do\s*\[\s*)/,
-      "\\1{:local_live_view, path: \"#{llv_path}\"},\n      ",
-      global: false
-    )
+    new =
+      String.replace(
+        content,
+        ~r/(defp deps do\s*\[\s*)/,
+        "\\1{:local_live_view, path: \"#{llv_path}\"},\n      ",
+        global: false
+      )
 
     File.write!(mix_path, new)
   end
 
   defp overwrite_home_html(app_dir) do
-    path = Path.join([app_dir, "lib", "test_app_web", "controllers", "page_html", "home.html.heex"])
+    path =
+      Path.join([app_dir, "lib", "test_app_web", "controllers", "page_html", "home.html.heex"])
+
     File.write!(path, ~s|<.local_live_view view="HelloLocal" />\n|)
   end
 
