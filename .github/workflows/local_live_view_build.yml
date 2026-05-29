@@ -88,11 +88,6 @@ jobs:
       - name: Compile Hex dependencies
         run: mix deps.compile
 
-      # Inlined instead of using ./.github/actions/setup-playwright — that action
-      # has a broad `Linux-playwright-` restore-key fallback that pulls in another
-      # workflow's cache (different chromium version) on first run for a new prefix,
-      # which then hangs trying to clean up + reinstall on top. We only restore our
-      # own cache; on miss we do a clean install.
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -100,9 +95,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
 
+      # `pnpx playwright install` hangs after the chromium download finishes (~28min in
+      # our CI runs). Using `npx --yes` works; root cause unclear, possibly pnpx waiting
+      # on an interactive prompt that never comes in a non-TTY context.
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpx playwright@1.49.1 install chromium
+        run: npx --yes playwright@1.49.1 install --with-deps chromium
         working-directory: .
 
       - name: Lint
