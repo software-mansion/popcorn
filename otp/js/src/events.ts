@@ -14,23 +14,37 @@ type BootEvent = {
 
 type SendEvent = {
   type: "popcorn:send";
-  payload: BeamSendPayload;
+  payload: SendRequestPayload;
+};
+
+export type SendRequestPayload = {
+  id: string;
+  message: BeamSendPayload;
+};
+
+export type SerializedSendResult =
+  | { ok: true; data: null }
+  | { ok: false; error: SerializedError };
+
+export type SendCompletionPayload = {
+  id: string;
+  result: SerializedSendResult;
+};
+
+type SendEndEvent = {
+  type: "popcorn:send-end";
+  payload: SendCompletionPayload;
 };
 
 type BootEndEvent =
   | { type: "popcorn:boot-end"; payload: {} }
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
-type SendFailEvent = {
-  type: "popcorn:send-fail";
-  payload: SerializedError;
-};
-
 export type MainToVmEvent = BootEvent | SendEvent;
 
 export type PopcornEvent = AnyValue;
 
-type RuntimeEvent = BeamEvent | SendFailEvent;
+type RuntimeEvent = BeamEvent | SendEndEvent;
 
 export type VmToMainEvent = RuntimeEvent | BootEndEvent;
 
@@ -74,7 +88,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
     case "otp:message":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
-    case "popcorn:send-fail":
+    case "popcorn:send-end":
       return data as VmToMainEvent;
     default:
       return null;

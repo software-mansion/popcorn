@@ -4,6 +4,7 @@ import {
   serializeSendPayload,
   toVm,
   type PopcornEvent,
+  type SendCompletionPayload,
 } from "./events";
 import type { AnyValue, BeamBootOptions } from "./types";
 import { check } from "./utils";
@@ -27,12 +28,15 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
 const LOG_PREFIX = "[Popcorn]";
 
 type PopcornState = "created" | "booting" | "booted";
+type PendingSend = (result: Result<null>) => void;
 
 export class Popcorn {
   private vmWorker: Worker;
   private state: PopcornState = "created";
   private readonly opts: PopcornOpts;
+  private requestSeq = 0;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
+  private readonly pendingSends = new Map<string, PendingSend>();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
     check(data !== null);
@@ -59,9 +63,8 @@ export class Popcorn {
       case "otp:exit":
         console.info(`${LOG_PREFIX} exit:`, data.payload);
         return;
-      case "popcorn:send-fail": {
-        const error = PopcornError.deserialize(data.payload);
-        console.error(`${LOG_PREFIX} send failed:`, error.message, error);
+      case "popcorn:send-end": {
+        this.completeSend(data.payload);
         return;
       }
     }
@@ -100,14 +103,10 @@ export class Popcorn {
     this.state = "booting";
 
     return await new Promise<Result<Popcorn>>((resolve) => {
-      let isSettled = false;
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
-      const cleanup = () => {
-        this.vmWorker.removeEventListener("message", onBootMessage);
-        if (this.state === "booting") {
-          this.state = "created";
-        }
-      };
+
+      let isSettled = false;
+
       const settle = (result: Result<Popcorn>) => {
         if (isSettled) return;
         isSettled = true;
@@ -144,16 +143,28 @@ export class Popcorn {
         }
       };
 
+      const cleanup = () => {
+        this.vmWorker.removeEventListener("message", onBootMessage);
+        if (this.state === "booting") {
+          this.state = "created";
+        }
+      };
+
       this.vmWorker.addEventListener("message", onBootMessage);
       toVm(this.vmWorker, { type: "popcorn:boot", payload: this.opts.beam });
     });
   }
 
-  public send(
+  /**
+   * Resolves after the VM has attempted to put the event into the target
+   * listener process mailbox. It does not wait for application-level handling by
+   * the receiving Elixir process.
+   */
+  public async send(
     target: string,
     payload?: AnyValue,
     opts?: PopcornSendOpts,
-  ): Result<null> {
+  ): Promise<Result<null>> {
     if (this.state !== "booted") {
       return { ok: false, error: err("bridge:not-started", {}) };
     }
@@ -167,11 +178,15 @@ export class Popcorn {
       return command;
     }
 
-    toVm(this.vmWorker, {
-      type: "popcorn:send",
-      payload: command.data,
+    const requestId = this.nextRequestId();
+
+    return await new Promise<Result<null>>((resolve) => {
+      this.pendingSends.set(requestId, resolve);
+      toVm(this.vmWorker, {
+        type: "popcorn:send",
+        payload: { id: requestId, message: command.data },
+      });
     });
-    return { ok: true, data: null };
   }
 
   public onEvent(handler: (event: PopcornEvent) => void): () => void {
@@ -192,5 +207,25 @@ export class Popcorn {
     for (const handler of this.eventHandlers) {
       handler(event);
     }
+  }
+
+  private completeSend(payload: SendCompletionPayload): void {
+    const resolve = this.pendingSends.get(payload.id) ?? null;
+    if (resolve === null) {
+      return;
+    }
+
+    this.pendingSends.delete(payload.id);
+    const result = payload.result;
+    resolve(
+      result.ok
+        ? { ok: true, data: null }
+        : { ok: false, error: PopcornError.deserialize(result.error) },
+    );
+  }
+
+  private nextRequestId(): string {
+    this.requestSeq += 1;
+    return `send:${this.requestSeq}`;
   }
 }

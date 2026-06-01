@@ -35,13 +35,16 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       return;
     }
     case "popcorn:send": {
-      const result = send(instance, data.payload);
-      if (!result.ok) {
-        toMain({
-          type: "popcorn:send-fail",
-          payload: result.error.serialize(),
-        });
-      }
+      const result = send(instance, data.payload.message);
+      toMain({
+        type: "popcorn:send-end",
+        payload: {
+          id: data.payload.id,
+          result: result.ok
+            ? { ok: true, data: null }
+            : { ok: false, error: result.error.serialize() },
+        },
+      });
       return;
     }
     default:

@@ -81,8 +81,8 @@ export class Otp {
     const popcorn = this.requirePopcorn();
 
     return await popcorn.evaluate(
-      (instance, args) => {
-        const result = instance.send(args.target, args.payload, args.opts);
+      async (instance, args) => {
+        const result = await instance.send(args.target, args.payload, args.opts);
 
         return result.ok
           ? { ok: true, data: null }

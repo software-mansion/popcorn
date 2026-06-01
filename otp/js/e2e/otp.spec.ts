@@ -83,7 +83,7 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
-test("raports non-existent send() targets", async ({ otp }) => {
+test("surfaces listener lookup failures from popcorn.send", async ({ otp }) => {
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", READY_BOOT_EVAL] },
   });
@@ -92,10 +92,12 @@ test("raports non-existent send() targets", async ({ otp }) => {
   await otp.waitForEvent("ready");
 
   const send = await otp.send("missing-listener", { ping: true });
-  const consoleMessage = await otp.waitForStderr("send failed");
 
-  assert(send.ok);
-  expect(consoleMessage.text()).toContain("send failed");
-  expect(consoleMessage.text()).toContain("Target listener not found");
-  expect(consoleMessage.text()).toContain("missing-listener");
+  expect(send).toEqual({
+    ok: false,
+    error: {
+      t: "bridge:listener-not-found",
+      data: { targetName: "missing-listener" },
+    },
+  });
 });
