@@ -13,6 +13,8 @@ on:
       - "docker/base.Dockerfile"
       - "docker/landing.Dockerfile"
       - "docker/langtour.Dockerfile"
+      - "docker/burrito/Dockerfile"
+      - "examples/local-lv-burrito/**"
       - ".github/workflows/demo_staging_build_and_deploy.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -56,6 +58,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
 
       - name: Build base Docker image
         id: build-base
@@ -85,6 +88,22 @@ jobs:
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build burrito Docker image
+        id: build-and-push-burrito
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/burrito/Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=staging
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito:staging"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
