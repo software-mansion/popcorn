@@ -21,10 +21,13 @@ export type BeamBootOptions = {
 export type BeamEvent =
   | { type: "otp:stdout"; payload: string }
   | { type: "otp:stderr"; payload: string }
-  | { type: "otp:exit"; payload: number }
-  | { type: "otp:abort"; payload: string }
-  | { type: "otp:error"; payload: string }
+  | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue };
+
+export type OtpErrorPayload =
+  | { kind: "abort"; data: string }
+  | { kind: "error"; data: string }
+  | { kind: "exit"; data: number };
 
 export type EmscriptenFS = {
   mkdir: (path: string) => void;

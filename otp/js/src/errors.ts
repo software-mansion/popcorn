@@ -6,6 +6,7 @@ type Tag = keyof PopcornErrors;
 export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
   "worker:load": { message: string };
+  "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
   "bridge:invalid-target": EmptyData;
   "bridge:unserializable": EmptyData;
@@ -22,6 +23,11 @@ export type SerializedError<T extends Tag = Tag> = {
 }[T];
 
 type EmptyData = Record<never, never>;
+type VmExitedData =
+  | { reason: "deinit" }
+  | { reason: "abort"; data: string }
+  | { reason: "error"; data: string }
+  | { reason: "exit"; data: number };
 
 export function err<T extends Tag>(
   t: T,
@@ -79,6 +85,8 @@ function message(error: SerializedError): string {
       return `Init timed out after ${error.data.timeoutMs}ms`;
     case "worker:load":
       return error.data.message;
+    case "vm:exited":
+      return "VM exited";
     case "bridge:not-started":
       return "Bridge did not start";
     case "bridge:invalid-target":
@@ -100,7 +108,7 @@ function message(error: SerializedError): string {
     case "internal:unreachable":
       return "Entered unreachable code";
     default:
-      return unreachable();
+      unreachable();
   }
 }
 
@@ -112,6 +120,9 @@ function parse(value: unknown): SerializedError {
       return { t: value.t, data: value.data };
     case "worker:load":
       check(isWorkerLoadData(value.data));
+      return { t: value.t, data: value.data };
+    case "vm:exited":
+      check(isVmExitedData(value.data));
       return { t: value.t, data: value.data };
     case "bridge:not-started":
       check(isEmptyData(value.data));
@@ -139,7 +150,7 @@ function parse(value: unknown): SerializedError {
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     default:
-      return unreachable();
+      unreachable();
   }
 }
 
@@ -153,6 +164,10 @@ function isWorkerLoadData(
   value: unknown,
 ): value is PopcornErrors["worker:load"] {
   return objectWithKeys(value, ["message"]) !== null;
+}
+
+function isVmExitedData(value: unknown): value is PopcornErrors["vm:exited"] {
+  return objectWithKeys(value, ["reason"]) !== null;
 }
 
 function isListenerNotFoundData(

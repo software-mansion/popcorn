@@ -50,15 +50,18 @@ export async function boot({
   const moduleConfig: Partial<EmscriptenModule> = {
     print: (text) => emit({ type: "otp:stdout", payload: text }),
     printErr: (text) => emit({ type: "otp:stderr", payload: text }),
-    onExit: (code) => emit({ type: "otp:exit", payload: code }),
-    onAbort: (text) => emit({ type: "otp:abort", payload: text }),
+    onExit: (code) =>
+      emit({ type: "otp:error", payload: { kind: "exit", data: code } }),
+    onAbort: (text) =>
+      emit({ type: "otp:error", payload: { kind: "abort", data: text } }),
     onBeamMessage: (text) => {
       const event = deserializeBridgeMessage(text);
       if (event !== null) {
         emit(event);
       }
     },
-    onError: (text) => emit({ type: "otp:error", payload: text }),
+    onError: (text) =>
+      emit({ type: "otp:error", payload: { kind: "error", data: text } }),
     arguments: buildArgs({
       searchPaths: searchPaths ?? [],
       extra: extraArgs ?? [],
@@ -79,7 +82,10 @@ export async function boot({
           } catch (error) {
             check(error instanceof PopcornError);
             initError = error;
-            emit({ type: "otp:abort", payload: error.message });
+            emit({
+              type: "otp:error",
+              payload: { kind: "abort", data: error.message },
+            });
           } finally {
             mod.removeRunDependency("fs");
           }

@@ -55,7 +55,7 @@ type BridgeEnvelope =
     }
   | {
       type: "vm_error";
-      data?: unknown;
+      data: string;
     };
 
 export function readMainEvent(value: unknown): MainToVmEvent | null {
@@ -82,9 +82,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
   switch (data.type) {
     case "otp:stdout":
     case "otp:stderr":
-    case "otp:abort":
     case "otp:error":
-    case "otp:exit":
     case "otp:message":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
@@ -132,8 +130,10 @@ export function deserializeBridgeMessage(
       case "vm_error":
         return {
           type: "otp:error",
-          payload:
-            typeof parsed.data === "string" ? parsed.data : "unknown_vm_error",
+          payload: {
+            kind: "error",
+            data: parsed.data,
+          },
         };
       default:
         return null;

@@ -6,14 +6,15 @@ import {
   type PopcornEvent,
   type SendCompletionPayload,
 } from "./events";
-import type { AnyValue, BeamBootOptions } from "./types";
-import { check } from "./utils";
+import type { AnyValue, BeamBootOptions, OtpErrorPayload } from "./types";
+import { check, unreachable } from "./utils";
 
 export type PopcornOpts = {
   beam: Pick<BeamBootOptions, "assetsUrl" | "searchPaths" | "extraArgs">;
   timeoutsMs?: {
     boot?: number;
   };
+  onError?: (event: OtpErrorPayload) => void;
 };
 
 export type PopcornSendOpts = {
@@ -27,14 +28,25 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
 
 const LOG_PREFIX = "[Popcorn]";
 
-type PopcornState = "created" | "booting" | "booted";
+type VmExitReason =
+  | { reason: "deinit" }
+  | { reason: "abort"; data: string }
+  | { reason: "error"; data: string }
+  | { reason: "exit"; data: number };
+
+type PopcornState =
+  | { status: "created" }
+  | { status: "booting" }
+  | { status: "booted" }
+  | { status: "closed"; error: PopcornError<"vm:exited"> };
 type PendingSend = (result: Result<null>) => void;
 
 export class Popcorn {
   private vmWorker: Worker;
-  private state: PopcornState = "created";
+  private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts;
   private requestSeq = 0;
+  private settleBoot: ((result: Result<Popcorn>) => void) | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
@@ -54,19 +66,15 @@ export class Popcorn {
       case "otp:stderr":
         console.error(`${LOG_PREFIX} stderr:`, data.payload);
         return;
-      case "otp:abort":
-        console.error(`${LOG_PREFIX} abort:`, data.payload);
-        return;
       case "otp:error":
-        console.error(`${LOG_PREFIX} error:`, data.payload);
-        return;
-      case "otp:exit":
-        console.info(`${LOG_PREFIX} exit:`, data.payload);
+        this.handleOtpError(data.payload);
         return;
       case "popcorn:send-end": {
         this.completeSend(data.payload);
         return;
       }
+      default:
+        unreachable();
     }
   };
 
@@ -89,18 +97,22 @@ export class Popcorn {
   }
 
   public async boot(): Promise<Result<Popcorn>> {
-    if (this.state === "booted") {
+    if (this.state.status === "booted") {
       return { ok: true, data: this };
     }
 
-    if (this.state === "booting") {
+    if (this.state.status === "closed") {
+      return { ok: false, error: this.state.error };
+    }
+
+    if (this.state.status === "booting") {
       return {
         ok: false,
         error: err("internal:check", { detail: "Boot already in progress" }),
       };
     }
 
-    this.state = "booting";
+    this.state = { status: "booting" };
 
     return await new Promise<Result<Popcorn>>((resolve) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
@@ -117,6 +129,7 @@ export class Popcorn {
         }
         resolve(result);
       };
+      this.settleBoot = settle;
 
       const timer = setTimeout(() => {
         const error = err("timeout:init", { timeoutMs: timeoutsMs.boot });
@@ -129,7 +142,7 @@ export class Popcorn {
 
         switch (data.type) {
           case "popcorn:boot-end":
-            this.state = "booted";
+            this.state = { status: "booted" };
             settle({ ok: true, data: this });
             break;
           case "popcorn:boot-fail": {
@@ -144,9 +157,10 @@ export class Popcorn {
       };
 
       const cleanup = () => {
+        this.settleBoot = null;
         this.vmWorker.removeEventListener("message", onBootMessage);
-        if (this.state === "booting") {
-          this.state = "created";
+        if (this.state.status === "booting") {
+          this.state = { status: "created" };
         }
       };
 
@@ -165,7 +179,10 @@ export class Popcorn {
     payload?: AnyValue,
     opts?: PopcornSendOpts,
   ): Promise<Result<null>> {
-    if (this.state !== "booted") {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
       return { ok: false, error: err("bridge:not-started", {}) };
     }
 
@@ -179,7 +196,6 @@ export class Popcorn {
     }
 
     const requestId = this.nextRequestId();
-
     return await new Promise<Result<null>>((resolve) => {
       this.pendingSends.set(requestId, resolve);
       toVm(this.vmWorker, {
@@ -196,8 +212,22 @@ export class Popcorn {
     };
   }
 
-  public deinit(): void {
-    this.state = "created";
+  public deinit(reason: VmExitReason = { reason: "deinit" }): void {
+    if (this.state.status === "closed") {
+      return;
+    }
+
+    const error = err("vm:exited", reason);
+    if (this.settleBoot !== null) {
+      this.settleBoot({ ok: false, error });
+      return;
+    }
+
+    this.state = { status: "closed", error };
+    for (const resolve of this.pendingSends.values()) {
+      resolve({ ok: false, error });
+    }
+    this.pendingSends.clear();
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.eventHandlers.clear();
     this.vmWorker.terminate();
@@ -211,9 +241,7 @@ export class Popcorn {
 
   private completeSend(payload: SendCompletionPayload): void {
     const resolve = this.pendingSends.get(payload.id) ?? null;
-    if (resolve === null) {
-      return;
-    }
+    check(resolve !== null);
 
     this.pendingSends.delete(payload.id);
     const result = payload.result;
@@ -227,5 +255,45 @@ export class Popcorn {
   private nextRequestId(): string {
     this.requestSeq += 1;
     return `send:${this.requestSeq}`;
+  }
+
+  private handleOtpError(payload: OtpErrorPayload): void {
+    const onError = this.opts.onError ?? defaultOnError;
+    onError(payload);
+
+    check(["booting", "booted"].includes(this.state.status));
+    if (this.state.status === "booting") {
+      return;
+    }
+
+    switch (payload.kind) {
+      case "abort":
+        this.deinit({ reason: "abort", data: payload.data });
+        break;
+      case "error":
+        this.deinit({ reason: "error", data: payload.data });
+        break;
+      case "exit":
+        this.deinit({ reason: "exit", data: payload.data });
+        break;
+      default:
+        unreachable();
+    }
+  }
+}
+
+function defaultOnError(payload: OtpErrorPayload): void {
+  switch (payload.kind) {
+    case "abort":
+      console.error(`${LOG_PREFIX} abort:`, payload.data);
+      return;
+    case "error":
+      console.error(`${LOG_PREFIX} error:`, payload.data);
+      return;
+    case "exit":
+      console.info(`${LOG_PREFIX} exit:`, payload.data);
+      return;
+    default:
+      unreachable();
   }
 }

@@ -1,7 +1,5 @@
 import { assert, expect, test } from "./helpers";
 
-const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
-
 test("boots", async ({ otp }) => {
   const result = await otp.boot({ beam: { assetsUrl: "/otp-assets" } });
 
@@ -31,6 +29,53 @@ test("handles missing boot script", async ({ otp }) => {
       t: "beam:missing-boot-script",
       data: { url: "/otp-assets/missing/bin/vm.boot" },
     },
+  });
+});
+
+test("reports runtime errors through onError", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const errors: unknown[] = [];
+    const popcorn = new window.Popcorn({
+      beam: { assetsUrl: "/otp-assets/missing" },
+      onError: (event) => errors.push(event),
+    });
+
+    const boot = await popcorn.boot();
+    return {
+      errors,
+      boot: boot.ok
+        ? { ok: true, data: null }
+        : { ok: false, error: boot.error.serialize() },
+    };
+  });
+
+  expect(result.errors).toContainEqual({
+    kind: "abort",
+    data: "Missing boot script: '/otp-assets/missing/bin/vm.boot'",
+  });
+  expect(result.boot).toEqual({
+    ok: false,
+    error: {
+      t: "beam:missing-boot-script",
+      data: { url: "/otp-assets/missing/bin/vm.boot" },
+    },
+  });
+});
+
+test("does not allow boot after deinit", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const popcorn = new window.Popcorn({ beam: { assetsUrl: "/otp-assets" } });
+    popcorn.deinit();
+
+    const boot = await popcorn.boot();
+    return boot.ok
+      ? { ok: true, data: null }
+      : { ok: false, error: boot.error.serialize() };
+  });
+
+  expect(result).toEqual({
+    ok: false,
+    error: { t: "vm:exited", data: { reason: "deinit" } },
   });
 });
 
@@ -83,16 +128,15 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
-test("surfaces listener lookup failures from popcorn.send", async ({ otp }) => {
+test("popcorn.send() reports unregistered process", async ({ otp }) => {
+  const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", READY_BOOT_EVAL] },
   });
-
   assert(boot.ok);
   await otp.waitForEvent("ready");
 
   const send = await otp.send("missing-listener", { ping: true });
-
   expect(send).toEqual({
     ok: false,
     error: {

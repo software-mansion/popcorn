@@ -6,6 +6,7 @@ import type { EmscriptenModule } from "./types";
 import { check, unreachable } from "./utils";
 
 let instance: EmscriptenModule | null = null;
+let state: "created" | "booting" | "booted" = "created";
 
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const data = readMainEvent(event.data);
@@ -13,7 +14,8 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
 
   switch (data.type) {
     case "popcorn:boot": {
-      check(instance === null);
+      check(state === "created");
+      state = "booting";
 
       const result = await boot({
         assetsUrl: data.payload.assetsUrl,
@@ -23,6 +25,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         emit: toMain,
       });
       if (!result.ok) {
+        state = "created";
         toMain({
           type: "popcorn:boot-fail",
           payload: result.error.serialize(),
@@ -31,6 +34,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       }
 
       instance = result.data;
+      state = "booted";
       toMain({ type: "popcorn:boot-end", payload: {} });
       return;
     }
@@ -48,6 +52,6 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       return;
     }
     default:
-      return unreachable();
+      unreachable();
   }
 };
