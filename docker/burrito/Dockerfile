@@ -27,7 +27,7 @@ RUN LLV_PROJECT_DIR=$(pwd) node /build/popcorn/local-live-view/assets/bundle.mjs
 COPY examples/local-lv-burrito/lib/ lib/
 COPY examples/local-lv-burrito/assets/ assets/
 RUN mix compile
-RUN cd assets && pnpm run build
+RUN cd assets && CI=true pnpm run build
 RUN mix tailwind burrito --minify
 RUN mix phx.digest
 
