@@ -1,0 +1,38 @@
+# Exclude build artifacts and tool caches
+**/.git
+**/_build
+**/deps
+**/node_modules
+**/.elixir_ls
+**/cover
+**/doc
+**/tmp
+
+# Exclude unrelated top-level directories
+landing-page/
+language-tour/
+popdoc/
+docker/
+scripts/
+test/
+otp/
+projects/
+
+# Exclude the pre-built popcorn JS package — it is built inside the base image
+popcorn/js/
+
+# Exclude examples other than local-lv-burrito
+examples/local-lv-compare/
+examples/local-lv-forms/
+examples/local-lv-thermostat/
+examples/hello-popcorn/
+examples/hello-react/
+examples/eval-in-wasm/
+examples/iex-wasm/
+examples/game-of-life/
+
+# Keep only what the Dockerfile COPYs:
+#   pnpm-lock.yaml, package.json, pnpm-workspace.yaml  (workspace root)
+#   popcorn/elixir/
+#   local-live-view/
+#   examples/local-lv-burrito/
