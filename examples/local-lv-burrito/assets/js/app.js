@@ -303,7 +303,7 @@ window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));
 window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 
 // Setup Local LiveViews (intercepts LLV data-pop-view elements and runs them via WASM)
-import { LLVEngine } from "local_live_view";
+import { LLVEngine } from "../vendor/local_live_view.js";
 
 liveSocket.connect();
 window.liveSocket = liveSocket;
