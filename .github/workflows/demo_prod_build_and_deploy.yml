@@ -38,6 +38,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
 
       - name: Build base Docker image
         id: build-base
@@ -67,6 +68,22 @@ jobs:
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build burrito Docker image
+        id: build-and-push-burrito
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/burrito/Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=latest
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito:latest"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
