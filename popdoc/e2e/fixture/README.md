@@ -4,17 +4,13 @@ Minimal Popdoc fixture for manual docs checks.
 
 ## Single expression
 
-<!-- popcorn:eval -->
-
-```elixir
+```elixir-popcorn
 Example.add(20, 22)
 ```
 
 ## Multiple expressions
 
-<!-- popcorn:eval -->
-
-```elixir
+```elixir-popcorn
 x = Example.add(20, 22)
 IO.puts("hello\nfrom\nstdout")
 IO.puts(:stderr, "hello from stderr\nit even has multiple lines")
@@ -27,9 +23,7 @@ end
 
 ## Error
 
-<!-- popcorn:eval -->
-
-```elixir
+```elixir-popcorn
 a = 1
 b = 0
 all = {c, d} = {10, 20}
@@ -40,9 +34,7 @@ Example.hello()
 
 ## Error with stacktrace
 
-<!-- popcorn:eval -->
-
-```elixir
+```elixir-popcorn
 Example.divide_all(10, [2, 5, 0])
 ```
 
