@@ -5,6 +5,7 @@ export type Result<T, E extends Tag = Tag> =
 type Tag = keyof PopcornErrors;
 export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
+  "timeout:send": { timeoutMs: number };
   "worker:load": { message: string };
   "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
@@ -83,6 +84,8 @@ function message(error: SerializedError): string {
   switch (error.t) {
     case "timeout:init":
       return `Init timed out after ${error.data.timeoutMs}ms`;
+    case "timeout:send":
+      return `Send timed out after ${error.data.timeoutMs}ms`;
     case "worker:load":
       return error.data.message;
     case "vm:exited":
@@ -116,7 +119,8 @@ function parse(value: unknown): SerializedError {
   check(objectWithKeys(value, ["t", "data"]));
   switch (value.t) {
     case "timeout:init":
-      check(isTimeoutInitData(value.data));
+    case "timeout:send":
+      check(isTimeoutData(value.data));
       return { t: value.t, data: value.data };
     case "worker:load":
       check(isWorkerLoadData(value.data));
@@ -154,7 +158,7 @@ function parse(value: unknown): SerializedError {
   }
 }
 
-function isTimeoutInitData(
+function isTimeoutData(
   value: unknown,
 ): value is PopcornErrors["timeout:init"] {
   return objectWithKeys(value, ["timeoutMs"]) !== null;

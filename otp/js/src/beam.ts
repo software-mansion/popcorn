@@ -7,7 +7,6 @@ import type {
   EmscriptenModule,
 } from "./types";
 import {
-  check,
   decompressGzip,
   dirname,
   ensureDir,
@@ -80,12 +79,7 @@ export async function boot({
           try {
             await initFs({ module: mod, assetsUrl });
           } catch (error) {
-            check(error instanceof PopcornError);
-            initError = error;
-            emit({
-              type: "otp:error",
-              payload: { kind: "abort", data: error.message },
-            });
+            initError = toPopcornError(error);
           } finally {
             mod.removeRunDependency("fs");
           }
@@ -99,9 +93,14 @@ export async function boot({
     if (initError !== null) return { ok: false, error: initError };
     return { ok: true, data: module };
   } catch (error) {
-    check(isErr(error));
-    return { ok: false, error };
+    return { ok: false, error: toPopcornError(error) };
   }
+}
+
+function toPopcornError(error: unknown): PopcornError {
+  if (isErr(error)) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return err("worker:load", { message });
 }
 
 type BuildArgsArgs = {

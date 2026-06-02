@@ -13,8 +13,10 @@ export type PopcornOpts = {
   beam: Pick<BeamBootOptions, "assetsUrl" | "searchPaths" | "extraArgs">;
   timeoutsMs?: {
     boot?: number;
+    send?: number;
   };
   onError?: (event: OtpErrorPayload) => void;
+  workerUrl?: string | URL;
 };
 
 export type PopcornSendOpts = {
@@ -24,6 +26,7 @@ export type PopcornSendOpts = {
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
+  send: 5_000,
 };
 
 const LOG_PREFIX = "[Popcorn]";
@@ -42,7 +45,7 @@ type PopcornState =
 type PendingSend = (result: Result<null>) => void;
 
 export class Popcorn {
-  private vmWorker: Worker;
+  private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts;
   private requestSeq = 0;
@@ -79,9 +82,14 @@ export class Popcorn {
   };
 
   public constructor(opts: PopcornOpts) {
-    const vmWorkerUrl = new URL("./worker.mjs", import.meta.url);
-    this.vmWorker = new Worker(vmWorkerUrl, { type: "module" });
     this.opts = opts;
+    this.spawnWorker();
+  }
+
+  private spawnWorker(): void {
+    const defaultWorkerUrl = new URL("./worker.mjs", import.meta.url);
+    const workerUrl = this.opts.workerUrl ?? defaultWorkerUrl;
+    this.vmWorker = new Worker(workerUrl, { type: "module" });
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
   }
 
@@ -101,15 +109,17 @@ export class Popcorn {
       return { ok: true, data: this };
     }
 
-    if (this.state.status === "closed") {
-      return { ok: false, error: this.state.error };
+    if (this.state.status === "booting") {
+      // TODO(jgonet): make it easier to construct check() errors without throwing
+      const error = err("internal:check", {
+        detail: "Boot already in progress",
+      });
+      return { ok: false, error };
     }
 
-    if (this.state.status === "booting") {
-      return {
-        ok: false,
-        error: err("internal:check", { detail: "Boot already in progress" }),
-      };
+    const reboot = this.state.status === "closed";
+    if (reboot) {
+      this.spawnWorker();
     }
 
     this.state = { status: "booting" };
@@ -117,11 +127,8 @@ export class Popcorn {
     return await new Promise<Result<Popcorn>>((resolve) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
 
-      let isSettled = false;
-
       const settle = (result: Result<Popcorn>) => {
-        if (isSettled) return;
-        isSettled = true;
+        if (this.settleBoot === null) return;
         clearTimeout(timer);
         cleanup();
         if (!result.ok) {
@@ -151,7 +158,7 @@ export class Popcorn {
             break;
           }
           default:
-            // User-level VM events are handled by the main worker listener.
+            // user-level VM events are handled by the main worker listener.
             break;
         }
       };
@@ -159,9 +166,6 @@ export class Popcorn {
       const cleanup = () => {
         this.settleBoot = null;
         this.vmWorker.removeEventListener("message", onBootMessage);
-        if (this.state.status === "booting") {
-          this.state = { status: "created" };
-        }
       };
 
       this.vmWorker.addEventListener("message", onBootMessage);
@@ -170,9 +174,7 @@ export class Popcorn {
   }
 
   /**
-   * Resolves after the VM has attempted to put the event into the target
-   * listener process mailbox. It does not wait for application-level handling by
-   * the receiving Elixir process.
+   * Resolves after VM sent message to registered process.
    */
   public async send(
     target: string,
@@ -196,8 +198,20 @@ export class Popcorn {
     }
 
     const requestId = this.nextRequestId();
+    const timeoutMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs }.send;
+
     return await new Promise<Result<null>>((resolve) => {
-      this.pendingSends.set(requestId, resolve);
+      const timer = setTimeout(() => {
+        const wasMessageStale = this.pendingSends.delete(requestId);
+        if (wasMessageStale) {
+          resolve({ ok: false, error: err("timeout:send", { timeoutMs }) });
+        }
+      }, timeoutMs);
+
+      this.pendingSends.set(requestId, (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
       toVm(this.vmWorker, {
         type: "popcorn:send",
         payload: { id: requestId, message: command.data },
@@ -229,8 +243,8 @@ export class Popcorn {
     }
     this.pendingSends.clear();
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
-    this.eventHandlers.clear();
     this.vmWorker.terminate();
+    // we keep onEvent() callbacks across reboots
   }
 
   private emit(event: PopcornEvent): void {
@@ -241,7 +255,9 @@ export class Popcorn {
 
   private completeSend(payload: SendCompletionPayload): void {
     const resolve = this.pendingSends.get(payload.id) ?? null;
-    check(resolve !== null);
+
+    const didTimeout = resolve === null;
+    if (didTimeout) return;
 
     this.pendingSends.delete(payload.id);
     const result = payload.result;
@@ -261,24 +277,32 @@ export class Popcorn {
     const onError = this.opts.onError ?? defaultOnError;
     onError(payload);
 
-    check(["booting", "booted"].includes(this.state.status));
-    if (this.state.status === "booting") {
+    check(this.state.status === "booting" || this.state.status === "booted");
+
+    // if failed while booting, settle early
+    const booting = this.state.status === "booting";
+    if (booting) {
+      check(this.settleBoot !== null);
+
+      const error = err("vm:exited", exitReason(payload));
+      this.settleBoot({ ok: false, error });
       return;
     }
 
-    switch (payload.kind) {
-      case "abort":
-        this.deinit({ reason: "abort", data: payload.data });
-        break;
-      case "error":
-        this.deinit({ reason: "error", data: payload.data });
-        break;
-      case "exit":
-        this.deinit({ reason: "exit", data: payload.data });
-        break;
-      default:
-        unreachable();
-    }
+    this.deinit(exitReason(payload));
+  }
+}
+
+function exitReason(payload: OtpErrorPayload): VmExitReason {
+  switch (payload.kind) {
+    case "abort":
+      return { reason: "abort", data: payload.data };
+    case "error":
+      return { reason: "error", data: payload.data };
+    case "exit":
+      return { reason: "exit", data: payload.data };
+    default:
+      return unreachable();
   }
 }
 
