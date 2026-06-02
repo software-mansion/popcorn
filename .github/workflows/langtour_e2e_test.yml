@@ -64,6 +64,8 @@ jobs:
         working-directory: language-tour/elixir_tour
 
       - name: Install pnpm dependencies
+        env:
+          CXXFLAGS: "-std=c++20"
         run: pnpm install --frozen-lockfile
 
       - name: Build popcorn JS package

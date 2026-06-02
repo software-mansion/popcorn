@@ -4,5 +4,12 @@
   "version": "0.1.0",
   "description": "Monorepo root",
   "scripts": {},
-  "packageManager": "pnpm@11.0.8"
+  "packageManager": "pnpm@10.28.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "tree-sitter",
+      "tree-sitter-elixir"
+    ]
+  }
 }

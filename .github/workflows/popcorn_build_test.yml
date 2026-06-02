@@ -67,6 +67,8 @@ jobs:
 
       - name: Install JS dependencies
         working-directory: .
+        env:
+          CXXFLAGS: "-std=c++20"
         run: pnpm install
 
       - name: Setup Playwright
