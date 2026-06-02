@@ -3,21 +3,16 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: LocalLiveView - Build
+name: Hello Popcorn - Build & test
 
 on:
   push:
     branches: ["**"]
     paths:
-      - "local-live-view/**"
-      - "examples/local-lv-thermostat/**"
-      - "examples/local-lv-compare/**"
-      - "examples/local-lv-forms/**"
-      - ".github/workflows/local_live_view_build.yml"
-      - "pnpm-workspace.yaml"
-      - "pnpm-lock.yaml"
-      - "package.json"
-      - ".npmrc"
+      - "examples/hello-popcorn/**"
+      - "popcorn/**"
+      - "!.github/**"
+      - ".github/workflows/hello_popcorn_build_test.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -32,13 +27,13 @@ env:
 
 jobs:
   build:
-    name: Build
+    name: Build & test
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
     defaults:
       run:
-        working-directory: local-live-view
+        working-directory: examples/hello-popcorn
 
     steps:
       - uses: actions/checkout@v4
@@ -63,9 +58,9 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: local-live-view/deps
-          key: ${{ runner.os }}-mix-local_live_view-${{ hashFiles('local-live-view/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_live_view-
+          path: examples/hello-popcorn/deps
+          key: ${{ runner.os }}-mix-hello_popcorn-${{ hashFiles('examples/hello-popcorn/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-hello_popcorn-
 
       - name: Install Hex dependencies
         run: mix deps.get
@@ -73,20 +68,27 @@ jobs:
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: local-live-view
+          working-directory: examples/hello-popcorn
           build-mode: debug-wasm
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
-      - name: Configure runtime source
-        run: |
-          printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs
-
       - name: Compile Hex dependencies
         run: mix deps.compile
 
-      - name: Lint
-        run: mix lint
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          cache-prefix: examples-hello-popcorn
+          lockfile: examples/hello-popcorn/mix.lock
 
       - name: Build
         run: mix build
+
+      - name: Run tests
+        run: mix test --no-start
+
+      - name: Run tests with treeshaking
+        # We need to change the port as the default one is allocated by the previous
+        # mix test job and not freed fast enough
+        run: TEST_SERVER_PORT=9877 POPCORN_TREESHAKE=true mix test --no-start
