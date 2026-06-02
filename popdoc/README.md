@@ -37,11 +37,10 @@ defp docs do
 end
 ```
 
-To make block runnable, please add `<!-- popcorn:eval -->` before codeblock, for example:
+To make a block runnable, use the `elixir-popcorn` fence:
 
 ````
-<!-- popcorn:eval -->
-```elixir
+```elixir-popcorn
 1+2
 ```
 ````
