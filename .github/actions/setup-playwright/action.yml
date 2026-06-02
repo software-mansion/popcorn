@@ -2,35 +2,42 @@ name: Setup Playwright
 description: Cache and install Playwright browsers
 
 inputs:
-  cache-prefix:
-    description: Cache key prefix for this workflow
-    required: true
-  lockfile:
-    description: Path to lockfile used for cache key hashing
-    required: true
   version:
-    description: Playwright version to install (default matches Elixir dep)
+    description: >
+      Playwright version to install. Default matches the playwright-elixir.
+      JS e2e workflows override this to match @playwright/test.
     required: false
     default: "1.49.1"
 runs:
   using: composite
   steps:
+    # Browser binaries depend ONLY on the Playwright version, so the cache key
+    # must be the version. No restore-keys: a partial match would restore a
+    # mismatched browser set that `playwright install` then deletes and
+    # re-downloads, defeating the cache (and risking a hung download).
     - name: Cache Playwright browsers
       id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ inputs.cache-prefix }}-${{ hashFiles(inputs.lockfile) }}
-        restore-keys: |
-          ${{ runner.os }}-playwright-${{ inputs.cache-prefix }}-
-          ${{ runner.os }}-playwright-
+        key: ${{ runner.os }}-playwright-${{ inputs.version }}
 
     - name: Install Playwright browsers
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         if command -v pnpx &> /dev/null; then
-          pnpx playwright@${{ inputs.version }} install chromium
+          runner="pnpx"
         else
-          npx playwright@${{ inputs.version }} install chromium
+          runner="npx"
         fi
+        for attempt in 1 2 3; do
+          echo "Playwright install attempt $attempt"
+          if timeout 300 "$runner" playwright@${{ inputs.version }} install chromium; then
+            exit 0
+          fi
+          echo "Attempt $attempt failed or timed out; retrying..."
+          sleep 5
+        done
+        echo "Playwright install failed after 3 attempts" >&2
+        exit 1

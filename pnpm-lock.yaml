@@ -223,8 +223,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.30
       playwright:
-        specifier: ^1.53.2
-        version: 1.59.1
+        specifier: ^1.60.0
+        version: 1.60.0
       react:
         specifier: ^19.1.0
         version: 19.2.6
@@ -233,7 +233,7 @@ importers:
         version: 19.2.6(react@19.2.6)
       rehype-mermaid:
         specifier: ^3.0.0
-        version: 3.0.0(playwright@1.59.1)
+        version: 3.0.0(playwright@1.60.0)
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -354,8 +354,8 @@ importers:
         specifier: ^9.30.1
         version: 9.39.4
       '@playwright/test':
-        specifier: ^1.56.1
-        version: 1.59.1
+        specifier: ^1.60.0
+        version: 1.60.0
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -414,8 +414,8 @@ importers:
   otp/js:
     devDependencies:
       '@playwright/test':
-        specifier: ^1.58.2
-        version: 1.59.1
+        specifier: ^1.60.0
+        version: 1.60.0
       '@rollup/plugin-typescript':
         specifier: ^12.1.2
         version: 12.3.0(rollup@4.60.3)(tslib@2.8.1)(typescript@5.9.3)
@@ -458,8 +458,8 @@ importers:
         specifier: ^9.39.0
         version: 9.39.4
       '@playwright/test':
-        specifier: ^1.52.0
-        version: 1.59.1
+        specifier: ^1.60.0
+        version: 1.60.0
       '@rollup/plugin-typescript':
         specifier: ^12.1.2
         version: 12.3.0(rollup@4.60.3)(tslib@2.8.1)(typescript@5.8.3)
@@ -510,8 +510,8 @@ importers:
   popdoc/e2e:
     devDependencies:
       '@playwright/test':
-        specifier: 1.59.1
-        version: 1.59.1
+        specifier: 1.60.0
+        version: 1.60.0
       '@types/node':
         specifier: 'catalog:'
         version: 25.6.0
@@ -1484,8 +1484,8 @@ packages:
   '@oxc-project/types@0.127.0':
     resolution: {integrity: sha512-aIYXQBo4lCbO4z0R3FHeucQHpF46l2LbMdxRvqvuRuW2OxdnSkcng5B8+K12spgLDj93rtN3+J2Vac/TIO+ciQ==}
 
-  '@playwright/test@1.59.1':
-    resolution: {integrity: sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg==}
+  '@playwright/test@1.60.0':
+    resolution: {integrity: sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -3810,13 +3810,13 @@ packages:
   pkg-types@2.3.1:
     resolution: {integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==}
 
-  playwright-core@1.59.1:
-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
+  playwright-core@1.60.0:
+    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright@1.59.1:
-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
+  playwright@1.60.0:
+    resolution: {integrity: sha512-hheHdokM8cdqCb0lcE3s+zT4t4W+vvjpGxsZlDnikarzx8tSzMebh3UiFtgqwFwnTnjYQcsyMF8ei2mCO/tpeA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -5491,9 +5491,9 @@ snapshots:
 
   '@oxc-project/types@0.127.0': {}
 
-  '@playwright/test@1.59.1':
+  '@playwright/test@1.60.0':
     dependencies:
-      playwright: 1.59.1
+      playwright: 1.60.0
 
   '@rolldown/binding-android-arm64@1.0.0-rc.17':
     optional: true
@@ -7924,13 +7924,13 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mermaid-isomorphic@3.1.0(playwright@1.59.1):
+  mermaid-isomorphic@3.1.0(playwright@1.60.0):
     dependencies:
       '@fortawesome/fontawesome-free': 6.7.2
       katex: 0.16.45
       mermaid: 11.14.0
     optionalDependencies:
-      playwright: 1.59.1
+      playwright: 1.60.0
 
   mermaid@11.14.0:
     dependencies:
@@ -8411,11 +8411,11 @@ snapshots:
       exsolve: 1.0.8
       pathe: 2.0.3
 
-  playwright-core@1.59.1: {}
+  playwright-core@1.60.0: {}
 
-  playwright@1.59.1:
+  playwright@1.60.0:
     dependencies:
-      playwright-core: 1.59.1
+      playwright-core: 1.60.0
     optionalDependencies:
       fsevents: 2.3.2
 
@@ -8538,19 +8538,19 @@ snapshots:
       unist-util-visit: 5.1.0
       vfile: 6.0.3
 
-  rehype-mermaid@3.0.0(playwright@1.59.1):
+  rehype-mermaid@3.0.0(playwright@1.60.0):
     dependencies:
       '@types/hast': 3.0.4
       hast-util-from-html-isomorphic: 2.0.0
       hast-util-to-text: 4.0.2
-      mermaid-isomorphic: 3.1.0(playwright@1.59.1)
+      mermaid-isomorphic: 3.1.0(playwright@1.60.0)
       mini-svg-data-uri: 1.4.4
       space-separated-tokens: 2.0.2
       unified: 11.0.5
       unist-util-visit-parents: 6.0.2
       vfile: 6.0.3
     optionalDependencies:
-      playwright: 1.59.1
+      playwright: 1.60.0
 
   rehype-parse@9.0.1:
     dependencies:

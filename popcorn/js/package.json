@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.60.0",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
     "esbuild": "^0.25.0",
