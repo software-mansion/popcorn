@@ -53,6 +53,7 @@ const exampleButtonClass =
 <script>
   import { Popcorn } from "@swmansion/popcorn";
   import { init, Terminal, FitAddon } from "ghostty-web";
+  import { preventFocus } from "../scripts/utils";
 
   const IGNORED_SEQUENCES = new Set(["\x1b[A", "\x1b[B", "\t"]); // arrow up, arrow down, tab
 
@@ -150,7 +151,9 @@ const exampleButtonClass =
     const term = new Terminal(TERMINAL_CONFIG);
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    term.open(container);
+    // ghostty-web's term.open ends with container.focus() (sync + setTimeout
+    // backup), which scrolls the page since #live-demo is below the fold.
+    preventFocus(container, (el) => term.open(el));
     fitAddon.fit();
     fitAddon.observeResize();
     async function write(
