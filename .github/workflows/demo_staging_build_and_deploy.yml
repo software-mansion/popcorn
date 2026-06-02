@@ -136,13 +136,18 @@ jobs:
     steps:
       - name: Deploy to staging
         uses: appleboy/ssh-action@v1
+        env:
+          BURRITO_SECRET_KEY_BASE: ${{ secrets.BURRITO_SECRET_KEY_BASE }}
         with:
           host: ${{ secrets.STAG_POPCORN_HOST }}
           username: ${{ secrets.POPCORN_USER }}
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ secrets.STAG_POPCORN_PORT }}
+          envs: BURRITO_SECRET_KEY_BASE
           script: |
             docker compose -f popcorn-landing.yml -p landing pull
             docker compose -f popcorn-landing.yml -p landing up -d
             docker compose -f elixir-langtour.yml -p langtour pull
             docker compose -f elixir-langtour.yml -p langtour up -d
+            docker compose -f popcorn-burrito.yml -p burrito pull
+            docker compose -f popcorn-burrito.yml -p burrito up -d
