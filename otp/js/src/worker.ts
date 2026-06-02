@@ -17,8 +17,8 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
 
       const result = await boot({
         assetsUrl: data.payload.assetsUrl,
-        extraArgs: [],
-        searchPaths: [],
+        extraArgs: data.payload.extraArgs,
+        searchPaths: data.payload.searchPaths,
         createModule,
         emit: toMain,
       });
@@ -32,19 +32,22 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
 
       instance = result.data;
       toMain({ type: "popcorn:boot-end", payload: {} });
-      return;
+      break;
     }
     case "popcorn:send": {
-      const result = send(instance, data.payload.command);
-      if (!result.ok) {
-        toMain({
-          type: "popcorn:send-fail",
-          payload: result.error.serialize(),
-        });
-      }
-      return;
+      const result = send(instance, data.payload.message);
+      toMain({
+        type: "popcorn:send-end",
+        payload: {
+          id: data.payload.id,
+          result: result.ok
+            ? { ok: true, data: null }
+            : { ok: false, error: result.error.serialize() },
+        },
+      });
+      break;
     }
     default:
-      return unreachable();
+      unreachable();
   }
 };

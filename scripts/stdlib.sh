@@ -71,13 +71,13 @@ select_otp_app_ebin_dir() {
     local bootstrap_ebin="${beam_dir}/bootstrap/lib/${app}/ebin"
     local lib_ebin="${beam_dir}/lib/${app}/ebin"
 
-    if [[ -f "${bootstrap_ebin}/${app}.app" ]]; then
-        echo "${bootstrap_ebin}"
+    if [[ -f "${lib_ebin}/${app}.app" ]]; then
+        echo "${lib_ebin}"
         return 0
     fi
 
-    if [[ -f "${lib_ebin}/${app}.app" ]]; then
-        echo "${lib_ebin}"
+    if [[ -f "${bootstrap_ebin}/${app}.app" ]]; then
+        echo "${bootstrap_ebin}"
         return 0
     fi
 

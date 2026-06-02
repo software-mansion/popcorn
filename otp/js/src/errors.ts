@@ -5,9 +5,13 @@ export type Result<T, E extends Tag = Tag> =
 type Tag = keyof PopcornErrors;
 export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
+  "timeout:send": { timeoutMs: number };
   "worker:load": { message: string };
+  "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
+  "bridge:invalid-target": EmptyData;
   "bridge:unserializable": EmptyData;
+  "bridge:listener-not-found": { targetName: string };
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
@@ -20,6 +24,11 @@ export type SerializedError<T extends Tag = Tag> = {
 }[T];
 
 type EmptyData = Record<never, never>;
+type VmExitedData =
+  | { reason: "deinit" }
+  | { reason: "abort"; data: string }
+  | { reason: "error"; data: string }
+  | { reason: "exit"; data: number };
 
 export function err<T extends Tag>(
   t: T,
@@ -75,12 +84,20 @@ function message(error: SerializedError): string {
   switch (error.t) {
     case "timeout:init":
       return `Init timed out after ${error.data.timeoutMs}ms`;
+    case "timeout:send":
+      return `Send timed out after ${error.data.timeoutMs}ms`;
     case "worker:load":
       return error.data.message;
+    case "vm:exited":
+      return "VM exited";
     case "bridge:not-started":
       return "Bridge did not start";
+    case "bridge:invalid-target":
+      return "Target name must not be empty";
     case "bridge:unserializable":
       return "Message can't be serialized to string";
+    case "bridge:listener-not-found":
+      return `Target listener not found: '${error.data.targetName}'`;
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
@@ -94,7 +111,7 @@ function message(error: SerializedError): string {
     case "internal:unreachable":
       return "Entered unreachable code";
     default:
-      return unreachable();
+      unreachable();
   }
 }
 
@@ -102,16 +119,26 @@ function parse(value: unknown): SerializedError {
   check(objectWithKeys(value, ["t", "data"]));
   switch (value.t) {
     case "timeout:init":
-      check(isTimeoutInitData(value.data));
+    case "timeout:send":
+      check(isTimeoutData(value.data));
       return { t: value.t, data: value.data };
     case "worker:load":
       check(isWorkerLoadData(value.data));
       return { t: value.t, data: value.data };
+    case "vm:exited":
+      check(isVmExitedData(value.data));
+      return { t: value.t, data: value.data };
     case "bridge:not-started":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:invalid-target":
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     case "bridge:unserializable":
       check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:listener-not-found":
+      check(isListenerNotFoundData(value.data));
       return { t: value.t, data: value.data };
     case "beam:missing-boot-script":
     case "beam:missing-manifest":
@@ -127,11 +154,11 @@ function parse(value: unknown): SerializedError {
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     default:
-      return unreachable();
+      unreachable();
   }
 }
 
-function isTimeoutInitData(
+function isTimeoutData(
   value: unknown,
 ): value is PopcornErrors["timeout:init"] {
   return objectWithKeys(value, ["timeoutMs"]) !== null;
@@ -141,6 +168,16 @@ function isWorkerLoadData(
   value: unknown,
 ): value is PopcornErrors["worker:load"] {
   return objectWithKeys(value, ["message"]) !== null;
+}
+
+function isVmExitedData(value: unknown): value is PopcornErrors["vm:exited"] {
+  return objectWithKeys(value, ["reason"]) !== null;
+}
+
+function isListenerNotFoundData(
+  value: unknown,
+): value is PopcornErrors["bridge:listener-not-found"] {
+  return objectWithKeys(value, ["targetName"]) !== null;
 }
 
 function isUrlData(

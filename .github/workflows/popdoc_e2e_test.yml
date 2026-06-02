@@ -42,7 +42,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
+          # See https://github.com/nodejs/node/issues/63487.
+          node-version: "24.15.0"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
@@ -64,9 +66,7 @@ jobs:
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          cache-prefix: popdoc-e2e
-          lockfile: pnpm-lock.yaml
-          version: "1.59.1"
+          version: "1.60.0"
 
       - name: Run e2e tests
         run: bash scripts/test.sh --popdoc

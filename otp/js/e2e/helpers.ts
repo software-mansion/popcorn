@@ -3,11 +3,14 @@ import {
   expect,
   test as base,
   type JSHandle,
+  type ConsoleMessage,
   type Page,
 } from "@playwright/test";
 import type {
   Popcorn,
   PopcornOpts,
+  PopcornEvent,
+  PopcornSendOpts,
   SerializedError,
 } from "@swmansion/popcorn-otp";
 
@@ -15,102 +18,163 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Window {
     Popcorn: typeof Popcorn;
+    __recordOtpEvent: (event: PopcornEvent) => Promise<void>;
   }
 }
 
 type InitOptions = PopcornOpts;
+type BootResult = Result<null>;
+type EventWaiter = (event: PopcornEvent) => void;
 
 export type Result<T> =
   | { ok: true; data: T }
   | { ok: false; error: SerializedError };
 
-type BrowserInitResult = Result<Popcorn>;
-type PopcornHandleResult = Result<JSHandle<Popcorn>>;
-type PopcornInputContext = Record<string, unknown> & {
-  popcorn?: never;
-};
-type PopcornEvaluateArg<TContext extends PopcornInputContext> = TContext & {
-  popcorn: JSHandle<Popcorn>;
-};
+export class Otp {
+  public readonly events = new Set<PopcornEvent>();
 
-type PopcornContext<TContext extends PopcornInputContext> = TContext & {
-  popcorn: Popcorn;
-};
+  private popcorn: JSHandle<Popcorn> | null = null;
+  private readonly eventWaiters = new Map<string, Array<EventWaiter>>();
 
-type PopcornRun<TContext extends PopcornInputContext, TResult> = (
-  args: PopcornContext<TContext>,
-) => Promise<TResult> | TResult;
+  public constructor(private readonly page: Page) {}
+
+  public async installEventBridge(): Promise<void> {
+    await this.page.exposeBinding("__recordOtpEvent", (_source, event) => {
+      this.recordEvent(event as PopcornEvent);
+    });
+  }
+
+  public async boot(options: InitOptions): Promise<BootResult> {
+    if (this.popcorn !== null) {
+      throw new Error("OTP is already booted");
+    }
+
+    this.popcorn = await this.page.evaluateHandle(
+      (initOptions: InitOptions): Popcorn => new window.Popcorn(initOptions),
+      options,
+    );
+    await this.popcorn.evaluate((popcorn) => {
+      popcorn.onEvent((event) => {
+        window.__recordOtpEvent(event);
+      });
+    });
+
+    const result = await this.popcorn.evaluate(async (popcorn): Promise<BootResult> => {
+      const boot = await popcorn.boot();
+      return boot.ok
+        ? { ok: true, data: null }
+        : { ok: false, error: boot.error.serialize() };
+    });
+
+    if (!result.ok) {
+      await this.dispose();
+    }
+
+    return result;
+  }
+
+  public async send(
+    target: string,
+    payload?: unknown,
+    opts?: PopcornSendOpts,
+  ): Promise<BootResult> {
+    const popcorn = this.requirePopcorn();
+
+    return await popcorn.evaluate(
+      async (instance, args) => {
+        const result = await instance.send(args.target, args.payload, args.opts);
+
+        return result.ok
+          ? { ok: true, data: null }
+          : { ok: false, error: result.error.serialize() };
+      },
+      { target, payload, opts },
+    );
+  }
+
+  public async waitForEvent(name: string): Promise<PopcornEvent> {
+    const event = this.findEvent(name);
+    if (event !== null) {
+      return event;
+    }
+
+    return await new Promise<PopcornEvent>((resolve) => {
+      const waiters = this.eventWaiters.get(name) ?? [];
+      waiters.push(resolve);
+      this.eventWaiters.set(name, waiters);
+    });
+  }
+
+  public async waitForStderr(text: string): Promise<ConsoleMessage> {
+    return await this.page.waitForEvent("console", (message) => {
+      return (
+        message.type() === "error" &&
+        message.text().includes("[Popcorn]") &&
+        message.text().includes(text)
+      );
+    });
+  }
+
+  public async dispose(): Promise<void> {
+    const popcorn = this.popcorn;
+    this.popcorn = null;
+    if (popcorn !== null) {
+      await this.page.evaluate((instance) => instance.deinit(), popcorn);
+      await popcorn.dispose();
+    }
+  }
+
+  private requirePopcorn(): JSHandle<Popcorn> {
+    if (this.popcorn === null) {
+      throw new Error("Popcorn has not been booted");
+    }
+
+    return this.popcorn;
+  }
+
+  private recordEvent(event: PopcornEvent): void {
+    this.events.add(event);
+
+    for (const [name, waiters] of this.eventWaiters) {
+      if (hasKey(event, name)) {
+        this.eventWaiters.delete(name);
+        for (const resolve of waiters) {
+          resolve(event);
+        }
+      }
+    }
+  }
+
+  private findEvent(name: string): PopcornEvent | null {
+    for (const event of this.events) {
+      if (hasKey(event, name)) {
+        return event;
+      }
+    }
+
+    return null;
+  }
+}
+
+const hasKey = (event: PopcornEvent, key: string) =>
+  typeof event === "object" && event !== null && key in event;
+
+type Fixtures = {
+  otp: Otp;
+};
 
 export { assert, expect };
 
-export const test = base.extend({
+export const test = base.extend<Fixtures>({
   page: async ({ page }, use) => {
     await page.goto("/");
     await page.waitForFunction(() => window.Popcorn !== undefined);
     await use(page);
   },
+  otp: async ({ page }, use) => {
+    const otp = new Otp(page);
+    await otp.installEventBridge();
+    await use(otp);
+    await otp.dispose();
+  },
 });
-
-export async function withPopcorn<
-  TContext extends PopcornInputContext,
-  TResult,
->(
-  page: Page,
-  options: InitOptions,
-  context: TContext,
-  run: PopcornRun<TContext, TResult>,
-): Promise<Result<TResult>> {
-  const popcorn = await createPopcornHandle(page, options);
-  if (!popcorn.ok) {
-    return popcorn;
-  }
-
-  try {
-    const data = await page.evaluate<TResult, PopcornEvaluateArg<TContext>>(
-      run,
-      { ...context, popcorn: popcorn.data },
-    );
-    return { ok: true, data };
-  } finally {
-    await disposePopcorn(page, popcorn.data);
-  }
-}
-
-async function createPopcornHandle(
-  page: Page,
-  options: InitOptions,
-): Promise<PopcornHandleResult> {
-  const resultHandle = await page.evaluateHandle(
-    async (initOptions: InitOptions): Promise<BrowserInitResult> => {
-      const result = await window.Popcorn.init(initOptions);
-
-      return result.ok
-        ? { ok: true, data: result.data }
-        : { ok: false, error: result.error.serialize() };
-    },
-    options,
-  );
-
-  const okHandle = await resultHandle.getProperty("ok");
-  const ok = (await okHandle.jsonValue()) as boolean;
-  await okHandle.dispose();
-
-  if (!ok) {
-    const errorHandle = await resultHandle.getProperty("error");
-    const error = (await errorHandle.jsonValue()) as SerializedError;
-    await errorHandle.dispose();
-    await resultHandle.dispose();
-    return { ok: false, error };
-  }
-
-  const popcorn = (await resultHandle.getProperty("data")) as JSHandle<Popcorn>;
-  await resultHandle.dispose();
-  return { ok: true, data: popcorn };
-}
-
-async function disposePopcorn(page: Page, popcorn: JSHandle<Popcorn>) {
-  await page.evaluate((instance: Popcorn) => {
-    instance.deinit();
-  }, popcorn);
-  await popcorn.dispose();
-}

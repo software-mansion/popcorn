@@ -26,10 +26,11 @@
     "setup": "./scripts/setup-assets.sh",
     "build": "pnpm run setup && rollup -c && ./scripts/setup-assets.sh dist",
     "lint": "tsc --noEmit",
-    "e2e": "playwright test --config e2e/playwright.config.ts"
+    "lint:e2e": "tsc -p e2e/tsconfig.json",
+    "e2e": "env -u FORCE_COLOR -u NO_COLOR playwright test --config e2e/playwright.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.60.0",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
     "rollup": "^4.55.1",

@@ -54,19 +54,17 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e41
  	;;
  esac
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index 5d6c12c8a54493e3550082370288a7d0cc79aded..9b39ceff97b9b20dc26aa30b5605bd6345fa361f 100644
+index 5d6c12c8a54493e3550082370288a7d0cc79aded..170b833e8f5c20fab52426010083a9b6d09d2ccb 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -1204,7 +1204,8 @@ OS_OBJS = \
- 
- DRV_OBJS = \
- 	$(OBJDIR)/inet_drv.o \
--	$(OBJDIR)/ram_file_drv.o
-+	$(OBJDIR)/ram_file_drv.o \
-+	$(OBJDIR)/js_bridge_drv.o
- endif
- 
- ifneq ($(STATIC_NIFS),no)
+@@ -1169,6 +1169,7 @@ NIF_OBJS = \
+ 	$(OBJDIR)/erl_tracer_nif.o \
+ 	$(OBJDIR)/prim_buffer_nif.o \
+ 	$(OBJDIR)/prim_file_nif.o \
++	$(OBJDIR)/wasm_nif.o \
+ 	$(OBJDIR)/zlib_nif.o \
+ 	$(OBJDIR)/zstd_nif.o \
+ 	$(ESOCK_NIF_OBJS)
 @@ -1291,7 +1292,7 @@ EMU_LD=$(CC)
  endif
  $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
@@ -76,350 +74,18 @@ index 5d6c12c8a54493e3550082370288a7d0cc79aded..9b39ceff97b9b20dc26aa30b5605bd63
  	$(STATIC_NIF_LIBS) $(STATIC_DRIVER_LIBS) $(LIBS)
  
  endif
-diff --git a/erts/emulator/drivers/common/js_bridge_drv.c b/erts/emulator/drivers/common/js_bridge_drv.c
-new file mode 100644
-index 0000000000000000000000000000000000000000..09cb0c79f224c79ef1ed061b69f054920a3cfecc
---- /dev/null
-+++ b/erts/emulator/drivers/common/js_bridge_drv.c
-@@ -0,0 +1,338 @@
-+#ifdef HAVE_CONFIG_H
-+#  include "config.h"
-+#endif
-+
-+#include <stddef.h>
-+#include <stdio.h>
-+#include <string.h>
-+
-+#include "sys.h"
-+#include "erl_driver.h"
-+
-+#ifdef ERTS_EMSCRIPTEN
-+#  include <emscripten/emscripten.h>
-+#endif
-+
-+typedef struct {
-+    ErlDrvPort port;
-+} JsBridgeData;
-+
-+static ErlDrvPort js_bridge_port = (ErlDrvPort) 0;
-+
-+static ErlDrvData js_bridge_start(ErlDrvPort port, char *cmd);
-+static void js_bridge_stop(ErlDrvData handle);
-+static void js_bridge_outputv(ErlDrvData handle, ErlIOVec *ev);
-+
-+static void js_bridge_send_term(ErlDrvPort port,
-+                                const char *target_type,
-+                                ErlDrvBinary *target_bin,
-+                                ErlDrvBinary *payload_bin,
-+                                ErlDrvBinary *meta_bin) {
-+    ErlDrvTermData spec[32];
-+    int i = 0;
-+
-+    spec[i++] = ERL_DRV_ATOM;
-+    spec[i++] = driver_mk_atom("js_bridge_in");
-+
-+    spec[i++] = ERL_DRV_ATOM;
-+    spec[i++] = driver_mk_atom(target_type);
-+
-+    spec[i++] = ERL_DRV_BINARY;
-+    spec[i++] = (ErlDrvTermData) target_bin;
-+    spec[i++] = target_bin ? target_bin->orig_size : 0;
-+    spec[i++] = 0;
-+
-+    if (payload_bin != NULL) {
-+        spec[i++] = ERL_DRV_BINARY;
-+        spec[i++] = (ErlDrvTermData) payload_bin;
-+        spec[i++] = payload_bin->orig_size;
-+        spec[i++] = 0;
-+    } else {
-+        spec[i++] = ERL_DRV_ATOM;
-+        spec[i++] = driver_mk_atom("undefined");
-+    }
-+
-+    if (meta_bin != NULL) {
-+        spec[i++] = ERL_DRV_BINARY;
-+        spec[i++] = (ErlDrvTermData) meta_bin;
-+        spec[i++] = meta_bin->orig_size;
-+        spec[i++] = 0;
-+    } else {
-+        spec[i++] = ERL_DRV_ATOM;
-+        spec[i++] = driver_mk_atom("undefined");
-+    }
-+
-+    spec[i++] = ERL_DRV_TUPLE;
-+    spec[i++] = 5;
-+
-+    erl_drv_output_term(driver_mk_port(port), spec, i);
-+}
-+
-+#ifdef ERTS_EMSCRIPTEN
-+extern void js_bridge_on_from_beam(const char *data, int len);
-+extern void js_bridge_on_error(const char *data, int len);
-+
-+static void js_bridge_emit_error(const char *type, const char *detail) {
-+    char envelope[512];
-+    int written = snprintf(envelope,
-+                           sizeof(envelope),
-+                           "{\"type\":\"%s\",\"detail\":\"%s\"}",
-+                           type,
-+                           detail);
-+
-+    if (written <= 0) {
-+        return;
-+    }
-+    if (written >= (int) sizeof(envelope)) {
-+        written = (int) sizeof(envelope) - 1;
-+    }
-+    js_bridge_on_error(envelope, written);
-+}
-+
-+EM_JS(void, js_vm_message_parse, (const char *data, int len), {
-+    var msg = UTF8ToString(data, len);
-+
-+    function sendError(type, detail) {
-+      var envelope = JSON.stringify({
-+        type: type,
-+        detail: detail,
-+      });
-+      var ptr = Module.stringToNewUTF8(envelope);
-+      _js_vm_message_error(ptr, Module.lengthBytesUTF8(envelope));
-+      _free(ptr);
-+    }
-+
-+    var command;
-+    try {
-+      command = JSON.parse(msg);
-+    } catch (_error) {
-+      sendError('invalid_message', 'command is not valid JSON');
-+      return;
-+    }
-+
-+    if (command === null || typeof command !== 'object') {
-+      sendError('invalid_message', 'command must be a JSON object');
-+      return;
-+    }
-+
-+    if (command.type !== 'send') {
-+      sendError('invalid_message', 'command.type must be \"send\"');
-+      return;
-+    }
-+
-+    if (command.target === null || typeof command.target !== 'object') {
-+      sendError('invalid_message', 'command.target must be an object');
-+      return;
-+    }
-+
-+    var targetType;
-+    var targetValue;
-+    if (typeof command.target.name === 'string') {
-+      targetType = 'name';
-+      targetValue = command.target.name;
-+    } else if (typeof command.target.pid === 'string') {
-+      targetType = 'pid';
-+      targetValue = command.target.pid;
-+    } else {
-+      sendError('invalid_message', 'target must include name or pid');
-+      return;
-+    }
-+
-+    var targetTypePtr = Module.stringToNewUTF8(targetType);
-+    var targetValuePtr = Module.stringToNewUTF8(targetValue);
-+    var targetValueLen = Module.lengthBytesUTF8(targetValue);
-+
-+    var payloadPtr = 0;
-+    var payloadLen = 0;
-+    if (command.payload !== undefined) {
-+      var payload = JSON.stringify(command.payload);
-+      payloadPtr = Module.stringToNewUTF8(payload);
-+      payloadLen = Module.lengthBytesUTF8(payload);
-+    }
-+
-+    var metaPtr = 0;
-+    var metaLen = 0;
-+    if (command.meta !== undefined) {
-+      var meta = JSON.stringify(command.meta);
-+      metaPtr = Module.stringToNewUTF8(meta);
-+      metaLen = Module.lengthBytesUTF8(meta);
-+    }
-+
-+    _js_vm_message_dispatch(
-+      targetTypePtr,
-+      targetValuePtr,
-+      targetValueLen,
-+      payloadPtr,
-+      payloadLen,
-+      metaPtr,
-+      metaLen
-+    );
-+
-+    _free(targetTypePtr);
-+    _free(targetValuePtr);
-+    if (payloadPtr !== 0) {
-+      _free(payloadPtr);
-+    }
-+    if (metaPtr !== 0) {
-+      _free(metaPtr);
-+    }
-+});
-+
-+EMSCRIPTEN_KEEPALIVE
-+void js_vm_message_error(const char *envelope, int len) {
-+    if (envelope == NULL || len <= 0) {
-+        return;
-+    }
-+    js_bridge_on_error(envelope, len);
-+}
-+
-+EMSCRIPTEN_KEEPALIVE
-+void js_vm_message_dispatch(const char *target_type,
-+                            const char *target_value,
-+                            int target_value_len,
-+                            const char *payload_json,
-+                            int payload_len,
-+                            const char *meta_json,
-+                            int meta_len) {
-+    ErlDrvBinary *target_bin;
-+    ErlDrvBinary *payload_bin = NULL;
-+    ErlDrvBinary *meta_bin = NULL;
-+
-+    if (js_bridge_port == (ErlDrvPort) 0) {
-+        js_bridge_emit_error("bridge_not_ready", "bridge port is not open");
-+        return;
-+    }
-+
-+    if (target_type == NULL || target_value == NULL || target_value_len <= 0) {
-+        js_bridge_emit_error("invalid_message", "target is missing");
-+        return;
-+    }
-+
-+    target_bin = driver_alloc_binary(target_value_len);
-+    if (target_bin == NULL) {
-+        js_bridge_emit_error("bridge_error", "failed to allocate target buffer");
-+        return;
-+    }
-+    memcpy(target_bin->orig_bytes, target_value, target_value_len);
-+
-+    if (payload_json != NULL && payload_len > 0) {
-+        payload_bin = driver_alloc_binary(payload_len);
-+        if (payload_bin == NULL) {
-+            driver_free_binary(target_bin);
-+            js_bridge_emit_error("bridge_error", "failed to allocate payload buffer");
-+            return;
-+        }
-+        memcpy(payload_bin->orig_bytes, payload_json, payload_len);
-+    }
-+
-+    if (meta_json != NULL && meta_len > 0) {
-+        meta_bin = driver_alloc_binary(meta_len);
-+        if (meta_bin == NULL) {
-+            driver_free_binary(target_bin);
-+            if (payload_bin != NULL) {
-+                driver_free_binary(payload_bin);
-+            }
-+            js_bridge_emit_error("bridge_error", "failed to allocate meta buffer");
-+            return;
-+        }
-+        memcpy(meta_bin->orig_bytes, meta_json, meta_len);
-+    }
-+
-+    js_bridge_send_term(js_bridge_port, target_type, target_bin, payload_bin, meta_bin);
-+
-+    driver_free_binary(target_bin);
-+    if (payload_bin != NULL) {
-+        driver_free_binary(payload_bin);
-+    }
-+    if (meta_bin != NULL) {
-+        driver_free_binary(meta_bin);
-+    }
-+}
-+
-+EMSCRIPTEN_KEEPALIVE
-+void sendVmMessage(const char *data, int len) {
-+    if (data == NULL || len <= 0) {
-+        js_bridge_emit_error("invalid_message", "command must be a non-empty UTF-8 string");
-+        return;
-+    }
-+    js_vm_message_parse(data, len);
-+}
-+#else
-+void sendVmMessage(const char *data, int len) {
-+    (void) data;
-+    (void) len;
-+}
-+#endif
-+
-+static ErlDrvData js_bridge_start(ErlDrvPort port, char *cmd) {
-+    JsBridgeData *data;
-+    (void) cmd;
-+
-+    data = (JsBridgeData *) driver_alloc(sizeof(JsBridgeData));
-+    if (data == NULL) {
-+        return (ErlDrvData) NULL;
-+    }
-+
-+    data->port = port;
-+    js_bridge_port = port;
-+    return (ErlDrvData) data;
-+}
-+
-+static void js_bridge_stop(ErlDrvData handle) {
-+    JsBridgeData *data = (JsBridgeData *) handle;
-+    if (data != NULL) {
-+        if (js_bridge_port == data->port) {
-+            js_bridge_port = (ErlDrvPort) 0;
-+        }
-+        driver_free(data);
-+    }
-+}
-+
-+static void js_bridge_outputv(ErlDrvData handle, ErlIOVec *ev) {
-+    char *buffer;
-+    (void) handle;
-+
-+    if (ev == NULL || ev->size <= 0) {
-+        return;
-+    }
-+
-+    buffer = (char *) driver_alloc(ev->size + 1);
-+    if (buffer == NULL) {
-+        return;
-+    }
-+
-+    driver_vec_to_buf(ev, buffer, ev->size);
-+    buffer[ev->size] = '\0';
-+
-+#ifdef ERTS_EMSCRIPTEN
-+    js_bridge_on_from_beam(buffer, (int) ev->size);
-+#endif
-+
-+    driver_free(buffer);
-+}
-+
-+struct erl_drv_entry js_bridge_driver_entry = {
-+    NULL,
-+    js_bridge_start,
-+    js_bridge_stop,
-+    NULL,
-+    NULL,
-+    NULL,
-+    "js_bridge",
-+    NULL,
-+    NULL,
-+    NULL,
-+    NULL,
-+    js_bridge_outputv,
-+    NULL,
-+    NULL,
-+    NULL,
-+    NULL,
-+    ERL_DRV_EXTENDED_MARKER,
-+    ERL_DRV_EXTENDED_MAJOR_VERSION,
-+    ERL_DRV_EXTENDED_MINOR_VERSION,
-+    ERL_DRV_FLAG_USE_PORT_LOCKING,
-+    NULL,
-+    NULL,
-+    NULL
-+};
+diff --git a/erts/emulator/beam/erl_bif_chksum.c b/erts/emulator/beam/erl_bif_chksum.c
+index a09675e3552f985b3f416dd83f07824f0e5d3860..80e625774c76ad03b804dcc15e9c7162a74114fc 100644
+--- a/erts/emulator/beam/erl_bif_chksum.c
++++ b/erts/emulator/beam/erl_bif_chksum.c
+@@ -34,7 +34,6 @@
+ #include "zlib.h"
+ #include "erl_md5.h"
+ 
+-
+ typedef void (*ChksumFun)(void *sum_in_out, const byte *buf,
+ 			  unsigned buflen);
+ 
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
 index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4d3bfbe60
@@ -444,15 +110,22 @@ index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4
 +};
 diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..0b7996e35e311aa67629a6e54df2820eac4b7438
+index 0000000000000000000000000000000000000000..0b446eedf17294c0c47c2b872bf2fb44a032ff67
 --- /dev/null
 +++ b/erts/emulator/js_bridge/js_bridge.js
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,26 @@
 +mergeInto(LibraryManager.library, {
-+  js_bridge_on_from_beam__proxy: 'sync',
-+  js_bridge_on_from_beam__sig: 'vii',
-+  js_bridge_on_from_beam: function(data, len) {
-+    var envelope = UTF8ToString(data, len);
++  js_bridge_on_from_beam_async__proxy: 'async',
++  js_bridge_on_from_beam_async__sig: 'vii',
++  js_bridge_on_from_beam_async: function(data, len) {
++    var envelope;
++
++    try {
++      envelope = UTF8ToString(data, len);
++    } finally {
++      _free(data);
++    }
++
 +    if (typeof Module['onBeamMessage'] === 'function') {
 +      Module['onBeamMessage'](envelope);
 +    }
@@ -467,8 +140,756 @@ index 0000000000000000000000000000000000000000..0b7996e35e311aa67629a6e54df2820e
 +    }
 +  },
 +});
+diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb4173b9b9b10
+--- /dev/null
++++ b/erts/emulator/nifs/common/wasm_nif.c
+@@ -0,0 +1,742 @@
++/*
++ * %CopyrightBegin%
++ *
++ * SPDX-License-Identifier: Apache-2.0
++ *
++ * Copyright Ericsson AB 2026. All Rights Reserved.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ * %CopyrightEnd%
++ */
++
++#define STATIC_ERLANG_NIF 1
++
++#include "config.h"
++#include "erl_nif.h"
++#include "sys.h"
++
++#include <limits.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
++
++#ifdef ERTS_EMSCRIPTEN
++#include <emscripten/emscripten.h>
++#endif
++
++typedef enum {
++  WASM_LISTENER_NAME_OPAQUE = 0,
++  WASM_LISTENER_NAME_REGISTERED = 1,
++} wasm_listener_name_kind_t;
++
++typedef struct wasm_state_s wasm_state_t;
++
++typedef struct wasm_listener_s {
++  wasm_state_t *state;
++  ErlNifPid pid;
++  ErlNifMonitor monitor;
++  unsigned int name_kind;
++  ErlNifBinary name;
++  ErlNifBinary pid_token;
++  struct wasm_listener_s *next;
++} wasm_listener_t;
++
++struct wasm_state_s {
++  unsigned int owner_count;
++  wasm_listener_t *listeners;
++};
++
++static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info);
++static int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data,
++                   ERL_NIF_TERM load_info);
++static void unload(ErlNifEnv *env, void *priv_data);
++
++static ERL_NIF_TERM register_listener_nif(ErlNifEnv *env, int argc,
++                                          const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM unregister_listener_nif(ErlNifEnv *env, int argc,
++                                            const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
++                                 const ERL_NIF_TERM argv[]);
++
++static void wasm_listener_dtor(ErlNifEnv *env, void *obj);
++static void wasm_listener_down(ErlNifEnv *env, void *obj, ErlNifPid *pid,
++                               ErlNifMonitor *mon);
++
++static ErlNifFunc nif_funcs[] = {
++    {"register_listener_nif", 1, register_listener_nif},
++    {"unregister_listener_nif", 1, unregister_listener_nif},
++    {"send_raw", 1, send_raw_nif},
++};
++
++ERL_NIF_INIT(wasm, nif_funcs, load, NULL, upgrade, unload)
++
++static ERL_NIF_TERM am_ok;
++static ERL_NIF_TERM am_error;
++static ERL_NIF_TERM am_already_registered;
++static ERL_NIF_TERM am_not_found;
++static ERL_NIF_TERM am_not_owner;
++static ERL_NIF_TERM am_out_of_memory;
++static ERL_NIF_TERM am_unsupported;
++static ERL_NIF_TERM am_wasm;
++static ERL_NIF_TERM am_registered_name;
++static ERL_NIF_TERM am_opaque_name;
++
++static ErlNifResourceType *wasm_listener_type = NULL;
++/*
++ * The bridge keeps a single active state at a time. Serializing lookups,
++ * callbacks, and unload through one process-wide lock is slower than the
++ * atomic refcount path, but it keeps the lifetime rules straightforward.
++ */
++static ErlNifMutex *erts_wasm_state_lock = NULL;
++static wasm_state_t *erts_wasm_state = NULL;
++
++#ifdef ERTS_EMSCRIPTEN
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len);
++#endif
++
++static void init_atoms(ErlNifEnv *env) {
++  am_ok = enif_make_atom(env, "ok");
++  am_error = enif_make_atom(env, "error");
++  am_already_registered = enif_make_atom(env, "already_registered");
++  am_not_found = enif_make_atom(env, "not_found");
++  am_not_owner = enif_make_atom(env, "not_owner");
++  am_out_of_memory = enif_make_atom(env, "out_of_memory");
++  am_unsupported = enif_make_atom(env, "unsupported");
++  am_wasm = enif_make_atom(env, "wasm");
++  am_registered_name = enif_make_atom(env, "registered_name");
++  am_opaque_name = enif_make_atom(env, "opaque_name");
++}
++
++static int load_listener_resource_type(ErlNifEnv *env,
++                                       ErlNifResourceFlags flags) {
++  ErlNifResourceTypeInit init = {wasm_listener_dtor, NULL, wasm_listener_down};
++
++  wasm_listener_type =
++      enif_open_resource_type_x(env, "wasm_listener", &init, flags, NULL);
++  return wasm_listener_type != NULL;
++}
++
++static int ensure_wasm_state_lock(void) {
++  if (erts_wasm_state_lock != NULL) {
++    return 1;
++  }
++
++  erts_wasm_state_lock = enif_mutex_create("wasm_nif_state_lock");
++  return erts_wasm_state_lock != NULL;
++}
++
++static wasm_state_t *create_wasm_state(void) {
++  wasm_state_t *state;
++
++  state = enif_alloc(sizeof(wasm_state_t));
++  if (state == NULL) {
++    return NULL;
++  }
++
++  state->owner_count = 1;
++  state->listeners = NULL;
++
++  return state;
++}
++
++static void destroy_wasm_state(wasm_state_t *state) {
++  wasm_listener_t *listener;
++
++  if (state == NULL) {
++    return;
++  }
++
++  listener = state->listeners;
++  state->listeners = NULL;
++
++  while (listener != NULL) {
++    wasm_listener_t *next = listener->next;
++    listener->next = NULL;
++    listener->state = NULL;
++    enif_release_resource(listener);
++    listener = next;
++  }
++
++  enif_free(state);
++}
++
++static int same_name(const unsigned char *lhs_data, size_t lhs_size,
++                     const unsigned char *rhs_data, size_t rhs_size) {
++  return lhs_size == rhs_size &&
++         (lhs_size == 0 || memcmp(lhs_data, rhs_data, lhs_size) == 0);
++}
++
++static int same_pid(const ErlNifPid *lhs, const ErlNifPid *rhs) {
++  return enif_compare_pids(lhs, rhs) == 0;
++}
++
++static ERL_NIF_TERM make_error(ErlNifEnv *env, ERL_NIF_TERM reason) {
++  return enif_make_tuple2(env, am_error, reason);
++}
++
++static int copy_binary(ErlNifBinary *dst, const ErlNifBinary *src) {
++  if (!enif_alloc_binary(src->size, dst)) {
++    return 0;
++  }
++
++  if (src->size > 0) {
++    memcpy(dst->data, src->data, src->size);
++  }
++
++  return 1;
++}
++
++static int copy_pid_token(ErlNifEnv *env, ErlNifBinary *dst,
++                          const ErlNifPid *pid) {
++  char pid_token[64];
++  ERL_NIF_TERM pid_term;
++  int pid_token_len;
++
++  pid_term = enif_make_pid(env, pid);
++  pid_token_len = enif_snprintf(pid_token, sizeof(pid_token), "%T", pid_term);
++  if (pid_token_len < 0 || pid_token_len >= (int)sizeof(pid_token)) {
++    return 0;
++  }
++
++  if (!enif_alloc_binary((size_t)pid_token_len, dst)) {
++    return 0;
++  }
++
++  if (pid_token_len > 0) {
++    memcpy(dst->data, pid_token, (size_t)pid_token_len);
++  }
++
++  return 1;
++}
++
++static int inspect_listener_registration(ErlNifEnv *env, ERL_NIF_TERM arg,
++                                         ErlNifBinary *name,
++                                         unsigned int *name_kind) {
++  const ERL_NIF_TERM *tuple_elements;
++  int arity;
++
++  if (!enif_get_tuple(env, arg, &arity, &tuple_elements) || arity != 2) {
++    return 0;
++  }
++
++  if (enif_is_identical(tuple_elements[0], am_registered_name)) {
++    *name_kind = WASM_LISTENER_NAME_REGISTERED;
++  } else if (enif_is_identical(tuple_elements[0], am_opaque_name)) {
++    *name_kind = WASM_LISTENER_NAME_OPAQUE;
++  } else {
++    return 0;
++  }
++
++  return enif_inspect_iolist_as_binary(env, tuple_elements[1], name) &&
++         name->size > 0;
++}
++
++static int listener_registered_name_is_current(ErlNifEnv *env,
++                                               wasm_listener_t *listener) {
++  (void)env;
++  (void)listener;
++
++  /*
++   * `wasm:register_listener/1` creates an explicit bridge alias for the
++   * current pid. Atom names are labels for JS callers and should not be tied
++   * to `register/2` ownership, otherwise a listener registered as
++   * `wasm:register_listener(bridge)` is discarded before the first lookup.
++   */
++  return 1;
++}
++
++static int listener_is_stale(ErlNifEnv *env, wasm_listener_t *listener) {
++  return !enif_is_process_alive(env, &listener->pid) ||
++         !listener_registered_name_is_current(env, listener);
++}
++
++static void release_listener(wasm_listener_t *listener) {
++  listener->next = NULL;
++  listener->state = NULL;
++  enif_release_resource(listener);
++}
++
++static void remove_listener_locked(wasm_state_t *state, wasm_listener_t *prev,
++                                   wasm_listener_t *listener) {
++  if (prev == NULL) {
++    state->listeners = listener->next;
++  } else {
++    prev->next = listener->next;
++  }
++
++  release_listener(listener);
++}
++
++static wasm_listener_t *
++find_listener_by_name_locked(ErlNifEnv *env, wasm_state_t *state,
++                             const unsigned char *name_data, size_t name_size,
++                             wasm_listener_t **prev_out) {
++  wasm_listener_t *prev = NULL;
++  wasm_listener_t *listener = state->listeners;
++
++  while (listener != NULL) {
++    wasm_listener_t *next = listener->next;
++
++    if (listener_is_stale(env, listener)) {
++      remove_listener_locked(state, prev, listener);
++      listener = next;
++      continue;
++    }
++
++    if (same_name(listener->name.data, listener->name.size, name_data,
++                  name_size)) {
++      if (prev_out != NULL) {
++        *prev_out = prev;
++      }
++      return listener;
++    }
++
++    prev = listener;
++    listener = next;
++  }
++
++  if (prev_out != NULL) {
++    *prev_out = prev;
++  }
++
++  return NULL;
++}
++
++static wasm_listener_t *
++find_listener_by_pid_token_locked(ErlNifEnv *env, wasm_state_t *state,
++                                  const unsigned char *pid_token_data,
++                                  size_t pid_token_size) {
++  wasm_listener_t *prev = NULL;
++  wasm_listener_t *listener = state->listeners;
++
++  while (listener != NULL) {
++    wasm_listener_t *next = listener->next;
++
++    if (listener_is_stale(env, listener)) {
++      remove_listener_locked(state, prev, listener);
++      listener = next;
++      continue;
++    }
++
++    if (same_name(listener->pid_token.data, listener->pid_token.size,
++                  pid_token_data, pid_token_size)) {
++      return listener;
++    }
++
++    prev = listener;
++    listener = next;
++  }
++
++  return NULL;
++}
++
++static void remove_listener_by_ptr_locked(wasm_state_t *state,
++                                          wasm_listener_t *target) {
++  wasm_listener_t *prev = NULL;
++  wasm_listener_t *listener = state->listeners;
++
++  while (listener != NULL) {
++    if (listener == target) {
++      remove_listener_locked(state, prev, listener);
++      return;
++    }
++
++    prev = listener;
++    listener = listener->next;
++  }
++}
++
++static int make_binary_copy(ErlNifEnv *env, const char *data, size_t size,
++                            ERL_NIF_TERM *term_out) {
++  unsigned char *dst;
++
++  dst = enif_make_new_binary(env, size, term_out);
++  if (dst == NULL) {
++    return 0;
++  }
++
++  if (size > 0) {
++    memcpy(dst, data, size);
++  }
++
++  return 1;
++}
++
++static void wasm_listener_dtor(ErlNifEnv *env, void *obj) {
++  wasm_listener_t *listener = obj;
++
++  (void)env;
++
++  enif_release_binary(&listener->name);
++  enif_release_binary(&listener->pid_token);
++}
++
++static void wasm_listener_down(ErlNifEnv *env, void *obj, ErlNifPid *pid,
++                               ErlNifMonitor *mon) {
++  wasm_listener_t *listener = obj;
++  wasm_state_t *state;
++
++  (void)env;
++  (void)pid;
++  (void)mon;
++
++  if (erts_wasm_state_lock == NULL) {
++    return;
++  }
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  state = listener->state;
++  if (state != NULL) {
++    remove_listener_by_ptr_locked(state, listener);
++  }
++  enif_mutex_unlock(erts_wasm_state_lock);
++}
++
++static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
++  wasm_state_t *state;
++
++  (void)load_info;
++
++  state = create_wasm_state();
++  if (state == NULL) {
++    return -1;
++  }
++
++  if (!ensure_wasm_state_lock()) {
++    destroy_wasm_state(state);
++    return -1;
++  }
++
++  if (!load_listener_resource_type(env, ERL_NIF_RT_CREATE)) {
++    destroy_wasm_state(state);
++    return -1;
++  }
++
++  init_atoms(env);
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  if (erts_wasm_state != NULL) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    destroy_wasm_state(state);
++    return -1;
++  }
++  erts_wasm_state = state;
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  *priv_data = state;
++
++  return 0;
++}
++
++static int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data,
++                   ERL_NIF_TERM load_info) {
++  wasm_state_t *state;
++
++  (void)load_info;
++
++  if (old_priv_data == NULL || *old_priv_data == NULL) {
++    return -1;
++  }
++
++  state = *old_priv_data;
++
++  if (!load_listener_resource_type(env, ERL_NIF_RT_TAKEOVER)) {
++    return -1;
++  }
++
++  if (!ensure_wasm_state_lock()) {
++    return -1;
++  }
++
++  init_atoms(env);
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  if (erts_wasm_state != state) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return -1;
++  }
++  state->owner_count += 1;
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  *priv_data = state;
++
++  return 0;
++}
++
++static void unload(ErlNifEnv *env, void *priv_data) {
++  wasm_state_t *state = priv_data;
++  int destroy_state = 0;
++  wasm_listener_t *listener;
++
++  (void)env;
++
++  if (state == NULL) {
++    return;
++  }
++
++  if (erts_wasm_state_lock == NULL) {
++    destroy_wasm_state(state);
++    return;
++  }
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  if (state->owner_count > 0) {
++    state->owner_count -= 1;
++  }
++  if (state->owner_count == 0) {
++    if (erts_wasm_state == state) {
++      erts_wasm_state = NULL;
++    }
++    for (listener = state->listeners; listener != NULL; listener = listener->next) {
++      listener->state = NULL;
++    }
++    destroy_state = 1;
++  }
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  if (destroy_state) {
++    destroy_wasm_state(state);
++  }
++}
++
++static ERL_NIF_TERM register_listener_nif(ErlNifEnv *env, int argc,
++                                          const ERL_NIF_TERM argv[]) {
++  ErlNifBinary name;
++  ErlNifPid self;
++  unsigned int name_kind;
++  wasm_listener_t *listener;
++  wasm_state_t *state = enif_priv_data(env);
++
++  if (argc != 1 ||
++      !inspect_listener_registration(env, argv[0], &name, &name_kind)) {
++    return enif_make_badarg(env);
++  }
++
++  enif_self(env, &self);
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  listener =
++      find_listener_by_name_locked(env, state, name.data, name.size, NULL);
++
++  if (listener != NULL) {
++    ERL_NIF_TERM result = same_pid(&listener->pid, &self)
++                              ? am_ok
++                              : make_error(env, am_already_registered);
++
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return result;
++  }
++
++  listener = enif_alloc_resource(wasm_listener_type, sizeof(wasm_listener_t));
++  if (listener == NULL) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return make_error(env, am_out_of_memory);
++  }
++
++  memset(listener, 0, sizeof(wasm_listener_t));
++  listener->state = state;
++  listener->pid = self;
++  listener->name_kind = name_kind;
++
++  if (!copy_binary(&listener->name, &name) ||
++      !copy_pid_token(env, &listener->pid_token, &self)) {
++    listener->state = NULL;
++    enif_release_resource(listener);
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return make_error(env, am_out_of_memory);
++  }
++
++  if (enif_monitor_process(env, listener, &self, &listener->monitor) != 0) {
++    listener->state = NULL;
++    enif_release_resource(listener);
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return make_error(env, am_not_found);
++  }
++
++  listener->next = state->listeners;
++  state->listeners = listener;
++
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  return am_ok;
++}
++
++static ERL_NIF_TERM unregister_listener_nif(ErlNifEnv *env, int argc,
++                                            const ERL_NIF_TERM argv[]) {
++  ErlNifBinary name;
++  ErlNifPid self;
++  unsigned int name_kind;
++  wasm_listener_t *listener;
++  wasm_listener_t *prev = NULL;
++  wasm_state_t *state = enif_priv_data(env);
++
++  (void)name_kind;
++
++  if (argc != 1 ||
++      !inspect_listener_registration(env, argv[0], &name, &name_kind)) {
++    return enif_make_badarg(env);
++  }
++
++  enif_self(env, &self);
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  listener =
++      find_listener_by_name_locked(env, state, name.data, name.size, &prev);
++
++  if (listener == NULL) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return make_error(env, am_not_found);
++  }
++
++  if (!same_pid(&listener->pid, &self)) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return make_error(env, am_not_owner);
++  }
++
++  remove_listener_locked(state, prev, listener);
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  return am_ok;
++}
++
++#ifdef ERTS_EMSCRIPTEN
++extern void js_bridge_on_from_beam_async(char *data, int len);
++
++static void schedule_js_message(const unsigned char *data, size_t size) {
++  char *copy;
++
++  if (size > (size_t)INT_MAX) {
++    return;
++  }
++
++  copy = malloc(size + 1);
++  if (copy == NULL) {
++    return;
++  }
++
++  if (size > 0) {
++    memcpy(copy, data, size);
++  }
++  copy[size] = '\0';
++
++  js_bridge_on_from_beam_async(copy, (int)size);
++}
++
++#endif
++
++static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
++                                 const ERL_NIF_TERM argv[]) {
++  ErlNifBinary message;
++
++  if (argc != 1 || !enif_inspect_iolist_as_binary(env, argv[0], &message)) {
++    return enif_make_badarg(env);
++  }
++
++#ifdef ERTS_EMSCRIPTEN
++  schedule_js_message(message.data, message.size);
++  return am_ok;
++#else
++  return make_error(env, am_unsupported);
++#endif
++}
++
++#ifdef ERTS_EMSCRIPTEN
++EMSCRIPTEN_KEEPALIVE
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len) {
++  ErlNifEnv *env;
++  wasm_state_t *state;
++  wasm_listener_t *listener;
++  ErlNifPid pid;
++  ERL_NIF_TERM payload_term;
++  ERL_NIF_TERM meta_term;
++  ERL_NIF_TERM message;
++
++  if (target_name == NULL || target_name_len <= 0 || payload_len < 0 ||
++      meta_len < 0 || (payload_json == NULL && payload_len > 0) ||
++      (meta_json == NULL && meta_len > 0)) {
++    return 2;
++  }
++
++  env = enif_alloc_env();
++  if (env == NULL) {
++    return 2;
++  }
++
++  if (erts_wasm_state_lock == NULL) {
++    enif_free_env(env);
++    return 1;
++  }
++
++  enif_mutex_lock(erts_wasm_state_lock);
++  state = erts_wasm_state;
++  if (state == NULL) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    enif_free_env(env);
++    return 1;
++  }
++
++  listener = find_listener_by_pid_token_locked(
++      env, state, (const unsigned char *)target_name, (size_t)target_name_len);
++
++  if (listener == NULL) {
++    listener = find_listener_by_name_locked(env, state,
++                                            (const unsigned char *)target_name,
++                                            (size_t)target_name_len, NULL);
++  }
++
++  if (listener != NULL) {
++    pid = listener->pid;
++  }
++  enif_mutex_unlock(erts_wasm_state_lock);
++
++  if (listener == NULL) {
++    enif_free_env(env);
++    return 1;
++  }
++
++  if (!make_binary_copy(env, payload_json != NULL ? payload_json : "",
++                        (size_t)payload_len, &payload_term) ||
++      !make_binary_copy(env, meta_json != NULL ? meta_json : "",
++                        (size_t)meta_len, &meta_term)) {
++    enif_free_env(env);
++    return 2;
++  }
++
++  message = enif_make_tuple3(env, am_wasm, payload_term, meta_term);
++
++  if (!enif_send(NULL, &pid, env, message)) {
++    enif_free_env(env);
++    return 1;
++  }
++
++  enif_free_env(env);
++  return 0;
++}
++#else
++int sendVmMessage(const char *target_name, int target_name_len,
++                  const char *payload_json, int payload_len,
++                  const char *meta_json, int meta_len) {
++  (void)target_name;
++  (void)target_name_len;
++  (void)payload_json;
++  (void)payload_len;
++  (void)meta_json;
++  (void)meta_len;
++  return 2;
++}
++#endif
 diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
-index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f5061dee6ae0 100644
+index 4663b680c0a24684c6bcd171129420df24e753c5..efd4ce6c49cc2d1a0276af562618308b81a43059 100644
 --- a/erts/emulator/sys/unix/sys.c
 +++ b/erts/emulator/sys/unix/sys.c
 @@ -82,6 +82,9 @@
@@ -481,7 +902,56 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
  extern int  driver_interrupt(int, int);
  extern void do_break(void);
  
-@@ -1105,6 +1108,9 @@ static erts_tid_t sig_dispatcher_tid;
+@@ -102,7 +105,9 @@ static erts_atomic32_t have_prepared_crash_dump;
+ erts_atomic_t sys_misc_mem_sz;
+ 
+ static void smp_sig_notify(int signum);
++#ifndef ERTS_EMSCRIPTEN
+ static int sig_notify_fds[2] = {-1, -1};
++#endif
+ 
+ #ifdef ERTS_SYS_SUSPEND_SIGNAL
+ static int sig_suspend_fds[2] = {-1, -1};
+@@ -586,6 +591,7 @@ int erts_sys_prepare_crash_dump(int secs)
+     return prepare_crash_dump(secs);
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static void signal_notify_requested(Eterm type) {
+     Process* p = NULL;
+     Eterm msg, *hp;
+@@ -622,6 +628,7 @@ break_requested(void)
+   /* Wake aux thread to get handle break */
+   erts_aux_thread_poke();
+ }
++#endif
+ 
+ static RETSIGTYPE request_break(int signum)
+ {
+@@ -720,6 +727,7 @@ signalterm_to_signum(Eterm signal)
+     }
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static ERTS_INLINE Eterm
+ signum_to_signalterm(int signum)
+ {
+@@ -745,6 +753,7 @@ signum_to_signalterm(int signum)
+     default:      return am_error;
+     }
+ }
++#endif
+ 
+ static RETSIGTYPE generic_signal_handler(int signum)
+ {
+@@ -1100,11 +1109,16 @@ erl_debug(char* fmt, ...)
+ 
+ #endif /* DEBUG */
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static erts_tid_t sig_dispatcher_tid;
++#endif
+ 
  static void
  smp_sig_notify(int signum)
  {
@@ -491,15 +961,26 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      int res;
      do {
  	/* write() is async-signal safe (according to posix) */
-@@ -1117,6 +1123,7 @@ smp_sig_notify(int signum)
+@@ -1117,8 +1131,10 @@ smp_sig_notify(int signum)
  	erts_silence_warn_unused_result(write(2, msg, sizeof(msg)));
  	abort();
      }
 +#endif
  }
  
++#ifndef ERTS_EMSCRIPTEN
  static void *
-@@ -1239,6 +1246,15 @@ erts_sys_main_thread(void)
+ signal_dispatcher_thread_func(void *unused)
+ {
+@@ -1211,6 +1227,7 @@ init_smp_sig_suspend(void) {
+   }
+ #endif
+ }
++#endif
+ 
+ #ifdef __DARWIN__
+ 
+@@ -1239,6 +1256,15 @@ erts_sys_main_thread(void)
  #endif
      smp_sig_notify(0); /* Notify initialized */
  
@@ -515,7 +996,7 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      /* Wait for a signal to arrive... */
  
  #ifdef __DARWIN__
-@@ -1293,8 +1309,10 @@ erl_sys_args(int* argc, char** argv)
+@@ -1293,8 +1319,10 @@ erl_sys_args(int* argc, char** argv)
  
      max_files = erts_check_io_max_files();
  
@@ -527,17 +1008,17 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..fa26557945c1b4e0a2a570c6f329f506
      erts_sys_env_init();
  }
 diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
-index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..10792a788a45c28162735db4198d9e6470313f70 100644
+index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d8c1dc066 100644
 --- a/erts/emulator/sys/unix/sys_drivers.c
 +++ b/erts/emulator/sys/unix/sys_drivers.c
-@@ -172,6 +172,7 @@ erl_sys_late_init(void)
+@@ -169,6 +169,7 @@ typedef struct driver_data {
+ void
+ erl_sys_late_init(void)
+ {
++#ifndef ERTS_EMSCRIPTEN
      SysDriverOpts opts = {0};
      Port *port;
  
-+#ifndef ERTS_EMSCRIPTEN
-     sys_signal(SIGPIPE, SIG_IGN); /* Ignore - we'll handle the write failure */
- 
-     opts.packet_bytes = 0;
 @@ -191,6 +192,7 @@ erl_sys_late_init(void)
          erts_open_driver(&forker_driver, make_internal_pid(0), "forker", &opts, NULL, NULL);
      erts_mtx_unlock(port->lock);
@@ -611,6 +1092,108 @@ index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3
   ],
   [
    dnl "$with_odbc" != "no"
+diff --git a/lib/stdlib/src/Makefile b/lib/stdlib/src/Makefile
+index ddecd632450c741768c5463d52b1a83c56b6b971..81413860358d3ac8809ecb9362f204eeaa211a23 100644
+--- a/lib/stdlib/src/Makefile
++++ b/lib/stdlib/src/Makefile
+@@ -136,6 +136,7 @@ MODULES= \
+ 	unicode \
+ 	unicode_util \
+ 	uri_string \
++	wasm \
+ 	win32reg \
+ 	zip \
+ 	zstd
+diff --git a/lib/stdlib/src/stdlib.app.src b/lib/stdlib/src/stdlib.app.src
+index 7f42f8573765db26e571864972016e29c7ed5e01..c0ae85a462419b6d4ab1641c9f45f304c5444891 100644
+--- a/lib/stdlib/src/stdlib.app.src
++++ b/lib/stdlib/src/stdlib.app.src
+@@ -116,6 +116,7 @@
+ 	     unicode,
+              unicode_util,
+ 	     uri_string,
++	     wasm,
+ 	     win32reg,
+ 	     zip,
+              zstd]},
+diff --git a/lib/stdlib/src/wasm.erl b/lib/stdlib/src/wasm.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f4f0a3c2a0f45d47d6b20bed64c8b58e0a412c0
+--- /dev/null
++++ b/lib/stdlib/src/wasm.erl
+@@ -0,0 +1,72 @@
++%%
++%% %CopyrightBegin%
++%%
++%% SPDX-License-Identifier: Apache-2.0
++%%
++%% Copyright Ericsson AB 2026. All Rights Reserved.
++%%
++%% Licensed under the Apache License, Version 2.0 (the "License");
++%% you may not use this file except in compliance with the License.
++%% You may obtain a copy of the License at
++%%
++%%     http://www.apache.org/licenses/LICENSE-2.0
++%%
++%% Unless required by applicable law or agreed to in writing, software
++%% distributed under the License is distributed on an "AS IS" BASIS,
++%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++%% See the License for the specific language governing permissions and
++%% limitations under the License.
++%%
++%% %CopyrightEnd%
++%%
++-module(wasm).
++-moduledoc false.
++
++-on_load(on_load/0).
++
++-export([register_listener/1, unregister_listener/1, send/1]).
++
++-nifs([register_listener_nif/1, unregister_listener_nif/1, send_raw/1]).
++
++-type listener_name() ::
++          atom() | pid() | unicode:charlist() | unicode:unicode_binary().
++
++-export_type([listener_name/0]).
++
++-spec register_listener(listener_name()) ->
++          ok | {error, already_registered | not_found | out_of_memory}.
++register_listener(Name) ->
++    register_listener_nif(normalize_registration(Name)).
++
++-spec unregister_listener(listener_name()) -> ok | {error, not_found | not_owner}.
++unregister_listener(Name) ->
++    unregister_listener_nif(normalize_registration(Name)).
++
++-spec send(json:encode_value()) -> ok.
++send(Message) ->
++    Envelope = #{type => vm_message, data => Message},
++    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
++
++-spec on_load() -> ok.
++on_load() ->
++    ok = erlang:load_nif("wasm", wasm).
++
++register_listener_nif(_Name) ->
++    erlang:nif_error(undef).
++
++unregister_listener_nif(_Name) ->
++    erlang:nif_error(undef).
++
++send_raw(_Message) ->
++    erlang:nif_error(undef).
++
++normalize_registration(Name) when is_atom(Name) ->
++    {registered_name, atom_to_binary(Name, utf8)};
++normalize_registration(Name) when is_pid(Name) ->
++    {opaque_name, list_to_binary(erlang:pid_to_list(Name))};
++normalize_registration(Name) when is_binary(Name) ->
++    {opaque_name, Name};
++normalize_registration(Name) when is_list(Name) ->
++    {opaque_name, unicode:characters_to_binary(Name)};
++normalize_registration(Name) ->
++    erlang:error(badarg, [Name]).
 diff --git a/make/autoconf/otp.m4 b/make/autoconf/otp.m4
 index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8bafa90e1 100644
 --- a/make/autoconf/otp.m4
