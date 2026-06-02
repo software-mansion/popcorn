@@ -44,6 +44,34 @@ defmodule TestServer do
     raise "intentional crash"
   end
 
+  defp handle_wasm({:wasm_call, %{"action" => "track_cleanup_test"}}, state) do
+    {:ok, result} =
+      Wasm.run_js(
+        """
+        ({ wasm }) => {
+          window.__cleanupCalls = [];
+          const tv = wasm.trackWithCleanup("payload", () => {
+            window.__cleanupCalls.push("fired");
+          });
+          const callsBefore = window.__cleanupCalls.slice();
+          wasm.releaseTracked(tv.key);
+          const callsAfterFirstRelease = window.__cleanupCalls.slice();
+          wasm.releaseTracked(tv.key);
+          const callsAfterSecondRelease = window.__cleanupCalls.slice();
+          return [{
+            callsBefore,
+            callsAfterFirstRelease,
+            callsAfterSecondRelease,
+          }];
+        }
+        """,
+        %{},
+        return: :value
+      )
+
+    {:resolve, result, state}
+  end
+
   defp handle_wasm({:wasm_call, data}, state) do
     {:reject, %{"error" => "unknown action", "received" => data}, state}
   end

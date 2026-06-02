@@ -329,14 +329,7 @@ defmodule Popcorn.Wasm do
       };
 
       node.addEventListener(event_name, fn);
-      const key = wasm.nextTrackedObjectKey();
-      const cleanupFn = () => {
-        node.removeEventListener(event_name, fn);
-        wasm.cleanupFunctions.delete(key);
-      };
-      wasm.cleanupFunctions.set(key, cleanupFn);
-
-      return [new TrackedValue({key: key, value: cleanupFn})];
+      return [wasm.trackWithCleanup(null, () => node.removeEventListener(event_name, fn))];
     }
     """
     |> run_js(
@@ -354,13 +347,27 @@ defmodule Popcorn.Wasm do
   @doc """
   Unregister event listener. See `register_event_listener/2`.
   """
-  def unregister_event_listener(ref) do
-    """
-    ({ args }) => {
-      args.cleanupFn();
-    }
-    """
-    |> run_js(%{cleanupFn: ref})
+  def unregister_event_listener(ref), do: release_tracked(ref)
+
+  @doc """
+  Releases a tracked object eagerly, running its JS-side cleanup function now
+  rather than waiting for the BEAM to garbage-collect the `TrackedObject`.
+
+  Calling this twice (or letting GC fire after an explicit release) is safe —
+  the cleanup runs at most once.
+  """
+  @spec release_tracked(TrackedObject.t()) :: result(run_js_return())
+  def release_tracked(%TrackedObject{ref: ref}) do
+    [key] = :emscripten.get_tracked([ref], :key)
+
+    run_js(
+      """
+      ({ wasm, args }) => {
+        wasm.releaseTracked(args.key);
+      }
+      """,
+      %{key: key}
+    )
   end
 
   @doc false
