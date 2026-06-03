@@ -146,9 +146,9 @@ regen_patches() {
     # Stage all source changes (build artifacts excluded via .git/info/exclude)
     git -C "${OTP_DIR}" add -A
 
-    # Unstage generated files that must not land in the source patch
+    # Unstage generated files that must not land in the source patch.
     git -C "${OTP_DIR}" diff --cached --name-only "${base_rev}" \
-        | grep -E '(^|/)\.openssl-wasm/|(^|/)autom4te\.cache/|(/configure|config\.h\.in|config\.log|config\.status|cross_check_erl\.erl)$' \
+        | grep -E '(^|/)\.openssl-wasm/|(^|/)autom4te\.cache/|\.beam$|(/configure|config\.h\.in|config\.log|config\.status|cross_check_erl\.erl)$' \
         | xargs -I{} git -C "${OTP_DIR}" reset "${base_rev}" -- {} > /dev/null 2>&1 || true
 
     # Write patch
