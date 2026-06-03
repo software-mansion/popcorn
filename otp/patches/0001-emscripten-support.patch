@@ -152,10 +152,10 @@ index 0000000000000000000000000000000000000000..0b446eedf17294c0c47c2b872bf2fb44
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb4173b9b9b10
+index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d85867ee0d0ff
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,742 @@
+@@ -0,0 +1,528 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -220,10 +220,6 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +                   ERL_NIF_TERM load_info);
 +static void unload(ErlNifEnv *env, void *priv_data);
 +
-+static ERL_NIF_TERM register_listener_nif(ErlNifEnv *env, int argc,
-+                                          const ERL_NIF_TERM argv[]);
-+static ERL_NIF_TERM unregister_listener_nif(ErlNifEnv *env, int argc,
-+                                            const ERL_NIF_TERM argv[]);
 +static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
 +                                 const ERL_NIF_TERM argv[]);
 +
@@ -232,8 +228,6 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +                               ErlNifMonitor *mon);
 +
 +static ErlNifFunc nif_funcs[] = {
-+    {"register_listener_nif", 1, register_listener_nif},
-+    {"unregister_listener_nif", 1, unregister_listener_nif},
 +    {"send_raw", 1, send_raw_nif},
 +};
 +
@@ -241,14 +235,10 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +
 +static ERL_NIF_TERM am_ok;
 +static ERL_NIF_TERM am_error;
-+static ERL_NIF_TERM am_already_registered;
 +static ERL_NIF_TERM am_not_found;
-+static ERL_NIF_TERM am_not_owner;
 +static ERL_NIF_TERM am_out_of_memory;
 +static ERL_NIF_TERM am_unsupported;
 +static ERL_NIF_TERM am_wasm;
-+static ERL_NIF_TERM am_registered_name;
-+static ERL_NIF_TERM am_opaque_name;
 +
 +static ErlNifResourceType *wasm_listener_type = NULL;
 +/*
@@ -268,14 +258,10 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +static void init_atoms(ErlNifEnv *env) {
 +  am_ok = enif_make_atom(env, "ok");
 +  am_error = enif_make_atom(env, "error");
-+  am_already_registered = enif_make_atom(env, "already_registered");
 +  am_not_found = enif_make_atom(env, "not_found");
-+  am_not_owner = enif_make_atom(env, "not_owner");
 +  am_out_of_memory = enif_make_atom(env, "out_of_memory");
 +  am_unsupported = enif_make_atom(env, "unsupported");
 +  am_wasm = enif_make_atom(env, "wasm");
-+  am_registered_name = enif_make_atom(env, "registered_name");
-+  am_opaque_name = enif_make_atom(env, "opaque_name");
 +}
 +
 +static int load_listener_resource_type(ErlNifEnv *env,
@@ -357,61 +343,16 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +  return 1;
 +}
 +
-+static int copy_pid_token(ErlNifEnv *env, ErlNifBinary *dst,
-+                          const ErlNifPid *pid) {
-+  char pid_token[64];
-+  ERL_NIF_TERM pid_term;
-+  int pid_token_len;
-+
-+  pid_term = enif_make_pid(env, pid);
-+  pid_token_len = enif_snprintf(pid_token, sizeof(pid_token), "%T", pid_term);
-+  if (pid_token_len < 0 || pid_token_len >= (int)sizeof(pid_token)) {
-+    return 0;
-+  }
-+
-+  if (!enif_alloc_binary((size_t)pid_token_len, dst)) {
-+    return 0;
-+  }
-+
-+  if (pid_token_len > 0) {
-+    memcpy(dst->data, pid_token, (size_t)pid_token_len);
-+  }
-+
-+  return 1;
-+}
-+
-+static int inspect_listener_registration(ErlNifEnv *env, ERL_NIF_TERM arg,
-+                                         ErlNifBinary *name,
-+                                         unsigned int *name_kind) {
-+  const ERL_NIF_TERM *tuple_elements;
-+  int arity;
-+
-+  if (!enif_get_tuple(env, arg, &arity, &tuple_elements) || arity != 2) {
-+    return 0;
-+  }
-+
-+  if (enif_is_identical(tuple_elements[0], am_registered_name)) {
-+    *name_kind = WASM_LISTENER_NAME_REGISTERED;
-+  } else if (enif_is_identical(tuple_elements[0], am_opaque_name)) {
-+    *name_kind = WASM_LISTENER_NAME_OPAQUE;
-+  } else {
-+    return 0;
-+  }
-+
-+  return enif_inspect_iolist_as_binary(env, tuple_elements[1], name) &&
-+         name->size > 0;
-+}
-+
 +static int listener_registered_name_is_current(ErlNifEnv *env,
 +                                               wasm_listener_t *listener) {
 +  (void)env;
 +  (void)listener;
 +
 +  /*
-+   * `wasm:register_listener/1` creates an explicit bridge alias for the
-+   * current pid. Atom names are labels for JS callers and should not be tied
-+   * to `register/2` ownership, otherwise a listener registered as
-+   * `wasm:register_listener(bridge)` is discarded before the first lookup.
++   * Dormant scaffolding retained for the opaque-pid-handle work (Plan 2).
++   * The bridge no longer self-registers listeners; named targets resolve at
++   * send time via enif_whereis_pid. Kept as a no-op so the listener registry
++   * lifetime rules stay intact for when handle targeting is reintroduced.
 +   */
 +  return 1;
 +}
@@ -436,41 +377,6 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +  }
 +
 +  release_listener(listener);
-+}
-+
-+static wasm_listener_t *
-+find_listener_by_name_locked(ErlNifEnv *env, wasm_state_t *state,
-+                             const unsigned char *name_data, size_t name_size,
-+                             wasm_listener_t **prev_out) {
-+  wasm_listener_t *prev = NULL;
-+  wasm_listener_t *listener = state->listeners;
-+
-+  while (listener != NULL) {
-+    wasm_listener_t *next = listener->next;
-+
-+    if (listener_is_stale(env, listener)) {
-+      remove_listener_locked(state, prev, listener);
-+      listener = next;
-+      continue;
-+    }
-+
-+    if (same_name(listener->name.data, listener->name.size, name_data,
-+                  name_size)) {
-+      if (prev_out != NULL) {
-+        *prev_out = prev;
-+      }
-+      return listener;
-+    }
-+
-+    prev = listener;
-+    listener = next;
-+  }
-+
-+  if (prev_out != NULL) {
-+    *prev_out = prev;
-+  }
-+
-+  return NULL;
 +}
 +
 +static wasm_listener_t *
@@ -670,106 +576,6 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +  }
 +}
 +
-+static ERL_NIF_TERM register_listener_nif(ErlNifEnv *env, int argc,
-+                                          const ERL_NIF_TERM argv[]) {
-+  ErlNifBinary name;
-+  ErlNifPid self;
-+  unsigned int name_kind;
-+  wasm_listener_t *listener;
-+  wasm_state_t *state = enif_priv_data(env);
-+
-+  if (argc != 1 ||
-+      !inspect_listener_registration(env, argv[0], &name, &name_kind)) {
-+    return enif_make_badarg(env);
-+  }
-+
-+  enif_self(env, &self);
-+
-+  enif_mutex_lock(erts_wasm_state_lock);
-+  listener =
-+      find_listener_by_name_locked(env, state, name.data, name.size, NULL);
-+
-+  if (listener != NULL) {
-+    ERL_NIF_TERM result = same_pid(&listener->pid, &self)
-+                              ? am_ok
-+                              : make_error(env, am_already_registered);
-+
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return result;
-+  }
-+
-+  listener = enif_alloc_resource(wasm_listener_type, sizeof(wasm_listener_t));
-+  if (listener == NULL) {
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return make_error(env, am_out_of_memory);
-+  }
-+
-+  memset(listener, 0, sizeof(wasm_listener_t));
-+  listener->state = state;
-+  listener->pid = self;
-+  listener->name_kind = name_kind;
-+
-+  if (!copy_binary(&listener->name, &name) ||
-+      !copy_pid_token(env, &listener->pid_token, &self)) {
-+    listener->state = NULL;
-+    enif_release_resource(listener);
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return make_error(env, am_out_of_memory);
-+  }
-+
-+  if (enif_monitor_process(env, listener, &self, &listener->monitor) != 0) {
-+    listener->state = NULL;
-+    enif_release_resource(listener);
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return make_error(env, am_not_found);
-+  }
-+
-+  listener->next = state->listeners;
-+  state->listeners = listener;
-+
-+  enif_mutex_unlock(erts_wasm_state_lock);
-+
-+  return am_ok;
-+}
-+
-+static ERL_NIF_TERM unregister_listener_nif(ErlNifEnv *env, int argc,
-+                                            const ERL_NIF_TERM argv[]) {
-+  ErlNifBinary name;
-+  ErlNifPid self;
-+  unsigned int name_kind;
-+  wasm_listener_t *listener;
-+  wasm_listener_t *prev = NULL;
-+  wasm_state_t *state = enif_priv_data(env);
-+
-+  (void)name_kind;
-+
-+  if (argc != 1 ||
-+      !inspect_listener_registration(env, argv[0], &name, &name_kind)) {
-+    return enif_make_badarg(env);
-+  }
-+
-+  enif_self(env, &self);
-+
-+  enif_mutex_lock(erts_wasm_state_lock);
-+  listener =
-+      find_listener_by_name_locked(env, state, name.data, name.size, &prev);
-+
-+  if (listener == NULL) {
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return make_error(env, am_not_found);
-+  }
-+
-+  if (!same_pid(&listener->pid, &self)) {
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    return make_error(env, am_not_owner);
-+  }
-+
-+  remove_listener_locked(state, prev, listener);
-+  enif_mutex_unlock(erts_wasm_state_lock);
-+
-+  return am_ok;
-+}
-+
 +#ifdef ERTS_EMSCRIPTEN
 +extern void js_bridge_on_from_beam_async(char *data, int len);
 +
@@ -817,8 +623,7 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +                  const char *payload_json, int payload_len,
 +                  const char *meta_json, int meta_len) {
 +  ErlNifEnv *env;
-+  wasm_state_t *state;
-+  wasm_listener_t *listener;
++  ERL_NIF_TERM atom;
 +  ErlNifPid pid;
 +  ERL_NIF_TERM payload_term;
 +  ERL_NIF_TERM meta_term;
@@ -835,34 +640,15 @@ index 0000000000000000000000000000000000000000..360a7310ffb94e80e5cdfe92428fb417
 +    return 2;
 +  }
 +
-+  if (erts_wasm_state_lock == NULL) {
-+    enif_free_env(env);
-+    return 1;
-+  }
-+
-+  enif_mutex_lock(erts_wasm_state_lock);
-+  state = erts_wasm_state;
-+  if (state == NULL) {
-+    enif_mutex_unlock(erts_wasm_state_lock);
-+    enif_free_env(env);
-+    return 1;
-+  }
-+
-+  listener = find_listener_by_pid_token_locked(
-+      env, state, (const unsigned char *)target_name, (size_t)target_name_len);
-+
-+  if (listener == NULL) {
-+    listener = find_listener_by_name_locked(env, state,
-+                                            (const unsigned char *)target_name,
-+                                            (size_t)target_name_len, NULL);
-+  }
-+
-+  if (listener != NULL) {
-+    pid = listener->pid;
-+  }
-+  enif_mutex_unlock(erts_wasm_state_lock);
-+
-+  if (listener == NULL) {
++  /*
++   * Resolve the target by its registered name at send time. The
++   * existing-atom lookup keeps arbitrary JS strings from growing the atom
++   * table, and enif_whereis_pid piggybacks on erlang:register/2 so any
++   * registered process is addressable without opting in.
++   */
++  if (!enif_make_existing_atom_len(env, target_name, (size_t)target_name_len,
++                                   &atom, ERL_NIF_UTF8) ||
++      !enif_whereis_pid(env, atom, &pid)) {
 +    enif_free_env(env);
 +    return 1;
 +  }
@@ -1077,10 +863,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..3ce86526e9785dd1108a2d0ba6a273963fa639ef
+index 0000000000000000000000000000000000000000..519f96444ebe4f3c581944daab93abe5add71736
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,41 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1105,27 +891,11 @@ index 0000000000000000000000000000000000000000..3ce86526e9785dd1108a2d0ba6a27396
 +-module(wasm).
 +-moduledoc false.
 +
-+%% `on_load/0` is exported and called explicitly from `erl_init:start/2`
-+%% (like zlib, prim_file, prim_buffer, erl_tracer). It must NOT use the
-+%% `-on_load` attribute: preloaded modules with an on_load handler make
-+%% `load_preloaded` in erl_init.c abort the VM at boot.
-+-export([on_load/0, register_listener/1, unregister_listener/1, send/1]).
++%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
++%% -on_load attribute (a preloaded module with one aborts the VM at boot).
++-export([on_load/0, send/1]).
 +
-+-nifs([register_listener_nif/1, unregister_listener_nif/1, send_raw/1]).
-+
-+-type listener_name() ::
-+          atom() | pid() | unicode:charlist() | unicode:unicode_binary().
-+
-+-export_type([listener_name/0]).
-+
-+-spec register_listener(listener_name()) ->
-+          ok | {error, already_registered | not_found | out_of_memory}.
-+register_listener(Name) ->
-+    register_listener_nif(normalize_registration(Name)).
-+
-+-spec unregister_listener(listener_name()) -> ok | {error, not_found | not_owner}.
-+unregister_listener(Name) ->
-+    unregister_listener_nif(normalize_registration(Name)).
++-nifs([send_raw/1]).
 +
 +-spec send(json:encode_value()) -> ok.
 +send(Message) ->
@@ -1136,25 +906,8 @@ index 0000000000000000000000000000000000000000..3ce86526e9785dd1108a2d0ba6a27396
 +on_load() ->
 +    ok = erlang:load_nif("wasm", wasm).
 +
-+register_listener_nif(_Name) ->
-+    erlang:nif_error(undef).
-+
-+unregister_listener_nif(_Name) ->
-+    erlang:nif_error(undef).
-+
 +send_raw(_Message) ->
 +    erlang:nif_error(undef).
-+
-+normalize_registration(Name) when is_atom(Name) ->
-+    {registered_name, atom_to_binary(Name, utf8)};
-+normalize_registration(Name) when is_pid(Name) ->
-+    {opaque_name, list_to_binary(erlang:pid_to_list(Name))};
-+normalize_registration(Name) when is_binary(Name) ->
-+    {opaque_name, Name};
-+normalize_registration(Name) when is_list(Name) ->
-+    {opaque_name, unicode:characters_to_binary(Name)};
-+normalize_registration(Name) ->
-+    erlang:error(badarg, [Name]).
 diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
 index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
 --- a/lib/asn1/src/asn1rtt_ber.erl
