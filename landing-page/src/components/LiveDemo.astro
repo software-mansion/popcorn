@@ -101,6 +101,8 @@ const exampleButtonClass =
     });
     window.terminal = term;
 
+    term.write("Loading...\r\n");
+
     const POPCORN_CONFIG = {
       bundlePaths: ["/wasm/iex.avm"],
       debug: true,
@@ -108,6 +110,8 @@ const exampleButtonClass =
       onStderr: (text: string) => displayLog(text, { term, isError: true }),
     };
     const popcorn = await Popcorn.init(POPCORN_CONFIG);
+
+    term.clear();
 
     term.onData(async (data: string) => {
       if (IGNORED_SEQUENCES.has(data)) return;
