@@ -6,3 +6,18 @@ export async function onPageLoad(fn: () => Promise<void>) {
     await fn();
   }
 }
+
+type ContainerFn = (node: HTMLElement) => void;
+export function preventFocus(node: HTMLElement, fn: ContainerFn): void {
+  const original = node.focus;
+  const restoreOriginal = () => {
+    node.focus = original;
+  };
+  node.focus = () => {};
+
+  try {
+    fn(node);
+  } finally {
+    setTimeout(restoreOriginal, 0);
+  }
+}
