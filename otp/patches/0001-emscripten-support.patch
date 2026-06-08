@@ -54,10 +54,20 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e41
  	;;
  esac
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index 5d6c12c8a54493e3550082370288a7d0cc79aded..170b833e8f5c20fab52426010083a9b6d09d2ccb 100644
+index 5d6c12c8a54493e3550082370288a7d0cc79aded..e45b3b861b670ecc95d975b26f11c92bdf9ab9b3 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -1169,6 +1169,7 @@ NIF_OBJS = \
+@@ -785,7 +785,8 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/atomics.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/counters.beam \
+-		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam
++		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm.beam
+ 
+ ifeq ($(TARGET),win32)
+ # On windows the preloaded objects are in a resource object.
+@@ -1169,6 +1170,7 @@ NIF_OBJS = \
  	$(OBJDIR)/erl_tracer_nif.o \
  	$(OBJDIR)/prim_buffer_nif.o \
  	$(OBJDIR)/prim_file_nif.o \
@@ -65,7 +75,7 @@ index 5d6c12c8a54493e3550082370288a7d0cc79aded..170b833e8f5c20fab52426010083a9b6
  	$(OBJDIR)/zlib_nif.o \
  	$(OBJDIR)/zstd_nif.o \
  	$(ESOCK_NIF_OBJS)
-@@ -1291,7 +1292,7 @@ EMU_LD=$(CC)
+@@ -1291,7 +1293,7 @@ EMU_LD=$(CC)
  endif
  $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
  	$(ld_verbose) $(EMU_LD) -o $@ \
@@ -1027,6 +1037,124 @@ index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d
  }
  
  /* II. Prototypes */
+diff --git a/erts/preloaded/src/Makefile b/erts/preloaded/src/Makefile
+index e76af6ce766adb16ce964733c7eba6f3554b8f6e..be1005e2490384368dde68305207c50a477e86c3 100644
+--- a/erts/preloaded/src/Makefile
++++ b/erts/preloaded/src/Makefile
+@@ -58,7 +58,8 @@ PRE_LOADED_ERL_MODULES = \
+ 	erts_dirty_process_signal_handler \
+ 	atomics \
+ 	counters \
+-        persistent_term
++        persistent_term \
++	wasm
+ 
+ PRE_LOADED_BEAM_MODULES = \
+ 	prim_eval
+diff --git a/erts/preloaded/src/erl_init.erl b/erts/preloaded/src/erl_init.erl
+index 1ec50d34b3ea130c55c5554df31d01ea67d00046..7e845c2f84943228833d3bbd2c9ac2320e150dee 100644
+--- a/erts/preloaded/src/erl_init.erl
++++ b/erts/preloaded/src/erl_init.erl
+@@ -38,6 +38,7 @@ start(Mod, BootArgs) ->
+     erl_tracer:on_load(),
+     prim_buffer:on_load(),
+     prim_file:on_load(),
++    wasm:on_load(),
+     %% prim_socket:on_load(), prim_net:on_load(),
+     if_loaded(
+       prim_socket,
+diff --git a/erts/preloaded/src/erts.app.src b/erts/preloaded/src/erts.app.src
+index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d835dbd9b95 100644
+--- a/erts/preloaded/src/erts.app.src
++++ b/erts/preloaded/src/erts.app.src
+@@ -39,6 +39,7 @@
+                 atomics,
+                 counters,
+                 persistent_term,
++                wasm,
+ 		%ESOCK_MODS%
+ 		zlib
+ 	    ]},
+diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ce86526e9785dd1108a2d0ba6a273963fa639ef
+--- /dev/null
++++ b/erts/preloaded/src/wasm.erl
+@@ -0,0 +1,74 @@
++%%
++%% %CopyrightBegin%
++%%
++%% SPDX-License-Identifier: Apache-2.0
++%%
++%% Copyright Ericsson AB 2026. All Rights Reserved.
++%%
++%% Licensed under the Apache License, Version 2.0 (the "License");
++%% you may not use this file except in compliance with the License.
++%% You may obtain a copy of the License at
++%%
++%%     http://www.apache.org/licenses/LICENSE-2.0
++%%
++%% Unless required by applicable law or agreed to in writing, software
++%% distributed under the License is distributed on an "AS IS" BASIS,
++%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++%% See the License for the specific language governing permissions and
++%% limitations under the License.
++%%
++%% %CopyrightEnd%
++%%
++-module(wasm).
++-moduledoc false.
++
++%% `on_load/0` is exported and called explicitly from `erl_init:start/2`
++%% (like zlib, prim_file, prim_buffer, erl_tracer). It must NOT use the
++%% `-on_load` attribute: preloaded modules with an on_load handler make
++%% `load_preloaded` in erl_init.c abort the VM at boot.
++-export([on_load/0, register_listener/1, unregister_listener/1, send/1]).
++
++-nifs([register_listener_nif/1, unregister_listener_nif/1, send_raw/1]).
++
++-type listener_name() ::
++          atom() | pid() | unicode:charlist() | unicode:unicode_binary().
++
++-export_type([listener_name/0]).
++
++-spec register_listener(listener_name()) ->
++          ok | {error, already_registered | not_found | out_of_memory}.
++register_listener(Name) ->
++    register_listener_nif(normalize_registration(Name)).
++
++-spec unregister_listener(listener_name()) -> ok | {error, not_found | not_owner}.
++unregister_listener(Name) ->
++    unregister_listener_nif(normalize_registration(Name)).
++
++-spec send(json:encode_value()) -> ok.
++send(Message) ->
++    Envelope = #{type => vm_message, data => Message},
++    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
++
++-spec on_load() -> ok.
++on_load() ->
++    ok = erlang:load_nif("wasm", wasm).
++
++register_listener_nif(_Name) ->
++    erlang:nif_error(undef).
++
++unregister_listener_nif(_Name) ->
++    erlang:nif_error(undef).
++
++send_raw(_Message) ->
++    erlang:nif_error(undef).
++
++normalize_registration(Name) when is_atom(Name) ->
++    {registered_name, atom_to_binary(Name, utf8)};
++normalize_registration(Name) when is_pid(Name) ->
++    {opaque_name, list_to_binary(erlang:pid_to_list(Name))};
++normalize_registration(Name) when is_binary(Name) ->
++    {opaque_name, Name};
++normalize_registration(Name) when is_list(Name) ->
++    {opaque_name, unicode:characters_to_binary(Name)};
++normalize_registration(Name) ->
++    erlang:error(badarg, [Name]).
 diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
 index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
 --- a/lib/asn1/src/asn1rtt_ber.erl
@@ -1092,108 +1220,6 @@ index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3
   ],
   [
    dnl "$with_odbc" != "no"
-diff --git a/lib/stdlib/src/Makefile b/lib/stdlib/src/Makefile
-index ddecd632450c741768c5463d52b1a83c56b6b971..81413860358d3ac8809ecb9362f204eeaa211a23 100644
---- a/lib/stdlib/src/Makefile
-+++ b/lib/stdlib/src/Makefile
-@@ -136,6 +136,7 @@ MODULES= \
- 	unicode \
- 	unicode_util \
- 	uri_string \
-+	wasm \
- 	win32reg \
- 	zip \
- 	zstd
-diff --git a/lib/stdlib/src/stdlib.app.src b/lib/stdlib/src/stdlib.app.src
-index 7f42f8573765db26e571864972016e29c7ed5e01..c0ae85a462419b6d4ab1641c9f45f304c5444891 100644
---- a/lib/stdlib/src/stdlib.app.src
-+++ b/lib/stdlib/src/stdlib.app.src
-@@ -116,6 +116,7 @@
- 	     unicode,
-              unicode_util,
- 	     uri_string,
-+	     wasm,
- 	     win32reg,
- 	     zip,
-              zstd]},
-diff --git a/lib/stdlib/src/wasm.erl b/lib/stdlib/src/wasm.erl
-new file mode 100644
-index 0000000000000000000000000000000000000000..2f4f0a3c2a0f45d47d6b20bed64c8b58e0a412c0
---- /dev/null
-+++ b/lib/stdlib/src/wasm.erl
-@@ -0,0 +1,72 @@
-+%%
-+%% %CopyrightBegin%
-+%%
-+%% SPDX-License-Identifier: Apache-2.0
-+%%
-+%% Copyright Ericsson AB 2026. All Rights Reserved.
-+%%
-+%% Licensed under the Apache License, Version 2.0 (the "License");
-+%% you may not use this file except in compliance with the License.
-+%% You may obtain a copy of the License at
-+%%
-+%%     http://www.apache.org/licenses/LICENSE-2.0
-+%%
-+%% Unless required by applicable law or agreed to in writing, software
-+%% distributed under the License is distributed on an "AS IS" BASIS,
-+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-+%% See the License for the specific language governing permissions and
-+%% limitations under the License.
-+%%
-+%% %CopyrightEnd%
-+%%
-+-module(wasm).
-+-moduledoc false.
-+
-+-on_load(on_load/0).
-+
-+-export([register_listener/1, unregister_listener/1, send/1]).
-+
-+-nifs([register_listener_nif/1, unregister_listener_nif/1, send_raw/1]).
-+
-+-type listener_name() ::
-+          atom() | pid() | unicode:charlist() | unicode:unicode_binary().
-+
-+-export_type([listener_name/0]).
-+
-+-spec register_listener(listener_name()) ->
-+          ok | {error, already_registered | not_found | out_of_memory}.
-+register_listener(Name) ->
-+    register_listener_nif(normalize_registration(Name)).
-+
-+-spec unregister_listener(listener_name()) -> ok | {error, not_found | not_owner}.
-+unregister_listener(Name) ->
-+    unregister_listener_nif(normalize_registration(Name)).
-+
-+-spec send(json:encode_value()) -> ok.
-+send(Message) ->
-+    Envelope = #{type => vm_message, data => Message},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
-+
-+-spec on_load() -> ok.
-+on_load() ->
-+    ok = erlang:load_nif("wasm", wasm).
-+
-+register_listener_nif(_Name) ->
-+    erlang:nif_error(undef).
-+
-+unregister_listener_nif(_Name) ->
-+    erlang:nif_error(undef).
-+
-+send_raw(_Message) ->
-+    erlang:nif_error(undef).
-+
-+normalize_registration(Name) when is_atom(Name) ->
-+    {registered_name, atom_to_binary(Name, utf8)};
-+normalize_registration(Name) when is_pid(Name) ->
-+    {opaque_name, list_to_binary(erlang:pid_to_list(Name))};
-+normalize_registration(Name) when is_binary(Name) ->
-+    {opaque_name, Name};
-+normalize_registration(Name) when is_list(Name) ->
-+    {opaque_name, unicode:characters_to_binary(Name)};
-+normalize_registration(Name) ->
-+    erlang:error(badarg, [Name]).
 diff --git a/make/autoconf/otp.m4 b/make/autoconf/otp.m4
 index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8bafa90e1 100644
 --- a/make/autoconf/otp.m4

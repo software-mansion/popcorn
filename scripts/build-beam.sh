@@ -155,6 +155,43 @@ build_bootstrap() {
 }
 
 
+compile_preloaded_modules() {
+    local beam_dir="$1"
+    local force="${2:-false}"
+    local ebin="${beam_dir}/erts/preloaded/ebin"
+    local erlc="${beam_dir}/bootstrap/bin/erlc"
+    local module
+
+    if [[ ! -x "${erlc}" ]]; then
+        erlc="$(command -v erlc || true)"
+        if [[ -z "${erlc}" ]]; then
+            error "No erlc found. Install Erlang or build bootstrap before compiling preloaded modules."
+        fi
+    fi
+
+    mkdir -p "${ebin}"
+    for module in wasm erl_init; do
+        local src="${beam_dir}/erts/preloaded/src/${module}.erl"
+        local beam="${ebin}/${module}.beam"
+
+        if [[ ! -f "${src}" ]]; then
+            error "Preloaded source not found at ${src} (patch not applied?)"
+        fi
+
+        # Idempotent: skip if the beam is already newer than its source.
+        if [[ "${force}" != "true" ]] && [[ -f "${beam}" ]] && [[ "${beam}" -nt "${src}" ]]; then
+            log "Preloaded ${module}.beam up to date, skipping."
+            continue
+        fi
+
+        log "Compiling preloaded ${module}.beam with ${erlc}..."
+        # +deterministic matches how the committed preloaded beams are produced.
+        "${erlc}" +deterministic -o "${ebin}" "${src}"
+    done
+    success "Preloaded modules compiled."
+}
+
+
 # Prints the OpenSSL install prefix path.
 build_openssl() {
     local mode="$1"
@@ -363,9 +400,7 @@ copy_artifacts() {
     done
 
     if [[ -f "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" ]]; then
-        escript "${PROJECT_ROOT}/scripts/ensure-wasm-boot.escript" \
-            "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" \
-            "${outdir}/bin/vm.boot"
+        cp "${beam_dir}/bootstrap/bin/no_dot_erlang.boot" "${outdir}/bin/vm.boot"
     fi
 
     success "Artifacts written to: ${outdir}"
@@ -453,7 +488,13 @@ main() {
 
     run_autoconf "${beam_dir}"
 
+    # The native bootstrap emulator embeds erts/preloaded/ebin/*.beam while
+    # building preload.c, before bootstrap/bin/erlc has been created.
+    compile_preloaded_modules "${beam_dir}" true
+
     build_bootstrap "${beam_dir}" "${jobs}"
+
+    compile_preloaded_modules "${beam_dir}" true
 
     local openssl_prefix=""
     if [[ "${with_crypto}" == "true" ]]; then
