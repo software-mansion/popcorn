@@ -1,3 +1,34 @@
+diff --git a/Makefile.in b/Makefile.in
+index dc20f9858337f345b7010d912264d46a093499c6..739cf1ef4c5dd21eafc4977fc6f529c3ecee9f97 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -639,16 +639,19 @@ SECONDARY_BOOTSTRAP=$(TINY_SECONDARY_BOOTSTRAP) asn1
+ SECONDARY_BOOTSTRAP_BUILD=$(TINY_SECONDARY_BOOTSTRAP_BUILD) asn1/src
+ 
+ # The TERTIARY bootstrap
+-# - wx is needed for wx_object behaviour in debugger, observer and et
+ # - public_key is needed for include files in ssl and ssh
+ # - erl_interface is needed by odbc
+ # - syntax_tools is needed by diameter
+-# - snmp is needed to compile tests
+-# - runtime_tools includes are needed by observer
+-# - xmerl includes are needed by ct, edoc, and wx
+-# - common_test is needed to compile tests
+-TERTIARY_BOOTSTRAP_BUILD=parsetools wx public_key erl_interface syntax_tools snmp
+-TERTIARY_BOOTSTRAP=$(TERTIARY_BOOTSTRAP_BUILD) runtime_tools xmerl common_test
++#
++# popcorn (wasm) note: wx, snmp, runtime_tools, xmerl and common_test were
++# removed from the tertiary bootstrap. They only provide includes/behaviours
++# for applications disabled in the wasm configure (wx -> debugger/observer/et;
++# snmp/common_test -> compiling tests; runtime_tools -> observer; xmerl ->
++# ct/edoc/wx), and building wx (wxWidgets bindings) and snmp (MIB compilation)
++# dominates the native bootstrap time for no benefit. asn1 (secondary
++# bootstrap) is kept so public_key's ASN.1 modules still compile.
++TERTIARY_BOOTSTRAP_BUILD=parsetools public_key erl_interface syntax_tools
++TERTIARY_BOOTSTRAP=$(TERTIARY_BOOTSTRAP_BUILD)
+ 
+ $(BOOTSTRAP_ROOT)/bootstrap/lib/%/update:
+ 	$(V_generate)
 diff --git a/erts/configure.ac b/erts/configure.ac
 index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e417d1095a4 100644
 --- a/erts/configure.ac
