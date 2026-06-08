@@ -17,6 +17,7 @@ export type PopcornErrors = {
   "beam:missing-tarball": { name: string; all: string[] };
   "internal:check": { detail?: string };
   "internal:unreachable": EmptyData;
+  "runtime:eval-unavailable": EmptyData;
 };
 
 export type SerializedError<T extends Tag = Tag> = {
@@ -110,6 +111,8 @@ function message(error: SerializedError): string {
         : `Check failed: ${error.data.detail}`;
     case "internal:unreachable":
       return "Entered unreachable code";
+    case "runtime:eval-unavailable":
+      return "JS eval is unavailable; run_js requires a Content-Security-Policy that allows 'unsafe-eval'";
     default:
       unreachable();
   }
@@ -151,6 +154,7 @@ function parse(value: unknown): SerializedError {
       check(isInternalCheckData(value.data));
       return { t: value.t, data: value.data };
     case "internal:unreachable":
+    case "runtime:eval-unavailable":
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     default:

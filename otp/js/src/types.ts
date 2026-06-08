@@ -22,7 +22,8 @@ export type BeamEvent =
   | { type: "otp:stdout"; payload: string }
   | { type: "otp:stderr"; payload: string }
   | { type: "otp:error"; payload: OtpErrorPayload }
-  | { type: "otp:message"; payload: AnyValue };
+  | { type: "otp:message"; payload: AnyValue }
+  | { type: "otp:run_js"; payload: { code: string } };
 
 export type OtpErrorPayload =
   | { kind: "abort"; data: string }
