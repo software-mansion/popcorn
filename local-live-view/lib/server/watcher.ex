@@ -33,7 +33,7 @@ defmodule LocalLiveView.Watcher do
 
   @spec start_link([option]) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    opts = Keyword.validate!(opts, dirs: [Path.absname("local")])
+    opts = Keyword.validate!(opts, dirs: [Path.absname("local/lib")])
     GenServer.start_link(__MODULE__, opts)
   end
 
