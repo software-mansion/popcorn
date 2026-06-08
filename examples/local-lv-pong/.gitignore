@@ -35,3 +35,4 @@ local_lv_pong-*.tar
 npm-debug.log
 /assets/node_modules/
 
+/assets/vendor/local_live_view.js
