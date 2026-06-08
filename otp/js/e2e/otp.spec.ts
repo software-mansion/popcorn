@@ -166,7 +166,7 @@ test("handles events in both directions", async ({ otp }) => {
   const BRIDGE_BOOT_EVAL = [
     "spawn(fun() ->",
     "  ok = wasm:send(#{direct => true, nested => #{count => 1}}),",
-    "  ok = wasm:register_listener(bridge),",
+    "  true = register(bridge, self()),",
     "  Loop = fun(F) ->",
     "    ok = wasm:send(#{bridge_ready => true}),",
     "    receive",
