@@ -1,18 +1,27 @@
-# LocalLvKanban
+# Kanban board (Local LiveView demo)
 
-To start your Phoenix server:
+A kanban board game implemented fully in Local Live View - see [kanban.ex](local/lib/local/kanban.ex).
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+Demonstrates simple forms, modals and drag&drop.
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+![](kanban.png)
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+## Usage
 
-## Learn more
+From the repository root:
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+```bash
+pnpm install
+mise run dev --example local-lv-pong
+```
+
+or directly from the example directory:
+
+```bash
+mix dev
+```
+
+and visit [localhost:4000](http://localhost:4000).
+
+
+
