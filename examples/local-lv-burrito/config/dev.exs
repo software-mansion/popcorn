@@ -7,12 +7,7 @@ config :burrito, BurritoWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "bUrR1t0S3cr3tK3yB4s3F0rD3vOnly!!PleaseChangeInProd1234567890abcd",
   watchers: [
-    node: [
-      "build.mjs",
-      "--watch",
-      cd: Path.expand("../assets", __DIR__),
-      env: %{"MIX_BUILD_PATH" => Mix.Project.build_path()}
-    ],
+    esbuild: {Esbuild, :install_and_run, [:burrito, ~w(--watch)]},
     tailwind: {Tailwind, :install_and_run, [:burrito, ~w(--watch)]}
   ]
 

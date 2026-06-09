@@ -1,0 +1,7 @@
+{
+  "name": "local_thermostat_assets",
+  "private": true,
+  "dependencies": {
+    "local_live_view": "workspace:*"
+  }
+}

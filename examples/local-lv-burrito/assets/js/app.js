@@ -308,7 +308,7 @@ import { LLVEngine } from "../vendor/local_live_view.js";
 liveSocket.connect();
 window.liveSocket = liveSocket;
 
-await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
 
 if (process.env.NODE_ENV === "development") {
   window.addEventListener(
