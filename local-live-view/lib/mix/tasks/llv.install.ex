@@ -26,8 +26,8 @@ defmodule Mix.Tasks.Llv.Install do
     * Add `mix llv.build` to your setup alias
     * Generate a `local/` project with a sample HelloLocal component
 
-  `mix setup` will then run `mix llv.build` which bundles the JS assets
-  and builds the WASM bundle from `local/`.
+  `mix setup` will then run `mix llv.build` which copies the LLV JS runtime files
+  into your project's `priv/static/assets/js/` and builds the WASM bundle from `local/`.
   """
 
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
@@ -186,7 +186,7 @@ defmodule Mix.Tasks.Llv.Install do
   # --- app.js ---
 
   @llv_js """
-  import { LLVEngine } from "../vendor/local_live_view.js";
+  import { LLVEngine } from "local_live_view";
   await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
   """
 
