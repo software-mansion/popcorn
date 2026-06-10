@@ -31,7 +31,7 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, path: "../popcorn/elixir", targets: :wasm},
+      {:popcorn, "~> 0.3.0-rc2", targets: :wasm},
       {:phoenix, "~> 1.8", runtime: false},
       {:phoenix_live_view, runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},

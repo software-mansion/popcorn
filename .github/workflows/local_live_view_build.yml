@@ -85,6 +85,21 @@ jobs:
       - name: Compile Hex dependencies
         run: mix deps.compile
 
+      # Catches three classes of staleness:
+      #  - assets/local_live_view.js edited without rebundle (priv/static/local_live_view.js drifts)
+      #  - popcorn npm bumped without re-copying runtime (iframe.mjs / AtomVM.* drift)
+      #  - bundle.mjs itself changed without re-running
+      #
+      # When this fails locally:
+      #   cd local-live-view/assets && npm install && node bundle.mjs
+      #   git add ../priv/static
+      - name: Verify priv/static up-to-date
+        working-directory: local-live-view/assets
+        run: |
+          npm install --no-audit --no-fund
+          node bundle.mjs
+          git diff --exit-code -- ../priv/static
+
       - name: Lint
         run: mix lint
 
