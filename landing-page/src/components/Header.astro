@@ -1,11 +1,18 @@
 ---
 import { Icon } from "astro-icon/components";
+import { TOP_BAR_BANNER, varNames } from "./TopBarBanner";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
+
+const firstZone = TOP_BAR_BANNER!.zones[0];
+const bannerHeightVar = varNames(firstZone.zoneId, firstZone.contentId).height;
 ---
 
-<div class="pointer-events-auto fixed top-0 right-0 left-0 z-50 min-w-max">
+<div
+  class="pointer-events-auto fixed top-0 right-0 left-0 z-50 min-w-max"
+  style={`top: var(${bannerHeightVar}, 0px)`}
+>
   <nav
     class="flex h-16 items-center justify-between gap-8 px-4 pt-3 pb-3 text-black backdrop-blur-xs transition-colors duration-300 md:px-12 lg:bg-transparent xl:px-36"
   >
@@ -27,7 +34,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     </div>
 
     <div
-      class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-full flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
+      class="bg-brown-70 h- text-light-20 fixed top-0 left-0 z-50 h-screen w-full -translate-y-[200%] flex-col gap-11 p-4 pt-10 transition-transform duration-300 lg:static lg:contents lg:text-black"
       data-mobile-menu
     >
       <div class="flex flex-col gap-10 lg:flex-row lg:gap-8 xl:gap-10">
@@ -90,7 +97,10 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     const menuToggle = document.querySelector("[data-mobile-menu-toggle]")!;
 
     function showMenu(open: boolean) {
-      mobileMenu.classList.toggle("-translate-y-full", !open);
+      // -200% (not -100%): the nav's backdrop-filter makes it the containing
+      // block for this fixed menu, so the banner offset shifts the menu down by
+      // the banner height. Hiding by twice its own height clears any offset
+      mobileMenu.classList.toggle("-translate-y-[200%]", !open);
       mobileMenu.classList.toggle("flex", open);
       // 14 instead of 16 to slightly overlap (pixels glitch)
       mobileMenu.classList.toggle("top-14", open);
@@ -190,11 +200,46 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
     swapTextColor();
   }
 
+  function setupBannerOffset(container: HTMLElement) {
+    const slot = document.getElementById("top-bar-banner");
+    if (!slot) return;
+
+    function bannerHeight() {
+      return slot!.getBoundingClientRect().height;
+    }
+
+    function updateOffset() {
+      container.style.top = `${Math.max(0, bannerHeight() - window.scrollY)}px`;
+    }
+
+    updateOffset();
+    window.addEventListener("scroll", updateOffset, { passive: true });
+    window.addEventListener("resize", updateOffset, { passive: true });
+
+    let rafId = 0;
+    const tick = () => {
+      updateOffset();
+      rafId = requestAnimationFrame(tick);
+    };
+    const startTracking = (e: TransitionEvent) => {
+      if (e.propertyName === "height" && !rafId) rafId = requestAnimationFrame(tick);
+    };
+    const stopTracking = (e: TransitionEvent) => {
+      if (e.propertyName !== "height") return;
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+      updateOffset();
+    };
+    slot.addEventListener("transitionrun", startTracking);
+    slot.addEventListener("transitionend", stopTracking);
+    slot.addEventListener("transitioncancel", stopTracking);
+  }
+
   function setup() {
     const nav = document.querySelector("nav")!;
     const container = nav.parentElement!;
     const logo = nav.querySelector("[data-logo]");
-    const links = nav.querySelectorAll("a:not(.lang-tour)");
+    const links = nav.querySelectorAll<HTMLAnchorElement>("a:not(.lang-tour)");
     const hamburgerIcon = nav.querySelector("[data-hamburger-icon]");
 
     const elements = {
@@ -211,6 +256,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
 
     setupHeaderColorChange(elements, state);
     setupMobileMenu(elements, state);
+    setupBannerOffset(container);
   }
 
   document.addEventListener("DOMContentLoaded", setup);

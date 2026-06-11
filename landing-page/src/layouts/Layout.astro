@@ -5,6 +5,23 @@ import "@fontsource-variable/inter";
 import interWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import handjetWoff2 from "@fontsource-variable/handjet/files/handjet-latin-wght-normal.woff2?url";
 import Header from "../components/Header.astro";
+import {
+  TopBarBanner,
+  topBarBannerReservationScript,
+  isBannerHidden,
+  TOP_BAR_BANNER,
+} from "../components/TopBarBanner";
+
+const firstZone = TOP_BAR_BANNER!.zones[0];
+const reservationScript = topBarBannerReservationScript(
+  firstZone.zoneId,
+  firstZone.contentId,
+  TOP_BAR_BANNER.hiddenPaths,
+);
+const bannerHidden = isBannerHidden(
+  Astro.url.pathname,
+  TOP_BAR_BANNER.hiddenPaths,
+);
 ---
 
 <!doctype html>
@@ -12,6 +29,7 @@ import Header from "../components/Header.astro";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
+    <script is:inline set:html={reservationScript} />
     <title>Popcorn: Elixir & Wasm</title>
     <meta
       name="description"
@@ -91,6 +109,17 @@ import Header from "../components/Header.astro";
 			)
 		}
 		<!-- End Google Tag Manager (noscript) -->
+    <div id="top-bar-banner">
+      {
+        !bannerHidden && (
+          <TopBarBanner
+            client:load
+            zones={TOP_BAR_BANNER.zones}
+            rotateIntervalMs={TOP_BAR_BANNER.rotateIntervalMs}
+          />
+        )
+      }
+    </div>
     <main class="bg-light-20 font-inter min-h-dvh gap-20 overflow-x-clip pt-24">
       <Header />
       <slot />
