@@ -266,6 +266,19 @@ window.toggleElevator = function () {
   }
 };
 
+window.openInfoModal = function () {
+  document.getElementById("info-modal").classList.remove("hidden");
+};
+
+window.closeInfoModal = function () {
+  document.getElementById("info-modal").classList.add("hidden");
+  localStorage.setItem("llv-burrito-seen", "1");
+};
+
+if (!localStorage.getItem("llv-burrito-seen")) {
+  document.getElementById("info-modal")?.classList.remove("hidden");
+}
+
 window.toggleLatency = function () {
   latencyEnabled = !latencyEnabled;
   const btn = document.getElementById("latency-btn");
@@ -275,14 +288,14 @@ window.toggleLatency = function () {
     btn && btn.classList.remove("border-white/20");
     btn &&
       (btn.innerHTML =
-        '<span class="hero-clock size-4"></span> Latency ON (500ms)');
+        '<span class="hero-clock size-4"></span><span class="hidden sm:inline"> Latency ON (500ms)</span><span class="sm:hidden"> ON</span>');
   } else {
     window.liveSocket.disableLatencySim();
     btn && btn.classList.remove("bg-white/20", "border-white/40");
     btn && btn.classList.add("border-white/20");
     btn &&
       (btn.innerHTML =
-        '<span class="hero-clock size-4"></span> Add 500ms Latency');
+        '<span class="hero-clock size-4"></span><span class="hidden sm:inline"> Add 500ms Latency</span><span class="sm:hidden"> Latency</span>');
   }
 };
 
@@ -309,6 +322,7 @@ liveSocket.connect();
 window.liveSocket = liveSocket;
 
 await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+document.getElementById("llv-loading")?.remove();
 
 if (process.env.NODE_ENV === "development") {
   window.addEventListener(

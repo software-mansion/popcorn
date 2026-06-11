@@ -272,7 +272,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
           <button
             phx-click="dec_qty"
             phx-target={@myself}
-            class="w-8 h-8 rounded-full border-2 border-pop-brown-medium text-pop-brown-medium hover:bg-pop-orange-light font-bold flex items-center justify-center disabled:opacity-30 transition-colors"
+            class="w-8 h-8 rounded-full border-2 border-pop-brown-medium text-pop-brown-medium hover:bg-pop-orange-light font-bold flex items-center justify-center disabled:opacity-30 transition-colors cursor-pointer"
             disabled={@builder.quantity <= 1}
           >
             −
@@ -283,7 +283,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
           <button
             phx-click="inc_qty"
             phx-target={@myself}
-            class="w-8 h-8 rounded-full border-2 border-pop-brown-medium text-pop-brown-medium hover:bg-pop-orange-light font-bold flex items-center justify-center disabled:opacity-30 transition-colors"
+            class="w-8 h-8 rounded-full border-2 border-pop-brown-medium text-pop-brown-medium hover:bg-pop-orange-light font-bold flex items-center justify-center disabled:opacity-30 transition-colors cursor-pointer"
             disabled={@builder.quantity >= 10}
           >
             +
@@ -302,7 +302,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
           phx-click="add_to_cart"
           phx-target={@myself}
           phx-disable-with="Adding…"
-          class="w-full bg-pop-brown hover:bg-pop-brown-medium text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors"
+          class="w-full bg-pop-brown hover:bg-pop-brown-medium text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors cursor-pointer"
         >
           Add to Cart
         </button>
@@ -331,7 +331,7 @@ defmodule BurritoWeb.Live.OrderingFormComponent do
                   phx-click="remove_item"
                   phx-value-id={item.id}
                   phx-target={@myself}
-                  class="text-red-400 hover:text-red-600 font-bold text-base leading-none"
+                  class="text-red-400 hover:text-red-600 font-bold text-base leading-none cursor-pointer"
                   title="Remove"
                 >
                   ×
