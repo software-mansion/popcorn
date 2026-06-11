@@ -266,18 +266,32 @@ window.toggleElevator = function () {
   }
 };
 
-window.openInfoModal = function () {
-  document.getElementById("info-modal").classList.remove("hidden");
-};
+const InfoModal = {
+  mounted() {
+    if (!localStorage.getItem("llv-burrito-seen")) {
+      this.el.classList.remove("hidden");
+    }
 
-window.closeInfoModal = function () {
-  document.getElementById("info-modal").classList.add("hidden");
-  localStorage.setItem("llv-burrito-seen", "1");
-};
+    this.handleOpen = () => this.el.classList.remove("hidden");
+    this.handleClose = () => this._close();
+    this.handleBackdrop = (e) => { if (e.target === this.el) this._close(); };
 
-if (!localStorage.getItem("llv-burrito-seen")) {
-  document.getElementById("info-modal")?.classList.remove("hidden");
-}
+    this.el.addEventListener("open-info-modal", this.handleOpen);
+    this.el.addEventListener("close-info-modal", this.handleClose);
+    this.el.addEventListener("click", this.handleBackdrop);
+  },
+
+  _close() {
+    this.el.classList.add("hidden");
+    localStorage.setItem("llv-burrito-seen", "1");
+  },
+
+  destroyed() {
+    this.el.removeEventListener("open-info-modal", this.handleOpen);
+    this.el.removeEventListener("close-info-modal", this.handleClose);
+    this.el.removeEventListener("click", this.handleBackdrop);
+  },
+};
 
 window.toggleLatency = function () {
   latencyEnabled = !latencyEnabled;
@@ -308,7 +322,7 @@ const csrfToken = document
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: { _csrf_token: csrfToken },
-  hooks: { ScrollSync },
+  hooks: { ScrollSync, InfoModal },
 });
 
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });

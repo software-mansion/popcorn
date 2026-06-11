@@ -38,7 +38,7 @@ defmodule BurritoWeb.OrderLive do
         </button>
 
         <button
-          onclick="window.openInfoModal()"
+          phx-click={JS.dispatch("open-info-modal", to: "#info-modal")}
           class="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium rounded-md border border-white/20 text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
         >
           <.icon name="hero-information-circle" class="size-4" />

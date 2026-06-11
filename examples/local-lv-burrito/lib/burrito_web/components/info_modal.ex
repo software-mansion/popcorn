@@ -3,17 +3,18 @@ defmodule BurritoWeb.InfoModal do
 
   import BurritoWeb.CoreComponents
 
+  alias Phoenix.LiveView.JS
+
   def info_modal(assigns) do
     ~H"""
     <div
       id="info-modal"
-      phx-update="ignore"
-      onclick="if(event.target===this) window.closeInfoModal()"
+      phx-hook="InfoModal"
       class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
     >
       <div class="info-modal-card relative w-full max-w-lg bg-pop-cream-warm border-2 border-pop-orange rounded-xl shadow-2xl p-6 flex flex-col gap-5">
         <button
-          onclick="window.closeInfoModal()"
+          phx-click={JS.dispatch("close-info-modal", to: "#info-modal")}
           class="absolute top-4 right-4 text-pop-brown-medium hover:text-pop-brown transition-colors cursor-pointer"
         >
           <.icon name="hero-x-mark" class="size-5" />
@@ -51,7 +52,7 @@ defmodule BurritoWeb.InfoModal do
         </div>
 
         <button
-          onclick="window.closeInfoModal()"
+          phx-click={JS.dispatch("close-info-modal", to: "#info-modal")}
           class="self-end px-4 py-2 text-sm font-semibold bg-pop-orange text-white rounded-lg hover:bg-pop-orange-dark transition-colors cursor-pointer"
         >
           Got it
