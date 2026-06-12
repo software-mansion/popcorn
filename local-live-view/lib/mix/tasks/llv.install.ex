@@ -34,8 +34,6 @@ defmodule Mix.Tasks.Llv.Install do
 
   @impl Igniter.Mix.Task
   def igniter(igniter) do
-    llv_path = llv_path_from_local()
-
     igniter
     |> inject_endpoint()
     |> inject_web_module()
@@ -44,13 +42,7 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_esbuild_format()
     |> inject_dev_watcher()
     |> inject_setup_alias()
-    |> generate_local_project(llv_path)
-  end
-
-  defp llv_path_from_local do
-    llv_abs = Mix.Project.deps_paths()[:local_live_view]
-    local_abs = Path.join(File.cwd!(), "local")
-    Path.relative_to(llv_abs, local_abs, force: true)
+    |> generate_local_project()
   end
 
   # --- Endpoint ---
@@ -112,36 +104,36 @@ defmodule Mix.Tasks.Llv.Install do
   # --- Web module ---
 
   defp inject_web_module(igniter) do
-    case Path.wildcard("lib/*_web.ex") do
-      [path | _] ->
-        Igniter.update_elixir_file(igniter, path, fn zipper ->
-          if module_source_contains?(zipper, "LocalLiveView.Component") do
-            {:ok, zipper}
-          else
-            anchor =
-              find_import_by_suffix(zipper, "CoreComponents") ||
-                find_import_by_suffix(zipper, "Phoenix.HTML")
+    web_module = Igniter.Libs.Phoenix.web_module(igniter)
 
-            case anchor do
-              {:ok, anchor_zipper} ->
-                {:ok,
-                 Igniter.Code.Common.add_code(
-                   anchor_zipper,
-                   "import LocalLiveView.Component"
-                 )}
+    case Igniter.Project.Module.find_and_update_module(igniter, web_module, &update_web_module/1) do
+      {:ok, igniter} ->
+        igniter
 
-              nil ->
-                {:warning,
-                 "Could not find html_helpers imports in #{path}. Add manually: import LocalLiveView.Component"}
-            end
-          end
-        end)
-
-      [] ->
+      {:error, igniter} ->
         Igniter.add_warning(
           igniter,
-          "Could not find *_web.ex. Add manually to html_helpers: import LocalLiveView.Component"
+          "Could not find module #{inspect(web_module)}. Add manually to html_helpers: import LocalLiveView.Component"
         )
+    end
+  end
+
+  defp update_web_module(zipper) do
+    if module_source_contains?(zipper, "LocalLiveView.Component") do
+      {:ok, zipper}
+    else
+      anchor =
+        find_import_by_suffix(zipper, "CoreComponents") ||
+          find_import_by_suffix(zipper, "Phoenix.HTML")
+
+      case anchor do
+        {:ok, anchor_zipper} ->
+          {:ok, Igniter.Code.Common.add_code(anchor_zipper, "import LocalLiveView.Component")}
+
+        nil ->
+          {:warning,
+           "Could not find html_helpers imports in web module. Add manually: import LocalLiveView.Component"}
+      end
     end
   end
 
@@ -165,22 +157,31 @@ defmodule Mix.Tasks.Llv.Install do
   # --- Root layout ---
 
   defp inject_root_layout(igniter) do
-    case Path.wildcard("lib/*_web/components/layouts/root.html.heex") do
-      [path | _] ->
-        replace_in_file(
-          igniter,
-          path,
-          ~s|type="module"|,
-          ~s|type="text/javascript"|,
-          ~s|type="module"|
-        )
+    web_dir = web_module_dir(igniter)
+    path = "lib/#{web_dir}/components/layouts/root.html.heex"
 
-      [] ->
-        Igniter.add_warning(
-          igniter,
-          ~s|Could not find root.html.heex. Change app.js script tag to type="module" manually.|
-        )
+    if Igniter.exists?(igniter, path) do
+      replace_in_file(
+        igniter,
+        path,
+        ~s|type="module"|,
+        ~s|type="text/javascript"|,
+        ~s|type="module"|
+      )
+    else
+      Igniter.add_warning(
+        igniter,
+        ~s|Could not find #{path}. Change app.js script tag to type="module" manually.|
+      )
     end
+  end
+
+  defp web_module_dir(igniter) do
+    igniter
+    |> Igniter.Libs.Phoenix.web_module()
+    |> Module.split()
+    |> List.last()
+    |> Macro.underscore()
   end
 
   # --- app.js ---
@@ -191,31 +192,31 @@ defmodule Mix.Tasks.Llv.Install do
   """
 
   defp inject_app_js(igniter) do
-    case Path.wildcard("assets/js/app.js") do
-      [path | _] ->
-        Igniter.update_file(igniter, path, fn source ->
-          content = Rewrite.Source.get(source, :content)
+    path = "assets/js/app.js"
 
-          if String.contains?(content, "local_live_view") do
-            source
-          else
-            Rewrite.Source.update(
-              source,
-              :content,
-              Regex.replace(
-                ~r/liveSocket\.connect\(\);?\n/,
-                content,
-                "liveSocket.connect();\n\n" <> @llv_js
-              )
+    if Igniter.exists?(igniter, path) do
+      Igniter.update_file(igniter, path, fn source ->
+        content = Rewrite.Source.get(source, :content)
+
+        if String.contains?(content, "local_live_view") do
+          source
+        else
+          Rewrite.Source.update(
+            source,
+            :content,
+            Regex.replace(
+              ~r/liveSocket\.connect\(\);?\n/,
+              content,
+              "liveSocket.connect();\n\n" <> @llv_js
             )
-          end
-        end)
-
-      [] ->
-        Igniter.add_warning(igniter, """
-        Could not find assets/js/app.js. Add after liveSocket.connect():
-        #{@llv_js}
-        """)
+          )
+        end
+      end)
+    else
+      Igniter.add_warning(igniter, """
+      Could not find #{path}. Add after liveSocket.connect():
+      #{@llv_js}
+      """)
     end
   end
 
@@ -229,7 +230,7 @@ defmodule Mix.Tasks.Llv.Install do
   end
 
   defp inject_esbuild_format_in(igniter, path) do
-    if File.exists?(path) do
+    if Igniter.exists?(igniter, path) do
       replace_in_file(igniter, path, "--format=esm", "--bundle", "--bundle --format=esm")
     else
       igniter
@@ -296,16 +297,30 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- local/ project ---
 
-  defp generate_local_project(igniter, llv_path) do
-    if File.exists?("local") do
+  defp generate_local_project(igniter) do
+    if Igniter.exists?(igniter, "local/mix.exs") do
       igniter
     else
+      llv_path = llv_path_from_local()
+
       igniter
       |> copy_template("local/mix.exs", "mix.exs", llv_path: llv_path)
       |> copy_template("local/config/config.exs", "config.exs")
       |> copy_template("local/.formatter.exs", "formatter.exs")
       |> copy_template("local/lib/local/application.ex", "application.ex")
       |> copy_template("local/lib/hello_local.ex", "hello_local.ex")
+    end
+  end
+
+  defp llv_path_from_local do
+    case Mix.Project.deps_paths()[:local_live_view] do
+      nil ->
+        # Running inside local_live_view itself (e.g. tests) — llv is not a dep.
+        ".."
+
+      llv_abs ->
+        local_abs = Path.join(File.cwd!(), "local")
+        Path.relative_to(llv_abs, local_abs, force: true)
     end
   end
 
