@@ -367,7 +367,7 @@ defmodule BurritoLive do
         <div class="justify-center sm:justify-start px-3 pb-3 pt-2 flex items-center gap-3">
           <button
             phx-click="dec_qty"
-            class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors"
+            class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors cursor-pointer"
           >
             −
           </button>
@@ -376,7 +376,7 @@ defmodule BurritoLive do
           </span>
           <button
             phx-click="inc_qty"
-            class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors"
+            class="w-8 h-8 rounded-full border-2 border-pop-orange text-pop-orange-dark hover:bg-pop-orange-light font-bold flex items-center justify-center transition-colors cursor-pointer"
           >
             +
           </button>
@@ -392,7 +392,7 @@ defmodule BurritoLive do
         </div>
         <button
           phx-click="add_to_cart"
-          class="w-full bg-white text-pop-orange-dark hover:bg-pop-orange-light text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors"
+          class="w-full bg-white text-pop-orange-dark hover:bg-pop-orange-light text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors cursor-pointer"
         >
           Add to Cart
         </button>
@@ -417,7 +417,7 @@ defmodule BurritoLive do
                 <button
                   phx-click="remove_item"
                   phx-value-id={item.id}
-                  class="text-red-400 hover:text-red-600 font-bold text-base leading-none"
+                  class="text-red-400 hover:text-red-600 font-bold text-base leading-none cursor-pointer"
                   title="Remove"
                 >
                   ×

@@ -76,6 +76,24 @@ body {
   background-color: rgba(255, 255, 255, 0.03);
 }
 
+#info-modal:not(.hidden) {
+  animation: modal-backdrop-in 0.2s ease-out;
+}
+
+#info-modal:not(.hidden) .info-modal-card {
+  animation: modal-card-in 0.2s ease-out;
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* Smooth collapsible using CSS grid (no max-height lag) */
 .collapsible-grid {
   display: grid;
