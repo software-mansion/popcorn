@@ -21,7 +21,7 @@ async function runBlock(block: Locator) {
   await expect(run).toBeEnabled({ timeout: EVAL_TIMEOUT_MS });
 }
 
-test("decorates popcorn:eval blocks and enables Run once Popcorn is ready", async ({
+test("decorates elixir-popcorn blocks and enables Run once Popcorn is ready", async ({
   page,
 }) => {
   const blocks = page.locator(".popdoc-block");
