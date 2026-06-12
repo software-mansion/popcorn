@@ -112,6 +112,7 @@ defmodule LocalLiveView.Component do
       id={@id}
       data-pop-mirror={@has_mirror || nil}
       data-pop-assigns={encode_assigns(@comp_assigns)}
+      phx-hook="LocalLiveView"
       phx-update="ignore"
     >
     </div>

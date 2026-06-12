@@ -92,6 +92,25 @@ On mount, `mount/1` runs once and then `update/2` receives the assigns. They
 arrive with atom keys at the top level (nested maps keep string keys, since they
 are serialized to JSON to cross into the runtime).
 
+`update/2` also runs again whenever the hosting server `LiveView` re-renders with
+changed assigns, so the local component tracks server-side state:
+
+```elixir
+# in the server LiveView
+def handle_event("add", _params, socket) do
+  {:noreply, update(socket, :items, &[new_item() | &1])}
+end
+
+def render(assigns) do
+  ~H"""
+  <.local_component module="Cart" items={@items} />
+  """
+end
+```
+
+Each time `@items` changes, `Cart`'s `update/2` runs in the browser with the new
+list.
+
 ## Build
 
 To build the project after defining the above, run:

@@ -39,6 +39,13 @@ export class LLVEngine {
       await sendServerMessage(popcorn, e.detail);
     });
 
+    // Register the assigns hook on the LiveSocket before the host LiveView joins
+    // and attaches hooks (this runs synchronously, before the first await). The
+    // mount point carries phx-hook="LocalLiveView"; the hook's updated() forwards
+    // server-driven assign changes into the runtime. getHookDefinition reads
+    // liveSocket.hooks live, so mutating it here is enough — no app.js changes.
+    liveSocket.hooks.LocalLiveView = assignsHook(() => popcorn);
+
     // Pages with only LocalLiveViews (no server-side LiveView) connect in "dead"
     // mode, which skips bindForms() — making phx-submit / phx-change no-ops on
     // any LLV. Wire them up manually when no real LiveView is on the page.
@@ -300,6 +307,41 @@ function parseAssigns(raw) {
     console.error("LLV failed to parse data-pop-assigns:", raw, err);
     return {};
   }
+}
+
+// Phoenix LiveView hook that keeps a local_component in sync with server-driven
+// assign changes — the same mechanism live_vue/live_svelte use for props. The
+// mount point carries phx-hook="LocalLiveView" and phx-update="ignore"; when the
+// host LiveView re-renders, Phoenix patches the element's data-pop-assigns
+// attribute (it merges data-* attrs even on ignored elements) and calls
+// updated(), where we forward the new assigns so the component's update/2 runs
+// again. The initial assigns were already delivered when the view mounted, so we
+// seed in mounted() and only react to later changes.
+//
+// `getPopcorn` is a thunk because the hook is registered before Popcorn finishes
+// initializing; updated() only fires on a later server render, by which point
+// the runtime is ready.
+function assignsHook(getPopcorn) {
+  return {
+    mounted() {
+      this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
+    },
+    updated() {
+      const raw = this.el.getAttribute("data-pop-assigns");
+      if (raw === this.llvLastAssigns) return;
+      this.llvLastAssigns = raw;
+
+      const popcorn = getPopcorn();
+      if (!popcorn) return;
+
+      popcorn
+        .call(
+          { id: this.el.id, event: "llv_update_assigns", payload: parseAssigns(raw) },
+          { timeoutMs: 10_000 },
+        )
+        .catch((err) => console.error("LLV update assigns error", err));
+    },
+  };
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so

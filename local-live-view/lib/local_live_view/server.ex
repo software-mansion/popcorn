@@ -89,6 +89,26 @@ defmodule LocalLiveView.Server do
     |> handle_result({:handle_info, 2, nil}, state)
   end
 
+  def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
+    # The host LiveView re-rendered with new assigns for a LocalComponent. Run its
+    # update/2 (via the generated entrypoint) and push the resulting diff.
+    if function_exported?(socket.view, :__llv_update__, 2) do
+      case socket.view.__llv_update__(assigns, socket) do
+        {:ok, %Socket{} = new_socket} ->
+          handle_changed(state, new_socket, nil)
+
+        other ->
+          raise ArgumentError, """
+          expected #{inspect(socket.view)}.update/2 to return {:ok, %Socket{}}, got:
+
+          #{inspect(other)}
+          """
+      end
+    else
+      {:noreply, state}
+    end
+  end
+
   def handle_info({:phoenix, :send_update, update}, state) do
     case Diff.update_component(state.socket, state.components, update) do
       {diff, new_components} ->

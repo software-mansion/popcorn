@@ -34,8 +34,11 @@ defmodule LocalComponent do
       <.local_component module="Cart" items={@items} />
 
   On mount, `mount/1` is called once, then `update/2` receives the assigns passed
-  via the component. Assigns arrive with atom keys at the top level; nested maps
-  keep string keys, since they are serialized to JSON to cross into the runtime.
+  via the component. Whenever the hosting (server) `LiveView` re-renders with
+  changed assigns, `update/2` runs again with the new values — so server-side
+  state stays reflected in the local component. Assigns arrive with atom keys at
+  the top level; nested maps keep string keys, since they are serialized to JSON
+  to cross into the runtime.
   '''
 
   alias Phoenix.LiveView.Socket
@@ -71,6 +74,13 @@ defmodule LocalComponent do
       def update(assigns, socket), do: {:ok, assign(socket, assigns)}
 
       defoverridable mount: 1, update: 2
+
+      @doc false
+      # Internal entrypoint the server calls when the host LiveView pushes new
+      # assigns. Not overridable, so it always reaches the user's update/2.
+      def __llv_update__(assigns, socket) do
+        update(LocalComponent.__normalize_assigns__(assigns), socket)
+      end
     end
   end
 
