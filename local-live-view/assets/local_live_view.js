@@ -285,7 +285,21 @@ function findPredefinedViews() {
   return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) => ({
     view: el.getAttribute("data-pop-view"),
     id: el.id,
+    assigns: parseAssigns(el.getAttribute("data-pop-assigns")),
   }));
+}
+
+// data-pop-assigns holds the JSON a local_component serialized from its inline
+// assigns. Absent/empty for plain local views — default to {} so the process is
+// always handed a map.
+function parseAssigns(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("LLV failed to parse data-pop-assigns:", raw, err);
+    return {};
+  }
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so

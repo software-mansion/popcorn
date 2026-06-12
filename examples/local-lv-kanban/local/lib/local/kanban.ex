@@ -1,5 +1,5 @@
-defmodule Local.KanbanLive do
-  use LocalLiveView
+defmodule Local.Kanban do
+  use LocalComponent
 
   alias Local.ColumnComponent
   alias Local.OrderedMap
@@ -10,14 +10,13 @@ defmodule Local.KanbanLive do
   # (`OrderedMap.insert_before/4`); columns are only appended or removed.
 
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok,
-     assign(socket,
-       columns: seed_columns(),
-       task_modal: nil,
-       dragging: nil,
-       drag_target: nil
-     )}
+  def mount(socket) do
+    {:ok, assign(socket, task_modal: nil, dragging: nil, drag_target: nil)}
+  end
+
+  @impl true
+  def update(%{board: board}, socket) do
+    {:ok, assign(socket, :columns, build_columns(board))}
   end
 
   # --- Columns & tasks -------------------------------------------------------
@@ -162,39 +161,18 @@ defmodule Local.KanbanLive do
 
   defp successor_id(columns, cid, tid), do: OrderedMap.next_key(columns[cid].tasks, tid)
 
-  defp seed_columns do
-    [
-      %{
-        name: "To Do",
-        tasks: [
-          %{text: "Design landing page", description: ""},
-          %{text: "Write project proposal", description: "Outline scope, timeline, budget."},
-          %{text: "Set up CI/CD pipeline", description: ""},
-          %{text: "Measure performance", description: ""}
-        ]
-      },
-      %{
-        name: "In Progress",
-        tasks: [
-          %{text: "Implement auth flow", description: "OAuth + session handling."},
-          %{text: "Refactor database layer", description: ""}
-        ]
-      },
-      %{
-        name: "Review",
-        tasks: [%{text: "Code review for PR #42", description: ""}]
-      },
-      %{
-        name: "Done",
-        tasks: [
-          %{text: "Set up development environment", description: ""},
-          %{text: "Initial repo structure", description: ""}
-        ]
-      }
-    ]
+  # Turns the JSON board handed down by the server LiveView (string-keyed maps,
+  # tasks as plain lists) into the ordered-map structure the rest of the view
+  # works with, assigning a fresh id to every column and task.
+  defp build_columns(board) do
+    board
     |> Enum.map(fn col ->
-      tasks = Enum.map(col.tasks, &Map.put(&1, :id, uuid()))
-      col |> Map.put(:id, uuid()) |> Map.put(:tasks, OrderedMap.new(tasks, & &1.id))
+      tasks =
+        Enum.map(col["tasks"], fn task ->
+          %{id: uuid(), text: task["text"], description: task["description"] || ""}
+        end)
+
+      %{id: uuid(), name: col["name"], tasks: OrderedMap.new(tasks, & &1.id)}
     end)
     |> OrderedMap.new(& &1.id)
   end

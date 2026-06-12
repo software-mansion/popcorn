@@ -445,7 +445,12 @@ defmodule LocalLiveView.Server do
       view: view
     } = verified
 
-    connect_params = params["params"]
+    # Assigns passed via the `<.local_component assigns... />` component reach us
+    # here as a string-keyed map (empty for a plain local view). They become the
+    # first argument to the view's mount/3 callback — `LocalComponent` routes them
+    # on to its update/2.
+    initial_assigns = params["assigns"] || %{}
+    connect_params = initial_assigns
     llv_id = params["llv_id"]
 
     socket = %Socket{
@@ -466,9 +471,9 @@ defmodule LocalLiveView.Server do
 
         try do
           %Socket{socket | view: view}
-          |> Utils.maybe_call_live_view_mount!(view, params, verified)
+          |> Utils.maybe_call_live_view_mount!(view, initial_assigns, verified)
           |> build_state(phx_socket, llv_id)
-          |> maybe_call_mount_handle_params(params)
+          |> maybe_call_mount_handle_params(initial_assigns)
           |> reply_mount(from, verified)
         rescue
           exception ->

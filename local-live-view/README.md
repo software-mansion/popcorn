@@ -55,6 +55,43 @@ end
 </html>
 ```
 
+## Local components
+
+When you need to seed a local view with state from the server, use a
+`LocalComponent` instead. It is the browser-side counterpart of
+`Phoenix.LiveComponent`: same `mount/1`, `update/2`, `render/1` and
+`handle_event/3` callbacks, and it can be handed assigns when mounted.
+
+```elixir
+defmodule Cart do
+  use LocalComponent
+
+  @impl true
+  def mount(socket), do: {:ok, assign(socket, open: false)}
+
+  @impl true
+  def update(%{items: items}, socket), do: {:ok, assign(socket, :items, items)}
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <p>{length(@items)} items in cart</p>
+    """
+  end
+end
+```
+
+Mount it with the `local_component/1` component — typically from a server
+`LiveView` — passing assigns inline, just like `Phoenix.Component.live_component/1`:
+
+```elixir
+<.local_component module="Cart" items={@items} />
+```
+
+On mount, `mount/1` runs once and then `update/2` receives the assigns. They
+arrive with atom keys at the top level (nested maps keep string keys, since they
+are serialized to JSON to cross into the runtime).
+
 ## Build
 
 To build the project after defining the above, run:
