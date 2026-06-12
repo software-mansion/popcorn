@@ -1,6 +1,8 @@
 defmodule BurritoWeb.OrderLive do
   use BurritoWeb, :live_view
 
+  import BurritoWeb.InfoModal
+
   def mount(_params, _session, socket) do
     {:ok, assign(socket, llv_id: "burrito-live-#{socket.id}")}
   end
@@ -20,7 +22,7 @@ defmodule BurritoWeb.OrderLive do
         <button
           id="elevator-btn"
           onclick="window.toggleElevator()"
-          class="flex items-center gap-1.5 whitespace-nowrap px-2.5 md:px-3 py-1.5 text-[10px] sm:text-xs md:text-sm font-semibold rounded-md bg-pop-orange text-white hover:bg-pop-orange-dark transition-colors"
+          class="flex items-center gap-1.5 whitespace-nowrap px-2.5 md:px-3 py-1.5 text-[10px] sm:text-xs md:text-sm font-semibold rounded-md bg-pop-orange text-white hover:bg-pop-orange-dark transition-colors cursor-pointer"
         >
           <.icon name="hero-signal-slash" class="size-4" /> Disconnect
         </button>
@@ -28,9 +30,19 @@ defmodule BurritoWeb.OrderLive do
         <button
           id="latency-btn"
           onclick="window.toggleLatency()"
-          class="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium rounded-md border border-white/20 text-white/80 hover:bg-white/10 transition-colors"
+          class="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium rounded-md border border-white/20 text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
         >
-          <.icon name="hero-clock" class="size-4" /> Add 500ms Latency
+          <.icon name="hero-clock" class="size-4" />
+          <span class="hidden sm:inline">Add 500ms Latency</span>
+          <span class="sm:hidden">Latency</span>
+        </button>
+
+        <button
+          phx-click={JS.dispatch("open-info-modal", to: "#info-modal")}
+          class="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 text-xs md:text-sm font-medium rounded-md border border-white/20 text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
+        >
+          <.icon name="hero-information-circle" class="size-4" />
+          <span class="hidden sm:inline">About</span>
         </button>
 
         <div
@@ -85,8 +97,16 @@ defmodule BurritoWeb.OrderLive do
 
           <div
             id="right-scroll-panel"
-            class="border-b border-pop-orange/20 flex-1 min-h-0 overflow-auto"
+            class="border-b border-pop-orange/20 flex-1 min-h-0 overflow-auto relative"
           >
+            <div
+              id="llv-loading"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none"
+            >
+              <div class="size-8 rounded-full border-4 border-pop-orange/30 border-t-pop-orange animate-spin">
+              </div>
+              <span class="text-xs text-pop-orange-dark/60 font-medium">Loading Local LiveView…</span>
+            </div>
             <.local_live_view id={@llv_id} view="BurritoLive" />
           </div>
         </div>
@@ -96,7 +116,7 @@ defmodule BurritoWeb.OrderLive do
         <button
           id="sync-panel-toggle"
           onclick="window.toggleSyncedPanel()"
-          class="w-full flex items-center justify-between px-3 py-2 text-xxs sm:text-sm font-medium transition-colors sticky top-0 z-10 bg-pop-brown hover:bg-pop-brown/90 border-b border-white/10"
+          class="w-full flex items-center justify-between px-3 py-2 text-xxs sm:text-sm font-medium transition-colors sticky top-0 z-10 bg-pop-brown hover:bg-pop-brown/90 border-b border-white/10 cursor-pointer"
         >
           <h4 class="text-xs sm:text-sm font-semibold text-white flex items-center gap-1.5">
             <.icon name="hero-arrow-path" class="size-4 text-pop-orange-light" />
@@ -116,6 +136,8 @@ defmodule BurritoWeb.OrderLive do
           </div>
         </div>
       </div>
+
+      <.info_modal />
     </div>
     """
   end

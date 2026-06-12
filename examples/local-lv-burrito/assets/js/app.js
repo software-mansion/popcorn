@@ -266,6 +266,33 @@ window.toggleElevator = function () {
   }
 };
 
+const InfoModal = {
+  mounted() {
+    if (!localStorage.getItem("llv-burrito-seen")) {
+      this.el.classList.remove("hidden");
+    }
+
+    this.handleOpen = () => this.el.classList.remove("hidden");
+    this.handleClose = () => this._close();
+    this.handleBackdrop = (e) => { if (e.target === this.el) this._close(); };
+
+    this.el.addEventListener("open-info-modal", this.handleOpen);
+    this.el.addEventListener("close-info-modal", this.handleClose);
+    this.el.addEventListener("click", this.handleBackdrop);
+  },
+
+  _close() {
+    this.el.classList.add("hidden");
+    localStorage.setItem("llv-burrito-seen", "1");
+  },
+
+  destroyed() {
+    this.el.removeEventListener("open-info-modal", this.handleOpen);
+    this.el.removeEventListener("close-info-modal", this.handleClose);
+    this.el.removeEventListener("click", this.handleBackdrop);
+  },
+};
+
 window.toggleLatency = function () {
   latencyEnabled = !latencyEnabled;
   const btn = document.getElementById("latency-btn");
@@ -275,14 +302,14 @@ window.toggleLatency = function () {
     btn && btn.classList.remove("border-white/20");
     btn &&
       (btn.innerHTML =
-        '<span class="hero-clock size-4"></span> Latency ON (500ms)');
+        '<span class="hero-clock size-4"></span><span class="hidden sm:inline"> Latency ON (500ms)</span><span class="sm:hidden"> ON</span>');
   } else {
     window.liveSocket.disableLatencySim();
     btn && btn.classList.remove("bg-white/20", "border-white/40");
     btn && btn.classList.add("border-white/20");
     btn &&
       (btn.innerHTML =
-        '<span class="hero-clock size-4"></span> Add 500ms Latency');
+        '<span class="hero-clock size-4"></span><span class="hidden sm:inline"> Add 500ms Latency</span><span class="sm:hidden"> Latency</span>');
   }
 };
 
@@ -295,7 +322,7 @@ const csrfToken = document
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: { _csrf_token: csrfToken },
-  hooks: { ScrollSync },
+  hooks: { ScrollSync, InfoModal },
 });
 
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
@@ -309,6 +336,7 @@ liveSocket.connect();
 window.liveSocket = liveSocket;
 
 await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+document.getElementById("llv-loading")?.remove();
 
 if (process.env.NODE_ENV === "development") {
   window.addEventListener(
