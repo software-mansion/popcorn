@@ -6,7 +6,7 @@ defmodule FormDemoWeb.FormDemoLive do
     <div class="centered-div">
       <.local_live_view id={"form-demo-local-#{@socket.id}"} view="FormDemoLocal" />
       <div class="bordered">
-        <h1>[Server Runtime] User List:</h1>
+        <h2>[Server Runtime] User List:</h2>
         <ul>
           <%= for user <- @users do %>
             <li>Username: {user["username"]}, Email: {user["email"]}</li>

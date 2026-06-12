@@ -16,6 +16,34 @@
   --color-brown-60: #696057;
   --color-brown-gray: #696057;
   --color-black: #301b05;
+  --color-llv-bg-100: #1a0f05;
+  --color-llv-bg-110: #120a02;
+  --color-llv-brown-50: #7a5535;
+  --color-llv-brown-55: #5a4535;
+  --color-llv-brown-75: #5a4030;
+  --color-llv-brown-85: #4a3020;
+  --color-llv-brown-95: #3a2810;
+  --color-llv-gutter: #2e1e0a;
+  --color-llv-fg-muted: #d4c4b0;
+  --color-llv-orange-40: #ffe599;
+  --color-llv-orange-50: #ffc285;
+  --color-llv-orange-60: #ffa94d;
+  --color-llv-orange-70: #ef9f40;
+  --color-llv-green-60: #a8d8a8;
+  --color-llv-blue-50: #a0c4d4;
+  --color-llv-blue-60: #80b8d4;
   --font-handjet: "Handjet Variable", system-ui;
   --font-inter: "Inter Variable", sans-serif;
+  --animate-fade-slide: fadeSlide 0.3s ease;
+
+  @keyframes fadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }

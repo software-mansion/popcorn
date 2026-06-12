@@ -1,0 +1,24 @@
+.llv-scroll,
+.llv-scroll pre {
+  scrollbar-color: var(--color-llv-brown-50) var(--color-llv-gutter);
+  scrollbar-width: thin;
+}
+.llv-scroll::-webkit-scrollbar,
+.llv-scroll pre::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.llv-scroll::-webkit-scrollbar-track,
+.llv-scroll pre::-webkit-scrollbar-track {
+  background: var(--color-llv-gutter);
+  border-radius: 3px;
+}
+.llv-scroll::-webkit-scrollbar-thumb,
+.llv-scroll pre::-webkit-scrollbar-thumb {
+  background: var(--color-llv-brown-50);
+  border-radius: 3px;
+}
+.llv-scroll::-webkit-scrollbar-thumb:hover,
+.llv-scroll pre::-webkit-scrollbar-thumb:hover {
+  background: #ef7c00;
+}
