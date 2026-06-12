@@ -71,9 +71,13 @@ defmodule LocalLiveView.Server do
     %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
     val = decode_event_type(type, raw_val, msg.payload)
 
-    state.socket
-    |> view_handle_event(event, val)
-    |> handle_result({:handle_event, 3, msg.ref}, state)
+    if cid = msg.payload["cid"] do
+      component_handle_event(state, cid, event, val, msg.ref)
+    else
+      state.socket
+      |> view_handle_event(event, val)
+      |> handle_result({:handle_event, 3, msg.ref}, state)
+    end
   end
 
   def handle_info(
@@ -83,6 +87,16 @@ defmodule LocalLiveView.Server do
     {:js_push, event, payload}
     |> view_handle_info(socket)
     |> handle_result({:handle_info, 2, nil}, state)
+  end
+
+  def handle_info({:phoenix, :send_update, update}, state) do
+    case Diff.update_component(state.socket, state.components, update) do
+      {diff, new_components} ->
+        {:noreply, push_diff(%{state | components: new_components}, diff, nil)}
+
+      :noop ->
+        {:noreply, state}
+    end
   end
 
   def handle_info(msg, %{socket: socket} = state) do
@@ -115,6 +129,59 @@ defmodule LocalLiveView.Server do
 
       other ->
         raise_bad_callback_response!(other, socket.view, :handle_event, 3)
+    end
+  end
+
+  defp component_handle_event(state, cid, event, val, ref) do
+    %{socket: socket, components: components} = state
+
+    result =
+      Diff.write_component(socket, cid, components, fn component_socket, component ->
+        {component_handle_event_call(component_socket, component, event, val), nil}
+      end)
+
+    case result do
+      {diff, new_components, _extra} ->
+        {:noreply, push_diff(%{state | components: new_components}, diff, ref)}
+
+      :error ->
+        {:noreply, push_noop(state, ref)}
+    end
+  end
+
+  defp component_handle_event_call(component_socket, _component, "lv:clear-flash", val) do
+    case val do
+      %{"key" => key} -> Utils.clear_flash(component_socket, key)
+      _ -> Utils.clear_flash(component_socket)
+    end
+  end
+
+  defp component_handle_event_call(_component_socket, _component, "lv:" <> _ = bad_event, _val) do
+    raise ArgumentError, """
+    received unknown LiveView event #{inspect(bad_event)}.
+    The following LiveView events are supported: lv:clear-flash.
+    """
+  end
+
+  defp component_handle_event_call(component_socket, component, event, val) do
+    case component.handle_event(event, val, component_socket) do
+      {:noreply, %Socket{} = component_socket} ->
+        component_socket
+
+      {:reply, %{} = reply, %Socket{} = component_socket} ->
+        Utils.put_reply(component_socket, reply)
+
+      other ->
+        raise ArgumentError, """
+        invalid return from #{inspect(component)}.handle_event/3 callback.
+
+        Expected one of:
+
+            {:noreply, %Socket{}}
+            {:reply, map, %Socket{}}
+
+        Got: #{inspect(other)}
+        """
     end
   end
 

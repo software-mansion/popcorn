@@ -497,8 +497,8 @@ take(Key, Map) when is_map(Map) ->
             V = ?MODULE:get(Key, Map),
             Map2 = iterate_remove(Key, maps:next(maps:iterator(Map)), ?MODULE:new()),
             {V, Map2};
-        _ ->
-            Map
+        false ->
+            error
     end;
 take(_Key, Map) ->
     error({badmap, Map}).
