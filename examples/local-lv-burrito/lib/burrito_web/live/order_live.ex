@@ -101,6 +101,7 @@ defmodule BurritoWeb.OrderLive do
           >
             <div
               id="llv-loading"
+              phx-hook="LLVLoader"
               class="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none"
             >
               <div class="size-8 rounded-full border-4 border-pop-orange/30 border-t-pop-orange animate-spin">

@@ -266,6 +266,22 @@ window.toggleElevator = function () {
   }
 };
 
+const LLVLoader = {
+  mounted() {
+    const popView = document.querySelector("[data-pop-view]");
+    if (popView?.childElementCount > 0) {
+      this.el.remove();
+      return;
+    }
+    this.handleReady = () => this.el.remove();
+    window.addEventListener("llv:ready", this.handleReady, { once: true });
+  },
+
+  destroyed() {
+    window.removeEventListener("llv:ready", this.handleReady);
+  },
+};
+
 const InfoModal = {
   mounted() {
     if (!localStorage.getItem("llv-burrito-seen")) {
@@ -322,7 +338,7 @@ const csrfToken = document
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: { _csrf_token: csrfToken },
-  hooks: { ScrollSync, InfoModal },
+  hooks: { ScrollSync, InfoModal, LLVLoader },
 });
 
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
@@ -336,7 +352,7 @@ liveSocket.connect();
 window.liveSocket = liveSocket;
 
 await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
-document.getElementById("llv-loading")?.remove();
+window.dispatchEvent(new CustomEvent("llv:ready"));
 
 if (process.env.NODE_ENV === "development") {
   window.addEventListener(
