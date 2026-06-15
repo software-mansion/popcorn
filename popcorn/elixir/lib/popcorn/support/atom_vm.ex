@@ -152,10 +152,15 @@ defmodule Popcorn.Support.AtomVM do
 
     log_path = Path.join(run_dir, "logs.txt")
 
-    {page, instance_id} = Popcorn.Support.Browser.new_instance(bundle_path)
+    # `apply/3` keeps the test-only Browser/Playwright modules off the compile-time
+    # dependency graph so this module can ship in `lib/` without forcing those deps
+    # on consumers that only use the :unix target.
+    {page, instance_id} = apply(Popcorn.Support.Browser, :new_instance, [bundle_path])
 
     result =
-      Playwright.Page.evaluate(page, """
+      apply(Playwright.Page, :evaluate, [
+        page,
+        """
       async () => {
         const instance = window.popcornInstances.get("#{instance_id}");
         try {
@@ -168,7 +173,8 @@ defmodule Popcorn.Support.AtomVM do
           return { error: true, logs: instance.logs.join("") };
         }
       }
-      """)
+      """
+      ])
 
     logs = Map.get(result, :logs, "")
     File.write!(log_path, logs)
@@ -203,8 +209,19 @@ defmodule Popcorn.Support.AtomVM do
     Path.join(build_dir, "bundle.avm")
   end
 
+  @doc """
+  Path to the native AtomVM binary used by the :unix target.
+
+  Defaults to popcorn's own test fixture location; consumers building the runtime
+  via `mix popcorn.build_runtime --target unix` should point this at their
+  artifacts dir, e.g. in `test_helper.exs`:
+
+      Application.put_env(:popcorn, :atomvm_unix_runtime_path,
+        Path.join([File.cwd!(), "popcorn_runtime_source/artifacts/unix", "AtomVM"]))
+  """
   def unix_runtime_path() do
-    Path.join([File.cwd!(), "test/fixtures/unix", "AtomVM"])
+    Application.get_env(:popcorn, :atomvm_unix_runtime_path) ||
+      Path.join([File.cwd!(), "test/fixtures/unix", "AtomVM"])
   end
 
   @doc """
@@ -255,7 +272,16 @@ defmodule Popcorn.Support.AtomVM do
 
     source_path = Path.join(build_dir, "code.ex")
     File.write!(source_path, Macro.to_string(ast))
-    {_output, 0} = System.shell("elixirc #{source_path} -o #{build_dir}")
+
+    # Expose the project's dep closure so struct literals / macros from deps
+    # (e.g. %Phoenix.LiveView.Socket{}) resolve while compiling the wrapper module.
+    pa_flags =
+      [Mix.Project.build_path(), "lib/*/ebin"]
+      |> Path.join()
+      |> Path.wildcard()
+      |> Enum.map_join(" ", &"-pa #{&1}")
+
+    {_output, 0} = System.shell("elixirc #{pa_flags} #{source_path} -o #{build_dir}")
 
     files = build_dir |> Path.join("*.{ex,beam}") |> Path.wildcard()
     paths = Enum.map(files, copy_artifacts_to_dir)
