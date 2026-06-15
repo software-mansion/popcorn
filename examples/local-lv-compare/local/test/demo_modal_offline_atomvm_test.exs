@@ -7,7 +7,7 @@ defmodule DemoModalOfflineAtomVMTest do
 
   Build the runtime once with:
 
-      MIX_TARGET=wasm mix popcorn.build_runtime --target unix
+      MIX_TARGET=wasm mix popcorn.build_runtime --target unix --out-dir test/popcorn_runtime_source
   """
   use ExUnit.Case
   alias Popcorn.Support.AtomVM
