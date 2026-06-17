@@ -133,6 +133,7 @@ export class LLVEngine {
           view: pop_view_el.getAttribute("data-pop-view"),
           url: window.location.href,
           url_params: Object.fromEntries(new URLSearchParams(window.location.search)),
+          assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns"))
         },
         { timeoutMs: 10_000 },
       );
@@ -274,7 +275,23 @@ export class LLVEngine {
     // fires before Popcorn is ready.
     liveSocket.hooks.LocalLiveView = {
       mounted() {
+        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
         if (popcornReady) mountView(this.el);
+      },
+      updated() {
+        const raw = this.el.getAttribute("data-pop-assigns");
+        if (raw === this.llvLastAssigns) return;
+        this.llvLastAssigns = raw;
+        // Not mounted yet (Popcorn still booting): the mount reads the current
+        // assigns, so there's nothing to forward. Once mounted, the dispatcher
+        // processes this after the mount (it's sent after, and calls are FIFO).
+        if (!popcornReady) return;
+        popcorn
+          .call(
+            { action: "update_assigns", id: this.el.id, assigns: parseAssigns(raw) },
+            { timeoutMs: 10_000 },
+          )
+          .catch((err) => console.error("LLV update assigns error", err));
       },
       destroyed() {
         unmountView(this.el);
@@ -437,6 +454,19 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 10_000 },
   );
+}
+
+// data-pop-assigns holds the JSON a local_component serialized from its inline
+// assigns. Absent/empty for plain local views — default to {} so the process is
+// always handed a map.
+function parseAssigns(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("LLV failed to parse data-pop-assigns:", raw, err);
+    return {};
+  }
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so
