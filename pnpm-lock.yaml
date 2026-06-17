@@ -160,11 +160,31 @@ importers:
     dependencies:
       local_live_view:
         specifier: workspace:*
-        version: link:../../../local-live-view/assets
-    devDependencies:
-      esbuild:
-        specifier: ^0.25.0
-        version: 0.25.12
+        version: link:../../../local-live-view
+
+  examples/local-lv-compare/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view
+
+  examples/local-lv-forms/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view
+
+  examples/local-lv-pong/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view
+
+  examples/local-lv-thermostat/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view
 
   landing-page:
     dependencies:
@@ -212,7 +232,7 @@ importers:
         version: 11.11.1
       local_live_view:
         specifier: workspace:*
-        version: link:../local-live-view/assets
+        version: link:../local-live-view
       mermaid:
         specifier: ^11.7.0
         version: 11.14.0
@@ -401,6 +421,8 @@ importers:
       vite-plugin-svgr:
         specifier: ^4.3.0
         version: 4.5.0(rollup@4.60.3)(typescript@5.8.3)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0))
+
+  local-live-view: {}
 
   local-live-view/assets:
     dependencies:

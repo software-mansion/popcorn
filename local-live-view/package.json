@@ -1,0 +1,7 @@
+{
+  "name": "local_live_view",
+  "version": "0.1.0",
+  "description": "JS bundle for LocalLiveView — bundled at release time, resolved via Phoenix esbuild NODE_PATH.",
+  "main": "priv/static/local_live_view.js",
+  "private": true
+}

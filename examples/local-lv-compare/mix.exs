@@ -63,7 +63,7 @@ defmodule CompareLiveViews.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:local_live_view, path: "../../local-live-view", runtime: false}
+      {:local_live_view, path: "../../local-live-view"}
     ]
   end
 
@@ -75,29 +75,14 @@ defmodule CompareLiveViews.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "llv.build", &pnpm_install/1, "compile", "assets.setup", "assets.build"],
-      "assets.setup": ["tailwind.install --if-missing"],
-      "assets.build": [&build_js/1, "tailwind compare_live_views"],
-      "assets.deploy": [&build_js/1, "tailwind compare_live_views --minify", "phx.digest"]
+      setup: ["deps.get", "llv.build", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["tailwind compare_live_views", "esbuild compare_live_views"],
+      "assets.deploy": [
+        "tailwind compare_live_views --minify",
+        "esbuild compare_live_views --minify",
+        "phx.digest"
+      ]
     ]
-  end
-
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: Path.join(File.cwd!(), "assets"),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
-    {_, 0} =
-      System.cmd("node", ["build.mjs"],
-        cd: Path.join(File.cwd!(), "assets"),
-        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
   end
 end

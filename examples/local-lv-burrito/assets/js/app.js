@@ -290,7 +290,9 @@ const InfoModal = {
 
     this.handleOpen = () => this.el.classList.remove("hidden");
     this.handleClose = () => this._close();
-    this.handleBackdrop = (e) => { if (e.target === this.el) this._close(); };
+    this.handleBackdrop = (e) => {
+      if (e.target === this.el) this._close();
+    };
 
     this.el.addEventListener("open-info-modal", this.handleOpen);
     this.el.addEventListener("close-info-modal", this.handleClose);
@@ -351,7 +353,10 @@ import { LLVEngine } from "../vendor/local_live_view.js";
 liveSocket.connect();
 window.liveSocket = liveSocket;
 
-await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["bundle.avm"] });
+await LLVEngine.create(liveSocket, {
+  Socket,
+  bundlePaths: ["/assets/js/wasm/bundle.avm"],
+});
 window.dispatchEvent(new CustomEvent("llv:ready"));
 
 if (process.env.NODE_ENV === "development") {

@@ -34,6 +34,7 @@ defmodule Burrito.MixProject do
       {:phoenix_live_view, "~> 1.1.0"},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:heroicons,
        github: "tailwindlabs/heroicons",
        tag: "v2.2.0",
@@ -66,51 +67,15 @@ defmodule Burrito.MixProject do
     [
       build: ["setup"],
       dev: ["setup", "phx.server"],
-      setup: [
-        &build_local/1,
-        &pnpm_install/1,
-        "deps.get",
-        "compile",
-        "assets.setup",
-        "assets.build"
-      ],
-      "assets.setup": ["tailwind.install --if-missing"],
-      "assets.build": [&build_js/1, "tailwind burrito"],
+      setup: ["deps.get", "llv.build", "assets.setup", "assets.build"],
+      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
+      "assets.build": ["tailwind burrito", "esbuild burrito"],
       "assets.deploy": [
-        &build_js/1,
         "tailwind burrito --minify",
+        "esbuild burrito --minify",
         "phx.digest"
       ],
       precommit: ["compile --warning-as-errors", "deps.unlock --unused", "format", "test"]
     ]
-  end
-
-  defp build_local(_) do
-    Mix.shell().cmd(
-      """
-      mix deps.get
-      MIX_TARGET=wasm mix popcorn.cook
-      """,
-      cd: "local"
-    )
-  end
-
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["run", "build"],
-        cd: Path.join(File.cwd!(), "assets"),
-        env: [{"MIX_BUILD_PATH", Mix.Project.build_path()}],
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
   end
 end
