@@ -1,6 +1,6 @@
 defmodule LocalLiveView.Component do
   @moduledoc """
-  Phoenix component for mounting a LocalLiveView.
+  Phoenix components for mounting a `LocalLiveView` or a `LocalLiveView.Popconent`.
 
   Import this module in your application's CoreComponents:
 
@@ -9,9 +9,10 @@ defmodule LocalLiveView.Component do
         ...
       end
 
-  Then use it in your templates:
+  Then use them in your templates:
 
       <.local_live_view view="MyLive" />
+      <.popconent module="MyComponent" items={@items} />
   """
   use Phoenix.Component
 
@@ -26,6 +27,9 @@ defmodule LocalLiveView.Component do
   ## Examples
 
       <.local_live_view view="MyLocal" />
+
+  To seed a local view with server-side state, use a `LocalLiveView.Popconent` and
+  `popconent/1` instead — local views do not take parameters.
   '''
   def local_live_view(assigns) do
     view = assigns[:view]
@@ -53,6 +57,71 @@ defmodule LocalLiveView.Component do
     </div>
     """
   end
+
+  @doc ~S'''
+  Renders a `LocalLiveView.Popconent` mount point.
+
+  Like `Phoenix.Component.live_component/1`, any attribute other than `module` is
+  forwarded to the component as the assigns of its `c:LocalLiveView.Popconent.update/2`
+  callback. `id` is forwarded too, and additionally used as the mount point's DOM
+  id. Assigns are serialized as JSON and arrive with atom keys at the top level
+  (nested maps keep string keys, as they cross the JSON boundary).
+
+  ## Attributes
+
+    * `module` (required) - the LocalLiveView.Popconent module name, as a string.
+    * `id` - stable element id; defaults to a server-generated random id.
+
+  ## Examples
+
+      <.popconent module="Cart" />
+
+      <.popconent module="Cart" items={@items} currency="EUR" />
+
+  The second example mounts the component, calling its `update/2` with:
+
+      %{id: _, items: items, currency: "EUR"}
+  '''
+  def popconent(assigns) do
+    module = assigns[:module]
+
+    unless is_binary(module) do
+      raise ArgumentError, """
+      <.popconent> expects module="..." parameter to be a string, got:
+        #{inspect(module)}
+      """
+    end
+
+    if Map.has_key?(assigns, :inner_block) do
+      raise ArgumentError, "<.popconent> does not accept inner content"
+    end
+
+    assigns = assign_new(assigns, :id, fn -> default_id(module) end)
+
+    # Every attribute except `module` is forwarded as an assign; `__changed__` is
+    # Phoenix's internal change-tracking map and is always dropped.
+    comp_assigns = Map.drop(assigns, [:__changed__, :module])
+
+    assigns =
+      assigns
+      |> assign(:has_mirror, mirror_exists?(module))
+      |> assign(:comp_assigns, comp_assigns)
+
+    ~H"""
+    <div
+      data-pop-view={@module}
+      id={@id}
+      data-pop-mirror={@has_mirror || nil}
+      data-pop-assigns={encode_assigns(@comp_assigns)}
+      phx-hook="LocalLiveView"
+      phx-update="ignore"
+    >
+    </div>
+    """
+  end
+
+  defp encode_assigns(assigns) when assigns == %{}, do: nil
+  defp encode_assigns(assigns), do: Jason.encode!(assigns)
 
   # The mount point lives under `phx-update="ignore"`, so its id MUST be stable
   # across the host LiveView's dead and connected renders — otherwise morphdom

@@ -89,6 +89,30 @@ defmodule LocalLiveView.Server do
     |> handle_result({:handle_info, 2, nil}, state)
   end
 
+  def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
+    # The host LiveView re-rendered with new assigns for a popconent: run its
+    # update/2 and push the resulting diff. Only a popconent receives assigns this
+    # way (a full LocalLiveView gets its state from the mirror channel), so an
+    # update targeting a non-popconent means something is wired wrong.
+    unless popconent?(socket.view) do
+      raise ArgumentError,
+            "received an assigns update for #{inspect(socket.view)}, which is not a " <>
+              "LocalLiveView.Popconent — only popconents receive assigns from a host LiveView."
+    end
+
+    case update_popconent(socket.view, assigns, socket) do
+      {:ok, %Socket{} = new_socket} ->
+        handle_changed(state, new_socket, nil)
+
+      other ->
+        raise ArgumentError, """
+        expected #{inspect(socket.view)}.update/2 to return {:ok, %Socket{}}, got:
+
+        #{inspect(other)}
+        """
+    end
+  end
+
   def handle_info({:phoenix, :send_update, update}, state) do
     case Diff.update_component(state.socket, state.components, update) do
       {diff, new_components} ->
@@ -151,6 +175,44 @@ defmodule LocalLiveView.Server do
 
   defp view_handle_info(msg, %{view: view} = socket) do
     view.handle_info(msg, socket)
+  end
+
+  # A popconent (`use LocalLiveView.Popconent`) is driven by mount/1 + update/2,
+  # unlike a full LocalLiveView's mount/3. Detected by the __popconent__/0 marker
+  # the macro injects — a function check, since @behaviour reflection isn't
+  # available in the AtomVM runtime this server runs in.
+  defp popconent?(view), do: function_exported?(view, :__popconent__, 0)
+
+  # Popconent mount lifecycle (it has no mount/3): run mount/1, then feed the
+  # initial assigns through update/2. Returns the mounted %Socket{}.
+  defp mount_popconent(view, assigns, %Socket{} = socket) do
+    with {:ok, %Socket{} = socket} <- view.mount(socket),
+         {:ok, %Socket{} = socket} <- update_popconent(view, assigns, socket) do
+      socket
+    else
+      other ->
+        raise ArgumentError, """
+        expected #{inspect(view)}.mount/1 and update/2 to return {:ok, %Socket{}}, got:
+
+        #{inspect(other)}
+        """
+    end
+  end
+
+  # Re-run the popconent's update/2 for the (JSON, string-keyed) assigns the host
+  # pushed.
+  defp update_popconent(view, assigns, %Socket{} = socket) do
+    view.update(normalize_assigns(assigns), socket)
+  end
+
+  # Top-level assign keys cross the JSON boundary as strings; convert them back to
+  # atoms so they read like Phoenix assigns (`@items`). Nested values are left as
+  # is — deeply atomizing arbitrary maps would be unsafe.
+  defp normalize_assigns(assigns) do
+    Map.new(assigns, fn
+      {key, value} when is_atom(key) -> {key, value}
+      {key, value} when is_binary(key) -> {String.to_atom(key), value}
+    end)
   end
 
   defp decode_event_type("form", url_encoded, raw_payload) do
@@ -401,7 +463,12 @@ defmodule LocalLiveView.Server do
       view: view
     } = verified
 
-    connect_params = params["params"]
+    # Assigns passed via the `<.popconent assigns... />` component reach us
+    # here as a string-keyed map (empty for a plain local view). They become the
+    # first argument to the view's mount/3 callback — `LocalLiveView.Popconent` routes them
+    # on to its update/2.
+    initial_assigns = params["assigns"] || %{}
+    connect_params = initial_assigns
     llv_id = params["llv_id"]
 
     socket = %Socket{
@@ -421,10 +488,21 @@ defmodule LocalLiveView.Server do
         }
 
         try do
-          %Socket{socket | view: view}
-          |> Utils.maybe_call_live_view_mount!(view, params, verified)
+          mounted_socket = %Socket{socket | view: view}
+
+          # A popconent has no mount/3; its lifecycle (mount/1 + update/2 seeded
+          # with the initial assigns) is driven here. A full LocalLiveView goes
+          # through the standard mount/3 path.
+          mounted_socket =
+            if popconent?(view) do
+              mount_popconent(view, initial_assigns, mounted_socket)
+            else
+              Utils.maybe_call_live_view_mount!(mounted_socket, view, initial_assigns, verified)
+            end
+
+          mounted_socket
           |> build_state(phx_socket, llv_id)
-          |> maybe_call_mount_handle_params(params)
+          |> maybe_call_mount_handle_params(initial_assigns)
           |> reply_mount(from, verified)
         rescue
           exception ->

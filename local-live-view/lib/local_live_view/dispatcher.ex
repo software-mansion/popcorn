@@ -47,6 +47,14 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, state}
   end
 
+  defp handle_wasm(
+         {:wasm_call, %{"action" => "update_assigns", "id" => id, "assigns" => assigns}},
+         state
+       ) do
+    send_to_view(state, id, %Message{event: "update_assigns", payload: assigns})
+    {:resolve, :ok, state}
+  end
+
   defp handle_wasm({:wasm_call, %{"action" => "destroy", "id" => id}}, state) do
     # The host LiveView removed a mount point. Stop its process and forget it.
     case Map.get(state.views, id) do
@@ -59,11 +67,15 @@ defmodule LocalLiveView.Dispatcher do
 
   # This event may be fired multiple times for the same view from JS,
   # in such case we only handle the first event.
-  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id, "view" => view}}, state)
+  defp handle_wasm(
+         {:wasm_call, %{"action" => "create", "id" => id} = message},
+         state
+       )
        when not is_map_key(state.views, id) do
+    %{"view" => view, "assigns" => assigns} = message
     view = String.to_existing_atom("Elixir." <> view)
 
-    case start_local_live_view(view, id) do
+    case start_local_live_view(view, id, assigns) do
       {:ok, pid, rendered} ->
         {:resolve, %{status: :ok, rendered: rendered}, put_in(state.views[id], pid)}
 
@@ -94,10 +106,11 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp start_local_live_view(view, id) do
+  defp start_local_live_view(view, id, assigns) do
     params = %{
       "session" => %Session{view: view},
-      "llv_id" => id
+      "llv_id" => id,
+      "assigns" => assigns
     }
 
     ref = make_ref()

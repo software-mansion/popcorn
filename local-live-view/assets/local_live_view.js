@@ -123,7 +123,12 @@ export class LLVEngine {
       const llvId = pop_view_el.id;
       if (viewsById[llvId]) return;
       const { data } = await popcorn.call(
-        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        {
+          action: "create",
+          id: llvId,
+          view: pop_view_el.getAttribute("data-pop-view"),
+          assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns"))
+        },
         { timeoutMs: 10_000 },
       );
       if (data.status == "error") return;
@@ -164,7 +169,23 @@ export class LLVEngine {
     // fires before Popcorn is ready.
     liveSocket.hooks.LocalLiveView = {
       mounted() {
+        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
         if (popcornReady) mountView(this.el);
+      },
+      updated() {
+        const raw = this.el.getAttribute("data-pop-assigns");
+        if (raw === this.llvLastAssigns) return;
+        this.llvLastAssigns = raw;
+        // Not mounted yet (Popcorn still booting): the mount reads the current
+        // assigns, so there's nothing to forward. Once mounted, the dispatcher
+        // processes this after the mount (it's sent after, and calls are FIFO).
+        if (!popcornReady) return;
+        popcorn
+          .call(
+            { action: "update_assigns", id: this.el.id, assigns: parseAssigns(raw) },
+            { timeoutMs: 10_000 },
+          )
+          .catch((err) => console.error("LLV update assigns error", err));
       },
       destroyed() {
         unmountView(this.el);
@@ -333,6 +354,19 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 10_000 },
   );
+}
+
+// data-pop-assigns holds the JSON a local_component serialized from its inline
+// assigns. Absent/empty for plain local views — default to {} so the process is
+// always handed a map.
+function parseAssigns(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("LLV failed to parse data-pop-assigns:", raw, err);
+    return {};
+  }
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so
