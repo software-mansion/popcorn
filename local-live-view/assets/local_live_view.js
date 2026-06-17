@@ -25,23 +25,17 @@ export class LLVEngine {
     const { Socket } = config;
 
     let popcorn;
+    // Whether the Popcorn runtime has finished booting. Hooks that fire before it
+    // does can't mount (Popcorn isn't there yet); the startup scan picks those up.
+    let popcornReady = false;
     const channels = {};
     const viewsById = {};
     const bufferedServerMessages = [];
 
-    // The spec sent to the runtime to start a view: module name and element id.
-    const viewSpec = (el) => ({
-      view: el.getAttribute("data-pop-view"),
-      id: el.id,
-    });
-
     // Wire a fake Phoenix root view around a [data-pop-view] element so the
-    // browser renders the runtime's diffs and routes events to it. Idempotent:
-    // if the element is already mounted — e.g. caught by both the startup scan
-    // and the hook — the second call is ignored.
+    // browser renders the runtime's diffs and routes events to it.
     const setupFakeView = (pop_view_el, initialRendered) => {
       const llvId = pop_view_el.id;
-      if (viewsById[llvId]) return;
 
       const view = liveSocket.newRootView(pop_view_el);
       viewsById[llvId] = view;
@@ -118,6 +112,40 @@ export class LLVEngine {
       }
     };
 
+    // Stop a view's runtime process. The caller drops the fake view (if any).
+    const teardownProcess = (llvId) =>
+      popcorn
+        .call({ id: llvId, event: "llv_destroy", payload: {} }, { timeoutMs: 10_000 })
+        .catch((err) => console.error("LLV destroy error", err));
+
+    // Start a view and wire it up.
+    const mountView = async (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      if (viewsById[llvId]) return;
+      const { data } = await popcorn.call(
+        { event: "llv_create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        { timeoutMs: 10_000 },
+      );
+      if (data.status == "error") return;
+      const liveEl = document.getElementById(llvId);
+      if (liveEl?.matches("[data-pop-view]")) {
+        setupFakeView(liveEl, data.rendered);
+      } else {
+        teardownProcess(llvId);
+      }
+    };
+
+    // Stop a view's runtime process and drop its fake view. Used by the hook when
+    // the host LiveView removes the mount point.
+    const unmountView = (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      const view = viewsById[llvId];
+      if (!view) return;
+      delete viewsById[llvId];
+      view.destroy?.();
+      teardownProcess(llvId);
+    };
+
     // Register the server message listener immediately — BEFORE any awaits.
     // push_event("llv_server_message") from Phoenix LiveView fires during the initial
     // LiveView join, which happens before Popcorn finishes initializing. Without this,
@@ -130,6 +158,19 @@ export class LLVEngine {
       await sendServerMessage(popcorn, e.detail);
     });
 
+    // Hook that manages views rendered inside a host LiveView.
+    // Other views are rendered during startup scan.
+    // The startup scan also handles the case when hook's mount
+    // fires before Popcorn is ready.
+    liveSocket.hooks.LocalLiveView = {
+      mounted() {
+        if (popcornReady) mountView(this.el);
+      },
+      destroyed() {
+        unmountView(this.el);
+      },
+    };
+
     // Pages with only LocalLiveViews (no server-side LiveView) connect in "dead"
     // mode, which skips bindForms() — making phx-submit / phx-change no-ops on
     // any LLV. Wire them up manually when no real LiveView is on the page.
@@ -141,6 +182,7 @@ export class LLVEngine {
       debug: config.debug ?? false,
       bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"],
     });
+    popcornReady = true;
 
     if (config.eventHandler) {
       popcorn.onMessage(config.eventHandler);
@@ -231,18 +273,15 @@ export class LLVEngine {
 
     registerCustomEventBindings(liveSocket);
 
-    // Startup scan: mount every [data-pop-view] present at load — works with or
-    // without a host LiveView. Views the LiveView adds later mount via the hook.
-    const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
-    if (pop_view_els.length > 0) {
-      const { data: initialRenderedByView } = await popcorn.call(
-        { views: pop_view_els.map(viewSpec) },
-        { timeoutMs: 10_000 },
-      );
-      pop_view_els.forEach((el) =>
-        setupFakeView(el, initialRenderedByView[el.id]),
-      );
-    }
+    // Startup scan: mount every [data-pop-view] present now that Popcorn is up.
+    // This is the mount path for host-less pages (no hooks fire there) and the
+    // catch-up for hooks that fired before Popcorn was ready.
+    // If a view is mounted twice (here and by the hook), the dispatcher
+    // on the Elixir side ignores the second mount.
+    const pop_view_els = Array.from(
+      document.querySelectorAll("[data-pop-view]"),
+    );
+    await Promise.all(pop_view_els.map((el) => mountView(el)));
 
     // Flush any server messages that arrived during Popcorn initialization.
     for (const detail of bufferedServerMessages) {
