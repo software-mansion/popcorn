@@ -99,8 +99,13 @@ export class LLVEngine {
       };
     }
 
+    const initialUrlParams = Object.fromEntries(
+      new URLSearchParams(window.location.search).entries(),
+    );
+    const initialUrl = window.location.href;
+
     const { data: initialRenderedByView } = await popcorn.call(
-      { views: findPredefinedViews() },
+      { views: findPredefinedViews(), params: initialUrlParams, url: initialUrl },
       { timeoutMs: 10_000 },
     );
 
@@ -198,6 +203,24 @@ export class LLVEngine {
         console.error("LLV no initial rendered for view", llvId);
       }
     });
+
+    // popstate: notify all LLV views when the user navigates via browser back/forward
+    // window.addEventListener("popstate", () => {
+    //   const parsed = new URL(window.location.href);
+    //   const params = Object.fromEntries(parsed.searchParams.entries());
+    //   const url = parsed.href;
+
+    //   for (const llvId of Object.keys(viewsById)) {
+    //     popcorn
+    //       .call(
+    //         { id: llvId, event: "handle_params", payload: { params, url } },
+    //         { timeoutMs: 10_000 },
+    //       )
+    //       .catch((err) =>
+    //         console.error("LLV handle_params (popstate) error", err),
+    //       );
+    //   }
+    // });
 
     // owner: route events from inside [data-pop-view] elements to our fake views.
     // We never set data-phx-session on LLV elements, so Phoenix's default closestViewEl()

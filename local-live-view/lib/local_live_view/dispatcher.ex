@@ -52,6 +52,16 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
+         {:wasm_call, %{"id" => id, "event" => "handle_params", "payload" => payload}},
+         state
+       ) do
+    Map.get(state.views, id)
+    |> send(%Message{event: "handle_params", payload: payload})
+
+    {:resolve, :ok, state}
+  end
+
+  defp handle_wasm(
          {:wasm_call, %{"id" => id, "event" => _type, "payload" => payload}},
          state
        ) do
@@ -61,12 +71,15 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm({:wasm_call, %{"views" => views}}, state) do
+  defp handle_wasm({:wasm_call, %{"views" => views} = msg}, state) do
+    url_params = Map.get(msg, "params", %{})
+    url = Map.get(msg, "url", "")
+
     started =
       views
       |> Enum.map(fn %{"view" => view_string, "id" => id} ->
         view = ("Elixir." <> view_string) |> String.to_existing_atom()
-        start_local_live_view(view, id)
+        start_local_live_view(view, id, url_params, url)
       end)
       |> Enum.filter(fn result -> result != nil end)
 
@@ -77,10 +90,12 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, initial_rendered, %{state | views: views_map}}
   end
 
-  defp start_local_live_view(view, id) do
+  defp start_local_live_view(view, id, url_params, url) do
     params = %{
       "session" => %Session{view: view},
-      "llv_id" => id
+      "llv_id" => id,
+      "url_params" => url_params,
+      "url" => url
     }
 
     ref = make_ref()
