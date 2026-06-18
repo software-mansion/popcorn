@@ -94,10 +94,12 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp start_local_live_view(view, id) do
+  defp start_local_live_view(view, id, url_params, url) do
     params = %{
       "session" => %Session{view: view},
-      "llv_id" => id
+      "llv_id" => id,
+      "url_params" => url_params,
+      "url" => url
     }
 
     ref = make_ref()

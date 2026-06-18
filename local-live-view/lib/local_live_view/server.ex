@@ -61,6 +61,22 @@ defmodule LocalLiveView.Server do
     end
   end
 
+  def handle_info(
+        %Message{event: "handle_params", payload: %{"params" => params, "url" => url}},
+        %{socket: socket} = state
+      ) do
+    view = socket.view
+    lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
+
+    if lifecycle.any? do
+      socket
+      |> call_handle_params_direct(view, lifecycle.exported?, params, url)
+      |> handle_result({:handle_info, 2, nil}, state)
+    else
+      {:noreply, state}
+    end
+  end
+
   def handle_info(%Message{event: "llv_reconnected"}, state) do
     keys = Map.keys(state.socket.assigns)
     LocalLiveView.mirror_sync(state.socket, keys)
@@ -189,6 +205,8 @@ defmodule LocalLiveView.Server do
   defp gather_keys(_, acc), do: acc
 
   defp maybe_call_mount_handle_params(%{socket: socket} = state, params) do
+    url_params = Map.get(params, "url_params", %{})
+    url = Map.get(params, "url", "")
     %{view: view, redirected: mount_redirect} = socket
     lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
 
@@ -202,9 +220,20 @@ defmodule LocalLiveView.Server do
 
       true ->
         socket
-        |> Utils.call_handle_params!(view, lifecycle.exported?, params)
+        |> call_handle_params_direct(view, lifecycle.exported?, url_params, url)
         |> mount_handle_params_result(state, :mount)
     end
+  end
+
+  defp call_handle_params_direct(socket, view, true, params, url) do
+    case view.handle_params(params, url, socket) do
+      {:noreply, %Socket{} = socket} -> {:noreply, socket}
+      other -> raise_bad_callback_response!(other, view, :handle_params, 3)
+    end
+  end
+
+  defp call_handle_params_direct(socket, _view, false, _params, _url) do
+    {:noreply, socket}
   end
 
   defp mount_handle_params_result({:noreply, %Socket{} = new_socket}, state, redir) do
@@ -273,9 +302,54 @@ defmodule LocalLiveView.Server do
          |> push_live_patch(pending_live_patch)
          |> push_diff(diff, ref)}
 
+      {:live, :patch, opts} ->
+        handle_live_patch(new_state, opts, ref)
+
       _result ->
-        state
+        {:noreply, state}
     end
+  end
+
+  defp handle_live_patch(state, opts, ref) do
+    to = opts.to
+    replace = opts.kind == :replace
+
+    url_params =
+      case String.split(to, "?", parts: 2) do
+        [_path, query] -> URI.decode_query(query)
+        [_path] -> %{}
+      end
+
+    socket = %{state.socket | redirected: nil}
+    new_state = %{state | socket: socket}
+
+    view = socket.view
+    lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
+
+    push_url_update(to, replace)
+
+    if lifecycle.any? do
+      socket
+      |> call_handle_params_direct(view, lifecycle.exported?, url_params, to)
+      |> handle_result({:handle_info, 2, ref}, new_state)
+    else
+      {:noreply, new_state}
+    end
+  end
+
+  defp push_url_update(url, replace) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        if (args.replace) {
+          window.history.replaceState({}, "", args.url);
+        } else {
+          window.history.pushState({}, "", args.url);
+        }
+      }
+      """,
+      %{url: url, replace: replace}
+    )
   end
 
   defp clear_live_patch_counter(state) do
