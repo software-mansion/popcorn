@@ -720,7 +720,7 @@ var LLVEngine = class _LLVEngine {
         );
         return;
       }
-      view.update(structuredClone(diff), []);
+      view.update(diff, []);
     };
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {

@@ -368,14 +368,23 @@ defmodule Popcorn.Wasm do
 
   defp with_wrapper(js_function, args) do
     with {:ok, serialized_args} <- serialize(args) do
+      # Module.deserialize uses main window's realm, so that if we pass
+      # JS objects to code created outside of the Popcorn's iframe,
+      # checks like `value instanceof Array` work as expected.
+      # Therefore, we also stub `Array` and `Object`, so that
+      # `args.key instanceof Array` also works inside `run_js`.
+      # This unfortunately makes literals not work: `[] instanceof Array`
+      # and `{} instanceof Object` inside `run_js` returns `false`.
       code = """
       (Module) => {
         const iframeWindow = globalThis.window;
         const window = globalThis.window.parent;
         const document = globalThis.window.parent.document;
+        const Array = window.Array;
+        const Object = window.Object;
         return (#{js_function})({
           wasm: Module,
-          args: Module.deserialize(JSON.stringify(#{serialized_args})),
+          args: Module.deserialize(JSON.stringify(#{serialized_args}), window.JSON),
           iframeWindow: iframeWindow
         });
       }
