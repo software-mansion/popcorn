@@ -4,6 +4,7 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
   def mount(_params, _session, socket) do
     {:ok, assign(socket,
       llv_id: "checkout-#{socket.id}",
+      nav_llv_id: "nav-#{socket.id}",
       current_step: 1
     )}
   end
@@ -50,7 +51,7 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
 
         <!-- Local Live View -->
         <div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <.live_component module={LocalLvCheckoutWeb.Live.CheckoutFormComponent} id="checkout-form" llv_id={@llv_id} />
+          <.local_live_view id={"checkout-#{@socket.id}"} view="CheckoutLive" />
         </div>
       </div>
     </div>

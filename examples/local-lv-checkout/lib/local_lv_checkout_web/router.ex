@@ -18,6 +18,7 @@ defmodule LocalLvCheckoutWeb.Router do
     pipe_through :browser
 
     live "/", CheckoutLive
+    get "/plain", PageController, :home
   end
 
   # Other scopes may use custom stacks.

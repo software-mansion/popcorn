@@ -2,15 +2,11 @@ defmodule CheckoutLive do
   use LocalLiveView
 
   def mount(params, _session, socket) do
-    dbg "mount: #{inspect(params)}"
-
     {:ok, assign(socket,
       current_step: 1,
       form_data: %{
         "email" => "",
         "name" => "",
-        "address" => "",
-        "city" => "",
         "card_number" => "",
         "expiry" => ""
       },
@@ -24,8 +20,6 @@ defmodule CheckoutLive do
   end
 
   def handle_params(params, _uri, socket) do
-    dbg "handle_params: #{inspect(params)}"
-
     {:noreply, assign(socket, current_step: 1)}
   end
 
@@ -39,41 +33,43 @@ defmodule CheckoutLive do
           <.step_2_payment form_data={@form_data} errors={@errors} />
         <% 3 -> %>
           <.step_3_confirmation form_data={@form_data} />
+        <% 4 -> %>
+          <.step_4_success />
       <% end %>
 
-      <div style="display: flex; gap: 16px; margin-top: 32px; justify-content: space-between;">
-        <p style="color: black">Current step: <%= @current_step %></p>
-        <%= if @current_step > 1 do %>
-          <button
-            phx-click="prev_step"
-            style="padding: 8px 24px; background-color: #d1d5db; color: #1f2937; border-radius: 4px; border: none; cursor: pointer; font-weight: 500;"
-          >
-            ← Back
-          </button>
-        <% else %>
-          <div></div>
-        <% end %>
+      <%= if @current_step < 4 do %>
+        <div style="display: flex; gap: 16px; margin-top: 32px; justify-content: space-between;">
+          <%= if @current_step > 1 do %>
+            <button
+              phx-click="prev_step"
+              style="padding: 8px 24px; background-color: #d1d5db; color: #1f2937; border-radius: 4px; border: none; cursor: pointer; font-weight: 500;"
+            >
+              ← Back
+            </button>
+          <% else %>
+            <div></div>
+          <% end %>
 
-        <.link patch={"/?step=2"}>test</.link>
-        <%= if @current_step < 3 do %>
-          <button
-            phx-click="next_step"
-            disabled={@errors != []}
-            style={button_style(@errors != [])}
-          >
-            Next →
-          </button>
-        <% end %>
+          <%= if @current_step < 3 do %>
+            <button
+              phx-click="next_step"
+              disabled={@errors != []}
+              style={button_style(@errors != [])}
+            >
+              Next →
+            </button>
+          <% end %>
 
-        <%= if @current_step == 3 do %>
-          <button
-            phx-click="complete"
-            style="padding: 8px 24px; background-color: #22c55e; color: white; border-radius: 4px; border: none; cursor: pointer; font-weight: 500;"
-          >
-            Complete Order
-          </button>
-        <% end %>
-      </div>
+          <%= if @current_step == 3 do %>
+            <button
+              phx-click="complete"
+              style="padding: 8px 24px; background-color: #22c55e; color: white; border-radius: 4px; border: none; cursor: pointer; font-weight: 500;"
+            >
+              Complete Order
+            </button>
+          <% end %>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -101,8 +97,6 @@ defmodule CheckoutLive do
     step = socket.assigns.current_step
     errors = validate_step(step, socket.assigns.form_data)
 
-    dbg "next_step: #{inspect(step)} errors: #{inspect(errors)}"
-
     if errors == [] do
       {:noreply, push_patch(socket, to: "/?step=#{step + 1}")}
     else
@@ -124,8 +118,6 @@ defmodule CheckoutLive do
     errors = []
     errors = if String.trim(form_data["email"]) == "", do: ["Email is required" | errors], else: errors
     errors = if String.trim(form_data["name"]) == "", do: ["Name is required" | errors], else: errors
-    errors = if String.trim(form_data["address"]) == "", do: ["Address is required" | errors], else: errors
-    errors = if String.trim(form_data["city"]) == "", do: ["City is required" | errors], else: errors
     Enum.reverse(errors)
   end
 
@@ -137,6 +129,7 @@ defmodule CheckoutLive do
   end
 
   defp validate_step(3, _form_data), do: []
+  defp validate_step(_, _form_data), do: []
 
   defp step_1_shipping(assigns) do
     ~H"""
@@ -167,30 +160,6 @@ defmodule CheckoutLive do
           />
         </div>
 
-        <div>
-          <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Address</label>
-          <input
-            type="text"
-            name="address"
-            value={@form_data["address"]}
-            phx-change="update_field"
-            style="width: 100%; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; box-sizing: border-box; color: black;"
-            placeholder="123 Main St"
-          />
-        </div>
-
-        <div>
-          <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">City</label>
-          <input
-            type="text"
-            name="city"
-            value={@form_data["city"]}
-            phx-change="update_field"
-            style="width: 100%; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; box-sizing: border-box; color: black;"
-            placeholder="New York"
-          />
-        </div>
-
         <%= if @errors != [] do %>
           <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 16px;">
             <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px; margin-top: 0;">Please fix the following:</p>
@@ -215,9 +184,9 @@ defmodule CheckoutLive do
           <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Card Number</label>
           <input
             type="text"
+            name="card_number"
             value={@form_data["card_number"]}
             phx-change="update_field"
-            phx-value-field="card_number"
             style="width: 100%; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; box-sizing: border-box; color: black;"
             placeholder="1234 5678 9012 3456"
             maxlength="19"
@@ -228,9 +197,9 @@ defmodule CheckoutLive do
           <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Expiry Date (MM/YY)</label>
           <input
             type="text"
+            name="expiry"
             value={@form_data["expiry"]}
             phx-change="update_field"
-            phx-value-field="expiry"
             style="width: 100%; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; box-sizing: border-box; color: black;"
             placeholder="12/25"
             maxlength="5"
@@ -265,14 +234,6 @@ defmodule CheckoutLive do
           <span style="font-weight: 500;">Name:</span>
           <span>{@form_data["name"]}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #d1d5db;">
-          <span style="font-weight: 500;">Address:</span>
-          <span>{@form_data["address"]}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #d1d5db;">
-          <span style="font-weight: 500;">City:</span>
-          <span>{@form_data["city"]}</span>
-        </div>
         <div style="display: flex; justify-content: space-between; padding: 8px 0;">
           <span style="font-weight: 500;">Card ending in:</span>
           <span>••••{String.slice(@form_data["card_number"], -4..-1)}</span>
@@ -282,6 +243,18 @@ defmodule CheckoutLive do
       <div style="margin-top: 24px; padding: 16px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px;">
         <p style="color: #1e40af; margin: 0;">✓ All information looks correct. Click "Complete Order" to finish.</p>
       </div>
+    </div>
+    """
+  end
+
+  defp step_4_success(assigns) do
+    ~H"""
+    <div style="text-align: center; padding: 32px 0;">
+      <div style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+        <span style="font-size: 32px;">✓</span>
+      </div>
+      <h2 style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 8px;">Order Complete!</h2>
+      <p style="color: #6b7280; font-size: 14px;">Your order has been placed successfully.</p>
     </div>
     """
   end
