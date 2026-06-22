@@ -33,7 +33,7 @@ defmodule LocalLiveView.Watcher do
 
   @spec start_link([option]) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    opts = Keyword.validate!(opts, dirs: [Path.absname("local/lib")])
+    opts = Keyword.validate!(opts, dirs: [Path.absname("local")])
     GenServer.start_link(__MODULE__, opts)
   end
 
@@ -46,7 +46,7 @@ defmodule LocalLiveView.Watcher do
 
   @impl true
   def handle_info({:file_event, _pid, {path, event}}, state) do
-    trigger_cook = String.ends_with?(path, ".ex") and event in @trigger_events
+    trigger_cook = Path.extname(path) == ".ex" and event in @trigger_events
 
     cond do
       not trigger_cook ->
