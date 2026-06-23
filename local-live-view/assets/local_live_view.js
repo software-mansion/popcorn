@@ -124,15 +124,11 @@ export class LLVEngine {
         );
         return;
       }
-      // The diff is delivered from the Popcorn WASM iframe via run_js, so its
-      // arrays belong to the iframe's JS realm. phoenix_live_view's isObject()
-      // uses `!(obj instanceof Array)`, which is false for cross-realm arrays —
-      // so it treats statics arrays as plain objects. In the component-only diff
-      // path (cloneMerge), that turns a cached statics array into `{0:.., 1:..}`
-      // with no `.length`, and the renderer then emits only `statics[0]`, so the
-      // re-rendered component is truncated. structuredClone re-creates the diff
-      // in this realm so `instanceof Array` works again.
-      view.update(structuredClone(diff), []);
+      // The diff is delivered from the Popcorn WASM iframe via run_js. Popcorn
+      // deserializes run_js args using the parent window's JSON, so the diff's
+      // arrays already belong to this realm and pass phoenix_live_view's
+      // `instanceof Array` checks — no re-cloning needed here.
+      view.update(diff, []);
     };
 
     pop_view_els.forEach((pop_view_el) => {

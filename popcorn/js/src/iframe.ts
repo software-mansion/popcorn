@@ -19,7 +19,10 @@ type EmscriptenFS = {
 /** AtomVM Module interface - the WASM module with Elixir runtime */
 type AtomVMModule = {
   serialize: (data: AnySerializable) => string;
-  deserialize: (message: string) => AnySerializable;
+  deserialize: (
+    message: string,
+    json?: { parse: typeof JSON.parse },
+  ) => AnySerializable;
   cleanupFunctions: Map<number, () => void>;
   trackedObjectsMap: Map<number, AnySerializable>;
   nextTrackedObjectKey: () => number;
@@ -250,8 +253,17 @@ function ensureResultKeyList(result: unknown): void {
   }
 }
 
-function deserialize(message: string): AnySerializable {
-  return JSON.parse(message, (_key: string, value: AnySerializable) => {
+// `json` selects the realm whose JSON.parse builds the result. By default that
+// is the iframe's own JSON, but run_js passes the parent window's JSON so the
+// deserialized terms (arrays/objects) belong to the parent realm — otherwise
+// cross-realm arrays sent out of the iframe fail `instanceof Array` checks in
+// the parent (e.g. phoenix_live_view's diff renderer). Tracked `popcorn_ref`
+// values are resolved by reference and keep their own realm regardless.
+function deserialize(
+  message: string,
+  json: { parse: typeof JSON.parse } = JSON,
+): AnySerializable {
+  return json.parse(message, (_key: string, value: AnySerializable) => {
     const isRef =
       typeof value === "object" &&
       value !== null &&
