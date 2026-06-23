@@ -71,9 +71,13 @@ defmodule LocalLiveView.Server do
     %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
     val = decode_event_type(type, raw_val, msg.payload)
 
-    state.socket
-    |> view_handle_event(event, val)
-    |> handle_result({:handle_event, 3, msg.ref}, state)
+    if cid = msg.payload["cid"] do
+      component_handle_event(state, cid, event, val, msg.ref)
+    else
+      state.socket
+      |> view_handle_event(event, val)
+      |> handle_result({:handle_event, 3, msg.ref}, state)
+    end
   end
 
   def handle_info(
@@ -85,36 +89,63 @@ defmodule LocalLiveView.Server do
     |> handle_result({:handle_info, 2, nil}, state)
   end
 
+  def handle_info({:phoenix, :send_update, update}, state) do
+    case Diff.update_component(state.socket, state.components, update) do
+      {diff, new_components} ->
+        {:noreply, push_diff(%{state | components: new_components}, diff, nil)}
+
+      :noop ->
+        {:noreply, state}
+    end
+  end
+
   def handle_info(msg, %{socket: socket} = state) do
     msg
     |> view_handle_info(socket)
     |> handle_result({:handle_info, 2, nil}, state)
   end
 
-  defp view_handle_event(%Socket{} = socket, "lv:clear-flash", val) do
-    case val do
-      %{"key" => key} -> {:noreply, Utils.clear_flash(socket, key)}
-      _ -> {:noreply, Utils.clear_flash(socket)}
+  defp view_handle_event(%Socket{} = socket, event, val) do
+    {:noreply, do_handle_event(socket.view, socket, event, val)}
+  end
+
+  defp component_handle_event(state, cid, event, val, ref) do
+    %{socket: socket, components: components} = state
+
+    result =
+      Diff.write_component(socket, cid, components, fn component_socket, component ->
+        socket = do_handle_event(component, component_socket, event, val)
+        {socket, nil}
+      end)
+
+    case result do
+      {diff, new_components, _extra} ->
+        {:noreply, push_diff(%{state | components: new_components}, diff, ref)}
+
+      :error ->
+        {:noreply, push_noop(state, ref)}
     end
   end
 
-  defp view_handle_event(%Socket{}, "lv:" <> _ = bad_event, _val) do
+  defp do_handle_event(_module, %Socket{} = socket, "lv:clear-flash", val) do
+    case val do
+      %{"key" => key} -> Utils.clear_flash(socket, key)
+      _val -> Utils.clear_flash(socket)
+    end
+  end
+
+  defp do_handle_event(_module, %Socket{}, "lv:" <> _ = bad_event, _val) do
     raise ArgumentError, """
-    received unknown LiveView event #{inspect(bad_event)}.
+    Received unknown LiveView event #{inspect(bad_event)}.
     The following LiveView events are supported: lv:clear-flash.
     """
   end
 
-  defp view_handle_event(%Socket{} = socket, event, val) do
-    case socket.view.handle_event(event, val, socket) do
-      {:noreply, %Socket{} = socket} ->
-        {:noreply, socket}
-
-      {:reply, reply, %Socket{} = socket} ->
-        {:reply, reply, socket}
-
-      other ->
-        raise_bad_callback_response!(other, socket.view, :handle_event, 3)
+  defp do_handle_event(module, %Socket{} = socket, event, val) do
+    case module.handle_event(event, val, socket) do
+      {:noreply, %Socket{} = socket} -> socket
+      {:reply, %{} = reply, %Socket{} = socket} -> Utils.put_reply(socket, reply)
+      other -> raise_bad_callback_response!(other, module, :handle_event, 3)
     end
   end
 
@@ -183,14 +214,6 @@ defmodule LocalLiveView.Server do
       {:diff, diff, new_state} ->
         {:ok, diff, redir, new_state}
     end
-  end
-
-  defp handle_result(
-         {:reply, %{} = reply, %Socket{} = new_socket},
-         {:handle_event, 3, ref},
-         state
-       ) do
-    handle_changed(state, Utils.put_reply(new_socket, reply), ref)
   end
 
   defp handle_result({:noreply, %Socket{} = new_socket}, {_from, _arity, ref}, state) do
