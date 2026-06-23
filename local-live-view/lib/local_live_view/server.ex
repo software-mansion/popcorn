@@ -341,11 +341,12 @@ defmodule LocalLiveView.Server do
     Popcorn.Wasm.run_js(
       """
       ({ args }) => {
-        if (args.replace) {
-          window.history.replaceState({}, "", args.url);
-        } else {
-          window.history.pushState({}, "", args.url);
-        }
+        const event = new CustomEvent("llv:navigate", {
+          detail: { href: args.url, replace: args.replace },
+          cancelable: true,
+        });
+
+        window.dispatchEvent(event);
       }
       """,
       %{url: url, replace: replace}

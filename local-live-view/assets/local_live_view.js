@@ -6,6 +6,10 @@ import { Popcorn } from "@swmansion/popcorn";
  * @property {string[]} [bundlePaths] - Paths to the compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]`.
  * @property {boolean} [debug] - Enable Popcorn debug logging. Defaults to `false`.
  * @property {(msg: unknown) => void} [eventHandler] - Optional callback for raw Popcorn messages.
+ * @property {(href: string, replace: boolean) => void} [onNavigate] - Override LLV's default navigation handler.
+ *   Called instead of `liveSocket.historyPatch` when an LLV view calls `push_patch`.
+ *   The default syncs LLV navigation into the Phoenix LiveView channel so the host page's
+ *   `handle_params/3` fires. Pass a custom function to take full control of navigation.
  */
 
 export class LLVEngine {
