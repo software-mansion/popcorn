@@ -54,11 +54,11 @@ defmodule NavTestLive do
   end
 
   defp tab_link(assigns) do
-    active = assigns.page == assigns.target
+    assigns = assign(assigns, :active, assigns.page == assigns.target)
     ~H"""
     <.link
       patch={"/plain/?page=#{@target}"}
-      style={"padding: 8px 16px; font-size: 14px; font-weight: 500; border-bottom: 2px solid #{if active, do: "#3b82f6", else: "transparent"}; color: #{if active, do: "#3b82f6", else: "#6b7280"}; text-decoration: none; margin-bottom: -2px;"}
+      style={"padding: 8px 16px; font-size: 14px; font-weight: 500; border-bottom: 2px solid #{if @active, do: "#3b82f6", else: "transparent"}; color: #{if @active, do: "#3b82f6", else: "#6b7280"}; text-decoration: none; margin-bottom: -2px;"}
     >
       {@label}
     </.link>
