@@ -629,6 +629,66 @@ var LLVEngine = class _LLVEngine {
         console.error("LLV no initial rendered for view", llvId);
       }
     });
+    const absHref = (href) => new URL(href, window.location.origin).href;
+    const phoenixOwnsNav = () => liveSocket.isConnected();
+    const llvHandleParams = (href) => {
+      const url = absHref(href);
+      const params = Object.fromEntries(new URL(url).searchParams.entries());
+      for (const llvId of Object.keys(viewsById)) {
+        popcorn.call(
+          { id: llvId, event: "handle_params", payload: { params, url } },
+          { timeoutMs: 1e4 }
+        ).catch((err) => console.error("LLV handle_params error", err));
+      }
+    };
+    let lastLLVNavigatedHref = null;
+    document.addEventListener("click", (e) => {
+      if (phoenixOwnsNav()) return;
+      const link = e.target.closest('a[data-phx-link="patch"]');
+      if (!link) return;
+      e.preventDefault();
+      const to = link.getAttribute("href");
+      const replace = link.getAttribute("data-phx-link-state") === "replace";
+      if (replace) {
+        window.history.replaceState({ llv: true }, "", to);
+      } else {
+        window.history.pushState({ llv: true }, "", to);
+      }
+      llvHandleParams(to);
+    });
+    window.addEventListener("popstate", () => {
+      if (phoenixOwnsNav()) return;
+      llvHandleParams(window.location.href);
+    });
+    window.addEventListener("llv:navigate", (e) => {
+      const href = e.detail.href;
+      lastLLVNavigatedHref = absHref(href);
+      if (config.onNavigate) {
+        config.onNavigate(href, e.detail.replace);
+        return;
+      }
+      if (phoenixOwnsNav()) {
+        liveSocket.pushHistoryPatch(
+          { isTrusted: false, type: "llv:navigate" },
+          href,
+          e.detail.replace ? "replace" : "push",
+          null
+        );
+      } else if (e.detail.replace) {
+        window.history.replaceState({ llv: true }, "", href);
+      } else {
+        window.history.pushState({ llv: true }, "", href);
+      }
+    });
+    window.addEventListener("phx:navigate", (e) => {
+      if (!e.detail?.patch) return;
+      const url = absHref(e.detail.href ?? window.location.href);
+      if (url === lastLLVNavigatedHref) {
+        lastLLVNavigatedHref = null;
+        return;
+      }
+      llvHandleParams(url);
+    });
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {
       const llvEl = childEl.closest?.("[data-pop-view]");
