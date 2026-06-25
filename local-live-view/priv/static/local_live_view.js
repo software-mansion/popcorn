@@ -1,4 +1,4 @@
-// node_modules/@swmansion/popcorn/dist/types.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/types.mjs
 var INIT_VM_TIMEOUT_MS = 3e4;
 var CALL_TIMEOUT_MS = 6e4;
 var HEARTBEAT_TIMEOUT_MS = 6e4;
@@ -23,7 +23,7 @@ function isMessageType(type) {
   return MESSAGES_TYPES.has(type);
 }
 
-// node_modules/@swmansion/popcorn/dist/errors.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/errors.mjs
 var defaultErrorMessages = {
   timeout: "Promise timeout",
   deinitialized: "Call cancelled due to instance deinit",
@@ -76,7 +76,7 @@ function throwError(error) {
   throw buildError(error);
 }
 
-// node_modules/@swmansion/popcorn/dist/bridge.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/bridge.mjs
 var STYLE_HIDDEN = "visibility: hidden; width: 0px; height: 0px; border: none";
 var IframeBridge = class {
   iframe;
@@ -136,7 +136,7 @@ function metaTagsFrom(config) {
   return Object.entries(config).map(([key, value]) => `<meta name="${key}" content="${value}" />`).join("\n");
 }
 
-// node_modules/@swmansion/popcorn/dist/popcorn.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/popcorn.mjs
 var INIT_TOKEN = /* @__PURE__ */ Symbol();
 var IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 var Popcorn = class _Popcorn {
@@ -559,8 +559,12 @@ var LLVEngine = class _LLVEngine {
         }
       };
     }
+    const initialUrlParams = Object.fromEntries(
+      new URLSearchParams(window.location.search).entries()
+    );
+    const initialUrl = window.location.href;
     const { data: initialRenderedByView } = await popcorn.call(
-      { views: findPredefinedViews() },
+      { views: findPredefinedViews(), params: initialUrlParams, url: initialUrl },
       { timeoutMs: 1e4 }
     );
     const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
@@ -624,6 +628,66 @@ var LLVEngine = class _LLVEngine {
       } else {
         console.error("LLV no initial rendered for view", llvId);
       }
+    });
+    const absHref = (href) => new URL(href, window.location.origin).href;
+    const phoenixOwnsNav = () => liveSocket.isConnected();
+    const llvHandleParams = (href) => {
+      const url = absHref(href);
+      const params = Object.fromEntries(new URL(url).searchParams.entries());
+      for (const llvId of Object.keys(viewsById)) {
+        popcorn.call(
+          { id: llvId, event: "handle_params", payload: { params, url } },
+          { timeoutMs: 1e4 }
+        ).catch((err) => console.error("LLV handle_params error", err));
+      }
+    };
+    let lastLLVNavigatedHref = null;
+    document.addEventListener("click", (e) => {
+      if (phoenixOwnsNav()) return;
+      const link = e.target.closest('a[data-phx-link="patch"]');
+      if (!link) return;
+      e.preventDefault();
+      const to = link.getAttribute("href");
+      const replace = link.getAttribute("data-phx-link-state") === "replace";
+      if (replace) {
+        window.history.replaceState({ llv: true }, "", to);
+      } else {
+        window.history.pushState({ llv: true }, "", to);
+      }
+      llvHandleParams(to);
+    });
+    window.addEventListener("popstate", () => {
+      if (phoenixOwnsNav()) return;
+      llvHandleParams(window.location.href);
+    });
+    window.addEventListener("llv:navigate", (e) => {
+      const href = e.detail.href;
+      lastLLVNavigatedHref = absHref(href);
+      if (config.onNavigate) {
+        config.onNavigate(href, e.detail.replace);
+        return;
+      }
+      if (phoenixOwnsNav()) {
+        liveSocket.pushHistoryPatch(
+          { isTrusted: false, type: "llv:navigate" },
+          href,
+          e.detail.replace ? "replace" : "push",
+          null
+        );
+      } else if (e.detail.replace) {
+        window.history.replaceState({ llv: true }, "", href);
+      } else {
+        window.history.pushState({ llv: true }, "", href);
+      }
+    });
+    window.addEventListener("phx:navigate", (e) => {
+      if (!e.detail?.patch) return;
+      const url = absHref(e.detail.href ?? window.location.href);
+      if (url === lastLLVNavigatedHref) {
+        lastLLVNavigatedHref = null;
+        return;
+      }
+      llvHandleParams(url);
     });
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {

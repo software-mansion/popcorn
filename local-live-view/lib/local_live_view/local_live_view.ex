@@ -142,6 +142,23 @@ defmodule LocalLiveView do
     }
   end
 
+  @doc """
+  Navigates to the given path with a browser history push, then calls `handle_params/3`
+  with the new URL query params. No server round-trip.
+
+  Mirrors `Phoenix.LiveView.push_patch/2` semantics.
+
+  ## Options
+
+    * `:to` — the path to navigate to (required)
+    * `:replace` — when `true`, replaces the current history entry instead of pushing a new one
+  """
+  def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
+    to = Keyword.fetch!(opts, :to)
+    kind = if opts[:replace], do: :replace, else: :push
+    %{socket | redirected: {:live, :patch, %{to: to, kind: kind}}}
+  end
+
   @type unsigned_params :: map
 
   @callback render(assigns :: Socket.assigns()) :: map()
@@ -153,8 +170,16 @@ defmodule LocalLiveView do
             ) ::
               {:ok, Socket.t()} | {:ok, Socket.t(), keyword()}
 
+  @callback handle_params(
+              params :: unsigned_params(),
+              uri :: String.t(),
+              socket :: Socket.t()
+            ) :: {:noreply, Socket.t()}
+
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
 
   @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
+
+  @optional_callbacks handle_params: 3
 end
