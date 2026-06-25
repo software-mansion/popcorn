@@ -50,16 +50,28 @@ defmodule LocalLiveView.MixProject do
     [
       main: "welcome",
       filter_modules: ~r/^(?!Elixir.Phoenix\.).*/,
+      before_closing_body_tag: &before_closing_body_tag/1,
       extras: [
         "pages/introduction/welcome.md",
+        "pages/guides/navigation.md",
         "README.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
-        "Getting started": "README.md"
+        "Getting started": "README.md",
+        Guides: ~r"/guides/"
       ]
     ]
   end
+
+  defp before_closing_body_tag(:html) do
+    """
+      <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+      <script>mermaid.initialize({startOnLoad: true})</script>
+    """
+  end
+
+  defp before_closing_body_tag(_), do: ""
 
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
