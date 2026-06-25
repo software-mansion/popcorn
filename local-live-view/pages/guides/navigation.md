@@ -20,7 +20,9 @@ Navigation behaves differently depending on how an LLV view is rendered.
   LLV owns navigation itself: it intercepts patch-link clicks, writes the browser
   history entry, and handles `popstate`.
 
-The same `<.link patch={...}>` markup works in both modes.
+The same `<.link patch={...}>` markup works in both modes. `<.link href={...}>` and
+`<.link navigate={...}>` are handled by Phoenix LiveView as usual and are not affected
+by LLV.
 
 ## `handle_params/3`
 
@@ -74,7 +76,7 @@ so `handle_params/3` is not run twice for the same navigation.
 
 ```mermaid
 flowchart TD
-    PP["push_patch/2 (Elixir)"] --> WASM["handle_params/3 runs in WASM, diff to DOM"]
+    PP["push_patch/2 (LLV)"] --> WASM["handle_params/3 runs in WASM, diff to DOM"]
     WASM --> EMIT["local_live_view server emits llv:navigate event"]
     EMIT --> H{Hosted?}
     H -- yes --> PHX["route through Phoenix, phx:navigate echo de-duplicated"]

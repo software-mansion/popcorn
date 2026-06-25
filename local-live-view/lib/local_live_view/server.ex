@@ -70,8 +70,8 @@ defmodule LocalLiveView.Server do
 
     if lifecycle.any? do
       socket
-      |> call_handle_params_direct(view, lifecycle.exported?, params, url)
-      |> handle_result({:handle_info, 2, nil}, state)
+      |> call_handle_params(view, lifecycle.exported?, params, url)
+      |> handle_result({:handle_params, 3, nil}, state)
     else
       {:noreply, state}
     end
@@ -204,9 +204,7 @@ defmodule LocalLiveView.Server do
   defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
   defp gather_keys(_, acc), do: acc
 
-  defp maybe_call_mount_handle_params(%{socket: socket} = state, params) do
-    url_params = Map.get(params, "url_params", %{})
-    url = Map.get(params, "url", "")
+  defp maybe_call_mount_handle_params(%{socket: socket} = state, %{"url_params" => url_params, "url" => url}) do
     %{view: view, redirected: mount_redirect} = socket
     lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
 
@@ -220,19 +218,19 @@ defmodule LocalLiveView.Server do
 
       true ->
         socket
-        |> call_handle_params_direct(view, lifecycle.exported?, url_params, url)
+        |> call_handle_params(view, lifecycle.exported?, url_params, url)
         |> mount_handle_params_result(state, :mount)
     end
   end
 
-  defp call_handle_params_direct(socket, view, true, params, url) do
+  defp call_handle_params(socket, view, true, params, url) do
     case view.handle_params(params, url, socket) do
       {:noreply, %Socket{} = socket} -> {:noreply, socket}
       other -> raise_bad_callback_response!(other, view, :handle_params, 3)
     end
   end
 
-  defp call_handle_params_direct(socket, _view, false, _params, _url) do
+  defp call_handle_params(socket, _view, false, _params, _url) do
     {:noreply, socket}
   end
 
@@ -330,8 +328,8 @@ defmodule LocalLiveView.Server do
 
     if lifecycle.any? do
       socket
-      |> call_handle_params_direct(view, lifecycle.exported?, url_params, to)
-      |> handle_result({:handle_info, 2, ref}, new_state)
+      |> call_handle_params(view, lifecycle.exported?, url_params, to)
+      |> handle_result({:handle_params, 3, ref}, new_state)
     else
       {:noreply, new_state}
     end
