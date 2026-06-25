@@ -71,9 +71,7 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm({:wasm_call, %{"views" => views} = msg}, state) do
-    url_params = Map.get(msg, "params", %{})
-    url = Map.get(msg, "url", "")
+  defp handle_wasm({:wasm_call, %{"views" => views, "params" => url_params, "url" => url}}, state) do
 
     started =
       views

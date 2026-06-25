@@ -162,6 +162,12 @@ importers:
         specifier: workspace:*
         version: link:../../../local-live-view
 
+  examples/local-lv-checkout/assets:
+    dependencies:
+      local_live_view:
+        specifier: workspace:*
+        version: link:../../../local-live-view
+
   examples/local-lv-compare/assets:
     dependencies:
       local_live_view:
