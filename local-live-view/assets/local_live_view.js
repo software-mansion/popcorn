@@ -78,7 +78,7 @@ export class LLVEngine {
 
         popcorn
           .call(
-            { id: this.el.id, event: event, payload: payload },
+            { action: "event", id: this.el.id, payload: payload },
             { timeoutMs: 10_000 },
           )
           .catch((err) => console.error("LLV view.pushWithReply error", err));
@@ -115,7 +115,7 @@ export class LLVEngine {
     // Stop a view's runtime process. The caller drops the fake view (if any).
     const teardownProcess = (llvId) =>
       popcorn
-        .call({ id: llvId, event: "llv_destroy", payload: {} }, { timeoutMs: 10_000 })
+        .call({ action: "destroy", id: llvId, payload: {} }, { timeoutMs: 10_000 })
         .catch((err) => console.error("LLV destroy error", err));
 
     // Start a view and wire it up.
@@ -123,7 +123,7 @@ export class LLVEngine {
       const llvId = pop_view_el.id;
       if (viewsById[llvId]) return;
       const { data } = await popcorn.call(
-        { event: "llv_create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
         { timeoutMs: 10_000 },
       );
       if (data.status == "error") return;
@@ -217,7 +217,7 @@ export class LLVEngine {
             if (viewsById[llvId]) {
               popcorn
                 .call(
-                  { id: llvId, event: "llv_reconnected", payload: {} },
+                  { action: "reconnected", id: llvId, payload: {} },
                   { timeoutMs: 10_000 },
                 )
                 .catch((err) => console.error("LLV reconnect sync error", err));
@@ -304,7 +304,7 @@ export class LLVEngine {
     const llvId = el ? el.id : viewId;
 
     const result = await this.popcorn.call(
-      { id: llvId, event: "llv_push", payload: { event, payload } },
+      { action: "push", id: llvId, payload: { event, payload } },
       { timeoutMs: 10_000 },
     );
 
@@ -324,7 +324,7 @@ async function sendServerMessage(popcorn, detail) {
   await popcorn.call(
     {
       id: llvId,
-      event: "llv_server_message",
+      action: "event",
       payload: {
         event: "llv_server_message",
         value: detail.payload,
