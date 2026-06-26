@@ -161,19 +161,19 @@ defmodule Popcorn.Support.AtomVM do
       apply(Playwright.Page, :evaluate, [
         page,
         """
-      async () => {
-        const instance = window.popcornInstances.get("#{instance_id}");
-        try {
-          const result = await instance.popcorn.call("#{args}", {process: "main"});
-          if (!result.ok) {
+        async () => {
+          const instance = window.popcornInstances.get("#{instance_id}");
+          try {
+            const result = await instance.popcorn.call("#{args}", {process: "main"});
+            if (!result.ok) {
+              return { error: true, logs: instance.logs.join("") };
+            }
+            return { data: result.data, logs: instance.logs.join("") };
+          } catch (e) {
             return { error: true, logs: instance.logs.join("") };
           }
-          return { data: result.data, logs: instance.logs.join("") };
-        } catch (e) {
-          return { error: true, logs: instance.logs.join("") };
         }
-      }
-      """
+        """
       ])
 
     logs = Map.get(result, :logs, "")
