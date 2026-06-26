@@ -32,7 +32,7 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"id" => id, "event" => "llv_reconnected"}},
+         {:wasm_call, %{"action" => "reconnected", "id" => id}},
          state
        ) do
     send_to_view(state, id, %Message{event: "llv_reconnected", payload: %{}})
@@ -40,14 +40,14 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"id" => id, "event" => "llv_push", "payload" => payload}},
+         {:wasm_call, %{"action" => "push", "id" => id, "payload" => payload}},
          state
        ) do
     send_to_view(state, id, %Message{event: "js_push", payload: payload})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm({:wasm_call, %{"id" => id, "event" => "llv_destroy"}}, state) do
+  defp handle_wasm({:wasm_call, %{"action" => "destroy", "id" => id}}, state) do
     # The host LiveView removed a mount point. Stop its process and forget it.
     case Map.get(state.views, id) do
       nil -> :ok
@@ -59,7 +59,7 @@ defmodule LocalLiveView.Dispatcher do
 
   # This event may be fired multiple times for the same view from JS,
   # in such case we only handle the first event.
-  defp handle_wasm({:wasm_call, %{"event" => "llv_create", "id" => id, "view" => view}}, state)
+  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id, "view" => view}}, state)
        when not is_map_key(state.views, id) do
     view = String.to_existing_atom("Elixir." <> view)
 
@@ -72,12 +72,12 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp handle_wasm({:wasm_call, %{"event" => "llv_create"}}, state) do
+  defp handle_wasm({:wasm_call, %{"action" => "create"}}, state) do
     {:resolve, %{status: :error}, state}
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"id" => id, "event" => _type, "payload" => payload}},
+         {:wasm_call, %{"action" => "event", "id" => id, "payload" => payload}},
          state
        ) do
     send_to_view(state, id, %Message{payload: payload, event: "event"})
