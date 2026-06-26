@@ -515,6 +515,9 @@ var LLVEngine = class _LLVEngine {
       }
       await sendServerMessage(popcorn, e.detail);
     });
+    if (!document.querySelector("[data-phx-session]")) {
+      liveSocket.bindForms();
+    }
     popcorn = await Popcorn.init({
       debug: config.debug ?? false,
       bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"]
@@ -575,7 +578,7 @@ var LLVEngine = class _LLVEngine {
         );
         return;
       }
-      view.update(diff, []);
+      view.update(structuredClone(diff), []);
     };
     pop_view_els.forEach((pop_view_el) => {
       const llvId = pop_view_el.id;
@@ -634,6 +637,7 @@ var LLVEngine = class _LLVEngine {
       }
       return origOwner(childEl, callback);
     };
+    registerCustomEventBindings(liveSocket);
     for (const detail of bufferedServerMessages) {
       await sendServerMessage(popcorn, detail);
     }
@@ -683,6 +687,107 @@ function findPredefinedViews() {
     view: el.getAttribute("data-pop-view"),
     id: el.id
   }));
+}
+function registerCustomEventBindings(liveSocket) {
+  const buildPointerData = (e, el) => {
+    const rect = el.getBoundingClientRect();
+    return {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      pageX: e.pageX,
+      pageY: e.pageY,
+      screenX: e.screenX,
+      screenY: e.screenY,
+      movementX: e.movementX,
+      movementY: e.movementY,
+      button: e.button,
+      buttons: e.buttons,
+      altKey: e.altKey,
+      ctrlKey: e.ctrlKey,
+      metaKey: e.metaKey,
+      shiftKey: e.shiftKey,
+      rect: {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
+      }
+    };
+  };
+  const closestWithBinding = (target, binding) => {
+    let el = target;
+    while (el && el.nodeType === 1 && !(el.getAttribute && el.getAttribute(binding))) {
+      el = el.parentNode;
+    }
+    return el && el.nodeType === 1 && el.getAttribute(binding) ? el : null;
+  };
+  const mouseEventTypes = [
+    "mousedown",
+    "mouseup",
+    "mousemove",
+    "mouseover",
+    "mouseout"
+  ];
+  for (const eventType of mouseEventTypes) {
+    const elementBinding = `phx-${eventType}`;
+    const windowBinding = `phx-window-${eventType}`;
+    window.addEventListener(eventType, (e) => {
+      const el = closestWithBinding(e.target, elementBinding);
+      if (el) {
+        const phxEvent = el.getAttribute(elementBinding);
+        liveSocket.debounce(el, e, eventType, () => {
+          liveSocket.withinOwners(el, (view) => {
+            view.pushEvent(eventType, el, null, phxEvent, buildPointerData(e, el), {});
+          });
+        });
+      } else {
+        document.querySelectorAll(`[${windowBinding}]`).forEach((wel) => {
+          const phxEvent = wel.getAttribute(windowBinding);
+          liveSocket.debounce(wel, e, eventType, () => {
+            liveSocket.withinOwners(wel, (view) => {
+              view.pushEvent(eventType, wel, null, phxEvent, buildPointerData(e, wel), {});
+            });
+          });
+        });
+      }
+    });
+  }
+  const dragEventTypes = [
+    "dragstart",
+    "dragenter",
+    "dragover",
+    "dragleave",
+    "drop",
+    "dragend"
+  ];
+  const dragPreventDefault = /* @__PURE__ */ new Set(["dragenter", "dragover", "drop"]);
+  for (const eventType of dragEventTypes) {
+    const elementBinding = `phx-${eventType}`;
+    window.addEventListener(eventType, (e) => {
+      const el = closestWithBinding(e.target, elementBinding);
+      if (!el) return;
+      if (dragPreventDefault.has(eventType)) {
+        e.preventDefault();
+      }
+      if (e.dataTransfer) {
+        if (eventType === "dragstart") {
+          e.dataTransfer.effectAllowed = "move";
+          try {
+            e.dataTransfer.setData("text/plain", el.id || "");
+          } catch (_) {
+          }
+        } else if (eventType === "dragover") {
+          e.dataTransfer.dropEffect = "move";
+        }
+      }
+      const phxEvent = el.getAttribute(elementBinding);
+      liveSocket.debounce(el, e, eventType, () => {
+        liveSocket.withinOwners(el, (view) => {
+          view.pushEvent(eventType, el, null, phxEvent, buildPointerData(e, el), {});
+        });
+      });
+    });
+  }
 }
 export {
   LLVEngine
