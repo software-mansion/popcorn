@@ -79,6 +79,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
 
     add_llv_path_dep(app_dir, llv_path)
     run!("mix", ["deps.get"], cd: app_dir)
+    link_llv_into_deps(app_dir, llv_path)
     run!("mix", ["llv.install", "--yes"], cd: app_dir)
     overwrite_home_html(app_dir)
     run!("mix", ["setup"], cd: app_dir)
@@ -100,6 +101,15 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
       )
 
     File.write!(mix_path, new)
+  end
+
+  # Mix doesn't materialize path deps under deps/, but Phoenix's esbuild resolves
+  # `import "local_live_view"` via NODE_PATH=deps. Symlink it in so the bundle resolves
+  # exactly like a real hex/git install (deps/local_live_view/priv/static/local_live_view.js).
+  defp link_llv_into_deps(app_dir, llv_path) do
+    link = Path.join([app_dir, "deps", "local_live_view"])
+    File.rm_rf!(link)
+    File.ln_s!(llv_path, link)
   end
 
   defp overwrite_home_html(app_dir) do
