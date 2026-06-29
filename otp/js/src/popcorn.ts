@@ -63,6 +63,9 @@ export class Popcorn {
       case "otp:message":
         this.emit(data.payload);
         return;
+      case "otp:run_js":
+        this.runJs(data.payload.code);
+        return;
       case "otp:stdout":
         console.log(`${LOG_PREFIX} stdout:`, data.payload);
         return;
@@ -94,6 +97,10 @@ export class Popcorn {
   }
 
   public static async init(opts: PopcornOpts): Promise<Result<Popcorn>> {
+    if (!canEval()) {
+      return { ok: false, error: err("runtime:eval-unavailable", {}) };
+    }
+
     const popcorn = new Popcorn(opts);
     const result = await popcorn.boot();
 
@@ -253,6 +260,11 @@ export class Popcorn {
     }
   }
 
+  private runJs(code: string): void {
+    // Main thread; supports sync or async code, errors are thrown.
+    indirectEval(code);
+  }
+
   private completeSend(payload: SendCompletionPayload): void {
     const resolve = this.pendingSends.get(payload.id) ?? null;
 
@@ -303,6 +315,20 @@ function exitReason(payload: OtpErrorPayload): VmExitReason {
       return { reason: "exit", data: payload.data };
     default:
       return unreachable();
+  }
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval
+function indirectEval(code: string): unknown {
+  return (0, eval)(code);
+}
+
+function canEval(): boolean {
+  try {
+    indirectEval("0");
+    return true;
+  } catch {
+    return false;
   }
 }
 

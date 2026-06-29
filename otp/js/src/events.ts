@@ -56,6 +56,10 @@ type BridgeEnvelope =
   | {
       type: "vm_error";
       data: string;
+    }
+  | {
+      type: "run_js";
+      code: string;
     };
 
 export function readMainEvent(value: unknown): MainToVmEvent | null {
@@ -84,6 +88,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
     case "otp:stderr":
     case "otp:error":
     case "otp:message":
+    case "otp:run_js":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
     case "popcorn:send-end":
@@ -119,7 +124,9 @@ export function serializeSendPayload(
 
 export function deserializeBridgeMessage(
   text: string,
-): Extract<BeamEvent, { type: "otp:message" | "otp:error" }> | null {
+):
+  | Extract<BeamEvent, { type: "otp:message" | "otp:error" | "otp:run_js" }>
+  | null {
   try {
     const parsed = JSON.parse(text) as unknown;
     if (!isBridgeEnvelope(parsed)) return null;
@@ -135,6 +142,8 @@ export function deserializeBridgeMessage(
             data: parsed.data,
           },
         };
+      case "run_js":
+        return { type: "otp:run_js", payload: { code: parsed.code } };
       default:
         return null;
     }
@@ -157,7 +166,9 @@ function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
   const data = objectWithKeys(value, ["type"]);
   return (
     data !== null &&
-    (data.type === "vm_message" || data.type === "vm_error")
+    (data.type === "vm_message" ||
+      data.type === "vm_error" ||
+      data.type === "run_js")
   );
 }
 

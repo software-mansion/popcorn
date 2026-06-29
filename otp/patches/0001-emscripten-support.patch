@@ -894,10 +894,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..519f96444ebe4f3c581944daab93abe5add71736
+index 0000000000000000000000000000000000000000..cdc153b8b2a72525f044c8586c6893b399095f08
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,46 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -924,13 +924,18 @@ index 0000000000000000000000000000000000000000..519f96444ebe4f3c581944daab93abe5
 +
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
-+-export([on_load/0, send/1]).
++-export([on_load/0, send/1, run_js/1]).
 +
 +-nifs([send_raw/1]).
 +
 +-spec send(json:encode_value()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
++    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
++
++-spec run_js(binary()) -> ok.
++run_js(Code) when is_binary(Code) ->
++    Envelope = #{type => run_js, code => Code},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
 +
 +-spec on_load() -> ok.

@@ -211,6 +211,45 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
+test("run_js evaluates code on the main thread", async ({ otp, page }) => {
+  // run_js is fire-and-forget: it emits no onEvent and returns nothing, so we
+  // poll the side effect the eval'd code leaves on the main-thread window.
+  const RUN_JS_BOOT_EVAL = 'wasm:run_js(<<"window.popcorn = {js: true}">>).';
+  const boot = await otp.boot({
+    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
+  });
+  assert(boot.ok);
+
+  await page.waitForFunction("window.popcorn?.js === true");
+});
+
+test("run_js runs an async snippet", async ({ otp, page }) => {
+  const RUN_JS_BOOT_EVAL =
+    'wasm:run_js(<<"(async () => { window.popcorn = {async: true}; })()">>).';
+  const boot = await otp.boot({
+    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
+  });
+  assert(boot.ok);
+
+  await page.waitForFunction("window.popcorn?.async === true");
+});
+
+test("a throwing run_js snippet doesn't stop later ones from running", async ({
+  otp,
+  page,
+}) => {
+  // The first eval throws; the second must still run and leave its side effect.
+  const RUN_JS_BOOT_EVAL =
+    "wasm:run_js(<<\"throw new Error('boom')\">>), " +
+    'wasm:run_js(<<"window.popcorn = {throwing: true}">>).';
+  const boot = await otp.boot({
+    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
+  });
+  assert(boot.ok);
+
+  await page.waitForFunction("window.popcorn?.throwing === true");
+});
+
 test("popcorn.send() reports unregistered process", async ({ otp }) => {
   const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
   const boot = await otp.boot({
