@@ -18,16 +18,17 @@ COPY examples/local-lv-burrito/config/config.exs examples/local-lv-burrito/confi
 RUN mix deps.compile
 
 RUN mix tailwind.install --if-missing
+RUN mix esbuild.install --if-missing
 
 COPY examples/local-lv-burrito/local/ local/
 RUN cd local && mix deps.get && MIX_TARGET=wasm mix popcorn.cook
 
-RUN LLV_PROJECT_DIR=$(pwd) node /build/popcorn/local-live-view/assets/bundle.mjs
+RUN mix llv.build
 
 COPY examples/local-lv-burrito/lib/ lib/
 COPY examples/local-lv-burrito/assets/ assets/
 RUN mix compile
-RUN cd assets && CI=true pnpm run build
+RUN mix esbuild burrito --minify
 RUN mix tailwind burrito --minify
 RUN mix phx.digest
 
