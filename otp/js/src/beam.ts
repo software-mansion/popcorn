@@ -4,6 +4,7 @@ import { extractTar } from "./tar";
 import type {
   BeamBootOptions,
   BeamSendPayload,
+  BeamTarget,
   EmscriptenModule,
 } from "./types";
 import {
@@ -13,6 +14,7 @@ import {
   fetchBinary,
   fetchJson,
   isGzip,
+  unreachable,
 } from "./utils";
 
 const DEFAULT_USER = "web_user";
@@ -213,13 +215,43 @@ export function send(
     return { ok: false, error: err("bridge:not-started", {}) };
   }
 
+  let targetName: string;
+  let target: PreparedTarget;
+  if (isNameTarget(message.target)) {
+    targetName = message.target.name;
+    target = {
+      kind: TARGET_REGISTERED_NAME,
+      argType: "string",
+      value: targetName,
+      length: utf8Length(targetName),
+    };
+  } else {
+    targetName = message.target.pid;
+    const bytes = base64ToBytes(targetName);
+    target = {
+      kind: TARGET_PID_BYTES,
+      argType: "array",
+      value: bytes,
+      length: bytes.length,
+    };
+  }
+
   const status = module.ccall(
     "sendVmMessage",
     "number",
-    ["string", "number", "string", "number", "string", "number"],
     [
-      message.targetName,
-      utf8Length(message.targetName),
+      "number",
+      target.argType,
+      "number",
+      "string",
+      "number",
+      "string",
+      "number",
+    ],
+    [
+      target.kind,
+      target.value,
+      target.length,
       message.payloadJson,
       utf8Length(message.payloadJson),
       message.metaJson,
@@ -234,20 +266,44 @@ export function send(
   if (status === 1) {
     return {
       ok: false,
-      error: err("bridge:listener-not-found", {
-        targetName: message.targetName,
-      }),
+      error: err("bridge:listener-not-found", { targetName }),
     };
   }
+  unreachable();
+}
 
-  return {
-    ok: false,
-    error: err("internal:check", {
-      detail: `Unexpected sendVmMessage status: ${String(status)}`,
-    }),
-  };
+const TARGET_REGISTERED_NAME = 0;
+const TARGET_PID_BYTES = 1;
+
+type PreparedTarget =
+  | {
+      kind: typeof TARGET_REGISTERED_NAME;
+      argType: "string";
+      value: string;
+      length: number;
+    }
+  | {
+      kind: typeof TARGET_PID_BYTES;
+      argType: "array";
+      value: Uint8Array;
+      length: number;
+    };
+
+function isNameTarget(
+  target: BeamTarget,
+): target is Extract<BeamTarget, { name: string }> {
+  return Object.hasOwn(target, "name");
 }
 
 function utf8Length(text: string): number {
   return UTF8.encode(text).length;
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }

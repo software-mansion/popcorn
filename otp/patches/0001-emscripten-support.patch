@@ -183,10 +183,10 @@ index 0000000000000000000000000000000000000000..0b446eedf17294c0c47c2b872bf2fb44
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d85867ee0d0ff
+index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b91408d52
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,580 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -216,6 +216,7 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +#include "sys.h"
 +
 +#include <limits.h>
++#include <stdbool.h>
 +#include <stddef.h>
 +#include <stdlib.h>
 +#include <string.h>
@@ -228,6 +229,11 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +  WASM_LISTENER_NAME_OPAQUE = 0,
 +  WASM_LISTENER_NAME_REGISTERED = 1,
 +} wasm_listener_name_kind_t;
++
++typedef enum {
++  WASM_TARGET_REGISTERED_NAME = 0,
++  WASM_TARGET_PID_BYTES = 1,
++} wasm_target_kind_t;
 +
 +typedef struct wasm_state_s wasm_state_t;
 +
@@ -281,7 +287,7 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +static wasm_state_t *erts_wasm_state = NULL;
 +
 +#ifdef ERTS_EMSCRIPTEN
-+int sendVmMessage(const char *target_name, int target_name_len,
++int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
 +                  const char *payload_json, int payload_len,
 +                  const char *meta_json, int meta_len);
 +#endif
@@ -649,16 +655,48 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +}
 +
 +#ifdef ERTS_EMSCRIPTEN
++static bool decode_pid_target(ErlNifEnv *env, const char *target_name,
++                              int target_name_len, ErlNifPid *pid,
++                              bool *has_token, ERL_NIF_TERM *token) {
++  ERL_NIF_TERM target_term;
++  int arity;
++  const ERL_NIF_TERM *elems;
++
++  *has_token = false;
++
++  if (enif_binary_to_term(env, (const unsigned char *)target_name,
++                          (size_t)target_name_len, &target_term,
++                          ERL_NIF_BIN2TERM_SAFE) == 0) {
++    return false;
++  }
++
++  if (enif_get_local_pid(env, target_term, pid)) {
++    return true;
++  }
++
++  if (enif_get_tuple(env, target_term, &arity, &elems) && arity == 2 &&
++      enif_get_local_pid(env, elems[0], pid)) {
++    *has_token = true;
++    *token = elems[1];
++    return true;
++  }
++
++  return false;
++}
++
 +EMSCRIPTEN_KEEPALIVE
-+int sendVmMessage(const char *target_name, int target_name_len,
++int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
 +                  const char *payload_json, int payload_len,
 +                  const char *meta_json, int meta_len) {
 +  ErlNifEnv *env;
 +  ERL_NIF_TERM atom;
 +  ErlNifPid pid;
 +  ERL_NIF_TERM payload_term;
++  ERL_NIF_TERM message_payload;
 +  ERL_NIF_TERM meta_term;
 +  ERL_NIF_TERM message;
++  ERL_NIF_TERM token;
++  bool has_token = false;
 +
 +  if (target_name == NULL || target_name_len <= 0 || payload_len < 0 ||
 +      meta_len < 0 || (payload_json == NULL && payload_len > 0) ||
@@ -671,17 +709,28 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +    return 2;
 +  }
 +
-+  /*
-+   * Resolve the target by its registered name at send time. The
-+   * existing-atom lookup keeps arbitrary JS strings from growing the atom
-+   * table, and enif_whereis_pid piggybacks on erlang:register/2 so any
-+   * registered process is addressable without opting in.
-+   */
-+  if (!enif_make_existing_atom_len(env, target_name, (size_t)target_name_len,
-+                                   &atom, ERL_NIF_UTF8) ||
-+      !enif_whereis_pid(env, atom, &pid)) {
++  if (target_kind == WASM_TARGET_PID_BYTES) {
++    if (!decode_pid_target(env, target_name, target_name_len, &pid, &has_token,
++                           &token)) {
++      enif_free_env(env);
++      return 1;
++    }
++  } else if (target_kind == WASM_TARGET_REGISTERED_NAME) {
++    /*
++     * Resolve the target by its registered name at send time. The
++     * existing-atom lookup keeps arbitrary JS strings from growing the atom
++     * table, and enif_whereis_pid piggybacks on erlang:register/2 so any
++     * registered process is addressable without opting in.
++     */
++    if (!enif_make_existing_atom_len(env, target_name, (size_t)target_name_len,
++                                     &atom, ERL_NIF_UTF8) ||
++        !enif_whereis_pid(env, atom, &pid)) {
++      enif_free_env(env);
++      return 1;
++    }
++  } else {
 +    enif_free_env(env);
-+    return 1;
++    return 2;
 +  }
 +
 +  if (!make_binary_copy(env, payload_json != NULL ? payload_json : "",
@@ -692,7 +741,9 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +    return 2;
 +  }
 +
-+  message = enif_make_tuple3(env, am_wasm, payload_term, meta_term);
++  message_payload =
++      has_token ? enif_make_tuple2(env, token, payload_term) : payload_term;
++  message = enif_make_tuple3(env, am_wasm, message_payload, meta_term);
 +
 +  if (!enif_send(NULL, &pid, env, message)) {
 +    enif_free_env(env);
@@ -703,9 +754,10 @@ index 0000000000000000000000000000000000000000..b6bce2ecfc556414033534076d9d8586
 +  return 0;
 +}
 +#else
-+int sendVmMessage(const char *target_name, int target_name_len,
++int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
 +                  const char *payload_json, int payload_len,
 +                  const char *meta_json, int meta_len) {
++  (void)target_kind;
 +  (void)target_name;
 +  (void)target_name_len;
 +  (void)payload_json;
@@ -894,10 +946,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..cdc153b8b2a72525f044c8586c6893b399095f08
+index 0000000000000000000000000000000000000000..e6996fe9345bff0e934b8e0bf7f9515c18123b15
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,64 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -924,19 +976,37 @@ index 0000000000000000000000000000000000000000..cdc153b8b2a72525f044c8586c6893b3
 +
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
-+-export([on_load/0, send/1, run_js/1]).
++-export([on_load/0, send/1, run_js/2]).
 +
 +-nifs([send_raw/1]).
++
++-define(RUN_JS_TIMEOUT, 5000).
 +
 +-spec send(json:encode_value()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
 +
-+-spec run_js(binary()) -> ok.
-+run_js(Code) when is_binary(Code) ->
-+    Envelope = #{type => run_js, code => Code},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
++%% Run a JS function expression on the main browser thread and wait for its reply.
++-spec run_js(binary(), map()) -> json:decode_value().
++run_js(Code, Args) when is_binary(Code), is_map(Args) ->
++    Token = erlang:unique_integer(),
++    ReplyTo = base64:encode(term_to_binary({self(), Token})),
++    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
++    ok = send_raw(iolist_to_binary(json:encode(Envelope))),
++    receive
++        {wasm, {Token, PayloadJson}, _MetaJson} ->
++            handle_run_js_reply(PayloadJson)
++    after ?RUN_JS_TIMEOUT ->
++        error(run_js_timeout)
++    end.
++
++handle_run_js_reply(PayloadJson) ->
++    case json:decode(PayloadJson) of
++        #{<<"ok">> := true, <<"value">> := Value} -> Value;
++        #{<<"ok">> := true} -> null;
++        #{<<"ok">> := false, <<"error">> := Reason} -> error({run_js, Reason})
++    end.
 +
 +-spec on_load() -> ok.
 +on_load() ->

@@ -5,7 +5,7 @@ export type AnyValue = unknown;
 export type BeamTarget = { name: string } | { pid: string };
 
 export type BeamSendPayload = {
-  targetName: string;
+  target: BeamTarget;
   payloadJson: string;
   metaJson: string;
 };
@@ -23,7 +23,13 @@ export type BeamEvent =
   | { type: "otp:stderr"; payload: string }
   | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue }
-  | { type: "otp:run_js"; payload: { code: string } };
+  | { type: "otp:run_js"; payload: RunJsRequest };
+
+export type RunJsRequest = {
+  code: string;
+  args: AnyValue;
+  replyTo: string;
+};
 
 export type OtpErrorPayload =
   | { kind: "abort"; data: string }

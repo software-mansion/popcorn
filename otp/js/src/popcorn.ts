@@ -6,7 +6,13 @@ import {
   type PopcornEvent,
   type SendCompletionPayload,
 } from "./events";
-import type { AnyValue, BeamBootOptions, OtpErrorPayload } from "./types";
+import type {
+  AnyValue,
+  BeamBootOptions,
+  BeamTarget,
+  OtpErrorPayload,
+  RunJsRequest,
+} from "./types";
 import { check, unreachable } from "./utils";
 
 export type PopcornOpts = {
@@ -43,6 +49,11 @@ type PopcornState =
   | { status: "booted" }
   | { status: "closed"; error: PopcornError<"vm:exited"> };
 type PendingSend = (result: Result<null>) => void;
+type RunJsFn = (args: AnyValue) => AnyValue;
+
+function assertRunJsFn(value: unknown): asserts value is RunJsFn {
+  check(typeof value === "function");
+}
 
 export class Popcorn {
   private vmWorker!: Worker;
@@ -64,7 +75,7 @@ export class Popcorn {
         this.emit(data.payload);
         return;
       case "otp:run_js":
-        this.runJs(data.payload.code);
+        this.runJs(data.payload);
         return;
       case "otp:stdout":
         console.log(`${LOG_PREFIX} stdout:`, data.payload);
@@ -184,7 +195,7 @@ export class Popcorn {
    * Resolves after VM sent message to registered process.
    */
   public async send(
-    target: string,
+    target: string | BeamTarget,
     payload?: AnyValue,
     opts?: PopcornSendOpts,
   ): Promise<Result<null>> {
@@ -196,7 +207,7 @@ export class Popcorn {
     }
 
     const command = serializeSendPayload(
-      target,
+      typeof target === "string" ? { name: target } : target,
       payload ?? {},
       opts?.meta ?? {},
     );
@@ -260,9 +271,24 @@ export class Popcorn {
     }
   }
 
-  private runJs(code: string): void {
-    // Main thread; supports sync or async code, errors are thrown.
-    indirectEval(code);
+  private async runJs(request: RunJsRequest): Promise<void> {
+    let payload: AnyValue;
+    try {
+      const fn = indirectEval(request.code);
+      assertRunJsFn(fn);
+      const result = await fn(request.args);
+      payload = { ok: true, value: result ?? null };
+    } catch (error) {
+      check(error instanceof Error);
+      payload = { ok: false, error: error.toString() };
+    }
+
+    const command = serializeSendPayload({ pid: request.replyTo }, payload, {});
+    check(command.ok);
+    toVm(this.vmWorker, {
+      type: "popcorn:run-js-reply",
+      payload: { message: command.data },
+    });
   }
 
   private completeSend(payload: SendCompletionPayload): void {

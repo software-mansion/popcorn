@@ -11,6 +11,7 @@ import type {
   PopcornOpts,
   PopcornEvent,
   PopcornSendOpts,
+  BeamTarget,
   SerializedError,
 } from "@swmansion/popcorn-otp";
 
@@ -74,7 +75,7 @@ export class Otp {
   }
 
   public async send(
-    target: string,
+    target: string | BeamTarget,
     payload?: unknown,
     opts?: PopcornSendOpts,
   ): Promise<BootResult> {

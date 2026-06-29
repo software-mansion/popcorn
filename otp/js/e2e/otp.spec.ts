@@ -211,43 +211,44 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
-test("run_js evaluates code on the main thread", async ({ otp, page }) => {
-  // run_js is fire-and-forget: it emits no onEvent and returns nothing, so we
-  // poll the side effect the eval'd code leaves on the main-thread window.
-  const RUN_JS_BOOT_EVAL = 'wasm:run_js(<<"window.popcorn = {js: true}">>).';
+test("run_js returns the snippet result to the caller", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL =
+    'V = wasm:run_js(<<"(args) => 1 + 2">>, #{}), ' +
+    "ok = wasm:send(#{run_js_result => V}).";
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
   });
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.js === true");
+  await otp.waitForEvent("run_js_result");
+  expect(otp.events).toContainEqual({ run_js_result: 3 });
 });
 
-test("run_js runs an async snippet", async ({ otp, page }) => {
+test("run_js passes args and awaits an async snippet", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL =
-    'wasm:run_js(<<"(async () => { window.popcorn = {async: true}; })()">>).';
+    'V = wasm:run_js(<<"async ({a, b}) => a + b">>, #{a => 2, b => 5}), ' +
+    "ok = wasm:send(#{run_js_async => V}).";
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
   });
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.async === true");
+  await otp.waitForEvent("run_js_async");
+  expect(otp.events).toContainEqual({ run_js_async: 7 });
 });
 
-test("a throwing run_js snippet doesn't stop later ones from running", async ({
-  otp,
-  page,
-}) => {
-  // The first eval throws; the second must still run and leave its side effect.
+test("a throwing run_js snippet raises in the caller", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL =
-    "wasm:run_js(<<\"throw new Error('boom')\">>), " +
-    'wasm:run_js(<<"window.popcorn = {throwing: true}">>).';
+    "R = try wasm:run_js(<<\"() => { throw new Error('boom') }\">>, #{}) " +
+    "catch error:{run_js, Msg} -> Msg end, " +
+    "ok = wasm:send(#{run_js_error => R}).";
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
   });
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.throwing === true");
+  await otp.waitForEvent("run_js_error");
+  expect(otp.events).toContainEqual({ run_js_error: "Error: boom" });
 });
 
 test("popcorn.send() reports unregistered process", async ({ otp }) => {
