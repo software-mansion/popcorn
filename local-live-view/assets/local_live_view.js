@@ -24,118 +24,17 @@ export class LLVEngine {
   static async create(liveSocket, config = {}) {
     const { Socket } = config;
 
-    // Register the server message listener immediately — BEFORE any awaits.
-    // push_event("llv_server_message") from Phoenix LiveView fires during the initial
-    // LiveView join, which happens before Popcorn finishes initializing. Without this,
-    // the event is dispatched on window before our listener is registered and is lost.
     let popcorn;
-    const bufferedServerMessages = [];
-
-    window.addEventListener("phx:llv_server_message", async (e) => {
-      if (!popcorn) {
-        bufferedServerMessages.push(e.detail);
-        return;
-      }
-      await sendServerMessage(popcorn, e.detail);
-    });
-
-    // Pages with only LocalLiveViews (no server-side LiveView) connect in "dead"
-    // mode, which skips bindForms() — making phx-submit / phx-change no-ops on
-    // any LLV. Wire them up manually when no real LiveView is on the page.
-    if (!document.querySelector("[data-phx-session]")) {
-      liveSocket.bindForms();
-    }
-
-    popcorn = await Popcorn.init({
-      debug: config.debug ?? false,
-      bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"],
-    });
-
-    if (config.eventHandler) {
-      popcorn.onMessage(config.eventHandler);
-    }
-
-    window.__popcorn = popcorn;
-
+    // Whether the Popcorn runtime has finished booting. Hooks that fire before it
+    // does can't mount (Popcorn isn't there yet); the startup scan picks those up.
+    let popcornReady = false;
     const channels = {};
     const viewsById = {};
+    const bufferedServerMessages = [];
 
-    // Mirror channels: only created for views with a server-side Mirror module.
-    const mirrorEls = document.querySelectorAll(
-      "[data-pop-view][data-pop-mirror]",
-    );
-    if (mirrorEls.length > 0) {
-      const csrfToken = document
-        .querySelector("meta[name='csrf-token']")
-        ?.getAttribute("content");
-
-      const llvSocket = new Socket("/llv_socket", {
-        params: { _csrf_token: csrfToken },
-      });
-      llvSocket.connect();
-
-      mirrorEls.forEach((el) => {
-        const llvId = el.id;
-        const channel = llvSocket.channel(`llv:${llvId}`, {
-          view: el.dataset.popView,
-        });
-        channels[llvId] = channel;
-
-        channel
-          .join()
-          .receive("ok", () => {
-            if (viewsById[llvId]) {
-              popcorn
-                .call(
-                  { id: llvId, event: "llv_reconnected", payload: {} },
-                  { timeoutMs: 10_000 },
-                )
-                .catch((err) => console.error("LLV reconnect sync error", err));
-            }
-          })
-          .receive("error", (err) =>
-            console.error("LLV channel join error", err),
-          );
-      });
-
-      window.__llvSync = (id, eventName, payload) => {
-        const channel = channels[id];
-        if (channel) {
-          channel.push(eventName, payload);
-        }
-      };
-    }
-
-    const { data: initialRenderedByView } = await popcorn.call(
-      { views: findPredefinedViews() },
-      { timeoutMs: 10_000 },
-    );
-
-    const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
-
-    window.__popcornTransportReceive = function (llvId, diff) {
-      const view = viewsById[llvId];
-      if (!view) {
-        console.error(
-          "LLV view not found:",
-          llvId,
-          "available:",
-          Object.keys(viewsById),
-        );
-        return;
-      }
-      // The diff is delivered from the Popcorn WASM iframe via run_js, so its
-      // arrays belong to the iframe's JS realm. phoenix_live_view's isObject()
-      // uses `!(obj instanceof Array)`, which is false for cross-realm arrays —
-      // so it treats statics arrays as plain objects. In the component-only diff
-      // path (cloneMerge), that turns a cached statics array into `{0:.., 1:..}`
-      // with no `.length`, and the renderer then emits only `statics[0]`, so the
-      // re-rendered component is truncated. structuredClone re-creates the diff
-      // in this realm so `instanceof Array` works again.
-      view.update(structuredClone(diff), []);
-    };
-
-    pop_view_els.forEach((pop_view_el) => {
+    // Wire a fake Phoenix root view around a [data-pop-view] element so the
+    // browser renders the runtime's diffs and routes events to it.
+    const setupFakeView = (pop_view_el, initialRendered) => {
       const llvId = pop_view_el.id;
 
       const view = liveSocket.newRootView(pop_view_el);
@@ -179,7 +78,7 @@ export class LLVEngine {
 
         popcorn
           .call(
-            { id: this.el.id, event: event, payload: payload },
+            { action: "event", id: this.el.id, payload: payload },
             { timeoutMs: 10_000 },
           )
           .catch((err) => console.error("LLV view.pushWithReply error", err));
@@ -204,7 +103,6 @@ export class LLVEngine {
       view.bindChannel = function () { };
       view.join();
 
-      const initialRendered = initialRenderedByView[llvId];
       if (initialRendered) {
         liveSocket.requestDOMUpdate(() =>
           view.onJoin({ rendered: initialRendered }),
@@ -212,7 +110,153 @@ export class LLVEngine {
       } else {
         console.error("LLV no initial rendered for view", llvId);
       }
+    };
+
+    // Stop a view's runtime process. The caller drops the fake view (if any).
+    const teardownProcess = (llvId) =>
+      popcorn
+        .call({ action: "destroy", id: llvId, payload: {} }, { timeoutMs: 10_000 })
+        .catch((err) => console.error("LLV destroy error", err));
+
+    // Start a view and wire it up.
+    const mountView = async (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      if (viewsById[llvId]) return;
+      const { data } = await popcorn.call(
+        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        { timeoutMs: 10_000 },
+      );
+      if (data.status == "error") return;
+      const liveEl = document.getElementById(llvId);
+      if (liveEl?.matches("[data-pop-view]")) {
+        setupFakeView(liveEl, data.rendered);
+      } else {
+        teardownProcess(llvId);
+      }
+    };
+
+    // Stop a view's runtime process and drop its fake view. Used by the hook when
+    // the host LiveView removes the mount point.
+    const unmountView = (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      const view = viewsById[llvId];
+      if (!view) return;
+      delete viewsById[llvId];
+      view.destroy?.();
+      teardownProcess(llvId);
+    };
+
+    // Register the server message listener immediately — BEFORE any awaits.
+    // push_event("llv_server_message") from Phoenix LiveView fires during the initial
+    // LiveView join, which happens before Popcorn finishes initializing. Without this,
+    // the event is dispatched on window before our listener is registered and is lost.
+    window.addEventListener("phx:llv_server_message", async (e) => {
+      if (!popcorn) {
+        bufferedServerMessages.push(e.detail);
+        return;
+      }
+      await sendServerMessage(popcorn, e.detail);
     });
+
+    // Hook that manages views rendered inside a host LiveView.
+    // Other views are rendered during startup scan.
+    // The startup scan also handles the case when hook's mount
+    // fires before Popcorn is ready.
+    liveSocket.hooks.LocalLiveView = {
+      mounted() {
+        if (popcornReady) mountView(this.el);
+      },
+      destroyed() {
+        unmountView(this.el);
+      },
+    };
+
+    // Pages with only LocalLiveViews (no server-side LiveView) connect in "dead"
+    // mode, which skips bindForms() — making phx-submit / phx-change no-ops on
+    // any LLV. Wire them up manually when no real LiveView is on the page.
+    if (!document.querySelector("[data-phx-session]")) {
+      liveSocket.bindForms();
+    }
+
+    popcorn = await Popcorn.init({
+      debug: config.debug ?? false,
+      bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"],
+    });
+    popcornReady = true;
+
+    if (config.eventHandler) {
+      popcorn.onMessage(config.eventHandler);
+    }
+
+    window.__popcorn = popcorn;
+
+    // Mirror channels: only created for views with a server-side Mirror module.
+    const mirrorEls = document.querySelectorAll(
+      "[data-pop-view][data-pop-mirror]",
+    );
+    if (mirrorEls.length > 0) {
+      const csrfToken = document
+        .querySelector("meta[name='csrf-token']")
+        ?.getAttribute("content");
+
+      const llvSocket = new Socket("/llv_socket", {
+        params: { _csrf_token: csrfToken },
+      });
+      llvSocket.connect();
+
+      mirrorEls.forEach((el) => {
+        const llvId = el.id;
+        const channel = llvSocket.channel(`llv:${llvId}`, {
+          view: el.dataset.popView,
+        });
+        channels[llvId] = channel;
+
+        channel
+          .join()
+          .receive("ok", () => {
+            if (viewsById[llvId]) {
+              popcorn
+                .call(
+                  { action: "reconnected", id: llvId, payload: {} },
+                  { timeoutMs: 10_000 },
+                )
+                .catch((err) => console.error("LLV reconnect sync error", err));
+            }
+          })
+          .receive("error", (err) =>
+            console.error("LLV channel join error", err),
+          );
+      });
+
+      window.__llvSync = (id, eventName, payload) => {
+        const channel = channels[id];
+        if (channel) {
+          channel.push(eventName, payload);
+        }
+      };
+    }
+
+    window.__popcornTransportReceive = function (llvId, diff) {
+      const view = viewsById[llvId];
+      if (!view) {
+        console.error(
+          "LLV view not found:",
+          llvId,
+          "available:",
+          Object.keys(viewsById),
+        );
+        return;
+      }
+      // The diff is delivered from the Popcorn WASM iframe via run_js, so its
+      // arrays belong to the iframe's JS realm. phoenix_live_view's isObject()
+      // uses `!(obj instanceof Array)`, which is false for cross-realm arrays —
+      // so it treats statics arrays as plain objects. In the component-only diff
+      // path (cloneMerge), that turns a cached statics array into `{0:.., 1:..}`
+      // with no `.length`, and the renderer then emits only `statics[0]`, so the
+      // re-rendered component is truncated. structuredClone re-creates the diff
+      // in this realm so `instanceof Array` works again.
+      view.update(structuredClone(diff), []);
+    };
 
     // owner: route events from inside [data-pop-view] elements to our fake views.
     // We never set data-phx-session on LLV elements, so Phoenix's default closestViewEl()
@@ -228,6 +272,16 @@ export class LLVEngine {
     };
 
     registerCustomEventBindings(liveSocket);
+
+    // Startup scan: mount every [data-pop-view] present now that Popcorn is up.
+    // This is the mount path for host-less pages (no hooks fire there) and the
+    // catch-up for hooks that fired before Popcorn was ready.
+    // If a view is mounted twice (here and by the hook), the dispatcher
+    // on the Elixir side ignores the second mount.
+    const pop_view_els = Array.from(
+      document.querySelectorAll("[data-pop-view]"),
+    );
+    await Promise.all(pop_view_els.map((el) => mountView(el)));
 
     // Flush any server messages that arrived during Popcorn initialization.
     for (const detail of bufferedServerMessages) {
@@ -250,7 +304,7 @@ export class LLVEngine {
     const llvId = el ? el.id : viewId;
 
     const result = await this.popcorn.call(
-      { id: llvId, event: "llv_push", payload: { event, payload } },
+      { action: "push", id: llvId, payload: { event, payload } },
       { timeoutMs: 10_000 },
     );
 
@@ -270,7 +324,7 @@ async function sendServerMessage(popcorn, detail) {
   await popcorn.call(
     {
       id: llvId,
-      event: "llv_server_message",
+      action: "event",
       payload: {
         event: "llv_server_message",
         value: detail.payload,
@@ -279,13 +333,6 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 10_000 },
   );
-}
-
-function findPredefinedViews() {
-  return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) => ({
-    view: el.getAttribute("data-pop-view"),
-    id: el.id,
-  }));
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so
