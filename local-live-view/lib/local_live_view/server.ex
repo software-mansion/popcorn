@@ -31,6 +31,11 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
+  # Sentinel seeded into a popconent's @server assign; the LocalLiveView JS
+  # recognizes this exact value (keep in sync with LLV_SERVER_TARGET in
+  # assets/local_live_view.js).
+  @server_target "__llv_server__"
+
   @doc """
   Starts LocalLiveView.Server process.
   """
@@ -183,9 +188,12 @@ defmodule LocalLiveView.Server do
   # available in the AtomVM runtime this server runs in.
   defp popconent?(view), do: function_exported?(view, :__popconent__, 0)
 
-  # Popconent mount lifecycle (it has no mount/3): run mount/1, then feed the
-  # initial assigns through update/2. Returns the mounted %Socket{}.
+  # Popconent mount lifecycle (it has no mount/3): seed the @server target
+  # sentinel, run mount/1, then feed the initial assigns through update/2.
+  # Returns the mounted %Socket{}.
   defp mount_popconent(view, assigns, %Socket{} = socket) do
+    socket = Phoenix.Component.assign(socket, :server, @server_target)
+
     with {:ok, %Socket{} = socket} <- view.mount(socket),
          {:ok, %Socket{} = socket} <- update_popconent(view, assigns, socket) do
       socket

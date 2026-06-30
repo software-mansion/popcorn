@@ -492,6 +492,8 @@ async function resolveBundleURL(primary, fallback) {
 }
 
 // local_live_view.js
+var LLV_SERVER_TARGET = "__llv_server__";
+var PHX_VIEW_SELECTOR = "[data-phx-session]";
 var LLVEngine = class _LLVEngine {
   /** @param {unknown} popcorn */
   constructor(popcorn) {
@@ -515,6 +517,33 @@ var LLVEngine = class _LLVEngine {
       const llvId = pop_view_el.id;
       const view = liveSocket.newRootView(pop_view_el);
       viewsById[llvId] = view;
+      const origWithinTargets = view.withinTargets.bind(view);
+      view.withinTargets = function(phxTarget, callback, dom) {
+        const toServer = () => {
+          const hostEl = this.el.closest(PHX_VIEW_SELECTOR);
+          if (!hostEl) {
+            console.error("LLV phx-target=@server: no host LiveView for view", llvId);
+            return;
+          }
+          let dispatched = false;
+          liveSocket.owner(hostEl, (hostView) => {
+            dispatched = true;
+            callback(hostView, hostEl);
+          });
+          if (!dispatched) {
+            console.error(
+              "LLV phx-target=@server: host LiveView element has no live view",
+              llvId,
+              hostEl.id
+            );
+          }
+        };
+        if (phxTarget === LLV_SERVER_TARGET) {
+          toServer();
+          return;
+        }
+        return origWithinTargets(phxTarget, callback, dom);
+      };
       const origAddHook = view.addHook.bind(view);
       view.addHook = function(el) {
         if (el === this.el) return;
@@ -563,7 +592,12 @@ var LLVEngine = class _LLVEngine {
       const llvId = pop_view_el.id;
       if (viewsById[llvId]) return;
       const { data } = await popcorn.call(
-        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        {
+          action: "create",
+          id: llvId,
+          view: pop_view_el.getAttribute("data-pop-view"),
+          assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns"))
+        },
         { timeoutMs: 1e4 }
       );
       if (data.status == "error") return;
@@ -591,7 +625,18 @@ var LLVEngine = class _LLVEngine {
     });
     liveSocket.hooks.LocalLiveView = {
       mounted() {
+        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
         if (popcornReady) mountView(this.el);
+      },
+      updated() {
+        const raw = this.el.getAttribute("data-pop-assigns");
+        if (raw === this.llvLastAssigns) return;
+        this.llvLastAssigns = raw;
+        if (!popcornReady) return;
+        popcorn.call(
+          { action: "update_assigns", id: this.el.id, assigns: parseAssigns(raw) },
+          { timeoutMs: 1e4 }
+        ).catch((err) => console.error("LLV update assigns error", err));
       },
       destroyed() {
         unmountView(this.el);
@@ -656,6 +701,26 @@ var LLVEngine = class _LLVEngine {
       }
       view.update(structuredClone(diff), []);
     };
+    window.__llvPushServer = (llvId, event, payload) => {
+      const popEl = document.getElementById(llvId);
+      if (!popEl) {
+        console.error("LLV pushServer: no popconent element", llvId);
+        return;
+      }
+      const hostEl = popEl.closest(PHX_VIEW_SELECTOR);
+      if (!hostEl) {
+        console.error("LLV pushServer: no host LiveView for", llvId);
+        return;
+      }
+      let dispatched = false;
+      liveSocket.owner(hostEl, (hostView) => {
+        dispatched = true;
+        hostView.pushEvent("event", hostEl, null, event, payload, {});
+      });
+      if (!dispatched) {
+        console.error("LLV pushServer: host element has no live view", llvId, hostEl.id);
+      }
+    };
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {
       const llvEl = childEl.closest?.("[data-pop-view]");
@@ -713,6 +778,15 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 1e4 }
   );
+}
+function parseAssigns(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("LLV failed to parse data-pop-assigns:", raw, err);
+    return {};
+  }
 }
 function registerCustomEventBindings(liveSocket) {
   const buildPointerData = (e, el) => {
