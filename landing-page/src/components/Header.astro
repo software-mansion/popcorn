@@ -1,5 +1,7 @@
 ---
-import { Icon } from "astro-icon/components";
+import LogoText from "../icons/logo-text.svg";
+import Hamburger from "../icons/hamburger.svg";
+import Close from "../icons/close.svg";
 
 const linkClass = "transition-colors duration-300 hover:text-orange-100";
 const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
@@ -11,8 +13,7 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
   >
     <div class="nav-wide:gap-10 flex items-center gap-4 lg:gap-6">
       <a href="/" class="flex-shrink-0">
-        <Icon
-          name="logo-text"
+        <LogoText
           class="text-brown-100 text-2xl transition-colors duration-300 md:text-4xl"
           data-logo
         />
@@ -55,13 +56,11 @@ const openNewTab = { target: "_blank", rel: "noopener noreferrer" };
       data-mobile-menu-toggle
       aria-label="Toggle mobile menu"
     >
-      <Icon
-        name="hamburger"
+      <Hamburger
         class="text-brown-header text-2xl transition-colors duration-300"
         data-hamburger-icon
       />
-      <Icon
-        name="close"
+      <Close
         class="text-light-20 hidden text-2xl transition-colors duration-300"
         data-close-icon
       />
