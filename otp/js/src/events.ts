@@ -1,11 +1,12 @@
-import { err, type Result, type SerializedError } from "./errors";
+import { type Result, type SerializedError } from "./errors";
 import type {
   AnyValue,
   BeamBootOptions,
   BeamEvent,
   BeamSendPayload,
+  BeamTarget,
 } from "./types";
-import { objectWithKeys } from "./utils";
+import { check, objectWithKeys } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
@@ -15,6 +16,15 @@ type BootEvent = {
 type SendEvent = {
   type: "popcorn:send";
   payload: SendRequestPayload;
+};
+
+export type RunJsReplyPayload = {
+  message: BeamSendPayload;
+};
+
+type RunJsReplyEvent = {
+  type: "popcorn:run-js-reply";
+  payload: RunJsReplyPayload;
 };
 
 export type SendRequestPayload = {
@@ -40,7 +50,7 @@ type BootEndEvent =
   | { type: "popcorn:boot-end"; payload: {} }
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
-export type MainToVmEvent = BootEvent | SendEvent;
+export type MainToVmEvent = BootEvent | SendEvent | RunJsReplyEvent;
 
 export type PopcornEvent = AnyValue;
 
@@ -60,6 +70,8 @@ type BridgeEnvelope =
   | {
       type: "run_js";
       code: string;
+      args: AnyValue;
+      reply_to: string;
     };
 
 export function readMainEvent(value: unknown): MainToVmEvent | null {
@@ -71,6 +83,7 @@ export function readMainEvent(value: unknown): MainToVmEvent | null {
   switch (data.type) {
     case "popcorn:boot":
     case "popcorn:send":
+    case "popcorn:run-js-reply":
       return data as MainToVmEvent;
     default:
       return null;
@@ -99,34 +112,38 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
 }
 
 export function serializeSendPayload(
-  targetName: string,
+  target: BeamTarget,
   payload: AnyValue,
   meta: AnyValue,
 ): Result<BeamSendPayload> {
-  if (targetName.length === 0) {
-    return { ok: false, error: err("bridge:invalid-target", {}) };
+  if (isNameTarget(target)) {
+    check(target.name.length > 0);
+  } else {
+    check(target.pid.length > 0);
   }
 
-  try {
-    return {
-      ok: true,
-      data: {
-        targetName,
-        payloadJson: serializeJson(payload),
-        metaJson: serializeJson(meta),
-      },
-    };
-  } catch {
-    const error = err("bridge:unserializable", {});
-    return { ok: false, error };
-  }
+  return {
+    ok: true,
+    data: {
+      target,
+      payloadJson: serializeJson(payload),
+      metaJson: serializeJson(meta),
+    },
+  };
+}
+
+function isNameTarget(
+  target: BeamTarget,
+): target is Extract<BeamTarget, { name: string }> {
+  return Object.hasOwn(target, "name");
 }
 
 export function deserializeBridgeMessage(
   text: string,
-):
-  | Extract<BeamEvent, { type: "otp:message" | "otp:error" | "otp:run_js" }>
-  | null {
+): Extract<
+  BeamEvent,
+  { type: "otp:message" | "otp:error" | "otp:run_js" }
+> | null {
   try {
     const parsed = JSON.parse(text) as unknown;
     if (!isBridgeEnvelope(parsed)) return null;
@@ -137,13 +154,17 @@ export function deserializeBridgeMessage(
       case "vm_error":
         return {
           type: "otp:error",
-          payload: {
-            kind: "error",
-            data: parsed.data,
-          },
+          payload: { kind: "error", data: parsed.data },
         };
       case "run_js":
-        return { type: "otp:run_js", payload: { code: parsed.code } };
+        return {
+          type: "otp:run_js",
+          payload: {
+            code: parsed.code,
+            args: parsed.args,
+            replyTo: parsed.reply_to,
+          },
+        };
       default:
         return null;
     }
@@ -163,16 +184,13 @@ export function toMain(event: VmToMainEvent): void {
 }
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
+  const KNOWN_MESSAGE_TYPES: unknown[] = ["vm_message", "vm_error", "run_js"];
   const data = objectWithKeys(value, ["type"]);
-  return (
-    data !== null &&
-    (data.type === "vm_message" ||
-      data.type === "vm_error" ||
-      data.type === "run_js")
-  );
+  return data !== null && KNOWN_MESSAGE_TYPES.includes(data.type);
 }
 
 function serializeJson(value: AnyValue): string {
   const serialized = JSON.stringify(value);
-  return serialized === undefined ? "null" : serialized;
+  check(serialized !== undefined);
+  return serialized;
 }

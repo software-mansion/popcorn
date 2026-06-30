@@ -1,4 +1,10 @@
-import { assert, expect, test } from "./helpers";
+import { assert, expect, test, trimLeft } from "./helpers";
+
+function evalOpts(code: string) {
+  return {
+    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", code] },
+  };
+}
 
 test("boots", async ({ otp }) => {
   const result = await otp.boot({ beam: { assetsUrl: "/otp-assets" } });
@@ -163,30 +169,25 @@ test("failing boot fails fast (no timeout)", async ({ page }) => {
 });
 
 test("handles events in both directions", async ({ otp }) => {
-  const BRIDGE_BOOT_EVAL = [
-    "spawn(fun() ->",
-    "  ok = wasm:send(#{direct => true, nested => #{count => 1}}),",
-    "  true = register(bridge, self()),",
-    "  Loop = fun(F) ->",
-    "    ok = wasm:send(#{bridge_ready => true}),",
-    "    receive",
-    "      {wasm, PayloadJson, MetaJson} ->",
-    "        Payload = json:decode(PayloadJson),",
-    "        Meta = json:decode(MetaJson),",
-    "        ok = wasm:send(#{reply => Payload, meta => Meta})",
-    "    after 100 ->",
-    "        F(F)",
-    "    end",
-    "  end,",
-    "  Loop(Loop)",
-    "end).",
-  ].join(" ");
-  const boot = await otp.boot({
-    beam: {
-      assetsUrl: "/otp-assets",
-      extraArgs: ["-eval", BRIDGE_BOOT_EVAL],
-    },
-  });
+  const BRIDGE_BOOT_EVAL = trimLeft(`
+    spawn(fun() ->
+      ok = wasm:send(#{direct => true, nested => #{count => 1}}),
+      true = register(bridge, self()),
+      Loop = fun(F) ->
+        ok = wasm:send(#{bridge_ready => true}),
+        receive
+          {wasm, PayloadJson, MetaJson} ->
+            Payload = json:decode(PayloadJson),
+            Meta = json:decode(MetaJson),
+            ok = wasm:send(#{reply => Payload, meta => Meta})
+        after 100 ->
+            F(F)
+        end
+      end,
+      Loop(Loop)
+    end).
+  `);
+  const boot = await otp.boot(evalOpts(BRIDGE_BOOT_EVAL));
 
   assert(boot.ok);
   await otp.waitForEvent("direct");
@@ -211,50 +212,65 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
-test("run_js evaluates code on the main thread", async ({ otp, page }) => {
-  // run_js is fire-and-forget: it emits no onEvent and returns nothing, so we
-  // poll the side effect the eval'd code leaves on the main-thread window.
-  const RUN_JS_BOOT_EVAL = 'wasm:run_js(<<"window.popcorn = {js: true}">>).';
-  const boot = await otp.boot({
-    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
-  });
+test("run_js returns the snippet result to the caller", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    V = wasm:run_js(<<"(args) => 1 + 2">>, #{}),
+    ok = wasm:send(#{run_js_result => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.js === true");
+  await otp.waitForEvent("run_js_result");
+  expect(otp.events).toContainEqual({ run_js_result: 3 });
 });
 
-test("run_js runs an async snippet", async ({ otp, page }) => {
-  const RUN_JS_BOOT_EVAL =
-    'wasm:run_js(<<"(async () => { window.popcorn = {async: true}; })()">>).';
-  const boot = await otp.boot({
-    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
-  });
+test("run_js passes args and awaits an async snippet", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    V = wasm:run_js(<<"async ({a, b}) => a + b">>, #{a => 2, b => 5}),
+    ok = wasm:send(#{run_js_async => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.async === true");
+  await otp.waitForEvent("run_js_async");
+  expect(otp.events).toContainEqual({ run_js_async: 7 });
 });
 
-test("a throwing run_js snippet doesn't stop later ones from running", async ({
-  otp,
-  page,
-}) => {
-  // The first eval throws; the second must still run and leave its side effect.
-  const RUN_JS_BOOT_EVAL =
-    "wasm:run_js(<<\"throw new Error('boom')\">>), " +
-    'wasm:run_js(<<"window.popcorn = {throwing: true}">>).';
-  const boot = await otp.boot({
-    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", RUN_JS_BOOT_EVAL] },
-  });
+test("run_js accepts a custom timeout", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    R = try
+      wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
+    catch
+      error:run_js_timeout -> <<"timeout">>
+    end,
+    ok = wasm:send(#{run_js_timeout => R}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
   assert(boot.ok);
 
-  await page.waitForFunction("window.popcorn?.throwing === true");
+  await otp.waitForEvent("run_js_timeout");
+  expect(otp.events).toContainEqual({ run_js_timeout: "timeout" });
+});
+
+test("a throwing run_js snippet raises in the caller", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    R = try
+      wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
+    catch
+      error:{run_js, Msg} -> Msg
+    end,
+    ok = wasm:send(#{run_js_error => R}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("run_js_error");
+  expect(otp.events).toContainEqual({ run_js_error: "Error: boom" });
 });
 
 test("popcorn.send() reports unregistered process", async ({ otp }) => {
   const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
-  const boot = await otp.boot({
-    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", READY_BOOT_EVAL] },
-  });
+  const boot = await otp.boot(evalOpts(READY_BOOT_EVAL));
   assert(boot.ok);
   await otp.waitForEvent("ready");
 

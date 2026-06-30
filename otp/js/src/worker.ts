@@ -47,6 +47,11 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       });
       break;
     }
+    case "popcorn:run-js-reply": {
+      // ignore the `send()` result, process could've died
+      send(instance, data.payload.message);
+      break;
+    }
     default:
       unreachable();
   }
