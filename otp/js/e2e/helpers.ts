@@ -31,6 +31,26 @@ export type Result<T> =
   | { ok: true; data: T }
   | { ok: false; error: SerializedError };
 
+export function trimLeft(text: string): string {
+  const leadingBlanks = /^(?:[ \t]*\n)+/;
+  const trailingBlanks = /(?:\n[ \t]*)+$/;
+  const trimmedText = text
+    .replace(leadingBlanks, "")
+    .replace(trailingBlanks, "");
+  const lines = trimmedText.split("\n");
+  const nonBlank = lines.filter((line) => line.trim() !== "");
+  assert(nonBlank.length > 0);
+
+  const indents = nonBlank.map((line) => {
+    const trimmedLine = line.trimStart();
+    return line.length - trimmedLine.length;
+  });
+  const indentN = Math.min(...indents);
+
+  const trimmedLines = lines.map((line) => line.slice(indentN));
+  return trimmedLines.join("\n");
+}
+
 export class Otp {
   public readonly events = new Set<PopcornEvent>();
 
@@ -60,12 +80,13 @@ export class Otp {
       });
     });
 
-    const result = await this.popcorn.evaluate(async (popcorn): Promise<BootResult> => {
-      const boot = await popcorn.boot();
-      return boot.ok
-        ? { ok: true, data: null }
-        : { ok: false, error: boot.error.serialize() };
-    });
+    const result = await this.popcorn.evaluate(
+      async (popcorn): Promise<BootResult> => {
+        const boot = await popcorn.boot();
+        if (boot.ok) return { ok: true, data: null };
+        return { ok: false, error: boot.error.serialize() };
+      },
+    );
 
     if (!result.ok) {
       await this.dispose();
@@ -83,11 +104,14 @@ export class Otp {
 
     return await popcorn.evaluate(
       async (instance, args) => {
-        const result = await instance.send(args.target, args.payload, args.opts);
+        const result = await instance.send(
+          args.target,
+          args.payload,
+          args.opts,
+        );
 
-        return result.ok
-          ? { ok: true, data: null }
-          : { ok: false, error: result.error.serialize() };
+        if (result.ok) return { ok: true, data: null };
+        return { ok: false, error: result.error.serialize() };
       },
       { target, payload, opts },
     );
@@ -137,7 +161,11 @@ export class Otp {
     this.events.add(event);
 
     for (const [name, waiters] of this.eventWaiters) {
-      if (hasKey(event, name)) {
+      if (
+        typeof event === "object" &&
+        event !== null &&
+        Object.hasOwn(event, name)
+      ) {
         this.eventWaiters.delete(name);
         for (const resolve of waiters) {
           resolve(event);
@@ -148,7 +176,11 @@ export class Otp {
 
   private findEvent(name: string): PopcornEvent | null {
     for (const event of this.events) {
-      if (hasKey(event, name)) {
+      if (
+        typeof event === "object" &&
+        event !== null &&
+        Object.hasOwn(event, name)
+      ) {
         return event;
       }
     }
@@ -156,9 +188,6 @@ export class Otp {
     return null;
   }
 }
-
-const hasKey = (event: PopcornEvent, key: string) =>
-  typeof event === "object" && event !== null && key in event;
 
 type Fixtures = {
   otp: Otp;
