@@ -63,8 +63,8 @@ export function objectWithKeys<K extends string>(
   value: unknown,
   keys: K[],
 ): null | Record<K, unknown> {
-  const isObject = value !== null && typeof value === "object";
-  if (!isObject) return null;
+  if (value === null || typeof value !== "object") return null;
+  if (value.constructor !== Object) return null;
   const hasAllKeys = keys.every((k) => Object.hasOwn(value, k));
   if (!hasAllKeys) return null;
   return value as Record<K, unknown>;

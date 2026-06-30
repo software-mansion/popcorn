@@ -23,7 +23,8 @@ export type BeamEvent =
   | { type: "otp:stderr"; payload: string }
   | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue }
-  | { type: "otp:run_js"; payload: RunJsRequest };
+  | { type: "otp:run_js"; payload: RunJsRequest }
+  | { type: "otp:tracked-value-delete"; payload: number };
 
 export type RunJsRequest = {
   code: string;
@@ -66,6 +67,7 @@ export type EmscriptenModule = {
   _free: (ptr: number) => void;
   onBeamMessage?: (text: string) => void | Promise<void>;
   onError?: (text: string) => void | Promise<void>;
+  onTrackedValueDelete?: (key: number) => void;
   addRunDependency: (id: string) => void;
   removeRunDependency: (id: string) => void;
 };

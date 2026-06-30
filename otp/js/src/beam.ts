@@ -63,6 +63,8 @@ export async function boot({
     },
     onError: (text) =>
       emit({ type: "otp:error", payload: { kind: "error", data: text } }),
+    onTrackedValueDelete: (key) =>
+      emit({ type: "otp:tracked-value-delete", payload: key }),
     arguments: buildArgs({
       searchPaths: searchPaths ?? [],
       extra: extraArgs ?? [],
