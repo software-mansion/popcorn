@@ -9,8 +9,10 @@ The demo form is built as an html page with a single form and a two rendered lis
 One list is stored in the local LiveView assigns, while the other is stored in the Phoenix LiveView assigns. These will be referred to as the local list and the server list, respectively.
 
 The form handles onchange and onsubmit LocalLiveView events.
-The change event triggers validate function that looks through already saved users and makes sure that
-new username or email isn't already present in the users list. The submit event adds a new user to the user list.
+Validation is driven by an Ecto `embedded_schema` (`local/lib/user.ex`), exactly as you would
+in a regular Phoenix LiveView: the `validate` event builds an `Ecto.Changeset` and the `save`
+event commits it with `Ecto.Changeset.apply_action/2`. The changeset enforces username length,
+email format, and rejects usernames/emails already present in the list.
 
 On mount both local and phoenix liveViews synchronizes their states (list of users).
 

@@ -83,5 +83,4 @@ defmodule FormDemo.MixProject do
       "assets.deploy": ["tailwind form_demo --minify", "esbuild form_demo --minify", "phx.digest"]
     ]
   end
-
 end
