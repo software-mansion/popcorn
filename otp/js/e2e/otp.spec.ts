@@ -236,6 +236,22 @@ test("run_js passes args and awaits an async snippet", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_async: 7 });
 });
 
+test("run_js accepts a custom timeout", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    R = try
+      wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
+    catch
+      error:run_js_timeout -> <<"timeout">>
+    end,
+    ok = wasm:send(#{run_js_timeout => R}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("run_js_timeout");
+  expect(otp.events).toContainEqual({ run_js_timeout: "timeout" });
+});
+
 test("a throwing run_js snippet raises in the caller", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     R = try

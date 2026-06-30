@@ -946,10 +946,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..e6996fe9345bff0e934b8e0bf7f9515c18123b15
+index 0000000000000000000000000000000000000000..778a49d4b207159cd495116d0d548226777f43af
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,68 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -976,7 +976,7 @@ index 0000000000000000000000000000000000000000..e6996fe9345bff0e934b8e0bf7f9515c
 +
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
-+-export([on_load/0, send/1, run_js/2]).
++-export([on_load/0, send/1, run_js/2, run_js/3]).
 +
 +-nifs([send_raw/1]).
 +
@@ -987,9 +987,13 @@ index 0000000000000000000000000000000000000000..e6996fe9345bff0e934b8e0bf7f9515c
 +    Envelope = #{type => vm_message, data => Message},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
 +
-+%% Run a JS function expression on the main browser thread and wait for its reply.
 +-spec run_js(binary(), map()) -> json:decode_value().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
++    run_js(Code, Args, []).
++
++-spec run_js(binary(), map(), proplists:proplist()) -> json:decode_value().
++run_js(Code, Args, Opts) when is_binary(Code), is_map(Args), is_list(Opts) ->
++    Timeout = proplists:get_value(timeout, Opts, ?RUN_JS_TIMEOUT),
 +    Token = erlang:unique_integer(),
 +    ReplyTo = base64:encode(term_to_binary({self(), Token})),
 +    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
@@ -997,7 +1001,7 @@ index 0000000000000000000000000000000000000000..e6996fe9345bff0e934b8e0bf7f9515c
 +    receive
 +        {wasm, {Token, PayloadJson}, _MetaJson} ->
 +            handle_run_js_reply(PayloadJson)
-+    after ?RUN_JS_TIMEOUT ->
++    after Timeout ->
 +        error(run_js_timeout)
 +    end.
 +
