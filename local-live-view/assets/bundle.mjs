@@ -10,8 +10,8 @@
 // resolved by Phoenix's esbuild via NODE_PATH (because we ship a package.json
 // at the hex package root pointing to priv/static/local_live_view.js).
 //
-// One-shot build:  npm run build   (cd local-live-view/assets; or `mise run build-llv-js`)
-// Watch mode:      npm run dev      (or `mise run dev-llv-js`)
+// One-shot build:  pnpm run build   (cd local-live-view/assets; or `mise run build-llv-js`)
+// Watch mode:      pnpm run dev      (or `mise run dev-llv-js`)
 
 import * as esbuild from "esbuild";
 import { copyFile, mkdir } from "fs/promises";
