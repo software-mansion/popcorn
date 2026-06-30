@@ -183,10 +183,10 @@ index 0000000000000000000000000000000000000000..0b446eedf17294c0c47c2b872bf2fb44
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b91408d52
+index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e640b20a5
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,580 @@
+@@ -0,0 +1,655 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -252,6 +252,10 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +  wasm_listener_t *listeners;
 +};
 +
++typedef struct wasm_tracked_value_s {
++  int key;
++} wasm_tracked_value_t;
++
 +static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info);
 +static int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data,
 +                   ERL_NIF_TERM load_info);
@@ -259,13 +263,20 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +
 +static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
 +                                 const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM materialize_ref_nif(ErlNifEnv *env, int argc,
++                                        const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM ref_key_nif(ErlNifEnv *env, int argc,
++                                const ERL_NIF_TERM argv[]);
 +
 +static void wasm_listener_dtor(ErlNifEnv *env, void *obj);
 +static void wasm_listener_down(ErlNifEnv *env, void *obj, ErlNifPid *pid,
 +                               ErlNifMonitor *mon);
++static void wasm_tracked_value_dtor(ErlNifEnv *env, void *obj);
 +
 +static ErlNifFunc nif_funcs[] = {
 +    {"send_raw", 1, send_raw_nif},
++    {"materialize_ref", 1, materialize_ref_nif},
++    {"ref_key", 1, ref_key_nif},
 +};
 +
 +ERL_NIF_INIT(wasm, nif_funcs, load, NULL, upgrade, unload)
@@ -278,6 +289,7 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +static ERL_NIF_TERM am_wasm;
 +
 +static ErlNifResourceType *wasm_listener_type = NULL;
++static ErlNifResourceType *wasm_tracked_value_type = NULL;
 +/*
 + * The bridge keeps a single active state at a time. Serializing lookups,
 + * callbacks, and unload through one process-wide lock is slower than the
@@ -308,6 +320,15 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +  wasm_listener_type =
 +      enif_open_resource_type_x(env, "wasm_listener", &init, flags, NULL);
 +  return wasm_listener_type != NULL;
++}
++
++static bool load_tracked_value_resource_type(ErlNifEnv *env,
++                                             ErlNifResourceFlags flags) {
++  ErlNifResourceTypeInit init = {wasm_tracked_value_dtor, NULL, NULL};
++
++  wasm_tracked_value_type =
++      enif_open_resource_type_x(env, "wasm_tracked_value", &init, flags, NULL);
++  return wasm_tracked_value_type != NULL;
 +}
 +
 +static int ensure_wasm_state_lock(void) {
@@ -526,6 +547,11 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +    return -1;
 +  }
 +
++  if (!load_tracked_value_resource_type(env, ERL_NIF_RT_CREATE)) {
++    destroy_wasm_state(state);
++    return -1;
++  }
++
 +  init_atoms(env);
 +
 +  enif_mutex_lock(erts_wasm_state_lock);
@@ -555,6 +581,10 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +  state = *old_priv_data;
 +
 +  if (!load_listener_resource_type(env, ERL_NIF_RT_TAKEOVER)) {
++    return -1;
++  }
++
++  if (!load_tracked_value_resource_type(env, ERL_NIF_RT_TAKEOVER)) {
 +    return -1;
 +  }
 +
@@ -615,6 +645,7 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +
 +#ifdef ERTS_EMSCRIPTEN
 +extern void js_bridge_on_from_beam_async(char *data, int len);
++extern void js_bridge_on_tracked_value_delete(int key);
 +
 +static void schedule_js_message(const unsigned char *data, size_t size) {
 +  char *copy;
@@ -652,6 +683,50 @@ index 0000000000000000000000000000000000000000..2b786c77d12f0716646938b60fdcbc4b
 +#else
 +  return make_error(env, am_unsupported);
 +#endif
++}
++
++static void wasm_tracked_value_dtor(ErlNifEnv *env, void *obj) {
++  wasm_tracked_value_t *tracked = obj;
++
++  (void)env;
++
++#ifdef ERTS_EMSCRIPTEN
++  js_bridge_on_tracked_value_delete(tracked->key);
++#else
++  (void)tracked;
++#endif
++}
++
++static ERL_NIF_TERM materialize_ref_nif(ErlNifEnv *env, int argc,
++                                        const ERL_NIF_TERM argv[]) {
++  int key;
++  wasm_tracked_value_t *tracked;
++  ERL_NIF_TERM term;
++
++  if (argc != 1 || !enif_get_int(env, argv[0], &key)) {
++    return enif_make_badarg(env);
++  }
++
++  tracked = enif_alloc_resource(wasm_tracked_value_type,
++                                sizeof(wasm_tracked_value_t));
++  tracked->key = key;
++
++  term = enif_make_resource(env, tracked);
++  enif_release_resource(tracked);
++
++  return term;
++}
++
++static ERL_NIF_TERM ref_key_nif(ErlNifEnv *env, int argc,
++                                const ERL_NIF_TERM argv[]) {
++  wasm_tracked_value_t *tracked;
++
++  if (argc != 1 || !enif_get_resource(env, argv[0], wasm_tracked_value_type,
++                                      (void **)&tracked)) {
++    return enif_make_badarg(env);
++  }
++
++  return enif_make_int(env, tracked->key);
 +}
 +
 +#ifdef ERTS_EMSCRIPTEN
@@ -946,10 +1021,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..778a49d4b207159cd495116d0d548226777f43af
+index 0000000000000000000000000000000000000000..2941e22e231bc3ea65868e61b03a661c845144af
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,89 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -978,7 +1053,7 @@ index 0000000000000000000000000000000000000000..778a49d4b207159cd495116d0d548226
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
 +-export([on_load/0, send/1, run_js/2, run_js/3]).
 +
-+-nifs([send_raw/1]).
++-nifs([send_raw/1, materialize_ref/1, ref_key/1]).
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
@@ -997,7 +1072,7 @@ index 0000000000000000000000000000000000000000..778a49d4b207159cd495116d0d548226
 +    Token = erlang:unique_integer(),
 +    ReplyTo = base64:encode(term_to_binary({self(), Token})),
 +    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope))),
++    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
 +    receive
 +        {wasm, {Token, PayloadJson}, _MetaJson} ->
 +            handle_run_js_reply(PayloadJson)
@@ -1007,16 +1082,37 @@ index 0000000000000000000000000000000000000000..778a49d4b207159cd495116d0d548226
 +
 +handle_run_js_reply(PayloadJson) ->
 +    case json:decode(PayloadJson) of
-+        #{<<"ok">> := true, <<"value">> := Value} -> Value;
++        #{<<"ok">> := true, <<"value">> := Value} -> revive_refs(Value);
 +        #{<<"ok">> := true} -> null;
 +        #{<<"ok">> := false, <<"error">> := Reason} -> error({run_js, Reason})
 +    end.
++
++encode_arg({wasm_tracked_value, Resource}, Encoder) ->
++    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
++encode_arg(Other, Encoder) ->
++    json:encode_value(Other, Encoder).
++
++revive_refs(#{<<"popcorn_ref">> := Key} = Marker)
++  when is_integer(Key), map_size(Marker) =:= 1 ->
++    {wasm_tracked_value, materialize_ref(Key)};
++revive_refs(Map) when is_map(Map) ->
++    maps:map(fun(_K, V) -> revive_refs(V) end, Map);
++revive_refs(List) when is_list(List) ->
++    [revive_refs(V) || V <- List];
++revive_refs(Other) ->
++    Other.
 +
 +-spec on_load() -> ok.
 +on_load() ->
 +    ok = erlang:load_nif("wasm", wasm).
 +
 +send_raw(_Message) ->
++    erlang:nif_error(undef).
++
++materialize_ref(_Key) ->
++    erlang:nif_error(undef).
++
++ref_key(_Resource) ->
 +    erlang:nif_error(undef).
 diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
 index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
