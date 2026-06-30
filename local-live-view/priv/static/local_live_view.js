@@ -492,7 +492,9 @@ async function resolveBundleURL(primary, fallback) {
 }
 
 // local_live_view.js
+var LLV_DEFAULT_TARGET = "__llv_default__";
 var LLV_SERVER_TARGET = "__llv_server__";
+var LLV_TARGET_SEP = "";
 var PHX_VIEW_SELECTOR = "[data-phx-session]";
 var LLVEngine = class _LLVEngine {
   /** @param {unknown} popcorn */
@@ -538,8 +540,14 @@ var LLVEngine = class _LLVEngine {
             );
           }
         };
-        if (phxTarget === LLV_SERVER_TARGET) {
-          toServer();
+        const toLocal = () => callback(this, null);
+        const dispatchToken = (t) => {
+          if (t === LLV_DEFAULT_TARGET) toLocal();
+          else if (t === LLV_SERVER_TARGET) toServer();
+          else origWithinTargets(t, callback, dom);
+        };
+        if (typeof phxTarget === "string" && (phxTarget.includes(LLV_TARGET_SEP) || phxTarget === LLV_DEFAULT_TARGET || phxTarget === LLV_SERVER_TARGET)) {
+          for (const t of phxTarget.split(LLV_TARGET_SEP)) if (t) dispatchToken(t);
           return;
         }
         return origWithinTargets(phxTarget, callback, dom);

@@ -48,6 +48,17 @@ defmodule LocalLiveView.Popconent do
       <button phx-click="archive" phx-target={@server}>Archive</button>
 
   or by calling `push_server_event/3`.
+
+  Events can be sent to multiple targets with `targets/1`.
+  For example, to send an event to the parent popconent _and_ the server,
+  set the target to `targets([@default, @server])`:
+
+      <button phx-click="archive" phx-target={targets([@default, @server]}>Archive</button>
+
+  This approach is useful for optimistic updates. The event is first
+  handled locally by the popconent, then it's also handled on the server.
+  Each of them updates popconent's assigns: the local update is optimistic,
+  then the server update can possibly override it.
   '''
 
   alias Phoenix.LiveView.Socket
@@ -69,7 +80,7 @@ defmodule LocalLiveView.Popconent do
       # ~H / assign) and render compilation — but not the mirror-channel machinery
       # `use LocalLiveView` injects (handle_server_event, llv_server_message), which
       # a popconent never uses. Set up only what's needed here.
-      import LocalLiveView.Popconent, only: [push_server_event: 3]
+      import LocalLiveView.Popconent, only: [targets: 1, push_server_event: 3]
       @before_compile Phoenix.LiveView.Renderer
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
@@ -101,6 +112,25 @@ defmodule LocalLiveView.Popconent do
       defoverridable mount: 1, update: 2, handle_info: 2
     end
   end
+
+  # Delimiter joining composed phx-target tokens (see targets/1). ASCII Unit
+  # Separator — it never appears in a CSS selector or cid, so the JS can split it
+  # back unambiguously. Keep in sync with LLV_TARGET_SEP in assets/local_live_view.js.
+  @target_sep "\x1f"
+
+  @doc """
+  Composes a `phx-target` from a list of targets.
+
+  Combine the `@default` (local, as if no target) and `@server` (host LiveView)
+  assigns with each other and/or ordinary `phx-target` selectors/cids, dispatching
+  the event to every target in the list:
+
+      <button phx-click="save" phx-target={targets([@default, @server])}>Save</button>
+      <button phx-click="ping" phx-target={targets([@default, @server, "#cart"])}>Ping</button>
+
+  A single target needs no helper — `phx-target={@server}` works on its own.
+  """
+  def targets(list) when is_list(list), do: Enum.map_join(list, @target_sep, &to_string/1)
 
   @doc """
   Sends an event to the host (server) `LiveView` that mounts this popconent.
