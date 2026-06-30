@@ -94,14 +94,13 @@ jobs:
       #  - bundle.mjs itself changed without re-running
       #
       # When this fails locally:
-      #   cd local-live-view/assets && npm install && node bundle.mjs
-      #   git add ../priv/static
+      #   mise run build-llv-js   # (or: pnpm -F ./local-live-view/assets build)
+      #   git add local-live-view/priv/static
       - name: Verify priv/static up-to-date
-        working-directory: local-live-view/assets
         run: |
-          npm install --no-audit --no-fund
-          node bundle.mjs
-          git diff --exit-code -- ../priv/static
+          pnpm -F ./local-live-view/assets build
+          git diff --exit-code -- local-live-view/priv/static
+        working-directory: .
 
       - name: Cache Playwright browsers
         id: playwright-cache

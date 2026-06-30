@@ -31,6 +31,14 @@ depends = ["build-otp debug"]
 run = "pnpm -F ./otp/js build"
 description = "Build JS part of OTP/BEAM interop"
 
+[tasks.build-llv-js]
+run = "pnpm -F ./local-live-view/assets build"
+description = "Build JS bundle for LocalLiveView"
+
+[tasks.dev-llv-js]
+run = "pnpm -F ./local-live-view/assets dev"
+description = "Watch & rebuild LocalLiveView JS bundle"
+
 [tasks.build-otp-with-crypto]
 run = "scripts/build-beam.sh --with-crypto"
 description = "Build OTP/BEAM for WASM with crypto/asn1 NIFs"

@@ -1,6 +1,10 @@
 {
   "name": "local_live_view",
   "private": true,
+  "scripts": {
+    "build": "node bundle.mjs",
+    "dev": "node bundle.mjs --watch"
+  },
   "exports": {
     ".": "./local_live_view.js",
     "./esbuild": "./esbuild.mjs"

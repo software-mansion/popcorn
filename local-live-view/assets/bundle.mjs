@@ -10,7 +10,8 @@
 // resolved by Phoenix's esbuild via NODE_PATH (because we ship a package.json
 // at the hex package root pointing to priv/static/local_live_view.js).
 //
-// Run: cd local-live-view/assets && npm install && node bundle.mjs
+// One-shot build:  pnpm run build   (cd local-live-view/assets; or `mise run build-llv-js`)
+// Watch mode:      pnpm run dev      (or `mise run dev-llv-js`)
 
 import * as esbuild from "esbuild";
 import { copyFile, mkdir } from "fs/promises";
@@ -21,19 +22,30 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const out = resolve(__dirname, "../priv/static");
 const popcornDist = resolve(__dirname, "node_modules/@swmansion/popcorn/dist");
 
-await mkdir(out, { recursive: true });
+const watch = process.argv.includes("--watch");
 
-await esbuild.build({
+const buildOpts = {
   entryPoints: [resolve(__dirname, "local_live_view.js")],
   bundle: true,
   format: "esm",
   outfile: resolve(out, "local_live_view.js"),
-});
+};
 
+await mkdir(out, { recursive: true });
+
+// Runtime files come from @swmansion/popcorn/dist and rarely change, so copy
+// them once up front rather than on every rebuild.
 await Promise.all([
   copyFile(resolve(popcornDist, "iframe.mjs"), resolve(out, "iframe.mjs")),
   copyFile(resolve(popcornDist, "AtomVM.mjs"), resolve(out, "AtomVM.mjs")),
   copyFile(resolve(popcornDist, "AtomVM.wasm"), resolve(out, "AtomVM.wasm")),
 ]);
 
-console.log("[llv] Release assets built into priv/static/");
+if (watch) {
+  const ctx = await esbuild.context(buildOpts);
+  await ctx.watch();
+  console.log("[llv] Watching assets/local_live_view.js → priv/static/...");
+} else {
+  await esbuild.build(buildOpts);
+  console.log("[llv] Release assets built into priv/static/");
+}

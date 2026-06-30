@@ -1,4 +1,4 @@
-// node_modules/@swmansion/popcorn/dist/types.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/types.mjs
 var INIT_VM_TIMEOUT_MS = 3e4;
 var CALL_TIMEOUT_MS = 6e4;
 var HEARTBEAT_TIMEOUT_MS = 6e4;
@@ -23,7 +23,7 @@ function isMessageType(type) {
   return MESSAGES_TYPES.has(type);
 }
 
-// node_modules/@swmansion/popcorn/dist/errors.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/errors.mjs
 var defaultErrorMessages = {
   timeout: "Promise timeout",
   deinitialized: "Call cancelled due to instance deinit",
@@ -76,7 +76,7 @@ function throwError(error) {
   throw buildError(error);
 }
 
-// node_modules/@swmansion/popcorn/dist/bridge.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/bridge.mjs
 var STYLE_HIDDEN = "visibility: hidden; width: 0px; height: 0px; border: none";
 var IframeBridge = class {
   iframe;
@@ -136,7 +136,7 @@ function metaTagsFrom(config) {
   return Object.entries(config).map(([key, value]) => `<meta name="${key}" content="${value}" />`).join("\n");
 }
 
-// node_modules/@swmansion/popcorn/dist/popcorn.mjs
+// ../../node_modules/.pnpm/@swmansion+popcorn@0.3.0-rc2_esbuild@0.28.0_rollup@4.60.3_vite@8.0.10_@types+node@25.6.0_esbuild@0.28.0_jiti@2.7.0_/node_modules/@swmansion/popcorn/dist/popcorn.mjs
 var INIT_TOKEN = /* @__PURE__ */ Symbol();
 var IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 var Popcorn = class _Popcorn {
