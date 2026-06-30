@@ -1,5 +1,15 @@
 import { Popcorn } from "@swmansion/popcorn";
 
+// Sentinel value a Popconent renders into phx-target (via its @server assign),
+// recognized in the fake view's withinTargets override below: @server sends the
+// event to the host LiveView (over the websocket). Keep in sync with
+// @server_target in lib/local_live_view/popconent.ex.
+const LLV_SERVER_TARGET = "__llv_server__";
+
+// Phoenix tags every real LiveView root element with data-phx-session; this is
+// the selector phoenix_live_view uses internally (PHX_VIEW_SELECTOR), not exported.
+const PHX_VIEW_SELECTOR = "[data-phx-session]";
+
 /**
  * @typedef {Object} LLVConfig
  * @property {typeof import("phoenix").Socket} [Socket] - The Phoenix Socket class (required when using mirror channels).
@@ -43,6 +53,50 @@ export class LLVEngine {
 
       const view = liveSocket.newRootView(pop_view_el);
       viewsById[llvId] = view;
+
+      // withinTargets: intercept the @server sentinel and route the event to the
+      // host LiveView. All other targets keep Phoenix's default resolution (local
+      // fake view).
+      const origWithinTargets = view.withinTargets.bind(view);
+      view.withinTargets = function (phxTarget, callback, dom) {
+        // Server leg: dispatch to the host LiveView. Resolve the host root fresh on
+        // every event — caching it is unsafe because a LiveView reconnect or
+        // re-render can swap out the [data-phx-session] element, and a stale
+        // reference resolves to no view (the event would vanish, the button "stops
+        // working"). this.el (the popconent) is the live mount point, so its closest
+        // session ancestor is always the current host root. liveSocket.owner returns
+        // the real host view — this.el sits inside the host but the host root itself
+        // is above any [data-pop-view], so the owner override falls through to the
+        // real lookup; cid resolves to null on the host root, so Phoenix's own
+        // pushEvent delivers the event over the websocket to handle_event/3.
+        const toServer = () => {
+          const hostEl = this.el.closest(PHX_VIEW_SELECTOR);
+          if (!hostEl) {
+            console.error("LLV phx-target=@server: no host LiveView for view", llvId);
+            return;
+          }
+          // liveSocket.owner only calls back when the element maps to a live view;
+          // surface the miss instead of dropping the event without a trace.
+          let dispatched = false;
+          liveSocket.owner(hostEl, (hostView) => {
+            dispatched = true;
+            callback(hostView, hostEl);
+          });
+          if (!dispatched) {
+            console.error(
+              "LLV phx-target=@server: host LiveView element has no live view",
+              llvId,
+              hostEl.id,
+            );
+          }
+        };
+
+        if (phxTarget === LLV_SERVER_TARGET) {
+          toServer();
+          return;
+        }
+        return origWithinTargets(phxTarget, callback, dom);
+      };
 
       // addHook: skip the root element to prevent Phoenix from trying to register it
       // as a hook within this view's scope — hooks on children are still processed normally.
@@ -377,6 +431,34 @@ export class LLVEngine {
       }
 
       view.update(diff, []);
+    };
+
+    // __llvPushServer: programmatic counterpart of phx-target=@server, called from
+    // a local view's Elixir via LocalLiveView.push_server_event/3. Resolves the
+    // popconent's host LiveView fresh each call (a reconnect can swap the
+    // [data-phx-session] element) and dispatches the event to it over the
+    // websocket — same host resolution as the @server `toServer` leg.
+    window.__llvPushServer = (llvId, event, payload) => {
+      const popEl = document.getElementById(llvId);
+      if (!popEl) {
+        console.error("LLV pushServer: no popconent element", llvId);
+        return;
+      }
+      const hostEl = popEl.closest(PHX_VIEW_SELECTOR);
+      if (!hostEl) {
+        console.error("LLV pushServer: no host LiveView for", llvId);
+        return;
+      }
+      // hostEl is above any [data-pop-view], so the owner override falls through
+      // to the real host view; cid null → host handle_event(event, payload).
+      let dispatched = false;
+      liveSocket.owner(hostEl, (hostView) => {
+        dispatched = true;
+        hostView.pushEvent("event", hostEl, null, event, payload, {});
+      });
+      if (!dispatched) {
+        console.error("LLV pushServer: host element has no live view", llvId, hostEl.id);
+      }
     };
 
     // owner: route events from inside [data-pop-view] elements to our fake views.

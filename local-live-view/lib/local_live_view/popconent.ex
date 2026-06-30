@@ -41,6 +41,13 @@ defmodule LocalLiveView.Popconent do
   because they live in different runtimes.
   - Events sent by popconent's child components land in the popconent by default,
   not in its parent live view.
+
+  However, it's possible to send events to the parent live view, by using
+  `phx-target={@server}`, for example:
+
+      <button phx-click="archive" phx-target={@server}>Archive</button>
+
+  or by calling `push_server_event/3`.
   '''
 
   alias Phoenix.LiveView.Socket
@@ -62,6 +69,7 @@ defmodule LocalLiveView.Popconent do
       # ~H / assign) and render compilation — but not the mirror-channel machinery
       # `use LocalLiveView` injects (handle_server_event, llv_server_message), which
       # a popconent never uses. Set up only what's needed here.
+      import LocalLiveView.Popconent, only: [push_server_event: 3]
       @before_compile Phoenix.LiveView.Renderer
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
@@ -92,5 +100,32 @@ defmodule LocalLiveView.Popconent do
 
       defoverridable mount: 1, update: 2, handle_info: 2
     end
+  end
+
+  @doc """
+  Sends an event to the host (server) `LiveView` that mounts this popconent.
+
+  The programmatic counterpart of `phx-target={@server}`: callable from a
+  popconent's `handle_event/3` or `handle_info/2` (so the payload can be computed
+  — e.g. a drag result), it delivers `event`/`payload` to the host LiveView's
+  `handle_event(event, payload, socket)` over the regular Phoenix websocket.
+  """
+  def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        if (window.__llvPushServer) {
+          window.__llvPushServer(args.id, args.event, args.payload);
+        }
+      }
+      """,
+      %{
+        id: socket.private[:llv_id],
+        event: to_string(event),
+        payload: LocalLiveView.Utils.to_serializable(payload)
+      }
+    )
+
+    socket
   end
 end
