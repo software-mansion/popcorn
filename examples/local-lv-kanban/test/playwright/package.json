@@ -1,0 +1,12 @@
+{
+  "name": "local-lv-kanban-e2e",
+  "private": true,
+  "description": "End-to-end Playwright tests for the collaborative kanban example.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1"
+  }
+}
