@@ -17,7 +17,7 @@ defmodule LocalLvKanbanWeb.Router do
   scope "/", LocalLvKanbanWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", BoardLive
   end
 
   # Other scopes may use custom stacks.
