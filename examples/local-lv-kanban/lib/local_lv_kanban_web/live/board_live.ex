@@ -1,75 +1,99 @@
 defmodule LocalLvKanbanWeb.BoardLive do
   @moduledoc """
-  Server LiveView that hosts the Kanban `LocalLiveView.Popconent`.
+  Server LiveView that hosts the `Local.Kanban` popconent for one board.
 
-  The board's initial state is produced here, on the server, and handed to the
-  client-side `Local.Kanban` component as an assign via the `<.popconent>`
-  component. From there the local component runs entirely in the browser
-  (Popcorn/WASM).
+  Server-authoritative collaborative flow:
+
+    * The browser component applies edits optimistically and notifies this view
+      (`targets([@default, @server])` for adds/removes, `push_server_event` for drag-moves).
+    * `handle_event` writes the edit to the DB. On success it broadcasts
+      `:board_changed` to every `BoardLive` viewing this board (including itself);
+      each re-reads the board and re-assigns it, so all clients converge.
+    * On failure it re-pushes the (unchanged) authoritative board to the origin,
+      rolling back the optimistic change. The `rev` counter forces that push even
+      though the board value is unchanged.
   """
   use LocalLvKanbanWeb, :live_view
 
+  alias LocalLvKanban.Boards
+
+  @edits ~w(add_column add_task move_task remove_column remove_task)
+
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok, assign(socket, board: initial_board(), extra: 0)}
+  def mount(%{"id" => id}, _session, socket) do
+    case Boards.get_board(id) do
+      nil ->
+        # Stale/removed board: pop an error and send them back to the list.
+        {:ok,
+         socket
+         |> put_flash(:error, "That board doesn't exist anymore.")
+         |> push_navigate(to: ~p"/")}
+
+      board ->
+        if connected?(socket), do: Phoenix.PubSub.subscribe(LocalLvKanban.PubSub, topic(id))
+
+        {:ok,
+         assign(socket,
+           board_id: id,
+           board_name: board.name,
+           board: Boards.board_to_data(board),
+           rev: 0
+         )}
+    end
   end
 
-  # Changing the board assign on the server re-runs the local component's update/2
-  # in the browser, which rebuilds the board from the new data.
   @impl true
-  def handle_event("reset_board", _params, socket) do
-    extra = socket.assigns.extra + 1
-    board = initial_board() ++ [%{name: "Server column #{extra}", tasks: []}]
-    {:noreply, assign(socket, board: board, extra: extra)}
+  def handle_event(event, params, socket) when event in @edits do
+    case apply_edit(socket.assigns.board_id, event, params) do
+      :ok ->
+        Phoenix.PubSub.broadcast(
+          LocalLvKanban.PubSub,
+          topic(socket.assigns.board_id),
+          :board_changed
+        )
+
+        {:noreply, socket}
+
+      :error ->
+        # Roll back the optimistic change on this client by re-pushing the
+        # authoritative (unchanged) board.
+        {:noreply, push_board(socket)}
+    end
   end
+
+  @impl true
+  def handle_info(:board_changed, socket) do
+    {:noreply, push_board(socket)}
+  end
+
+  # Re-read the board from the DB and re-assign it. Always bump `rev` so the
+  # popconent re-renders even when the board value is unchanged (failure
+  # rollback) — `rev` is the client's rebuild trigger.
+  defp push_board(socket) do
+    board = Boards.board_to_data(Boards.get_board!(socket.assigns.board_id))
+    assign(socket, board: board, rev: socket.assigns.rev + 1)
+  end
+
+  defp topic(board_id), do: "board:#{board_id}"
+
+  defp apply_edit(board_id, "add_column", params), do: Boards.add_column(board_id, params)
+  defp apply_edit(board_id, "add_task", params), do: Boards.add_task(board_id, params)
+  defp apply_edit(board_id, "move_task", params), do: Boards.move_task(board_id, params)
+  defp apply_edit(board_id, "remove_column", params), do: Boards.remove_column(board_id, params)
+  defp apply_edit(board_id, "remove_task", params), do: Boards.remove_task(board_id, params)
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div style="font-size:1.5em;font-family:sans-serif;padding:1em;color:#fcfcfc">
-      <button
-        phx-click="reset_board"
-        style="margin-bottom:0.75em;background:#2563eb;color:#fff;border:none;border-radius:5px;padding:0.4em 0.8em;font-size:0.6em;cursor:pointer"
+    <div style="min-height:100vh;background:#0b1220;padding:1em;font-family:sans-serif">
+      <.link
+        navigate={~p"/"}
+        style="color:#93c5fd;text-decoration:none;font-size:0.9em;display:inline-block;margin-bottom:0.5em"
       >
-        Reset board from server
-      </button>
-      <.popconent module="Local.Kanban" board={@board} />
+        ← All boards
+      </.link>
+      <.popconent module="Local.Kanban" name={@board_name} board={@board} rev={@rev} />
     </div>
     """
-  end
-
-  # The seed board, as plain JSON-serializable data. The component serializes it
-  # into the mount point; `Local.Kanban` assigns ids and builds its ordered maps
-  # from it in the browser when its update/2 receives the board assign.
-  defp initial_board do
-    [
-      %{
-        name: "To Do",
-        tasks: [
-          %{text: "Design landing page", description: ""},
-          %{text: "Write project proposal", description: "Outline scope, timeline, budget."},
-          %{text: "Set up CI/CD pipeline", description: ""},
-          %{text: "Measure performance", description: ""}
-        ]
-      },
-      %{
-        name: "In Progress",
-        tasks: [
-          %{text: "Implement auth flow", description: "OAuth + session handling."},
-          %{text: "Refactor database layer", description: ""}
-        ]
-      },
-      %{
-        name: "Review",
-        tasks: [%{text: "Code review for PR #42", description: ""}]
-      },
-      %{
-        name: "Done",
-        tasks: [
-          %{text: "Set up development environment", description: ""},
-          %{text: "Initial repo structure", description: ""}
-        ]
-      }
-    ]
   end
 end
