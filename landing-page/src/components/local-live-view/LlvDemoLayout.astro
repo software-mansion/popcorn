@@ -1,0 +1,34 @@
+<div class="llv-demo-layout">
+  <div class="llv-left-panel">
+    <slot name="left" />
+  </div>
+  <slot name="right" />
+</div>
+
+<style is:global>
+  .llv-demo-layout {
+    display: grid;
+    grid-template-columns: minmax(300px, 400px) 1fr;
+    gap: 1.5rem;
+    max-width: 1160px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 800px) {
+    .llv-demo-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  .llv-left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    position: sticky;
+    top: 4.5rem;
+  }
+  @media (max-width: 800px) {
+    .llv-left-panel {
+      position: static;
+    }
+  }
+</style>

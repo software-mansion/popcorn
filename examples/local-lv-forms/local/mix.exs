@@ -7,6 +7,7 @@ defmodule Local.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(),
       deps: deps(),
       compilers: Mix.compilers(),
       aliases: aliases()
@@ -15,6 +16,14 @@ defmodule Local.MixProject do
 
   def cli do
     [default_target: :wasm]
+  end
+
+  defp elixirc_paths do
+    if System.get_env("LLV_LANDING_PATCH") == "true" do
+      ["lib", "lib_landing"]
+    else
+      ["lib"]
+    end
   end
 
   def application do

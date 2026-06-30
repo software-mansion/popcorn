@@ -5,7 +5,8 @@ import { Popcorn } from "@swmansion/popcorn";
  * @property {typeof import("phoenix").Socket} [Socket] - The Phoenix Socket class (required when using mirror channels).
  * @property {string[]} [bundlePaths] - Paths to the compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]`.
  * @property {boolean} [debug] - Enable Popcorn debug logging. Defaults to `false`.
- * @property {(msg: unknown) => void} [eventHandler] - Optional callback for raw Popcorn messages.
+ * @property {(eventName: string, payload: unknown) => void} [eventHandler] - Optional callback for raw Popcorn messages.
+
  */
 
 export class LLVEngine {

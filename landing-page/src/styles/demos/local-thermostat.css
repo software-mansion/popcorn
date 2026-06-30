@@ -1,0 +1,54 @@
+@reference "../global.css";
+
+[data-value] {
+  @apply transition-colors duration-300;
+}
+
+[data-pop-view].hl-temperature [data-value="temperature"] {
+  @apply text-orange-100!;
+}
+
+[data-pop-view] {
+  scroll-margin-top: 5.5rem;
+}
+
+.demo-card {
+  @apply bg-light-20 border-2 border-brown-header rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(48,27,5,0.1)];
+}
+
+.clock-band {
+  @apply bg-brown-header text-light-20 py-3 px-6 text-center font-handjet text-lg tracking-[0.04em];
+}
+
+.thermostat-wrapper {
+  @apply flex flex-col items-center gap-5 p-8 w-full;
+}
+
+.thermostat-temp-label {
+  @apply text-xs uppercase tracking-widest text-llv-brown-50 font-semibold;
+}
+
+.thermostat-temp-value {
+  @apply font-handjet text-7xl font-bold text-brown-header leading-none transition-colors duration-150 ease-in;
+}
+
+.thermostat-controls {
+  @apply flex gap-4;
+}
+
+.thermostat-country {
+  @apply text-sm text-llv-brown-50;
+}
+
+/* ── Ghost button (circular variant) ─────────────────────── */
+.ghost-button {
+  @apply size-14 p-0 border-2 border-brown-header bg-transparent text-brown-header rounded-full cursor-pointer transition-all duration-150 ease-in text-2xl font-bold flex items-center justify-center font-handjet;
+}
+
+.ghost-button:hover {
+  @apply bg-orange-100 border-orange-100 text-light-20 scale-[1.08];
+}
+
+.ghost-button:active {
+  @apply scale-[0.93];
+}
