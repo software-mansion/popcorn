@@ -3,7 +3,8 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   @moduledoc """
   #{@shortdoc}
 
-  It outputs the artifacts in `project_dir/popcorn_runtime_source/artifacts/<target>`.
+  It outputs the artifacts in `<out-dir>/artifacts/<target>` (by default
+  `project_dir/popcorn_runtime_source/artifacts/<target>`).
   To use the built artifacts in Popcorn, configure it with
 
   ```
@@ -15,6 +16,8 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     - `git-ref` - branch, tag or commit (only works with the `git` option)
     - `path` - path to repo source (can be used instead of `git`)
     - `target` - `wasm` (default) or `unix`
+    - `out-dir` - directory for the build artifacts (default:
+    `popcorn_runtime_source`). Useful e.g. to keep a test-only runtime under `test/`.
     - `cmake-opts` - string with space-separated `KEY=VALUE` options that
     will be converted to `-DKEY=VALUE` cmake options
 
@@ -25,10 +28,10 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
   @requirements "app.config"
 
-  @out_dir "popcorn_runtime_source"
+  @default_out_dir "popcorn_runtime_source"
 
   def run(args) do
-    options_defaults = %{path: nil, git: nil, git_ref: nil, cmake_opts: nil}
+    options_defaults = %{path: nil, git: nil, git_ref: nil, cmake_opts: nil, out_dir: nil}
     parser_config = [strict: [:target | Map.keys(options_defaults)] |> Keyword.from_keys(:string)]
     {options, _rest} = OptionParser.parse!(args, parser_config)
     options = Map.merge(options_defaults, Map.new(options))
@@ -38,14 +41,15 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
     end
 
     target = options.target
+    out_dir = options.out_dir || @default_out_dir
 
     # Build script args
     script_args = build_script_args(options)
 
     # Add output directory
-    artifacts_dir = Path.join([@out_dir, "artifacts", target])
+    artifacts_dir = Path.join([out_dir, "artifacts", target])
     File.mkdir_p!(artifacts_dir)
-    File.write!(Path.join(@out_dir, ".gitignore"), "*\n")
+    File.write!(Path.join(out_dir, ".gitignore"), "*\n")
 
     script_args = ["--outdir", artifacts_dir | script_args]
 
