@@ -1,5 +1,13 @@
 import { Popcorn } from "@swmansion/popcorn";
 
+const LLV_DEFAULT_TARGET = "__llv_default__";
+const LLV_SERVER_TARGET = "__llv_server__";
+const LLV_TARGET_SEP = "\x1f";
+
+// Phoenix tags every real LiveView root element with data-phx-session; this is
+// the selector phoenix_live_view uses internally (PHX_VIEW_SELECTOR).
+const PHX_VIEW_SELECTOR = "[data-phx-session]";
+
 /**
  * @typedef {Object} LLVConfig
  * @property {typeof import("phoenix").Socket} [Socket] - The Phoenix Socket class (required when using mirror channels).
@@ -39,6 +47,51 @@ export class LLVEngine {
 
       const view = liveSocket.newRootView(pop_view_el);
       viewsById[llvId] = view;
+
+      // Handle LLV's custom targets (default, server, targets composed by LocalLiveView.targets/1)
+      const origWithinTargets = view.withinTargets.bind(view);
+      view.withinTargets = function (phxTarget, callback, dom) {
+        const toServer = () => {
+          const hostEl = this.el.closest(PHX_VIEW_SELECTOR);
+          if (!hostEl) {
+            console.error("LLV phx-target=@server: no host LiveView for view", llvId);
+            return;
+          }
+          // liveSocket.owner only calls back when the element maps to a live view;
+          // surface the miss instead of dropping the event without a trace.
+          let dispatched = false;
+          liveSocket.owner(hostEl, (hostView) => {
+            dispatched = true;
+            callback(hostView, hostEl);
+          });
+          if (!dispatched) {
+            console.error(
+              "LLV phx-target=@server: host LiveView element has no live view",
+              llvId,
+              hostEl.id,
+            );
+          }
+        };
+
+        const toLocal = () => callback(this, null);
+
+        const dispatchToken = (t) => {
+          if (t === LLV_DEFAULT_TARGET) toLocal();
+          else if (t === LLV_SERVER_TARGET) toServer();
+          else origWithinTargets(t, callback, dom);
+        };
+
+        if (
+          typeof phxTarget === "string" &&
+          (phxTarget.includes(LLV_TARGET_SEP) ||
+            phxTarget === LLV_DEFAULT_TARGET ||
+            phxTarget === LLV_SERVER_TARGET)
+        ) {
+          for (const t of phxTarget.split(LLV_TARGET_SEP)) if (t) dispatchToken(t);
+          return;
+        }
+        return origWithinTargets(phxTarget, callback, dom);
+      };
 
       // addHook: skip the root element to prevent Phoenix from trying to register it
       // as a hook within this view's scope — hooks on children are still processed normally.
@@ -123,7 +176,12 @@ export class LLVEngine {
       const llvId = pop_view_el.id;
       if (viewsById[llvId]) return;
       const { data } = await popcorn.call(
-        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        {
+          action: "create",
+          id: llvId,
+          view: pop_view_el.getAttribute("data-pop-view"),
+          assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns"))
+        },
         { timeoutMs: 10_000 },
       );
       if (data.status == "error") return;
@@ -164,7 +222,23 @@ export class LLVEngine {
     // fires before Popcorn is ready.
     liveSocket.hooks.LocalLiveView = {
       mounted() {
+        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
         if (popcornReady) mountView(this.el);
+      },
+      updated() {
+        const raw = this.el.getAttribute("data-pop-assigns");
+        if (raw === this.llvLastAssigns) return;
+        this.llvLastAssigns = raw;
+        // Not mounted yet (Popcorn still booting): the mount reads the current
+        // assigns, so there's nothing to forward. Once mounted, the dispatcher
+        // processes this after the mount (it's sent after, and calls are FIFO).
+        if (!popcornReady) return;
+        popcorn
+          .call(
+            { action: "update_assigns", id: this.el.id, assigns: parseAssigns(raw) },
+            { timeoutMs: 10_000 },
+          )
+          .catch((err) => console.error("LLV update assigns error", err));
       },
       destroyed() {
         unmountView(this.el);
@@ -258,6 +332,32 @@ export class LLVEngine {
       view.update(structuredClone(diff), []);
     };
 
+    // __llvPushServer: programmatic counterpart of phx-target=@server, called from
+    // a local view's Elixir via LocalLiveView.push_server_event/3. Resolves the
+    // popconent's host LiveView fresh each call (a reconnect can swap the
+    // [data-phx-session] element) and dispatches the event to it over the
+    // websocket.
+    window.__llvPushServer = (llvId, event, payload) => {
+      const popEl = document.getElementById(llvId);
+      if (!popEl) {
+        console.error("LLV pushServer: no popconent element", llvId);
+        return;
+      }
+      const hostEl = popEl.closest(PHX_VIEW_SELECTOR);
+      if (!hostEl) {
+        console.error("LLV pushServer: no host LiveView for", llvId);
+        return;
+      }
+      let dispatched = false;
+      liveSocket.owner(hostEl, (hostView) => {
+        dispatched = true;
+        hostView.pushEvent("event", hostEl, null, event, payload, {});
+      });
+      if (!dispatched) {
+        console.error("LLV pushServer: host element has no live view", llvId, hostEl.id);
+      }
+    };
+
     // owner: route events from inside [data-pop-view] elements to our fake views.
     // We never set data-phx-session on LLV elements, so Phoenix's default closestViewEl()
     // would walk up to the parent LiveView and dispatch events there instead.
@@ -333,6 +433,19 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 10_000 },
   );
+}
+
+// data-pop-assigns holds the JSON a local_component serialized from its inline
+// assigns. Absent/empty for plain local views — default to {} so the process is
+// always handed a map.
+function parseAssigns(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("LLV failed to parse data-pop-assigns:", raw, err);
+    return {};
+  }
 }
 
 // Phoenix LiveView only binds click/keydown/keyup/blur/focus natively, so

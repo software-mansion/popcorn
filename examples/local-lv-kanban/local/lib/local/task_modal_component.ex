@@ -1,28 +1,16 @@
 defmodule Local.TaskModalComponent do
-  use Phoenix.LiveComponent
+  use Phoenix.Component
 
   alias Phoenix.LiveView.JS
 
-  @impl true
-  def update(assigns, socket) do
-    socket = assign(socket, params: assigns.params, error: nil)
-    {:ok, socket}
-  end
+  # Add-task modal. Visibility is driven by the parent Kanban's `@task_modal`
+  # state (open_task_modal/close_task_modal). The form is client-only (no
+  # phx-target) — Kanban applies the add optimistically, generates the task's
+  # position, and pushes it to the host LiveView itself.
 
-  @impl true
-  def handle_event("submit_task_modal", %{"name" => name} = params, socket) do
-    case String.trim(name) do
-      "" ->
-        {:noreply, assign(socket, :error, "Task name cannot be empty")}
+  attr :params, :map, default: nil
 
-      _ ->
-        send(self(), {:add_task, params})
-        {:noreply, assign(socket, :error, nil)}
-    end
-  end
-
-  @impl true
-  def render(assigns) do
+  def modal(assigns) do
     ~H"""
     <div>
       <div
@@ -50,8 +38,7 @@ defmodule Local.TaskModalComponent do
         </div>
 
         <form
-          phx-submit="submit_task_modal"
-          phx-target={@myself}
+          phx-submit="add_task"
           style="display:flex;flex-direction:column;gap:0.75em"
           autocomplete="off"
         >
@@ -61,13 +48,13 @@ defmodule Local.TaskModalComponent do
             Name
             <input
               type="text"
-              name="name"
+              name="text"
+              required
               autocomplete="off"
               phx-mounted={JS.focus()}
               placeholder="Task name"
-              style={"background:#111827;color:#f3f4f6;border:1px solid #{if @error, do: "#dc2626", else: "#374151"};border-radius:5px;padding:0.5em 0.6em;font-size:0.95em;outline:none"}
+              style="background:#111827;color:#f3f4f6;border:1px solid #374151;border-radius:5px;padding:0.5em 0.6em;font-size:0.95em;outline:none"
             />
-            <span :if={@error} style="color:#fca5a5;font-size:0.8em">{@error}</span>
           </label>
 
           <label style="display:flex;flex-direction:column;gap:0.3em;font-size:0.85em;color:#cbd5e1">

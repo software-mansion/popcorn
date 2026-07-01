@@ -1,7 +1,6 @@
 defmodule Local.ColumnComponent do
   use Phoenix.Component
 
-  alias Local.OrderedMap
   alias Local.TaskComponent
 
   @placeholder_height 36
@@ -9,11 +8,13 @@ defmodule Local.ColumnComponent do
   def placeholder_height, do: @placeholder_height
 
   attr :col, :map, required: true
+  attr :target, :string, required: true
   attr :dragging, :map, default: nil
   attr :drag_target, :map, default: nil
 
   def column(assigns) do
-    assigns = assign(assigns, :tasks, OrderedMap.values(assigns.col.tasks))
+    assigns =
+      assign(assigns, :tasks, assigns.col.tasks |> Map.values() |> Enum.sort_by(& &1.position))
 
     ~H"""
     <div
@@ -29,6 +30,7 @@ defmodule Local.ColumnComponent do
         <button
           type="button"
           phx-click="remove_column"
+          phx-target={@target}
           phx-value-id={@col.id}
           title="Remove column"
           style="background:transparent;color:#9ca3af;border:none;cursor:pointer;font-size:1.1em;line-height:1;padding:0.1em 0.35em;border-radius:4px"
@@ -41,6 +43,7 @@ defmodule Local.ColumnComponent do
           <TaskComponent.card
             task={task}
             column_id={@col.id}
+            target={@target}
             is_dragging={dragging_task?(@dragging, task.id)}
           />
         <% end %>
