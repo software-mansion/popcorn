@@ -139,7 +139,7 @@ test("event hooks preserved after a reboot", async ({ page }) => {
   expect(result.afterReboot).toBeGreaterThan(0);
 });
 
-test("failing boot fails fast (no timeout)", async ({ page }) => {
+test("failing boot fails immediately", async ({ page }) => {
   const result = await page.evaluate(async () => {
     const popcorn = new window.Popcorn({
       beam: { assetsUrl: "/otp-assets" },
@@ -212,7 +212,7 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
-test("run_js returns the snippet result to the caller", async ({ otp }) => {
+test("run_js -> send", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     V = wasm:run_js(<<"(args) => 1 + 2">>, #{}),
     ok = wasm:send(#{run_js_result => V}).
@@ -224,7 +224,7 @@ test("run_js returns the snippet result to the caller", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_result: 3 });
 });
 
-test("run_js passes args and awaits an async snippet", async ({ otp }) => {
+test("async run_js", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     V = wasm:run_js(<<"async ({a, b}) => a + b">>, #{a => 2, b => 5}),
     ok = wasm:send(#{run_js_async => V}).
@@ -236,7 +236,7 @@ test("run_js passes args and awaits an async snippet", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_async: 7 });
 });
 
-test("run_js accepts a custom timeout", async ({ otp }) => {
+test("run_js timeout", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     R = try
       wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
@@ -252,7 +252,7 @@ test("run_js accepts a custom timeout", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_timeout: "timeout" });
 });
 
-test("a throwing run_js snippet raises in the caller", async ({ otp }) => {
+test("throwing run_js raises in VM", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     R = try
       wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
@@ -268,7 +268,111 @@ test("a throwing run_js snippet raises in the caller", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_error: "Error: boom" });
 });
 
-test("popcorn.send() reports unregistered process", async ({ otp }) => {
+test("tracked values keep identity", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    H = wasm:run_js(<<"() => new TrackedValue({n: 1})">>, #{}),
+    V = wasm:run_js(<<"({h}) => { h.n = h.n + 1; return h.n; }">>, #{h => H}),
+    ok = wasm:send(#{roundtrip => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("roundtrip");
+  expect(otp.events).toContainEqual({ roundtrip: 2 });
+});
+
+test("nested tracked values", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    H = wasm:run_js(<<"() => new TrackedValue({n: 5})">>, #{}),
+    V = wasm:run_js(
+      <<"(a) => a.list[0].n + a.wrap.h.n">>,
+      #{list => [H], wrap => #{h => H}}
+    ),
+    ok = wasm:send(#{nested => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("nested");
+  expect(otp.events).toContainEqual({ nested: 10 });
+});
+
+test("isolated tracked values", async ({ createOtp }) => {
+  const evalFor = (id: string) =>
+    trimLeft(`
+      H = wasm:run_js(<<"() => new TrackedValue({id: '${id}'})">>, #{}),
+      ok = wasm:send(H).
+    `);
+
+  const [a, b] = await Promise.all([createOtp(), createOtp()]);
+  const [aBoot, bBoot] = await Promise.all([
+    a.boot(evalOpts(evalFor("A"))),
+    b.boot(evalOpts(evalFor("B"))),
+  ]);
+  assert(aBoot.ok);
+  assert(bBoot.ok);
+
+  const aId = await a.waitForEvent("id");
+  const bId = await b.waitForEvent("id");
+
+  expect(aId).toEqual({ id: "A" });
+  expect(bId).toEqual({ id: "B" });
+});
+
+test("tracked values isolated cleanup", async ({ createOtp, page }) => {
+  const [closedOtp, liveOtp] = await Promise.all([createOtp(), createOtp()]);
+  let cleanupCalls = 0;
+  await page.exposeFunction("popcornCleanup", () => {
+    cleanupCalls += 1;
+  });
+  await page.evaluate(() => {
+    const scope = globalThis as unknown as {
+      popcorn: { cleanup: () => void };
+      popcornCleanup: () => void;
+    };
+    scope.popcorn = { cleanup: () => scope.popcornCleanup() };
+  });
+  const cleanupTrackedEval = trimLeft(`
+    spawn(fun() ->
+      H = wasm:run_js(
+        <<"() => new TrackedValue(0, () => globalThis.popcorn.cleanup())">>,
+        #{}
+      ),
+      ok = wasm:send(#{deinit_ready => true}),
+      receive stop -> H end
+    end).
+  `);
+  const liveEval = trimLeft(`
+    register(controller, self()),
+    HB = wasm:run_js(<<"() => new TrackedValue({v: 42})">>, #{}),
+    ok = wasm:send(#{live_ready => true}),
+    receive
+      {wasm, _, _} ->
+        ok = wasm:send(HB)
+    end.
+  `);
+
+  const [closedBoot, liveBoot] = await Promise.all([
+    closedOtp.boot(evalOpts(cleanupTrackedEval)),
+    liveOtp.boot(evalOpts(liveEval)),
+  ]);
+  assert(closedBoot.ok);
+  assert(liveBoot.ok);
+
+  await closedOtp.waitForEvent("deinit_ready");
+  await liveOtp.waitForEvent("live_ready");
+  await closedOtp.dispose();
+  await expect.poll(() => cleanupCalls).toBe(1);
+
+  const send = await liveOtp.send("controller", { ping: true });
+  assert(send.ok);
+  const liveEvent = await liveOtp.waitForEvent("v");
+
+  expect(liveEvent).toEqual({ v: 42 });
+  expect(cleanupCalls).toBe(1);
+});
+
+test("send() to unregistered process", async ({ otp }) => {
   const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
   const boot = await otp.boot(evalOpts(READY_BOOT_EVAL));
   assert(boot.ok);
@@ -284,7 +388,7 @@ test("popcorn.send() reports unregistered process", async ({ otp }) => {
   });
 });
 
-test("reports timeouts on send", async ({ otp }) => {
+test("send() timeout", async ({ otp }) => {
   const boot = await otp.boot({
     beam: { assetsUrl: "/otp-assets" },
     timeoutsMs: { send: 0 },

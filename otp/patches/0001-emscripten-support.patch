@@ -1029,7 +1029,7 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..2941e22e231bc3ea65868e61b03a661c845144af
+index 0000000000000000000000000000000000000000..9b79d3cfd08e70efc765a74ef07de90836f6854d
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
 @@ -0,0 +1,89 @@
@@ -1068,7 +1068,7 @@ index 0000000000000000000000000000000000000000..2941e22e231bc3ea65868e61b03a661c
 +-spec send(json:encode_value()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope))).
++    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))).
 +
 +-spec run_js(binary(), map()) -> json:decode_value().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->

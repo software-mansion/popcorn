@@ -25,6 +25,8 @@ export type PopcornOpts = {
     boot?: number;
     send?: number;
   };
+  onStdout?: (text: string) => void;
+  onStderr?: (text: string) => void;
   onError?: (event: OtpErrorPayload) => void;
   workerUrl?: string | URL;
 };
@@ -85,7 +87,7 @@ export class Popcorn {
       case "popcorn:boot-fail":
         return;
       case "otp:message":
-        this.emit(data.payload);
+        this.emit(this.reviveTrackedValues(data.payload));
         return;
       case "otp:run_js":
         this.runJs(data.payload);
@@ -94,10 +96,10 @@ export class Popcorn {
         this.deleteTrackedValue(data.payload);
         return;
       case "otp:stdout":
-        console.log(`${LOG_PREFIX} stdout:`, data.payload);
+        this.handleStdout(data.payload);
         return;
       case "otp:stderr":
-        console.error(`${LOG_PREFIX} stderr:`, data.payload);
+        this.handleStderr(data.payload);
         return;
       case "otp:error":
         this.handleOtpError(data.payload);
@@ -302,7 +304,7 @@ export class Popcorn {
     try {
       const fn = this.jsWithCurrentEnv(request.code);
       assertRunJsFn(fn);
-      const args = this.reviveArgs(request.args);
+      const args = this.reviveTrackedValues(request.args);
       const result = await fn(args);
       payload = { ok: true, value: this.serializeResult(result) ?? null };
     } catch (error) {
@@ -326,8 +328,7 @@ export class Popcorn {
     return make(this.TrackedValue);
   }
 
-  // Replaces `{popcorn_ref: key}` in args, walking recursively
-  private reviveArgs(value: unknown): unknown {
+  private reviveTrackedValues(value: unknown): unknown {
     const key = trackedRefKey(value);
     if (key !== null) {
       const entry = this.trackedValues.get(key);
@@ -335,20 +336,19 @@ export class Popcorn {
       return entry.value;
     }
     if (Array.isArray(value)) {
-      return value.map((item) => this.reviveArgs(item));
+      return value.map((item) => this.reviveTrackedValues(item));
     }
     const obj = objectWithKeys(value, []);
     if (obj !== null) {
       const revived: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        revived[k] = this.reviveArgs(v);
+        revived[k] = this.reviveTrackedValues(v);
       }
       return revived;
     }
     return value;
   }
 
-  // Replaces `{popcorn_ref: key}` in args, walking recursively
   private serializeResult(value: unknown): unknown {
     if (value instanceof this.TrackedValue) {
       this.trackedKeySeq += 1;
@@ -401,6 +401,16 @@ export class Popcorn {
   private nextRequestId(): string {
     this.requestSeq += 1;
     return `send:${this.requestSeq}`;
+  }
+
+  private handleStdout(text: string): void {
+    const onStdout = this.opts.onStdout ?? defaultOnStdout;
+    onStdout(text);
+  }
+
+  private handleStderr(text: string): void {
+    const onStderr = this.opts.onStderr ?? defaultOnStderr;
+    onStderr(text);
   }
 
   private handleOtpError(payload: OtpErrorPayload): void {
@@ -459,6 +469,14 @@ function canEval(): boolean {
   } catch {
     return false;
   }
+}
+
+function defaultOnStdout(text: string): void {
+  console.log(`${LOG_PREFIX} stdout:`, text);
+}
+
+function defaultOnStderr(text: string): void {
+  console.error(`${LOG_PREFIX} stderr:`, text);
 }
 
 function defaultOnError(payload: OtpErrorPayload): void {

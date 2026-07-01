@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import {
   expect,
   test as base,
@@ -12,6 +13,7 @@ import type {
   PopcornEvent,
   PopcornSendOpts,
   BeamTarget,
+  OtpErrorPayload,
   SerializedError,
 } from "@swmansion/popcorn-otp";
 
@@ -25,8 +27,9 @@ declare global {
 type InitOptions = PopcornOpts;
 type BootResult = Result<null>;
 type EventWaiter = (event: PopcornEvent) => void;
-type OtpFactory = () => Promise<OtpHandle>;
+type OtpFactory = (id?: string) => Promise<OtpHandle>;
 type Otp = {
+  id: string;
   events: PopcornEvent[];
   boot(options: InitOptions): Promise<BootResult>;
   send(
@@ -51,8 +54,8 @@ export const test = base.extend<Fixtures>({
   },
   createOtp: async ({ page }, use) => {
     const handles = new Set<OtpHandle>();
-    const createOtp = async () => {
-      const otp = await OtpHandle.create(page);
+    const createOtp = async (id = randomOtpId()) => {
+      const otp = await OtpHandle.create(page, id);
       handles.add(otp);
       return otp;
     };
@@ -72,14 +75,15 @@ export class OtpHandle {
 
   private constructor(
     private readonly page: Page,
+    public readonly id: string,
     otp: JSHandle<Otp>,
   ) {
     this.otpHandle = otp;
   }
 
-  public static async create(page: Page): Promise<OtpHandle> {
-    const otp = await page.evaluateHandle(createOtp);
-    return new OtpHandle(page, otp);
+  public static async create(page: Page, id: string): Promise<OtpHandle> {
+    const otp = await page.evaluateHandle(createOtp, id);
+    return new OtpHandle(page, id, otp);
   }
 
   public async boot(options: InitOptions): Promise<BootResult> {
@@ -117,7 +121,7 @@ export class OtpHandle {
     return await this.page.waitForEvent("console", (message) => {
       return (
         message.type() === "error" &&
-        message.text().includes("[Popcorn]") &&
+        message.text().includes(`[Popcorn-${this.id}]`) &&
         message.text().includes(text)
       );
     });
@@ -146,7 +150,21 @@ export class OtpHandle {
   }
 }
 
-function createOtp(): Otp {
+function createOtp(id: string): Otp {
+  function logOtpError(logPrefix: string, payload: OtpErrorPayload): void {
+    switch (payload.kind) {
+      case "abort":
+        console.error(`${logPrefix} abort:`, payload.data);
+        return;
+      case "error":
+        console.error(`${logPrefix} error:`, payload.data);
+        return;
+      case "exit":
+        console.info(`${logPrefix} exit:`, payload.data);
+        return;
+    }
+  }
+
   function hasKey(event: PopcornEvent, key: string) {
     return (
       typeof event === "object" && event !== null && Object.hasOwn(event, key)
@@ -158,6 +176,7 @@ function createOtp(): Otp {
   }
 
   class Otp {
+    public readonly id = id;
     public readonly events: PopcornEvent[] = [];
 
     private popcornHandle: Popcorn | null = null;
@@ -166,7 +185,7 @@ function createOtp(): Otp {
     public async boot(options: InitOptions): Promise<BootResult> {
       check(this.popcornHandle === null, "OTP is already booted");
 
-      this.popcornHandle = new window.Popcorn(options);
+      this.popcornHandle = new window.Popcorn(this.withLogHandlers(options));
       this.popcornHandle.onEvent((event) => {
         this.recordEvent(event);
       });
@@ -215,6 +234,19 @@ function createOtp(): Otp {
       return popcorn;
     }
 
+    private get logPrefix(): string {
+      return `[Popcorn-${this.id}]`;
+    }
+
+    private withLogHandlers(options: InitOptions): InitOptions {
+      return {
+        ...options,
+        onStdout: (text) => console.log(`${this.logPrefix} stdout:`, text),
+        onStderr: (text) => console.error(`${this.logPrefix} stderr:`, text),
+        onError: (event) => logOtpError(this.logPrefix, event),
+      };
+    }
+
     private recordEvent(event: PopcornEvent): void {
       this.events.push(event);
 
@@ -240,6 +272,10 @@ type Fixtures = {
   createOtp: OtpFactory;
   otp: OtpHandle;
 };
+
+function randomOtpId(): string {
+  return `otp-${randomUUID().slice(0, 8)}`;
+}
 
 export function trimLeft(text: string): string {
   const leadingBlanks = /^(?:[ \t]*\n)+/;
