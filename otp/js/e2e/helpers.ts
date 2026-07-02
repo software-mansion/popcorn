@@ -25,6 +25,7 @@ declare global {
 type InitOptions = PopcornOpts;
 type BootResult = Result<null>;
 type EventWaiter = (event: PopcornEvent) => void;
+type OtpFactory = () => Promise<OtpHandle>;
 type Otp = {
   events: PopcornEvent[];
   boot(options: InitOptions): Promise<BootResult>;
@@ -48,10 +49,20 @@ export const test = base.extend<Fixtures>({
     await page.waitForFunction(() => window.Popcorn !== undefined);
     await use(page);
   },
-  otp: async ({ page }, use) => {
-    const otp = await OtpHandle.create(page);
+  createOtp: async ({ page }, use) => {
+    const handles = new Set<OtpHandle>();
+    const createOtp = async () => {
+      const otp = await OtpHandle.create(page);
+      handles.add(otp);
+      return otp;
+    };
+
+    await use(createOtp);
+    await Promise.all(Array.from(handles, (otp) => otp.dispose()));
+  },
+  otp: async ({ createOtp }, use) => {
+    const otp = await createOtp();
     await use(otp);
-    await otp.dispose();
   },
 });
 
@@ -226,6 +237,7 @@ function createOtp(): Otp {
 }
 
 type Fixtures = {
+  createOtp: OtpFactory;
   otp: OtpHandle;
 };
 
