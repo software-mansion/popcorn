@@ -102,6 +102,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
     case "otp:error":
     case "otp:message":
     case "otp:run_js":
+    case "otp:tracked-value-delete":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
     case "popcorn:send-end":

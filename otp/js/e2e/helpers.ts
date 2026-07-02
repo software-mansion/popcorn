@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import {
   expect,
   test as base,
@@ -12,6 +13,7 @@ import type {
   PopcornEvent,
   PopcornSendOpts,
   BeamTarget,
+  OtpErrorPayload,
   SerializedError,
 } from "@swmansion/popcorn-otp";
 
@@ -19,17 +21,261 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Window {
     Popcorn: typeof Popcorn;
-    __recordOtpEvent: (event: PopcornEvent) => Promise<void>;
   }
 }
 
 type InitOptions = PopcornOpts;
 type BootResult = Result<null>;
 type EventWaiter = (event: PopcornEvent) => void;
+type OtpFactory = (id?: string) => Promise<OtpHandle>;
+type Otp = {
+  id: string;
+  events: PopcornEvent[];
+  boot(options: InitOptions): Promise<BootResult>;
+  send(
+    target: string | BeamTarget,
+    payload?: unknown,
+    opts?: PopcornSendOpts,
+  ): Promise<BootResult>;
+  waitForEvent(name: string): Promise<PopcornEvent>;
+  deinit(): void;
+};
 
 export type Result<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: SerializedError };
+  { ok: true; data: T } | { ok: false; error: SerializedError };
+
+export { assert, expect };
+
+export const test = base.extend<Fixtures>({
+  page: async ({ page }, use) => {
+    await page.goto("/");
+    await page.waitForFunction(() => window.Popcorn !== undefined);
+    await use(page);
+  },
+  createOtp: async ({ page }, use) => {
+    const handles = new Set<OtpHandle>();
+    const createOtp = async (id = randomOtpId()) => {
+      const otp = await OtpHandle.create(page, id);
+      handles.add(otp);
+      return otp;
+    };
+
+    await use(createOtp);
+    await Promise.all(Array.from(handles, (otp) => otp.dispose()));
+  },
+  otp: async ({ createOtp }, use) => {
+    const otp = await createOtp();
+    await use(otp);
+  },
+});
+
+export class OtpHandle {
+  public readonly events = new Set<PopcornEvent>();
+  private otpHandle: JSHandle<Otp> | null;
+
+  private constructor(
+    private readonly page: Page,
+    public readonly id: string,
+    otp: JSHandle<Otp>,
+  ) {
+    this.otpHandle = otp;
+  }
+
+  public static async create(page: Page, id: string): Promise<OtpHandle> {
+    const otp = await page.evaluateHandle(createOtp, id);
+    return new OtpHandle(page, id, otp);
+  }
+
+  public async boot(options: InitOptions): Promise<BootResult> {
+    const result = await this.otp.evaluate(
+      (otp, initOptions) => otp.boot(initOptions),
+      options,
+    );
+    await this.syncEvents();
+    return result;
+  }
+
+  public async send(
+    target: string | BeamTarget,
+    payload?: unknown,
+    opts?: PopcornSendOpts,
+  ): Promise<BootResult> {
+    const result = await this.otp.evaluate(
+      (otp, args) => otp.send(args.target, args.payload, args.opts),
+      { target, payload, opts },
+    );
+    await this.syncEvents();
+    return result;
+  }
+
+  public async waitForEvent(name: string): Promise<PopcornEvent> {
+    const event = await this.otp.evaluate(
+      (otp, eventName) => otp.waitForEvent(eventName),
+      name,
+    );
+    await this.syncEvents();
+    return event;
+  }
+
+  public async waitForStderr(text: string): Promise<ConsoleMessage> {
+    return await this.page.waitForEvent("console", (message) => {
+      return (
+        message.type() === "error" &&
+        message.text().includes(`[Popcorn-${this.id}]`) &&
+        message.text().includes(text)
+      );
+    });
+  }
+
+  public async dispose(): Promise<void> {
+    const otp = this.otpHandle;
+    this.otpHandle = null;
+
+    if (otp === null) return;
+    await otp.evaluate((browserOtp) => browserOtp.deinit());
+    await otp.dispose();
+  }
+
+  private get otp(): JSHandle<Otp> {
+    assert(this.otpHandle !== null, "OTP has been disposed");
+    return this.otpHandle;
+  }
+
+  private async syncEvents(): Promise<void> {
+    const events = await this.otp.evaluate((otp) => otp.events);
+    this.events.clear();
+    for (const event of events) {
+      this.events.add(event);
+    }
+  }
+}
+
+function createOtp(id: string): Otp {
+  function logOtpError(logPrefix: string, payload: OtpErrorPayload): void {
+    switch (payload.kind) {
+      case "abort":
+        console.error(`${logPrefix} abort:`, payload.data);
+        return;
+      case "error":
+        console.error(`${logPrefix} error:`, payload.data);
+        return;
+      case "exit":
+        console.info(`${logPrefix} exit:`, payload.data);
+        return;
+    }
+  }
+
+  function hasKey(event: PopcornEvent, key: string) {
+    return (
+      typeof event === "object" && event !== null && Object.hasOwn(event, key)
+    );
+  }
+
+  function check(condition: boolean, message: string): asserts condition {
+    if (!condition) throw new Error(message);
+  }
+
+  class Otp {
+    public readonly id = id;
+    public readonly events: PopcornEvent[] = [];
+
+    private popcornHandle: Popcorn | null = null;
+    private readonly eventWaiters = new Map<string, Array<EventWaiter>>();
+
+    public async boot(options: InitOptions): Promise<BootResult> {
+      check(this.popcornHandle === null, "OTP is already booted");
+
+      this.popcornHandle = new window.Popcorn(this.withLogHandlers(options));
+      this.popcornHandle.onEvent((event) => {
+        this.recordEvent(event);
+      });
+
+      const boot = await this.popcornHandle.boot();
+      if (boot.ok) return { ok: true, data: null };
+
+      const result: BootResult = {
+        ok: false,
+        error: boot.error.serialize(),
+      };
+      this.deinit();
+      return result;
+    }
+
+    public async send(
+      target: string | BeamTarget,
+      payload?: unknown,
+      opts?: PopcornSendOpts,
+    ): Promise<BootResult> {
+      const result = await this.popcorn.send(target, payload, opts);
+      if (result.ok) return { ok: true, data: null };
+      return { ok: false, error: result.error.serialize() };
+    }
+
+    public async waitForEvent(name: string): Promise<PopcornEvent> {
+      const event = this.findEvent(name);
+      if (event !== null) return event;
+
+      return await new Promise<PopcornEvent>((resolve) => {
+        const waiters = this.eventWaiters.get(name) ?? [];
+        waiters.push(resolve);
+        this.eventWaiters.set(name, waiters);
+      });
+    }
+
+    public deinit(): void {
+      const popcorn = this.popcornHandle;
+      this.popcornHandle = null;
+      popcorn?.deinit();
+    }
+
+    private get popcorn() {
+      const popcorn = this.popcornHandle;
+      check(popcorn !== null, "Popcorn has not been booted");
+      return popcorn;
+    }
+
+    private get logPrefix(): string {
+      return `[Popcorn-${this.id}]`;
+    }
+
+    private withLogHandlers(options: InitOptions): InitOptions {
+      return {
+        ...options,
+        onStdout: (text) => console.log(`${this.logPrefix} stdout:`, text),
+        onStderr: (text) => console.error(`${this.logPrefix} stderr:`, text),
+        onError: (event) => logOtpError(this.logPrefix, event),
+      };
+    }
+
+    private recordEvent(event: PopcornEvent): void {
+      this.events.push(event);
+
+      for (const [name, waiters] of this.eventWaiters) {
+        if (hasKey(event, name)) {
+          this.eventWaiters.delete(name);
+          for (const resolve of waiters) {
+            resolve(event);
+          }
+        }
+      }
+    }
+
+    private findEvent(name: string): PopcornEvent | null {
+      return this.events.find((event) => hasKey(event, name)) ?? null;
+    }
+  }
+
+  return new Otp();
+}
+
+type Fixtures = {
+  createOtp: OtpFactory;
+  otp: OtpHandle;
+};
+
+function randomOtpId(): string {
+  return `otp-${randomUUID().slice(0, 8)}`;
+}
 
 export function trimLeft(text: string): string {
   const leadingBlanks = /^(?:[ \t]*\n)+/;
@@ -50,161 +296,3 @@ export function trimLeft(text: string): string {
   const trimmedLines = lines.map((line) => line.slice(indentN));
   return trimmedLines.join("\n");
 }
-
-export class Otp {
-  public readonly events = new Set<PopcornEvent>();
-
-  private popcorn: JSHandle<Popcorn> | null = null;
-  private readonly eventWaiters = new Map<string, Array<EventWaiter>>();
-
-  public constructor(private readonly page: Page) {}
-
-  public async installEventBridge(): Promise<void> {
-    await this.page.exposeBinding("__recordOtpEvent", (_source, event) => {
-      this.recordEvent(event as PopcornEvent);
-    });
-  }
-
-  public async boot(options: InitOptions): Promise<BootResult> {
-    if (this.popcorn !== null) {
-      throw new Error("OTP is already booted");
-    }
-
-    this.popcorn = await this.page.evaluateHandle(
-      (initOptions: InitOptions): Popcorn => new window.Popcorn(initOptions),
-      options,
-    );
-    await this.popcorn.evaluate((popcorn) => {
-      popcorn.onEvent((event) => {
-        window.__recordOtpEvent(event);
-      });
-    });
-
-    const result = await this.popcorn.evaluate(
-      async (popcorn): Promise<BootResult> => {
-        const boot = await popcorn.boot();
-        if (boot.ok) return { ok: true, data: null };
-        return { ok: false, error: boot.error.serialize() };
-      },
-    );
-
-    if (!result.ok) {
-      await this.dispose();
-    }
-
-    return result;
-  }
-
-  public async send(
-    target: string | BeamTarget,
-    payload?: unknown,
-    opts?: PopcornSendOpts,
-  ): Promise<BootResult> {
-    const popcorn = this.requirePopcorn();
-
-    return await popcorn.evaluate(
-      async (instance, args) => {
-        const result = await instance.send(
-          args.target,
-          args.payload,
-          args.opts,
-        );
-
-        if (result.ok) return { ok: true, data: null };
-        return { ok: false, error: result.error.serialize() };
-      },
-      { target, payload, opts },
-    );
-  }
-
-  public async waitForEvent(name: string): Promise<PopcornEvent> {
-    const event = this.findEvent(name);
-    if (event !== null) {
-      return event;
-    }
-
-    return await new Promise<PopcornEvent>((resolve) => {
-      const waiters = this.eventWaiters.get(name) ?? [];
-      waiters.push(resolve);
-      this.eventWaiters.set(name, waiters);
-    });
-  }
-
-  public async waitForStderr(text: string): Promise<ConsoleMessage> {
-    return await this.page.waitForEvent("console", (message) => {
-      return (
-        message.type() === "error" &&
-        message.text().includes("[Popcorn]") &&
-        message.text().includes(text)
-      );
-    });
-  }
-
-  public async dispose(): Promise<void> {
-    const popcorn = this.popcorn;
-    this.popcorn = null;
-    if (popcorn !== null) {
-      await this.page.evaluate((instance) => instance.deinit(), popcorn);
-      await popcorn.dispose();
-    }
-  }
-
-  private requirePopcorn(): JSHandle<Popcorn> {
-    if (this.popcorn === null) {
-      throw new Error("Popcorn has not been booted");
-    }
-
-    return this.popcorn;
-  }
-
-  private recordEvent(event: PopcornEvent): void {
-    this.events.add(event);
-
-    for (const [name, waiters] of this.eventWaiters) {
-      if (
-        typeof event === "object" &&
-        event !== null &&
-        Object.hasOwn(event, name)
-      ) {
-        this.eventWaiters.delete(name);
-        for (const resolve of waiters) {
-          resolve(event);
-        }
-      }
-    }
-  }
-
-  private findEvent(name: string): PopcornEvent | null {
-    for (const event of this.events) {
-      if (
-        typeof event === "object" &&
-        event !== null &&
-        Object.hasOwn(event, name)
-      ) {
-        return event;
-      }
-    }
-
-    return null;
-  }
-}
-
-type Fixtures = {
-  otp: Otp;
-};
-
-export { assert, expect };
-
-export const test = base.extend<Fixtures>({
-  page: async ({ page }, use) => {
-    await page.goto("/");
-    await page.waitForFunction(() => window.Popcorn !== undefined);
-    await use(page);
-  },
-  otp: async ({ page }, use) => {
-    const otp = new Otp(page);
-    await otp.installEventBridge();
-    await use(otp);
-    await otp.dispose();
-  },
-});
