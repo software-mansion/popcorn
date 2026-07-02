@@ -507,80 +507,11 @@ var LLVEngine = class _LLVEngine {
   static async create(liveSocket, config = {}) {
     const { Socket } = config;
     let popcorn;
-    const bufferedServerMessages = [];
-    window.addEventListener("phx:llv_server_message", async (e) => {
-      if (!popcorn) {
-        bufferedServerMessages.push(e.detail);
-        return;
-      }
-      await sendServerMessage(popcorn, e.detail);
-    });
-    if (!document.querySelector("[data-phx-session]")) {
-      liveSocket.bindForms();
-    }
-    popcorn = await Popcorn.init({
-      debug: config.debug ?? false,
-      bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"]
-    });
-    if (config.eventHandler) {
-      popcorn.onMessage(config.eventHandler);
-    }
-    window.__popcorn = popcorn;
+    let popcornReady = false;
     const channels = {};
     const viewsById = {};
-    const mirrorEls = document.querySelectorAll(
-      "[data-pop-view][data-pop-mirror]"
-    );
-    if (mirrorEls.length > 0) {
-      const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
-      const llvSocket = new Socket("/llv_socket", {
-        params: { _csrf_token: csrfToken }
-      });
-      llvSocket.connect();
-      mirrorEls.forEach((el) => {
-        const llvId = el.id;
-        const channel = llvSocket.channel(`llv:${llvId}`, {
-          view: el.dataset.popView
-        });
-        channels[llvId] = channel;
-        channel.join().receive("ok", () => {
-          if (viewsById[llvId]) {
-            popcorn.call(
-              { id: llvId, event: "llv_reconnected", payload: {} },
-              { timeoutMs: 1e4 }
-            ).catch((err) => console.error("LLV reconnect sync error", err));
-          }
-        }).receive(
-          "error",
-          (err) => console.error("LLV channel join error", err)
-        );
-      });
-      window.__llvSync = (id, eventName, payload) => {
-        const channel = channels[id];
-        if (channel) {
-          channel.push(eventName, payload);
-        }
-      };
-    }
-    const { data: initialRenderedByView } = await popcorn.call(
-      { views: findPredefinedViews() },
-      { timeoutMs: 1e4 }
-    );
-    const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
-    window.__popcornTransportReceive = function(llvId, diff) {
-      const view = viewsById[llvId];
-      if (!view) {
-        console.error(
-          "LLV view not found:",
-          llvId,
-          "available:",
-          Object.keys(viewsById)
-        );
-        return;
-      }
-      view.update(structuredClone(diff), []);
-    };
-    pop_view_els.forEach((pop_view_el) => {
+    const bufferedServerMessages = [];
+    const setupFakeView = (pop_view_el, initialRendered) => {
       const llvId = pop_view_el.id;
       const view = liveSocket.newRootView(pop_view_el);
       viewsById[llvId] = view;
@@ -606,7 +537,7 @@ var LLVEngine = class _LLVEngine {
           delete payload.cid;
         }
         popcorn.call(
-          { id: this.el.id, event, payload },
+          { action: "event", id: this.el.id, payload },
           { timeoutMs: 1e4 }
         ).catch((err) => console.error("LLV view.pushWithReply error", err));
         if (ref !== null) {
@@ -619,7 +550,6 @@ var LLVEngine = class _LLVEngine {
       view.bindChannel = function() {
       };
       view.join();
-      const initialRendered = initialRenderedByView[llvId];
       if (initialRendered) {
         liveSocket.requestDOMUpdate(
           () => view.onJoin({ rendered: initialRendered })
@@ -627,7 +557,105 @@ var LLVEngine = class _LLVEngine {
       } else {
         console.error("LLV no initial rendered for view", llvId);
       }
+    };
+    const teardownProcess = (llvId) => popcorn.call({ action: "destroy", id: llvId, payload: {} }, { timeoutMs: 1e4 }).catch((err) => console.error("LLV destroy error", err));
+    const mountView = async (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      if (viewsById[llvId]) return;
+      const { data } = await popcorn.call(
+        { action: "create", id: llvId, view: pop_view_el.getAttribute("data-pop-view") },
+        { timeoutMs: 1e4 }
+      );
+      if (data.status == "error") return;
+      const liveEl = document.getElementById(llvId);
+      if (liveEl?.matches("[data-pop-view]")) {
+        setupFakeView(liveEl, data.rendered);
+      } else {
+        teardownProcess(llvId);
+      }
+    };
+    const unmountView = (pop_view_el) => {
+      const llvId = pop_view_el.id;
+      const view = viewsById[llvId];
+      if (!view) return;
+      delete viewsById[llvId];
+      view.destroy?.();
+      teardownProcess(llvId);
+    };
+    window.addEventListener("phx:llv_server_message", async (e) => {
+      if (!popcorn) {
+        bufferedServerMessages.push(e.detail);
+        return;
+      }
+      await sendServerMessage(popcorn, e.detail);
     });
+    liveSocket.hooks.LocalLiveView = {
+      mounted() {
+        if (popcornReady) mountView(this.el);
+      },
+      destroyed() {
+        unmountView(this.el);
+      }
+    };
+    if (!document.querySelector("[data-phx-session]")) {
+      liveSocket.bindForms();
+    }
+    popcorn = await Popcorn.init({
+      debug: config.debug ?? false,
+      bundlePaths: config.bundlePaths ?? ["wasm/bundle.avm"]
+    });
+    popcornReady = true;
+    if (config.eventHandler) {
+      popcorn.onMessage(config.eventHandler);
+    }
+    window.__popcorn = popcorn;
+    const mirrorEls = document.querySelectorAll(
+      "[data-pop-view][data-pop-mirror]"
+    );
+    if (mirrorEls.length > 0) {
+      const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
+      const llvSocket = new Socket("/llv_socket", {
+        params: { _csrf_token: csrfToken }
+      });
+      llvSocket.connect();
+      mirrorEls.forEach((el) => {
+        const llvId = el.id;
+        const channel = llvSocket.channel(`llv:${llvId}`, {
+          view: el.dataset.popView
+        });
+        channels[llvId] = channel;
+        channel.join().receive("ok", () => {
+          if (viewsById[llvId]) {
+            popcorn.call(
+              { action: "reconnected", id: llvId, payload: {} },
+              { timeoutMs: 1e4 }
+            ).catch((err) => console.error("LLV reconnect sync error", err));
+          }
+        }).receive(
+          "error",
+          (err) => console.error("LLV channel join error", err)
+        );
+      });
+      window.__llvSync = (id, eventName, payload) => {
+        const channel = channels[id];
+        if (channel) {
+          channel.push(eventName, payload);
+        }
+      };
+    }
+    window.__popcornTransportReceive = function(llvId, diff) {
+      const view = viewsById[llvId];
+      if (!view) {
+        console.error(
+          "LLV view not found:",
+          llvId,
+          "available:",
+          Object.keys(viewsById)
+        );
+        return;
+      }
+      view.update(structuredClone(diff), []);
+    };
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {
       const llvEl = childEl.closest?.("[data-pop-view]");
@@ -638,6 +666,10 @@ var LLVEngine = class _LLVEngine {
       return origOwner(childEl, callback);
     };
     registerCustomEventBindings(liveSocket);
+    const pop_view_els = Array.from(
+      document.querySelectorAll("[data-pop-view]")
+    );
+    await Promise.all(pop_view_els.map((el) => mountView(el)));
     for (const detail of bufferedServerMessages) {
       await sendServerMessage(popcorn, detail);
     }
@@ -655,7 +687,7 @@ var LLVEngine = class _LLVEngine {
     const el = document.querySelector(`[data-pop-view="${viewId}"]`);
     const llvId = el ? el.id : viewId;
     const result = await this.popcorn.call(
-      { id: llvId, event: "llv_push", payload: { event, payload } },
+      { action: "push", id: llvId, payload: { event, payload } },
       { timeoutMs: 1e4 }
     );
     if (!result.ok) {
@@ -672,7 +704,7 @@ async function sendServerMessage(popcorn, detail) {
   await popcorn.call(
     {
       id: llvId,
-      event: "llv_server_message",
+      action: "event",
       payload: {
         event: "llv_server_message",
         value: detail.payload,
@@ -681,12 +713,6 @@ async function sendServerMessage(popcorn, detail) {
     },
     { timeoutMs: 1e4 }
   );
-}
-function findPredefinedViews() {
-  return Array.from(document.querySelectorAll("[data-pop-view]")).map((el) => ({
-    view: el.getAttribute("data-pop-view"),
-    id: el.id
-  }));
 }
 function registerCustomEventBindings(liveSocket) {
   const buildPointerData = (e, el) => {

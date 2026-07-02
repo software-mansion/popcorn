@@ -16,6 +16,7 @@ packages:
   - examples/local-lv-thermostat/assets
   - examples/local-lv-burrito/assets
   - examples/local-lv-pong/assets
+  - examples/local-lv-kanban/assets
   - local-live-view
   - local-live-view/assets
   - landing-page
