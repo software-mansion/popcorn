@@ -59,11 +59,13 @@ defmodule LocalLiveView.Dispatcher do
 
   # This event may be fired multiple times for the same view from JS,
   # in such case we only handle the first event.
-  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id, "view" => view}}, state)
+  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id, "view" => view} = msg}, state)
        when not is_map_key(state.views, id) do
+    url_params = Map.get(msg, "url_params", %{})
+    url = Map.get(msg, "url", "")
     view = String.to_existing_atom("Elixir." <> view)
 
-    case start_local_live_view(view, id) do
+    case start_local_live_view(view, id, url_params, url) do
       {:ok, pid, rendered} ->
         {:resolve, %{status: :ok, rendered: rendered}, put_in(state.views[id], pid)}
 
@@ -74,6 +76,14 @@ defmodule LocalLiveView.Dispatcher do
 
   defp handle_wasm({:wasm_call, %{"action" => "create"}}, state) do
     {:resolve, %{status: :error}, state}
+  end
+
+  defp handle_wasm(
+         {:wasm_call, %{"action" => "handle_params", "id" => id, "payload" => payload}},
+         state
+       ) do
+    send_to_view(state, id, %Message{event: "handle_params", payload: payload})
+    {:resolve, :ok, state}
   end
 
   defp handle_wasm(

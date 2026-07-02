@@ -47,7 +47,9 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
               <p style="font-size: 14px; margin-top: 8px; color: #6b7280;">Confirm</p>
             </div>
           </div>
+          <.link patch={~p"/?step=#{@current_step + 1}"}>Next</.link>
         </div>
+
 
         <!-- Local Live View -->
         <div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
