@@ -204,7 +204,10 @@ defmodule LocalLiveView.Server do
   defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
   defp gather_keys(_, acc), do: acc
 
-  defp maybe_call_mount_handle_params(%{socket: socket} = state, %{"url_params" => url_params, "url" => url}) do
+  defp maybe_call_mount_handle_params(%{socket: socket} = state, %{
+         "url_params" => url_params,
+         "url" => url
+       }) do
     %{view: view, redirected: mount_redirect} = socket
     lifecycle = Lifecycle.stage_info(socket, view, :handle_params, 3)
 
