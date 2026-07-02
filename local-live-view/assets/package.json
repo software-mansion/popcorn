@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@swmansion/popcorn": "^0.3.0-rc2",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.1"
   }
 }
