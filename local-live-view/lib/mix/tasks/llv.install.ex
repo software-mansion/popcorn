@@ -76,7 +76,8 @@ defmodule Mix.Tasks.Llv.Install do
 
              plug :put_wasm_security_headers
 
-             socket "/llv_socket", LocalLiveView.Socket, websocket: true
+             socket "/llv_socket", LocalLiveView.Socket,
+               websocket: [connect_info: [session: @session_options]]
 
              defp put_wasm_security_headers(conn, _opts) do
                conn

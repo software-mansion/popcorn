@@ -15,10 +15,25 @@ defmodule LocalLiveView.Channel do
     end
   end
 
-  def join("llv:" <> llv_id, %{"view" => view_string}, socket) do
-    Registry.register(LocalLiveView.ChannelRegistry, llv_id, view_string)
-    mirror_module = find_mirror_module(view_string)
-    {:ok, assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
+  def join("llv:" <> llv_id, %{"view" => view_string, "token" => token}, socket) do
+    case LocalLiveView.MirrorToken.verify(socket.endpoint, token, max_age: :infinity) do
+      {:ok, %{id: ^llv_id, view: ^view_string}} ->
+        case Registry.register(LocalLiveView.ChannelRegistry, llv_id, view_string) do
+          {:ok, _} ->
+            mirror_module = find_mirror_module(view_string)
+            {:ok, assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
+
+          {:error, {:already_registered, _pid}} ->
+            {:error, %{reason: "already_joined"}}
+        end
+
+      {:error, _} ->
+        {:error, %{reason: "unauthorized"}}
+    end
+  end
+
+  def join(_topic, _params, _socket) do
+    {:error, %{reason: "unauthorized"}}
   end
 
   def handle_call(:get_mirror_assigns, _from, socket) do
@@ -45,11 +60,13 @@ defmodule LocalLiveView.Channel do
   end
 
   defp find_mirror_module(view_string) do
-    mirror = Module.concat(Mirror, view_string)
+    mirror = String.to_existing_atom("Elixir.Mirror." <> view_string)
 
     if Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3),
       do: mirror,
       else: nil
+  rescue
+    ArgumentError -> nil
   end
 
   defp merge_assigns(nil, local_assigns, _mirror_assigns, _session), do: local_assigns

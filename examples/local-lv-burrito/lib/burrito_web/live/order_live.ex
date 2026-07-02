@@ -108,7 +108,7 @@ defmodule BurritoWeb.OrderLive do
               </div>
               <span class="text-xs text-pop-orange-dark/60 font-medium">Loading Local LiveView…</span>
             </div>
-            <.local_live_view id={@llv_id} view="BurritoLive" />
+            <.local_live_view id={@llv_id} view="BurritoLive" endpoint={@socket.endpoint} />
           </div>
         </div>
       </div>

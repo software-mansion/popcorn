@@ -22,6 +22,7 @@ defmodule LocalLiveView.Component do
 
     * `view` (required) - the LocalLiveView module name, as a string.
     * `id` - stable element id; defaults to a server-generated random id.
+    * `endpoint` - the Phoenix endpoint module used to sign the mirror token.
 
   ## Examples
 
@@ -40,14 +41,17 @@ defmodule LocalLiveView.Component do
     assigns =
       assigns
       |> assign_new(:id, fn -> default_id(view) end)
-      |> assign(:has_mirror, mirror_exists?(view))
+      |> assign_new(:mirror_token, fn ->
+        if mirror_exists?(view),
+          do: LocalLiveView.MirrorToken.sign(assigns.endpoint, view, assigns.id)
+      end)
 
     ~H"""
     <div
       data-pop-view={@view}
       id={@id}
-      data-pop-mirror={@has_mirror || nil}
       phx-hook="LocalLiveView"
+      data-pop-mirror-token={@mirror_token}
       phx-update="ignore"
     >
     </div>
@@ -63,7 +67,9 @@ defmodule LocalLiveView.Component do
   defp default_id(name), do: "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
 
   defp mirror_exists?(view_name) do
-    mirror = Module.concat(Mirror, String.to_atom(view_name))
+    mirror = String.to_existing_atom("Elixir.Mirror." <> view_name)
     Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3)
+  rescue
+    ArgumentError -> false
   end
 end

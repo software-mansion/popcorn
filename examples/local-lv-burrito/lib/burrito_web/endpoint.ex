@@ -12,7 +12,8 @@ defmodule BurritoWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  socket "/llv_socket", LocalLiveView.Socket, websocket: true
+  socket "/llv_socket", LocalLiveView.Socket,
+    websocket: [connect_info: [session: @session_options]]
 
   plug Plug.Static,
     at: "/",

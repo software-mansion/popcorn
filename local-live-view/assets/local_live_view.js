@@ -302,7 +302,7 @@ export class LLVEngine {
 
     // Mirror channels: only created for views with a server-side Mirror module.
     const mirrorEls = document.querySelectorAll(
-      "[data-pop-view][data-pop-mirror]",
+      "[data-pop-view][data-pop-mirror-token]",
     );
     if (mirrorEls.length > 0) {
       const csrfToken = document
@@ -318,6 +318,7 @@ export class LLVEngine {
         const llvId = el.id;
         const channel = llvSocket.channel(`llv:${llvId}`, {
           view: el.dataset.popView,
+          token: el.dataset.popMirrorToken,
         });
         channels[llvId] = channel;
 

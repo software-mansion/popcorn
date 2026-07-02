@@ -676,7 +676,7 @@ var LLVEngine = class _LLVEngine {
     }
     window.__popcorn = popcorn;
     const mirrorEls = document.querySelectorAll(
-      "[data-pop-view][data-pop-mirror]"
+      "[data-pop-view][data-pop-mirror-token]"
     );
     if (mirrorEls.length > 0) {
       const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
@@ -687,7 +687,8 @@ var LLVEngine = class _LLVEngine {
       mirrorEls.forEach((el) => {
         const llvId = el.id;
         const channel = llvSocket.channel(`llv:${llvId}`, {
-          view: el.dataset.popView
+          view: el.dataset.popView,
+          token: el.dataset.popMirrorToken
         });
         channels[llvId] = channel;
         channel.join().receive("ok", () => {
