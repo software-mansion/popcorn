@@ -21,7 +21,9 @@ defmodule LocalLiveView.Channel do
         case Registry.register(LocalLiveView.ChannelRegistry, llv_id, view_string) do
           {:ok, _} ->
             mirror_module = find_mirror_module(view_string)
-            {:ok, assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
+
+            {:ok,
+             assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
 
           {:error, {:already_registered, _pid}} ->
             {:error, %{reason: "already_joined"}}
