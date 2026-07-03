@@ -16,7 +16,7 @@ module.exports = defineConfig({
   testDir: "./tests",
   // The board renders inside a WASM (Popcorn) runtime that boots per page; first
   // mount can take several seconds, so timeouts are generous.
-  // Generous timeouts: the WASM popconent runs in-browser and competes with the
+  // Generous timeouts: the WASM local live view runs in-browser and competes with the
   // server + browser for CPU on constrained CI runners.
   timeout: 120_000,
   expect: { timeout: 30_000 },

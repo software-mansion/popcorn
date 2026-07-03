@@ -63,7 +63,7 @@ defmodule LocalLvKanban.Boards do
 
   @doc """
   Turns a preloaded `%Board{}` into the JSON-serializable shape the
-  `Local.Kanban` popconent expects: columns and tasks each carrying their
+  `Local.Kanban` local live view expects: columns and tasks each carrying their
   `position` so the client can sort them on render.
   """
   def board_to_data(%Board{} = board) do

@@ -434,13 +434,13 @@ export class LLVEngine {
 
     // __llvPushServer: programmatic counterpart of phx-target=@server, called from
     // a local view's Elixir via LocalLiveView.push_server_event/3. Resolves the
-    // popconent's host LiveView fresh each call (a reconnect can swap the
+    // LLV's host LiveView fresh each call (a reconnect can swap the
     // [data-phx-session] element) and dispatches the event to it over the
     // websocket.
     window.__llvPushServer = (llvId, event, payload) => {
       const popEl = document.getElementById(llvId);
       if (!popEl) {
-        console.error("LLV pushServer: no popconent element", llvId);
+        console.error("LLV pushServer: LLV element not found", llvId);
         return;
       }
       const hostEl = popEl.closest(PHX_VIEW_SELECTOR);

@@ -1,5 +1,5 @@
 defmodule Local.Kanban do
-  use LocalLiveView.Popconent
+  use LocalLiveView
 
   alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
 
@@ -21,7 +21,7 @@ defmodule Local.Kanban do
   # so a successful edit reconciles seamlessly and a failed one rolls back.
 
   @impl true
-  def mount(socket) do
+  def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
        name: nil,
@@ -294,7 +294,7 @@ defmodule Local.Kanban do
   @impl true
   def render(assigns) do
     # Removes run both locally (optimistic) and on the host LiveView, so target
-    # both the popconent (@default) and the server (@server). add_task/add_column
+    # both the local view (@default) and the server (@server). add_task/add_column
     # are client-only (the client pushes its generated position itself).
     assigns =
       assigns

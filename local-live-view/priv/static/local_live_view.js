@@ -775,7 +775,7 @@ var LLVEngine = class _LLVEngine {
     window.__llvPushServer = (llvId, event, payload) => {
       const popEl = document.getElementById(llvId);
       if (!popEl) {
-        console.error("LLV pushServer: no popconent element", llvId);
+        console.error("LLV pushServer: LLV element not found", llvId);
         return;
       }
       const hostEl = popEl.closest(PHX_VIEW_SELECTOR);

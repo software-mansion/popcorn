@@ -31,7 +31,7 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
-  # Sentinels seeded into a popconent's @default / @server assigns; the
+  # Sentinels seeded into every view's @default / @server assigns; the
   # LocalLiveView JS recognizes these exact values (keep in sync with
   # LLV_DEFAULT_TARGET / LLV_SERVER_TARGET in assets/local_live_view.js).
   @default_target "__llv_default__"
@@ -84,7 +84,9 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "llv_reconnected"}, state) do
-    keys = Map.keys(state.socket.assigns)
+    # The seeded @default / @server target sentinels are runtime plumbing, not
+    # view state — keep them out of the mirror resync.
+    keys = Map.keys(state.socket.assigns) -- [:default, :server]
     LocalLiveView.mirror_sync(state.socket, keys)
     {:noreply, state}
   end
@@ -112,27 +114,10 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
-    # The host LiveView re-rendered with new assigns for a popconent: run its
-    # update/2 and push the resulting diff. Only a popconent receives assigns this
-    # way (a full LocalLiveView gets its state from the mirror channel), so an
-    # update targeting a non-popconent means something is wired wrong.
-    unless popconent?(socket.view) do
-      raise ArgumentError,
-            "received an assigns update for #{inspect(socket.view)}, which is not a " <>
-              "LocalLiveView.Popconent — only popconents receive assigns from a host LiveView."
-    end
-
-    case update_popconent(socket.view, assigns, socket) do
-      {:ok, %Socket{} = new_socket} ->
-        handle_changed(state, new_socket, nil)
-
-      other ->
-        raise ArgumentError, """
-        expected #{inspect(socket.view)}.update/2 to return {:ok, %Socket{}}, got:
-
-        #{inspect(other)}
-        """
-    end
+    # The host LiveView re-rendered with new assigns for this view: run its
+    # update/2 and push the resulting diff.
+    new_socket = call_update!(socket.view, assigns, socket)
+    handle_changed(state, new_socket, nil)
   end
 
   def handle_info({:phoenix, :send_update, update}, state) do
@@ -199,38 +184,20 @@ defmodule LocalLiveView.Server do
     view.handle_info(msg, socket)
   end
 
-  # A popconent (`use LocalLiveView.Popconent`) is driven by mount/1 + update/2,
-  # unlike a full LocalLiveView's mount/3. Detected by the __popconent__/0 marker
-  # the macro injects — a function check, since @behaviour reflection isn't
-  # available in the AtomVM runtime this server runs in.
-  defp popconent?(view), do: function_exported?(view, :__popconent__, 0)
+  # Run the view's update/2 for the (JSON, string-keyed) assigns the host passed,
+  # raising on a bad return. Returns the updated %Socket{}.
+  defp call_update!(view, assigns, %Socket{} = socket) do
+    case view.update(normalize_assigns(assigns), socket) do
+      {:ok, %Socket{} = socket} ->
+        socket
 
-  # Popconent mount lifecycle (it has no mount/3): seed the @default / @server
-  # target sentinels, run mount/1, then feed the initial assigns through update/2.
-  # Returns the mounted %Socket{}.
-  defp mount_popconent(view, assigns, %Socket{} = socket) do
-    socket =
-      socket
-      |> Phoenix.Component.assign(:default, @default_target)
-      |> Phoenix.Component.assign(:server, @server_target)
-
-    with {:ok, %Socket{} = socket} <- view.mount(socket),
-         {:ok, %Socket{} = socket} <- update_popconent(view, assigns, socket) do
-      socket
-    else
       other ->
         raise ArgumentError, """
-        expected #{inspect(view)}.mount/1 and update/2 to return {:ok, %Socket{}}, got:
+        expected #{inspect(view)}.update/2 to return {:ok, %Socket{}}, got:
 
         #{inspect(other)}
         """
     end
-  end
-
-  # Re-run the popconent's update/2 for the (JSON, string-keyed) assigns the host
-  # pushed.
-  defp update_popconent(view, assigns, %Socket{} = socket) do
-    view.update(normalize_assigns(assigns), socket)
   end
 
   # Top-level assign keys cross the JSON boundary as strings; convert them back to
@@ -551,12 +518,10 @@ defmodule LocalLiveView.Server do
       view: view
     } = verified
 
-    # Assigns passed via the `<.popconent assigns... />` component reach us
-    # here as a string-keyed map (empty for a plain local view). They become the
-    # first argument to the view's mount/3 callback — `LocalLiveView.Popconent` routes them
-    # on to its update/2.
+    # Assigns passed via the `<.local_live_view assigns... />` component reach us
+    # here as a string-keyed map. They become the first argument to the view's
+    # mount/3 callback and are then fed through its update/2.
     initial_assigns = params["assigns"] || %{}
-    connect_params = initial_assigns
     llv_id = params["id"]
 
     socket = %Socket{
@@ -565,7 +530,7 @@ defmodule LocalLiveView.Server do
 
     lifecycle = load_lifecycle(config, nil)
 
-    case mount_private(verified, connect_params, nil, lifecycle) do
+    case mount_private(verified, params, nil, lifecycle) do
       {:ok, mount_priv} ->
         socket = %{
           socket
@@ -576,21 +541,19 @@ defmodule LocalLiveView.Server do
         }
 
         try do
-          mounted_socket = %Socket{socket | view: view}
-
-          # A popconent has no mount/3; its lifecycle (mount/1 + update/2 seeded
-          # with the initial assigns) is driven here. A full LocalLiveView goes
-          # through the standard mount/3 path.
+          # Seed the @default / @server target sentinels, run mount/3 (params are
+          # the host-passed assigns), then feed those assigns through update/2,
+          # LiveComponent-style.
           mounted_socket =
-            if popconent?(view) do
-              mount_popconent(view, initial_assigns, mounted_socket)
-            else
-              Utils.maybe_call_live_view_mount!(mounted_socket, view, initial_assigns, verified)
-            end
+            %Socket{socket | view: view}
+            |> Phoenix.Component.assign(:default, @default_target)
+            |> Phoenix.Component.assign(:server, @server_target)
+            |> Utils.maybe_call_live_view_mount!(view, params, verified)
+            |> then(&call_update!(view, initial_assigns, &1))
 
           mounted_socket
           |> build_state(phx_socket, llv_id)
-          |> maybe_call_mount_handle_params(initial_assigns)
+          |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)
         rescue
           exception ->

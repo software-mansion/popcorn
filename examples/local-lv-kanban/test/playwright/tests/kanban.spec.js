@@ -12,10 +12,10 @@ test.describe("board index + lifecycle", () => {
     const name = uniqueName("Lifecycle");
     const url = await h.createBoard(page, name);
 
-    // The popconent heading shows the board's own name.
+    // The local live view heading shows the board's own name.
     await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
 
-    // Seeded columns render in the WASM popconent.
+    // Seeded columns render in the WASM local live view.
     expect(await h.columnNames(page)).toEqual(SEEDED);
 
     // The board is listed on the index and links back to itself.

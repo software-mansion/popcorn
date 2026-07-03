@@ -81,7 +81,7 @@ boards = [
      {"Ideas",
       [
         "Learn Elixir LiveView",
-        {"Side project: WASM kanban", "Run LiveView popconents client-side."},
+        {"Side project: WASM kanban", "Run local live views client-side."},
         "Read 'Designing Elixir Systems'"
       ]},
      {"Doing",

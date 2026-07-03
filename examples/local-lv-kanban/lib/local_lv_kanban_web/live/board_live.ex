@@ -1,10 +1,10 @@
 defmodule LocalLvKanbanWeb.BoardLive do
   @moduledoc """
-  Server LiveView that hosts the `Local.Kanban` popconent for one board.
+  Server LiveView that hosts the `Local.Kanban` local live view for one board.
 
   Server-authoritative collaborative flow:
 
-    * The browser component applies edits optimistically and notifies this view
+    * The browser-side view applies edits optimistically and notifies this view
       (`targets([@default, @server])` for adds/removes, `push_server_event` for drag-moves).
     * `handle_event` writes the edit to the DB. On success it broadcasts
       `:board_changed` to every `BoardLive` viewing this board (including itself);
@@ -67,7 +67,7 @@ defmodule LocalLvKanbanWeb.BoardLive do
   end
 
   # Re-read the board from the DB and re-assign it. Always bump `rev` so the
-  # popconent re-renders even when the board value is unchanged (failure
+  # browser-side view re-renders even when the board value is unchanged (failure
   # rollback) — `rev` is the client's rebuild trigger.
   defp push_board(socket) do
     board = Boards.board_to_data(Boards.get_board!(socket.assigns.board_id))
@@ -92,7 +92,7 @@ defmodule LocalLvKanbanWeb.BoardLive do
       >
         ← All boards
       </.link>
-      <.popconent module="Local.Kanban" name={@board_name} board={@board} rev={@rev} />
+      <.local_live_view view="Local.Kanban" name={@board_name} board={@board} rev={@rev} />
     </div>
     """
   end

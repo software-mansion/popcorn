@@ -14,7 +14,7 @@ const columnByName = (page, name) => columns(page).filter({ hasText: name });
 // A task card located by its text.
 const taskCard = (page, text) => tasks(page).filter({ hasText: text });
 
-/** Wait until the WASM popconent has booted and rendered the board. */
+/** Wait until the WASM local live view has booted and rendered the board. */
 async function waitForBoard(page) {
   // The heading now shows the board's own name, so the first rendered column is
   // the name-agnostic boot signal.

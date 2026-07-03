@@ -1,7 +1,7 @@
 defmodule LocalLvKanbanWeb.BoardsLive do
   @moduledoc """
   Index of kanban boards: list existing boards and create new ones. Plain server
-  LiveView (no popconent) — boards are persisted in the DB.
+  LiveView (no local live view) — boards are persisted in the DB.
   """
   use LocalLvKanbanWeb, :live_view
 
