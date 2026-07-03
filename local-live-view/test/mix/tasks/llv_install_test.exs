@@ -33,8 +33,9 @@ defmodule Mix.Tasks.Llv.InstallTest do
       + |plug(:put_wasm_security_headers)
       """)
       |> assert_has_patch(@endpoint_path, """
-      + |socket("/llv_socket", LocalLiveView.Socket,
-      + |  websocket: [connect_info: [session: @session_options]])
+      + |  socket("/llv_socket", LocalLiveView.Socket,
+      + |    websocket: [connect_info: [session: @session_options]]
+      + |  )
       """)
       |> assert_has_patch(@endpoint_path, """
       + |defp put_wasm_security_headers(conn, _opts) do
