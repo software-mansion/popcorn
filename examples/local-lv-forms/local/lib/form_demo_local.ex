@@ -21,14 +21,9 @@ defmodule FormDemoLocal do
         </div>
       </.form>
     </div>
-    <div data-value="errors-list">
-      <%= for error <- @errors do %>
-        <p style="color:red;">{error}</p>
-      <% end %>
-    </div>
     <div class="bordered" data-value="users-list">
       <h2 class="title">[Local Runtime] User List:</h2>
-      <%= if @users == [] do %>
+      <%= if Enum.empty?(@users) do %>
         <p>No users yet - save one above</p>
       <% end %>
       <ul>

@@ -17,9 +17,11 @@ defmodule FormDemoLocalPresentation do
   end
 
   def handle_event(event, params, socket)
-      when event in ["validate", "save", "generate_random"] do
+      when event in ~w(validate save generate_random) do
+    # The UI socket lags behind the real state during animation; apply pending
+    # assigns so the event handler sees up-to-date data.
     effective_socket =
-      case socket.assigns[:_pending_cur] do
+      case socket.assigns[:pending_cur] do
         nil -> socket
         pending -> assign(socket, Map.to_list(pending))
       end
@@ -34,36 +36,23 @@ defmodule FormDemoLocalPresentation do
 
     new_pending = %{
       form: updated.assigns.form,
-      errors: updated.assigns.errors,
       disabled: updated.assigns.disabled,
       users: updated.assigns.users
     }
 
     {:noreply,
      socket
-     |> assign(:_pending_prev, socket.assigns[:_pending_cur])
-     |> assign(:_pending_cur, new_pending)}
+     |> assign(:pending_prev, socket.assigns[:pending_cur])
+     |> assign(:pending_cur, new_pending)}
   end
 
   def handle_info({:js_push, "llv_ack", _}, socket) do
-    case {socket.assigns[:_pending_prev], socket.assigns[:_pending_cur]} do
-      {%{form: form, errors: errors, disabled: disabled, users: users}, _} ->
-        {:noreply,
-         socket
-         |> assign(:form, form)
-         |> assign(:errors, errors)
-         |> assign(:disabled, disabled)
-         |> assign(:users, users)
-         |> assign(:_pending_prev, nil)}
+    case {socket.assigns[:pending_prev], socket.assigns[:pending_cur]} do
+      {%{form: form, disabled: disabled, users: users}, _} ->
+        {:noreply, assign(socket, form: form, disabled: disabled, users: users, pending_prev: nil)}
 
-      {nil, %{form: form, errors: errors, disabled: disabled, users: users}} ->
-        {:noreply,
-         socket
-         |> assign(:form, form)
-         |> assign(:errors, errors)
-         |> assign(:disabled, disabled)
-         |> assign(:users, users)
-         |> assign(:_pending_cur, nil)}
+      {nil, %{form: form, disabled: disabled, users: users}} ->
+        {:noreply, assign(socket, form: form, disabled: disabled, users: users, pending_cur: nil)}
 
       _ ->
         {:noreply, socket}
@@ -81,7 +70,6 @@ defmodule FormDemoLocalPresentation do
     %{
       username: Map.get(form_params, "username", ""),
       email: Map.get(form_params, "email", ""),
-      errors: length(assigns.errors),
       disabled: assigns.disabled,
       users: length(assigns.users)
     }

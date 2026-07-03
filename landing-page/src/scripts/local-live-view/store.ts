@@ -6,6 +6,12 @@ export interface LogEntry {
   result: string;
 }
 
+export interface PresentationPayload {
+  block: string | null;
+  event: string;
+  assigns: Record<string, unknown>;
+}
+
 // Animation step: 0=phx-click, 1=handle_event, 2=update assigns, 3=re-render, null=idle
 export const $step = atom<number | null>(null);
 

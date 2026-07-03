@@ -17,10 +17,11 @@ defmodule ThermostatLivePresentation do
   end
 
   def handle_event(event, params, socket)
-      when event in ["inc_temperature", "dec_temperature"] do
-
+      when event in ~w(inc_temperature dec_temperature) do
+    # The UI socket lags behind the real state during animation; apply pending
+    # assigns so the event handler sees up-to-date data.
     effective_socket =
-      case socket.assigns[:_pending_cur] do
+      case socket.assigns[:pending_cur] do
         nil -> socket
         pending -> assign(socket, Map.to_list(pending))
       end
@@ -40,25 +41,17 @@ defmodule ThermostatLivePresentation do
 
     {:noreply,
      socket
-     |> assign(:_pending_prev, socket.assigns[:_pending_cur])
-     |> assign(:_pending_cur, new_pending)}
+     |> assign(:pending_prev, socket.assigns[:pending_cur])
+     |> assign(:pending_cur, new_pending)}
   end
 
   def handle_info({:js_push, "llv_ack", _}, socket) do
-    case {socket.assigns[:_pending_prev], socket.assigns[:_pending_cur]} do
+    case {socket.assigns[:pending_prev], socket.assigns[:pending_cur]} do
       {%{temperature: t, country: c}, _} ->
-        {:noreply,
-         socket
-         |> assign(:temperature, t)
-         |> assign(:country, c)
-         |> assign(:_pending_prev, nil)}
+        {:noreply, assign(socket, temperature: t, country: c, pending_prev: nil)}
 
       {nil, %{temperature: t, country: c}} ->
-        {:noreply,
-         socket
-         |> assign(:temperature, t)
-         |> assign(:country, c)
-         |> assign(:_pending_cur, nil)}
+        {:noreply, assign(socket, temperature: t, country: c, pending_cur: nil)}
 
       _ ->
         {:noreply, socket}

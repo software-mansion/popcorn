@@ -37,8 +37,7 @@ const transformers: ShikiTransformer[] = tabs.map((tab) =>
     tabs.map((tab, i) => (
       <div
         id={`llv-code-body-${i}`}
-        class="code-body-wrap llv-scroll"
-        style={i === 0 ? "" : "display:none"}
+        class:list={["code-body-wrap", "llv-scroll", { "code-body-hidden": i !== 0 }]}
       >
         <Code
           code={tab.code}
@@ -67,7 +66,7 @@ const transformers: ShikiTransformer[] = tabs.map((tab) =>
       panel
         .querySelectorAll<HTMLElement>(".code-body-wrap")
         .forEach((body, i) => {
-          body.style.display = i === idx ? "" : "none";
+          body.classList.toggle("code-body-hidden", i !== idx);
         });
     });
   });
@@ -193,6 +192,9 @@ const transformers: ShikiTransformer[] = tabs.map((tab) =>
   }
   .line.dim {
     opacity: 0.3;
+  }
+  .code-body-hidden {
+    display: none;
   }
 .defp-header {
     cursor: pointer;

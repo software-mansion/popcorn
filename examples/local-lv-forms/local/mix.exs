@@ -18,6 +18,9 @@ defmodule Local.MixProject do
     [default_target: :wasm]
   end
 
+  # lib_landing contains presentation wrappers that emit WASM events for the
+  # landing page animation demos. They are compiled only when building for that
+  # context so normal development builds stay unaffected.
   defp elixirc_paths do
     if System.get_env("LLV_LANDING_PATCH") == "true" do
       ["lib", "lib_landing"]

@@ -90,6 +90,7 @@ const tabs: CodeTab[] = [
     $assigns,
     pushLog,
     type LogEntry,
+    type PresentationPayload,
   } from "../../scripts/local-live-view/store";
   import {
     applyAssignsWithFlash,
@@ -172,13 +173,7 @@ const tabs: CodeTab[] = [
     pendingAck = true;
   }
 
-  function handlePresentation(payload: unknown) {
-    const { block, event, assigns } = payload as {
-      block: string | null;
-      event: string;
-      assigns: Record<string, unknown>;
-    };
-
+  function handlePresentation({ block, event, assigns }: PresentationPayload) {
     if (!block || event === "mount") {
       $assigns.set(assigns);
       return;
@@ -194,7 +189,7 @@ const tabs: CodeTab[] = [
       Socket,
       bundlePaths: ["/wasm/local_thermostat.avm"],
       eventHandler: (name: string, payload: unknown) => {
-        if (name === "llv_presentation") handlePresentation(payload);
+        if (name === "llv_presentation") handlePresentation(payload as PresentationPayload);
       },
     });
 

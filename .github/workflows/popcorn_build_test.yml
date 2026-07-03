@@ -70,6 +70,8 @@ jobs:
       - name: Install JS dependencies
         working-directory: .
         env:
+          # Required by tree-sitter native bindings which use C++20 features
+          # and fail to compile without this flag on the default GCC version in CI.
           CXXFLAGS: "-std=c++20"
         run: pnpm install
 

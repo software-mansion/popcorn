@@ -1,6 +1,9 @@
 defmodule ThermostatLive do
   use LocalLiveView
 
+  @default_temperature 25
+  @default_country "Poland"
+
   def render(assigns) do
     ~H"""
     <div class="thermostat-wrapper">
@@ -16,7 +19,7 @@ defmodule ThermostatLive do
   end
 
   def mount(_params, _session, socket) do
-    {:ok, socket |> assign(:temperature, 25) |> assign(:country, "Poland")}
+    {:ok, socket |> assign(:temperature, @default_temperature) |> assign(:country, @default_country)}
   end
 
   def handle_event("inc_temperature", _params, socket) do

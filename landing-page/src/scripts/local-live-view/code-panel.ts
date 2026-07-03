@@ -1,6 +1,8 @@
 import type { ShikiTransformer } from "shiki";
 
 import Parser from "tree-sitter";
+
+type HastElement = Parameters<NonNullable<ShikiTransformer["line"]>>[0];
 import Elixir from "tree-sitter-elixir";
 
 const parser = new Parser();
@@ -115,20 +117,16 @@ export function createBlockTransformer(code: string): ShikiTransformer {
 
   return {
     name: "llv-block-annotator",
-    line(node, line) {
+    line(node: HastElement, line: number) {
       const ann = annotations[line - 1];
 
-      if (ann?.block)
-        (node.properties as Record<string, unknown>)["data-block"] = ann.block;
-
-      if (ann?.defpGroup)
-        (node.properties as Record<string, unknown>)["data-defp-group"] = ann.defpGroup;
-
-      if (ann?.defpHeader)
-        (node.properties as Record<string, unknown>)["data-defp-header"] = "true";
+      const props = node.properties;
+      if (ann?.block) props["data-block"] = ann.block;
+      if (ann?.defpGroup) props["data-defp-group"] = ann.defpGroup;
+      if (ann?.defpHeader) props["data-defp-header"] = "true";
 
       node.children = [
-        { type: "element", tagName: "span", children: node.children },
+        { type: "element", tagName: "span", properties: {}, children: node.children },
       ];
     },
   };

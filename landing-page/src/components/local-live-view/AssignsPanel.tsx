@@ -9,7 +9,7 @@ export function AssignsPanel() {
 
   return (
     <PanelLayout title="socket.assigns">
-      <div className="font-mono text-[0.8125rem] leading-[1.9]">
+      <div className="font-mono text-sm leading-loose">
         <span className="text-llv-brown-55">%&#123;</span>
         {entries.map(([k, v], i) => (
           <div key={k} className="block">
