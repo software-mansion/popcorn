@@ -19,6 +19,8 @@ defmodule Mix.Tasks.Llv.InstallTest do
   @app_js_path "assets/js/app.js"
   @config_path "config/config.exs"
   @mix_path "mix.exs"
+  @router_path "lib/test_app_web/router.ex"
+  @hello_live_path "lib/test_app_web/live/hello_local_live.ex"
 
   defp installed do
     [app_name: :test_app]
@@ -112,6 +114,43 @@ defmodule Mix.Tasks.Llv.InstallTest do
     end
   end
 
+  describe "generate_hello_live_view" do
+    test "creates a LiveView that renders the HelloLocal local live view" do
+      installed()
+      |> assert_creates(@hello_live_path, """
+      defmodule TestAppWeb.HelloLocalLive do
+        use TestAppWeb, :live_view
+
+        @impl true
+        def render(assigns) do
+          ~H\"\"\"
+          <.local_live_view view="HelloLocal" />
+          \"\"\"
+        end
+      end
+      """)
+    end
+
+    test "skips when the module already exists" do
+      existing = "defmodule TestAppWeb.HelloLocalLive do\nend\n"
+
+      [app_name: :test_app, files: %{@hello_live_path => existing}]
+      |> phx_test_project()
+      |> Igniter.compose_task("llv.install", [])
+      |> assert_unchanged(@hello_live_path)
+    end
+  end
+
+  describe "inject_hello_route" do
+    test "adds a live route to the browser scope" do
+      installed()
+      |> assert_has_patch(@router_path, """
+        |    get("/", PageController, :home)
+      + |    live "/hello_local", HelloLocalLive
+      """)
+    end
+  end
+
   describe "idempotency" do
     test "re-running the installer does not re-inject anything" do
       installed()
@@ -123,7 +162,9 @@ defmodule Mix.Tasks.Llv.InstallTest do
         @root_layout_path,
         @app_js_path,
         @config_path,
-        @mix_path
+        @mix_path,
+        @router_path,
+        @hello_live_path
       ])
     end
   end

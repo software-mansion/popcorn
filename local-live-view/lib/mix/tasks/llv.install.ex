@@ -24,7 +24,8 @@ defmodule Mix.Tasks.Llv.Install do
     * Configure esbuild to output ESM format
     * Add the LocalLiveView watcher to your endpoint config in `config/dev.exs`
     * Add `mix llv.build` to your setup alias
-    * Generate a `local/` project with a sample HelloLocal component
+    * Generate a `local/` project with a sample HelloLocal local live view
+    * Generate a HelloLocalLive LiveView that renders it and route it at `/hello_local`
 
   `mix setup` will then run `mix llv.build` which copies the LLV JS runtime files
   into your project's `priv/static/assets/js/` and builds the WASM bundle from `local/`.
@@ -41,9 +42,12 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_root_layout()
     |> inject_app_js()
     |> inject_esbuild_format()
+    |> inject_esbuild_alias()
     |> inject_dev_watcher()
     |> inject_setup_alias()
     |> generate_local_project()
+    |> generate_hello_live_view()
+    |> inject_hello_route()
   end
 
   # --- Endpoint ---
@@ -266,6 +270,45 @@ defmodule Mix.Tasks.Llv.Install do
     end
   end
 
+  # --- esbuild alias for path deps ---
+
+  # Phoenix's esbuild resolves the bare `import "local_live_view"` in app.js via
+  # NODE_PATH=deps, but Mix does not materialize path deps under deps/ — for a
+  # path dep, point esbuild directly at the dep's committed JS bundle instead.
+  # The alias resolves the dep path when the config is evaluated (the ~w sigil
+  # interpolates), so the generated config stays machine-independent.
+  @llv_alias_arg ~S|--alias:local_live_view=#{Mix.Project.deps_paths()[:local_live_view]}/priv/static/local_live_view.js|
+
+  defp inject_esbuild_alias(igniter) do
+    if llv_path_dep?() do
+      igniter
+      |> inject_esbuild_alias_in("config/config.exs")
+      |> inject_esbuild_alias_in("config/dev.exs")
+      |> inject_esbuild_alias_in("config/prod.exs")
+    else
+      igniter
+    end
+  end
+
+  defp llv_path_dep? do
+    llv_path = Mix.Project.deps_paths()[:local_live_view]
+    llv_path != nil and Path.expand(llv_path) != Path.expand("deps/local_live_view")
+  end
+
+  defp inject_esbuild_alias_in(igniter, path) do
+    if Igniter.exists?(igniter, path) do
+      replace_in_file(
+        igniter,
+        path,
+        "--alias:local_live_view",
+        "--format=esm",
+        "--format=esm #{@llv_alias_arg}"
+      )
+    else
+      igniter
+    end
+  end
+
   defp replace_in_file(igniter, path, sentinel, find, replacement) do
     Igniter.update_file(igniter, path, fn source ->
       content = Rewrite.Source.get(source, :content)
@@ -353,16 +396,63 @@ defmodule Mix.Tasks.Llv.Install do
     end
   end
 
+  # --- demo LiveView + route ---
+
+  defp generate_hello_live_view(igniter) do
+    live_view = igniter |> Igniter.Libs.Phoenix.web_module() |> Module.concat(HelloLocalLive)
+
+    case Igniter.Project.Module.module_exists(igniter, live_view) do
+      {true, igniter} ->
+        igniter
+
+      {false, igniter} ->
+        web_module = Igniter.Libs.Phoenix.web_module(igniter)
+        contents = render_template("hello_local_live.ex", web_module: inspect(web_module))
+        Igniter.Project.Module.create_module(igniter, live_view, contents)
+    end
+  end
+
+  defp inject_hello_route(igniter) do
+    {igniter, router} = Igniter.Libs.Phoenix.select_router(igniter)
+    route = ~s|live "/hello_local", HelloLocalLive|
+
+    cond do
+      is_nil(router) ->
+        Igniter.add_warning(
+          igniter,
+          "Could not find a Phoenix router. Add the demo route manually: #{route}"
+        )
+
+      router_contains?(igniter, router, "HelloLocalLive") ->
+        igniter
+
+      true ->
+        Igniter.Libs.Phoenix.append_to_scope(igniter, "/", route,
+          router: router,
+          arg2: Igniter.Libs.Phoenix.web_module(igniter),
+          with_pipelines: [:browser],
+          placement: :after
+        )
+    end
+  end
+
+  defp router_contains?(igniter, router, str) do
+    case Igniter.Project.Module.find_module(igniter, router) do
+      {:ok, {_igniter, _source, zipper}} -> module_source_contains?(zipper, str)
+      {:error, _igniter} -> false
+    end
+  end
+
   defp copy_template(igniter, dest, template, bindings \\ []) do
+    Igniter.create_new_file(igniter, dest, render_template(template, bindings))
+  end
+
+  defp render_template(template, bindings) do
     content = File.read!(Path.join(@templates_dir, template))
 
-    content =
-      if bindings == [] do
-        content
-      else
-        EEx.eval_string(content, assigns: bindings)
-      end
-
-    Igniter.create_new_file(igniter, dest, content)
+    case bindings do
+      [] -> content
+      bindings -> EEx.eval_string(content, assigns: bindings)
+    end
   end
 end
