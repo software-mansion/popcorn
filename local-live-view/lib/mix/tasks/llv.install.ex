@@ -74,6 +74,12 @@ defmodule Mix.Tasks.Llv.Install do
              use_zipper,
              """
 
+             @session_options [
+               store: :cookie,
+               key: "_app_key",
+               signing_salt: "salt"
+             ]
+
              plug :put_wasm_security_headers
 
              socket "/llv_socket", LocalLiveView.Socket,

@@ -30,6 +30,13 @@ defmodule Mix.Tasks.Llv.InstallTest do
     test "adds socket, plug and security-headers defp after `use Phoenix.Endpoint`" do
       installed()
       |> assert_has_patch(@endpoint_path, """
+      + |@session_options [
+      + |  store: :cookie,
+      + |  key: "_app_key",
+      + |  signing_salt: "salt"
+      + |]
+      """)
+      |> assert_has_patch(@endpoint_path, """
       + |plug(:put_wasm_security_headers)
       """)
       |> assert_has_patch(@endpoint_path, """
