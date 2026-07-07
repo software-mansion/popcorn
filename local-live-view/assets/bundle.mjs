@@ -10,17 +10,16 @@
 // resolved by Phoenix's esbuild via NODE_PATH (because we ship a package.json
 // at the hex package root pointing to priv/static/local_live_view.js).
 //
-// One-shot build:  pnpm run build   (cd local-live-view/assets; or `mise run build-llv-js`)
+// One-shot build:  pnpm run build   (from local-live-view root; or `mise run build-llv-js`)
 // Watch mode:      pnpm run dev      (or `mise run dev-llv-js`)
 
 import * as esbuild from "esbuild";
-import { copyFile, mkdir } from "fs/promises";
+import { popcorn } from "@swmansion/popcorn/esbuild";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const out = resolve(__dirname, "../priv/static");
-const popcornDist = resolve(__dirname, "node_modules/@swmansion/popcorn/dist");
 
 const watch = process.argv.includes("--watch");
 
@@ -29,17 +28,8 @@ const buildOpts = {
   bundle: true,
   format: "esm",
   outfile: resolve(out, "local_live_view.js"),
+  plugins: [popcorn({ bundlePaths: [] })],
 };
-
-await mkdir(out, { recursive: true });
-
-// Runtime files come from @swmansion/popcorn/dist and rarely change, so copy
-// them once up front rather than on every rebuild.
-await Promise.all([
-  copyFile(resolve(popcornDist, "iframe.mjs"), resolve(out, "iframe.mjs")),
-  copyFile(resolve(popcornDist, "AtomVM.mjs"), resolve(out, "AtomVM.mjs")),
-  copyFile(resolve(popcornDist, "AtomVM.wasm"), resolve(out, "AtomVM.wasm")),
-]);
 
 if (watch) {
   const ctx = await esbuild.context(buildOpts);

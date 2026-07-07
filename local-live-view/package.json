@@ -2,6 +2,21 @@
   "name": "local_live_view",
   "version": "0.1.0",
   "description": "JS bundle for LocalLiveView — bundled at release time, resolved via Phoenix esbuild NODE_PATH.",
-  "main": "priv/static/local_live_view.js",
-  "private": true
+  "type": "module",
+  "exports": {
+    ".": "./priv/static/local_live_view.js"
+  },
+  "main": "./priv/static/local_live_view.js",
+  "private": true,
+  "scripts": {
+    "build": "node assets/bundle.mjs",
+    "dev": "node assets/bundle.mjs --watch"
+  },
+  "files": [
+    "./priv/static/local_live_view.js"
+  ],
+  "devDependencies": {
+    "@swmansion/popcorn": "^0.3.0-rc2",
+    "esbuild": "^0.28.1"
+  }
 }

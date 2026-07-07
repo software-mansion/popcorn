@@ -32,11 +32,11 @@ run = "pnpm -F ./otp/js build"
 description = "Build JS part of OTP/BEAM interop"
 
 [tasks.build-llv-js]
-run = "pnpm -F ./local-live-view/assets build"
+run = "pnpm -F ./local-live-view build"
 description = "Build JS bundle for LocalLiveView"
 
 [tasks.dev-llv-js]
-run = "pnpm -F ./local-live-view/assets dev"
+run = "pnpm -F ./local-live-view dev"
 description = "Watch & rebuild LocalLiveView JS bundle"
 
 [tasks.build-otp-with-crypto]

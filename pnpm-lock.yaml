@@ -440,10 +440,8 @@ importers:
         specifier: ^4.3.0
         version: 4.5.0(rollup@4.60.3)(typescript@5.8.3)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.1)(jiti@2.7.0))
 
-  local-live-view: {}
-
-  local-live-view/assets:
-    dependencies:
+  local-live-view:
+    devDependencies:
       '@swmansion/popcorn':
         specifier: ^0.3.0-rc2
         version: 0.3.0-rc2(esbuild@0.28.1)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0))
