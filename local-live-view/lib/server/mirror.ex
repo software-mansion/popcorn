@@ -28,6 +28,23 @@ defmodule LocalLiveView.Mirror do
   @callback handle_sync(local_assigns :: map(), mirror_assigns :: map(), session :: map()) ::
               {:ok, map()}
 
+  @doc false
+  def find_module(view_string) do
+    mirror =
+      try do
+        String.to_existing_atom("Elixir.Mirror." <> view_string)
+      rescue
+        ArgumentError -> nil
+      end
+
+    if mirror != nil and Code.ensure_loaded?(mirror) and
+         function_exported?(mirror, :handle_sync, 3) do
+      mirror
+    else
+      nil
+    end
+  end
+
   defmacro __using__(_opts) do
     quote do
       @behaviour LocalLiveView.Mirror

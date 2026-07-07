@@ -66,10 +66,5 @@ defmodule LocalLiveView.Component do
   # more than one instance of the same module on a page.
   defp default_id(name), do: "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
 
-  defp mirror_exists?(view_name) do
-    mirror = String.to_existing_atom("Elixir.Mirror." <> view_name)
-    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3)
-  rescue
-    ArgumentError -> false
-  end
+  defp mirror_exists?(view_name), do: LocalLiveView.Mirror.find_module(view_name) != nil
 end
