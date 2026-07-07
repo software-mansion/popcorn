@@ -27,7 +27,7 @@ defmodule Mix.Tasks.Llv.InstallTest do
   end
 
   describe "inject_endpoint" do
-    test "adds socket, plug and security-headers defp after `use Phoenix.Endpoint`" do
+    test "adds socket, plug and security-headers defp to the endpoint" do
       installed()
       |> assert_has_patch(@endpoint_path, """
       + |plug(:put_wasm_security_headers)

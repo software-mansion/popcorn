@@ -67,30 +67,46 @@ defmodule Mix.Tasks.Llv.Install do
     if module_source_contains?(zipper, "llv_socket") do
       {:ok, zipper}
     else
-      case Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2]) do
-        {:ok, use_zipper} ->
-          {:ok,
-           Igniter.Code.Common.add_code(
-             use_zipper,
-             """
-             plug :put_wasm_security_headers
+      with {:ok, use_zipper} <- Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2]),
+           zipper_with_plug <-
+             Igniter.Code.Common.add_code(
+               use_zipper,
+               """
+               plug :put_wasm_security_headers
 
-             socket "/llv_socket", LocalLiveView.Socket,
-               websocket: [connect_info: [session: @session_options]]
-
-             defp put_wasm_security_headers(conn, _opts) do
-               conn
-               |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
-               |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
-             end
-             """,
-             placement: :after
-           )}
-
+               defp put_wasm_security_headers(conn, _opts) do
+                 conn
+                 |> Plug.Conn.put_resp_header("cross-origin-opener-policy", "same-origin")
+                 |> Plug.Conn.put_resp_header("cross-origin-embedder-policy", "require-corp")
+               end
+               """,
+               placement: :after
+             ),
+           {:ok, session_opts_zipper} <- find_attr(zipper_with_plug, :session_options) do
+        {:ok,
+         Igniter.Code.Common.add_code(
+           session_opts_zipper,
+           """
+           socket "/llv_socket", LocalLiveView.Socket,
+             websocket: [connect_info: [session: @session_options]]
+           """,
+           placement: :after
+         )}
+      else
         :error ->
           {:warning,
-           "Could not find use Phoenix.Endpoint in endpoint. Add LLV socket and WASM security headers manually."}
+           "Could not find use Phoenix.Endpoint or @session_options. Add LLV socket and WASM security headers manually."}
       end
+    end
+  end
+
+  defp find_attr(zipper, name) do
+    case Sourceror.Zipper.find(
+           Sourceror.Zipper.topmost(zipper),
+           &match?({:@, _, [{^name, _, _}]}, &1)
+         ) do
+      nil -> :error
+      z -> {:ok, z}
     end
   end
 
