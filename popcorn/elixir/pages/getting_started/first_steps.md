@@ -18,7 +18,7 @@ end
 
 def deps do
   [
-    {:popcorn, "~> 0.3.0-rc3"}
+    {:popcorn, "~> 0.3.1"}
   ]
 end
 ```
