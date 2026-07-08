@@ -34,8 +34,9 @@ defmodule FormDemoLocalAtomVMTest do
         {:ok, socket} = FormDemoLocal.mount(%{}, %{}, %Phoenix.LiveView.Socket{})
         initial_html = render.(socket)
 
-        valid = %{"username" => "alice", "email" => "alice@example.com"}
-        invalid = %{"username" => "al", "email" => "not-an-email"}
+        # Events arrive form-wrapped, exactly as Phoenix delivers phx-change/phx-submit.
+        valid = %{"user" => %{"username" => "alice", "email" => "alice@example.com"}}
+        invalid = %{"user" => %{"username" => "al", "email" => "not-an-email"}}
 
         {:noreply, invalid_socket} = FormDemoLocal.handle_event("validate", invalid, socket)
         {:noreply, valid_socket} = FormDemoLocal.handle_event("validate", valid, socket)
@@ -45,11 +46,14 @@ defmodule FormDemoLocalAtomVMTest do
 
         %{
           initial_html: initial_html,
-          invalid_errors: invalid_socket.assigns.errors,
+          invalid_error_count: length(invalid_socket.assigns.form.source.errors),
           invalid_disabled: invalid_socket.assigns.disabled,
-          valid_errors: valid_socket.assigns.errors,
+          valid_error_count: length(valid_socket.assigns.form.source.errors),
           valid_disabled: valid_socket.assigns.disabled,
-          saved_users: saved_socket.assigns.users,
+          saved_users:
+            Enum.map(saved_socket.assigns.users, fn u ->
+              %{"username" => u.username, "email" => u.email}
+            end),
           saved_html: saved_html
         }
       end
@@ -61,12 +65,12 @@ defmodule FormDemoLocalAtomVMTest do
     assert result.initial_html =~ "[Local Runtime] User List:"
     refute result.initial_html =~ "<li>Username:"
 
-    # validate: a bad form surfaces errors and keeps save disabled.
-    refute result.invalid_errors == []
+    # validate: a bad form surfaces changeset errors and keeps save disabled.
+    assert result.invalid_error_count > 0
     assert result.invalid_disabled
 
     # validate: a good form clears errors and enables save.
-    assert result.valid_errors == []
+    assert result.valid_error_count == 0
     refute result.valid_disabled
 
     # save: the user is appended to the local list and rendered. This is the state
