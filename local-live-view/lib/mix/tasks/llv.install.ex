@@ -108,8 +108,7 @@ defmodule Mix.Tasks.Llv.Install do
          )}
 
       :error ->
-        {:warning,
-         "Could not find @session_options. Add LLV socket configuration manually."}
+        {:warning, "Could not find @session_options. Add LLV socket configuration manually."}
     end
   end
 

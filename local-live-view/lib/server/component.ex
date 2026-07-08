@@ -38,6 +38,15 @@ defmodule LocalLiveView.Component do
       """
     end
 
+    if mirror_exists?(view) && !assigns[:endpoint] do
+      raise ArgumentError, """
+      <.local_live_view> with mirror mechanism requires endpoint="..." parameter.
+      View "#{view}" uses mirror, but no endpoint was provided.
+      Add endpoint to your component call:
+        <.local_live_view view="#{view}" endpoint={@endpoint} />
+      """
+    end
+
     assigns =
       assigns
       |> assign_new(:id, fn -> default_id(view) end)
