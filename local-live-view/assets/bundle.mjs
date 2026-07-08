@@ -28,6 +28,7 @@ const buildOpts = {
   bundle: true,
   format: "esm",
   outfile: resolve(out, "local_live_view.js"),
+  // bundlePaths passed via Popcorn.init() in local_live_view.js, not here
   plugins: [popcorn({ bundlePaths: [] })],
 };
 

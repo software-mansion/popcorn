@@ -272,11 +272,10 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- esbuild alias for path deps ---
 
-  # Phoenix's esbuild resolves the bare `import "local_live_view"` in app.js via
-  # NODE_PATH=deps, but Mix does not materialize path deps under deps/ — for a
-  # path dep, point esbuild directly at the dep's committed JS bundle instead.
-  # The alias resolves the dep path when the config is evaluated (the ~w sigil
-  # interpolates), so the generated config stays machine-independent.
+  # For path deps, Mix does not materialize them in deps/ — instead, directly
+  # use the path from the filesystem. Alias imports to local_live_view with the
+  # actual path to the generated JS code.
+  # See: https://esbuild.github.io/api/#alias
   @llv_alias_arg ~S|--alias:local_live_view=#{Mix.Project.deps_paths()[:local_live_view]}/priv/static/local_live_view.js|
 
   defp inject_esbuild_alias(igniter) do
@@ -292,6 +291,7 @@ defmodule Mix.Tasks.Llv.Install do
 
   defp llv_path_dep? do
     llv_path = Mix.Project.deps_paths()[:local_live_view]
+    # Check if local_live_view is a path dependency (not in the default deps/ location)
     llv_path != nil and Path.expand(llv_path) != Path.expand("deps/local_live_view")
   end
 
@@ -301,8 +301,8 @@ defmodule Mix.Tasks.Llv.Install do
         igniter,
         path,
         "--alias:local_live_view",
-        "--format=esm",
-        "--format=esm #{@llv_alias_arg}"
+        "--alias:@=.",
+        "#{@llv_alias_arg} --alias:@=."
       )
     else
       igniter
