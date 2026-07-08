@@ -521,30 +521,14 @@ var LLVEngine = class _LLVEngine {
       viewsById[llvId] = view;
       const origWithinTargets = view.withinTargets.bind(view);
       view.withinTargets = function(phxTarget, callback, dom) {
-        const toServer = () => {
-          const hostEl = this.el.closest(PHX_VIEW_SELECTOR);
-          if (!hostEl) {
-            console.error("LLV phx-target=@server: no host LiveView for view", llvId);
-            return;
-          }
-          let dispatched = false;
-          liveSocket.owner(hostEl, (hostView) => {
-            dispatched = true;
-            callback(hostView, hostEl);
-          });
-          if (!dispatched) {
-            console.error(
-              "LLV phx-target=@server: host LiveView element has no live view",
-              llvId,
-              hostEl.id
-            );
-          }
-        };
-        const toLocal = () => callback(this, null);
         const dispatchToken = (t) => {
-          if (t === LLV_DEFAULT_TARGET) toLocal();
-          else if (t === LLV_SERVER_TARGET) toServer();
-          else origWithinTargets(t, callback, dom);
+          if (t === LLV_DEFAULT_TARGET) {
+            callback(this, null);
+          } else if (t === LLV_SERVER_TARGET) {
+            withHostLV(liveSocket, llvId, callback);
+          } else {
+            origWithinTargets(t, callback, dom);
+          }
         };
         if (typeof phxTarget === "string" && (phxTarget.includes(LLV_TARGET_SEP) || phxTarget === LLV_DEFAULT_TARGET || phxTarget === LLV_SERVER_TARGET)) {
           for (const t of phxTarget.split(LLV_TARGET_SEP)) if (t) dispatchToken(t);
@@ -773,24 +757,9 @@ var LLVEngine = class _LLVEngine {
       view.update(diff, []);
     };
     window.__llvPushServer = (llvId, event, payload) => {
-      const popEl = document.getElementById(llvId);
-      if (!popEl) {
-        console.error("LLV pushServer: LLV element not found", llvId);
-        return;
-      }
-      const hostEl = popEl.closest(PHX_VIEW_SELECTOR);
-      if (!hostEl) {
-        console.error("LLV pushServer: no host LiveView for", llvId);
-        return;
-      }
-      let dispatched = false;
-      liveSocket.owner(hostEl, (hostView) => {
-        dispatched = true;
+      withHostLV(liveSocket, llvId, (hostView, hostEl) => {
         hostView.pushEvent("event", hostEl, null, event, payload, {});
       });
-      if (!dispatched) {
-        console.error("LLV pushServer: host element has no live view", llvId, hostEl.id);
-      }
     };
     const origOwner = liveSocket.owner.bind(liveSocket);
     liveSocket.owner = function(childEl, callback) {
@@ -834,6 +803,29 @@ var LLVEngine = class _LLVEngine {
     }
   }
 };
+function withHostLV(liveSocket, llvId, fun) {
+  const llvElement = document.getElementById(llvId);
+  if (!llvElement) {
+    console.error("LLV withHostLV: LLV element not found", llvId);
+    return;
+  }
+  const hostEl = llvElement.closest(PHX_VIEW_SELECTOR);
+  if (!hostEl) {
+    console.error("LLV withHostLV: no host LiveView for view", llvId);
+    return;
+  }
+  let dispatched = false;
+  liveSocket.owner(hostEl, (hostView) => {
+    dispatched = true;
+    fun(hostView, hostEl);
+  });
+  if (!dispatched) {
+    console.error(
+      "LLV withHostLV: host LiveView element has no live view",
+      { llvId, hostEl }
+    );
+  }
+}
 async function sendServerMessage(popcorn, detail) {
   const el = document.querySelector(`[data-pop-view="${detail.view}"]`);
   const llvId = el ? el.id : detail.view;

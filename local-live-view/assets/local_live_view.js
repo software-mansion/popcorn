@@ -55,34 +55,14 @@ export class LLVEngine {
       // Handle LLV's custom targets (default, server, targets composed by LocalLiveView.targets/1)
       const origWithinTargets = view.withinTargets.bind(view);
       view.withinTargets = function (phxTarget, callback, dom) {
-        const toServer = () => {
-          const hostEl = this.el.closest(PHX_VIEW_SELECTOR);
-          if (!hostEl) {
-            console.error("LLV phx-target=@server: no host LiveView for view", llvId);
-            return;
-          }
-          // liveSocket.owner only calls back when the element maps to a live view;
-          // surface the miss instead of dropping the event without a trace.
-          let dispatched = false;
-          liveSocket.owner(hostEl, (hostView) => {
-            dispatched = true;
-            callback(hostView, hostEl);
-          });
-          if (!dispatched) {
-            console.error(
-              "LLV phx-target=@server: host LiveView element has no live view",
-              llvId,
-              hostEl.id,
-            );
-          }
-        };
-
-        const toLocal = () => callback(this, null);
-
         const dispatchToken = (t) => {
-          if (t === LLV_DEFAULT_TARGET) toLocal();
-          else if (t === LLV_SERVER_TARGET) toServer();
-          else origWithinTargets(t, callback, dom);
+          if (t === LLV_DEFAULT_TARGET) {
+            callback(this, null);
+          } else if (t === LLV_SERVER_TARGET) {
+            withHostLV(liveSocket, llvId, callback);
+          } else {
+            origWithinTargets(t, callback, dom);
+          }
         };
 
         if (
@@ -438,24 +418,9 @@ export class LLVEngine {
     // [data-phx-session] element) and dispatches the event to it over the
     // websocket.
     window.__llvPushServer = (llvId, event, payload) => {
-      const popEl = document.getElementById(llvId);
-      if (!popEl) {
-        console.error("LLV pushServer: LLV element not found", llvId);
-        return;
-      }
-      const hostEl = popEl.closest(PHX_VIEW_SELECTOR);
-      if (!hostEl) {
-        console.error("LLV pushServer: no host LiveView for", llvId);
-        return;
-      }
-      let dispatched = false;
-      liveSocket.owner(hostEl, (hostView) => {
-        dispatched = true;
+      withHostLV(liveSocket, llvId, (hostView, hostEl) => {
         hostView.pushEvent("event", hostEl, null, event, payload, {});
       });
-      if (!dispatched) {
-        console.error("LLV pushServer: host element has no live view", llvId, hostEl.id);
-      }
     };
 
     // owner: route events from inside [data-pop-view] elements to our fake views.
@@ -514,6 +479,37 @@ export class LLVEngine {
         result,
       );
     }
+  }
+}
+
+// Resolve an LLV's host LiveView fresh on every call (a reconnect can swap the
+// [data-phx-session] element) and hand it to `fun`. We can't use
+// liveSocket.withinOwners(llvElement, fun) here: overriding the owner
+// connects [data-pop-view] elements with the fake local view, so we hop to the host
+// element ourselves first.
+function withHostLV(liveSocket, llvId, fun) {
+  const llvElement = document.getElementById(llvId);
+  if (!llvElement) {
+    console.error("LLV withHostLV: LLV element not found", llvId);
+    return;
+  }
+  const hostEl = llvElement.closest(PHX_VIEW_SELECTOR);
+  if (!hostEl) {
+    console.error("LLV withHostLV: no host LiveView for view", llvId);
+    return;
+  }
+  // liveSocket.owner only calls back when the element maps to a live view;
+  // surface the miss instead of dropping the event without a trace.
+  let dispatched = false;
+  liveSocket.owner(hostEl, (hostView) => {
+    dispatched = true;
+    fun(hostView, hostEl);
+  });
+  if (!dispatched) {
+    console.error(
+      "LLV withHostLV: host LiveView element has no live view",
+      { llvId, hostEl },
+    );
   }
 }
 
