@@ -22,6 +22,7 @@ defmodule LocalLiveView.Component do
 
     * `view` (required) - the LocalLiveView module name, as a string.
     * `id` - stable element id; defaults to a server-generated random id.
+    * `endpoint` - the Phoenix endpoint module used to sign the mirror token.
 
   ## Examples
 
@@ -37,17 +38,29 @@ defmodule LocalLiveView.Component do
       """
     end
 
+    if mirror_exists?(view) && !assigns[:endpoint] do
+      raise ArgumentError, """
+      <.local_live_view> with mirror mechanism requires endpoint="..." parameter.
+      View "#{view}" uses mirror, but no endpoint was provided.
+      Add endpoint to your component call:
+        <.local_live_view view="#{view}" endpoint={@endpoint} />
+      """
+    end
+
     assigns =
       assigns
       |> assign_new(:id, fn -> default_id(view) end)
-      |> assign(:has_mirror, mirror_exists?(view))
+      |> assign_new(:mirror_token, fn ->
+        if mirror_exists?(view),
+          do: LocalLiveView.MirrorToken.sign(assigns.endpoint, view, assigns.id)
+      end)
 
     ~H"""
     <div
       data-pop-view={@view}
       id={@id}
-      data-pop-mirror={@has_mirror || nil}
       phx-hook="LocalLiveView"
+      data-pop-mirror-token={@mirror_token}
       phx-update="ignore"
     >
     </div>
@@ -62,8 +75,5 @@ defmodule LocalLiveView.Component do
   # more than one instance of the same module on a page.
   defp default_id(name), do: "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
 
-  defp mirror_exists?(view_name) do
-    mirror = Module.concat(Mirror, String.to_atom(view_name))
-    Code.ensure_loaded?(mirror) and function_exported?(mirror, :handle_sync, 3)
-  end
+  defp mirror_exists?(view_name), do: LocalLiveView.Mirror.find_module(view_name) != nil
 end
