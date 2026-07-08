@@ -51,6 +51,39 @@ sha256_hash() {
 }
 
 
+app_version_from_file() {
+    local app_file="$1"
+    local version
+
+    version=$(sed -nE 's/.*\{vsn,[[:space:]]*"([^"]+)".*/\1/p' "${app_file}")
+    if [[ -z "${version}" ]]; then
+        error "Missing vsn in ${app_file}"
+    fi
+
+    echo "${version}"
+}
+
+
+app_version() {
+    local beam_dir="$1"
+    local elixir_dir="$2"
+    local app="$3"
+    local ebin
+
+    if is_elixir_app "${app}"; then
+        ebin=$(resolve_elixir_ebin_dir "${elixir_dir}" "${app}") || {
+            error "Missing Elixir app ebin dir for '${app}' in ${elixir_dir}."
+        }
+    else
+        ebin=$(select_otp_app_ebin_dir "${beam_dir}" "${app}") || {
+            error "Missing ebin dir for OTP app '${app}'."
+        }
+    fi
+
+    app_version_from_file "${ebin}/${app}.app"
+}
+
+
 is_elixir_app() {
     local app="$1"
     local elixir_app
@@ -333,11 +366,13 @@ create_elixir_tarballs() {
 write_tarball_manifest() {
     local beam_dir="$1"
     local outdir="$2"
+    local elixir_dir="$3"
     local manifest_path="${outdir}/tarballs.json"
     local otp_version
     local app
     local tarball
     local hash
+    local version
 
     otp_version="$(tr -d ' \n' < "${beam_dir}/OTP_VERSION")"
 
@@ -352,7 +387,8 @@ write_tarball_manifest() {
             fi
 
             hash=$(sha256_hash "${tarball}")
-            printf ',"%s":{"tar":"/lib/%s.tar.gz","sha256":"%s"}' "${app}" "${app}" "${hash}"
+            version=$(app_version "${beam_dir}" "${elixir_dir}" "${app}")
+            printf ',"%s":{"tar":"/lib/%s.tar.gz","version":"%s","sha256":"%s"}' "${app}" "${app}" "${version}" "${hash}"
         done
 
         printf '}\n'
@@ -453,7 +489,7 @@ main() {
     if [[ ${#SELECTED_ELIXIR_APPS[@]} -gt 0 ]]; then
         create_elixir_tarballs "${elixir_dir}" "${outdir}"
     fi
-    write_tarball_manifest "${beam_dir}" "${outdir}"
+    write_tarball_manifest "${beam_dir}" "${outdir}" "${elixir_dir}"
     emit_tarball_paths
 }
 
