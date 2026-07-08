@@ -18,7 +18,6 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       const result = await boot({
         assetsUrl: data.payload.assetsUrl,
         extraArgs: data.payload.extraArgs,
-        searchPaths: data.payload.searchPaths,
         createModule,
         emit: toMain,
       });

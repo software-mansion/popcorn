@@ -41,7 +41,6 @@ const CORE_APPS = ["kernel", "stdlib", "compiler"];
 
 export async function boot({
   assetsUrl,
-  searchPaths,
   extraArgs,
   createModule,
   emit,
@@ -66,7 +65,6 @@ export async function boot({
     onTrackedValueDelete: (key) =>
       emit({ type: "otp:tracked-value-delete", payload: key }),
     arguments: buildArgs({
-      searchPaths: searchPaths ?? [],
       extra: extraArgs ?? [],
     }),
     ENV: {
@@ -108,11 +106,10 @@ function toPopcornError(error: unknown): PopcornError {
 }
 
 type BuildArgsArgs = {
-  searchPaths: string[];
   extra: string[];
 };
 
-function buildArgs({ searchPaths, extra }: BuildArgsArgs): string[] {
+function buildArgs({ extra }: BuildArgsArgs): string[] {
   const args = [...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (true) {
@@ -123,10 +120,7 @@ function buildArgs({ searchPaths, extra }: BuildArgsArgs): string[] {
     args.push("-pa", `/lib/${app}/ebin`);
   }
 
-  for (const path of searchPaths ?? []) {
-    args.push("-pa", path);
-  }
-  for (const arg of extra ?? []) {
+  for (const arg of extra) {
     args.push(arg);
   }
 
