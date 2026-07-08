@@ -16,7 +16,7 @@
     "./priv/static/local_live_view.js"
   ],
   "devDependencies": {
-    "@swmansion/popcorn": "^0.3.0-rc2",
+    "@swmansion/popcorn": "^0.3.1",
     "esbuild": "^0.28.1"
   }
 }
