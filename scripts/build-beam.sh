@@ -15,6 +15,7 @@
 #   --outdir <dir>        Output directory (default: ./out)
 #   --clean               Clean before building (removes otp/sources/otp)
 #   -j <N>                Parallel jobs
+#   -v, --verbose         Show output of underlying build commands
 #   -h, --help            Show this help
 set -euo pipefail
 
@@ -24,6 +25,24 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
 DEFAULT_OTP_TAG="OTP-28.3.1"
 SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
+VERBOSE=false
+
+# Run a command, hiding its output unless --verbose is set. On failure the
+# captured output is replayed so errors are never swallowed.
+run() {
+    if [[ "${VERBOSE}" == "true" ]]; then
+        "$@"
+        return
+    fi
+    local logfile
+    logfile=$(mktemp)
+    if ! "$@" > "${logfile}" 2>&1; then
+        cat "${logfile}" >&2
+        rm -f "${logfile}"
+        return 1
+    fi
+    rm -f "${logfile}"
+}
 
 usage() {
     cat << EOF
@@ -42,6 +61,7 @@ Options:
   --outdir <dir>        Output directory (default: ./out)
   --clean               Clean before building (removes otp/sources/otp)
   -j <N>                Parallel jobs
+  -v, --verbose         Show output of underlying build commands
   -h, --help            Show this help
 
 Source selection (from higher to lower priority):
@@ -79,7 +99,7 @@ clone_otp() {
 
     log "Cloning OTP ${tag}..."
     mkdir -p "${SOURCES_DIR}"
-    git clone --depth 1 --branch "${tag}" \
+    run git clone --depth 1 --branch "${tag}" \
         https://github.com/erlang/otp.git "${original_dir}"
     success "OTP ${tag} cloned."
 }
@@ -113,7 +133,7 @@ setup_otp_source() {
 
 patch_otp() {
     log "Patching OTP sources..."
-    "${PROJECT_ROOT}/scripts/patch-beam.sh"
+    run "${PROJECT_ROOT}/scripts/patch-beam.sh"
 }
 
 
@@ -132,7 +152,7 @@ run_autoconf() {
     fi
 
     log "Regenerating autoconf scripts..."
-    (cd "${beam_dir}" && ./otp_build update_configure)
+    (cd "${beam_dir}" && run ./otp_build update_configure)
 
     echo "${current_hash}" > "${stamp}"
     success "Autoconf done."
@@ -149,8 +169,8 @@ build_bootstrap() {
     fi
 
     log "Building native bootstrap..."
-    (cd "${beam_dir}" && ./configure --enable-bootstrap-only)
-    (cd "${beam_dir}" && make -j"${jobs}")
+    (cd "${beam_dir}" && run ./configure --enable-bootstrap-only)
+    (cd "${beam_dir}" && run make -j"${jobs}")
     success "Bootstrap complete."
 }
 
@@ -186,7 +206,7 @@ compile_preloaded_modules() {
 
         log "Compiling preloaded ${module}.beam with ${erlc}..."
         # +deterministic matches how the committed preloaded beams are produced.
-        "${erlc}" +deterministic -o "${ebin}" "${src}"
+        run "${erlc}" +deterministic -o "${ebin}" "${src}"
     done
     success "Preloaded modules compiled."
 }
@@ -203,8 +223,21 @@ build_openssl() {
         openssl_args+=("-j" "${jobs}")
     fi
 
+    # build-openssl.sh returns the prefix on stdout; its build chatter goes to
+    # stderr, so quiet that (replaying on failure) rather than routing via run.
     local prefix
-    prefix=$("${PROJECT_ROOT}/scripts/build-openssl.sh" "${openssl_args[@]}")
+    if [[ "${VERBOSE}" == "true" ]]; then
+        prefix=$("${PROJECT_ROOT}/scripts/build-openssl.sh" "${openssl_args[@]}")
+    else
+        local logfile
+        logfile=$(mktemp)
+        if ! prefix=$("${PROJECT_ROOT}/scripts/build-openssl.sh" "${openssl_args[@]}" 2>"${logfile}"); then
+            cat "${logfile}" >&2
+            rm -f "${logfile}"
+            return 1
+        fi
+        rm -f "${logfile}"
+    fi
     echo "${prefix}"
 }
 
@@ -324,10 +357,10 @@ run_configure() {
         )
 
         (cd "${beam_dir}" && \
-            erl_xcomp_sysroot="${openssl_prefix}" \
-            erl_xcomp_isysroot="${openssl_prefix}" \
-            LIBS="-L${openssl_prefix}/lib -lcrypto -ldl -lm" \
-            emconfigure ./configure \
+            export erl_xcomp_sysroot="${openssl_prefix}" \
+                erl_xcomp_isysroot="${openssl_prefix}" \
+                LIBS="-L${openssl_prefix}/lib -lcrypto -ldl -lm" && \
+            run emconfigure ./configure \
             "${configure_args[@]}")
     else
         configure_args+=(
@@ -336,7 +369,7 @@ run_configure() {
             --without-ssl
         )
 
-        (cd "${beam_dir}" && emconfigure ./configure \
+        (cd "${beam_dir}" && run emconfigure ./configure \
             "${configure_args[@]}")
     fi
 
@@ -360,10 +393,10 @@ build_beam() {
 
     # erts/lib_src target dir is created on first build only
     if [[ ! -d "${beam_dir}/erts/lib_src/wasm32-unknown-emscripten" ]]; then
-        (cd "${beam_dir}" && ERL_TOP="${beam_dir}" emmake make -C erts/lib_src TARGET=wasm32-unknown-emscripten)
+        (cd "${beam_dir}" && export ERL_TOP="${beam_dir}" && run emmake make -C erts/lib_src TARGET=wasm32-unknown-emscripten)
     fi
 
-    (cd "${beam_dir}" && emmake make TARGET=wasm32-unknown-emscripten -j"${jobs}")
+    (cd "${beam_dir}" && run emmake make TARGET=wasm32-unknown-emscripten -j"${jobs}")
 
     success "BEAM build complete."
 }
@@ -446,6 +479,10 @@ main() {
                 jobs="$2"
                 shift 2
                 ;;
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
             debug|release)
                 mode="$1"
                 shift
@@ -510,7 +547,8 @@ main() {
         stdlib_preset="core-crypto"
     fi
 
-    "${PROJECT_ROOT}/scripts/stdlib.sh" \
+    log "Building stdlib (${stdlib_preset})..."
+    run "${PROJECT_ROOT}/scripts/stdlib.sh" \
         --beam-dir "${beam_dir}" \
         --outdir "${final_outdir}/lib" \
         --preset "${stdlib_preset}"
