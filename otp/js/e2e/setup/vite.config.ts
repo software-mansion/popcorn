@@ -16,6 +16,11 @@ const CORS_HEADERS = {
 };
 
 type Res = ServerResponse<IncomingMessage>;
+type CoreTarballEntry = { tar: string; sha256: string };
+type CoreTarballsJson = { version: string } & Record<
+  string,
+  string | CoreTarballEntry
+>;
 
 function otpAssetsPlugin(): Plugin {
   const serveAsset = async (
@@ -30,6 +35,20 @@ function otpAssetsPlugin(): Plugin {
     }
 
     const relativePath = requestUrl.slice("/otp-assets/".length);
+    if (relativePath === "manifest.json") {
+      try {
+        const content = await readFile(resolve(assetsDir, "lib/tarballs.json"));
+        setHeaders(res);
+        res.setHeader("Content-Type", "application/json");
+        res.end(synthesizeManifest(content.toString("utf8")));
+      } catch {
+        res.statusCode = 404;
+        setHeaders(res);
+        res.end("Not found");
+      }
+      return;
+    }
+
     const filePath = resolve(assetsDir, relativePath);
     const assetRelativePath = relative(assetsDir, filePath);
     if (assetRelativePath.startsWith("..") || isAbsolute(assetRelativePath)) {
@@ -60,6 +79,27 @@ function otpAssetsPlugin(): Plugin {
       server.middlewares.use(serveAsset);
     },
   };
+}
+
+function synthesizeManifest(tarballsJson: string): string {
+  const tarballs = JSON.parse(tarballsJson) as CoreTarballsJson;
+  const apps: Record<string, { tar: string; version: string }> = {};
+
+  for (const [name, entry] of Object.entries(tarballs)) {
+    if (name === "version") continue;
+    const tarball = entry as CoreTarballEntry;
+    apps[name] = {
+      tar: tarball.tar.replace(/^\/lib\//, "lib/"),
+      version: tarballs.version,
+    };
+  }
+
+  return JSON.stringify({
+    entrypoint: null,
+    apps,
+    notes: [],
+    vm: { boot: "bin/vm.boot", version: tarballs.version },
+  });
 }
 
 function setHeaders(res: Res) {

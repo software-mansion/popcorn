@@ -10,7 +10,7 @@ import { check, objectWithKeys } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
-  payload: Pick<BeamBootOptions, "assetsUrl" | "extraArgs">;
+  payload: Pick<BeamBootOptions, "manifestUrl" | "extraArgs">;
 };
 
 type SendEvent = {

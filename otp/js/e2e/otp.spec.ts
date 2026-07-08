@@ -2,19 +2,24 @@ import { assert, expect, test, trimLeft } from "./helpers";
 
 function evalOpts(code: string) {
   return {
-    beam: { assetsUrl: "/otp-assets", extraArgs: ["-eval", code] },
+    beam: {
+      manifestUrl: "/otp-assets/manifest.json",
+      extraArgs: ["-eval", code],
+    },
   };
 }
 
 test("boots", async ({ otp }) => {
-  const result = await otp.boot({ beam: { assetsUrl: "/otp-assets" } });
+  const result = await otp.boot({
+    beam: { manifestUrl: "/otp-assets/manifest.json" },
+  });
 
   expect(result).toEqual({ ok: true, data: null });
 });
 
 test("reports timeouts on init", async ({ otp }) => {
   const result = await otp.boot({
-    beam: { assetsUrl: "/otp-assets" },
+    beam: { manifestUrl: "/otp-assets/manifest.json" },
     timeoutsMs: { boot: 0 },
   });
 
@@ -24,16 +29,16 @@ test("reports timeouts on init", async ({ otp }) => {
   });
 });
 
-test("handles missing boot script", async ({ otp }) => {
+test("handles missing manifest", async ({ otp }) => {
   const result = await otp.boot({
-    beam: { assetsUrl: "/otp-assets/missing" },
+    beam: { manifestUrl: "/otp-assets/missing/manifest.json" },
   });
 
   expect(result).toEqual({
     ok: false,
     error: {
-      t: "beam:missing-boot-script",
-      data: { url: "/otp-assets/missing/bin/vm.boot" },
+      t: "beam:missing-manifest",
+      data: { url: "/otp-assets/missing/manifest.json" },
     },
   });
 });
@@ -42,7 +47,7 @@ test("failures on boot aren't sent to onEvent()", async ({ page }) => {
   const result = await page.evaluate(async () => {
     const errors: unknown[] = [];
     const popcorn = new window.Popcorn({
-      beam: { assetsUrl: "/otp-assets/missing" },
+      beam: { manifestUrl: "/otp-assets/missing/manifest.json" },
       onError: (event) => errors.push(event),
     });
 
@@ -59,15 +64,17 @@ test("failures on boot aren't sent to onEvent()", async ({ page }) => {
   expect(result.boot).toEqual({
     ok: false,
     error: {
-      t: "beam:missing-boot-script",
-      data: { url: "/otp-assets/missing/bin/vm.boot" },
+      t: "beam:missing-manifest",
+      data: { url: "/otp-assets/missing/manifest.json" },
     },
   });
 });
 
 test("can reboot after deinit", async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const popcorn = new window.Popcorn({ beam: { assetsUrl: "/otp-assets" } });
+    const popcorn = new window.Popcorn({
+      beam: { manifestUrl: "/otp-assets/manifest.json" },
+    });
     type BootResult = Awaited<ReturnType<typeof popcorn.boot>>;
 
     const first = await popcorn.boot();
@@ -92,7 +99,7 @@ test("event hooks preserved after a reboot", async ({ page }) => {
     const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
     const opts = {
       beam: {
-        assetsUrl: "/otp-assets",
+        manifestUrl: "/otp-assets/manifest.json",
         extraArgs: ["-eval", READY_BOOT_EVAL],
       },
     };
@@ -142,7 +149,7 @@ test("event hooks preserved after a reboot", async ({ page }) => {
 test("failing boot fails immediately", async ({ page }) => {
   const result = await page.evaluate(async () => {
     const popcorn = new window.Popcorn({
-      beam: { assetsUrl: "/otp-assets" },
+      beam: { manifestUrl: "/otp-assets/manifest.json" },
       workerUrl: "/fault-worker.mjs",
       timeoutsMs: { boot: 30_000 },
     });
@@ -390,7 +397,7 @@ test("send() to unregistered process", async ({ otp }) => {
 
 test("send() timeout", async ({ otp }) => {
   const boot = await otp.boot({
-    beam: { assetsUrl: "/otp-assets" },
+    beam: { manifestUrl: "/otp-assets/manifest.json" },
     timeoutsMs: { send: 0 },
   });
   assert(boot.ok);

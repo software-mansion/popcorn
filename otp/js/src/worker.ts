@@ -16,7 +16,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       check(instance === null);
 
       const result = await boot({
-        assetsUrl: data.payload.assetsUrl,
+        manifestUrl: data.payload.manifestUrl,
         extraArgs: data.payload.extraArgs,
         createModule,
         emit: toMain,
