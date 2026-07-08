@@ -1,7 +1,0 @@
-{
-  "name": "local_lv_burrito",
-  "private": true,
-  "dependencies": {
-    "local_live_view": "workspace:*"
-  }
-}

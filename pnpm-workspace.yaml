@@ -11,16 +11,7 @@ packages:
   - examples/eval-in-wasm/assets
   - examples/iex-wasm/assets
   - examples/game-of-life/assets
-  - examples/local-lv-compare/assets
-  - examples/local-lv-forms/assets
-  - examples/local-lv-thermostat/assets
-  - examples/local-lv-burrito/assets
-  - examples/local-lv-pong/assets
-  - examples/local-lv-kanban/assets
-  - examples/local-lv-kanban/test/playwright
-  - examples/local-lv-checkout/assets
   - local-live-view
-  - local-live-view/assets
   - landing-page
   - language-tour
 

@@ -8,7 +8,8 @@ config :burrito, BurritoWeb.Endpoint,
   secret_key_base: "bUrR1t0S3cr3tK3yB4s3F0rD3vOnly!!PleaseChangeInProd1234567890abcd",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:burrito, ~w(--watch)]},
-    tailwind: {Tailwind, :install_and_run, [:burrito, ~w(--watch)]}
+    tailwind: {Tailwind, :install_and_run, [:burrito, ~w(--watch)]},
+    local_live_view: {LocalLiveView.Watcher, :run, []}
   ]
 
 config :burrito, dev_routes: true

@@ -1,7 +1,0 @@
-{
-  "name": "local_lv_kanban_assets",
-  "private": true,
-  "dependencies": {
-    "local_live_view": "workspace:*"
-  }
-}
