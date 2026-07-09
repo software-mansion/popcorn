@@ -219,6 +219,19 @@ test("handles events in both directions", async ({ otp }) => {
   });
 });
 
+test("loads manifest apps before eval", async ({ otp }) => {
+  const boot = await otp.boot(
+    evalOpts(`
+      {ok, _} = application:ensure_all_started(elixir),
+      ok = wasm:send(#{manifest_app => true}).
+    `),
+  );
+  assert(boot.ok);
+
+  await otp.waitForEvent("manifest_app");
+  expect(otp.events).toContainEqual({ manifest_app: true });
+});
+
 test("run_js -> send", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     V = wasm:run_js(<<"(args) => 1 + 2">>, #{}),
