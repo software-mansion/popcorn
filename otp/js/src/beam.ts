@@ -35,8 +35,7 @@ const BASE_ARGS = [
   DEFAULT_HOME_DIR,
 ];
 
-const CORE_APPS = ["kernel", "stdlib", "compiler"];
-const CORE_APP_SET = new Set<string>(CORE_APPS);
+const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
 
 export async function boot({
   manifestUrl,
@@ -44,6 +43,43 @@ export async function boot({
   createModule,
   emit,
 }: BeamBootOptions): Promise<Result<EmscriptenModule>> {
+  const loadedFsData = await loadFsData(manifestUrl);
+  if (!loadedFsData.ok) {
+    return { ok: false, error: loadedFsData.error };
+  }
+
+  const fsData = loadedFsData.data;
+  const moduleConfig: Partial<EmscriptenModule> = {
+    print: (text) => emit({ type: "otp:stdout", payload: text }),
+    printErr: (text) => emit({ type: "otp:stderr", payload: text }),
+    onExit: (code) =>
+      emit({ type: "otp:error", payload: { kind: "exit", data: code } }),
+    onAbort: (text) =>
+      emit({ type: "otp:error", payload: { kind: "abort", data: text } }),
+    onBeamMessage: (text) => {
+      const event = deserializeBridgeMessage(text);
+      if (event !== null) {
+        emit(event);
+      }
+    },
+    onError: (text) =>
+      emit({ type: "otp:error", payload: { kind: "error", data: text } }),
+    onTrackedValueDelete: (key) =>
+      emit({ type: "otp:tracked-value-delete", payload: key }),
+    arguments: buildArgs({
+      appNames: fsData.appNames,
+      extra: extraArgs ?? [],
+    }),
+    ENV: {
+      BINDIR: "/bin",
+      EMU: "beam",
+      HOME: DEFAULT_HOME_DIR,
+      USER: DEFAULT_USER,
+      LOGNAME: DEFAULT_USER,
+    },
+    preRun: [(mod) => initFs({ module: mod, fsData })],
+  };
+
   try {
     const module = await createModule(moduleConfig);
     return { ok: true, data: module };
