@@ -46,11 +46,6 @@ EOF
 }
 
 
-sha256_hash() {
-    shasum -a 256 "$1" | cut -d' ' -f1
-}
-
-
 app_version_from_file() {
     local app_file="$1"
     local version
@@ -371,14 +366,14 @@ write_tarball_manifest() {
     local otp_version
     local app
     local tarball
-    local hash
     local version
+    local prefix
 
     otp_version="$(tr -d ' \n' < "${beam_dir}/OTP_VERSION")"
 
     {
-        printf '{'
-        printf '"version":"%s"' "${otp_version}"
+        printf '{"entrypoint":null,"apps":{'
+        prefix=""
 
         for app in "${SELECTED_APPS[@]}"; do
             tarball="${outdir}/${app}.tar.gz"
@@ -386,12 +381,12 @@ write_tarball_manifest() {
                 error "Expected tarball not found: ${tarball}"
             fi
 
-            hash=$(sha256_hash "${tarball}")
             version=$(app_version "${beam_dir}" "${elixir_dir}" "${app}")
-            printf ',"%s":{"tar":"/lib/%s.tar.gz","version":"%s","sha256":"%s"}' "${app}" "${app}" "${version}" "${hash}"
+            printf '%s"%s":{"tar":"lib/%s.tar.gz","version":"%s"}' "${prefix}" "${app}" "${app}" "${version}"
+            prefix=","
         done
 
-        printf '}\n'
+        printf '},"notes":[],"vm":{"boot":"bin/vm.boot","version":"%s"}}\n' "${otp_version}"
     } > "${manifest_path}"
 
     log "Wrote tarball manifest: ${manifest_path}"

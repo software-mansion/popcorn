@@ -31,8 +31,6 @@ defmodule Tarballs do
         %{ok: false, error: error}
         |> Jason.encode!()
         |> IO.puts()
-
-        System.halt(1)
     end
   end
 
@@ -103,7 +101,7 @@ defmodule Tarballs do
 
   defp fetch_provided_apps(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"version" => version} = data} <- Jason.decode(json),
+         {:ok, %{"apps" => data, "vm" => %{"version" => version}}} <- Jason.decode(json),
          {:ok, apps} <- normalize_provided_apps(data) do
       {:ok, %{version: version, apps: apps, names: apps |> Map.keys() |> MapSet.new()}}
     else
@@ -113,20 +111,15 @@ defmodule Tarballs do
 
   defp normalize_provided_apps(data) do
     data
-    |> Map.delete("version")
     |> Enum.reduce_while({:ok, %{}}, fn
       {app, %{"tar" => tar, "version" => version} = entry}, {:ok, apps}
       when is_binary(tar) and is_binary(version) ->
-        entry = Map.put(entry, "tar", normalize_tar_path(tar))
         {:cont, {:ok, Map.put(apps, app, entry)}}
 
       _entry, _acc ->
         {:halt, :error}
     end)
   end
-
-  defp normalize_tar_path("/lib/" <> path), do: "lib/" <> path
-  defp normalize_tar_path(tar_path), do: tar_path
 
   defp fetch_apps_to_pack(user_apps, _provided_apps, nil) do
     {:ok, user_apps |> Map.keys() |> Enum.sort()}
