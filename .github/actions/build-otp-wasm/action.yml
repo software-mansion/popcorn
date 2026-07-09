@@ -24,15 +24,36 @@ runs:
       run: |
         set -euo pipefail
 
-        mapfile -t patch_files < <(find otp/patches -type f -print | sort)
+        hash_files() {
+          sort | xargs sha256sum | sha256sum | cut -d' ' -f1
+        }
 
-        if [[ "${#patch_files[@]}" -eq 0 ]]; then
-          patch_hash="no-patches"
-        else
-          patch_hash="$(sha256sum "${patch_files[@]}" | sha256sum | cut -d' ' -f1)"
-        fi
+        {
+          printf 'key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-%s\n' "$(
+            {
+              find otp/patches -type f -print
+              printf '%s\n' \
+                .github/actions/build-otp-wasm/action.yml \
+                .github/actions/setup-toolchain/action.yml \
+                scripts/_common.sh \
+                scripts/build-beam.sh \
+                scripts/build-openssl.sh \
+                scripts/patch-beam.sh \
+                scripts/stdlib.sh
+            } | hash_files
+          )"
 
-        echo "key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-${patch_hash}" >> "$GITHUB_OUTPUT"
+          printf 'openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-%s\n' "$(
+            {
+              printf '%s\n' \
+                .github/actions/build-otp-wasm/action.yml \
+                .github/actions/setup-toolchain/action.yml \
+                scripts/_common.sh \
+                scripts/build-beam.sh \
+                scripts/build-openssl.sh
+            } | hash_files
+          )"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Cache built OTP output
       id: otp-build-cache
@@ -83,7 +104,7 @@ runs:
         path: |
           otp/sources/openssl-3.0.15-${{ inputs.build-mode }}
           otp/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
-        key: openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}
+        key: ${{ steps.otp-build-cache-key.outputs.openssl_key }}
 
     - name: Diagnose environment size
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
