@@ -1,6 +1,8 @@
 defmodule LocalLvCheckoutWeb.Router do
   use LocalLvCheckoutWeb, :router
 
+  import LocalLiveView.Router
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -14,11 +16,21 @@ defmodule LocalLvCheckoutWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :put_plain_layout do
+    plug :put_layout, html: {LocalLvCheckoutWeb.Layouts, :plain}
+  end
+
   scope "/", LocalLvCheckoutWeb do
     pipe_through :browser
 
     live "/", CheckoutLive
-    get "/plain", PageController, :home
+  end
+
+  scope "/", LocalLvCheckoutWeb do
+    pipe_through :browser
+    pipe_through :put_plain_layout
+
+    live_local "/plain", NavTestLive
   end
 
   # Other scopes may use custom stacks.

@@ -122,6 +122,28 @@ defmodule LocalLvCheckoutWeb.Layouts do
   end
 
   @doc """
+  Plain layout with nav header for local routes.
+
+  Used for routes like /plain that need a simple container layout.
+  """
+  def plain(assigns) do
+    ~H"""
+    <div style="min-height: 100vh; background-color: #f3f4f6; padding: 48px 16px;">
+      <div style="max-width: 42rem; margin: 0 auto;">
+        <div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="padding: 16px 24px; border-bottom: 1px solid #e5e7eb;">
+            <p style="font-size: 12px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">
+              Nav Test LLV — no LiveView host
+            </p>
+          </div>
+          {@inner_content}
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Provides dark vs light theme toggle based on themes defined in app.css.
 
   See <head> in root.html.heex which applies the theme before page load.
