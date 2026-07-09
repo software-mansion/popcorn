@@ -65,7 +65,10 @@ for (const filename of ["beam.mjs", "beam.emu.mjs"]) {
     writeFileSync(path, patchedSource);
   }
 }
+
 EOF
+
+  cp "${ASSETS_DIR}/lib/tarballs.json" "${ASSETS_DIR}/manifest.json"
 }
 
 copy_dist_assets() {
@@ -74,6 +77,7 @@ copy_dist_assets() {
   cp "${ASSETS_DIR}/beam.mjs" "${DIST_ASSETS_DIR}/beam.mjs"
   cp "${ASSETS_DIR}/beam.emu.mjs" "${DIST_ASSETS_DIR}/beam.emu.mjs"
   cp "${ASSETS_DIR}/beam.wasm" "${DIST_ASSETS_DIR}/beam.wasm"
+  cp "${ASSETS_DIR}/manifest.json" "${DIST_ASSETS_DIR}/manifest.json"
   cp -R "${ASSETS_DIR}/bin/." "${DIST_ASSETS_DIR}/bin/"
   cp -R "${ASSETS_DIR}/lib/." "${DIST_ASSETS_DIR}/lib/"
 }

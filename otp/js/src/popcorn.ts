@@ -20,7 +20,7 @@ type TrackedEntry = { value: unknown; cleanup?: () => void };
 const TRACKED_REF_KEY = "popcorn_ref";
 
 export type PopcornOpts = {
-  beam: Pick<BeamBootOptions, "assetsUrl" | "searchPaths" | "extraArgs">;
+  beam: Pick<BeamBootOptions, "manifestUrl" | "extraArgs">;
   timeoutsMs?: {
     boot?: number;
     send?: number;

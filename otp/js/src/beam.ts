@@ -22,7 +22,6 @@ const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
-const MANIFEST_PATH = "/lib/tarballs.json";
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
   "--",
@@ -36,18 +35,20 @@ const BASE_ARGS = [
   DEFAULT_HOME_DIR,
 ];
 
-// must be present to load vm
-const CORE_APPS = ["kernel", "stdlib", "compiler"];
+const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
 
 export async function boot({
-  assetsUrl,
-  searchPaths,
+  manifestUrl,
   extraArgs,
   createModule,
   emit,
 }: BeamBootOptions): Promise<Result<EmscriptenModule>> {
-  let initError: PopcornError | null = null;
+  const loadedFsData = await loadFsData(manifestUrl);
+  if (!loadedFsData.ok) {
+    return { ok: false, error: loadedFsData.error };
+  }
 
+  const fsData = loadedFsData.data;
   const moduleConfig: Partial<EmscriptenModule> = {
     print: (text) => emit({ type: "otp:stdout", payload: text }),
     printErr: (text) => emit({ type: "otp:stderr", payload: text }),
@@ -66,7 +67,7 @@ export async function boot({
     onTrackedValueDelete: (key) =>
       emit({ type: "otp:tracked-value-delete", payload: key }),
     arguments: buildArgs({
-      searchPaths: searchPaths ?? [],
+      appNames: fsData.appNames,
       extra: extraArgs ?? [],
     }),
     ENV: {
@@ -76,25 +77,11 @@ export async function boot({
       USER: DEFAULT_USER,
       LOGNAME: DEFAULT_USER,
     },
-    preRun: [
-      (mod) => {
-        void (async () => {
-          mod.addRunDependency("fs");
-          try {
-            await initFs({ module: mod, assetsUrl });
-          } catch (error) {
-            initError = toPopcornError(error);
-          } finally {
-            mod.removeRunDependency("fs");
-          }
-        })();
-      },
-    ],
+    preRun: [(mod) => initFs({ module: mod, fsData })],
   };
 
   try {
     const module = await createModule(moduleConfig);
-    if (initError !== null) return { ok: false, error: initError };
     return { ok: true, data: module };
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
@@ -108,11 +95,11 @@ function toPopcornError(error: unknown): PopcornError {
 }
 
 type BuildArgsArgs = {
-  searchPaths: string[];
+  appNames: string[];
   extra: string[];
 };
 
-function buildArgs({ searchPaths, extra }: BuildArgsArgs): string[] {
+function buildArgs({ appNames, extra }: BuildArgsArgs): string[] {
   const args = [...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (true) {
@@ -123,50 +110,102 @@ function buildArgs({ searchPaths, extra }: BuildArgsArgs): string[] {
     args.push("-pa", `/lib/${app}/ebin`);
   }
 
-  for (const path of searchPaths ?? []) {
-    args.push("-pa", path);
+  for (const app of appNames) {
+    if (CORE_APPS.has(app)) continue;
+    args.push("-pa", `/lib/${app}/ebin`);
   }
-  for (const arg of extra ?? []) {
+
+  for (const arg of extra) {
     args.push(arg);
   }
 
   return args;
 }
 
-type TarballManifest = { version: string } & {
-  [appName: string]: TarballManifestEntry;
+type BeamManifest = {
+  apps: Record<string, BeamManifestApp>;
+  vm: {
+    boot: string;
+  };
 };
 
-type TarballManifestEntry = {
-  tar: `/lib/${string}.tar` | `/lib/${string}.tar.gz`;
-  sha256: string;
+type BeamManifestApp = {
+  tar: string;
+};
+
+type LoadedFsData = {
+  appNames: string[];
+  bootFile: Uint8Array;
+  tarballs: Uint8Array[];
 };
 
 type InitFsArgs = {
   module: EmscriptenModule;
-  assetsUrl: string;
+  fsData: LoadedFsData;
 };
 
-async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
+async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
+  const manifest = await fetchJson<BeamManifest>(manifestUrl);
+  if (manifest === null) {
+    return {
+      ok: false,
+      error: err("beam:missing-manifest", { url: manifestUrl }),
+    };
+  }
+
+  const appNames = Object.keys(manifest.apps);
+  for (const name of CORE_APPS) {
+    if (!Object.hasOwn(manifest.apps, name)) {
+      return {
+        ok: false,
+        error: err("beam:missing-tarball", { name, all: appNames }),
+      };
+    }
+  }
+
+  const bootUrl = resolveManifestPath(manifestUrl, manifest.vm.boot);
+  const bootFile = await fetchBinary(bootUrl);
+  if (bootFile === null) {
+    return {
+      ok: false,
+      error: err("beam:missing-boot-script", { url: bootUrl }),
+    };
+  }
+
+  const loadedTarballs = await Promise.all(
+    appNames.map(async (name): Promise<Result<Uint8Array>> => {
+      const entry = manifest.apps[name];
+      const tarUrl = resolveManifestPath(manifestUrl, entry.tar);
+      const tar = await fetchBinary(tarUrl);
+      if (tar === null) {
+        return {
+          ok: false,
+          error: err("beam:missing-tarball", { name, all: appNames }),
+        };
+      }
+
+      return { ok: true, data: await maybeDecompressTar(tar) };
+    }),
+  );
+
+  const tarballs: Uint8Array[] = [];
+  for (const tarball of loadedTarballs) {
+    if (!tarball.ok) {
+      return { ok: false, error: tarball.error };
+    }
+
+    tarballs.push(tarball.data);
+  }
+
+  return { ok: true, data: { appNames, bootFile, tarballs } };
+}
+
+function initFs({ module, fsData }: InitFsArgs): void {
   for (const dir of FS_DIRS) {
     ensureDir(module.FS, dir);
   }
 
-  // vm.boot
-  const BOOT_URL = `${assetsUrl}${BOOT_PATH}`;
-  const bootFile = await fetchBinary(BOOT_URL);
-  if (bootFile === null) {
-    throw err("beam:missing-boot-script", { url: BOOT_URL });
-  }
-
-  module.FS.writeFile(BOOT_PATH, bootFile);
-
-  // tarballs.json
-  const MANIFEST_URL = `${assetsUrl}${MANIFEST_PATH}`;
-  const manifest = await fetchJson<TarballManifest>(MANIFEST_URL);
-  if (manifest === null) {
-    throw err("beam:missing-manifest", { url: MANIFEST_URL });
-  }
+  module.FS.writeFile(BOOT_PATH, fsData.bootFile);
 
   const createDir = (dirPath: string) => {
     ensureDir(module.FS, dirPath);
@@ -176,29 +215,21 @@ async function initFs({ module, assetsUrl }: InitFsArgs): Promise<void> {
     module.FS.writeFile(path, content);
   };
 
-  const tarballs = await Promise.all(
-    CORE_APPS.map(async (name) => {
-      const entry = manifest[name] ?? null;
-      if (entry === null) {
-        throw err("beam:missing-tarball", { name, all: getTarballs(manifest) });
-      }
-
-      const tar = await fetchBinary(`${assetsUrl}${entry.tar}`);
-      if (tar === null) {
-        throw err("beam:missing-tarball", { name, all: getTarballs(manifest) });
-      }
-
-      return maybeDecompressTar(tar);
-    }),
-  );
-
-  for (const tarball of tarballs) {
+  for (const tarball of fsData.tarballs) {
     extractTar(tarball, createDir, createFile);
   }
 }
 
-function getTarballs(manifest: TarballManifest): string[] {
-  return Object.keys(manifest).filter((name) => name !== "version");
+function resolveManifestPath(manifestUrl: string, path: string): string {
+  if (path.startsWith("/") || isAbsoluteUrl(path)) {
+    return path;
+  }
+
+  return new URL(path, new URL(manifestUrl, self.location.href)).toString();
+}
+
+function isAbsoluteUrl(path: string): boolean {
+  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path);
 }
 
 async function maybeDecompressTar(tar: Uint8Array): Promise<Uint8Array> {
