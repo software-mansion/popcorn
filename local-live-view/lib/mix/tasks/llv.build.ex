@@ -39,6 +39,7 @@ defmodule Mix.Tasks.Llv.Build do
 
     Mix.shell().info("[llv] Copying runtime files to #{dst_dir}/")
     File.mkdir_p!(dst_dir)
+    File.mkdir_p!(Path.join(dst_dir, "wasm"))
 
     for file <- @runtime_files do
       File.cp!(Path.join(src_dir, file), Path.join(dst_dir, file))

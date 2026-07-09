@@ -39,6 +39,7 @@ defmodule Mix.Tasks.Llv.Install do
     igniter
     |> inject_endpoint()
     |> inject_web_module()
+    |> inject_router_import()
     |> inject_root_layout()
     |> inject_app_js()
     |> inject_esbuild_format()
@@ -178,6 +179,56 @@ defmodule Mix.Tasks.Llv.Install do
           |> Sourceror.Zipper.node()
           |> Macro.to_string()
           |> String.ends_with?(suffix)
+        end)
+      end)
+
+    case result do
+      {:ok, z} -> {:ok, z}
+      :error -> nil
+    end
+  end
+
+  # --- Router import ---
+
+  defp inject_router_import(igniter) do
+    router = Igniter.Libs.Phoenix.web_module_name(igniter, "Router")
+
+    case Igniter.Project.Module.find_and_update_module(igniter, router, &update_router/1) do
+      {:ok, igniter} ->
+        igniter
+
+      {:error, igniter} ->
+        Igniter.add_warning(
+          igniter,
+          "Could not find module #{inspect(router)}. Add manually: import LocalLiveView.Router"
+        )
+    end
+  end
+
+  defp update_router(zipper) do
+    if module_source_contains?(zipper, "LocalLiveView.Router") do
+      {:ok, zipper}
+    else
+      anchor =
+        find_import_by_suffix(zipper, "Phoenix.LiveView.Router") ||
+          find_use_router(zipper)
+
+      case anchor do
+        {:ok, anchor_zipper} ->
+          {:ok, Igniter.Code.Common.add_code(anchor_zipper, "import LocalLiveView.Router")}
+
+        nil ->
+          {:warning,
+           "Could not find Phoenix.LiveView.Router import in router. Add manually: import LocalLiveView.Router"}
+      end
+    end
+  end
+
+  defp find_use_router(zipper) do
+    result =
+      Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2], fn call ->
+        Igniter.Code.Function.argument_matches_predicate?(call, 1, fn arg ->
+          arg |> Sourceror.Zipper.node() |> Macro.to_string() == ":router"
         end)
       end)
 

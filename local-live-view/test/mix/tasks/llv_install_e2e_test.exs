@@ -4,8 +4,8 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
 
   Spins up a fresh Phoenix project via `mix phx.new` in a temp dir,
   injects local_live_view as a path dep, runs `mix llv.install` + `mix setup`,
-  starts `mix phx.server`, and uses Playwright to assert that the generated
-  HelloLocalLive route renders "Hello from WASM!" in the browser.
+  adds a `live_local "/hello_local"` route, starts `mix phx.server`, and uses Playwright
+  to assert that the bundled HelloLocal component renders "Hello from WASM!" in the browser.
 
   Slow (~1-2 min) — covers what unit tests can't: real `mix llv.build`,
   real esbuild + popcorn.cook + AtomVM bootstrap, real DOM render.
@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     [browser: browser]
   end
 
-  test "HelloLocal renders on the generated /hello_local route", %{browser: browser} do
+  test "HelloLocal renders inside the Phoenix page via live_local route", %{browser: browser} do
     page = Playwright.Browser.new_page(browser)
     Playwright.Page.goto(page, "#{@url}/hello_local")
 
@@ -80,6 +80,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     add_llv_path_dep(app_dir, llv_path)
     run!("mix", ["deps.get"], cd: app_dir)
     run!("mix", ["llv.install", "--yes"], cd: app_dir)
+    patch_router(app_dir)
     run!("mix", ["setup"], cd: app_dir)
 
     app_dir
@@ -99,6 +100,29 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
       )
 
     File.write!(mix_path, new)
+  end
+
+  # Mix doesn't materialize path deps under deps/, but Phoenix's esbuild resolves
+  # `import "local_live_view"` via NODE_PATH=deps. Symlink it in so the bundle resolves
+  # exactly like a real hex/git install (deps/local_live_view/priv/static/local_live_view.js).
+  defp link_llv_into_deps(app_dir, llv_path) do
+    link = Path.join([app_dir, "deps", "local_live_view"])
+    File.rm_rf!(link)
+    File.ln_s!(llv_path, link)
+  end
+
+  defp patch_router(app_dir) do
+    path = Path.join(app_dir, "lib/test_app_web/router.ex")
+    content = File.read!(path)
+
+    content =
+      String.replace(
+        content,
+        "get \"/\", PageController, :home",
+        "get \"/\", PageController, :home\n\n    live_local \"/hello_local\", \"HelloLocal\""
+      )
+
+    File.write!(path, content)
   end
 
   defp kill_port(port) do
