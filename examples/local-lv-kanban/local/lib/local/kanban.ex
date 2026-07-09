@@ -1,39 +1,134 @@
-defmodule Local.KanbanLive do
+defmodule Local.Kanban do
   use LocalLiveView
 
-  alias Local.ColumnComponent
-  alias Local.OrderedMap
+  alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
 
-  # The board's columns, and each column's tasks, are `OrderedMap`s keyed by id —
-  # so iteration order is the on-screen order and lookups/updates go through the
-  # Access key path (`columns[cid][:tasks][tid]`). Task reordering is a splice
-  # (`OrderedMap.insert_before/4`); columns are only appended or removed.
+  # The board is a plain map `%{id => column}`; each column carries its tasks as
+  # `%{id => task}`. Nothing tracks order explicitly — columns and tasks are
+  # sorted by their `position` on render. Tasks use fractional-index string ranks
+  # (`Rank`) with the task's id baked on (so positions are globally unique);
+  # columns use the server's integer position. THE CLIENT generates task
+  # positions: a drag/add computes the new rank locally and sends the literal
+  # `position` to the host, which just persists it.
+  #
+  # This is the OPTIMISTIC, collaborative client: every edit is applied here
+  # instantly AND sent to the host `BoardLive`, which writes the DB and broadcasts
+  # so all viewers reconcile. add_column/removes ride `phx-target={targets([@default,
+  # @server])}` (the same DOM event runs here and on the server); add_task and
+  # drag-moves carry a client-generated position, so they apply locally and notify
+  # the server via `push_server_event/3`. The server is authoritative: `update/2`
+  # rebuilds the whole board (preserving server ids) whenever a new `rev` arrives,
+  # so a successful edit reconciles seamlessly and a failed one rolls back.
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       columns: seed_columns(),
+       name: nil,
+       columns: %{},
+       last_rev: nil,
        task_modal: nil,
        dragging: nil,
-       drag_target: nil
+       drag_target: nil,
+       add_seq: 0
      )}
   end
 
-  # --- Columns & tasks -------------------------------------------------------
+  @impl true
+  def update(assigns, socket) do
+    socket = assign(socket, :name, assigns[:name])
+
+    # The host bumps `rev` on every authoritative push (incl. failure rollback,
+    # where the board value is unchanged). Rebuild only when it changes.
+    if assigns[:rev] == socket.assigns.last_rev do
+      {:ok, socket}
+    else
+      {:ok,
+       socket
+       |> assign(:last_rev, assigns[:rev])
+       |> assign(:columns, build_board(assigns.board))}
+    end
+  end
+
+  # --- Columns & tasks (optimistic) ------------------------------------------
 
   @impl true
+  def handle_event("add_column", %{"name" => name}, socket) do
+    case String.trim(name) do
+      "" ->
+        {:noreply, socket}
+
+      name ->
+        # The client owns the position: generate the id + an append position
+        # (max + 1) and tell the host to persist them verbatim (reusing the same
+        # id, so optimistic and authoritative columns converge). Bumping add_seq
+        # re-mounts the (uncontrolled) add-column input so it clears — but only
+        # after *this* client adds.
+        id = uuid()
+        position = next_column_position(socket.assigns.columns)
+        column = %{id: id, name: name, position: position, tasks: %{}}
+
+        {:noreply,
+         socket
+         |> assign(:columns, Map.put(socket.assigns.columns, id, column))
+         |> assign(:add_seq, socket.assigns.add_seq + 1)
+         |> push_server_event("add_column", %{
+           "id" => id,
+           "name" => name,
+           "position" => position
+         })}
+    end
+  end
+
+  def handle_event("add_task", %{"column_id" => cid, "text" => text} = params, socket) do
+    case {String.trim(text), socket.assigns.columns[cid]} do
+      {"", _} ->
+        {:noreply, assign(socket, :task_modal, nil)}
+
+      {_text, nil} ->
+        {:noreply, assign(socket, :task_modal, nil)}
+
+      {text, column} ->
+        # The client owns the position: generate the id up front and an append
+        # rank, then tell the host to persist it verbatim (and reuse the same id,
+        # so optimistic and authoritative rows converge).
+        id = uuid()
+        position = Rank.key_before(Map.values(column.tasks), nil, id)
+
+        task = %{
+          id: id,
+          text: text,
+          description: params |> Map.get("description", "") |> String.trim(),
+          position: position
+        }
+
+        socket =
+          socket
+          |> assign(:columns, put_in(socket.assigns.columns, [cid, :tasks, id], task))
+          |> assign(:task_modal, nil)
+          |> push_server_event("add_task", %{
+            "column_id" => cid,
+            "text" => task.text,
+            "description" => task.description,
+            "id" => id,
+            "position" => position
+          })
+
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("remove_column", %{"id" => id}, socket) do
     {_column, columns} = pop_in(socket.assigns.columns, [id])
     {:noreply, assign(socket, :columns, columns)}
   end
 
   def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid}, socket) do
-    columns = update_in(socket.assigns.columns, [cid, :tasks], &OrderedMap.delete(&1, tid))
+    {_task, columns} = pop_in(socket.assigns.columns, [cid, :tasks, tid])
     {:noreply, assign(socket, :columns, columns)}
   end
 
-  # --- Task modal ------------------------------------------------------------
+  # --- Task modal (local-only UI state) --------------------------------------
 
   def handle_event("open_task_modal", %{"column_id" => cid}, socket) do
     case socket.assigns.columns[cid] do
@@ -49,7 +144,7 @@ defmodule Local.KanbanLive do
     {:noreply, assign(socket, :task_modal, nil)}
   end
 
-  # --- Drag & drop -----------------------------------------------------------
+  # --- Drag & drop (local until drop; commit notifies the server) ------------
 
   def handle_event("drag_start", %{"column_id" => cid, "task_id" => tid}, socket) do
     # get_in is nil-safe, so this validates that both the column and task exist.
@@ -90,35 +185,29 @@ defmodule Local.KanbanLive do
   end
 
   def handle_event("drag_end", _params, socket) do
-    socket =
-      case {socket.assigns.dragging, socket.assigns.drag_target} do
-        {%{task_id: tid, source_column_id: src}, %{column_id: dst, before_task_id: before_id}} ->
-          assign(socket, :columns, move_task(socket.assigns.columns, src, tid, dst, before_id))
+    case {socket.assigns.dragging, socket.assigns.drag_target} do
+      {%{task_id: tid, source_column_id: src}, %{column_id: dst, before_task_id: before_id}} ->
+        # Generate the new position locally (a rank between the destination
+        # neighbors, with this task's id baked on) and move the card optimistically.
+        position =
+          socket.assigns.columns[dst].tasks |> Map.values() |> Rank.key_before(before_id, tid)
 
-        _ ->
+        columns = move_task(socket.assigns.columns, src, tid, dst, position)
+
+        socket =
           socket
-      end
+          |> assign(columns: columns, dragging: nil, drag_target: nil)
+          |> push_server_event("move_task", %{
+            "task_id" => tid,
+            "to_column_id" => dst,
+            "position" => position
+          })
 
-    {:noreply, assign(socket, dragging: nil, drag_target: nil)}
-  end
+        {:noreply, socket}
 
-  @impl true
-  def handle_info({:add_column, name}, socket) do
-    id = uuid()
-    column = %{id: id, name: name, tasks: OrderedMap.new()}
-    {:noreply, assign(socket, :columns, put_in(socket.assigns.columns, [id], column))}
-  end
-
-  def handle_info({:add_task, %{"column_id" => cid, "name" => name} = params}, socket) do
-    task = %{
-      id: uuid(),
-      text: String.trim(name),
-      description: params |> Map.get("description", "") |> String.trim()
-    }
-
-    columns = update_in(socket.assigns.columns, [cid, :tasks], &OrderedMap.put(&1, task.id, task))
-
-    {:noreply, assign(socket, columns: columns, task_modal: nil)}
+      _ ->
+        {:noreply, assign(socket, dragging: nil, drag_target: nil)}
+    end
   end
 
   # --- Drag helpers ----------------------------------------------------------
@@ -152,51 +241,45 @@ defmodule Local.KanbanLive do
     end
   end
 
-  defp move_task(columns, src_id, task_id, dst_id, before_id) do
-    task = get_in(columns, [src_id, :tasks, task_id])
+  defp move_task(columns, src_id, task_id, dst_id, position) do
+    task = %{get_in(columns, [src_id, :tasks, task_id]) | position: position}
 
-    columns
-    |> update_in([src_id, :tasks], &OrderedMap.delete(&1, task_id))
-    |> update_in([dst_id, :tasks], &OrderedMap.insert_before(&1, task.id, task, before_id))
+    {_task, columns} = pop_in(columns, [src_id, :tasks, task_id])
+    put_in(columns, [dst_id, :tasks, task_id], task)
   end
 
-  defp successor_id(columns, cid, tid), do: OrderedMap.next_key(columns[cid].tasks, tid)
+  # The id of the task following `tid` in `cid`'s on-screen (position) order, or
+  # nil when it is last/absent.
+  defp successor_id(columns, cid, tid) do
+    ids = columns[cid].tasks |> sorted_tasks() |> Enum.map(& &1.id)
 
-  defp seed_columns do
-    [
-      %{
-        name: "To Do",
-        tasks: [
-          %{text: "Design landing page", description: ""},
-          %{text: "Write project proposal", description: "Outline scope, timeline, budget."},
-          %{text: "Set up CI/CD pipeline", description: ""},
-          %{text: "Measure performance", description: ""}
-        ]
-      },
-      %{
-        name: "In Progress",
-        tasks: [
-          %{text: "Implement auth flow", description: "OAuth + session handling."},
-          %{text: "Refactor database layer", description: ""}
-        ]
-      },
-      %{
-        name: "Review",
-        tasks: [%{text: "Code review for PR #42", description: ""}]
-      },
-      %{
-        name: "Done",
-        tasks: [
-          %{text: "Set up development environment", description: ""},
-          %{text: "Initial repo structure", description: ""}
-        ]
-      }
-    ]
-    |> Enum.map(fn col ->
-      tasks = Enum.map(col.tasks, &Map.put(&1, :id, uuid()))
-      col |> Map.put(:id, uuid()) |> Map.put(:tasks, OrderedMap.new(tasks, & &1.id))
+    case Enum.find_index(ids, &(&1 == tid)) do
+      nil -> nil
+      index -> Enum.at(ids, index + 1)
+    end
+  end
+
+  # --- Positions -------------------------------------------------------------
+
+  defp sorted_tasks(tasks), do: tasks |> Map.values() |> Enum.sort_by(& &1.position)
+
+  # Append after the last column. max + 1 (not count) so it never collides with an
+  # existing position once deletes leave gaps.
+  defp next_column_position(columns) do
+    columns
+    |> Enum.map(fn {_id, %{position: pos}} -> pos + 1 end)
+    |> Enum.max(fn -> 0 end)
+  end
+
+  defp build_board(data) when is_list(data) do
+    Map.new(data, fn entity ->
+      entity = Map.new(entity, fn {k, v} -> {String.to_atom(k), build_board(v)} end)
+      {entity.id, entity}
     end)
-    |> OrderedMap.new(& &1.id)
+  end
+
+  defp build_board(data) do
+    data
   end
 
   defp uuid do
@@ -210,26 +293,34 @@ defmodule Local.KanbanLive do
 
   @impl true
   def render(assigns) do
+    # Removes run both locally (optimistic) and on the host LiveView, so target
+    # both the local view (@default) and the server (@server). add_task/add_column
+    # are client-only (the client pushes its generated position itself).
+    assigns =
+      assigns
+      |> assign(:target, targets([assigns.default, assigns.server]))
+      |> assign(
+        :columns_sorted,
+        assigns.columns |> Map.values() |> Enum.sort_by(&{&1.position, &1.id})
+      )
+
     ~H"""
     <div style={"font-family:sans-serif;color:#e5e7eb;padding:0.5em 0#{if @dragging, do: ";user-select:none"}"}>
-      <h1 style="margin:0 0 0.75em;font-size:1.6em;font-weight:600;color:#f9fafb">Kanban Board</h1>
+      <h1 style="margin:0 0 0.75em;font-size:1.6em;font-weight:600;color:#f9fafb">{@name}</h1>
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
-          :for={col <- OrderedMap.values(@columns)}
+          :for={col <- @columns_sorted}
           col={col}
+          target={@target}
           dragging={@dragging}
           drag_target={@drag_target}
         />
 
-        <.live_component module={Local.AddColumnComponent} id="add-column" />
+        <AddColumnComponent.add_column seq={@add_seq} />
       </div>
 
-      <.live_component
-        module={Local.TaskModalComponent}
-        id="task-modal"
-        params={@task_modal}
-      />
+      <TaskModalComponent.modal params={@task_modal} />
     </div>
     """
   end

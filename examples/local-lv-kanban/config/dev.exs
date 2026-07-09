@@ -16,6 +16,12 @@ config :local_lv_kanban, LocalLvKanban.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
+watchers = [
+  esbuild: {Esbuild, :install_and_run, [:local_lv_kanban, ~w(--sourcemap=inline --watch)]},
+  tailwind: {Tailwind, :install_and_run, [:local_lv_kanban, ~w(--watch)]},
+  local_live_view: {LocalLiveView.Watcher, :run, []}
+]
+
 config :local_lv_kanban, LocalLvKanbanWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
@@ -24,11 +30,7 @@ config :local_lv_kanban, LocalLvKanbanWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "Q9WpxCl33hDacw39CSc/Xh/wftOHkoJpngXiZrsTRP4L6chQPK6PEUnsk7VaG468",
-  watchers: [
-    esbuild: {Esbuild, :install_and_run, [:local_lv_kanban, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:local_lv_kanban, ~w(--watch)]},
-    local_live_view: {LocalLiveView.Watcher, :run, []}
-  ]
+  watchers: watchers
 
 # ## SSL Support
 #

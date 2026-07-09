@@ -17,6 +17,7 @@ packages:
   - examples/local-lv-burrito/assets
   - examples/local-lv-pong/assets
   - examples/local-lv-kanban/assets
+  - examples/local-lv-kanban/test/playwright
   - examples/local-lv-checkout/assets
   - local-live-view
   - local-live-view/assets

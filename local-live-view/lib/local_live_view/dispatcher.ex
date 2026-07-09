@@ -8,10 +8,10 @@ defmodule LocalLiveView.Dispatcher do
   #  Uses GenServer.
 
   use GenServer
-  alias Phoenix.LiveView.Session
   import Popcorn.Wasm
   alias Popcorn.Wasm
   alias LocalLiveView.Message
+  alias Phoenix.LiveView.Session
   @process_name :main
 
   @doc false
@@ -47,6 +47,14 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, state}
   end
 
+  defp handle_wasm(
+         {:wasm_call, %{"action" => "update_assigns", "id" => id, "assigns" => assigns}},
+         state
+       ) do
+    send_to_view(state, id, %Message{event: "update_assigns", payload: assigns})
+    {:resolve, :ok, state}
+  end
+
   defp handle_wasm({:wasm_call, %{"action" => "destroy", "id" => id}}, state) do
     # The host LiveView removed a mount point. Stop its process and forget it.
     case Map.get(state.views, id) do
@@ -59,13 +67,15 @@ defmodule LocalLiveView.Dispatcher do
 
   # This event may be fired multiple times for the same view from JS,
   # in such case we only handle the first event.
-  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id, "view" => view} = msg}, state)
+  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id} = msg}, state)
        when not is_map_key(state.views, id) do
-    url_params = Map.get(msg, "url_params", %{})
-    url = Map.get(msg, "url", "")
-    view = String.to_existing_atom("Elixir." <> view)
+    view = String.to_existing_atom("Elixir." <> Map.fetch!(msg, "view"))
 
-    case start_local_live_view(view, id, url_params, url) do
+    params =
+      Map.take(msg, ~w"id assigns url url_params")
+      |> Map.put("session", %Session{view: view})
+
+    case start_local_live_view(params) do
       {:ok, pid, rendered} ->
         {:resolve, %{status: :ok, rendered: rendered}, put_in(state.views[id], pid)}
 
@@ -104,14 +114,7 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp start_local_live_view(view, id, url_params, url) do
-    params = %{
-      "session" => %Session{view: view},
-      "llv_id" => id,
-      "url_params" => url_params,
-      "url" => url
-    }
-
+  defp start_local_live_view(params) do
     ref = make_ref()
 
     {:ok, pid} = LocalLiveView.Server.start_llv_process()

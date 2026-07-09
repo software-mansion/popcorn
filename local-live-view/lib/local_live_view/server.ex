@@ -31,6 +31,12 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
+  # Sentinels seeded into every view's @default / @server assigns; the
+  # LocalLiveView JS recognizes these exact values (keep in sync with
+  # LLV_DEFAULT_TARGET / LLV_SERVER_TARGET in assets/local_live_view.js).
+  @default_target "__llv_default__"
+  @server_target "__llv_server__"
+
   @doc """
   Starts LocalLiveView.Server process.
   """
@@ -78,7 +84,9 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "llv_reconnected"}, state) do
-    keys = Map.keys(state.socket.assigns)
+    # The seeded @default / @server target sentinels are runtime plumbing, not
+    # view state — keep them out of the mirror resync.
+    keys = Map.keys(state.socket.assigns) -- [:default, :server]
     LocalLiveView.mirror_sync(state.socket, keys)
     {:noreply, state}
   end
@@ -103,6 +111,13 @@ defmodule LocalLiveView.Server do
     {:js_push, event, payload}
     |> view_handle_info(socket)
     |> handle_result({:handle_info, 2, nil}, state)
+  end
+
+  def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
+    # The host LiveView re-rendered with new assigns for this view: run its
+    # update/2 and push the resulting diff.
+    new_socket = call_update!(socket.view, assigns, socket)
+    handle_changed(state, new_socket, nil)
   end
 
   def handle_info({:phoenix, :send_update, update}, state) do
@@ -167,6 +182,32 @@ defmodule LocalLiveView.Server do
 
   defp view_handle_info(msg, %{view: view} = socket) do
     view.handle_info(msg, socket)
+  end
+
+  # Run the view's update/2 for the (JSON, string-keyed) assigns the host passed,
+  # raising on a bad return. Returns the updated %Socket{}.
+  defp call_update!(view, assigns, %Socket{} = socket) do
+    case view.update(normalize_assigns(assigns), socket) do
+      {:ok, %Socket{} = socket} ->
+        socket
+
+      other ->
+        raise ArgumentError, """
+        expected #{inspect(view)}.update/2 to return {:ok, %Socket{}}, got:
+
+        #{inspect(other)}
+        """
+    end
+  end
+
+  # Top-level assign keys cross the JSON boundary as strings; convert them back to
+  # atoms so they read like Phoenix assigns (`@items`). Nested values are left as
+  # is — deeply atomizing arbitrary maps would be unsafe.
+  defp normalize_assigns(assigns) do
+    Map.new(assigns, fn
+      {key, value} when is_atom(key) -> {key, value}
+      {key, value} when is_binary(key) -> {String.to_atom(key), value}
+    end)
   end
 
   defp decode_event_type("form", url_encoded, raw_payload) do
@@ -477,8 +518,11 @@ defmodule LocalLiveView.Server do
       view: view
     } = verified
 
-    connect_params = params["params"]
-    llv_id = params["llv_id"]
+    # Assigns passed via the `<.local_live_view assigns... />` component reach us
+    # here as a string-keyed map. They become the first argument to the view's
+    # mount/3 callback and are then fed through its update/2.
+    initial_assigns = params["assigns"] || %{}
+    llv_id = params["id"]
 
     socket = %Socket{
       view: view
@@ -486,7 +530,7 @@ defmodule LocalLiveView.Server do
 
     lifecycle = load_lifecycle(config, nil)
 
-    case mount_private(verified, connect_params, nil, lifecycle) do
+    case mount_private(verified, params, nil, lifecycle) do
       {:ok, mount_priv} ->
         socket = %{
           socket
@@ -497,8 +541,17 @@ defmodule LocalLiveView.Server do
         }
 
         try do
-          %Socket{socket | view: view}
-          |> Utils.maybe_call_live_view_mount!(view, params, verified)
+          # Seed the @default / @server target sentinels, run mount/3 (params are
+          # the host-passed assigns), then feed those assigns through update/2,
+          # LiveComponent-style.
+          mounted_socket =
+            %Socket{socket | view: view}
+            |> Phoenix.Component.assign(:default, @default_target)
+            |> Phoenix.Component.assign(:server, @server_target)
+            |> Utils.maybe_call_live_view_mount!(view, params, verified)
+            |> then(&call_update!(view, initial_assigns, &1))
+
+          mounted_socket
           |> build_state(phx_socket, llv_id)
           |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)

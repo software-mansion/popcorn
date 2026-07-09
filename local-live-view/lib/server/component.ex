@@ -1,6 +1,6 @@
 defmodule LocalLiveView.Component do
   @moduledoc """
-  Phoenix component for mounting a LocalLiveView.
+  Phoenix component for mounting a `LocalLiveView`.
 
   Import this module in your application's CoreComponents:
 
@@ -12,11 +12,18 @@ defmodule LocalLiveView.Component do
   Then use it in your templates:
 
       <.local_live_view view="MyLive" />
+      <.local_live_view view="Cart" items={@items} />
   """
   use Phoenix.Component
 
   @doc ~S'''
   Renders a `LocalLiveView` mount point.
+
+  Like `Phoenix.Component.live_component/1`, any attribute other than `view` is
+  forwarded to the view as the assigns of its `c:LocalLiveView.update/2`
+  callback. `id` is forwarded too, and additionally used as the mount point's DOM
+  id. Assigns are serialized as JSON and arrive with atom keys at the top level
+  (nested maps keep string keys, as they cross the JSON boundary).
 
   ## Attributes
 
@@ -27,6 +34,12 @@ defmodule LocalLiveView.Component do
   ## Examples
 
       <.local_live_view view="MyLocal" />
+
+      <.local_live_view view="Cart" items={@items} currency="EUR" />
+
+  The second example mounts the view, calling its `update/2` with:
+
+      %{id: _, items: items, currency: "EUR"}
   '''
   def local_live_view(assigns) do
     view = assigns[:view]
@@ -47,13 +60,19 @@ defmodule LocalLiveView.Component do
       """
     end
 
-    assigns =
-      assigns
-      |> assign_new(:id, fn -> default_id(view) end)
-      |> assign_new(:mirror_token, fn ->
-        if mirror_exists?(view),
-          do: LocalLiveView.MirrorToken.sign(assigns.endpoint, view, assigns.id)
-      end)
+    if Map.has_key?(assigns, :inner_block) do
+      raise ArgumentError, "<.local_live_view> does not accept inner content"
+    end
+
+    assigns = assign_new(assigns, :id, fn -> default_id(view) end)
+
+    comp_assigns = Map.drop(assigns, [:__changed__, :view])
+
+    mirror_token =
+      if mirror_exists?(view),
+        do: LocalLiveView.MirrorToken.sign(assigns.endpoint, view, assigns.id)
+
+    assigns = assign(assigns, mirror_token: mirror_token, comp_assigns: comp_assigns)
 
     ~H"""
     <div
@@ -61,11 +80,15 @@ defmodule LocalLiveView.Component do
       id={@id}
       phx-hook="LocalLiveView"
       data-pop-mirror-token={@mirror_token}
+      data-pop-assigns={encode_assigns(@comp_assigns)}
       phx-update="ignore"
     >
     </div>
     """
   end
+
+  defp encode_assigns(assigns) when assigns == %{}, do: nil
+  defp encode_assigns(assigns), do: Jason.encode!(assigns)
 
   # The mount point lives under `phx-update="ignore"`, so its id MUST be stable
   # across the host LiveView's dead and connected renders — otherwise morphdom
