@@ -491,7 +491,7 @@ async function resolveBundleURL(primary, fallback) {
   }
 }
 
-// local_live_view.js
+// assets/local_live_view.js
 var LLV_DEFAULT_TARGET = "__llv_default__";
 var LLV_SERVER_TARGET = "__llv_server__";
 var LLV_TARGET_SEP = "";
