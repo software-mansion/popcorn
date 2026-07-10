@@ -18,7 +18,9 @@ defmodule Local.Kanban do
   # drag-moves carry a client-generated position, so they apply locally and notify
   # the server via `push_server_event/3`. The server is authoritative: `update/2`
   # rebuilds the whole board (preserving server ids) whenever a new `rev` arrives,
-  # so a successful edit reconciles seamlessly and a failed one rolls back.
+  # so a successful edit reconciles seamlessly and a failed one rolls back. When a
+  # push never reaches the host at all (disconnected socket), `handle_push_error/4`
+  # rolls the board back to the last authoritative state.
 
   @impl true
   def mount(_params, _session, socket) do
@@ -48,6 +50,20 @@ defmodule Local.Kanban do
        |> assign(:last_rev, assigns[:rev])
        |> assign(:columns, build_board(assigns.board))}
     end
+  end
+
+  @impl true
+  def handle_push_error(_event, _params, server_assigns, socket) do
+    # The default (feeding server_assigns through update/2) would no-op here:
+    # the rolled-back rev already equals last_rev, so the guard skips the
+    # rebuild. Force it, and drop any in-flight drag state that referenced the
+    # rolled-back board.
+    {:noreply,
+     assign(socket,
+       columns: build_board(server_assigns.board),
+       dragging: nil,
+       drag_target: nil
+     )}
   end
 
   # --- Columns & tasks (optimistic) ------------------------------------------

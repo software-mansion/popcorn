@@ -48,6 +48,14 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
+         {:wasm_call, %{"action" => "push_error", "id" => id, "payload" => payload}},
+         state
+       ) do
+    send_to_view(state, id, %Message{event: "push_error", payload: payload})
+    {:resolve, :ok, state}
+  end
+
+  defp handle_wasm(
          {:wasm_call, %{"action" => "update_assigns", "id" => id, "assigns" => assigns}},
          state
        ) do

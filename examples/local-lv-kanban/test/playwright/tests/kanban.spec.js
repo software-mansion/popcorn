@@ -172,3 +172,19 @@ test.describe("optimistic rollback", () => {
     await expect(h.columns(page)).toHaveCount(3);
   });
 });
+
+test.describe("push failure (handle_push_error)", () => {
+  test("an optimistic add snaps back when the socket is down", async ({ page }) => {
+    await h.createBoard(page, uniqueName("PushErr"));
+    await expect(h.columns(page)).toHaveCount(3);
+
+    // Kill the host websocket: push_server_event rejects with "no connection".
+    await page.evaluate(() => window.liveSocket.disconnect());
+
+    // add_column applies optimistically in WASM, then the failed push triggers
+    // handle_push_error, restoring the last authoritative board.
+    await h.submitColumn(page, "Ghost");
+    await expect(h.columnByName(page, "Ghost")).toHaveCount(0, { timeout: 15_000 });
+    await expect(h.columns(page)).toHaveCount(3);
+  });
+});

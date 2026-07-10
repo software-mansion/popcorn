@@ -115,9 +115,22 @@ defmodule LocalLiveView.Server do
 
   def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
     # The host LiveView re-rendered with new assigns for this view: run its
-    # update/2 and push the resulting diff.
+    # update/2 and push the resulting diff. data-pop-assigns carries the full
+    # set of host-forwarded assigns each render, so it replaces server_assigns.
+    assigns = normalize_assigns(assigns)
     new_socket = call_update!(socket.view, assigns, socket)
-    handle_changed(state, new_socket, nil)
+    handle_changed(%{state | server_assigns: assigns}, new_socket, nil)
+  end
+
+  def handle_info(
+        %Message{event: "push_error", payload: %{"event" => event, "payload" => params}},
+        %{socket: socket} = state
+      ) do
+    # A push_server_event failed to reach the host: hand the view the last
+    # assigns received from it, so it can roll back to authoritative state.
+    event
+    |> socket.view.handle_push_error(params, state.server_assigns, socket)
+    |> handle_result({:handle_push_error, 4, nil}, state)
   end
 
   def handle_info({:phoenix, :send_update, update}, state) do
@@ -184,10 +197,10 @@ defmodule LocalLiveView.Server do
     view.handle_info(msg, socket)
   end
 
-  # Run the view's update/2 for the (JSON, string-keyed) assigns the host passed,
-  # raising on a bad return. Returns the updated %Socket{}.
+  # Run the view's update/2 for the host-passed assigns (already normalized by
+  # the caller), raising on a bad return. Returns the updated %Socket{}.
   defp call_update!(view, assigns, %Socket{} = socket) do
-    case view.update(normalize_assigns(assigns), socket) do
+    case view.update(assigns, socket) do
       {:ok, %Socket{} = socket} ->
         socket
 
@@ -521,7 +534,7 @@ defmodule LocalLiveView.Server do
     # Assigns passed via the `<.local_live_view assigns... />` component reach us
     # here as a string-keyed map. They become the first argument to the view's
     # mount/3 callback and are then fed through its update/2.
-    initial_assigns = params["assigns"] || %{}
+    initial_assigns = normalize_assigns(params["assigns"] || %{})
     llv_id = params["id"]
 
     socket = %Socket{
@@ -552,7 +565,7 @@ defmodule LocalLiveView.Server do
             |> then(&call_update!(view, initial_assigns, &1))
 
           mounted_socket
-          |> build_state(phx_socket, llv_id)
+          |> build_state(phx_socket, llv_id, initial_assigns)
           |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)
         rescue
@@ -621,7 +634,7 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket, llv_id) do
+  defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket, llv_id, server_assigns) do
     %{
       join_ref: phx_socket.join_ref,
       serializer: phx_socket.serializer,
@@ -632,7 +645,11 @@ defmodule LocalLiveView.Server do
       redirect_count: 0,
       upload_names: %{},
       upload_pids: %{},
-      llv_id: llv_id
+      llv_id: llv_id,
+      # Last (normalized) assigns received from the host, for handle_push_error.
+      # Updated only on mount and "update_assigns"; if the mirror channel's
+      # "set_assigns" push ever gets a JS consumer, it must update this too.
+      server_assigns: server_assigns
     }
   end
 

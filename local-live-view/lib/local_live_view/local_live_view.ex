@@ -94,6 +94,19 @@ defmodule LocalLiveView do
   updates the LocalLiveView's assigns: the local update is optimistic,
   then the server update can possibly override it.
 
+  ## Handling failed server pushes
+
+  A `push_server_event/3` can fail: the page may have no host LiveView,
+  the websocket may be disconnected, or the host may reply with an error
+  or time out. When that happens, the view's `c:handle_push_error/4`
+  callback is invoked with the event, its params and `server_assigns` —
+  the last value of each assign received from the host server. The
+  default implementation feeds `server_assigns` through `c:update/2`,
+  rolling optimistic local edits back to the latest authoritative state.
+
+  Note this covers only `push_server_event/3`; events dispatched via
+  `phx-target={@server}` are not tracked.
+
   Another way of communicating the server is by using `mirror_sync/2`.
   '''
 
@@ -159,6 +172,9 @@ defmodule LocalLiveView do
   `handle_event/3` or `handle_info/2` (so the payload can be computed — e.g. a
   drag result), it delivers `event`/`payload` to the host LiveView's
   `handle_event(event, payload, socket)` over the regular Phoenix websocket.
+
+  If the push fails (no host LiveView, disconnected socket, error reply or
+  timeout), the view's `c:handle_push_error/4` callback is invoked.
   """
   def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
     Popcorn.Wasm.run_js(
@@ -209,7 +225,13 @@ defmodule LocalLiveView do
         {:noreply, socket}
       end
 
-      defoverridable handle_server_event: 3, update: 2, handle_info: 2
+      @impl true
+      def handle_push_error(_event, _params, server_assigns, socket) do
+        {:ok, socket} = update(server_assigns, socket)
+        {:noreply, socket}
+      end
+
+      defoverridable handle_server_event: 3, update: 2, handle_info: 2, handle_push_error: 4
     end
   end
 
@@ -299,5 +321,34 @@ defmodule LocalLiveView do
 
   @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
 
-  @optional_callbacks mount: 3, update: 2, handle_event: 3, handle_info: 2, handle_params: 3
+  @doc """
+  Invoked when a `push_server_event/3` fails: there is no host LiveView on the
+  page, the websocket is disconnected, or the host replies with an error or
+  times out. Events dispatched via `phx-target={@server}` are not covered.
+
+  `event` and `params` are the event name and payload the failed push carried
+  (`params` has string keys, after a JSON round-trip, like `c:handle_event/3`
+  params). `server_assigns` holds the last value of each assign received from
+  the host server (through mount and `c:update/2`) — assigns only ever set
+  locally are absent.
+
+  The default implementation feeds `server_assigns` through `c:update/2`, as if
+  the host had re-sent them — restoring the latest authoritative state through
+  the view's usual derivation path. A view whose `c:update/2` skips unchanged
+  data (e.g. guarded by a revision counter) should override this callback and
+  force its rollback explicitly.
+  """
+  @callback handle_push_error(
+              event :: binary,
+              params :: unsigned_params(),
+              server_assigns :: map(),
+              socket :: Socket.t()
+            ) :: {:noreply, Socket.t()}
+
+  @optional_callbacks mount: 3,
+                      update: 2,
+                      handle_event: 3,
+                      handle_info: 2,
+                      handle_params: 3,
+                      handle_push_error: 4
 end
