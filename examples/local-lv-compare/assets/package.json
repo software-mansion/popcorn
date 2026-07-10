@@ -1,7 +1,0 @@
-{
-  "name": "compare_live_views_assets",
-  "private": true,
-  "dependencies": {
-    "local_live_view": "workspace:*"
-  }
-}

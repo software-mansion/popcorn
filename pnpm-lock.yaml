@@ -156,53 +156,11 @@ importers:
         specifier: ^0.25.0
         version: 0.25.12
 
-  examples/local-lv-burrito/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
-  examples/local-lv-checkout/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
-  examples/local-lv-compare/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
-  examples/local-lv-forms/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
-  examples/local-lv-kanban/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
   examples/local-lv-kanban/test/playwright:
     devDependencies:
       '@playwright/test':
         specifier: 1.59.1
         version: 1.59.1
-
-  examples/local-lv-pong/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
-
-  examples/local-lv-thermostat/assets:
-    dependencies:
-      local_live_view:
-        specifier: workspace:*
-        version: link:../../../local-live-view
 
   landing-page:
     dependencies:
@@ -440,13 +398,11 @@ importers:
         specifier: ^4.3.0
         version: 4.5.0(rollup@4.60.3)(typescript@5.8.3)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.1)(jiti@2.7.0))
 
-  local-live-view: {}
-
-  local-live-view/assets:
-    dependencies:
+  local-live-view:
+    devDependencies:
       '@swmansion/popcorn':
-        specifier: ^0.3.0-rc2
-        version: 0.3.0-rc2(esbuild@0.28.1)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0))
+        specifier: ^0.3.1
+        version: 0.3.1(esbuild@0.28.1)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0))
       esbuild:
         specifier: ^0.28.1
         version: 0.28.1
@@ -2089,8 +2045,8 @@ packages:
     peerDependencies:
       '@svgr/core': '*'
 
-  '@swmansion/popcorn@0.3.0-rc2':
-    resolution: {integrity: sha512-purhxSfYFcIKF1U1hpeBACAykMdYmk6JLW5olxfFBsxea94qY3HV2Rz/2QbtvMlPIpk8+psUHrQYboTxKkIsJw==}
+  '@swmansion/popcorn@0.3.1':
+    resolution: {integrity: sha512-N+Qi09DKpt+FczWIh4geU+zeja9xgm8+MvuV8qrg7UPVkvStgjTjUeRYQqcaEuFrHmCfhWC2rYLnfvZIXd8Lkw==}
     peerDependencies:
       esbuild: '>=0.17.0'
       rollup: '>=4.59.0'
@@ -6098,7 +6054,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@swmansion/popcorn@0.3.0-rc2(esbuild@0.28.1)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0))':
+  '@swmansion/popcorn@0.3.1(esbuild@0.28.1)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0))':
     optionalDependencies:
       esbuild: 0.28.1
       rollup: 4.60.3
