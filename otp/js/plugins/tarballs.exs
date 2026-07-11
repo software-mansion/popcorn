@@ -1,13 +1,7 @@
-redirect_to_stderr = fn f ->
-  stdout = Process.group_leader()
-  Process.group_leader(self(), Process.whereis(:standard_error))
-  f.()
-  Process.group_leader(self(), stdout)
+if String.to_integer(System.otp_release()) < 27 do
+  IO.puts(:stderr, "tarballs.exs requires host OTP >= 27 for the built-in :json module")
+  System.halt(1)
 end
-
-redirect_to_stderr.(fn ->
-  Mix.install([{:jason, "~> 1.4"}])
-end)
 
 defmodule Tarballs do
   @options [
@@ -24,12 +18,12 @@ defmodule Tarballs do
     case run(argv) do
       {:ok, report} ->
         report
-        |> Jason.encode!()
+        |> encode_json()
         |> IO.puts()
 
       {:error, error} ->
         %{ok: false, error: error}
-        |> Jason.encode!()
+        |> encode_json()
         |> IO.puts()
     end
   end
@@ -73,7 +67,7 @@ defmodule Tarballs do
         vm: %{boot: "bin/vm.boot", version: vm_version}
       }
 
-      File.write!(manifest_path, Jason.encode!(manifest))
+      File.write!(manifest_path, encode_json(manifest))
 
       {:ok,
        %{
@@ -101,7 +95,7 @@ defmodule Tarballs do
 
   defp fetch_provided_apps(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"apps" => data, "vm" => %{"version" => version}}} <- Jason.decode(json),
+         {:ok, %{"apps" => data, "vm" => %{"version" => version}}} <- decode_json(json),
          {:ok, apps} <- normalize_provided_apps(data) do
       {:ok, %{version: version, apps: apps, names: apps |> Map.keys() |> MapSet.new()}}
     else
@@ -261,6 +255,16 @@ defmodule Tarballs do
 
   defp err(:missing_dep, {app, dep}) do
     {:error, %{code: "missing_dep", app: app, dep: dep}}
+  end
+
+  defp encode_json(term) do
+    term |> :json.encode() |> IO.iodata_to_binary()
+  end
+
+  defp decode_json(json) do
+    {:ok, :json.decode(json)}
+  rescue
+    _ -> :error
   end
 end
 
