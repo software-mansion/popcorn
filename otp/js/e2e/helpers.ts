@@ -46,6 +46,77 @@ export type Result<T> =
 
 export { assert, expect };
 
+type PopcornHooksGlobal = typeof globalThis & {
+  popcorn: {
+    cleanups: number;
+    cleanup: () => void;
+    runJs: {
+      isPaused: () => boolean;
+      pause: () => Promise<void>;
+      finish: () => void;
+    };
+  };
+};
+
+async function addPopcornHooks(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    let paused = false;
+    let finishRunJs!: () => void;
+    const resume = new Promise<void>((resolve) => {
+      finishRunJs = resolve;
+    });
+    const scope = globalThis as PopcornHooksGlobal;
+    scope.popcorn = {
+      cleanups: 0,
+      cleanup() {
+        this.cleanups += 1;
+      },
+      runJs: {
+        isPaused: () => paused,
+        pause: async () => {
+          paused = true;
+          await resume;
+          paused = false;
+        },
+        finish: finishRunJs,
+      },
+    };
+  });
+}
+
+export async function getCleanups(page: Page): Promise<number> {
+  return await page.evaluate(() => {
+    return (globalThis as PopcornHooksGlobal).popcorn.cleanups;
+  });
+}
+
+export async function waitForRunJsSuspension(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    return (globalThis as PopcornHooksGlobal).popcorn.runJs.isPaused();
+  });
+}
+
+export async function finishRunJs(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (globalThis as PopcornHooksGlobal).popcorn.runJs.finish();
+  });
+}
+
+export function valuesWithKey<K extends PropertyKey>(
+  values: Iterable<unknown>,
+  key: K,
+): unknown[] {
+  return Array.from(values)
+    .filter((value): value is Record<K, unknown> => {
+      return (
+        typeof value === "object" &&
+        value !== null &&
+        Object.hasOwn(value, key)
+      );
+    })
+    .map((value) => value[key]);
+}
+
 export const test = base.extend<Fixtures>({
   page: async ({ page }, use) => {
     await page.goto("/");
@@ -53,6 +124,7 @@ export const test = base.extend<Fixtures>({
     await use(page);
   },
   createOtp: async ({ page }, use) => {
+    await addPopcornHooks(page);
     const handles = new Set<OtpHandle>();
     const createOtp = async (id = randomOtpId()) => {
       const otp = await OtpHandle.create(page, id);

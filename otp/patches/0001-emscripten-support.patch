@@ -1029,10 +1029,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..9b79d3cfd08e70efc765a74ef07de90836f6854d
+index 0000000000000000000000000000000000000000..0e99092004c681b76ab1fe42831cf74197c06ee3
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,99 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1059,7 +1059,7 @@ index 0000000000000000000000000000000000000000..9b79d3cfd08e70efc765a74ef07de908
 +
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
-+-export([on_load/0, send/1, run_js/2, run_js/3]).
++-export([on_load/0, send/1, run_js/2, run_js/3, keep_alive/1]).
 +
 +-nifs([send_raw/1, materialize_ref/1, ref_key/1]).
 +
@@ -1068,7 +1068,9 @@ index 0000000000000000000000000000000000000000..9b79d3cfd08e70efc765a74ef07de908
 +-spec send(json:encode_value()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))).
++    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
++    ?MODULE:keep_alive(Envelope),
++    ok.
 +
 +-spec run_js(binary(), map()) -> json:decode_value().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
@@ -1081,12 +1083,20 @@ index 0000000000000000000000000000000000000000..9b79d3cfd08e70efc765a74ef07de908
 +    ReplyTo = base64:encode(term_to_binary({self(), Token})),
 +    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
-+    receive
-+        {wasm, {Token, PayloadJson}, _MetaJson} ->
-+            handle_run_js_reply(PayloadJson)
-+    after Timeout ->
-+        error(run_js_timeout)
++    Reply = receive
++                {wasm, {Token, PayloadJson}, _MetaJson} -> PayloadJson
++            after Timeout ->
++                timeout
++            end,
++    ?MODULE:keep_alive(Envelope),
++    case Reply of
++        timeout -> error(run_js_timeout);
++        ReplyJson -> handle_run_js_reply(ReplyJson)
 +    end.
++
++-spec keep_alive(Term) -> Term when Term :: term().
++keep_alive(Term) ->
++    Term.
 +
 +handle_run_js_reply(PayloadJson) ->
 +    case json:decode(PayloadJson) of
