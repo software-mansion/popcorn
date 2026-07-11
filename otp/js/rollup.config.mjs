@@ -38,6 +38,8 @@ export default [
   },
   {
     input: {
+      vite: "plugins/vite.ts",
+      rollup: "plugins/rollup.ts",
       esbuild: "plugins/esbuild.ts",
     },
     output: {
@@ -45,16 +47,8 @@ export default [
       format: "esm",
       entryFileNames: "[name].mjs",
     },
-    external: [
-      "node:assert",
-      "node:child_process",
-      "node:fs/promises",
-      "node:os",
-      "node:path",
-      "node:url",
-      "node:util",
-      "esbuild",
-    ],
+    external: (id) =>
+      id.startsWith("node") || ["esbuild", "rollup", "vite"].includes(id),
     cache: false,
     plugins: [
       typescript({
