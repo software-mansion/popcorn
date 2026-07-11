@@ -18,7 +18,6 @@ const execFileAsync = promisify(execFile);
 const brotliCompressAsync = promisify(brotliCompress);
 const gzipAsync = promisify(gzip);
 const OTP_DIR = "assets/otp";
-const manifestUrl = `/${OTP_DIR}/manifest.json`;
 
 export type Options = {
   rootDir: string;
@@ -28,7 +27,6 @@ export type Options = {
 
 export type Prepared = {
   dir: string;
-  manifestUrl: string;
   notes: unknown[];
 };
 
@@ -105,7 +103,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
 
     return {
       dir: preparedDir,
-      manifestUrl,
       notes: report.notes ?? [],
     };
   } catch (error) {

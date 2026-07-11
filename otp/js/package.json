@@ -16,10 +16,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs"
     },
-    "./beam": {
-      "types": "./dist/beam.d.ts",
-      "import": "./dist/beam.mjs"
-    },
     "./esbuild": {
       "types": "./dist/plugins/esbuild.d.ts",
       "import": "./dist/plugins/esbuild.mjs"
