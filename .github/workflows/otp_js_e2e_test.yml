@@ -74,6 +74,13 @@ jobs:
         with:
           version: "1.60.0"
 
+      # The e2e suite compiles a small OTP fixture app with escript, so host
+      # Erlang must be present even when the WASM build is restored from cache.
+      - name: Setup Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          otp-version: "26.0.2"
+
       - name: Run e2e tests
         run: pnpm e2e
         working-directory: otp/js
