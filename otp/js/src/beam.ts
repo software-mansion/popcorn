@@ -68,6 +68,7 @@ export async function boot({
       emit({ type: "otp:tracked-value-delete", payload: key }),
     arguments: buildArgs({
       appNames: fsData.appNames,
+      entrypoint: fsData.entrypoint,
       extra: extraArgs ?? [],
     }),
     ENV: {
@@ -96,10 +97,11 @@ function toPopcornError(error: unknown): PopcornError {
 
 type BuildArgsArgs = {
   appNames: string[];
+  entrypoint: string | null;
   extra: string[];
 };
 
-function buildArgs({ appNames, extra }: BuildArgsArgs): string[] {
+function buildArgs({ appNames, entrypoint, extra }: BuildArgsArgs): string[] {
   const args = [...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (true) {
@@ -115,6 +117,10 @@ function buildArgs({ appNames, extra }: BuildArgsArgs): string[] {
     args.push("-pa", `/lib/${app}/ebin`);
   }
 
+  if (entrypoint !== null) {
+    args.push("-s", "application", "ensure_all_started", entrypoint);
+  }
+
   for (const arg of extra) {
     args.push(arg);
   }
@@ -123,6 +129,7 @@ function buildArgs({ appNames, extra }: BuildArgsArgs): string[] {
 }
 
 type BeamManifest = {
+  entrypoint: string | null;
   apps: Record<string, BeamManifestApp>;
   vm: {
     boot: string;
@@ -135,6 +142,7 @@ type BeamManifestApp = {
 
 type LoadedFsData = {
   appNames: string[];
+  entrypoint: string | null;
   bootFile: Uint8Array;
   tarballs: Uint8Array[];
 };
@@ -197,7 +205,10 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
     tarballs.push(tarball.data);
   }
 
-  return { ok: true, data: { appNames, bootFile, tarballs } };
+  return {
+    ok: true,
+    data: { appNames, entrypoint: manifest.entrypoint ?? null, bootFile, tarballs },
+  };
 }
 
 function initFs({ module, fsData }: InitFsArgs): void {

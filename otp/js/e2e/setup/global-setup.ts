@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
+import { readFile, writeFile } from "fs/promises";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -24,6 +25,8 @@ async function globalSetup() {
     "building JS library and OTP assets",
     env,
   );
+
+  await buildEntrypointFixture(env);
 
   console.log("e2e: starting Vite dev server...");
 
@@ -69,6 +72,43 @@ async function globalSetup() {
 }
 
 export default globalSetup;
+
+// Packs a tiny OTP application whose start/2 sends a wasm message, and writes a
+// manifest with `entrypoint` set to it, so the entrypoint auto-start can be
+// exercised end-to-end without any extraArgs.
+async function buildEntrypointFixture(env: NodeJS.ProcessEnv): Promise<void> {
+  console.log("e2e: building entrypoint fixture app...");
+
+  const distAssetsDir = resolve(jsRootDir, "dist/assets");
+  const fixtureSrcDir = resolve(__dirname, "entrypoint-app");
+  const escript = resolve(fixtureSrcDir, "build-fixture.escript");
+  const stageDir = resolve(distAssetsDir, ".entrypoint-stage");
+  const tar = "lib/test_entrypoint.tar.gz";
+
+  await runCommand(
+    "escript",
+    [escript, fixtureSrcDir, stageDir, resolve(distAssetsDir, tar)],
+    fixtureSrcDir,
+    "compiling and packing entrypoint fixture",
+    env,
+  );
+
+  const baseManifest = JSON.parse(
+    await readFile(resolve(distAssetsDir, "manifest.json"), "utf8"),
+  );
+  const manifest = {
+    ...baseManifest,
+    entrypoint: "test_entrypoint",
+    apps: {
+      ...baseManifest.apps,
+      test_entrypoint: { tar, version: "0.1.0" },
+    },
+  };
+  await writeFile(
+    resolve(distAssetsDir, "manifest-entrypoint.json"),
+    JSON.stringify(manifest),
+  );
+}
 
 async function resolveNodeExecutable(): Promise<string> {
   try {

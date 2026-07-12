@@ -26,6 +26,16 @@ test("boots", async ({ otp }) => {
   expect(result).toEqual({ ok: true, data: null });
 });
 
+test("auto-starts the manifest entrypoint app", async ({ otp }) => {
+  const result = await otp.boot({
+    beam: { manifestUrl: "/otp-assets/manifest-entrypoint.json" },
+  });
+  expect(result).toEqual({ ok: true, data: null });
+
+  const event = await otp.waitForEvent("entrypoint_started");
+  expect(event).toMatchObject({ entrypoint_started: true });
+});
+
 test("reports timeouts on init", async ({ otp }) => {
   const result = await otp.boot({
     beam: { manifestUrl: "/otp-assets/manifest.json" },
