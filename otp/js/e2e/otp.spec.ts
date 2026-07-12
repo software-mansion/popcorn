@@ -241,6 +241,20 @@ test("loads manifest apps before eval", async ({ otp }) => {
   expect(otp.events).toContainEqual({ manifest_app: true });
 });
 
+test("starts the provided logger app", async ({ otp }) => {
+  const boot = await otp.boot(
+    evalOpts(`
+      {ok, _} = application:ensure_all_started(logger),
+      _ = 'Elixir.Logger':level(),
+      ok = wasm:send(#{logger_started => true}).
+    `),
+  );
+  assert(boot.ok);
+
+  await otp.waitForEvent("logger_started");
+  expect(otp.events).toContainEqual({ logger_started: true });
+});
+
 test("run_js -> send", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     V = wasm:run_js(<<"(args) => 1 + 2">>, #{}),

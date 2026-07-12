@@ -19,7 +19,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 DEFAULT_ELIXIR_TAG="v1.19.5"
 DEFAULT_PRESET="core"
 SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
-ELIXIR_CORE_APPS=(elixir)
+# logger is in core because `mix new` scaffolds `extra_applications: [:logger]`,
+# so almost every user app depends on it. It is pure BEAM (no NIF), so shipping
+# it as a provided tarball is enough for it to load in WASM.
+ELIXIR_CORE_APPS=(elixir logger)
 ELIXIR_ALL_APPS=(eex elixir ex_unit iex logger mix)
 CORE_APPS=(kernel stdlib compiler "${ELIXIR_CORE_APPS[@]}")
 CORE_CRYPTO_EXTRA_APPS=(asn1 crypto public_key ssl inets)
