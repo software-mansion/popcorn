@@ -18,6 +18,14 @@ function evalOpts(code: string) {
   };
 }
 
+function evalElixirOpts(code: string) {
+  const bytes = new TextEncoder().encode(code);
+  return evalOpts(`
+    {ok, _} = application:ensure_all_started(elixir),
+    'Elixir.Code':eval_string(<<${bytes.join(",")}>>).
+  `);
+}
+
 test("boots", async ({ otp }) => {
   const result = await otp.boot({
     beam: { manifestUrl: "/assets/otp/manifest.json" },
@@ -249,6 +257,18 @@ test("loads manifest apps before eval", async ({ otp }) => {
 
   await otp.waitForEvent("manifest_app");
   expect(otp.events).toContainEqual({ manifest_app: true });
+});
+
+test("evaluates Elixir code", async ({ otp }) => {
+  const boot = await otp.boot(
+    evalElixirOpts(`
+      :ok = :wasm.send(%{elixir_result: 1 + 2})
+    `),
+  );
+  assert(boot.ok);
+
+  await otp.waitForEvent("elixir_result");
+  expect(otp.events).toContainEqual({ elixir_result: 3 });
 });
 
 test("starts the provided logger app", async ({ otp }) => {
