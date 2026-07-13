@@ -1,0 +1,16 @@
+{
+  "name": "hello_popcorn_otp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "@swmansion/popcorn-otp": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "esbuild": "^0.25.0"
+  }
+}

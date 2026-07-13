@@ -1,0 +1,82 @@
+name: Hello Popcorn OTP - Build & test
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "examples/hello-popcorn-otp/**"
+      - "otp/**"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/patch-beam.sh"
+      - "scripts/stdlib.sh"
+      - "scripts/_common.sh"
+      - ".github/workflows/hello_popcorn_otp_build_test.yml"
+      - ".github/actions/build-otp-wasm/action.yml"
+      - ".github/actions/setup-playwright/action.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Produces otp/out with the OTP/BEAM WASM runtime (cached across runs).
+      - name: Build OTP/BEAM for WASM
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: "false"
+
+      # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.19.5
+      # runtime shipped in the WASM VM, so the host toolchain must match it.
+      # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
+          # See https://github.com/nodejs/node/issues/63487.
+          node-version: "24.15.0"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      # Bundles @swmansion/popcorn-otp and copies the runtime from otp/out
+      # into its dist/assets (consumed by the example's esbuild plugin).
+      - name: Build popcorn-otp JS package
+        run: pnpm -F ./otp/js build
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.60.0"
+
+      - name: Run tests
+        run: pnpm test
+        working-directory: examples/hello-popcorn-otp/assets
