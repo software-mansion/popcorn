@@ -32,6 +32,7 @@ ensure_runtime_artifacts() {
 }
 
 copy_runtime_assets() {
+  rm -rf "${ASSETS_DIR}/bin" "${ASSETS_DIR}/lib"
   mkdir -p "${ASSETS_DIR}" "${ASSETS_DIR}/bin" "${ASSETS_DIR}/lib"
 
   for path in beam.wasm beam.smp beam.emu; do
@@ -72,6 +73,7 @@ EOF
 }
 
 copy_dist_assets() {
+  rm -rf "${DIST_ASSETS_DIR}"
   mkdir -p "${DIST_ASSETS_DIR}" "${DIST_ASSETS_DIR}/bin" "${DIST_ASSETS_DIR}/lib"
 
   cp "${ASSETS_DIR}/beam.mjs" "${DIST_ASSETS_DIR}/beam.mjs"

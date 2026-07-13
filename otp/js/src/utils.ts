@@ -36,21 +36,6 @@ export async function fetchJson<T>(url: string): Promise<T | null> {
   }
 }
 
-export function isGzip(data: Uint8Array): boolean {
-  return (
-    data.length >= 3 && data[0] === 0x1f && data[1] === 0x8b && data[2] === 0x08
-  );
-}
-
-export async function decompressGzip(data: Uint8Array): Promise<Uint8Array> {
-  const bytes = data.slice();
-  const stream = new Blob([bytes])
-    .stream()
-    .pipeThrough(new DecompressionStream("gzip"));
-  const buffer = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buffer);
-}
-
 export function check(ok: boolean, msg?: string): asserts ok {
   if (!ok) throw err("internal:check", { detail: msg });
 }

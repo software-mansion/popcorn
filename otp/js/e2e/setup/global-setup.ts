@@ -83,7 +83,7 @@ async function buildEntrypointFixture(env: NodeJS.ProcessEnv): Promise<void> {
   const fixtureSrcDir = resolve(__dirname, "entrypoint-app");
   const escript = resolve(fixtureSrcDir, "build-fixture.escript");
   const stageDir = resolve(distAssetsDir, ".entrypoint-stage");
-  const tar = "lib/test_entrypoint.tar.gz";
+  const tar = "lib/test_entrypoint.tar";
 
   await runCommand(
     "escript",

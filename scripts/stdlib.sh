@@ -297,7 +297,7 @@ prepare_outdir() {
     mkdir -p "${outdir}"
 
     shopt -s nullglob
-    for path in "${outdir}"/*.tar.gz; do
+    for path in "${outdir}"/*.tar "${outdir}"/*.tar.br "${outdir}"/*.tar.gz; do
         rm -f "${path}"
     done
     shopt -u nullglob
@@ -328,8 +328,8 @@ create_otp_tarballs() {
             src_root="${beam_dir}/bootstrap"
         fi
 
-        tarball="${outdir}/${app}.tar.gz"
-        tar -C "${src_root}" -czf "${tarball}" "lib/${app}/ebin"
+        tarball="${outdir}/${app}.tar"
+        tar -C "${src_root}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
@@ -350,8 +350,8 @@ create_elixir_tarballs() {
             error "Missing Elixir app ebin dir for '${app}' in ${elixir_dir}."
         }
 
-        tarball="${outdir}/${app}.tar.gz"
-        tar -C "${elixir_dir}" -czf "${tarball}" "lib/${app}/ebin"
+        tarball="${outdir}/${app}.tar"
+        tar -C "${elixir_dir}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
@@ -379,13 +379,13 @@ write_tarball_manifest() {
         prefix=""
 
         for app in "${SELECTED_APPS[@]}"; do
-            tarball="${outdir}/${app}.tar.gz"
+            tarball="${outdir}/${app}.tar"
             if [[ ! -f "${tarball}" ]]; then
                 error "Expected tarball not found: ${tarball}"
             fi
 
             version=$(app_version "${beam_dir}" "${elixir_dir}" "${app}")
-            printf '%s"%s":{"tar":"lib/%s.tar.gz","version":"%s"}' "${prefix}" "${app}" "${app}" "${version}"
+            printf '%s"%s":{"tar":"lib/%s.tar","version":"%s"}' "${prefix}" "${app}" "${app}" "${version}"
             prefix=","
         done
 
