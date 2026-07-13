@@ -1,0 +1,230 @@
+diff --git a/erts/configure.ac b/erts/configure.ac
+index c5113a5953128d331ebff40e66feb6b2ced9f7b6..202d963ae91066795eac72f88f1f36b7a825d59c 100644
+--- a/erts/configure.ac
++++ b/erts/configure.ac
+@@ -539,8 +539,38 @@ dnl Special stuff regarding CFLAGS and details in the environment...
+ dnl ---------------------------------------------------------------------
+ 
+ dnl NOTE: CPPFLAGS will be included in CFLAGS at the end
++
++dnl ----------------------------------------------------------------------
++dnl Emscripten/WebAssembly detection
++dnl ----------------------------------------------------------------------
++EMSCRIPTEN=no
++case $host in
++    wasm32-*-emscripten*|wasm64-*-emscripten*)
++        EMSCRIPTEN=yes
++        AC_DEFINE(ERTS_EMSCRIPTEN, 1, [Define if targeting Emscripten/WebAssembly])
++        dnl Force disable features not supported on Wasm
++        enable_jit=no
++        enable_sctp=no
++        if test "x$enable_kernel_poll" = "xunknown"; then
++            enable_kernel_poll=no
++        fi
++        dnl Override function detection for functions not in Emscripten
++        ac_cv_func_memrchr=no
++        ac_cv_func_mallopt=no
++        ac_cv_func_sbrk=no
++        ac_cv_func_brk=no
++        ac_cv_func_mremap=no
++        ac_cv_func_vsyslog=no
++        ac_cv_func_ppoll=no
++        AC_MSG_NOTICE([Configuring for Emscripten/WebAssembly])
++        AC_MSG_NOTICE([  JIT disabled (not supported on Wasm)])
++        AC_MSG_NOTICE([  SCTP disabled (not supported on Wasm)])
++        ;;
++esac
++AC_SUBST(EMSCRIPTEN)
++
+ case $host_os in
+-    linux*) CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE";; 
++    linux*) CPPFLAGS="$CPPFLAGS -D_GNU_SOURCE";;
+     aix*|os400*)
+         # * _ALL_SOURCE: Required to get the winsize structure for TIOCSWINSZ.
+         # * _LINUX_SOURCE_COMPAT: Not required, but makes some libc functions
+@@ -552,6 +582,10 @@ case $host_os in
+ 	# -D_WIN32_WINNT=* from CPPFLAGS is saved in ETHR_DEFS.
+ 	CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600 -DWINVER=0x0600"
+ 	;;
++    emscripten*)
++	# Emscripten/Wasm target
++	CPPFLAGS="$CPPFLAGS -DERTS_EMSCRIPTEN"
++	;;
+     *)
+ 	;;
+ esac
+diff --git a/lib/crypto/CONF_INFO b/lib/crypto/CONF_INFO
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ed2f3a1367182896955ca4ac4211f6119029aca
+--- /dev/null
++++ b/lib/crypto/CONF_INFO
+@@ -0,0 +1 @@
++Static linking with OpenSSL 3.0 *MAY* require special configuring of the cryptolib.
+diff --git a/lib/erl_interface/src/connect/ei_resolve.c b/lib/erl_interface/src/connect/ei_resolve.c
+index 72a9397bc1a5863dc88c1458e143ebbca708d891..14160385f06a8229d3b0611ab33e2ed511ee8d32 100644
+--- a/lib/erl_interface/src/connect/ei_resolve.c
++++ b/lib/erl_interface/src/connect/ei_resolve.c
+@@ -400,7 +400,7 @@ struct hostent *ei_gethostbyaddr_r(const char *addr,
+   return gethostbyaddr(addr, length, type);
+ #elif !defined(HAVE_GETHOSTBYNAME_R)
+   return my_gethostbyaddr_r(addr,length,type,hostp,buffer,buflen,h_errnop);
+-#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__))
++#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__EMSCRIPTEN__))
+   struct hostent *result;
+ 
+   gethostbyaddr_r(addr, length, type, hostp, buffer, buflen, &result,
+@@ -423,7 +423,7 @@ struct hostent *ei_gethostbyname_r(const char *name,
+   return gethostbyname(name);
+ #elif !defined(HAVE_GETHOSTBYNAME_R)
+   return my_gethostbyname_r(name,hostp,buffer,buflen,h_errnop);
+-#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__ANDROID__))
++#elif (defined(__GLIBC__) || defined(__linux__) || (defined(__FreeBSD_version) && (__FreeBSD_version >= 602000)) || defined(__DragonFly__) || defined(__ANDROID__) || defined(__EMSCRIPTEN__))
+   struct hostent *result;
+   int err;
+ 
+diff --git a/lib/odbc/configure.ac b/lib/odbc/configure.ac
+index d8adc3810a535731b174a652ec45d723975dbf98..380de694dcd6ebabe78cff1862e022d5d1b5d6bc 100644
+--- a/lib/odbc/configure.ac
++++ b/lib/odbc/configure.ac
+@@ -70,9 +70,7 @@ _search_path=
+ 
+ AS_IF([test "$with_odbc" = "no"],
+  [
+-
+-   rm -f "$ERL_TOP/lib/odbc/SKIP"
+-
++   echo "ODBC disabled by user" > "$ERL_TOP/lib/odbc/SKIP"
+  ],
+  [
+   dnl "$with_odbc" != "no"
+diff --git a/make/autoconf/otp.m4 b/make/autoconf/otp.m4
+index f449c53196e81abf2d2941ae5b992fdc38371e44..6fd8e3b613b0baac1d288e166962e99d929f5a5f 100644
+--- a/make/autoconf/otp.m4
++++ b/make/autoconf/otp.m4
+@@ -3087,6 +3087,8 @@ AC_DEFUN([LM_HARDWARE_ARCH], [
+     aarch*)	ARCH=arm;;
+     tile)	ARCH=tile;;
+     e2k)        ARCH=e2k;;
++    wasm32)	ARCH=wasm32;;
++    wasm64)	ARCH=wasm64;;
+     *)	 	ARCH=noarch;;
+     esac
+     AC_MSG_RESULT($ARCH)
+diff --git a/xcomp/erl-xcomp-wasm32-emscripten.conf b/xcomp/erl-xcomp-wasm32-emscripten.conf
+new file mode 100644
+index 0000000000000000000000000000000000000000..e257796fd372fe0d6bc8e24c729eda31c24b3b28
+--- /dev/null
++++ b/xcomp/erl-xcomp-wasm32-emscripten.conf
+@@ -0,0 +1,112 @@
++## -*-shell-script-*-
++##
++## Cross compilation configuration for WebAssembly via Emscripten
++##
++## Usage:
++##   ./otp_build configure --xcomp-conf=xcomp/erl-xcomp-wasm32-emscripten.conf
++##
++## Or manually:
++##   emconfigure ./configure --host=wasm32-unknown-emscripten --build=$(./make/autoconf/config.guess) ...
++##
++
++## -- Variables for `otp_build' Only -------------------------------------------
++
++erl_xcomp_build=guess
++erl_xcomp_host=wasm32-unknown-emscripten
++
++erl_xcomp_configure_flags="--disable-jit \
++    --disable-sctp \
++    --disable-kernel-poll \
++    --without-common_test \
++    --without-asn1 \
++    --without-diameter \
++    --without-edoc \
++    --without-eldap \
++    --without-eunit \
++    --without-ftp \
++    --without-jinterface \
++    --without-reltool \
++    --without-snmp \
++    --without-tftp \
++    --without-tools \
++    --without-termcap \
++    --without-wx \
++    --without-debugger \
++    --without-dialyzer \
++    --without-et \
++    --without-megaco \
++    --without-observer \
++    --without-odbc \
++    --without-os_mon \
++    --without-parsetools \
++    --without-public_key \
++    --without-ssh \
++    --without-ssl \
++    --without-threadnames \
++    --without-javac \
++    --enable-builtin-zlib \
++    --disable-esock \
++    --disable-dynamic-ssl-lib"
++
++## -- Cross Compiler and Other Tools -------------------------------------------
++
++CC=emcc
++CXX=em++
++LD=emcc
++AR=emar
++RANLIB=emranlib
++
++## Compiler flags
++CFLAGS="-O2 -pthread -g"
++
++## Linker flags for Emscripten
++## Note: These are passed to emcc during linking
++LDFLAGS="-pthread \
++    -sUSE_PTHREADS=1 \
++    -sPTHREAD_POOL_SIZE=8 \
++    -sPROXY_TO_PTHREAD=1 \
++    -sENVIRONMENT=worker \
++    -sEXPORT_ES6=1 \
++    -sMODULARIZE=1 \
++    -sINITIAL_MEMORY=256MB \
++    -sALLOW_MEMORY_GROWTH=1 \
++    -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8 \
++    -sEXPORTED_FUNCTIONS=['_main','_malloc','_free'] \
++    -sFORCE_FILESYSTEM=1 \
++    -sASSERTIONS=2"
++
++## -- Cross System Root Locations ----------------------------------------------
++
++## Emscripten handles sysroot internally
++erl_xcomp_sysroot=
++
++## -- Optional Feature, and Bug Tests ------------------------------------------
++
++## These are values that cannot be determined by configure when cross-compiling.
++## We set them explicitly for Wasm/Emscripten.
++
++## Endianness: Wasm is little-endian
++erl_xcomp_bigendian=no
++
++## No clock_gettime for CPU time on Wasm
++erl_xcomp_clock_gettime_cpu_time=no
++
++## getaddrinfo works in Emscripten (via proxy)
++erl_xcomp_getaddrinfo=no
++
++## No kqueue on Wasm
++erl_xcomp_kqueue=no
++
++## No poll() - use select() instead
++erl_xcomp_poll=no
++
++## No reliable floating point exceptions
++erl_xcomp_reliable_fpe=no
++
++## posix_memalign works
++erl_xcomp_posix_memalign=yes
++
++## putenv stores a copy
++erl_xcomp_putenv_copy=yes
++
++## -----------------------------------------------------------------------------

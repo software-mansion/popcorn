@@ -1,0 +1,48 @@
+name: Release Hex Package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version to simulate, e.g. v0.3.0-rc1"
+        required: true
+      dry_run:
+        description: "Skip actual publish"
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check versions align
+        if: github.ref_type == 'tag' || inputs.tag
+        uses: ./.github/actions/check-release-versions
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          prefix: v
+          package-json: popcorn-2/js/package.json
+          mix-exs: popcorn-2/elixir/mix.exs
+
+      - name: Build Docker image
+        run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ inputs.tag || github.ref_name }} .
+
+      - name: Publish to Hex
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+          DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          docker run --rm -e HEX_API_KEY \
+            popcorn-builder \
+            sh -c "cd /build/popcorn/popcorn-2/elixir \
+              && mix deps.get \
+              && mix compile \
+              && mix hex.publish package --yes $DRY_RUN_FLAG \
+              && MIX_ENV=dev mix hex.publish docs --yes $DRY_RUN_FLAG"

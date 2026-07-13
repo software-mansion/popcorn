@@ -1,0 +1,28 @@
+diff --git a/erts/emulator/beam/erl_crash_dump.c b/erts/emulator/beam/erl_crash_dump.c
+index 8b45bbd88430c1d621799e1cb8d8a6a804b85b03..d1e757c651595b8ce1a493c3e3b4324d5cceab33 100644
+--- a/erts/emulator/beam/erl_crash_dump.c
++++ b/erts/emulator/beam/erl_crash_dump.c
+@@ -391,6 +391,17 @@ static int write_layered(void *to_arg, char *buf, size_t len) {
+ void
+ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+ {
++#ifdef __EMSCRIPTEN__
++    erts_fprintf(stderr, "\nBEAM fatal error");
++    if (file != NULL)
++        erts_fprintf(stderr, " in %s:%d", file, line);
++    if (fmt != NULL && *fmt != '\0') {
++        erts_fprintf(stderr, ": ");
++        erts_vfprintf(stderr, fmt, args);
++    }
++    erts_fprintf(stderr, "\n");
++    return;
++#else
+     const size_t WRITE_BUFFER_SIZE = 64 << 10;
+ 
+     ErtsThrPrgrData tpd_buf; /* in case we aren't a managed thread... */
+@@ -695,4 +706,5 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+     outer->close(outer->to_arg);
+ 
+     erts_fprintf(stderr,"done\n");
++#endif
+ }
