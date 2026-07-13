@@ -290,6 +290,10 @@ run_configure() {
         LDFLAGS+=" -sASSERTIONS=2"
     else
         LDFLAGS+=" -sASSERTIONS=0"
+        # LTO: -Oz runs binaryen's size passes and minifies the JS glue.
+        # --closure additionally Closure-minifies the glue.
+        # ref: https://emscripten.org/docs/tools_reference/emcc.html
+        LDFLAGS+=" -Oz --closure 1"
     fi
 
     # Autoconf cache variables for cross-compilation
