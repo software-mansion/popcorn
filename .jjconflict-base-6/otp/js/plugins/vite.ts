@@ -173,12 +173,9 @@ export function popcorn(options: Options): Plugin {
       ) as Manifest;
       const tarballs = Object.values(manifest.apps).map(({ tar }) => tar);
 
-      return [
-        preloadTag("/assets/beam.wasm", "application/wasm"),
-        ...tarballs.map((tar) =>
-          preloadTag(`/assets/otp/${tar}`, "application/octet-stream"),
-        ),
-      ];
+      return tarballs.map((tar) =>
+        preloadTag(`/assets/otp/${tar}`, "application/octet-stream"),
+      );
     },
 
     async closeBundle() {

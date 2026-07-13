@@ -41,12 +41,14 @@ test("injects asset preloads", async ({ page }) => {
   expect(allUrlsAreLogical).toBe(true);
 });
 
-test("reuses preloaded tarballs during boot", async ({ browser }) => {
+test("fetches each boot asset once", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   const requests = new Map<string, number>();
+  let wasmRequests = 0;
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
+    if (path.endsWith("/beam.wasm")) wasmRequests += 1;
     if (!path.startsWith("/assets/otp/") || !path.endsWith(".tar")) return;
     requests.set(path, (requests.get(path) ?? 0) + 1);
   });
@@ -64,6 +66,7 @@ test("reuses preloaded tarballs during boot", async ({ browser }) => {
   await context.close();
 
   expect(booted).toBe(true);
+  expect(wasmRequests).toBe(1);
   expect(requests.size).toBeGreaterThan(0);
   expect(Array.from(requests.values())).toEqual(
     Array.from(requests, () => 1),
@@ -94,22 +97,13 @@ test("asset preloads are disabled by default", async () => {
 });
 
 function expectedPreloads(manifest: { apps: Record<string, { tar: string }> }) {
-  return [
-    {
-      href: "/assets/beam.wasm",
-      as: "fetch",
-      crossorigin: true,
-      fetchpriority: "low",
-      type: "application/wasm",
-    },
-    ...Object.values(manifest.apps).map(({ tar }) => ({
+  return Object.values(manifest.apps).map(({ tar }) => ({
       href: `/assets/otp/${tar}`,
       as: "fetch",
       crossorigin: true,
       fetchpriority: "low",
       type: "application/octet-stream",
-    })),
-  ];
+    }));
 }
 
 function preloadsIn(html: string) {

@@ -223,6 +223,7 @@ export class Popcorn {
 
       this.vmWorker.addEventListener("message", onBootMessage);
       void loadFsData(this.opts.beam.manifestUrl).then((loaded) => {
+        if (this.settleBoot === null) return;
         if (!loaded.ok) {
           settle({ ok: false, error: loaded.error });
           return;
