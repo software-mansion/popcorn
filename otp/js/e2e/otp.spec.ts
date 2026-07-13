@@ -28,7 +28,7 @@ test("boots", async ({ otp }) => {
 
 test("auto-starts the manifest entrypoint app", async ({ otp }) => {
   const result = await otp.boot({
-    beam: { manifestUrl: "/assets/otp/manifest-entrypoint.json" },
+    beam: { manifestUrl: "/assets/otp/manifest.json" },
   });
   expect(result).toEqual({ ok: true, data: null });
 
