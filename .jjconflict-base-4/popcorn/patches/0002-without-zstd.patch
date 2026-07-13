@@ -1,0 +1,119 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 028e2bcafcdcc114e21dd6600139a7f6c322da5d..d89bb8aa69b2419fe8177fca209a1cedc516f3f9 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -32,7 +32,6 @@ DTRACE_ENABLED=@DTRACE_ENABLED@
+ DTRACE_ENABLED_2STEP=@DTRACE_ENABLED_2STEP@
+ USE_VM_PROBES=@USE_VM_PROBES@
+ LIBS = @LIBS@
+-LIBZSTD=@LIBZSTD@
+ SSL_LIBDIR = @SSL_LIBDIR@
+ SSL_INCLUDE = @SSL_INCLUDE@
+ SSL_CRYPTO_LIBNAME = @SSL_CRYPTO_LIBNAME@
+@@ -405,22 +404,6 @@ LIBS += $(RYU_LIBRARY)
+ endif
+ endif
+ 
+-ifdef LIBZSTD
+-# Use system libzstd
+-LIBS += $(LIBZSTD)
+-else
+-ZSTD_DIR = $(ERL_TOP)/erts/emulator/zstd/obj/$(TARGET)/$(TYPE)
+-ZSTD_LIB = $(ZSTD_DIR)/$(LIB_PREFIX)zstd$(LIB_SUFFIX)
+-DEPLIBS += $(ZSTD_LIB)
+- 
+-ifeq ($(TARGET),win32)
+-LIBS    += -L$(ZSTD_DIR) -lzstd
+-else
+-# Build on darwin fails if -l$(ZSTD_LIB) is used
+-LIBS    += $(ZSTD_LIB)
+-endif
+-endif
+-
+ ifeq ($(ENCRYPTED_CRASH_DUMPS),yes)
+ SSL_DYNAMIC_ONLY=@SSL_DYNAMIC_ONLY@
+ ifeq ($(SSL_DYNAMIC_ONLY),yes)
+@@ -472,8 +455,7 @@ OBJDIR = obj/$(TTF_DIR)
+ CREATE_DIRS += $(OBJDIR) \
+ 	pcre/obj/$(TARGET)/$(TYPE) \
+ 	$(ZLIB_OBJDIR) \
+-	$(RYU_OBJDIR) \
+-        $(ZSTD_OBJDIR)
++	$(RYU_OBJDIR)
+ 
+ ifeq ($(FLAVOR),jit)
+ CREATE_DIRS+=$(OBJDIR)/asmjit/ \
+@@ -553,7 +535,6 @@ include pcre/pcre.mk
+ ifeq ($(ERTS_USE_BUILTIN_RYU),yes)
+ include ryu/ryu.mk
+ endif
+-include zstd/zstd.mk
+ 
+ $(ERTS_LIB):
+ 	$(V_at)cd $(ERTS_LIB_DIR) && $(MAKE) $(TYPE)
+@@ -867,9 +848,6 @@ COMMON_INCLUDES = -Ibeam -Isys/$(ERLANG_OSTYPE) -Isys/common -I$(TARGET)
+ ifndef Z_LIB
+ COMMON_INCLUDES += -Izlib 
+ endif
+-ifndef LIBZSTD
+-COMMON_INCLUDES += -Izstd
+-endif
+ ifeq ($(ERTS_USE_BUILTIN_RYU),yes)
+ COMMON_INCLUDES += -Iryu
+ endif
+@@ -1239,7 +1217,6 @@ NIF_OBJS = \
+ 	$(OBJDIR)/prim_buffer_nif.o \
+ 	$(OBJDIR)/prim_file_nif.o \
+ 	$(OBJDIR)/zlib_nif.o \
+-	$(OBJDIR)/zstd_nif.o \
+ 	$(ESOCK_NIF_OBJS)
+ 
+ ifeq ($(TARGET),win32)
+@@ -1496,7 +1473,7 @@ $(TARGET)/gen_git_version.mk:
+ # rebuild.
+ 	$(V_at)if utils/gen_git_version $@; then touch beam/erl_bif_info.c; fi
+ 
+-DEPEND_DEPS=jit src drv nif sys target zlib zstd
++DEPEND_DEPS=jit src drv nif sys target zlib
+ ifeq ($(ERTS_USE_BUILTIN_RYU),yes)
+ DEPEND_DEPS += ryu
+ endif
+@@ -1531,10 +1508,6 @@ $(TTF_DIR)/ryu.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
+ 	$(gen_verbose)
+ 	$(V_at)$(DEP_CC) $(DEP_FLAGS) $(RYU_SRC) > $@.tmp
+ 	$(V_at)$(SED_DEPEND_ZLIB) $@.tmp  > $@
+-$(TTF_DIR)/zstd.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
+-	$(gen_verbose)
+-	$(V_at)$(DEP_CC) $(DEP_FLAGS) $(ZSTD_SRC) > $@.tmp
+-	$(V_at)$(SED_DEPEND_ZLIB) $@.tmp  > $@
+ $(TTF_DIR)/jit.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
+ 	$(gen_verbose)
+ 	@touch $@
+diff --git a/lib/stdlib/src/Makefile b/lib/stdlib/src/Makefile
+index 7639b583d90b04e8679ace5d5763b88c64c0a164..8647314222fc4694cd561798ad4baa9cd55460cb 100644
+--- a/lib/stdlib/src/Makefile
++++ b/lib/stdlib/src/Makefile
+@@ -139,8 +139,7 @@ MODULES= \
+ 	unicode_util \
+ 	uri_string \
+ 	win32reg \
+-	zip \
+-	zstd
++	zip
+ 
+ HRL_FILES= \
+ 	../include/assert.hrl \
+diff --git a/lib/stdlib/src/stdlib.app.src b/lib/stdlib/src/stdlib.app.src
+index 27cbb5e0fa7ab23fc2fd7ea275be87f004c9139f..e38e3f35018b9b00231a8b635ff5ef5cc3c7c818 100644
+--- a/lib/stdlib/src/stdlib.app.src
++++ b/lib/stdlib/src/stdlib.app.src
+@@ -119,8 +119,7 @@
+              unicode_util,
+ 	     uri_string,
+ 	     win32reg,
+-	     zip,
+-             zstd]},
++	     zip]},
+   {registered,[timer_server,rsh_starter,take_over_monitor,pool_master,
+                dets]},
+   {applications, [kernel]},

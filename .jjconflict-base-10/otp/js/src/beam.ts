@@ -1,0 +1,246 @@
+import { PopcornError, err, isErr, type Result } from "./errors";
+import { deserializeBridgeMessage } from "./events";
+import type { LoadedFsData } from "./fs-data";
+import { extractTar } from "./tar";
+import type {
+  BeamBootOptions,
+  BeamSendPayload,
+  BeamTarget,
+  EmscriptenModule,
+} from "./types";
+import {
+  dirname,
+  ensureDir,
+  unreachable,
+} from "./utils";
+
+const DEFAULT_USER = "web_user";
+const DEFAULT_HOME_DIR = "/home/web_user";
+const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
+const BOOT_NAME = "vm";
+const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
+const UTF8 = new TextEncoder();
+const BASE_ARGS = [
+  "--",
+  "-root",
+  "/",
+  "-bindir",
+  "/bin",
+  "-progname",
+  "erl",
+  "-home",
+  DEFAULT_HOME_DIR,
+];
+
+const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
+
+export async function boot({
+  fsData,
+  extraArgs,
+  createModule,
+  emit,
+}: BeamBootOptions): Promise<Result<EmscriptenModule>> {
+  const moduleConfig: Partial<EmscriptenModule> = {
+    print: (text) => emit({ type: "otp:stdout", payload: text }),
+    printErr: (text) => emit({ type: "otp:stderr", payload: text }),
+    onExit: (code) =>
+      emit({ type: "otp:error", payload: { kind: "exit", data: code } }),
+    onAbort: (text) =>
+      emit({ type: "otp:error", payload: { kind: "abort", data: text } }),
+    onBeamMessage: (text) => {
+      const event = deserializeBridgeMessage(text);
+      if (event !== null) {
+        emit(event);
+      }
+    },
+    onError: (text) =>
+      emit({ type: "otp:error", payload: { kind: "error", data: text } }),
+    onTrackedValueDelete: (key) =>
+      emit({ type: "otp:tracked-value-delete", payload: key }),
+    arguments: buildArgs({
+      appNames: fsData.appNames,
+      entrypoint: fsData.entrypoint,
+      extra: extraArgs ?? [],
+    }),
+    ENV: {
+      BINDIR: "/bin",
+      EMU: "beam",
+      HOME: DEFAULT_HOME_DIR,
+      USER: DEFAULT_USER,
+      LOGNAME: DEFAULT_USER,
+    },
+    preRun: [(mod) => initFs({ module: mod, fsData })],
+  };
+
+  try {
+    const module = await createModule(moduleConfig);
+    return { ok: true, data: module };
+  } catch (error) {
+    return { ok: false, error: toPopcornError(error) };
+  }
+}
+
+function toPopcornError(error: unknown): PopcornError {
+  if (isErr(error)) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return err("worker:load", { message });
+}
+
+type BuildArgsArgs = {
+  appNames: string[];
+  entrypoint: string | null;
+  extra: string[];
+};
+
+function buildArgs({ appNames, entrypoint, extra }: BuildArgsArgs): string[] {
+  const args = [...BASE_ARGS, "-boot", BOOT_NAME];
+
+  if (true) {
+    args.push("-noshell");
+  }
+
+  for (const app of CORE_APPS) {
+    args.push("-pa", `/lib/${app}/ebin`);
+  }
+
+  for (const app of appNames) {
+    if (CORE_APPS.has(app)) continue;
+    args.push("-pa", `/lib/${app}/ebin`);
+  }
+
+  if (entrypoint !== null) {
+    args.push("-s", "application", "ensure_all_started", entrypoint);
+  }
+
+  for (const arg of extra) {
+    args.push(arg);
+  }
+
+  return args;
+}
+
+type InitFsArgs = {
+  module: EmscriptenModule;
+  fsData: LoadedFsData;
+};
+
+function initFs({ module, fsData }: InitFsArgs): void {
+  for (const dir of FS_DIRS) {
+    ensureDir(module.FS, dir);
+  }
+
+  module.FS.writeFile(BOOT_PATH, fsData.bootFile);
+
+  const createDir = (dirPath: string) => {
+    ensureDir(module.FS, dirPath);
+  };
+  const createFile = (path: string, content: Uint8Array<ArrayBuffer>) => {
+    ensureDir(module.FS, dirname(path));
+    module.FS.writeFile(path, content);
+  };
+
+  for (const tarball of fsData.tarballs) {
+    extractTar(tarball, createDir, createFile);
+  }
+}
+
+export function send(
+  module: EmscriptenModule | null,
+  message: BeamSendPayload,
+): Result<null> {
+  if (module === null) {
+    return { ok: false, error: err("bridge:not-started", {}) };
+  }
+
+  let targetName: string;
+  let target: PreparedTarget;
+  if (isNameTarget(message.target)) {
+    targetName = message.target.name;
+    target = {
+      kind: TARGET_REGISTERED_NAME,
+      argType: "string",
+      value: targetName,
+      length: utf8Length(targetName),
+    };
+  } else {
+    targetName = message.target.pid;
+    const bytes = base64ToBytes(targetName);
+    target = {
+      kind: TARGET_PID_BYTES,
+      argType: "array",
+      value: bytes,
+      length: bytes.length,
+    };
+  }
+
+  const status = module.ccall(
+    "sendVmMessage",
+    "number",
+    [
+      "number",
+      target.argType,
+      "number",
+      "string",
+      "number",
+      "string",
+      "number",
+    ],
+    [
+      target.kind,
+      target.value,
+      target.length,
+      message.payloadJson,
+      utf8Length(message.payloadJson),
+      message.metaJson,
+      utf8Length(message.metaJson),
+    ],
+  );
+
+  if (status === 0) {
+    return { ok: true, data: null };
+  }
+
+  if (status === 1) {
+    return {
+      ok: false,
+      error: err("bridge:listener-not-found", { targetName }),
+    };
+  }
+  unreachable();
+}
+
+const TARGET_REGISTERED_NAME = 0;
+const TARGET_PID_BYTES = 1;
+
+type PreparedTarget =
+  | {
+      kind: typeof TARGET_REGISTERED_NAME;
+      argType: "string";
+      value: string;
+      length: number;
+    }
+  | {
+      kind: typeof TARGET_PID_BYTES;
+      argType: "array";
+      value: Uint8Array;
+      length: number;
+    };
+
+function isNameTarget(
+  target: BeamTarget,
+): target is Extract<BeamTarget, { name: string }> {
+  return Object.hasOwn(target, "name");
+}
+
+function utf8Length(text: string): number {
+  return UTF8.encode(text).length;
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}

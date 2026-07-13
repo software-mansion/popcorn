@@ -1,0 +1,42 @@
+name: Check Release Versions
+description: Fail unless the release tag, package.json and mix.exs all declare the same version
+
+inputs:
+  tag:
+    description: Release tag, e.g. v0.3.2 or llv-v0.1.0
+    required: true
+  prefix:
+    description: Tag prefix to strip before comparing, e.g. v or llv-v
+    required: true
+  package-json:
+    description: Path to the package.json holding the JS version
+    required: true
+  mix-exs:
+    description: Path to the mix.exs holding @version
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Inputs go in through env, not ${{ }} inside run: a tag is attacker-controlled
+    # on workflow_dispatch and would otherwise be interpolated into the script.
+    - name: Compare versions
+      shell: python
+      env:
+        TAG: ${{ inputs.tag }}
+        PREFIX: ${{ inputs.prefix }}
+        PACKAGE_JSON: ${{ inputs.package-json }}
+        MIX_EXS: ${{ inputs.mix-exs }}
+      run: |
+        import json, os, re
+        from pathlib import Path
+
+        tag = os.environ["TAG"].removeprefix(os.environ["PREFIX"])
+        js = json.loads(Path(os.environ["PACKAGE_JSON"]).read_text())["version"]
+        ex = re.search(r'@version\s+"([^"]+)"', Path(os.environ["MIX_EXS"]).read_text()).group(1)
+
+        versions = {"tag": tag, "js": js, "elixir": ex}
+        core = {k: re.split(r"[-+]", v, 1)[0] for k, v in versions.items()}
+        print(versions)
+        if len(set(core.values())) != 1:
+            raise SystemExit(f"version mismatch (ignoring pre-release): {versions}")

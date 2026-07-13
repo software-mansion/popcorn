@@ -1,0 +1,32 @@
+**/config/*.secret.exs
+
+# Elixir build artifacts
+_build/
+popcorn-2/elixir/popcorn_runtime_source/
+cover/
+deps/
+doc/
+.fetch
+erl_crash.dump
+*.ez
+popcorn-*.tar
+tmp/
+
+# Node
+node_modules/
+.pnpm-store/
+
+# MacOS specific
+.DS_Store
+
+# OTP/OpenSSL build sources
+popcorn/sources/
+popcorn/out/
+popcorn/js/dist/
+popcorn/js/assets/
+popcorn/js/e2e/setup/dist/
+popcorn/js/playwright-report/
+popcorn/js/test-results/
+
+# Local environment
+.env

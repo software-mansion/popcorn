@@ -1,0 +1,142 @@
+name: Build OTP Wasm
+description: Install the build toolchain, restore caches, and build OTP/BEAM for Wasm
+
+inputs:
+  build-mode:
+    description: Build mode passed to scripts/build-beam.sh
+    required: false
+    default: debug
+  otp-tag:
+    description: OTP git tag to build for Wasm
+    required: false
+    default: OTP-29.0.6
+  host-otp-version:
+    description: OTP release installed on the runner to bootstrap the build.
+    required: true
+  with-crypto:
+    description: Build with static OpenSSL-backed crypto/asn1 support
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Compute OTP build cache key
+      id: otp-build-cache-key
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        hash_files() {
+          sort | xargs sha256sum | sha256sum | cut -d' ' -f1
+        }
+
+        {
+          printf 'key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-%s\n' "$(
+            {
+              find popcorn/patches -type f -print
+              printf '%s\n' \
+                .github/actions/build-otp-wasm/action.yml \
+                scripts/_common.sh \
+                scripts/build-beam.sh \
+                scripts/build-openssl.sh \
+                scripts/patch-beam.sh \
+                scripts/runtime-manifest.sh
+            } | hash_files
+          )"
+
+          printf 'openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-%s\n' "$(
+            {
+              printf '%s\n' \
+                .github/actions/build-otp-wasm/action.yml \
+                scripts/_common.sh \
+                scripts/build-beam.sh \
+                scripts/build-openssl.sh
+            } | hash_files
+          )"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Cache built OTP output
+      id: otp-build-cache
+      uses: actions/cache@v4
+      with:
+        path: popcorn/out
+        key: ${{ steps.otp-build-cache-key.outputs.key }}
+
+    - name: Reuse cached OTP/BEAM build
+      if: steps.otp-build-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: echo "Using cached OTP Wasm build from popcorn/out"
+
+    # scripts/build-beam.sh needs emconfigure and an erlc to compile the
+    # preloaded modules the native bootstrap emulator embeds.
+    - name: Setup emsdk
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 6.0.2
+        actions-cache-folder: emsdk-cache
+
+    - name: Setup bootstrap Erlang
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      with:
+        # setup-beam always installs into $RUNNER_TEMP/.setup-beam, we need to avoid having
+        # two installs with different version
+        otp-version: ${{ inputs.host-otp-version }}
+
+    - name: Install autoconf 2.72
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if autoconf --version | head -n 1 | grep -q "2.72"; then
+          exit 0
+        fi
+
+        git config --global user.email "ci@ci.local"
+        git config --global user.name "CI"
+        wget -q https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.gz
+        tar xzf autoconf-2.72.tar.gz
+        cd autoconf-2.72
+        ./configure --prefix=/usr/local
+        make -j"$(nproc)"
+        sudo make install
+
+    - name: Cache OTP clone
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: popcorn/sources/otp-original
+        key: otp-clone-${{ runner.os }}-${{ inputs.otp-tag }}
+
+    - name: Cache OpenSSL
+      if: steps.otp-build-cache.outputs.cache-hit != 'true' && inputs.with-crypto == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          popcorn/sources/openssl-3.0.15-${{ inputs.build-mode }}
+          popcorn/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
+        key: ${{ steps.otp-build-cache-key.outputs.openssl_key }}
+
+    - name: Diagnose environment size
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        printf "env: %d bytes, %d vars\n" "$(env | wc -c)" "$(env | wc -l)"
+        env | awk -F'=' '{print length($0), $1}' | sort -rn | head -15
+        printf "ulimit -s: %s  ARG_MAX: %s\n" "$(ulimit -s)" "$(getconf ARG_MAX)"
+
+    - name: Build OTP/BEAM for Wasm
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        build_args=(--otp-tag "${{ inputs.otp-tag }}" "${{ inputs.build-mode }}")
+        if [[ "${{ inputs.with-crypto }}" == "true" ]]; then
+          build_args=(--with-crypto "${build_args[@]}")
+        fi
+
+        scripts/build-beam.sh "${build_args[@]}"

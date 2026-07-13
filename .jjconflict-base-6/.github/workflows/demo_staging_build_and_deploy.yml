@@ -1,0 +1,158 @@
+name: Build and deploy staging landing page and language tour
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "landing-page/**"
+      - "popcorn/js/**"
+      - "patches/otp/**"
+      - "scripts/_common.sh"
+      - "scripts/build-beam.sh"
+      - "scripts/patch-beam.sh"
+      - "language-tour/**"
+      - "docker/landing.nginx.conf"
+      - "docker/langtour.nginx.conf"
+      - "docker/base.Dockerfile"
+      - "docker/landing.Dockerfile"
+      - "docker/langtour.Dockerfile"
+      - "docker/burrito/Dockerfile"
+      - "examples/local-lv-burrito/**"
+      - ".github/workflows/demo_staging_build_and_deploy.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+
+env:
+  REGISTRY: ghcr.io
+  ORG_NAME: software-mansion
+
+jobs:
+  build_docker_images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: "false"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
+
+      - name: Build base Docker image
+        id: build-base
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/base.Dockerfile
+          build-args: |
+            COMMIT_REF=${{ github.sha }}
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:staging"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build landing Docker image
+        id: build-and-push-landing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/landing.Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=staging
+            SYNC_THIRD_PARTY_ASSETS=true
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build burrito Docker image
+        id: build-and-push-burrito
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/burrito/Dockerfile
+          build-args: |
+            POPCORN_BASE_TAG=staging
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito:staging"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build language tour Docker image
+        id: build-and-push-langtour
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/langtour.Dockerfile
+          # Sentry DSN is embedded in built JS, not really a secret
+          build-args: |
+            POPCORN_BASE_TAG=staging
+            SYNC_THIRD_PARTY_ASSETS=true
+            SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
+            SENTRY_MODE=staging
+            APP_VERSION=${{ github.sha }}
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:staging"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy_staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build_docker_images
+    steps:
+      - name: Deploy to staging
+        uses: appleboy/ssh-action@v1
+        env:
+          BURRITO_SECRET_KEY_BASE: ${{ secrets.BURRITO_SECRET_KEY_BASE }}
+        with:
+          host: ${{ secrets.STAG_POPCORN_HOST }}
+          username: ${{ secrets.POPCORN_USER }}
+          key: ${{ secrets.POPCORN_SSH_PRIV }}
+          port: ${{ secrets.STAG_POPCORN_PORT }}
+          envs: BURRITO_SECRET_KEY_BASE
+          script: |
+            docker compose -f popcorn-landing.yml -p landing pull
+            docker compose -f popcorn-landing.yml -p landing up -d
+            docker compose -f elixir-langtour.yml -p langtour pull
+            docker compose -f elixir-langtour.yml -p langtour up -d
+            docker compose -f popcorn-burrito.yml -p burrito pull
+            docker compose -f popcorn-burrito.yml -p burrito up -d

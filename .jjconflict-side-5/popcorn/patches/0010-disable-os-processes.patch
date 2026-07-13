@@ -1,0 +1,31 @@
+diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
+index bdd6528412393d3bb85b2d4ac64a27a226a1a1d3..1cb2c1283e28dae02a933ec62f474472dafa488c 100644
+--- a/erts/emulator/sys/unix/sys_drivers.c
++++ b/erts/emulator/sys/unix/sys_drivers.c
+@@ -169,6 +169,7 @@ typedef struct driver_data {
+ void
+ erl_sys_late_init(void)
+ {
++#ifndef ERTS_EMSCRIPTEN
+     SysDriverOpts opts = {0};
+     Port *port;
+ 
+@@ -191,6 +192,7 @@ erl_sys_late_init(void)
+         erts_open_driver(&forker_driver, make_internal_pid(0), "forker", &opts, NULL, NULL);
+     erts_mtx_unlock(port->lock);
+     erts_sys_unix_later_init(); /* Need to be called after forker has been started */
++#endif
+ }
+ 
+ /* II. Prototypes */
+@@ -481,6 +483,10 @@ static ErlDrvData spawn_start(ErlDrvPort port_num, char* name,
+     char *wd, *cwd;
+     int ifd[2], ofd[2], stderrfd;
+ 
++#ifdef ERTS_EMSCRIPTEN
++    return ERL_DRV_ERROR_BADARG;
++#endif
++
+     if (pipe(ifd) < 0) return ERL_DRV_ERROR_ERRNO;
+     errno = EMFILE;		/* default for next three conditions */
+     if (ifd[0] >= sys_max_files() || pipe(ofd) < 0) {

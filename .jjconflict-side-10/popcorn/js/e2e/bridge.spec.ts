@@ -1,0 +1,334 @@
+import { a, atom, encode, t, tuple } from "../src/etf";
+import { assert, evalOpts, expect, test } from "./helpers";
+
+const OVERFLOWED = Number.MAX_SAFE_INTEGER + 1;
+const PAYLOAD = {
+  text: "żółw",
+  nullValue: null,
+  nilString: "nil",
+  boolTrue: true,
+  boolFalse: false,
+  numbers: [
+    0,
+    2 ** 8 - 1,
+    2 ** 8,
+    -1,
+    2 ** 31 - 1,
+    -(2 ** 31),
+    2 ** 31,
+    -(2 ** 31) - 1,
+    Number.MAX_SAFE_INTEGER,
+    Number.MIN_SAFE_INTEGER,
+    1.5,
+  ],
+  emptyList: [],
+  emptyMap: {},
+  nested: [{ value: "ok", missing: null }, null],
+};
+
+test.describe("ETF", () => {
+  test("nil", () => {
+    assert.equal(hex(null), hex(atom("nil")));
+    assert.equal(hex(undefined), hex(null));
+    assert.equal(
+      hex({ value: undefined, nested: [undefined, tuple(undefined, null)] }),
+      hex({ value: null, nested: [null, tuple(null, null)] }),
+    );
+    assert.equal(hex(new Array(1)), hex([null]));
+  });
+
+  test("atoms and tuples", () => {
+    const tupleJs = tuple as (...entries: unknown[]) => unknown;
+
+    assert.equal(hex(atom("ok")), hex(a("ok")));
+    assert.equal(hex(tuple(atom("ok"), "value")), hex(t(a("ok"), "value")));
+    assert.throws(() => tupleJs("only"), /at least two entries/);
+  });
+
+  test("objects", () => {
+    const nullPrototype = Object.assign(Object.create(null), { key: "value" });
+    const symbolKey = { visible: true, [Symbol("key")]: true };
+    const hidden = Object.defineProperty({}, "hidden", { value: true });
+    const accessor = Object.defineProperty({}, "value", {
+      enumerable: true,
+      get: () => true,
+    });
+
+    assert.equal(hex({ b: 2, a: 1 }), hex({ a: 1, b: 2 }));
+    assert(encode(nullPrototype).ok);
+    assert.equal(hex(symbolKey), hex({ visible: true }));
+    assert.equal(hex(hidden), hex({}));
+    assert.equal(hex(accessor), hex({ value: true }));
+    assert.equal(hex(Object.assign([], { extra: true })), hex([]));
+  });
+
+  test("errors", () => {
+    const cyclic: unknown[] = [];
+    cyclic.push(cyclic);
+    const fn = () => null;
+    const symbol = Symbol("value");
+    const date = new Date();
+
+    for (const [value, part, reason] of [
+      [OVERFLOWED, OVERFLOWED, "lossy-int"],
+      [Infinity, Infinity, "non-finite-float"],
+      [-Infinity, -Infinity, "non-finite-float"],
+      [NaN, NaN, "non-finite-float"],
+      [cyclic, cyclic, "cyclic-object"],
+      [fn, fn, "unsupported"],
+      [symbol, symbol, "unsupported"],
+      [date, date, "non-plain-object"],
+      [[fn], fn, "unsupported"],
+    ] as const) {
+      const result = encode(value);
+      assert(!result.ok);
+      assert.equal(result.error.data.data, value);
+      assert.equal(result.error.data.part, part);
+      assert.equal(result.error.data.reason, reason);
+    }
+  });
+});
+
+test.describe("events", () => {
+  test("local fun ETF round trip", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Fun = fun(Value) -> Value + 1 end,
+          Encoded = term_to_binary(Fun),
+          Decoded = binary_to_term(Encoded),
+          {xxh3_128, Checksum} = lists:module_info(checksum),
+          {ok, {lists, {xxh3_128, Checksum}}} =
+            beam_lib:checksum(code:which(lists)),
+          undefined = lists:module_info(md5),
+          Info = lists:module_info(),
+          {checksum, {xxh3_128, Checksum}} =
+            lists:keyfind(checksum, 1, Info),
+          {md5, undefined} = lists:keyfind(md5, 1, Info),
+          ok = wasm:send(#{
+            local_fun_round_trip => Decoded(1) =:= 2,
+            new_fun_ext => binary:at(Encoded, 1) =:= 112,
+            module_checksum => byte_size(Checksum)
+          }).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("local_fun_round_trip")).toEqual({
+      local_fun_round_trip: true,
+      new_fun_ext: true,
+      module_checksum: 16,
+    });
+  });
+
+  test("atoms and tuples", async ({ otp, page }) => {
+    function inJs<Result>(fn: () => Result) {
+      return page.evaluateHandle(fn);
+    }
+
+    const boot = await otp.boot(
+      evalOpts(`
+          true = register(term_receiver, self()),
+          ok = wasm:send(#{bridge_ready => true}),
+          receive
+            {wasm, Payload} ->
+              ok = wasm:send(#{
+                term_received => Payload =:= {ok, <<"value">>}
+              })
+          end,
+          receive
+            stop -> ok
+          end.
+        `),
+    );
+    assert(boot.ok);
+
+    await otp.waitForEvent("bridge_ready");
+    const tuplePayload = await inJs(() => {
+      const a = window.popcorn.atom;
+      const t = window.popcorn.tuple;
+      return t(a("ok"), "value");
+    });
+    assert((await otp.send("term_receiver", tuplePayload)).ok);
+    await tuplePayload.dispose();
+    expect(await otp.waitForEvent("term_received")).toEqual({
+      term_received: true,
+    });
+
+    const atomPayload = await inJs(() => {
+      const a = window.popcorn.atom;
+      return a("popcorn_atom_that_does_not_exist");
+    });
+    const result = await otp.send("term_receiver", atomPayload);
+    await atomPayload.dispose();
+    assert(!result.ok);
+    assert.equal(result.error.t, "bridge:unserializable");
+  });
+
+  test("round trip", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          spawn(fun() ->
+            ExpectedPayload = #{
+              <<"text">> => <<"żółw"/utf8>>,
+              <<"nullValue">> => nil,
+              <<"nilString">> => <<"nil">>,
+              <<"boolTrue">> => true,
+              <<"boolFalse">> => false,
+              <<"numbers">> => [
+                0, 255, 256, -1, 2147483647, -2147483648,
+                2147483648, -2147483649, 9007199254740991,
+                -9007199254740991, 1.5
+              ],
+              <<"emptyList">> => [],
+              <<"emptyMap">> => #{},
+              <<"nested">> => [#{<<"value">> => <<"ok">>, <<"missing">> => nil}, nil]
+            },
+            ExpectedEtf = base64:encode(term_to_binary(ExpectedPayload)),
+            ok = wasm:send(#{etf_expected => ExpectedEtf}),
+            true = register('żółw', self()),
+            ok = wasm:send(#{bridge_ready => true}),
+            receive
+              {wasm, Payload} ->
+                ok = wasm:send(#{
+                  reply => Payload,
+                  decoded => Payload =:= ExpectedPayload
+                })
+            end
+          end).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("etf_expected")).toEqual({
+      etf_expected: Buffer.from(encodePayload(PAYLOAD)).toString("base64"),
+    });
+    await otp.waitForEvent("bridge_ready");
+    assert((await otp.send("żółw", structuredClone(PAYLOAD))).ok);
+    expect(await otp.waitForEvent("reply")).toEqual({
+      reply: PAYLOAD,
+      decoded: true,
+    });
+  });
+});
+
+test.describe("run_js", () => {
+  test("values", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Sync = wasm:run_js(<<"({a, b}) => a + b">>, #{a => 1, b => 2}),
+          Async = wasm:run_js(
+            <<"async ({a, b}) => a + b">>,
+            #{a => 2, b => 5}
+          ),
+          Nested = wasm:run_js(
+            <<"({missing}) => ({a: 1, nested: {b: [2, 3]}, flag: missing === null, missing})">>,
+            #{missing => nil},
+            [{return, value}]
+          ),
+          ok = wasm:send(#{sync => Sync, async => Async, nested => Nested}).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("sync")).toEqual({
+      sync: 3,
+      async: 7,
+      nested: { a: 1, nested: { b: [2, 3] }, flag: true, missing: null },
+    });
+  });
+
+  test("errors", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Timeout = try
+            wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
+          catch
+            error:run_js_timeout -> timeout
+          end,
+          Thrown = try
+            wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
+          catch
+            error:{run_js, Message} -> Message
+          end,
+          Unserializable = try
+            wasm:run_js(<<"() => () => 1">>, #{})
+          catch
+            error:{run_js, {unserializable, Reason}} -> Reason
+          end,
+          Invalid = try
+            wasm:run_js(<<"() => 1">>, #{}, [{return, bogus}])
+          catch
+            error:function_clause -> invalid_option
+          end,
+          ok = wasm:send(#{
+            timeout => Timeout,
+            thrown => Thrown,
+            unserializable => Unserializable,
+            invalid => Invalid
+          }).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("timeout")).toEqual({
+      timeout: "timeout",
+      thrown: "Error: boom",
+      unserializable: "unsupported",
+      invalid: "invalid_option",
+    });
+  });
+});
+
+test.describe("send", () => {
+  test("errors", async ({ createOtp }) => {
+    const otp = await createOtp();
+    const boot = await otp.boot(
+      evalOpts(`
+        true = register(controller, self()),
+        ok = wasm:send(#{ready => true}),
+        receive _ -> ok end.
+      `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("ready");
+
+    expect(await otp.send("unknown", {})).toEqual({
+      ok: false,
+      error: {
+        t: "bridge:listener-not-found",
+        data: { targetName: "unknown" },
+      },
+    });
+    expect(await otp.send("controller", OVERFLOWED)).toEqual({
+      ok: false,
+      error: {
+        t: "bridge:unserializable",
+        data: {
+          data: OVERFLOWED,
+          part: OVERFLOWED,
+          reason: "lossy-int",
+        },
+      },
+    });
+
+    const timedOut = await createOtp();
+    const bootOpts = {
+      timeoutsMs: { send: 0 },
+    };
+    assert((await timedOut.boot(bootOpts)).ok);
+    expect(await timedOut.send("any-target", {})).toEqual({
+      ok: false,
+      error: { t: "timeout:send", data: { timeoutMs: 0 } },
+    });
+  });
+});
+
+function hex(payload: unknown): string {
+  return Buffer.from(encodePayload(payload)).toString("hex");
+}
+
+function encodePayload(payload: unknown): Uint8Array<ArrayBuffer> {
+  const result = encode(payload);
+  assert(result.ok);
+  return result.data;
+}

@@ -1,0 +1,96 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Eval in Wasm Build & test
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "examples/eval-in-wasm/**"
+      - ".github/workflows/eval_in_wasm_build_test.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  MIX_ENV: test
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: examples/eval-in-wasm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build OTP/BEAM for Wasm
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: &host_otp "29.0.6"
+          build-mode: debug
+          with-crypto: "false"
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.20.4"
+          otp-version: *host_otp
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
+          # See https://github.com/nodejs/node/issues/63487.
+          node-version: "24.15.0"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+        working-directory: .
+
+      - name: Build Popcorn JS package
+        run: pnpm -F ./popcorn/js build
+        working-directory: .
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: examples/eval-in-wasm/deps
+          key: ${{ runner.os }}-mix-eval_in_wasm-${{ hashFiles('examples/eval-in-wasm/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-eval_in_wasm-
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
+      - name: Compile Hex dependencies
+        run: mix deps.compile
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+
+      - name: Build
+        run: mix build
+
+      - name: Run tests
+        run: mix test --no-start

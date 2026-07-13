@@ -1,0 +1,119 @@
+diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
+index 218da5447585fd54183a75f8c46c5ee3a8f180af..da1a2a67bacce05369407b415476136f26cb814f 100644
+--- a/erts/emulator/sys/unix/sys.c
++++ b/erts/emulator/sys/unix/sys.c
+@@ -82,6 +82,9 @@
+ #include "erl_cpu_topology.h"
+ #include "erl_osenv.h"
+ #include "erl_dyn_lock_check.h"
++#ifdef ERTS_EMSCRIPTEN
++#include <emscripten.h>
++#endif
+ extern int  driver_interrupt(int, int);
+ extern void do_break(void);
+ 
+@@ -102,7 +105,9 @@ static erts_atomic32_t have_prepared_crash_dump;
+ erts_atomic_t sys_misc_mem_sz;
+ 
+ static void smp_sig_notify(int signum);
++#ifndef ERTS_EMSCRIPTEN
+ static int sig_notify_fds[2] = {-1, -1};
++#endif
+ 
+ #ifdef ERTS_SYS_SUSPEND_SIGNAL
+ static int sig_suspend_fds[2] = {-1, -1};
+@@ -586,6 +591,7 @@ int erts_sys_prepare_crash_dump(int secs)
+     return prepare_crash_dump(secs);
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static void signal_notify_requested(Eterm type) {
+     Process* p = NULL;
+     Eterm msg, *hp;
+@@ -622,6 +628,7 @@ break_requested(void)
+   /* Wake aux thread to get handle break */
+   erts_aux_thread_poke();
+ }
++#endif
+ 
+ static RETSIGTYPE request_break(int signum)
+ {
+@@ -720,6 +727,7 @@ signalterm_to_signum(Eterm signal)
+     }
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static ERTS_INLINE Eterm
+ signum_to_signalterm(int signum)
+ {
+@@ -745,6 +753,7 @@ signum_to_signalterm(int signum)
+     default:      return am_error;
+     }
+ }
++#endif
+ 
+ static RETSIGTYPE generic_signal_handler(int signum)
+ {
+@@ -1100,11 +1109,16 @@ erl_debug(char* fmt, ...)
+ 
+ #endif /* DEBUG */
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static erts_tid_t sig_dispatcher_tid;
++#endif
+ 
+ static void
+ smp_sig_notify(int signum)
+ {
++#ifdef ERTS_EMSCRIPTEN
++    (void)signum; // No signal handling in Emscripten/Wasm
++#else
+     int res;
+     do {
+ 	/* write() is async-signal safe (according to posix) */
+@@ -1117,8 +1131,10 @@ smp_sig_notify(int signum)
+ 	erts_silence_warn_unused_result(write(2, msg, sizeof(msg)));
+ 	abort();
+     }
++#endif
+ }
+ 
++#ifndef ERTS_EMSCRIPTEN
+ static void *
+ signal_dispatcher_thread_func(void *unused)
+ {
+@@ -1211,6 +1227,7 @@ init_smp_sig_suspend(void) {
+   }
+ #endif
+ }
++#endif
+ 
+ #ifdef __DARWIN__
+ 
+@@ -1239,6 +1256,15 @@ erts_sys_main_thread(void)
+ #endif
+     smp_sig_notify(0); /* Notify initialized */
+ 
++#ifdef ERTS_EMSCRIPTEN
++    // Poll for VM halt since Emscripten has no async signal delivery.
++    while (erts_halt_code == INT_MIN) {
++        usleep(100000); // 100ms
++    }
++    emscripten_force_exit(erts_halt_code);
++    return;
++#endif
++
+     /* Wait for a signal to arrive... */
+ 
+ #ifdef __DARWIN__
+@@ -1293,8 +1319,10 @@ erl_sys_args(int* argc, char** argv)
+ 
+     max_files = erts_check_io_max_files();
+ 
++#ifndef ERTS_EMSCRIPTEN
+     init_smp_sig_notify();
+     init_smp_sig_suspend();
++#endif
+ 
+     erts_sys_env_init();
+ }

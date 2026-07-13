@@ -1,0 +1,115 @@
+name: Examples - Build & test
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "examples/game-of-life/**"
+      - "examples/hello-popcorn/**"
+      - "examples/iex-wasm/**"
+      - "popcorn/**"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/patch-beam.sh"
+      - "scripts/runtime-manifest.sh"
+      - "scripts/_common.sh"
+      - ".github/workflows/examples_build_test.yml"
+      - ".github/actions/build-otp-wasm/action.yml"
+      - ".github/actions/setup-playwright/action.yml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Produces popcorn/out with the OTP/BEAM Wasm runtime (cached across runs).
+      - name: Build OTP/BEAM for Wasm
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: &host_otp "29.0.6"
+          build-mode: debug
+          with-crypto: "false"
+
+      # The example is compiled to BEAM that runs on the OTP 29 / Elixir 1.20.4
+      # runtime shipped in the Wasm VM, so the host toolchain must match it.
+      # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.20.4"
+          otp-version: *host_otp
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
+          # See https://github.com/nodejs/node/issues/63487.
+          node-version: "24.15.0"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      # Bundles @swmansion/popcorn and copies the runtime from popcorn/out
+      # into its dist/assets (consumed by the example's esbuild plugin).
+      - name: Build Popcorn JS package
+        run: pnpm -F ./popcorn/js build
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.62.0"
+
+      - name: Run Game of Life unit tests
+        run: mix test
+        working-directory: examples/game-of-life
+
+      - name: Run Hello Popcorn unit tests
+        run: mix test
+        working-directory: examples/hello-popcorn
+
+      - name: Run Game of Life e2e tests
+        run: pnpm test
+        working-directory: examples/game-of-life/assets
+
+      - name: Run Hello Popcorn e2e tests
+        run: pnpm test
+        working-directory: examples/hello-popcorn/assets
+
+      - name: Run IEx Wasm e2e tests
+        run: pnpm test
+        working-directory: examples/iex-wasm/assets
+
+      - name: Upload Playwright test artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: examples-playwright-results
+          path: |
+            examples/game-of-life/assets/playwright-report/
+            examples/game-of-life/assets/test-results/
+            examples/hello-popcorn/assets/playwright-report/
+            examples/hello-popcorn/assets/test-results/
+            examples/iex-wasm/assets/playwright-report/
+            examples/iex-wasm/assets/test-results/
+          if-no-files-found: ignore

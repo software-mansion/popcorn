@@ -1,0 +1,168 @@
+---
+import "../styles/global.css";
+import "@fontsource-variable/handjet";
+import "@fontsource-variable/inter";
+import interWoff2 from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import handjetWoff2 from "@fontsource-variable/handjet/files/handjet-latin-wght-normal.woff2?url";
+import Header from "../components/Header.astro";
+import {
+  TopBarBanner,
+  topBarBannerReservationScript,
+  isBannerHidden,
+  TOP_BAR_BANNER,
+} from "../components/TopBarBanner";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Popcorn: Elixir & Wasm",
+  description = "Compile Elixir to Wasm and run it in the browser with no extra setup.",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://swmansion.com/#organization",
+      name: "Software Mansion",
+      url: "https://swmansion.com",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://popcorn.swmansion.com/#software",
+      name: "Popcorn",
+      url: "https://popcorn.swmansion.com",
+      description: "Compile Elixir to Wasm and run it in the browser with no extra setup.",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web",
+      publisher: { "@id": "https://swmansion.com/#organization" },
+    },
+  ],
+};
+
+const firstZone = TOP_BAR_BANNER!.zones[0];
+const reservationScript = topBarBannerReservationScript(
+  firstZone.zoneId,
+  firstZone.contentId,
+  TOP_BAR_BANNER.hiddenPaths,
+);
+const bannerHidden = isBannerHidden(
+  Astro.url.pathname,
+  TOP_BAR_BANNER.hiddenPaths,
+);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    {import.meta.env.PROD && <script is:inline src="/cookie-script.js" />}
+    <script is:inline set:html={reservationScript} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <script
+      is:inline
+      type="application/ld+json"
+      set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")}
+    />
+
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Popcorn" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="49x80" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href={handjetWoff2}
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href={interWoff2}
+      crossorigin="anonymous"
+    />
+    <meta
+      name="google-site-verification"
+      content="MrHmopnx2sLR0JbXEt14AR86iBeYXaxklQA2tLiMoXE"
+    />
+    <meta name="generator" content={Astro.generator} />
+    <!-- Google Tag Manager -->
+		{
+			import.meta.env.PROD && (
+				<script
+					is:inline
+					set:html={`  
+									(function (w, d, s, l, i) {
+											w[l] = w[l] || [];
+											w[l].push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
+											var f = d.getElementsByTagName(s)[0],
+													j = d.createElement(s),
+													dl = l != "dataLayer" ? "&l=" + l : "";
+											j.async = true;
+											j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+											f.parentNode.insertBefore(j, f);
+									})(window, document, "script", "dataLayer", "GTM-PB7X3QRL");
+							`}
+				/>
+			)
+		}
+		<!-- End Google Tag Manager -->
+  </head>
+  <body>
+    <!-- Google Tag Manager (noscript) -->
+		{
+			import.meta.env.PROD && (
+				<noscript>
+					<iframe
+						src="https://www.googletagmanager.com/ns.html?id=GTM-PB7X3QRL"
+						height="0"
+						width="0"
+						style="display:none;visibility:hidden"
+					/>
+				</noscript>
+			)
+		}
+		<!-- End Google Tag Manager (noscript) -->
+    <div id="top-bar-banner">
+      {
+        !bannerHidden && (
+          <TopBarBanner
+            client:load
+            zones={TOP_BAR_BANNER.zones}
+            rotateIntervalMs={TOP_BAR_BANNER.rotateIntervalMs}
+          />
+        )
+      }
+    </div>
+    <main class="bg-light-20 font-inter min-h-dvh gap-20 overflow-x-clip pt-24">
+      <Header />
+      <slot />
+    </main>
+  </body>
+</html>
+
+<style>
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+  }
+</style>

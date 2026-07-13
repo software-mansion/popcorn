@@ -1,0 +1,198 @@
+---
+import Button, { buttonGroupClass } from "./Button.astro";
+import Section from "./Section.astro";
+import LeadingElement from "./LeadingElement.astro";
+import Marquee from "./Marquee.astro";
+
+const exampleButtonClass =
+  "text-orange-100 cursor-pointer font-semibold hover:bg-grey-20 px-6 py-3 rounded-lg transition-colors duration-150";
+---
+
+<Section id="live-demo" background="light" class="hidden lg:flex">
+  <Marquee> Check out how simple it is to use Popcorn. </Marquee>
+  <LeadingElement title="Live demo" color="light" />
+
+  <div class="flex flex-wrap items-center justify-between gap-20">
+    <div class="m-auto max-w-96">
+      <p>
+        This live demo showcases Elixir’s IEx – running right here in the
+        browser. Write your own code and make it happen, or click on the buttons
+        to run examples that we’ve prepared for you.
+      </p>
+      <div class={buttonGroupClass}>
+        <Button
+          title="See the repo"
+          type="secondary"
+          href="https://github.com/software-mansion/popcorn/"
+          newTab={true}
+        />
+        <Button
+          title="Read the docs"
+          type="primary"
+          href="/docs/"
+          newTab={true}
+        />
+      </div>
+    </div>
+    <div class="m-auto flex flex-col gap-7">
+      <div class="border-brown-60 rounded-lg border bg-[#373129] p-4 pr-0">
+        <div id="terminal" class="live-demo-scroll relative h-80 w-xl"></div>
+      </div>
+      <div class="flex w-full justify-evenly gap-2">
+        <button id="live-simple" class={exampleButtonClass}
+          >Example: Sort
+        </button>
+        <button id="live-case" class={exampleButtonClass}
+          >Example: Processes
+        </button>
+      </div>
+    </div>
+  </div>
+</Section>
+
+<script>
+  import { Popcorn } from "@swmansion/popcorn";
+  import { init, Terminal, FitAddon } from "ghostty-web";
+  import { preventFocus } from "../scripts/utils";
+
+  const IGNORED_SEQUENCES = new Set(["\x1b[A", "\x1b[B", "\t"]); // arrow up, arrow down, tab
+
+  const TERMINAL_CONFIG = {
+    allowTransparency: true,
+    cursorBlink: true,
+    scrollback: 10000,
+    smoothScrollDuration: 100,
+    theme: {
+      background: "#373129",
+      foreground: "#fffdf5",
+      cursor: "#ef7c00",
+      cursorAccent: "#ef7c00",
+
+      black: "#958B82",
+      blue: "#61AFEF",
+      green: "#98C379",
+      cyan: "#56B6C2",
+      magenta: "#C678DD",
+      red: "#E06C75",
+      yellow: "#E5C07B",
+
+      selectionBackground: "#55423d",
+    },
+  };
+
+  const EXAMPLES = [
+    { id: "live-simple", lines: ["Enum.sort([3, 2, 1])"] },
+    {
+      id: "live-case",
+      lines: [
+        "hi = fn -> IO.inspect(self()) end",
+        "Enum.each(0..3, fn _ -> spawn(hi) end)",
+      ],
+    },
+  ];
+
+  async function main() {
+    const terminalContainer = document.getElementById("terminal");
+    if (terminalContainer === null) {
+      throw new Error("Terminal container not found");
+    }
+    const { term, write } = await terminalInit({
+      container: terminalContainer,
+    });
+    window.terminal = term;
+
+    term.write("Loading...\r\n");
+
+    const result = await Popcorn.init({
+      beam: {
+        env: { TERM: "xterm-256color" },
+        extraArgs: [
+          "-elixir_root",
+          "/lib",
+          "-user",
+          "elixir",
+          "-extra",
+          "--no-halt",
+          "+iex",
+          "--dot-iex",
+          "",
+        ],
+      },
+      tty: { size: { columns: term.cols || 80, rows: term.rows || 24 } },
+      onStdout: (text) => displayLog(text, { term, isError: false }),
+      onStderr: (text) => displayLog(text, { term, isError: true }),
+    });
+    if (!result.ok) throw result.error;
+    const popcorn = result.data;
+
+    term.clear();
+
+    term.onData(async (data: string) => {
+      if (IGNORED_SEQUENCES.has(data)) return;
+      try {
+        const result = popcorn.writeStdin(data);
+        if (!result.ok) displayLog(result.error.message, { term, isError: true });
+      } catch (error) {
+        displayLog(String(error), { term, isError: true });
+      }
+    });
+
+    for (const { id, lines } of EXAMPLES) {
+      const node = document.getElementById(id);
+      if (node === null) {
+        throw new Error(`Element with ID ${id} not found`);
+      }
+
+      node.addEventListener("click", async () => {
+        await write(lines, popcorn);
+      });
+    }
+    return term;
+  }
+
+  function displayLog(log: string, { term, isError }) {
+    if (!log) return;
+    if (isError) {
+      log = "\x1b[31m" + log + "\x1b[0m\n\r";
+    }
+    term.write(log);
+  }
+
+  type TerminalOpts = { container: HTMLElement };
+  async function terminalInit({ container }: TerminalOpts) {
+    await init();
+    const term = new Terminal(TERMINAL_CONFIG);
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    // ghostty-web's term.open ends with container.focus() (sync + setTimeout
+    // backup), which scrolls the page since #live-demo is below the fold.
+    preventFocus(container, (el) => term.open(el));
+    fitAddon.fit();
+    fitAddon.observeResize();
+    async function write(
+      lines: string[],
+      popcorn: any,
+      { withEnter = true } = {},
+    ) {
+      for (const line of lines) {
+        const lineResult = popcorn.writeStdin(line);
+        if (!lineResult.ok) throw lineResult.error;
+        if (withEnter) {
+          const enterResult = popcorn.writeStdin("\r");
+          if (!enterResult.ok) throw enterResult.error;
+        }
+      }
+    }
+
+    return { term, write };
+  }
+
+  // Entrypoint
+  await main();
+</script>
+
+<style>
+  .live-demo-scroll {
+    scrollbar-color: #ef7c00 #373129;
+  }
+</style>

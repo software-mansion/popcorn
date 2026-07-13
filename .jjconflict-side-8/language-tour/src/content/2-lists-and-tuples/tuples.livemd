@@ -1,0 +1,45 @@
+# Tuples
+
+Elixir uses curly brackets to define tuples. Like lists, tuples can hold any value.
+
+Tuples store elements contiguously in memory which means accessing a tuple element by index or getting the tuple size is a fast operation.
+
+A tuple example:
+
+```elixir
+tuple = {:ok, "hello"}
+```
+
+Accessing the second element of a tuple:
+
+```elixir
+elem(tuple, 1)
+```
+
+Getting the size of a tuple:
+
+```elixir
+tuple_size(tuple)
+```
+
+## Updating a tuple
+
+It is possible to put an element at a particular index in a tuple with `put_elem`:
+
+```elixir
+# 💡 Try changing the index in `put_elem` above to an out-of-bound value, such as 3. What happens?
+put_elem(tuple, 1, "world")
+```
+
+Notice that `put_elem` returns a new tuple - that's because tuples, like lists, are also immutable.
+
+```elixir
+# 💡 Check the `tuple` variable - did it change after the update?
+tuple
+```
+
+It means that changing a tuple is expensive - a whole new tuple has to be created in memory.
+
+Note, however, that the elements themselves are not copied. When you update a tuple, all entries are shared between the old and the new tuple, except for the entry that has been replaced.
+
+This rule applies to most data structures in Elixir. Such approach reduces the amount of memory allocation the language needs to perform and is only possible thanks to the immutable semantics of the language.

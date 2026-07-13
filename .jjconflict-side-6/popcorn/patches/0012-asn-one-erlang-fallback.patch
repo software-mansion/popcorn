@@ -1,0 +1,21 @@
+diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
+index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
+--- a/lib/asn1/src/asn1rtt_ber.erl
++++ b/lib/asn1/src/asn1rtt_ber.erl
+@@ -129,7 +129,15 @@ ber_encode(Tlv) ->
+     asn1rt_nif:encode_ber_tlv(Tlv).
+ 
+ ber_decode_nif(B) ->
+-    asn1rt_nif:decode_ber_tlv(B).
++    try asn1rt_nif:decode_ber_tlv(B) of
++        Result ->
++            Result
++    catch
++        error:undef ->
++            ber_decode_erlang(B);
++        error:{nif_not_loaded, _, _, _} ->
++            ber_decode_erlang(B)
++    end.
+ 
+ ber_decode_erlang(B) when is_binary(B) ->
+     decode_primitive(B);

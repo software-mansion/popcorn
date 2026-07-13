@@ -1,0 +1,29 @@
+---
+interface Props {
+  background: "light" | "dark";
+  class?: string;
+  id?: string;
+}
+const { background, class: className, id, ...rest } = Astro.props;
+
+const light = "bg-light-20 text-brown-100";
+const dark = "bg-brown-90 text-white";
+
+const backgroundClass = background === "light" ? light : dark;
+---
+
+<div
+  class:list={["-z-20 flex flex-col", backgroundClass]}
+  data-background={background}
+  {...rest}
+>
+  <section
+    {...{ id }}
+    class:list={[
+      "font-inter z-20 mr-4 ml-4 flex scroll-mt-20 flex-col items-center py-44 md:mr-20 md:ml-20 lg:mr-48 lg:ml-48 lg:py-80",
+      className ?? "",
+    ]}
+  >
+    <slot />
+  </section>
+</div>

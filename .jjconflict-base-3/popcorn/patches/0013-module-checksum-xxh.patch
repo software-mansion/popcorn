@@ -1,0 +1,455 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index ae77630dba5020c6fb2e7329e4050312e4867947..34504831d7dc05beeb1d7b8c3b2de8281476a4a7 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -948,6 +948,11 @@ endif
+ $(OBJDIR)/%.o: beam/%.c
+ 	$(V_CC) $(subst $(space)-O2$(space), $(GEN_OPT_FLGS) , $(CFLAGS)) $(INCLUDES) -c $< -o $@
+ 
++$(OBJDIR)/module_xxhash.o: zstd/common/xxhash.c
++	$(V_CC) -DERTS_ENABLE_XXH3 -DXXH_NAMESPACE=ERTS_ \
++		$(subst $(space)-O2$(space), $(GEN_OPT_FLGS) , $(CFLAGS)) \
++		$(INCLUDES) -c $< -o $@
++
+ $(OBJDIR)/%.o: beam/emu/%.c
+ 	$(V_CC) $(subst $(space)-O2$(space), $(GEN_OPT_FLGS) , $(CFLAGS)) $(INCLUDES) -c $< -o $@
+ 
+@@ -1199,6 +1204,7 @@ RUN_OBJS += \
+ 	$(ESOCK_RUN_OBJS)		$(OBJDIR)/erl_flxctr.o \
+ 	$(OBJDIR)/erl_nfunc_sched.o \
+ 	$(OBJDIR)/erl_global_literals.o \
++	$(OBJDIR)/module_xxhash.o \
+ 	$(OBJDIR)/beam_file.o \
+ 	$(OBJDIR)/beam_types.o \
+ 	$(OBJDIR)/erl_term_hashing.o \
+diff --git a/erts/emulator/beam/atom.names b/erts/emulator/beam/atom.names
+index 2f943195f1105e9bf451e4ab99896c68e33afa1b..6573d6fc4fbb9742acf84353b32f14c220c19056 100644
+--- a/erts/emulator/beam/atom.names
++++ b/erts/emulator/beam/atom.names
+@@ -183,6 +183,7 @@ atom CHANGE='CHANGE'
+ atom characters_to_binary_int
+ atom characters_to_list_int
+ atom check_gc
++atom checksum
+ atom clear
+ atom clock_service
+ atom close
+@@ -792,6 +793,7 @@ atom write_concurrency
+ atom x
+ atom xor
+ atom x86
++atom xxh3_128
+ atom y
+ atom yes
+ atom yield
+diff --git a/erts/emulator/beam/beam_bif_load.c b/erts/emulator/beam/beam_bif_load.c
+index 440a7134040e1e765918d6a60c86a7dbd6dc98f0..d70ea0d32483a3a1a3f425c40c027821f8cab67e 100644
+--- a/erts/emulator/beam/beam_bif_load.c
++++ b/erts/emulator/beam/beam_bif_load.c
+@@ -200,22 +200,21 @@ erts_internal_beamfile_chunk_2(BIF_ALIST_2)
+     return res;
+ }
+ 
+-/* Calculate the MD5 for a module. */
+-BIF_RETTYPE
+-erts_internal_beamfile_module_md5_1(BIF_ALIST_1)
++static Eterm
++beamfile_module_checksum(Process* p, Eterm binary)
+ {
+     const byte *temp_alloc = NULL, *bytes;
+     BeamFile beam;
+     Uint size;
+     Eterm res;
+ 
+-    bytes = erts_get_aligned_binary_bytes(BIF_ARG_1, &size, &temp_alloc);
++    bytes = erts_get_aligned_binary_bytes(binary, &size, &temp_alloc);
+     if (bytes == NULL) {
+-        BIF_ERROR(BIF_P, BADARG);
++        return THE_NON_VALUE;
+     }
+ 
+     if (beamfile_read(bytes, size, &beam) == BEAMFILE_READ_SUCCESS) {
+-        res = erts_new_binary_from_data(BIF_P,
++        res = erts_new_binary_from_data(p,
+                                         sizeof(beam.checksum),
+                                         beam.checksum);
+         beamfile_free(&beam);
+@@ -228,6 +227,28 @@ erts_internal_beamfile_module_md5_1(BIF_ALIST_1)
+     return res;
+ }
+ 
++BIF_RETTYPE
++erts_internal_beamfile_module_checksum_1(BIF_ALIST_1)
++{
++    Eterm result = beamfile_module_checksum(BIF_P, BIF_ARG_1);
++
++    if (is_non_value(result)) {
++        BIF_ERROR(BIF_P, BADARG);
++    }
++    BIF_RET(result);
++}
++
++BIF_RETTYPE
++erts_internal_beamfile_module_md5_1(BIF_ALIST_1)
++{
++    Eterm result = beamfile_module_checksum(BIF_P, BIF_ARG_1);
++
++    if (is_non_value(result)) {
++        BIF_ERROR(BIF_P, BADARG);
++    }
++    BIF_RET(result);
++}
++
+ BIF_RETTYPE
+ erts_internal_prepare_loading_2(BIF_ALIST_2)
+ {
+diff --git a/erts/emulator/beam/beam_file.c b/erts/emulator/beam/beam_file.c
+index 1938c5e6ab154aac9ea0da5974992c59a648aecd..ca7361cefe62446dca1ccfce50d90bf7b01c1d50 100644
+--- a/erts/emulator/beam/beam_file.c
++++ b/erts/emulator/beam/beam_file.c
+@@ -25,6 +25,10 @@
+ #endif
+ 
+ #include <stddef.h>
++#define ERTS_ENABLE_XXH3
++#define XXH_NAMESPACE ERTS_
++#define XXH_STATIC_LINKING_ONLY
++#include "../zstd/common/xxhash.h"
+ #include "beam_file.h"
+ #include "beam_load.h"
+ #include "erl_zlib.h"
+@@ -1750,23 +1754,38 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+ 
+     /* Compute module checksum. Please keep all parsing above this section */
+     {
+-        erts_md5_state md5;
+-
+-        erts_md5_init(&md5);
+-
+-        erts_md5_update(&md5,
++        XXH3_state_t xxh3;
++        XXH128_hash_t hash;
++        XXH128_canonical_t canonical;
++
++#define XXH3_UPDATE(Data, Size)                                      \
++        do {                                                         \
++            XXH_errorcode result =                                   \
++                XXH3_128bits_update(&xxh3, Data, Size);              \
++            (void)result;                                            \
++            ASSERT(result == XXH_OK);                                \
++        } while (0)
++
++        XXH3_INITSTATE(&xxh3);
++        {
++            XXH_errorcode result = XXH3_128bits_reset(&xxh3);
++            (void)result;
++            ASSERT(result == XXH_OK);
++        }
++
++        XXH3_UPDATE(
+                   (byte*)chunks[UTF8_ATOM_CHUNK].data,
+                   chunks[UTF8_ATOM_CHUNK].size);
+-        erts_md5_update(&md5,
++        XXH3_UPDATE(
+                   (byte*)chunks[CODE_CHUNK].data,
+                   chunks[CODE_CHUNK].size);
+-        erts_md5_update(&md5,
++        XXH3_UPDATE(
+                   (byte*)chunks[STR_CHUNK].data,
+                   chunks[STR_CHUNK].size);
+-        erts_md5_update(&md5,
++        XXH3_UPDATE(
+                   (byte*)chunks[IMP_CHUNK].data,
+                   chunks[IMP_CHUNK].size);
+-        erts_md5_update(&md5,
++        XXH3_UPDATE(
+                   (byte*)chunks[EXP_CHUNK].data,
+                   chunks[EXP_CHUNK].size);
+ 
+@@ -1778,7 +1797,7 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+             * checksum hash, as it's derived using a (broken and superseded)
+             * endian-dependent hash function. */
+             if (left >= 4) {
+-                erts_md5_update(&md5, (byte*)start, 4);
++                XXH3_UPDATE( (byte*)start, 4);
+ 
+                 start += 4;
+                 left -= 4;
+@@ -1787,9 +1806,9 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+                     static byte zero[4] = {0, 0, 0, 0};
+ 
+                     /* Include: Function Arity Index NumFree */
+-                    erts_md5_update(&md5, (byte*)start, 20);
++                    XXH3_UPDATE( (byte*)start, 20);
+                     /* Set to zero: OldUniq */
+-                    erts_md5_update(&md5, (byte*)zero, 4);
++                    XXH3_UPDATE( (byte*)zero, 4);
+ 
+                     start += 24;
+                     left -= 24;
+@@ -1803,30 +1822,34 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+         }
+ 
+         if (chunks[LITERAL_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[LITERAL_CHUNK].data,
+                       chunks[LITERAL_CHUNK].size);
+         }
+ 
+         if (chunks[META_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[META_CHUNK].data,
+                       chunks[META_CHUNK].size);
+         }
+ 
+         if (chunks[RECORD_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[RECORD_CHUNK].data,
+                       chunks[RECORD_CHUNK].size);
+         }
+ 
+         if (chunks[DEBUG_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[DEBUG_CHUNK].data,
+                       chunks[DEBUG_CHUNK].size);
+         }
+ 
+-        erts_md5_finish(beam->checksum, &md5);
++        hash = XXH3_128bits_digest(&xxh3);
++        XXH128_canonicalFromHash(&canonical, hash);
++        sys_memcpy(beam->checksum, canonical.digest, sizeof(canonical.digest));
++
++#undef XXH3_UPDATE
+     }
+ 
+     return BEAMFILE_READ_SUCCESS;
+diff --git a/erts/emulator/beam/bif.tab b/erts/emulator/beam/bif.tab
+index a4b1aa58ed6661741e84ad6dd9902ac42ece57e1..f366be789067fc00a45134450988846fbb8bd92e 100644
+--- a/erts/emulator/beam/bif.tab
++++ b/erts/emulator/beam/bif.tab
+@@ -768,6 +768,7 @@ bif erts_internal:get_creation/0
+ bif erts_internal:prepare_loading/2
+ bif erts_internal:beamfile_chunk/2
+ bif erts_internal:beamfile_module_md5/1
++bif erts_internal:beamfile_module_checksum/1
+ bif os:env/0
+ bif erlang:alias/1
+ bif erlang:unalias/1
+diff --git a/erts/emulator/beam/erl_bif_info.c b/erts/emulator/beam/erl_bif_info.c
+index 0b6eb12c462d8ff2a88c9a2accfb40b40eb51d3f..b3ed0d22a540c78d19f62884d36154439c26e80a 100644
+--- a/erts/emulator/beam/erl_bif_info.c
++++ b/erts/emulator/beam/erl_bif_info.c
+@@ -5904,11 +5904,14 @@ compilation_info_for_module(Process* p, const BeamCodeHeader* code_hdr)
+     return result;
+ }
+ 
+-/* Returns the MD5 checksum for a module */
++/* Returns the loader checksum for a module. */
+ static Eterm
+-md5_of_module(Process* p, const BeamCodeHeader* code_hdr)
++checksum_of_module(Process* p, const BeamCodeHeader* code_hdr)
+ {
+-    return erts_new_binary_from_data(p, MD5_SIZE, code_hdr->md5_ptr);
++    Eterm digest = erts_new_binary_from_data(p, MD5_SIZE, code_hdr->md5_ptr);
++    Eterm* hp = HAlloc(p, 3);
++
++    return TUPLE2(hp, am_xxh3_128, digest);
+ }
+ 
+ static Eterm
+@@ -5918,8 +5921,10 @@ get_module_info(Process* p, ErtsCodeIndex code_ix,
+ {
+     if (what == am_module) {
+         return module;
++    } else if (what == am_checksum) {
++        return checksum_of_module(p, code_hdr);
+     } else if (what == am_md5) {
+-        return md5_of_module(p, code_hdr);
++        return am_undefined;
+     } else if (what == am_exports) {
+         return exported_from_module(p, code_ix, module);
+     } else if (what == am_functions) {
+@@ -5970,6 +5975,7 @@ module_info_0(Process* p, Eterm module)
+     hp += 3; \
+     list = CONS(hp, tup, list)
+ 
++    BUILD_INFO(am_checksum);
+     BUILD_INFO(am_md5);
+     BUILD_INFO(am_compile);
+     BUILD_INFO(am_attributes);
+diff --git a/erts/emulator/beam/erl_fun.h b/erts/emulator/beam/erl_fun.h
+index c26c59ab11c9744838fcbd1ce80439f0acb83d05..6a101676536895d4d54199325e46ee4dbb4b8a08 100644
+--- a/erts/emulator/beam/erl_fun.h
++++ b/erts/emulator/beam/erl_fun.h
+@@ -39,7 +39,7 @@ typedef struct erl_fun_entry {
+     /* These fields identify the function and must not be altered after fun
+      * creation. */
+     Eterm module;                   /* Tagged atom for module. */
+-    byte uniq[16];                  /* MD5 for module. */
++    byte uniq[16];                  /* Module checksum. */
+     int arity;                      /* The arity of the fun. */
+     int index;                      /* New style index. */
+ 
+diff --git a/erts/emulator/beam/external.c b/erts/emulator/beam/external.c
+index b45bd379bec7bad1a8eaaf4a009260332dac644c..484c15cb5de1b703cbc2e2d62482ecf22d946aaf 100644
+--- a/erts/emulator/beam/external.c
++++ b/erts/emulator/beam/external.c
+@@ -3977,6 +3977,9 @@ enc_term_int(TTBEncodeContext* ctx, ErtsAtomCacheMap *acmp, Eterm obj, byte* ep,
+                     ep += 4;
+                     *ep = fun_arity(funp);
+                     ep += 1;
++                    /* Popcorn stores XXH3-128 here instead of MD5. NEW_FUN_EXT
++                     * has no algorithm tag, so local funs serialized by this
++                     * VM are not portable to a stock OTP runtime. */
+                     sys_memcpy(ep, fe->uniq, 16);
+                     ep += 16;
+                     put_int32(fe->index, ep);
+diff --git a/erts/emulator/zstd/common/xxhash.h b/erts/emulator/zstd/common/xxhash.h
+index b6af402fdf4c9a39207974448a0525e20631c115..0c6ababb85477ec24fdeba56b2423d20024d4727 100644
+--- a/erts/emulator/zstd/common/xxhash.h
++++ b/erts/emulator/zstd/common/xxhash.h
+@@ -11,7 +11,7 @@
+ 
+ /* Local adaptations for Zstandard */
+ 
+-#ifndef XXH_NO_XXH3
++#if !defined(ERTS_ENABLE_XXH3) && !defined(XXH_NO_XXH3)
+ # define XXH_NO_XXH3
+ #endif
+ 
+diff --git a/erts/preloaded/src/erlang.erl b/erts/preloaded/src/erlang.erl
+index 8e38a056819e114b89dbd90d6734c163573b0fdb..8db34aabd928e3a7d7999c0782f609a160b375a4 100644
+--- a/erts/preloaded/src/erlang.erl
++++ b/erts/preloaded/src/erlang.erl
+@@ -6997,7 +6997,7 @@ element(_N, _Tuple) ->
+     erlang:nif_error(undefined).
+ 
+ %% Not documented
+--type module_info_key() :: attributes | compile | exports | functions | md5
++-type module_info_key() :: attributes | checksum | compile | exports | functions | md5
+                          | module | native | native_addresses | nifs.
+ -doc false.
+ -spec get_module_info(Module, Item) -> ModuleInfo when
+diff --git a/erts/preloaded/src/erts_internal.erl b/erts/preloaded/src/erts_internal.erl
+index fcf68868566fd8c83af7a6dbac97e33c067ddb23..ee4188e9db4059a0e8d71682178402a842c9ad2d 100644
+--- a/erts/preloaded/src/erts_internal.erl
++++ b/erts/preloaded/src/erts_internal.erl
+@@ -119,7 +119,8 @@
+ 
+ -export([crasher/6]).
+ 
+--export([prepare_loading/2, beamfile_chunk/2, beamfile_module_md5/1]).
++-export([prepare_loading/2, beamfile_chunk/2,
++         beamfile_module_checksum/1, beamfile_module_md5/1]).
+ 
+ -export([no_aux_work_threads/0]).
+ 
+@@ -1101,6 +1102,10 @@ beamfile_chunk(_Bin, _Chunk) ->
+ beamfile_module_md5(_Bin) ->
+     erlang:nif_error(undefined).
+ 
++-spec beamfile_module_checksum(binary()) -> binary() | undefined.
++beamfile_module_checksum(_Bin) ->
++    erlang:nif_error(undefined).
++
+ -spec no_aux_work_threads() -> pos_integer().
+ 
+ no_aux_work_threads() ->
+diff --git a/lib/stdlib/src/beam_lib.erl b/lib/stdlib/src/beam_lib.erl
+index 28a84ab1284541e649535650c03f0a7eaff7e1be..2e38f3b08df2d1106c40827966ec387f14f7253f 100644
+--- a/lib/stdlib/src/beam_lib.erl
++++ b/lib/stdlib/src/beam_lib.erl
+@@ -174,6 +174,7 @@ providing one key for module `t` and another key for all other modules:
+ 	 significant_chunks/0,
+ 	 build_module/1,
+ 	 version/1,
++	 checksum/1,
+ 	 md5/1,
+ 	 format_error/1]).
+ 
+@@ -554,6 +555,33 @@ version(File) ->
+ 	    Error
+     end.
+ 
++-doc """
++Calculates the checksum used by the code loader for a module.
++""".
++-spec checksum(Beam) ->
++        {'ok', {module(), {'xxh3_128', binary()}}} |
++        {'error', 'beam_lib', chnk_rsn()} when
++      Beam :: beam().
++
++checksum(File0) ->
++    case catch checksum_1(File0) of
++	{ok, _} = Result ->
++	    Result;
++	Error ->
++	    Error
++    end.
++
++checksum_1(File0) ->
++    File = beam_filename(File0),
++    Beam = beam_data(File),
++    {ok, Module, _} = scan_beam(Beam, []),
++    case erts_internal:beamfile_module_checksum(Beam) of
++	Digest when is_binary(Digest) ->
++	    {ok, {Module, {xxh3_128, Digest}}};
++	undefined ->
++	    error({not_a_beam_file, File})
++    end.
++
+ -doc """
+ Calculates an MD5 redundancy check for the code of the module (compilation date
+ and other attributes are not included).
+@@ -1290,6 +1318,9 @@ extract_literals(Chunk0) ->
+ 	     bin :: binary(),
+ 	     source :: binary() | string()}).
+ 
++beam_data(File) ->
++    (open_file(File))#bb.bin.
++
+ open_file(Binary0) when is_binary(Binary0) ->
+     Binary = maybe_uncompress(Binary0),
+     #bb{bin = Binary, source = Binary};
+diff --git a/lib/stdlib/test/beam_lib_SUITE.erl b/lib/stdlib/test/beam_lib_SUITE.erl
+index 2425df74586ba6bd6fefea18cd8523cfdeb66fed..22a13b91249c9abdc62c5298ecc24d324a2bb8af 100644
+--- a/lib/stdlib/test/beam_lib_SUITE.erl
++++ b/lib/stdlib/test/beam_lib_SUITE.erl
+@@ -37,7 +37,7 @@
+ -export([all/0, suite/0,groups/0,init_per_suite/1, end_per_suite/1, 
+ 	 init_per_group/2,end_per_group/2, 
+ 	 normal/1, error/1, cmp/1, cmp_literals/1, strip/1, strip_add_chunks/1, otp_6711/1,
+-         building/1, md5/1, encrypted_abstr/1, encrypted_abstr_file/1,
++         building/1, checksum/1, md5/1, encrypted_abstr/1, encrypted_abstr_file/1,
+          missing_debug_info_backend/1, literals/1
+         ]).
+ -export([test_makedep_abstract_code/1]).
+@@ -50,7 +50,7 @@ suite() ->
+ 
+ all() -> 
+     [error, normal, cmp, cmp_literals, strip, strip_add_chunks, otp_6711,
+-     building, md5, encrypted_abstr, encrypted_abstr_file,
++     building, checksum, md5, encrypted_abstr, encrypted_abstr_file,
+      missing_debug_info_backend, test_makedep_abstract_code,
+      literals
+     ].
+@@ -622,6 +622,15 @@ building(Conf) when is_list(Conf) ->
+     ok.
+ 
+ %% Compare beam_lib:md5/1 and code:module_md5/1.
++checksum(Conf) when is_list(Conf) ->
++    Beam = code:which(lists),
++    {ok, {lists, Checksum}} = beam_lib:checksum(Beam),
++    Checksum = lists:module_info(checksum),
++    undefined = lists:module_info(md5),
++    {checksum, Checksum} = lists:keyfind(checksum, 1, lists:module_info()),
++    {md5, undefined} = lists:keyfind(md5, 1, lists:module_info()),
++    ok.
++
+ md5(Conf) when is_list(Conf) ->
+     Beams = collect_beams(),
+     io:format("Found ~w beam files", [length(Beams)]),

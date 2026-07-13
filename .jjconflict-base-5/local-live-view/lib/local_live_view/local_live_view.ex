@@ -1,0 +1,432 @@
+defmodule LocalLiveView do
+  @moduledoc ~S'''
+  `LocalLiveView` implements functionality of `Phoenix.LiveView`
+  inside the browser in Popcorn runtime.
+
+  Instead of running the code on the server and sending
+  updates via WebSocket, the local live view's code is sent
+  to the browser on page load. Whenever you render a local
+  live view on the page, it is run on the client.
+
+  `LocalLiveView` API similar to `Phoenix.LiveView`:
+  - it runs in a separate Elixir process,
+  - it has `c:mount/3`, `c:handle_params/3` and `c:render/1` callbacks,
+    which behave the same way as in a regular live view,
+  - it can spawn regular `Phoenix.Component`s and `Phoenix.LiveComponent`s,
+  - events from these components by default go to their parent
+    local live view.
+
+  Thus, you can implement a simple local live view just like a regular live view:
+
+  ```
+  defmodule DemoLive do
+    use LocalLiveView
+
+    def render(assigns) do
+      ~H"""
+      Hello world!
+      """
+    end
+  end
+  ```
+
+  and add it to your page using the `local_live_view/1` component:
+
+  ```
+  <.local_live_view view="DemoLive" />
+  ```
+
+  The main difference between `LocalLiveView` and `Phoenix.LiveView` is that
+  the former can also accept assigns and has an `update` callback, like
+  `Phoenix.LiveComponent`:
+
+  ```
+  defmodule Cart do
+    use LocalLiveView
+
+    @impl true
+    def mount(_params, _session, socket) do
+      {:ok, assign(socket, open: false)}
+    end
+
+    @impl true
+    def update(%{items: items}, socket) do
+      {:ok, assign(socket, :items, items)}
+    end
+
+    @impl true
+    def render(assigns) do
+      ~H"""
+      <div>The cart has {length(@items)} items</div>
+      """
+    end
+  end
+  ```
+
+  You can reder it the following way:
+
+  ```
+  <.local_live_view view="Cart" items={@items} />
+  ```
+
+  ## Sending events to the server
+
+  When a local live view is rendered inside a `Phoenix.LiveView`, it can
+  send events to that server-side live view by calling `push_server_event/3`
+  from `c:Phoenix.LiveView.handle_event/3` or `c:handle_info/2`:
+
+  ```
+  def handle_event("archive", %{"id" => id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:items, archive_item(socket.assigns.items, id))
+     |> push_server_event("archive", %{"id" => id})}
+  end
+  ```
+
+  This pattern gives optimistic updates: the event is handled locally
+  first (the optimistic edit), then delivered to the host LiveView's
+  `handle_event/3`, whose authoritative state can later override it.
+
+  ## Handling failed server pushes
+
+  A `push_server_event/3` can fail: the page may have no host LiveView,
+  the websocket may be disconnected, or the host may reply with an error
+  or time out. When that happens, the view's `c:handle_push_error/4`
+  callback is invoked with the event, its params and `server_assigns` —
+  the last value of each assign received from the host server. The
+  default implementation feeds `server_assigns` through `c:update/2`,
+  rolling optimistic local edits back to the latest authoritative state.
+
+  Another way of communicating the server is by using `mirror_sync/2`.
+  '''
+
+  alias Phoenix.LiveView.Socket
+
+  @doc """
+  Syncs the declared mirror assigns to the server-side mirror channel.
+  Must be called from within a LocalLiveView callback (handle_event, handle_info)
+  after assigns have been updated.
+  """
+  def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
+    payload =
+      Map.new(mirror_keys, fn key ->
+        {to_string(key), socket.assigns |> Map.get(key) |> LocalLiveView.Utils.to_serializable()}
+      end)
+
+    unless payload == %{} do
+      Popcorn.Wasm.run_js(
+        """
+        ({ args }) => {
+          if (window.__llvSync) {
+            window.__llvSync(args.mirror_id, "sync", args.payload);
+          }
+        }
+        """,
+        %{mirror_id: socket.private[:mirror_id], payload: payload}
+      )
+    end
+
+    socket
+  end
+
+  @doc """
+  Mimics `Phoenix.LiveView.connected?/1`. Always returns `true`.
+
+  Helps code reusability between server and local LiveViews.
+  """
+  def connected?(_socket), do: true
+
+  @doc """
+  Sends an event to the host (server) `LiveView` that mounts this local live view.
+
+  Callable from `handle_event/3` or `handle_info/2`, it delivers
+  `event`/`payload` to the host LiveView's `handle_event(event, payload, socket)`
+  over the regular Phoenix websocket.
+
+  If the push fails (no host LiveView, disconnected socket, error reply or
+  timeout), the view's `c:handle_push_error/4` callback is invoked.
+  """
+  def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        if (window.__llvPushServer) {
+          window.__llvPushServer(args.id, args.event, args.payload);
+        }
+      }
+      """,
+      %{
+        id: socket.private[:llv_id],
+        event: to_string(event),
+        payload: LocalLiveView.Utils.to_serializable(payload)
+      }
+    )
+
+    socket
+  end
+
+  defmacro __using__(opts) do
+    quote bind_quoted: [opts: opts] do
+      import LocalLiveView, only: [mirror_sync: 2, push_server_event: 2, push_server_event: 3]
+      @behaviour LocalLiveView
+      @before_compile Phoenix.LiveView.Renderer
+      @phoenix_live_opts []
+      Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
+      @before_compile LocalLiveView
+      alias LocalLiveView.Message
+      use Phoenix.Component, global_prefixes: ~w(pop-)
+
+      @impl true
+      def handle_event("llv_server_message", %{"type" => type} = params, socket) do
+        handle_server_event(type, params, socket)
+      end
+
+      def handle_server_event(_, _, socket) do
+        {:noreply, socket}
+      end
+
+      @impl true
+      def update(assigns, socket) do
+        {:ok, assign(socket, assigns)}
+      end
+
+      @impl true
+      def handle_info(_msg, socket) do
+        {:noreply, socket}
+      end
+
+      @impl true
+      def handle_push_error(_event, _params, server_assigns, socket) do
+        {:ok, socket} = update(server_assigns, socket)
+        {:noreply, socket}
+      end
+
+      defoverridable handle_server_event: 3, update: 2, handle_info: 2, handle_push_error: 4
+    end
+  end
+
+  @doc false
+  defmacro __before_compile__(env) do
+    opts = Module.get_attribute(env.module, :phoenix_live_opts)
+
+    on_mount =
+      env.module
+      |> Module.get_attribute(:phoenix_live_mount)
+      |> Enum.reverse()
+
+    live = LocalLiveView.__live__([on_mount: on_mount] ++ opts)
+
+    quote do
+      @doc false
+      def __live__ do
+        unquote(Macro.escape(live))
+      end
+    end
+  end
+
+  @doc false
+  def __live__(opts \\ []) do
+    on_mount = opts[:on_mount] || []
+
+    layout =
+      Phoenix.LiveView.Utils.normalize_layout(Keyword.get(opts, :layout, false))
+
+    log =
+      case Keyword.fetch(opts, :log) do
+        {:ok, false} -> false
+        {:ok, log} when is_atom(log) -> log
+        :error -> :debug
+        _ -> raise ArgumentError, ":log expects an atom or false, got: #{inspect(opts[:log])}"
+      end
+
+    container = opts[:container] || {:div, []}
+
+    %{
+      container: container,
+      kind: :view,
+      layout: layout,
+      lifecycle: Phoenix.LiveView.Lifecycle.build(on_mount),
+      log: log
+    }
+  end
+
+  @doc """
+  Navigates to the given path with a browser history push, then calls `handle_params/3`
+  with the new URL query params. No server round-trip.
+
+  Mirrors `Phoenix.LiveView.push_patch/2` semantics.
+
+  ## Options
+
+    * `:to` — the path to navigate to (required)
+    * `:replace` — when `true`, replaces the current history entry instead of pushing a new one
+  """
+  def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
+    to = Keyword.fetch!(opts, :to)
+    kind = if opts[:replace], do: :replace, else: :push
+    %{socket | redirected: {:live, :patch, %{to: to, kind: kind}}}
+  end
+
+  @type unsigned_params :: map
+
+  @doc ~S'''
+  Returns the HEEx template for the view's current state.
+
+  Called on mount and again after every state change, exactly like
+  `c:Phoenix.LiveView.render/1` — except the render happens in the browser, so
+  no diff travels over the network.
+
+  ```
+  def render(assigns) do
+    ~H"""
+    <p>{@label}: {@count}</p>
+    """
+  end
+  ```
+  '''
+  @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
+
+  @doc """
+  Invoked once when the view is initialized, before the first `c:render/1`.
+
+  Use it to set up the initial assigns. Assigns coming from the host LiveView
+  are not delivered here — `c:update/2` runs with them right after this
+  callback, before the first render.
+
+  ```
+  def mount(_params, _session, socket) do
+    {:ok, assign(socket, count: 0, label: "Counter")}
+  end
+  ```
+  """
+  @callback mount(
+              params :: unsigned_params() | :not_mounted_at_router,
+              session :: map,
+              socket :: Socket.t()
+            ) ::
+              {:ok, Socket.t()} | {:ok, Socket.t(), keyword()}
+
+  @doc """
+  Invoked with the query params of the page the view is rendered on.
+
+  Called after `c:mount/3` and again after every `push_patch/2`. `params` holds
+  the query string decoded into a map with string keys and `uri` is the full
+  URL.
+
+  ```
+  def handle_params(%{"tab" => tab}, _uri, socket) do
+    {:noreply, assign(socket, :tab, tab)}
+  end
+  ```
+  """
+  @callback handle_params(
+              params :: unsigned_params(),
+              uri :: String.t(),
+              socket :: Socket.t()
+            ) :: {:noreply, Socket.t()}
+
+  @doc ~S'''
+  Receives the assigns the host LiveView passes down.
+
+  The mechanism is the same as in `Phoenix.LiveComponent` and its
+  `c:Phoenix.LiveComponent.update/2` callback.
+
+  Every attribute other than `view` given to `local_live_view/1` is forwarded
+  here, the same way `Phoenix.LiveComponent` receives its assigns:
+
+  ```
+  <.local_live_view view="Cart" items={@items} currency="EUR" />
+  ```
+
+  It runs right after `c:mount/3` with the initial values, and then on every
+  re-render of the host LiveView. The host always sends the full set of
+  forwarded assigns, not a diff, so a view that needs to react only to actual
+  changes has to compare against its own assigns.
+
+  ```
+  def update(%{items: items}, socket) do
+    {:ok, assign(socket, :items, items)}
+  end
+  ```
+
+  The default implementation assigns everything it receives.
+
+  This callback is also called by the default implementation of `c:handle_push_error/4`.
+  '''
+  @callback update(assigns :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
+
+  @doc """
+  Handles an event triggered from the template, such as `phx-click`.
+
+  Bindings work exactly as in `Phoenix.LiveView`, but the event is dispatched to
+  the local process instead of travelling to the server, so the following
+  `c:render/1` happens without a round-trip.
+
+  ```
+  def handle_event("increment", _params, socket) do
+    {:noreply, update(socket, :count, &(&1 + 1))}
+  end
+  ```
+
+  To notify the host LiveView as well, push the event on with
+  `push_server_event/3`.
+  """
+  @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
+              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
+  @doc """
+  Handles a message sent to the view's process.
+
+  A local live view runs as its own Elixir process inside the browser, so
+  anything that can reach that process arrives here — for example, a timer set
+  with `Process.send_after/3`:
+
+  ```
+  def mount(_params, _session, socket) do
+    Process.send_after(self(), :tick, 1000)
+    {:ok, assign(socket, :time, Time.utc_now())}
+  end
+
+  def handle_info(:tick, socket) do
+    Process.send_after(self(), :tick, 1000)
+    {:noreply, assign(socket, :time, Time.utc_now())}
+  end
+  ```
+
+  The resulting render is pushed to the DOM as a diff, exactly as after
+  `c:handle_event/3`. The default implementation ignores the message.
+  """
+  @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
+
+  @doc """
+  Invoked when a `push_server_event/3` fails: there is no host LiveView on the
+  page, the websocket is disconnected, or the host replies with an error or
+  times out.
+
+  `event` and `params` are the event name and payload the failed push carried
+  (`params` has string keys, after a JSON round-trip, like `c:handle_event/3`
+  params). `server_assigns` holds the last value of each assign received from
+  the host server (through mount and `c:update/2`) — assigns only ever set
+  locally are absent.
+
+  The default implementation feeds `server_assigns` through `c:update/2`, as if
+  the host had re-sent them — restoring the latest authoritative state through
+  the view's usual derivation path. A view whose `c:update/2` skips unchanged
+  data (e.g. guarded by a revision counter) should override this callback and
+  force its rollback explicitly.
+  """
+  @callback handle_push_error(
+              event :: binary,
+              params :: unsigned_params(),
+              server_assigns :: map(),
+              socket :: Socket.t()
+            ) :: {:noreply, Socket.t()}
+
+  @optional_callbacks mount: 3,
+                      update: 2,
+                      handle_event: 3,
+                      handle_info: 2,
+                      handle_params: 3,
+                      handle_push_error: 4
+end

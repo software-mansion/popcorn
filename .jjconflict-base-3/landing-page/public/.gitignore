@@ -1,0 +1,4 @@
+wasm/
+assets/
+_astro/AtomVM.mjs
+_astro/AtomVM.wasm
