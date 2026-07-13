@@ -1,0 +1,219 @@
+---
+import { Code } from "astro:components";
+import type { ShikiTransformer } from "shiki";
+import { createBlockTransformer } from "../../scripts/local-live-view/code-panel";
+import { popcornTheme } from "../../scripts/local-live-view/theme";
+import "./llv-scrollbar.css";
+
+export interface CodeTab {
+  label: string;
+  id: string;
+  code: string;
+  lang: string;
+}
+
+interface Props {
+  tabs: CodeTab[];
+}
+
+const { tabs } = Astro.props;
+
+const transformers: ShikiTransformer[] = tabs.map((tab) =>
+  createBlockTransformer(tab.code),
+);
+---
+
+<div class="code-panel">
+  <div class="code-tabs">
+    {
+      tabs.map((tab, i) => (
+        <button class={`code-tab ${i === 0 ? "active" : ""}`} data-tab={tab.id}>
+          {tab.label}
+        </button>
+      ))
+    }
+  </div>
+  {
+    tabs.map((tab, i) => (
+      <div
+        id={`llv-code-body-${i}`}
+        class:list={["code-body-wrap", "llv-scroll", { "code-body-hidden": i !== 0 }]}
+      >
+        <Code
+          code={tab.code}
+          lang={tab.lang}
+          theme={popcornTheme}
+          transformers={[transformers[i]]}
+        />
+      </div>
+    ))
+  }
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>(".code-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const panel = tab.closest(".code-panel");
+      if (!panel) return;
+      panel
+        .querySelectorAll(".code-tab")
+        .forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const allTabs = Array.from(
+        panel.querySelectorAll<HTMLButtonElement>(".code-tab"),
+      );
+      const idx = allTabs.findIndex((t) => t.dataset.tab === tab.dataset.tab);
+      panel
+        .querySelectorAll<HTMLElement>(".code-body-wrap")
+        .forEach((body, i) => {
+          body.classList.toggle("code-body-hidden", i !== idx);
+        });
+    });
+  });
+
+  document
+    .querySelectorAll<HTMLElement>("[data-defp-header]")
+    .forEach((headerLine) => {
+      const groupId = headerLine.dataset.defpGroup!;
+      const wrap = headerLine.closest(".code-body-wrap")!;
+
+      const arrow = document.createElement("span");
+      arrow.className = "defp-arrow";
+      arrow.textContent = "▼";
+      headerLine.prepend(arrow);
+      headerLine.classList.add("defp-header");
+
+      const bodyLines = [
+        ...wrap.querySelectorAll<HTMLElement>(
+          `[data-defp-group="${groupId}"]:not([data-defp-header])`,
+        ),
+      ];
+
+      // Shiki places \n text nodes between lines — capture them so we can
+      // clear them on collapse (otherwise hidden lines leave blank gaps).
+      const textNodes = bodyLines.map((line) => {
+        const prev = line.previousSibling;
+        if (prev?.nodeType === Node.TEXT_NODE) {
+          const tn = prev as Text;
+          return { tn, original: tn.data };
+        }
+        return null;
+      });
+
+      const collapse = () => {
+        headerLine.dataset.collapsed = "true";
+        arrow.textContent = "▶";
+        bodyLines.forEach((l, i) => {
+          l.style.display = "none";
+          const entry = textNodes[i];
+          if (entry) entry.tn.data = "";
+        });
+      };
+
+      const expand = () => {
+        headerLine.dataset.collapsed = "false";
+        arrow.textContent = "▼";
+        bodyLines.forEach((l, i) => {
+          l.style.display = "";
+          const entry = textNodes[i];
+          if (entry) entry.tn.data = entry.original;
+        });
+      };
+
+      collapse();
+
+      headerLine.addEventListener("click", () => {
+        headerLine.dataset.collapsed === "true" ? expand() : collapse();
+      });
+    });
+</script>
+
+<style is:global>
+  .code-panel {
+    background: #1a0f05;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(48, 27, 5, 0.1);
+  }
+  .code-tabs {
+    display: flex;
+    background: #120a02;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 0.5rem;
+  }
+  .code-tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.75rem;
+    color: #7a5535;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: monospace;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .code-tab.active {
+    color: #ef7c00;
+    border-bottom-color: #ef7c00;
+  }
+  .code-tab:hover:not(.active) {
+    color: #fffdf5;
+  }
+  .code-body-wrap pre {
+    margin: 0;
+    padding: 1rem 0;
+    overflow-x: auto;
+    background-color: transparent !important;
+    font-family: monospace !important;
+    font-size: 0.8rem !important;
+    line-height: 1.65 !important;
+  }
+  .code-body-wrap pre code {
+    display: block;
+    background: transparent !important;
+  }
+  .line {
+    display: inline-flex;
+    justify-content: space-between;
+    gap: 1rem;
+    width: 100%;
+    position: relative;
+    transition:
+      background 0.25s,
+      border-color 0.25s;
+    padding: 0.05rem 1rem;
+    border-left: 2px solid transparent;
+    scroll-margin-top: 5.5rem;
+  }
+  .line.hl {
+    background: rgba(239, 124, 0, 0.09);
+    border-left-color: #ef7c00;
+  }
+  .line.dim {
+    opacity: 0.3;
+  }
+  .code-body-hidden {
+    display: none;
+  }
+.defp-header {
+    cursor: pointer;
+    user-select: none;
+  }
+  .defp-header:hover {
+    background: rgba(239, 124, 0, 0.05) !important;
+    border-left-color: #7a5535 !important;
+  }
+  .defp-arrow {
+    position: absolute;
+    font-size: 0.55rem;
+    color: #7a5535;
+    margin-right: 0.3rem;
+    flex-shrink: 0;
+    align-self: center;
+    transition: color 0.15s;
+  }
+  .defp-header:hover .defp-arrow {
+    color: #ef7c00;
+  }
+</style>

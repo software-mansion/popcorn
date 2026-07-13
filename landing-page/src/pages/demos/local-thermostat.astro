@@ -1,13 +1,46 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import Section from "../../components/Section.astro";
+import LlvDemoLayout from "../../components/local-live-view/LlvDemoLayout.astro";
+import { AssignsPanel } from "../../components/local-live-view/AssignsPanel";
+import { LifecycleStrip } from "../../components/local-live-view/LifecycleStrip";
+import { EventLog } from "../../components/local-live-view/EventLog";
+import LlvCodePanel from "../../components/local-live-view/LlvCodePanel.astro";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createBlockTransformer } from "../../scripts/local-live-view/code-panel";
+import type { CodeTab } from "../../components/local-live-view/LlvCodePanel.astro";
+import "../../styles/demos/local-thermostat.css";
+
+const libDir = path.resolve(
+  fileURLToPath(import.meta.url),
+  "../../../../..",
+  "examples/local-lv-thermostat/local/lib",
+);
+const thermostatCode = fs
+  .readFileSync(path.join(libDir, "thermostat_live.ex"), "utf8")
+  .trim();
+const clockCode = fs
+  .readFileSync(path.join(libDir, "clock_live.ex"), "utf8")
+  .trim();
+
+const tabs: CodeTab[] = [
+  {
+    label: "ThermostatLive",
+    id: "thermostat",
+    code: thermostatCode,
+    lang: "elixir",
+  },
+  { label: "ClockLive", id: "clock", code: clockCode, lang: "elixir" },
+];
 ---
 
 <Layout>
   <Section background="light">
     <header class="mb-4 text-center">
       <h1
-        class="font-handjet text-brown-header mb-4 text-4xl font-bold md:text-6xl"
+        class="font-handjet text-brown-header mb-3 text-4xl font-bold md:text-5xl"
       >
         Local thermostat
       </h1>
@@ -20,128 +53,144 @@ import Section from "../../components/Section.astro";
         demonstrates use of timers.
       </p>
     </header>
-    <div
-      class="bg-light-20 border-brown-header mx-auto mt-8 max-w-md overflow-hidden rounded-2xl border-2 shadow-lg"
-    >
-      <div
-        data-pop-view="ThermostatLive"
-        id="ThermostatLive"
-        class="from-light-20 to-light-30 flex flex-col items-center gap-6 bg-gradient-to-br p-8"
-      >
-      </div>
-      <div
-        data-pop-view="ClockLive"
-        id="ClockLive"
-        data-phx-session="session"
-        class="font-handjet text-light-20 bg-brown-header p-4 text-center text-2xl tracking-wide"
-      >
-      </div>
-    </div>
-    <div
-      class="bg-light-20 border-brown-header mx-w-md mt-8 overflow-hidden rounded-2xl border-2 p-4 shadow-lg"
-    >
-      <pre>
-      <code is:raw>
-defmodule ThermostatLive do
-  use LocalLiveView
 
-  def render(assigns) do
-    ~H&quot;&quot;&quot;
-    &lt;p&gt;Current temperature: {@temperature}&deg;C&lt;/p&gt;
-    &lt;div class=&quot;thermostat-controls&quot;&gt;
-      &lt;button phx-click=&quot;inc_temperature&quot; class=&quot;ghost-button&quot;&gt;+&lt;/button&gt;
-      &lt;button phx-click=&quot;dec_temperature&quot; class=&quot;ghost-button&quot;&gt;-&lt;/button&gt;
-    &lt;/div&gt;
-    &lt;p&gt;Country: {@country}&lt;/p&gt;
-    &quot;&quot;&quot;
-  end
+    <LlvDemoLayout>
+      <Fragment slot="left">
+        <div class="demo-card">
+          <div
+            data-pop-view="ThermostatLivePresentation"
+            id="ThermostatLivePresentation"
+          >
+          </div>
+          <div
+            data-pop-view="ClockLive"
+            id="ClockLive"
+            data-phx-session="session"
+            class="clock-band"
+          >
+          </div>
+        </div>
 
-  def mount(_params, _session, socket) do
-    temperature = 25
-    country = &quot;Poland&quot;
+        <AssignsPanel client:load />
+        <LifecycleStrip client:load />
+        <EventLog client:load />
+      </Fragment>
 
-    socket =
-      socket
-      |&gt; assign(:temperature, temperature)
-      |&gt; assign(:country, country)
-
-    {:ok, socket}
-  end
-
-  def handle_event(&quot;inc_temperature&quot;, _params, socket) do
-    {:noreply, update(socket, :temperature, &amp;(&amp;1 + 1))}
-  end
-
-  def handle_event(&quot;dec_temperature&quot;, _params, socket) do
-    {:noreply, update(socket, :temperature, &amp;(&amp;1 - 1))}
-  end
-end
-
-      </code>
-    </pre>
-    </div>
+      <LlvCodePanel slot="right" tabs={tabs} />
+    </LlvDemoLayout>
   </Section>
 </Layout>
 
-<style is:global>
-  .thermostat-controls {
-    display: flex;
-    gap: 1rem;
-  }
-
-  .ghost-button {
-    width: 3.5rem;
-    height: 3.5rem;
-    padding: 0;
-    border: 2px solid #58330c;
-    background: transparent;
-    color: #58330c;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 1.5rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .ghost-button:hover {
-    background: #ef7c00;
-    border-color: #ef7c00;
-    color: #fffdf5;
-    transform: scale(1.1);
-  }
-
-  .ghost-button:active {
-    transform: scale(0.95);
-  }
-
-  .ghost-button:disabled {
-    color: gray;
-    border: 2px solid gray;
-  }
-  .ghost-button:disabled:hover {
-    color: gray;
-    background-color: transparent;
-    box-shadow: none;
-    cursor: auto;
-  }
-</style>
 
 <script>
   import { Socket } from "phoenix";
   import { LiveSocket } from "phoenix_live_view";
   import { LLVEngine } from "local_live_view";
+  import {
+    $assigns,
+    pushLog,
+    type LogEntry,
+    type PresentationPayload,
+  } from "../../scripts/local-live-view/store";
+  import {
+    applyAssignsWithFlash,
+    createAnimation,
+    setCodeHighlight,
+    highlightHtml,
+  } from "../../scripts/local-live-view/animation";
+
+  type ThermoCtx = {
+    block: string;
+    newAssigns: Record<string, unknown>;
+  };
+
+  const CODE_PANEL = "llv-code-body-0";
+  const multiplier = 3;
+
+  let logId = 0;
+  let pendingAck = false;
+  let llv: LLVEngine | null = null;
+
+  const thermoAnimation = createAnimation<ThermoCtx>(
+    [
+      { delay: 0 },
+      {
+        delay: 180 * multiplier,
+        onEnter: ({ block }) => setCodeHighlight(CODE_PANEL, block),
+      },
+      {
+        delay: 900 * multiplier,
+        onEnter: ({ newAssigns }) => {
+          applyAssignsWithFlash(newAssigns);
+          setCodeHighlight(CODE_PANEL, "render");
+        },
+      },
+      {
+        delay: 1300 * multiplier,
+        onEnter: () => {
+          pendingAck = false;
+          highlightHtml("temperature", true);
+          llv?.pushEvent("ThermostatLivePresentation", "llv_ack");
+        },
+      },
+    ],
+    {
+      completeDelay: 1800 * multiplier,
+      onComplete: () => {
+        pendingAck = false;
+        highlightHtml("temperature", false);
+        setCodeHighlight(CODE_PANEL, null);
+      },
+      onCancel: ({ newAssigns }) => {
+        // Fire ack immediately on cancel so spam clicks accumulate in Elixir's _pending.
+        if (pendingAck) {
+          applyAssignsWithFlash(newAssigns);
+          llv?.pushEvent("ThermostatLivePresentation", "llv_ack");
+        }
+        pendingAck = false;
+        highlightHtml("temperature", false);
+        setCodeHighlight(CODE_PANEL, null);
+      },
+    },
+  );
+
+  function animate(
+    block: string,
+    eventName: string,
+    newAssigns: Record<string, unknown>,
+  ) {
+    const result = Object.entries(newAssigns)
+      .map(([k, v]) => `${k}: ${typeof v === "string" ? `"${v}"` : v}`)
+      .join(", ");
+    const entry: LogEntry = {
+      id: ++logId,
+      event: `handle_event("${eventName}")`,
+      result,
+    };
+    pushLog(entry);
+
+    thermoAnimation.run({ block, newAssigns });
+    pendingAck = true;
+  }
+
+  function handlePresentation({ block, event, assigns }: PresentationPayload) {
+    if (!block || event === "mount") {
+      $assigns.set(assigns);
+      return;
+    }
+
+    animate(block, event, assigns);
+  }
 
   async function init() {
-    const liveSocket = new LiveSocket("/live", Socket, {
-      params: {},
-    });
+    const liveSocket = new LiveSocket("/live", Socket, { params: {} });
 
-    const llv = await LLVEngine.create(liveSocket, {
+    llv = await LLVEngine.create(liveSocket, {
       Socket,
       bundlePaths: ["/wasm/local_thermostat.avm"],
+      eventHandler: (name: string, payload: unknown) => {
+        if (name === "llv_presentation") handlePresentation(payload as PresentationPayload);
+      },
     });
 
     liveSocket.connect();

@@ -18,6 +18,8 @@ const PHX_VIEW_SELECTOR = "[data-phx-session]";
  *   Called instead of `liveSocket.historyPatch` when an LLV view calls `push_patch`.
  *   The default syncs LLV navigation into the Phoenix LiveView channel so the host page's
  *   `handle_params/3` fires. Pass a custom function to take full control of navigation.
+ * @property {(eventName: string, payload: unknown) => void} [eventHandler] - Optional callback for raw Popcorn messages.
+
  */
 
 export class LLVEngine {

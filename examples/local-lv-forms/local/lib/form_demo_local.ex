@@ -6,22 +6,26 @@ defmodule FormDemoLocal do
   @impl true
   def render(assigns) do
     ~H"""
+    <h2 class="header">Add new user</h2>
     <div class="bordered">
       <.form for={@form} id={@form.id} phx-change="validate" phx-submit="save">
         <label>USERNAME</label>
-        <.input type="text" field={@form[:username]} />
+        <.input type="text" field={@form[:username]} placeholder="at least 4 characters" />
         <label>EMAIL</label>
-        <.input type="text" field={@form[:email]} />
-        <div class="centered">
-          <button class="ghost-button" disabled={@disabled}>SAVE</button>
+        <.input type="text" field={@form[:email]} placeholder="name@domain.com" />
+        <div class="buttons">
+          <button type="submit" class="ghost-button" disabled={@disabled}>SAVE</button>
+          <button type="button" class="ghost-button" phx-click="generate_random">
+            GENERATE RANDOM
+          </button>
         </div>
       </.form>
-      <div class="centered">
-        <button class="ghost-button" phx-click="generate_random">GENERATE RANDOM</button>
-      </div>
     </div>
-    <div class="bordered">
-      <h1>[Local Runtime] User List:</h1>
+    <div class="bordered" data-value="users-list">
+      <h2 class="title">[Local Runtime] User List:</h2>
+      <%= if Enum.empty?(@users) do %>
+        <p>No users yet - save one above</p>
+      <% end %>
       <ul>
         <%= for user <- @users do %>
           <li>Username: {user.username}, Email: {user.email}</li>
