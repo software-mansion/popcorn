@@ -8,12 +8,10 @@ import type {
   EmscriptenModule,
 } from "./types";
 import {
-  decompressGzip,
   dirname,
   ensureDir,
   fetchBinary,
   fetchJson,
-  isGzip,
   unreachable,
 } from "./utils";
 
@@ -192,7 +190,7 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
         };
       }
 
-      return { ok: true, data: await maybeDecompressTar(tar) };
+      return { ok: true, data: tar };
     }),
   );
 
@@ -241,14 +239,6 @@ function resolveManifestPath(manifestUrl: string, path: string): string {
 
 function isAbsoluteUrl(path: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path);
-}
-
-async function maybeDecompressTar(tar: Uint8Array): Promise<Uint8Array> {
-  if (!isGzip(tar)) {
-    return tar;
-  }
-
-  return decompressGzip(tar);
 }
 
 export function send(

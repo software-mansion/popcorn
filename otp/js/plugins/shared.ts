@@ -1,18 +1,29 @@
-import assert from "node:assert";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, normalize, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { brotliCompress, constants, gzip } from "node:zlib";
 
 const execFileAsync = promisify(execFile);
-const otpAssetsDirName = "otp-assets";
-const manifestUrl = `/${otpAssetsDirName}/manifest.json`;
+const brotliCompressAsync = promisify(brotliCompress);
+const gzipAsync = promisify(gzip);
+const OTP_DIR = "assets/otp";
+const manifestUrl = `/${OTP_DIR}/manifest.json`;
 
 export type Options = {
   rootDir: string;
   app: string | null;
+  brotli?: boolean;
 };
 
 export type Prepared = {
@@ -21,51 +32,76 @@ export type Prepared = {
   notes: unknown[];
 };
 
-type Report = {
-  ok: boolean;
-  notes?: unknown[];
-  error?: unknown;
+type Report =
+  | {
+      ok: true;
+      manifestPath: string;
+      tarPaths: string[];
+      notes?: unknown[];
+    }
+  | { ok: false; error: unknown };
+
+type CopyVariant = "gzip" | "brotli" | "uncompressed";
+type CopyOptions = {
+  variants?: (CopyVariant | false | null | undefined)[];
 };
 
 export async function popcorn(opts: Options): Promise<Prepared> {
-  const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  const distAssetsDir = join(distDir, "assets");
-  const preparedDir = await mkdtemp(join(tmpdir(), "popcorn-otp-"));
-  const distPath = (name: string) => join(distDir, name);
-  const distAssetsPath = (name: string) => join(distAssetsDir, name);
-  const preparedPath = (name: string) => join(preparedDir, name);
-  const otpAssetsPath = (name: string) =>
-    preparedPath(join(otpAssetsDirName, name));
-  const providedAppsManifestPath = distAssetsPath("manifest.json");
+  const useBrotli = opts.brotli ?? false;
+  const assetVariants: CopyOptions["variants"] = [
+    "gzip",
+    useBrotli && "brotli",
+  ];
+  const distDir = p`${dirname(fileURLToPath(import.meta.url))}/..`;
+  const preparedDir = await mkdtemp(p`${tmpdir()}/popcorn-otp-`);
+  const coreTarballs = await pathsIn(p`${distDir}/assets/lib`, ".tar");
 
   try {
     await Promise.all([
-      copy(distPath("worker.mjs"), preparedPath("worker.mjs")),
-      copy(distAssetsPath("beam.mjs"), preparedPath("assets/beam.mjs")),
+      copy(p`${distDir}/worker.mjs`, p`${preparedDir}/worker.mjs`),
+      copy(p`${distDir}/assets/beam.mjs`, p`${preparedDir}/assets/beam.mjs`),
       copy(
-        distAssetsPath("beam.emu.mjs"),
-        preparedPath("assets/beam.emu.mjs"),
+        p`${distDir}/assets/beam.emu.mjs`,
+        p`${preparedDir}/assets/beam.emu.mjs`,
       ),
-      copy(distAssetsPath("beam.wasm"), preparedPath("assets/beam.wasm")),
-      copy(distAssetsPath("bin/vm.boot"), otpAssetsPath("bin/vm.boot")),
+      copy(p`${distDir}/assets/beam.wasm`, p`${preparedDir}/assets/beam.wasm`, {
+        variants: assetVariants,
+      }),
       copy(
-        distAssetsPath("lib/tarballs.json"),
-        otpAssetsPath("lib/tarballs.json"),
+        p`${distDir}/assets/bin/vm.boot`,
+        p`${preparedDir}/${OTP_DIR}/bin/vm.boot`,
       ),
-      copyCoreTarballs(distAssetsPath("lib"), otpAssetsPath("lib")),
+      copy(
+        p`${distDir}/assets/lib/tarballs.json`,
+        p`${preparedDir}/${OTP_DIR}/lib/tarballs.json`,
+      ),
+      copy(coreTarballs, p`${preparedDir}/${OTP_DIR}/lib`, {
+        variants: assetVariants,
+      }),
     ]);
 
-    const report = await packTarballs({
-      rootDir: resolve(opts.rootDir),
-      outDir: otpAssetsPath(""),
-      providedAppsManifestPath,
-      app: opts.app,
-    });
+    const report = await withTmp(async (packedDir) => {
+      const report = await packTarballs({
+        rootDir: resolve(opts.rootDir),
+        outDir: packedDir,
+        providedAppsManifestPath: p`${distDir}/assets/manifest.json`,
+        app: opts.app,
+      });
 
-    assert(
-      report.ok,
-      `[popcorn-otp] tarballs.exs failed: ${JSON.stringify(report.error)}`,
-    );
+      if (!report.ok) {
+        throw new Error(
+          `[popcorn-otp] tarballs.exs failed: ${JSON.stringify(report.error)}`,
+        );
+      }
+
+      await Promise.all([
+        copy(report.manifestPath, p`${preparedDir}/${OTP_DIR}/manifest.json`),
+        copy(report.tarPaths, p`${preparedDir}/${OTP_DIR}/lib`, {
+          variants: assetVariants,
+        }),
+      ]);
+      return report;
+    });
 
     return {
       dir: preparedDir,
@@ -76,19 +112,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
     await rm(preparedDir, { recursive: true, force: true });
     throw error;
   }
-}
-
-async function copyCoreTarballs(
-  sourceLibDir: string,
-  targetLibDir: string,
-): Promise<void> {
-  const names = await readdir(sourceLibDir);
-
-  await Promise.all(
-    names
-      .filter((name) => name.endsWith(".tar.gz"))
-      .map((name) => copy(join(sourceLibDir, name), join(targetLibDir, name))),
-  );
 }
 
 async function packTarballs({
@@ -102,7 +125,7 @@ async function packTarballs({
   providedAppsManifestPath: string;
   app: string | null;
 }): Promise<Report> {
-  const scriptPath = join(dirname(fileURLToPath(import.meta.url)), "tarballs.exs");
+  const scriptPath = p`${dirname(fileURLToPath(import.meta.url))}/tarballs.exs`;
   const args = [
     scriptPath,
     "--root-dir",
@@ -121,7 +144,72 @@ async function packTarballs({
   return JSON.parse(stdout) as Report;
 }
 
-async function copy(source: string, target: string): Promise<void> {
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(source, target);
+async function copy(
+  source: string | string[],
+  target: string,
+  { variants = ["uncompressed"] }: CopyOptions = {},
+): Promise<void> {
+  const sources = typeof source === "string" ? [source] : source;
+  const targetIsDir = typeof source !== "string";
+
+  await Promise.all(
+    sources.map(async (sourcePath) => {
+      const targetPath = targetIsDir
+        ? p`${target}/${basename(sourcePath)}`
+        : target;
+      await mkdir(dirname(targetPath), { recursive: true });
+      let content: Promise<Buffer> | undefined;
+      const read = () => (content ??= readFile(sourcePath));
+
+      await Promise.all(
+        variants
+          .filter((variant): variant is CopyVariant => Boolean(variant))
+          .map(async (variant) => {
+            switch (variant) {
+              case "uncompressed":
+                await copyFile(sourcePath, targetPath);
+                break;
+
+              case "gzip":
+                await writeFile(
+                  `${targetPath}.gz`,
+                  await gzipAsync(await read(), { level: 9 }),
+                );
+                break;
+
+              case "brotli":
+                await writeFile(
+                  `${targetPath}.br`,
+                  await brotliCompressAsync(await read(), {
+                    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+                  }),
+                );
+                break;
+            }
+          }),
+      );
+    }),
+  );
+}
+
+function p(
+  strings: TemplateStringsArray,
+  ...values: (string | number)[]
+): string {
+  return normalize(String.raw(strings, ...values));
+}
+
+async function pathsIn(dir: string, suffix: string): Promise<string[]> {
+  return (await readdir(dir))
+    .filter((name) => name.endsWith(suffix))
+    .map((name) => p`${dir}/${name}`);
+}
+
+async function withTmp<T>(f: (dir: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(p`${tmpdir()}/popcorn-otp-`);
+  try {
+    return await f(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }

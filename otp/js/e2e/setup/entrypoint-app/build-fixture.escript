@@ -10,5 +10,5 @@ main([SrcDir, StageDir, OutTar]) ->
             filename:join(SrcDir, "test_entrypoint.app"),
             filename:join(EbinDir, "test_entrypoint.app")
         ),
-    ok = erl_tar:create(OutTar, [{"lib/test_entrypoint/ebin", EbinDir}], [compressed]),
+    ok = erl_tar:create(OutTar, [{"lib/test_entrypoint/ebin", EbinDir}], []),
     ok.

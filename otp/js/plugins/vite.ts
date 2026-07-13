@@ -56,7 +56,18 @@ export function popcorn(options: Options): Plugin {
     next: (error?: unknown) => void,
   ) => {
     const url = req.url;
-    if (url === undefined || !url.startsWith("/otp-assets/")) {
+    if (url === undefined) {
+      next();
+      return;
+    }
+
+    const requestPath = decodeURIComponent(
+      new URL(url, "http://localhost").pathname,
+    );
+    const isOtpAsset = requestPath.startsWith("/assets/otp/");
+    const isBuiltWasm = requestPath === "/assets/beam.wasm";
+    const isSourceWasm = requestPath === `/@fs${distDir}/assets/beam.wasm`;
+    if (!isOtpAsset && !isBuiltWasm && !isSourceWasm) {
       next();
       return;
     }
@@ -69,8 +80,10 @@ export function popcorn(options: Options): Plugin {
       return;
     }
 
-    const assetsRoot = join(dir, "otp-assets");
-    const rel = url.slice("/otp-assets/".length).split("?")[0];
+    const assetsRoot = join(dir, "assets");
+    const rel = isSourceWasm
+      ? "beam.wasm"
+      : requestPath.slice("/assets/".length);
     const filePath = resolve(assetsRoot, rel);
     if (!isUnder(assetsRoot, filePath)) {
       res.statusCode = 403;
@@ -80,9 +93,27 @@ export function popcorn(options: Options): Plugin {
     }
 
     try {
-      const content = await readFile(filePath);
+      const compressible = isCompressible(filePath);
+      const encoding = compressible
+        ? selectEncoding(
+            req.headers["accept-encoding"]?.toString(),
+            options.brotli ?? false,
+          )
+        : { name: null, suffix: "" } as const;
+      if (compressible && encoding.name === null) {
+        res.statusCode = 406;
+        setHeaders(res);
+        res.setHeader("Vary", "Accept-Encoding");
+        res.end("No supported content encoding");
+        return;
+      }
+      const content = await readFile(`${filePath}${encoding.suffix}`);
       setHeaders(res);
       setContentType(res, filePath);
+      res.setHeader("Vary", "Accept-Encoding");
+      if (encoding.name !== null) {
+        res.setHeader("Content-Encoding", encoding.name);
+      }
       res.end(content);
     } catch {
       res.statusCode = 404;
@@ -136,6 +167,21 @@ export function popcorn(options: Options): Plugin {
       }
     },
   };
+}
+
+function isCompressible(path: string): boolean {
+  return path.endsWith(".tar") || path.endsWith(".wasm");
+}
+
+function selectEncoding(header: string | undefined, useBrotli: boolean): {
+  name: "br" | "gzip" | null;
+  suffix: ".br" | ".gz" | "";
+} {
+  if (useBrotli && header?.includes("br")) {
+    return { name: "br", suffix: ".br" };
+  }
+  if (header?.includes("gzip")) return { name: "gzip", suffix: ".gz" };
+  return { name: null, suffix: "" };
 }
 
 function isUnder(dir: string, file: string): boolean {

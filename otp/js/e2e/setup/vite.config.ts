@@ -17,19 +17,19 @@ const CORS_HEADERS = {
 
 type Res = ServerResponse<IncomingMessage>;
 
-function otpAssetsPlugin(): Plugin {
+function otpPlugin(): Plugin {
   const serveAsset = async (
     req: IncomingMessage,
     res: Res,
     next: () => void,
   ) => {
     const requestUrl = req.url;
-    if (requestUrl === undefined || !requestUrl.startsWith("/otp-assets/")) {
+    if (requestUrl === undefined || !requestUrl.startsWith("/assets/otp/")) {
       next();
       return;
     }
 
-    const relativePath = requestUrl.slice("/otp-assets/".length);
+    const relativePath = requestUrl.slice("/assets/otp/".length);
     const filePath = resolve(assetsDir, relativePath);
     const assetRelativePath = relative(assetsDir, filePath);
     if (assetRelativePath.startsWith("..") || isAbsolute(assetRelativePath)) {
@@ -52,7 +52,7 @@ function otpAssetsPlugin(): Plugin {
   };
 
   return {
-    name: "otp-assets",
+    name: "otp",
     configureServer(server) {
       server.middlewares.use(serveAsset);
     },
@@ -86,7 +86,7 @@ function setContentType(res: Res, path: string) {
 
 export default defineConfig({
   root: __dirname,
-  plugins: [otpAssetsPlugin()],
+  plugins: [otpPlugin()],
   server: {
     host: "127.0.0.1",
     port: 5173,

@@ -60,6 +60,11 @@ defmodule Tarballs do
       manifest_path = Path.join(args.out_dir, "manifest.json")
       manifest_apps = Map.merge(packed_apps, provided_apps.apps)
 
+      tar_paths =
+        packed_apps
+        |> Map.values()
+        |> Enum.map(&Path.expand(Path.join(args.out_dir, &1.tar)))
+
       manifest = %{
         entrypoint: args.entrypoint_app,
         apps: manifest_apps,
@@ -74,6 +79,7 @@ defmodule Tarballs do
          ok: true,
          entrypoint: args.entrypoint_app,
          manifestPath: Path.expand(manifest_path),
+         tarPaths: tar_paths,
          apps: manifest_apps,
          notes: notes
        }}
@@ -161,14 +167,14 @@ defmodule Tarballs do
   end
 
   defp create_tarball(outdir, app, ebin_dir) do
-    tar = "lib/#{app}.tar.gz"
+    tar = "lib/#{app}.tar"
     tar_path = Path.join(outdir, tar)
     tar_path_c = to_charlist(tar_path)
     arc_name = ~c"lib/#{app}/ebin"
     ebin_dir_c = to_charlist(ebin_dir)
 
     File.mkdir_p!(Path.dirname(tar_path))
-    :ok = :erl_tar.create(tar_path_c, [{arc_name, ebin_dir_c}], [:compressed])
+    :ok = :erl_tar.create(tar_path_c, [{arc_name, ebin_dir_c}], [])
 
     tar
   end
