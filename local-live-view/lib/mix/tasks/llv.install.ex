@@ -332,7 +332,11 @@ defmodule Mix.Tasks.Llv.Install do
         if String.contains?(content, "local_live_view") do
           source
         else
-          Rewrite.Source.update(source, :content, inject_tsconfig_path_entry(content, llv_dts_path))
+          Rewrite.Source.update(
+            source,
+            :content,
+            inject_tsconfig_path_entry(content, llv_dts_path)
+          )
         end
       end)
     else
