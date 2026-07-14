@@ -43,6 +43,7 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_app_js()
     |> inject_esbuild_format()
     |> inject_esbuild_alias()
+    |> inject_tsconfig()
     |> inject_dev_watcher()
     |> inject_setup_alias()
     |> generate_local_project()
@@ -307,6 +308,57 @@ defmodule Mix.Tasks.Llv.Install do
     else
       igniter
     end
+  end
+
+  # --- tsconfig paths for path deps ---
+
+  # For path deps, tsc cannot resolve type declarations via node_modules since
+  # the package lives outside deps/. Add a paths entry pointing to the .d.ts file.
+  defp inject_tsconfig(igniter) do
+    if llv_path_dep?() do
+      inject_tsconfig_in(igniter, "assets/tsconfig.json")
+    else
+      igniter
+    end
+  end
+
+  defp inject_tsconfig_in(igniter, path) do
+    if Igniter.exists?(igniter, path) do
+      llv_dts_path = llv_tsconfig_path()
+
+      Igniter.update_file(igniter, path, fn source ->
+        content = Rewrite.Source.get(source, :content)
+
+        if String.contains?(content, "local_live_view") do
+          source
+        else
+          Rewrite.Source.update(source, :content, inject_tsconfig_path_entry(content, llv_dts_path))
+        end
+      end)
+    else
+      igniter
+    end
+  end
+
+  defp inject_tsconfig_path_entry(content, llv_dts_path) do
+    entry = ~s|"local_live_view": ["#{llv_dts_path}"]|
+
+    if String.contains?(content, ~s|"paths"|) do
+      Regex.replace(~r/"paths"\s*:\s*\{/, content, ~s|"paths": {\n      #{entry},|)
+    else
+      Regex.replace(
+        ~r/"compilerOptions"\s*:\s*\{/,
+        content,
+        ~s|"compilerOptions": {\n    "paths": { #{entry} },|
+      )
+    end
+  end
+
+  defp llv_tsconfig_path do
+    llv_abs = Mix.Project.deps_paths()[:local_live_view]
+    assets_abs = Path.join(File.cwd!(), "assets")
+    rel = Path.relative_to(llv_abs, assets_abs, force: true)
+    "#{rel}/priv/static/local_live_view.d.ts"
   end
 
   defp replace_in_file(igniter, path, sentinel, find, replacement) do
