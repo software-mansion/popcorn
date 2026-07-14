@@ -96,16 +96,15 @@ defmodule LocalLiveView do
 
   ## Handling failed server pushes
 
-  A `push_server_event/3` can fail: the page may have no host LiveView,
-  the websocket may be disconnected, or the host may reply with an error
-  or time out. When that happens, the view's `c:handle_push_error/4`
-  callback is invoked with the event, its params and `server_assigns` —
-  the last value of each assign received from the host server. The
-  default implementation feeds `server_assigns` through `c:update/2`,
-  rolling optimistic local edits back to the latest authoritative state.
-
-  Note this covers only `push_server_event/3`; events dispatched via
-  `phx-target={@server}` are not tracked.
+  A push to the server — `push_server_event/3` or an event dispatched via
+  `phx-target={@server}` (including the `@server` leg of `targets/1`) — can
+  fail: the page may have no host LiveView, the websocket may be
+  disconnected, or the host may reply with an error or time out. When that
+  happens, the view's `c:handle_push_error/4` callback is invoked with the
+  event, its params and `server_assigns` — the last value of each assign
+  received from the host server. The default implementation feeds
+  `server_assigns` through `c:update/2`, rolling optimistic local edits back
+  to the latest authoritative state.
 
   Another way of communicating the server is by using `mirror_sync/2`.
   '''

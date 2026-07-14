@@ -123,11 +123,15 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(
-        %Message{event: "push_error", payload: %{"event" => event, "payload" => params}},
+        %Message{event: "push_error", payload: %{"event" => event, "payload" => raw} = payload},
         %{socket: socket} = state
       ) do
-    # A push_server_event failed to reach the host: hand the view the last
-    # assigns received from it, so it can roll back to authoritative state.
+    # A local→server push (push_server_event or a @server-targeted DOM event)
+    # failed to reach the host: hand the view the last assigns received from
+    # it, so it can roll back to authoritative state. Form pushes carry their
+    # params URL-encoded, same as regular events.
+    params = decode_event_type(payload["type"], raw, payload)
+
     event
     |> socket.view.handle_push_error(params, state.server_assigns, socket)
     |> handle_result({:handle_push_error, 4, nil}, state)
