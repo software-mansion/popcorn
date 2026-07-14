@@ -4,19 +4,41 @@
   "description": "JS bundle for LocalLiveView — bundled at release time, resolved via Phoenix esbuild NODE_PATH.",
   "type": "module",
   "exports": {
-    ".": "./priv/static/local_live_view.js"
+    ".": {
+      "types": "./priv/static/local_live_view.d.ts",
+      "default": "./priv/static/local_live_view.js"
+    }
   },
   "main": "./priv/static/local_live_view.js",
+  "types": "./priv/static/local_live_view.d.ts",
   "private": true,
   "scripts": {
-    "build": "node assets/bundle.mjs",
-    "dev": "node assets/bundle.mjs --watch"
+    "build": "rollup -c",
+    "dev": "rollup -c --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint assets/",
+    "lint:fix": "eslint assets/ --fix",
+    "format": "prettier --write \"assets/**/*.ts\" rollup.config.mjs",
+    "format:check": "prettier --check \"assets/**/*.ts\" rollup.config.mjs",
+    "ci": "tsc --noEmit && eslint assets/ && prettier --check \"assets/**/*.ts\" rollup.config.mjs"
   },
   "files": [
-    "./priv/static/local_live_view.js"
+    "./priv/static/local_live_view.js",
+    "./priv/static/local_live_view.d.ts"
   ],
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@swmansion/popcorn": "^0.3.1",
-    "esbuild": "^0.28.1"
+    "@types/phoenix": "^1.6.7",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "^10.1.8",
+    "phoenix_live_view": "^1.1.30",
+    "prettier": "^3.9.4",
+    "rollup": "^4.60.3",
+    "rollup-plugin-dts": "^6.4.1",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.63.0"
   }
 }

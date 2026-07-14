@@ -56,7 +56,7 @@ if (ENVIRONMENT_IS_PTHREAD) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/atomvm-build-swm.2gQpIGg/atomvm/src/platforms/emscripten/src/atomvm.pre.js
+// include: /tmp/atomvm-build-swm.ItwMw6B/atomvm/src/platforms/emscripten/src/atomvm.pre.js
 /*
  * This file is part of AtomVM.
  *
@@ -128,7 +128,7 @@ function ensureValidResult(result) {
   throw new Error(message);
 }
 
-// end include: /tmp/atomvm-build-swm.2gQpIGg/atomvm/src/platforms/emscripten/src/atomvm.pre.js
+// end include: /tmp/atomvm-build-swm.ItwMw6B/atomvm/src/platforms/emscripten/src/atomvm.pre.js
 var arguments_ = [];
 
 var thisProgram = "./this.program";
@@ -968,8 +968,8 @@ async function createWasm() {
   wasmBinaryFile ??= findWasmBinary();
   try {
     var result = await instantiateAsync(wasmBinary, wasmBinaryFile, info);
-    var exports$1 = receiveInstantiationResult(result);
-    return exports$1;
+    var exports = receiveInstantiationResult(result);
+    return exports;
   } catch (e) {
     // If instantiation fails, reject the module ready promise.
     readyPromiseReject(e);

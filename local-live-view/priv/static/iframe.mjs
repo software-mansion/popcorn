@@ -193,8 +193,14 @@ function ensureResultKeyList(result) {
         throw new Error("Script passed to onRunTrackedJs() returned invalid value, accepted values are arrays and undefined");
     }
 }
-function deserialize(message) {
-    return JSON.parse(message, (_key, value) => {
+// `json` selects the realm whose JSON.parse builds the result. By default that
+// is the iframe's own JSON, but run_js passes the parent window's JSON so the
+// deserialized terms (arrays/objects) belong to the parent realm — otherwise
+// cross-realm arrays sent out of the iframe fail `instanceof Array` checks in
+// the parent (e.g. phoenix_live_view's diff renderer). Tracked `popcorn_ref`
+// values are resolved by reference and keep their own realm regardless.
+function deserialize(message, json = JSON) {
+    return json.parse(message, (_key, value) => {
         const isRef = typeof value === "object" &&
             value !== null &&
             Object.hasOwn(value, "popcorn_ref") &&
