@@ -189,6 +189,13 @@ main() {
          install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
          mix dev
 
+    elif [[ "${EXAMPLE}" == "game-of-life-otp" ]]; then
+         local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
+         log "Setting up example: ${EXAMPLE}"
+         cd "${example_dir}"
+         install_elixir_deps "${example_dir}" "${EXAMPLE} Elixir deps"
+         mix dev
+
     elif [[ "${EXAMPLE}" == "hello-popcorn" ]]; then
          local example_dir="${PROJECT_ROOT}/examples/${EXAMPLE}"
          log "Setting up example: ${EXAMPLE}"

@@ -79,6 +79,9 @@ defmodule Mix.Tasks.Popcorn.Server do
         end
       end
 
+      # stdout is a pipe to the parent Mix task, so it defaults to latin-1.
+      :io.setopts(:standard_io, encoding: :unicode)
+
       {opts, _} =
         OptionParser.parse!(System.argv(), strict: [port: :integer, dir: :string])
 
