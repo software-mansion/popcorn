@@ -7,7 +7,7 @@ import type {
   BeamSendPayload,
   BeamTarget,
 } from "./types";
-import { check, objectWithKeys } from "./utils";
+import { base64ToBytes, check, objectWithKeys } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
@@ -121,7 +121,7 @@ export function serializeSendPayload(
   if (isNameTarget(target)) {
     check(target.name.length > 0);
   } else {
-    check(target.pid.length > 0);
+    check(target.pid.byteLength > 0);
   }
 
   const etf = tuple2(payload, meta);
@@ -159,7 +159,7 @@ export function deserializeBridgeMessage(
           payload: {
             code: parsed.code,
             args: parsed.args,
-            replyTo: parsed.reply_to,
+            replyTo: base64ToBytes(parsed.reply_to),
           },
         };
       default:

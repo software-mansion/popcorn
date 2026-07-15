@@ -2,7 +2,11 @@ type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
 
 export type AnyValue = unknown;
 
-export type BeamTarget = { name: string } | { pid: string };
+declare const pidBrand: unique symbol;
+export type Pid = { readonly [pidBrand]: true };
+
+/** Internal wire target. The public `send` accepts `string | Pid` instead. */
+export type BeamTarget = { name: string } | { pid: Uint8Array };
 
 export type BeamSendPayload = {
   target: BeamTarget;
@@ -27,7 +31,7 @@ export type BeamEvent =
 export type RunJsRequest = {
   code: string;
   args: AnyValue;
-  replyTo: string;
+  replyTo: Uint8Array;
 };
 
 export type OtpErrorPayload =

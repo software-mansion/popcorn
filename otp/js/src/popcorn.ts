@@ -1,4 +1,5 @@
 import { PopcornError, err, type Result } from "./errors";
+import { RawTerm } from "./etf";
 import {
   readWorkerEvent,
   serializeSendPayload,
@@ -11,13 +12,15 @@ import type {
   BeamBootOptions,
   BeamTarget,
   OtpErrorPayload,
+  Pid,
   RunJsRequest,
 } from "./types";
-import { check, objectWithKeys, unreachable } from "./utils";
+import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 
 const TRACKED_REF_KEY = "popcorn_ref";
+const PID_REF_KEY = "popcorn_pid";
 
 export type PopcornOpts = {
   beam: Pick<BeamBootOptions, "manifestUrl" | "extraArgs">;
@@ -55,7 +58,18 @@ type PopcornState =
   | { status: "booted" }
   | { status: "closed"; error: PopcornError<"vm:exited"> };
 type PendingSend = (result: Result<null>) => void;
-type RunJsFn = (args: AnyValue) => AnyValue;
+type SendFn = (
+  target: string | Pid,
+  payload?: AnyValue,
+  opts?: PopcornSendOpts,
+) => Promise<Result<null>>;
+type RunJsFn = (args: AnyValue, send: SendFn) => AnyValue;
+
+function createPidClass() {
+  return class {
+    public constructor(public readonly bytes: Uint8Array) {}
+  };
+}
 
 function assertRunJsFn(value: unknown): asserts value is RunJsFn {
   check(typeof value === "function");
@@ -78,6 +92,8 @@ export class Popcorn {
       public readonly cleanup?: () => void,
     ) {}
   };
+
+  private Pid = createPidClass();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
     check(data !== null);
@@ -87,7 +103,7 @@ export class Popcorn {
       case "popcorn:boot-fail":
         return;
       case "otp:message":
-        this.emit(this.reviveTrackedValues(data.payload));
+        this.emit(this.reviveHandles(data.payload));
         return;
       case "otp:run_js":
         this.runJs(data.payload);
@@ -158,6 +174,7 @@ export class Popcorn {
       this.spawnWorker();
     }
 
+    this.Pid = createPidClass();
     this.state = { status: "booting" };
 
     return await new Promise<Result<Popcorn>>((resolve) => {
@@ -213,7 +230,7 @@ export class Popcorn {
    * Resolves after VM sent message to registered process.
    */
   public async send(
-    target: string | BeamTarget,
+    rawTarget: string | Pid,
     payload?: AnyValue,
     opts?: PopcornSendOpts,
   ): Promise<Result<null>> {
@@ -224,9 +241,18 @@ export class Popcorn {
       return { ok: false, error: err("bridge:not-started", {}) };
     }
 
+    let target: BeamTarget;
+    if (typeof rawTarget === "string" && rawTarget.length > 0) {
+      target = { name: rawTarget };
+    } else if (rawTarget instanceof this.Pid) {
+      target = { pid: rawTarget.bytes };
+    } else {
+      return { ok: false, error: err("bridge:invalid-target", {}) };
+    }
+
     const command = serializeSendPayload(
-      typeof target === "string" ? { name: target } : target,
-      payload ?? {},
+      target,
+      this.serializeHandles(payload ?? {}),
       opts?.meta ?? {},
     );
     if (!command.ok) {
@@ -308,9 +334,11 @@ export class Popcorn {
     try {
       const fn = this.jsWithCurrentEnv(request.code);
       assertRunJsFn(fn);
-      const args = this.reviveTrackedValues(request.args);
-      const result = await fn(args);
-      payload = { ok: true, value: this.serializeResult(result) ?? null };
+      const args = this.reviveHandles(request.args);
+      const send: SendFn = (target, sendPayload, sendOpts) =>
+        this.send(target, sendPayload, sendOpts);
+      const result = await fn(args, send);
+      payload = { ok: true, value: this.serializeHandles(result) ?? null };
     } catch (error) {
       check(error instanceof Error);
       payload = { ok: false, error: error.toString() };
@@ -336,28 +364,36 @@ export class Popcorn {
     return make(this.TrackedValue);
   }
 
-  private reviveTrackedValues(value: unknown): unknown {
+  private reviveHandles(value: unknown): unknown {
     const key = trackedRefKey(value);
     if (key !== null) {
       const entry = this.trackedValues.get(key);
       check(entry !== undefined);
       return entry.value;
     }
+    const pidToken = pidRefToken(value);
+    if (pidToken !== null) {
+      return new this.Pid(base64ToBytes(pidToken));
+    }
     if (Array.isArray(value)) {
-      return value.map((item) => this.reviveTrackedValues(item));
+      return value.map((item) => this.reviveHandles(item));
     }
     const obj = objectWithKeys(value, []);
     if (obj !== null) {
       const revived: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        revived[k] = this.reviveTrackedValues(v);
+        revived[k] = this.reviveHandles(v);
       }
       return revived;
     }
     return value;
   }
 
-  private serializeResult(value: unknown): unknown {
+  private serializeHandles(value: unknown): unknown {
+    if (value instanceof this.Pid) {
+      // Splice the pid's own ETF bytes so binary_to_term revives a real pid.
+      return RawTerm.fromExternal(value.bytes);
+    }
     if (value instanceof this.TrackedValue) {
       this.trackedKeySeq += 1;
       const key = this.trackedKeySeq;
@@ -368,13 +404,13 @@ export class Popcorn {
       return { [TRACKED_REF_KEY]: key };
     }
     if (Array.isArray(value)) {
-      return value.map((item) => this.serializeResult(item));
+      return value.map((item) => this.serializeHandles(item));
     }
     const obj = objectWithKeys(value, []);
     if (obj !== null) {
       const serialized: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        serialized[k] = this.serializeResult(v);
+        serialized[k] = this.serializeHandles(v);
       }
       return serialized;
     }
@@ -463,6 +499,17 @@ function trackedRefKey(value: unknown): number | null {
   const key = marker[TRACKED_REF_KEY];
   check(typeof key === "number");
   return key;
+}
+
+function pidRefToken(value: unknown): string | null {
+  const marker = objectWithKeys(value, [PID_REF_KEY]);
+  const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
+  if (!hasOnlyMarker) {
+    return null;
+  }
+  const token = marker[PID_REF_KEY];
+  check(typeof token === "string");
+  return token;
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval

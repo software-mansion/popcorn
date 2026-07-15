@@ -21,6 +21,22 @@ const UTF8 = new TextEncoder();
 
 type Atom = "true" | "false" | "nil";
 
+/** Pre-encoded ETF sub-term bytes (no version prefix), spliced verbatim. */
+export class RawTerm {
+  public constructor(public readonly bytes: Uint8Array) {}
+
+  /**
+   * Wraps a full external term (`term_to_binary` output) as a spliceable
+   * sub-term by dropping its leading version byte.
+   */
+  public static fromExternal(external: Uint8Array): RawTerm {
+    if (external[0] !== VERSION) {
+      throw new TypeError("expected a version-prefixed ETF external term");
+    }
+    return new RawTerm(external.subarray(1));
+  }
+}
+
 export function tuple2(
   data: unknown,
   meta: unknown,
@@ -121,6 +137,10 @@ class Encoder {
   }
 
   private object(value: object): void {
+    if (value instanceof RawTerm) {
+      this.bytes(value.bytes);
+      return;
+    }
     if (this.ancestors.has(value)) {
       throw err("cyclic-object", value);
     }
