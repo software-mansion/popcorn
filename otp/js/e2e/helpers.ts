@@ -46,6 +46,15 @@ export type Result<T> =
 
 export { assert, expect };
 
+export function evalOpts(code: string): PopcornOpts {
+  return {
+    beam: {
+      manifestUrl: "/assets/otp/manifest.json",
+      extraArgs: ["-eval", code],
+    },
+  };
+}
+
 type PopcornHooksGlobal = typeof globalThis & {
   popcorn: {
     cleanups: number;
