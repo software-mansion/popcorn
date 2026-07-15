@@ -449,6 +449,12 @@ defmodule LocalLiveView.Server do
         {socket, %{}, state.fingerprints, state.components}
       end
 
+    # Same as Phoenix.LiveView.Channel: fold the handle_event reply (:r) and
+    # push_event events (:e) into the diff — even when nothing re-rendered —
+    # so the browser's Rendered.extract delivers them. clear_temp below
+    # ensures they ride at most one diff.
+    diff = Diff.render_private(socket, diff)
+
     new_socket = Utils.clear_temp(socket)
 
     {:diff, diff,
@@ -463,11 +469,30 @@ defmodule LocalLiveView.Server do
     reply(state, ref, status, Map.merge(payload, extra))
   end
 
-  defp reply(state, _ref, _status, %{diff: diff}) do
-    push(state, "diff", diff)
-  end
+  # Safety net: an uncorrelated diff still reaches the page out-of-band.
+  # push_diff routes nil refs to push/3 directly, so these normally don't hit.
+  defp reply(state, nil = _ref, _status, %{diff: diff}), do: push(state, "diff", diff)
+  defp reply(state, nil = _ref, _status, _payload), do: state
 
-  defp reply(state, _ref, _status, _payload), do: state
+  # Ack a correlated push (ref = the browser transport's channel push ref,
+  # threaded through Message.ref by the dispatcher). The payload — %{diff: diff}
+  # or %{} for a no-op — resolves the pending channel push in the browser,
+  # driving LiveView's stock push lifecycle: apply the ack diff, undo the
+  # push's element refs, resolve the reply.
+  defp reply(state, ref, status, payload) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        if (window.__llvChannelReply) {
+          window.__llvChannelReply(args.id, args.ref, args.status, args.payload);
+        }
+      }
+      """,
+      %{id: state.llv_id, ref: ref, status: status, payload: payload}
+    )
+
+    state
+  end
 
   defp push(state, "diff", diff) do
     llv_id = state.llv_id

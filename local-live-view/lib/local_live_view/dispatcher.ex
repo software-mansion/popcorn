@@ -105,10 +105,15 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   defp handle_wasm(
-         {:wasm_call, %{"action" => "event", "id" => id, "payload" => payload}},
+         {:wasm_call, %{"action" => "event", "id" => id, "payload" => payload} = msg},
          state
        ) do
-    send_to_view(state, id, %Message{payload: payload, event: "event"})
+    # "ref" is the channel push ref from the browser's popcorn transport. The
+    # view acks the push through it — a reply carrying the render diff — which
+    # drives LiveView's regular push lifecycle (apply ack diff, undo element
+    # refs, resolve the reply). Absent for uncorrelated sends like
+    # llv_server_message.
+    send_to_view(state, id, %Message{payload: payload, event: "event", ref: msg["ref"]})
     {:resolve, :ok, state}
   end
 
