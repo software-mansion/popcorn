@@ -67,9 +67,15 @@ export class LLVEngine {
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
       assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns")),
     });
-    if (!result.ok) return;
+    if (!result.ok) {
+      console.error("LLV failed to create view", llvId, result.error);
+      return;
+    }
     const data = result.data as { status: string; rendered: Record<string, unknown> };
-    if (data.status === "error") return;
+    if (data.status === "error") {
+      console.error("LLV view returned error status on create", llvId, data);
+      return;
+    }
     const liveEl = document.getElementById(llvId);
     if (liveEl?.matches("[data-pop-view]")) {
       setupFakeView(this.socket, this.views, this.pop, liveEl, data.rendered);

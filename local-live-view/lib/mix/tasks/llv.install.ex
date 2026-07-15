@@ -346,15 +346,31 @@ defmodule Mix.Tasks.Llv.Install do
 
   defp inject_tsconfig_path_entry(content, llv_dts_path) do
     entry = ~s|"local_live_view": ["#{llv_dts_path}"]|
+    # Strip // line comments so Jason can parse the file. All replacements
+    # are done on the original `content` so comments are preserved in output.
+    stripped = String.replace(content, ~r|//[^\n]*|, "")
 
-    if String.contains?(content, ~s|"paths"|) do
-      Regex.replace(~r/"paths"\s*:\s*\{/, content, ~s|"paths": {\n      #{entry},|)
+    with {:ok, parsed} <- Jason.decode(stripped),
+         {:ok, compiler_opts} <- Map.fetch(parsed, "compilerOptions") do
+      if Map.has_key?(compiler_opts, "paths") do
+        String.replace(
+          content,
+          ~r/"paths"\s*:\s*\{/,
+          ~s|"paths": {\n      #{entry},|,
+          global: false
+        )
+      else
+        String.replace(
+          content,
+          ~r/"compilerOptions"\s*:\s*\{/,
+          ~s|"compilerOptions": {\n    "paths": { #{entry} },|,
+          global: false
+        )
+      end
     else
-      Regex.replace(
-        ~r/"compilerOptions"\s*:\s*\{/,
-        content,
-        ~s|"compilerOptions": {\n    "paths": { #{entry} },|
-      )
+      # Unparseable JSON or missing "compilerOptions" (extends-only config):
+      # return content unchanged; the caller leaves the file as-is.
+      _ -> content
     end
   end
 

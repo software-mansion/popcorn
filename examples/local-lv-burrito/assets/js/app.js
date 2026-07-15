@@ -126,11 +126,8 @@ function triggerLLVReconnect() {
   document
     .querySelectorAll("[data-pop-view][data-pop-mirror]")
     .forEach((el) => {
-      window.__popcorn
-        ?.call(
-          { id: el.id, event: "llv_reconnected", payload: {} },
-          { timeoutMs: 10_000 },
-        )
+      window.llvEngine
+        ?.pushEvent(el.id, "llv_reconnected", {})
         .catch((err) => console.error("LLV re-sync error", err));
     });
 }
@@ -353,7 +350,7 @@ import { LLVEngine } from "local_live_view";
 liveSocket.connect();
 window.liveSocket = liveSocket;
 
-await LLVEngine.create(liveSocket, {
+window.llvEngine = await LLVEngine.create(liveSocket, {
   Socket,
   bundlePaths: ["/assets/js/wasm/bundle.avm"],
 });

@@ -523,7 +523,7 @@ const PHX_VIEW_SELECTOR = "[data-phx-session]";
 // Resolve an LLV's element id from a view name or id: prefer the element whose
 // data-pop-view matches, else fall back to treating the argument as an id.
 function resolveLlvId(viewOrId) {
-    const el = document.querySelector(`[data-pop-view="${viewOrId}"]`);
+    const el = Array.from(document.querySelectorAll("[data-pop-view]")).find((e) => e.getAttribute("data-pop-view") === viewOrId);
     return el ? el.id : viewOrId;
 }
 // Resolve an LLV's host LiveView fresh on every call (a reconnect can swap the
@@ -697,7 +697,7 @@ function registerNavigationHandlers(socket, views, pop, config) {
         if (!link)
             return;
         e.preventDefault();
-        const to = link.getAttribute("href") ?? "/";
+        const to = link.getAttribute("href") ?? window.location.href;
         const replace = link.getAttribute("data-phx-link-state") === "replace";
         if (replace) {
             window.history.replaceState({ llv: true }, "", to);
@@ -902,8 +902,10 @@ class PopcornClient {
     }
     // Fire-and-forget: log on error, callers don't await the outcome.
     fire(action, args) {
-        this.call(args).then((result) => { if (!result.ok)
-            console.error(`LLV ${action} error`, result.error); }, (err) => console.error(`LLV ${action} error`, err));
+        this.call(args).then((result) => {
+            if (!result.ok)
+                console.error(`LLV ${action} error`, result.error);
+        }, (err) => console.error(`LLV ${action} error`, err));
     }
     create({ id, view, url, urlParams, assigns }) {
         return this.call({
@@ -1008,11 +1010,15 @@ class LLVEngine {
             urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
             assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns")),
         });
-        if (!result.ok)
+        if (!result.ok) {
+            console.error("LLV failed to create view", llvId, result.error);
             return;
+        }
         const data = result.data;
-        if (data.status === "error")
+        if (data.status === "error") {
+            console.error("LLV view returned error status on create", llvId, data);
             return;
+        }
         const liveEl = document.getElementById(llvId);
         if (liveEl?.matches("[data-pop-view]")) {
             setupFakeView(this.socket, this.views, this.pop, liveEl, data.rendered);

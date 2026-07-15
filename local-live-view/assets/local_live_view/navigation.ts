@@ -42,7 +42,7 @@ export function registerNavigationHandlers(
     if (!link) return;
     e.preventDefault();
 
-    const to = link.getAttribute("href") ?? "/";
+    const to = link.getAttribute("href") ?? window.location.href;
     const replace = link.getAttribute("data-phx-link-state") === "replace";
     if (replace) {
       window.history.replaceState({ llv: true }, "", to);

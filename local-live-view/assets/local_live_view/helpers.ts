@@ -5,7 +5,9 @@ import type { PopcornClient } from "./core/popcorn_client";
 // Resolve an LLV's element id from a view name or id: prefer the element whose
 // data-pop-view matches, else fall back to treating the argument as an id.
 export function resolveLlvId(viewOrId: string): string {
-  const el = document.querySelector(`[data-pop-view="${viewOrId}"]`);
+  const el = Array.from(document.querySelectorAll<HTMLElement>("[data-pop-view]")).find(
+    (e) => e.getAttribute("data-pop-view") === viewOrId,
+  );
   return el ? el.id : viewOrId;
 }
 
