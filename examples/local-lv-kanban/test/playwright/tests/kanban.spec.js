@@ -199,12 +199,12 @@ test.describe("push failure (handle_push_error)", () => {
     await expect(h.columns(page)).toHaveCount(3);
   });
 
-  test("an optimistic remove via phx-target @server snaps back when the socket is down", async ({ page }) => {
+  test("an optimistic remove snaps back when the socket is down", async ({ page }) => {
     await h.createBoard(page, uniqueName("PushErrDom"));
     await expect(h.columns(page)).toHaveCount(3);
 
-    // Kill the host websocket: the @server leg of the remove's
-    // targets([@default, @server]) rejects with "no connection".
+    // Kill the host websocket: the remove's push_server_event rejects with
+    // "no connection".
     await page.evaluate(() => window.liveSocket.disconnect());
 
     // The rollback can re-render the column within milliseconds of the
@@ -219,8 +219,8 @@ test.describe("push failure (handle_push_error)", () => {
       }).observe(document.body, { childList: true, subtree: true, characterData: true });
     });
 
-    // The @default leg removes the column optimistically, then the failed
-    // @server leg triggers handle_push_error, restoring the board.
+    // The local handler removes the column optimistically, then its failed
+    // push_server_event triggers handle_push_error, restoring the board.
     await h.columnByName(page, "In Progress").getByTitle("Remove column").click();
     await page.waitForFunction(() => window.__llvTestSawRemoval, null, { timeout: 15_000 });
     await expect(h.columnByName(page, "In Progress")).toHaveCount(1, { timeout: 15_000 });

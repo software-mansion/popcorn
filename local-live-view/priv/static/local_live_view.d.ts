@@ -47,7 +47,9 @@ declare class PopcornClient {
     reconnected(id: string): void;
     updateAssigns(id: string, assigns: Record<string, unknown>): void;
     handleParams(id: string, params: Record<string, string>, url: string): void;
-    event(id: string, payload: Record<string, unknown>): void;
+    transportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
+    serverMessage(id: string, payload: Record<string, unknown>): void;
+    pushError(id: string, event: string, payload: Record<string, unknown>): void;
     push(id: string, event: string, payload: Record<string, unknown>): Promise<CallResult>;
 }
 declare class LLVEngine {
@@ -57,6 +59,8 @@ declare class LLVEngine {
     private views;
     private channels;
     private bufferedServerMessages;
+    private eventBusHooks;
+    private popcornLink;
     private constructor();
     /**
      * Initializes LLVEngine and connects the LiveSocket.
@@ -65,6 +69,7 @@ declare class LLVEngine {
      * @param config - Optional LLV configuration.
      */
     static create(liveSocket: LiveSocketInstanceInterface, config?: LLVConfig): Promise<LLVEngine>;
+    private connectPopcornSocket;
     private mountView;
     private unmountView;
     private registerServerMessageListener;

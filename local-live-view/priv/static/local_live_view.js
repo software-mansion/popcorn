@@ -513,99 +513,17 @@ async function resolveBundleURL(primary, fallback) {
     }
 }
 
-const LLV_DEFAULT_TARGET = "__llv_default__";
-const LLV_SERVER_TARGET = "__llv_server__";
-const LLV_TARGET_SEP = "\x1f";
-// Phoenix tags every real LiveView root element with data-phx-session; this is
-// the selector phoenix_live_view uses internally (PHX_VIEW_SELECTOR).
-const PHX_VIEW_SELECTOR = "[data-phx-session]";
-
-// Resolve an LLV's element id from a view name or id: prefer the element whose
-// data-pop-view matches, else fall back to treating the argument as an id.
-function resolveLlvId(viewOrId) {
-    const el = Array.from(document.querySelectorAll("[data-pop-view]")).find((e) => e.getAttribute("data-pop-view") === viewOrId);
-    return el ? el.id : viewOrId;
-}
-// Resolve an LLV's host LiveView fresh on every call (a reconnect can swap the
-// [data-phx-session] element) and hand it to `fun`. We can't use
-// liveSocket.withinOwners(llvElement, fun) here: overriding the owner
-// connects [data-pop-view] elements with the fake local view, so we hop to the host
-// element ourselves first.
-function withHostLV(socket, llvId, fun) {
-    const llvElement = document.getElementById(llvId);
-    if (!llvElement) {
-        console.error("LLV withHostLV: LLV element not found", llvId);
-        return;
-    }
-    const hostEl = llvElement.closest(PHX_VIEW_SELECTOR);
-    if (!hostEl) {
-        console.error("LLV withHostLV: no host LiveView for view", llvId);
-        return;
-    }
-    // liveSocket.owner only calls back when the element maps to a live view;
-    // surface the miss instead of dropping the event without a trace.
-    let dispatched = false;
-    socket.owner(hostEl, (hostView) => {
-        dispatched = true;
-        fun(hostView, hostEl);
-    });
-    if (!dispatched) {
-        console.error("LLV withHostLV: host LiveView element has no live view", { llvId, hostEl });
-    }
-}
-function sendServerMessage(pop, detail) {
-    pop.event(resolveLlvId(detail.view), {
-        event: "llv_server_message",
-        value: detail.payload,
-        type: "llv_server_message",
-    });
-}
-// data-pop-assigns holds the JSON a local_component serialized from its inline
-// assigns. Absent/empty for plain local views — default to {} so the process is
-// always handed a map.
-function parseAssigns(raw) {
-    if (!raw)
-        return {};
-    try {
-        return JSON.parse(raw);
-    }
-    catch (err) {
-        console.error("LLV failed to parse data-pop-assigns:", raw, err);
-        return {};
-    }
-}
-
 // Wire a fake Phoenix root view around a [data-pop-view] element so the
 // browser renders the runtime's diffs and routes events to it.
-function setupFakeView(socket, views, pop, pop_view_el, initialRendered) {
+function setupFakeView(socket, views, popcornSocket, pop_view_el) {
     const llvId = pop_view_el.id;
     const view = socket.newRootView(pop_view_el);
     views.set(llvId, view);
-    // Handle LLV's custom targets (default, server, targets composed by LocalLiveView.targets/1)
-    const origWithinTargets = view.withinTargets.bind(view);
-    view.withinTargets = function (phxTarget, callback, dom) {
-        const dispatchToken = (t) => {
-            if (t === LLV_DEFAULT_TARGET) {
-                callback(this, null);
-            }
-            else if (t === LLV_SERVER_TARGET) {
-                withHostLV(socket, llvId, (hostView) => callback(hostView, null));
-            }
-            else {
-                origWithinTargets(t, callback, dom);
-            }
-        };
-        if (typeof phxTarget === "string" &&
-            (phxTarget.includes(LLV_TARGET_SEP) ||
-                phxTarget === LLV_DEFAULT_TARGET ||
-                phxTarget === LLV_SERVER_TARGET)) {
-            for (const t of phxTarget.split(LLV_TARGET_SEP))
-                if (t)
-                    dispatchToken(t);
-            return;
-        }
-        return origWithinTargets(phxTarget, callback, dom);
-    };
+    // The view's channel: a real Phoenix Channel on the popcorn socket.
+    // Everything channel-shaped — join handshake, event acks carrying
+    // diffs, out-of-band "diff" frames, ref bookkeeping — runs through the
+    // stock Channel/Push machinery over the PopcornTransport.
+    view.channel = popcornSocket.channel(`lv:${llvId}`);
     // addHook: skip the root element to prevent Phoenix from trying to register it
     // as a hook within this view's scope — hooks on children are still processed normally.
     const origAddHook = view.addHook.bind(view);
@@ -614,56 +532,119 @@ function setupFakeView(socket, views, pop, pop_view_el, initialRendered) {
             return;
         return origAddHook(el);
     };
-    // isConnected: we are always "connected" to Popcorn
-    view.isConnected = function () {
-        return true;
-    };
-    // join: skip bindChannel + channel.join — onJoin is called below after Popcorn mounts.
-    // No need to set data-phx-session / data-phx-root-id: owner() is overridden below
-    // to route events via [data-pop-view] lookup instead of attribute-based lookup.
-    view.join = function (callback) {
-        this.showLoader(this.liveSocket.loaderTimeout);
-        this.joinCallback = (onDone) => {
-            onDone = onDone ?? function () { };
-            if (callback) {
-                callback(this.joinCount, onDone);
-            }
-            else {
-                onDone();
-            }
-        };
-    };
-    // pushWithReply: send event to Popcorn, return a resolved Promise so callers
-    // like pushInput can safely chain .then() on it.
-    // The actual diff arrives asynchronously via window.__popcornTransportReceive.
-    view.pushWithReply = function (refGenerator, event, payload) {
-        const [ref] = refGenerator ? refGenerator({ payload }) : [null, [], {}];
-        if (typeof payload.cid !== "number") {
-            delete payload.cid;
-        }
-        pop.event(this.el.id, payload);
-        // In the real Phoenix flow, undoRefs is called synchronously inside
-        // pushWithReply's channel reply handler — just before this.update(diff).
-        // Since our diff arrives asynchronously via __popcornTransportReceive,
-        // we must release the ref locks now. Otherwise DOMPatch sees PHX_REF_LOCK
-        // on the form (set by pushInput for both the input AND the form element)
-        // and applies all diff changes to a clone instead of the real DOM.
-        if (ref !== null) {
-            this.undoRefs(ref, payload.event ?? event);
-        }
-        return Promise.resolve({ resp: {}, reply: null, ref });
-    };
-    // maybePushComponentsDestroyed: component lifecycle is managed by Popcorn/WASM,
-    // no need to notify the server about destroyed CIDs from the JS side
-    view.maybePushComponentsDestroyed = function () { };
-    view.bindChannel = function () { };
+    // Stock join: bindChannel + channel.join over the popcorn transport.
+    // The join frame is answered by the view's process itself, serving the
+    // rendered it produced at mount — so onJoin runs the regular path.
+    // No need to set data-phx-session / data-phx-root-id: owner() is
+    // overridden by the engine to route events via [data-pop-view] lookup
+    // instead of attribute-based lookup.
     view.join();
-    if (initialRendered) {
-        socket.requestDOMUpdate(() => view.onJoin({ rendered: initialRendered }));
+}
+
+// ---- Popcorn channel transport -----------------------------------------
+//
+// Each fake view gets a REAL Phoenix Channel on a dedicated Socket whose
+// transport is the class below — the same public seam Phoenix.LongPoll
+// plugs into. No network connection ever exists: the "wire" is
+// popcorn.call one way and injected frames the other, and the socket's
+// encode/decode passthrough keeps frames plain objects (no serializer).
+//
+// The transport honors the channel ack contract: frames the WASM view
+// must answer (join, events, component-destruction bookkeeping) ride
+// popcorn.call, whose promise the view's process settles once the frame
+// is processed — the resolved {status, payload} (initial rendered, render
+// diff or %{} no-op, pruned cids) becomes the channel ack. So LiveView's
+// stock push lifecycle runs unmodified: apply the ack diff, undo the
+// push's element refs, resolve the {:reply, ...} payload. Ref locks and
+// phx-disable-with span the local round-trip exactly like a server
+// round-trip.
+const llvIdFromTopic = (topic) => topic.slice("lv:".length);
+// Frames the WASM view must answer: the channel join (ack carries the
+// initial rendered), DOM events (ack carries the render diff and reply)
+// and component-destruction bookkeeping (ack carries the pruned cids).
+// Anything else — heartbeats, phx_leave — is acked in place so the socket
+// stays healthy and teardown completes. Each entry needs a matching
+// Message clause in LocalLiveView.Server.
+const ANSWERED_EVENTS = ["phx_join", "event", "cids_will_destroy", "cids_destroyed"];
+function createPopcornSocket(SocketClass, pop) {
+    let transport = null;
+    class PopcornTransport {
+        readyState = 0; // CONNECTING
+        onopen = () => { };
+        onerror = () => { };
+        onmessage = () => { };
+        onclose = () => { };
+        // The WebSocket-shaped signature the Socket constructs us with; the URL
+        // is a dead label.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        constructor(_endpointURL, _protocols) {
+            // eslint-disable-next-line @typescript-eslint/no-this-alias
+            transport = this;
+            // The Socket assigns onopen/onmessage/onclose after `new`, so the
+            // "connection" must open asynchronously.
+            queueMicrotask(() => {
+                this.readyState = 1; // OPEN
+                this.onopen();
+            });
+        }
+        // Deliver an inbound frame. Async so an ack never re-enters Socket code
+        // in the middle of an outbound send.
+        inject(frame) {
+            queueMicrotask(() => {
+                if (this.readyState === 1)
+                    this.onmessage({ data: frame });
+            });
+        }
+        // Ack an outbound frame in place (joins, leaves, heartbeats, no-ops).
+        ack(frame, status, response) {
+            this.inject({
+                topic: frame.topic,
+                event: "phx_reply",
+                payload: { status, response },
+                ref: frame.ref,
+                join_ref: frame.join_ref,
+            });
+        }
+        send(frame) {
+            const { topic, event, payload } = frame;
+            if (!ANSWERED_EVENTS.includes(event)) {
+                this.ack(frame, "ok", {});
+                return;
+            }
+            // The view's process settles the call promise with {status, payload}
+            // once the frame is processed; a dispatcher-side reject resolves with
+            // ok: false. A call left unsettled (crashed view process) rejects at
+            // the call timeout. Every failure acks "error" — never "timeout",
+            // whose Push path triggers liveSocket.reloadWithJitter.
+            pop.transportFrame(llvIdFromTopic(topic), event, payload).then((result) => {
+                if (result.ok) {
+                    const { status, payload: response } = result.data;
+                    this.ack(frame, status, response);
+                }
+                else {
+                    this.ack(frame, "error", result.error);
+                }
+            }, (err) => this.ack(frame, "error", String(err)));
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        close(_code, _reason) {
+            this.readyState = 3; // CLOSED
+            queueMicrotask(() => this.onclose({ code: 1000, wasClean: true }));
+        }
     }
-    else {
-        console.error("LLV no initial rendered for view", llvId);
-    }
+    // The endpoint URL is only a label — the transport never dereferences it.
+    const socket = new SocketClass("/llv-popcorn", {
+        transport: PopcornTransport,
+        encode: (payload, callback) => callback(payload),
+        decode: (rawPayload, callback) => callback(rawPayload),
+    });
+    socket.connect();
+    return {
+        socket,
+        inject(frame) {
+            transport?.inject(frame);
+        },
+    };
 }
 
 // LLV navigation runs in one of two modes:
@@ -872,6 +853,37 @@ function registerCustomEventBindings(socket) {
     }
 }
 
+// Resolve an LLV's element id from a view name or id: prefer the element whose
+// data-pop-view matches, else fall back to treating the argument as an id.
+function resolveLlvId(viewOrId) {
+    const el = Array.from(document.querySelectorAll("[data-pop-view]")).find((e) => e.getAttribute("data-pop-view") === viewOrId);
+    return el ? el.id : viewOrId;
+}
+// Host-pushed server messages are not channel pushes — there is no ack to
+// carry the render, so the view delivers any resulting diff out-of-band
+// (__popcornTransportReceive). Hence the dedicated fire-and-forget action.
+function sendServerMessage(pop, detail) {
+    pop.serverMessage(resolveLlvId(detail.view), {
+        event: "llv_server_message",
+        value: detail.payload,
+        type: "llv_server_message",
+    });
+}
+// data-pop-assigns holds the JSON a local_component serialized from its inline
+// assigns. Absent/empty for plain local views — default to {} so the process is
+// always handed a map.
+function parseAssigns(raw) {
+    if (!raw)
+        return {};
+    try {
+        return JSON.parse(raw);
+    }
+    catch (err) {
+        console.error("LLV failed to parse data-pop-assigns:", raw, err);
+        return {};
+    }
+}
+
 const DEFAULT_CALL_TIMEOUT_MS = 10_000;
 class PopcornClient {
     popcorn = null;
@@ -915,8 +927,20 @@ class PopcornClient {
     handleParams(id, params, url) {
         this.fire("handle_params", { action: "handle_params", id, payload: { params, url } });
     }
-    event(id, payload) {
-        this.fire("event", { action: "event", id, payload });
+    // A channel frame the view must answer: the view's process settles the
+    // call promise (Popcorn.Wasm.resolve) once the frame is processed, so the
+    // result carries the channel ack. The transport consumes it — no `fire`.
+    transportFrame(id, event, payload) {
+        return this.call({ action: "transport_frame", id, event, payload });
+    }
+    serverMessage(id, payload) {
+        this.fire("server_message", { action: "server_message", id, payload });
+    }
+    // Report a failed local→server push back to the view's process so its
+    // handle_push_error callback runs. `payload` is the map the view passed
+    // to push_server_event.
+    pushError(id, event, payload) {
+        this.fire("push_error report", { action: "push_error", id, payload: { event, payload } });
     }
     push(id, event, payload) {
         return this.call({ action: "push", id, payload: { event, payload } });
@@ -929,6 +953,10 @@ class LLVEngine {
     views = new Map();
     channels = {};
     bufferedServerMessages = [];
+    // llvId -> mounted LocalLiveViewEventBus hook: the host-side channel used
+    // by __llvPushServer.
+    eventBusHooks = new Map();
+    popcornLink;
     constructor(socket, config) {
         this.socket = socket;
         this.config = config;
@@ -947,6 +975,7 @@ class LLVEngine {
         registerNavigationHandlers(engine.socket, engine.views, engine.pop, engine.config);
         engine.registerHooks();
         engine.bindFormsIfHostless();
+        engine.connectPopcornSocket();
         await engine.bootPopcorn();
         engine.setupMirrorChannels();
         engine.exposeGlobals();
@@ -955,6 +984,13 @@ class LLVEngine {
         await engine.scanAndMount();
         engine.flushBufferedServerMessages();
         return engine;
+    }
+    // The dedicated never-networked socket the fake views' channels live on.
+    // Connected before Popcorn boots: heartbeats are acked in place by the
+    // transport, and no answered frame flows until a view mounts (post-boot).
+    connectPopcornSocket() {
+        const SocketClass = this.config.Socket ?? this.socket.getSocket().constructor;
+        this.popcornLink = createPopcornSocket(SocketClass, this.pop);
     }
     // Start a view and wire it up.
     async mountView(pop_view_el) {
@@ -968,18 +1004,16 @@ class LLVEngine {
             urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
             assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns")),
         });
+        // A rejected call resolves with ok: false (it does not throw). Bail on
+        // failed or duplicate creates — wiring a fake view without a live
+        // process would join a channel nobody answers.
         if (!result.ok) {
             console.error("LLV failed to create view", llvId, result.error);
             return;
         }
-        const data = result.data;
-        if (data.status === "error") {
-            console.error("LLV view returned error status on create", llvId, data);
-            return;
-        }
         const liveEl = document.getElementById(llvId);
         if (liveEl?.matches("[data-pop-view]")) {
-            setupFakeView(this.socket, this.views, this.pop, liveEl, data.rendered);
+            setupFakeView(this.socket, this.views, this.popcornLink.socket, liveEl);
         }
         else {
             this.pop.destroy(llvId);
@@ -1010,10 +1044,9 @@ class LLVEngine {
             sendServerMessage(this.pop, detail);
         });
     }
-    // Hook that manages views rendered inside a host LiveView.
-    // Other views are rendered during startup scan.
-    // The startup scan also handles the case when hook's mount
-    // fires before Popcorn is ready.
+    // Hooks that manage views rendered inside a host LiveView (other views are
+    // mounted by the startup scan, which also catches hooks that fired before
+    // Popcorn was ready) and the per-view event bus.
     registerHooks() {
         const pop = this.pop;
         const mountView = (el) => this.mountView(el);
@@ -1038,6 +1071,26 @@ class LLVEngine {
             },
             destroyed() {
                 unmountView(this.el);
+            },
+        };
+        // Event bus for local→server pushes: a hidden sibling of each mount
+        // point, owned by the HOST LiveView (see LocalLiveView.Component). Its
+        // lifecycle IS the host resolution — LiveView mounts and destroys it
+        // with the host view across reconnects and re-renders, so the registry
+        // always holds a live hook and no host-element lookup can go stale.
+        // __llvPushServer pushes through it via the documented hook pushEvent.
+        const eventBusHooks = this.eventBusHooks;
+        this.socket.hooks.LocalLiveViewEventBus = {
+            mounted() {
+                const llvId = this.el.getAttribute("data-llv-event-bus-for");
+                if (llvId)
+                    eventBusHooks.set(llvId, this);
+            },
+            destroyed() {
+                const llvId = this.el.getAttribute("data-llv-event-bus-for");
+                if (llvId && eventBusHooks.get(llvId) === this) {
+                    eventBusHooks.delete(llvId);
+                }
             },
         };
     }
@@ -1097,22 +1150,38 @@ class LLVEngine {
         };
     }
     exposeGlobals() {
+        // Out-of-band diffs (handle_info renders, send_update, push_error
+        // rollbacks, server messages — anything not acking a push). Injected as
+        // a channel "diff" frame, handled by the stock bindChannel handler
+        // exactly like a server-pushed diff. A diff racing a just-unmounted
+        // view is dropped.
         window.__popcornTransportReceive = (llvId, diff) => {
-            const view = this.views.get(llvId);
-            if (!view) {
-                console.error("LLV view not found:", llvId, "available:", this.views.keys());
+            if (!this.views.has(llvId))
+                return;
+            this.popcornLink.inject({
+                topic: `lv:${llvId}`,
+                event: "diff",
+                payload: diff,
+                ref: null,
+                join_ref: null,
+            });
+        };
+        // __llvPushServer: sends an event to the host LiveView, called from a
+        // local view's Elixir via LocalLiveView.push_server_event/3. Pushes
+        // through the event bus hook's documented, promise-returning pushEvent —
+        // it rejects when the host is disconnected, replies with an error, or
+        // times out; no event bus means no host LiveView on the page. Failures
+        // are reported back so the view's handle_push_error runs.
+        window.__llvPushServer = (llvId, event, payload) => {
+            const eventBus = this.eventBusHooks.get(llvId);
+            if (!eventBus) {
+                console.error("LLV push_server_event: no host event bus for view", llvId);
+                this.pop.pushError(llvId, event, payload);
                 return;
             }
-            view.update(diff, []);
-        };
-        // __llvPushServer: programmatic counterpart of phx-target=@server, called from
-        // a local view's Elixir via LocalLiveView.push_server_event/3. Resolves the
-        // LLV's host LiveView fresh each call (a reconnect can swap the
-        // [data-phx-session] element) and dispatches the event to it over the
-        // websocket.
-        window.__llvPushServer = (llvId, event, payload) => {
-            withHostLV(this.socket, llvId, (hostView, hostEl) => {
-                hostView.pushEvent("event", hostEl, null, event, payload, {});
+            eventBus.pushEvent(event, payload).catch((err) => {
+                console.error("LLV push_server_event failed", err);
+                this.pop.pushError(llvId, event, payload);
             });
         };
     }
@@ -1135,7 +1204,7 @@ class LLVEngine {
     // This is the mount path for host-less pages (no hooks fire there) and the
     // catch-up for hooks that fired before Popcorn was ready.
     // If a view is mounted twice (here and by the hook), the dispatcher
-    // on the Elixir side ignores the second mount.
+    // on the Elixir side rejects the second create.
     async scanAndMount() {
         const pop_view_els = Array.from(document.querySelectorAll("[data-pop-view]"));
         await Promise.all(pop_view_els.map((el) => this.mountView(el)));

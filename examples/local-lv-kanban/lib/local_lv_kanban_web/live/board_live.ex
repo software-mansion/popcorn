@@ -5,7 +5,7 @@ defmodule LocalLvKanbanWeb.BoardLive do
   Server-authoritative collaborative flow:
 
     * The browser-side view applies edits optimistically and notifies this view
-      (`targets([@default, @server])` for adds/removes, `push_server_event` for drag-moves).
+      via `push_server_event`.
     * `handle_event` writes the edit to the DB. On success it broadcasts
       `:board_changed` to every `BoardLive` viewing this board (including itself);
       each re-reads the board and re-assigns it, so all clients converge.

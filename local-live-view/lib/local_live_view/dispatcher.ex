@@ -27,43 +27,62 @@ defmodule LocalLiveView.Dispatcher do
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, state}
+    {:wasm_call, msg, promise} = Wasm.parse_message!(raw_msg)
+
+    case handle_wasm_call(msg, promise, state) do
+      {:resolve, reply, state} ->
+        Wasm.resolve(reply, promise)
+        {:noreply, state}
+
+      {:reject, reason, state} ->
+        Wasm.reject(reason, promise)
+        {:noreply, state}
+
+      {:ignore, state} ->
+        {:noreply, state}
+    end
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "reconnected", "id" => id}},
-         state
-       ) do
+  defp handle_wasm_call(%{"action" => "transport_frame", "id" => id} = msg, promise, state)
+       when is_map_key(state.views, id) do
+    send(state.views[id], %Message{event: msg["event"], payload: msg["payload"], promise: promise})
+
+    {:ignore, state}
+  end
+
+  defp handle_wasm_call(%{"action" => "transport_frame"}, _promise, state) do
+    {:reject, "view not mounted", state}
+  end
+
+  defp handle_wasm_call(%{"action" => "reconnected", "id" => id}, _promise, state) do
     send_to_view(state, id, %Message{event: "llv_reconnected", payload: %{}})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "push", "id" => id, "payload" => payload}},
-         state
-       ) do
+  defp handle_wasm_call(%{"action" => "push", "id" => id, "payload" => payload}, _promise, state) do
     send_to_view(state, id, %Message{event: "js_push", payload: payload})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "push_error", "id" => id, "payload" => payload}},
+  defp handle_wasm_call(
+         %{"action" => "push_error", "id" => id, "payload" => payload},
+         _promise,
          state
        ) do
     send_to_view(state, id, %Message{event: "push_error", payload: payload})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "update_assigns", "id" => id, "assigns" => assigns}},
+  defp handle_wasm_call(
+         %{"action" => "update_assigns", "id" => id, "assigns" => assigns},
+         _promise,
          state
        ) do
     send_to_view(state, id, %Message{event: "update_assigns", payload: assigns})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm({:wasm_call, %{"action" => "destroy", "id" => id}}, state) do
+  defp handle_wasm_call(%{"action" => "destroy", "id" => id}, _promise, state) do
     # The host LiveView removed a mount point. Stop its process and forget it.
     case Map.get(state.views, id) do
       nil -> :ok
@@ -75,45 +94,45 @@ defmodule LocalLiveView.Dispatcher do
 
   # This event may be fired multiple times for the same view from JS,
   # in such case we only handle the first event.
-  defp handle_wasm({:wasm_call, %{"action" => "create", "id" => id} = msg}, state)
+  defp handle_wasm_call(%{"action" => "create", "id" => id} = msg, _promise, state)
        when not is_map_key(state.views, id) do
-    view = String.to_existing_atom("Elixir." <> Map.fetch!(msg, "view"))
+    view = String.to_atom("Elixir." <> Map.fetch!(msg, "view"))
 
     params =
       Map.take(msg, ~w"id assigns url url_params")
       |> Map.put("session", %Session{view: view})
 
     case start_local_live_view(params) do
-      {:ok, pid, rendered} ->
-        {:resolve, %{status: :ok, rendered: rendered}, put_in(state.views[id], pid)}
+      {:ok, pid} ->
+        {:resolve, :ok, put_in(state.views[id], pid)}
 
       :error ->
-        {:resolve, %{status: :error}, state}
+        {:reject, "error creating LLV", state}
     end
   end
 
-  defp handle_wasm({:wasm_call, %{"action" => "create"}}, state) do
-    {:resolve, %{status: :error}, state}
+  defp handle_wasm_call(%{"action" => "create"}, _promise, state) do
+    {:reject, "error creating LLV", state}
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "handle_params", "id" => id, "payload" => payload}},
+  defp handle_wasm_call(
+         %{"action" => "handle_params", "id" => id, "payload" => payload},
+         _promise,
          state
        ) do
     send_to_view(state, id, %Message{event: "handle_params", payload: payload})
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm(
-         {:wasm_call, %{"action" => "event", "id" => id, "payload" => payload} = msg},
+  defp handle_wasm_call(
+         %{"action" => "server_message", "id" => id, "payload" => payload},
+         _promise,
          state
        ) do
-    # "ref" is the channel push ref from the browser's popcorn transport. The
-    # view acks the push through it — a reply carrying the render diff — which
-    # drives LiveView's regular push lifecycle (apply ack diff, undo element
-    # refs, resolve the reply). Absent for uncorrelated sends like
-    # llv_server_message.
-    send_to_view(state, id, %Message{payload: payload, event: "event", ref: msg["ref"]})
+    # Host-pushed llv_server_message: not a channel push, so there is no ack
+    # to carry the render — the view handles it like an event and pushes any
+    # resulting diff out-of-band (nil promise).
+    send_to_view(state, id, %Message{event: "event", payload: payload})
     {:resolve, :ok, state}
   end
 
@@ -131,10 +150,10 @@ defmodule LocalLiveView.Dispatcher do
     ref = make_ref()
 
     {:ok, pid} = LocalLiveView.Server.start_llv_process()
-    send(pid, {LocalLiveView.Server, params, {self(), ref}, %Phoenix.Socket{}})
+    send(pid, {LocalLiveView.Server, params, {self(), ref}})
 
     receive do
-      {^ref, {:ok, rendered}} -> {:ok, pid, rendered}
+      {^ref, :ok} -> {:ok, pid}
       {^ref, {:error, _reply}} -> :error
     end
   end

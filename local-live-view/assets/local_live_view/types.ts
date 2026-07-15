@@ -1,4 +1,4 @@
-import type { Socket as PhoenixSocket } from "phoenix";
+import type { Channel, Socket as PhoenixSocket } from "phoenix";
 import type { LiveSocketInstanceInterface } from "phoenix_live_view";
 
 // --- Public API ---
@@ -25,14 +25,13 @@ export interface LLVConfig {
 /** Opaque rendered diff payload delivered from WASM via structuredClone */
 export type RenderedDiff = Record<string, unknown>;
 
-export type RefGenerator = (opts: { payload: EventPayload }) => [unknown, Element[], object];
-
-export interface EventPayload {
-  cid?: number;
-  event?: string;
-  value?: unknown;
-  type?: string;
-  [key: string]: unknown;
+/** A raw Phoenix channel frame as it crosses the (fake) transport. */
+export interface TransportFrame {
+  topic: string;
+  event: string;
+  payload: unknown;
+  ref: string | null;
+  join_ref: string | null;
 }
 
 export interface PointerData {
@@ -58,20 +57,18 @@ export interface LLVServerMessageDetail {
   payload: unknown;
 }
 
-export const LLV_DEFAULT_TARGET = "__llv_default__";
-export const LLV_SERVER_TARGET = "__llv_server__";
-export const LLV_TARGET_SEP = "\x1f";
-
-// Phoenix tags every real LiveView root element with data-phx-session; this is
-// the selector phoenix_live_view uses internally (PHX_VIEW_SELECTOR).
-export const PHX_VIEW_SELECTOR = "[data-phx-session]";
-
-/** Phoenix View properties and methods that LLV reads or calls but does not replace. */
-interface PhxView {
+/**
+ * Phoenix View surface LLV touches on the object returned by
+ * socket.newRootView(). `channel` and `addHook` are reassigned in
+ * view_setup (property syntax so TypeScript allows reassignment on the
+ * concrete instance); everything else is stock and merely called.
+ */
+export interface LLVView {
   el: HTMLElement;
-  liveSocket: LLVSocket;
-  joinCount: number;
-  joinCallback: (onDone?: () => void) => void;
+  /** Reassigned to a channel on the popcorn socket before join(). */
+  channel: Channel;
+  /** Stock join: bindChannel + channel.join over the popcorn transport. */
+  join(): void;
   pushEvent(
     type: string,
     el: Element,
@@ -80,46 +77,25 @@ interface PhxView {
     meta: PointerData,
     opts: object,
   ): void;
-  showLoader(timeout: number): void;
-  onJoin(resp: { rendered: RenderedDiff }): void;
-  update(diff: RenderedDiff, events: unknown[]): boolean;
-  undoRefs(ref: unknown, event: string): void;
+  addHook: (el: Element) => unknown;
   destroy?: (callback?: () => void) => void;
 }
-
-/**
- * Phoenix View methods that LLV replaces via monkey-patching on the object
- * returned by socket.newRootView(). Property (arrow) syntax is required so
- * TypeScript allows reassignment on the concrete instance.
- */
-interface PhxViewPatchable {
-  withinTargets: (
-    phxTarget: unknown,
-    callback: (view: LLVView, ctx: null) => void,
-    dom?: unknown,
-  ) => void;
-  addHook: (el: Element) => unknown;
-  isConnected: () => boolean;
-  join: (callback?: (count: number, onDone?: () => void) => void) => void;
-  pushWithReply: (
-    refGenerator: RefGenerator | null,
-    event: string,
-    payload: EventPayload,
-  ) => Promise<{ resp: object; reply: null; ref: unknown }>;
-  maybePushComponentsDestroyed: (destroyedCIDs: number[]) => void;
-  bindChannel: () => void;
-}
-
-/** Phoenix View shape after LLV patches it in view_setup. */
-export type LLVView = PhxView & PhxViewPatchable;
 
 /** Registry of the fake Phoenix views LLV mounts, keyed by element id. */
 export type ViewRegistry = Map<string, LLVView>;
 
+/**
+ * A mounted LocalLiveViewEventBus hook instance: the host-side channel used
+ * by __llvPushServer. pushEvent is the documented promise-returning hook API.
+ */
+export interface EventBusHook {
+  el: HTMLElement;
+  pushEvent(event: string, payload: Record<string, unknown>): Promise<unknown>;
+}
+
 /** Private phoenix_live_view LiveSocket API that LLV accesses via type-cast. */
 interface PhxLiveSocketInternals {
   newRootView(el: HTMLElement, flash?: unknown, liveReferer?: unknown): LLVView;
-  requestDOMUpdate(callback: () => void): void;
   isConnected(): boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: Record<string, any>;
@@ -133,7 +109,6 @@ interface PhxLiveSocketInternals {
     targetEl: Element | null,
   ): void;
   bindForms(): void;
-  loaderTimeout: number;
 }
 
 /** Public LiveSocket interface extended with Phoenix internals accessed by LLV. */

@@ -43,7 +43,9 @@ defmodule LocalLvKanbanWeb.BoardsLive do
           <button
             type="submit"
             style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:0.6em 1.1em;font-size:1em;cursor:pointer"
-          >Create</button>
+          >
+            Create
+          </button>
         </form>
 
         <div :if={@boards == []} style="color:#6b7280;font-style:italic">
