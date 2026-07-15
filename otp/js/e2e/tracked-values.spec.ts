@@ -109,8 +109,7 @@ test("tracked argument cleanup waits for async run_js to finish", async ({
       ok = wasm:send(#{async_runner_ready => true})
     end),
     receive
-      {wasm, PayloadJson, _} ->
-        #{<<"collect">> := true} = json:decode(PayloadJson),
+      {wasm, #{<<"collect">> := true}, _} ->
         % Force collection while Runner is blocked inside wasm:run_js/3.
         erlang:garbage_collect(Runner),
         ok = wasm:send(#{async_runner_collected => true})
@@ -216,5 +215,4 @@ test("tracked values isolated cleanup", async ({ createOtp, page }) => {
   expect(liveEvent).toEqual({ v: 42 });
   expect(cleanupCalls).toBe(1);
 });
-
 

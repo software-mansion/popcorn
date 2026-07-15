@@ -1,4 +1,5 @@
 import { type Result, type SerializedError } from "./errors";
+import { tuple2 } from "./etf";
 import type {
   AnyValue,
   BeamBootOptions,
@@ -123,14 +124,9 @@ export function serializeSendPayload(
     check(target.pid.length > 0);
   }
 
-  return {
-    ok: true,
-    data: {
-      target,
-      payloadJson: serializeJson(payload),
-      metaJson: serializeJson(meta),
-    },
-  };
+  const etf = tuple2(payload, meta);
+  if (!etf.ok) return etf;
+  return { ok: true, data: { target, etf: etf.data } };
 }
 
 function isNameTarget(
@@ -175,8 +171,12 @@ export function deserializeBridgeMessage(
 }
 
 /** Usable only from main context. */
-export function toVm(worker: Worker, event: MainToVmEvent): void {
-  worker.postMessage(event);
+export function toVm(
+  worker: Worker,
+  event: MainToVmEvent,
+  transfer?: Transferable[],
+): void {
+  worker.postMessage(event, transfer ?? []);
 }
 
 /** Usable only from webworkers. */
@@ -188,10 +188,4 @@ function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
   const KNOWN_MESSAGE_TYPES: unknown[] = ["vm_message", "vm_error", "run_js"];
   const data = objectWithKeys(value, ["type"]);
   return data !== null && KNOWN_MESSAGE_TYPES.includes(data.type);
-}
-
-function serializeJson(value: AnyValue): string {
-  const serialized = JSON.stringify(value);
-  check(serialized !== undefined);
-  return serialized;
 }

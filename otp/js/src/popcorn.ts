@@ -248,10 +248,14 @@ export class Popcorn {
         clearTimeout(timer);
         resolve(result);
       });
-      toVm(this.vmWorker, {
-        type: "popcorn:send",
-        payload: { id: requestId, message: command.data },
-      });
+      toVm(
+        this.vmWorker,
+        {
+          type: "popcorn:send",
+          payload: { id: requestId, message: command.data },
+        },
+        [command.data.etf.buffer],
+      );
     });
   }
 
@@ -314,10 +318,14 @@ export class Popcorn {
 
     const command = serializeSendPayload({ pid: request.replyTo }, payload, {});
     check(command.ok);
-    toVm(this.vmWorker, {
-      type: "popcorn:run-js-reply",
-      payload: { message: command.data },
-    });
+    toVm(
+      this.vmWorker,
+      {
+        type: "popcorn:run-js-reply",
+        payload: { message: command.data },
+      },
+      [command.data.etf.buffer],
+    );
   }
 
   private jsWithCurrentEnv(code: string): unknown {

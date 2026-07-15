@@ -191,10 +191,10 @@ index 0000000000000000000000000000000000000000..ed09e8dd4ff11df4fe5e8b9adcb4dc70
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e640b20a5
+index 0000000000000000000000000000000000000000..730183d503d8b85a95083be2b9b7719ed99cd009
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,655 @@
+@@ -0,0 +1,651 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -308,8 +308,7 @@ index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e
 +
 +#ifdef ERTS_EMSCRIPTEN
 +int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
-+                  const char *payload_json, int payload_len,
-+                  const char *meta_json, int meta_len);
++                  const unsigned char *etf, int etf_len);
 +#endif
 +
 +static void init_atoms(ErlNifEnv *env) {
@@ -769,28 +768,37 @@ index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e
 +
 +EMSCRIPTEN_KEEPALIVE
 +int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
-+                  const char *payload_json, int payload_len,
-+                  const char *meta_json, int meta_len) {
++                  const unsigned char *etf, int etf_len) {
 +  ErlNifEnv *env;
 +  ERL_NIF_TERM atom;
 +  ErlNifPid pid;
++  ERL_NIF_TERM pair;
 +  ERL_NIF_TERM payload_term;
 +  ERL_NIF_TERM message_payload;
 +  ERL_NIF_TERM meta_term;
 +  ERL_NIF_TERM message;
 +  ERL_NIF_TERM token;
++  const ERL_NIF_TERM *pair_elems;
++  int pair_arity;
++  int decoded_size;
 +  bool has_token = false;
 +
-+  if (target_name == NULL || target_name_len <= 0 || payload_len < 0 ||
-+      meta_len < 0 || (payload_json == NULL && payload_len > 0) ||
-+      (meta_json == NULL && meta_len > 0)) {
-+    return 2;
-+  }
++  ASSERT(target_name != NULL && target_name_len > 0 && etf != NULL &&
++         etf_len > 0);
 +
 +  env = enif_alloc_env();
 +  if (env == NULL) {
-+    return 2;
++    abort();
 +  }
++
++  decoded_size = enif_binary_to_term(env, etf, (size_t)etf_len, &pair,
++                                     ERL_NIF_BIN2TERM_SAFE);
++  if (decoded_size != etf_len ||
++      !enif_get_tuple(env, pair, &pair_arity, &pair_elems) || pair_arity != 2) {
++    abort();
++  }
++  payload_term = pair_elems[0];
++  meta_term = pair_elems[1];
 +
 +  if (target_kind == WASM_TARGET_PID_BYTES) {
 +    if (!decode_pid_target(env, target_name, target_name_len, &pid, &has_token,
@@ -812,16 +820,7 @@ index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e
 +      return 1;
 +    }
 +  } else {
-+    enif_free_env(env);
-+    return 2;
-+  }
-+
-+  if (!make_binary_copy(env, payload_json != NULL ? payload_json : "",
-+                        (size_t)payload_len, &payload_term) ||
-+      !make_binary_copy(env, meta_json != NULL ? meta_json : "",
-+                        (size_t)meta_len, &meta_term)) {
-+    enif_free_env(env);
-+    return 2;
++    abort();
 +  }
 +
 +  message_payload =
@@ -838,16 +837,13 @@ index 0000000000000000000000000000000000000000..59f98e78d8c00ce54afc7525937acf2e
 +}
 +#else
 +int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
-+                  const char *payload_json, int payload_len,
-+                  const char *meta_json, int meta_len) {
++                  const unsigned char *etf, int etf_len) {
 +  (void)target_kind;
 +  (void)target_name;
 +  (void)target_name_len;
-+  (void)payload_json;
-+  (void)payload_len;
-+  (void)meta_json;
-+  (void)meta_len;
-+  return 2;
++  (void)etf;
++  (void)etf_len;
++  abort();
 +}
 +#endif
 diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
@@ -1029,7 +1025,7 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..0e99092004c681b76ab1fe42831cf74197c06ee3
+index 0000000000000000000000000000000000000000..4f9ce99cd9273e45ae4e3a296392d3570e9ebaec
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
 @@ -0,0 +1,99 @@
@@ -1084,26 +1080,26 @@ index 0000000000000000000000000000000000000000..0e99092004c681b76ab1fe42831cf741
 +    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
 +    Reply = receive
-+                {wasm, {Token, PayloadJson}, _MetaJson} -> PayloadJson
++                {wasm, {Token, Payload}, _Meta} -> Payload
 +            after Timeout ->
 +                timeout
 +            end,
 +    ?MODULE:keep_alive(Envelope),
 +    case Reply of
 +        timeout -> error(run_js_timeout);
-+        ReplyJson -> handle_run_js_reply(ReplyJson)
++        ReplyPayload -> handle_run_js_reply(ReplyPayload)
 +    end.
 +
 +-spec keep_alive(Term) -> Term when Term :: term().
 +keep_alive(Term) ->
 +    Term.
 +
-+handle_run_js_reply(PayloadJson) ->
-+    case json:decode(PayloadJson) of
-+        #{<<"ok">> := true, <<"value">> := Value} -> revive_refs(Value);
-+        #{<<"ok">> := true} -> null;
-+        #{<<"ok">> := false, <<"error">> := Reason} -> error({run_js, Reason})
-+    end.
++handle_run_js_reply(#{<<"ok">> := true, <<"value">> := Value}) ->
++    revive_refs(Value);
++handle_run_js_reply(#{<<"ok">> := true}) ->
++    null;
++handle_run_js_reply(#{<<"ok">> := false, <<"error">> := Reason}) ->
++    error({run_js, Reason}).
 +
 +encode_arg({wasm_tracked_value, Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);

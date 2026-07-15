@@ -277,19 +277,15 @@ export function send(
       "number",
       target.argType,
       "number",
-      "string",
-      "number",
-      "string",
+      "array",
       "number",
     ],
     [
       target.kind,
       target.value,
       target.length,
-      message.payloadJson,
-      utf8Length(message.payloadJson),
-      message.metaJson,
-      utf8Length(message.metaJson),
+      message.etf,
+      message.etf.byteLength,
     ],
   );
 
