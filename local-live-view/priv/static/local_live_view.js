@@ -580,7 +580,7 @@ function parseAssigns(raw) {
 function setupFakeView(socket, views, pop, pop_view_el, initialRendered) {
     const llvId = pop_view_el.id;
     const view = socket.newRootView(pop_view_el);
-    views.add(llvId, view);
+    views.set(llvId, view);
     // Handle LLV's custom targets (default, server, targets composed by LocalLiveView.targets/1)
     const origWithinTargets = view.withinTargets.bind(view);
     view.withinTargets = function (phxTarget, callback, dom) {
@@ -683,7 +683,7 @@ function registerNavigationHandlers(socket, views, pop, config) {
     const llvHandleParams = (href) => {
         const url = absHref(href);
         const params = Object.fromEntries(new URL(url).searchParams.entries());
-        for (const llvId of views.ids()) {
+        for (const llvId of views.keys()) {
             pop.handleParams(llvId, params, url);
         }
     };
@@ -785,17 +785,16 @@ function registerCustomEventBindings(socket) {
             },
         };
     };
+    const isElement = (node) => node?.nodeType === Node.ELEMENT_NODE;
     // Walk up from `target` to the nearest element that carries the `binding`
     // attribute (e.g. "phx-dragover"), returning it or null if none is found.
     // Mirrors how phx-click resolves a handler from the event's deepest target.
     const closestWithBinding = (target, binding) => {
         let el = target;
-        while (el && el.nodeType === 1 && !el.getAttribute?.(binding)) {
+        while (el && isElement(el) && !el.getAttribute(binding)) {
             el = el.parentNode;
         }
-        return el && el.nodeType === 1 && el.getAttribute(binding)
-            ? el
-            : null;
+        return isElement(el) && el.getAttribute(binding) ? el : null;
     };
     const mouseEventTypes = ["mousedown", "mouseup", "mousemove", "mouseover", "mouseout"];
     for (const eventType of mouseEventTypes) {
@@ -873,24 +872,12 @@ function registerCustomEventBindings(socket) {
     }
 }
 
-/** Timeout applied to every Popcorn call LLV makes. */
 const DEFAULT_CALL_TIMEOUT_MS = 10_000;
-/**
- * Thin wrapper around the Popcorn runtime. Owns the single call timeout, the
- * action vocabulary spoken to the Elixir side, and fire-and-forget error
- * logging — so the rest of LLV never touches raw action strings or timeouts.
- *
- * The runtime boots asynchronously: the client is created up front and handed
- * to handlers that only invoke it at runtime (after boot). `attach` binds the
- * booted runtime once ready, replacing the old `{ current: Popcorn }` box.
- */
 class PopcornClient {
     popcorn = null;
-    /** Whether the runtime has finished booting and calls can be made. */
     get ready() {
         return this.popcorn !== null;
     }
-    /** Bind the booted runtime. Called once after `Popcorn.init()`. */
     attach(popcorn) {
         this.popcorn = popcorn;
     }
@@ -900,7 +887,6 @@ class PopcornClient {
         }
         return this.popcorn.call(args, { timeoutMs: DEFAULT_CALL_TIMEOUT_MS });
     }
-    // Fire-and-forget: log on error, callers don't await the outcome.
     fire(action, args) {
         this.call(args).then((result) => {
             if (!result.ok)
@@ -936,39 +922,11 @@ class PopcornClient {
         return this.call({ action: "push", id, payload: { event, payload } });
     }
 }
-
-/**
- * Registry of the fake Phoenix views LLV mounts, keyed by element id. Replaces
- * the bare `Record<string, LLVView>` that used to be threaded through every
- * setup function and mutated in place.
- */
-class ViewRegistry {
-    byId = new Map();
-    get(id) {
-        return this.byId.get(id);
-    }
-    has(id) {
-        return this.byId.has(id);
-    }
-    add(id, view) {
-        this.byId.set(id, view);
-    }
-    /** Remove and return the view, or undefined if it wasn't registered. */
-    remove(id) {
-        const view = this.byId.get(id);
-        this.byId.delete(id);
-        return view;
-    }
-    ids() {
-        return [...this.byId.keys()];
-    }
-}
-
 class LLVEngine {
     socket;
     config;
     pop = new PopcornClient();
-    views = new ViewRegistry();
+    views = new Map();
     channels = {};
     bufferedServerMessages = [];
     constructor(socket, config) {
@@ -1031,9 +989,10 @@ class LLVEngine {
     // the host LiveView removes the mount point.
     unmountView(pop_view_el) {
         const llvId = pop_view_el.id;
-        const view = this.views.remove(llvId);
+        const view = this.views.get(llvId);
         if (!view)
             return;
+        this.views.delete(llvId);
         view.destroy?.();
         this.pop.destroy(llvId);
     }
@@ -1141,7 +1100,7 @@ class LLVEngine {
         window.__popcornTransportReceive = (llvId, diff) => {
             const view = this.views.get(llvId);
             if (!view) {
-                console.error("LLV view not found:", llvId, "available:", this.views.ids());
+                console.error("LLV view not found:", llvId, "available:", this.views.keys());
                 return;
             }
             view.update(diff, []);

@@ -1,6 +1,5 @@
-import type { LLVConfig, LLVSocket } from "./types";
-import type { PopcornClient } from "./core/popcorn_client";
-import type { ViewRegistry } from "./core/view_registry";
+import type { LLVConfig, LLVSocket, ViewRegistry } from "./types";
+import type { PopcornClient } from "./index";
 
 // LLV navigation runs in one of two modes:
 //
@@ -26,7 +25,7 @@ export function registerNavigationHandlers(
   const llvHandleParams = (href: string) => {
     const url = absHref(href);
     const params = Object.fromEntries(new URL(url).searchParams.entries());
-    for (const llvId of views.ids()) {
+    for (const llvId of views.keys()) {
       pop.handleParams(llvId, params, url);
     }
   };

@@ -1,3 +1,4 @@
+import { Popcorn } from '@swmansion/popcorn';
 import { LiveSocketInstanceInterface } from 'phoenix_live_view';
 import { Socket } from 'phoenix';
 
@@ -27,6 +28,28 @@ declare global {
     }
 }
 
+type CallResult = Awaited<ReturnType<Popcorn["call"]>>;
+interface CreateArgs {
+    id: string;
+    view: string | null;
+    url: string;
+    urlParams: Record<string, string>;
+    assigns: Record<string, unknown>;
+}
+declare class PopcornClient {
+    private popcorn;
+    get ready(): boolean;
+    attach(popcorn: Popcorn): void;
+    private call;
+    private fire;
+    create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult>;
+    destroy(id: string): void;
+    reconnected(id: string): void;
+    updateAssigns(id: string, assigns: Record<string, unknown>): void;
+    handleParams(id: string, params: Record<string, string>, url: string): void;
+    event(id: string, payload: Record<string, unknown>): void;
+    push(id: string, event: string, payload: Record<string, unknown>): Promise<CallResult>;
+}
 declare class LLVEngine {
     private socket;
     private config;
@@ -63,5 +86,5 @@ declare class LLVEngine {
     pushEvent(viewId: string, event: string, payload?: Record<string, unknown>): Promise<void>;
 }
 
-export { LLVEngine };
+export { LLVEngine, PopcornClient };
 export type { LLVConfig };

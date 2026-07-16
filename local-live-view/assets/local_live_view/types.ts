@@ -113,6 +113,9 @@ interface PhxViewPatchable {
 /** Phoenix View shape after LLV patches it in view_setup. */
 export type LLVView = PhxView & PhxViewPatchable;
 
+/** Registry of the fake Phoenix views LLV mounts, keyed by element id. */
+export type ViewRegistry = Map<string, LLVView>;
+
 /** Private phoenix_live_view LiveSocket API that LLV accesses via type-cast. */
 interface PhxLiveSocketInternals {
   newRootView(el: HTMLElement, flash?: unknown, liveReferer?: unknown): LLVView;

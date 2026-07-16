@@ -35,17 +35,17 @@ export function registerCustomEventBindings(socket: LLVSocket) {
     };
   };
 
+  const isElement = (node: Node | null): node is Element => node?.nodeType === Node.ELEMENT_NODE;
+
   // Walk up from `target` to the nearest element that carries the `binding`
   // attribute (e.g. "phx-dragover"), returning it or null if none is found.
   // Mirrors how phx-click resolves a handler from the event's deepest target.
   const closestWithBinding = (target: EventTarget | null, binding: string): Element | null => {
     let el = target as Node | null;
-    while (el && el.nodeType === 1 && !(el as Element).getAttribute?.(binding)) {
+    while (el && isElement(el) && !el.getAttribute(binding)) {
       el = el.parentNode;
     }
-    return el && el.nodeType === 1 && (el as Element).getAttribute(binding)
-      ? (el as Element)
-      : null;
+    return isElement(el) && el.getAttribute(binding) ? el : null;
   };
 
   const mouseEventTypes = ["mousedown", "mouseup", "mousemove", "mouseover", "mouseout"] as const;

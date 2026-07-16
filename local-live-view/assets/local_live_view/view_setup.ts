@@ -1,8 +1,14 @@
-import type { LLVSocket, LLVView, RenderedDiff, RefGenerator, EventPayload } from "./types";
+import type {
+  LLVSocket,
+  LLVView,
+  RenderedDiff,
+  RefGenerator,
+  EventPayload,
+  ViewRegistry,
+} from "./types";
 import { LLV_DEFAULT_TARGET, LLV_SERVER_TARGET, LLV_TARGET_SEP } from "./types";
 import { withHostLV } from "./helpers";
-import type { PopcornClient } from "./core/popcorn_client";
-import type { ViewRegistry } from "./core/view_registry";
+import type { PopcornClient } from "./index";
 
 // Wire a fake Phoenix root view around a [data-pop-view] element so the
 // browser renders the runtime's diffs and routes events to it.
@@ -16,7 +22,7 @@ export function setupFakeView(
   const llvId = pop_view_el.id;
 
   const view = socket.newRootView(pop_view_el);
-  views.add(llvId, view);
+  views.set(llvId, view);
 
   // Handle LLV's custom targets (default, server, targets composed by LocalLiveView.targets/1)
   const origWithinTargets = view.withinTargets.bind(view);

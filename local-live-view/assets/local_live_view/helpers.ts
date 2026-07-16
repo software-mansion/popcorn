@@ -1,6 +1,6 @@
 import type { LLVSocket, LLVView, LLVServerMessageDetail } from "./types";
 import { PHX_VIEW_SELECTOR } from "./types";
-import type { PopcornClient } from "./core/popcorn_client";
+import type { PopcornClient } from "./index";
 
 // Resolve an LLV's element id from a view name or id: prefer the element whose
 // data-pop-view matches, else fall back to treating the argument as an id.
