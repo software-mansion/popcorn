@@ -23,6 +23,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "local_live_view": ["../../../local-live-view/priv/static/local_live_view.d.ts"],
       "*": ["../deps/*"]
     },
     "allowJs": true,
