@@ -10,7 +10,7 @@ export type PopcornErrors = {
   "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
   "bridge:invalid-target": EmptyData;
-  "bridge:unserializable": EmptyData;
+  "bridge:unserializable": UnserializableData;
   "bridge:listener-not-found": { targetName: string };
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
@@ -25,6 +25,17 @@ export type SerializedError<T extends Tag = Tag> = {
 }[T];
 
 type EmptyData = Record<never, never>;
+export type UnserializableReason =
+  | "cyclic-object"
+  | "non-plain-object"
+  | "lossy-int"
+  | "non-finite-float"
+  | "unsupported";
+type UnserializableData = {
+  data: unknown;
+  part: unknown;
+  reason: UnserializableReason;
+};
 type VmExitedData =
   | { reason: "deinit" }
   | { reason: "abort"; data: string }
@@ -50,13 +61,14 @@ export function isErr<T extends Tag = Tag>(
 }
 
 export class PopcornError<T extends Tag = Tag> extends Error {
-  declare readonly cause: SerializedError<T>;
+  override readonly cause: SerializedError<T>;
   private readonly serialized: SerializedError<T>;
 
   constructor(cause: SerializedError<T>) {
     super(message(cause), { cause });
     this.name = "PopcornError";
     Object.setPrototypeOf(this, new.target.prototype);
+    this.cause = cause;
     this.serialized = cause;
   }
 
@@ -96,7 +108,7 @@ function message(error: SerializedError): string {
     case "bridge:invalid-target":
       return "Target name must not be empty";
     case "bridge:unserializable":
-      return "Message can't be serialized to string";
+      return "Message can't be serialized to ETF";
     case "bridge:listener-not-found":
       return `Target listener not found: '${error.data.targetName}'`;
     case "beam:missing-boot-script":
@@ -138,7 +150,7 @@ function parse(value: unknown): SerializedError {
       check(isEmptyData(value.data));
       return { t: value.t, data: value.data };
     case "bridge:unserializable":
-      check(isEmptyData(value.data));
+      check(isUnserializableData(value.data));
       return { t: value.t, data: value.data };
     case "bridge:listener-not-found":
       check(isListenerNotFoundData(value.data));
@@ -182,6 +194,27 @@ function isListenerNotFoundData(
   value: unknown,
 ): value is PopcornErrors["bridge:listener-not-found"] {
   return objectWithKeys(value, ["targetName"]) !== null;
+}
+
+function isUnserializableData(
+  value: unknown,
+): value is PopcornErrors["bridge:unserializable"] {
+  return (
+    objectWithKeys(value, ["data", "part", "reason"]) &&
+    isUnserializableReason(value.reason)
+  );
+}
+
+export function isUnserializableReason(
+  value: unknown,
+): value is UnserializableReason {
+  return (
+    value === "cyclic-object" ||
+    value === "non-plain-object" ||
+    value === "lossy-int" ||
+    value === "non-finite-float" ||
+    value === "unsupported"
+  );
 }
 
 function isUrlData(

@@ -6,8 +6,7 @@ export type BeamTarget = { name: string } | { pid: string };
 
 export type BeamSendPayload = {
   target: BeamTarget;
-  payloadJson: string;
-  metaJson: string;
+  etf: Uint8Array<ArrayBuffer>;
 };
 
 export type BeamBootOptions = {
