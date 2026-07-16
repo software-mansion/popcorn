@@ -205,7 +205,12 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
 
   return {
     ok: true,
-    data: { appNames, entrypoint: manifest.entrypoint ?? null, bootFile, tarballs },
+    data: {
+      appNames,
+      entrypoint: manifest.entrypoint ?? null,
+      bootFile,
+      tarballs,
+    },
   };
 }
 
@@ -249,10 +254,9 @@ export function send(
     return { ok: false, error: err("bridge:not-started", {}) };
   }
 
-  let targetName: string;
   let target: PreparedTarget;
   if (isNameTarget(message.target)) {
-    targetName = message.target.name;
+    const targetName = message.target.name;
     target = {
       kind: TARGET_REGISTERED_NAME,
       argType: "string",
@@ -260,8 +264,7 @@ export function send(
       length: utf8Length(targetName),
     };
   } else {
-    targetName = message.target.pid;
-    const bytes = base64ToBytes(targetName);
+    const bytes = message.target.pid;
     target = {
       kind: TARGET_PID_BYTES,
       argType: "array",
@@ -273,13 +276,7 @@ export function send(
   const status = module.ccall(
     "sendVmMessage",
     "number",
-    [
-      "number",
-      target.argType,
-      "number",
-      "array",
-      "number",
-    ],
+    ["number", target.argType, "number", "array", "number"],
     [
       target.kind,
       target.value,
@@ -294,9 +291,10 @@ export function send(
   }
 
   if (status === 1) {
+    const t = isNameTarget(message.target) ? message.target.name : "<pid>";
     return {
       ok: false,
-      error: err("bridge:listener-not-found", { targetName }),
+      error: err("bridge:listener-not-found", { targetName: t }),
     };
   }
   unreachable();
@@ -327,13 +325,4 @@ function isNameTarget(
 
 function utf8Length(text: string): number {
   return UTF8.encode(text).length;
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
 }

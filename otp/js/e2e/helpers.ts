@@ -12,8 +12,8 @@ import type {
   PopcornOpts,
   PopcornEvent,
   PopcornSendOpts,
-  BeamTarget,
   OtpErrorPayload,
+  Pid,
   SerializedError,
 } from "@swmansion/popcorn-otp";
 
@@ -32,8 +32,9 @@ type Otp = {
   id: string;
   events: PopcornEvent[];
   boot(options: InitOptions): Promise<BootResult>;
+  reboot(): Promise<BootResult>;
   send(
-    target: string | BeamTarget,
+    target: string | Pid,
     payload?: unknown,
     opts?: PopcornSendOpts,
   ): Promise<BootResult>;
@@ -53,6 +54,15 @@ export function evalOpts(code: string): PopcornOpts {
       extraArgs: ["-eval", code],
     },
   };
+}
+
+function pidCaptureEval(): PopcornOpts {
+  return evalOpts(
+    trimLeft(`
+      ok = wasm:send(#{pid_captured => self()}),
+      receive _ -> ok end.
+    `),
+  );
 }
 
 type PopcornHooksGlobal = typeof globalThis & {
@@ -176,8 +186,14 @@ export class OtpHandle {
     return result;
   }
 
+  public async reboot(): Promise<BootResult> {
+    const result = await this.otp.evaluate((otp) => otp.reboot());
+    await this.syncEvents();
+    return result;
+  }
+
   public async send(
-    target: string | BeamTarget,
+    target: string,
     payload?: unknown,
     opts?: PopcornSendOpts,
   ): Promise<BootResult> {
@@ -196,6 +212,35 @@ export class OtpHandle {
     );
     await this.syncEvents();
     return event;
+  }
+
+  /**
+   * Boots the instance and captures its main process as a JS `Pid` (the way the
+   * feature delivers one — a `run_js` closure receiving it in args). Returns a
+   * handle usable with `sendToPid`.
+   */
+  public async captureOwnPid(): Promise<JSHandle<Pid>> {
+    const boot = await this.boot(pidCaptureEval());
+    assert(boot.ok, "pid-capture boot failed");
+    await this.waitForEvent("pid_captured");
+
+    return this.otp.evaluateHandle((otp) => {
+      const event = otp.events.find(
+        (value): value is { pid_captured: Pid } =>
+          typeof value === "object" &&
+          value !== null &&
+          Object.hasOwn(value, "pid_captured"),
+      );
+      if (event === undefined) throw new Error("no captured pid");
+      return event.pid_captured;
+    });
+  }
+
+  /** Sends to a captured pid through this instance. */
+  public async sendToPid(pid: JSHandle<Pid>): Promise<BootResult> {
+    const result = await this.otp.evaluate((otp, p) => otp.send(p, {}), pid);
+    await this.syncEvents();
+    return result;
   }
 
   public async waitForStderr(text: string): Promise<ConsoleMessage> {
@@ -282,8 +327,16 @@ function createOtp(id: string): Otp {
       return result;
     }
 
+    public async reboot(): Promise<BootResult> {
+      const popcorn = this.popcorn;
+      popcorn.deinit();
+      const boot = await popcorn.boot();
+      if (boot.ok) return { ok: true, data: null };
+      return { ok: false, error: boot.error.serialize() };
+    }
+
     public async send(
-      target: string | BeamTarget,
+      target: string | Pid,
       payload?: unknown,
       opts?: PopcornSendOpts,
     ): Promise<BootResult> {

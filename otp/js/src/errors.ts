@@ -106,7 +106,7 @@ function message(error: SerializedError): string {
     case "bridge:not-started":
       return "Bridge did not start";
     case "bridge:invalid-target":
-      return "Target name must not be empty";
+      return "Target must be a non-empty name or a PID from this VM boot";
     case "bridge:unserializable":
       return "Message can't be serialized to ETF";
     case "bridge:listener-not-found":
