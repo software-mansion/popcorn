@@ -3,7 +3,6 @@ defmodule Local.TaskComponent do
 
   attr :task, :map, required: true
   attr :column_id, :string, required: true
-  attr :target, :string, required: true
   attr :is_dragging, :boolean, default: false
 
   def card(assigns) do
@@ -26,7 +25,6 @@ defmodule Local.TaskComponent do
         type="button"
         draggable="false"
         phx-click="remove_task"
-        phx-target={@target}
         phx-value-column_id={@column_id}
         phx-value-task_id={@task.id}
         title="Remove task"

@@ -1,6 +1,9 @@
 defmodule LocalLiveView.Message do
   @moduledoc false
-  defstruct topic: nil, event: nil, payload: nil, ref: nil, join_ref: nil
+  # `promise` is the popcorn.call promise of the browser frame this message
+  # answers (settled via Popcorn.Wasm.resolve when processed); nil for
+  # uncorrelated sends.
+  defstruct event: nil, payload: nil, promise: nil
 end
 
 defmodule LocalLiveView.Server do
@@ -31,12 +34,6 @@ defmodule LocalLiveView.Server do
 
   alias LocalLiveView.Message
 
-  # Sentinels seeded into every view's @default / @server assigns; the
-  # LocalLiveView JS recognizes these exact values (keep in sync with
-  # LLV_DEFAULT_TARGET / LLV_SERVER_TARGET in assets/local_live_view.js).
-  @default_target "__llv_default__"
-  @server_target "__llv_server__"
-
   @doc """
   Starts LocalLiveView.Server process.
   """
@@ -58,9 +55,9 @@ defmodule LocalLiveView.Server do
   end
 
   @impl true
-  def handle_info({LocalLiveView.Server, params, from, phx_socket}, _ref) do
+  def handle_info({LocalLiveView.Server, params, from}, _ref) do
     try do
-      mount(params, from, phx_socket)
+      mount(params, from)
     rescue
       e ->
         reraise(e, __STACKTRACE__)
@@ -84,9 +81,7 @@ defmodule LocalLiveView.Server do
   end
 
   def handle_info(%Message{event: "llv_reconnected"}, state) do
-    # The seeded @default / @server target sentinels are runtime plumbing, not
-    # view state — keep them out of the mirror resync.
-    keys = Map.keys(state.socket.assigns) -- [:default, :server]
+    keys = Map.keys(state.socket.assigns)
     LocalLiveView.mirror_sync(state.socket, keys)
     {:noreply, state}
   end
@@ -96,12 +91,64 @@ defmodule LocalLiveView.Server do
     val = decode_event_type(type, raw_val, msg.payload)
 
     if cid = msg.payload["cid"] do
-      component_handle_event(state, cid, event, val, msg.ref)
+      component_handle_event(state, cid, event, val, msg.promise)
     else
       state.socket
       |> view_handle_event(event, val)
-      |> handle_result({:handle_event, 3, msg.ref}, state)
+      |> handle_result({:handle_event, 3, msg.promise}, state)
     end
+  end
+
+  def handle_info(%Message{event: "phx_join"} = msg, state) do
+    # The channel join ack carries the rendered produced at mount. On a rejoin
+    # (channel error recovery) that's already consumed — serve a fresh full
+    # render instead, resetting diff tracking to match the client's clean
+    # slate.
+    {rendered, state} =
+      case state.initial_rendered do
+        nil ->
+          state = %{
+            state
+            | fingerprints: Diff.new_fingerprints(),
+              components: Diff.new_components()
+          }
+
+          {:diff, diff, state} = render_diff(state, state.socket, true)
+          {diff, state}
+
+        rendered ->
+          {rendered, %{state | initial_rendered: nil}}
+      end
+
+    reply(msg.promise, :ok, %{rendered: rendered})
+    {:noreply, state}
+  end
+
+  # Component-destruction bookkeeping, mirroring Phoenix.LiveView.Channel: the
+  # browser announces cids about to leave the DOM, then confirms removal. Without
+  # the prune, state.components would retain dead component state forever.
+  def handle_info(
+        %Message{event: "cids_will_destroy", payload: %{"cids" => cids}} = msg,
+        state
+      ) do
+    components =
+      Enum.reduce(cids, state.components, &Diff.mark_for_deletion_component/2)
+
+    reply(msg.promise, :ok, %{})
+    {:noreply, %{state | components: components}}
+  end
+
+  def handle_info(
+        %Message{event: "cids_destroyed", payload: %{"cids" => cids}} = msg,
+        state
+      ) do
+    {deleted_cids, components} =
+      Enum.flat_map_reduce(cids, state.components, &Diff.delete_component/2)
+
+    # The ack carries the cids actually deleted; the browser prunes exactly
+    # those from its rendered tree (a cid re-added mid-flight is kept).
+    reply(msg.promise, :ok, %{cids: deleted_cids})
+    {:noreply, %{state | components: components}}
   end
 
   def handle_info(
@@ -115,15 +162,31 @@ defmodule LocalLiveView.Server do
 
   def handle_info(%Message{event: "update_assigns", payload: assigns}, %{socket: socket} = state) do
     # The host LiveView re-rendered with new assigns for this view: run its
-    # update/2 and push the resulting diff.
+    # update/2 and push the resulting diff. data-pop-assigns carries the full
+    # set of host-forwarded assigns each render, so it replaces server_assigns.
+    assigns = normalize_assigns(assigns)
     new_socket = call_update!(socket.view, assigns, socket)
-    handle_changed(state, new_socket, nil)
+    handle_changed(%{state | server_assigns: assigns}, new_socket, nil)
+  end
+
+  def handle_info(
+        %Message{event: "push_error", payload: %{"event" => event, "payload" => params}},
+        %{socket: socket} = state
+      ) do
+    # A push_server_event failed to reach the host: hand the view the last
+    # assigns received from it, so it can roll back to authoritative state.
+    # `params` is the exact map the view passed to push_server_event.
+    event
+    |> socket.view.handle_push_error(params, state.server_assigns, socket)
+    |> handle_result({:handle_push_error, 4, nil}, state)
   end
 
   def handle_info({:phoenix, :send_update, update}, state) do
     case Diff.update_component(state.socket, state.components, update) do
       {diff, new_components} ->
-        {:noreply, push_diff(%{state | components: new_components}, diff, nil)}
+        new_state = %{state | components: new_components}
+        push_diff(new_state, diff, nil)
+        {:noreply, new_state}
 
       :noop ->
         {:noreply, state}
@@ -140,7 +203,7 @@ defmodule LocalLiveView.Server do
     {:noreply, do_handle_event(socket.view, socket, event, val)}
   end
 
-  defp component_handle_event(state, cid, event, val, ref) do
+  defp component_handle_event(state, cid, event, val, promise) do
     %{socket: socket, components: components} = state
 
     result =
@@ -151,10 +214,13 @@ defmodule LocalLiveView.Server do
 
     case result do
       {diff, new_components, _extra} ->
-        {:noreply, push_diff(%{state | components: new_components}, diff, ref)}
+        new_state = %{state | components: new_components}
+        push_diff(new_state, diff, promise)
+        {:noreply, new_state}
 
       :error ->
-        {:noreply, push_noop(state, ref)}
+        push_noop(promise)
+        {:noreply, state}
     end
   end
 
@@ -184,10 +250,10 @@ defmodule LocalLiveView.Server do
     view.handle_info(msg, socket)
   end
 
-  # Run the view's update/2 for the (JSON, string-keyed) assigns the host passed,
-  # raising on a bad return. Returns the updated %Socket{}.
+  # Run the view's update/2 for the host-passed assigns (already normalized by
+  # the caller), raising on a bad return. Returns the updated %Socket{}.
   defp call_update!(view, assigns, %Socket{} = socket) do
-    case view.update(normalize_assigns(assigns), socket) do
+    case view.update(assigns, socket) do
       {:ok, %Socket{} = socket} ->
         socket
 
@@ -287,8 +353,8 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  defp handle_result({:noreply, %Socket{} = new_socket}, {_from, _arity, ref}, state) do
-    handle_changed(state, new_socket, ref)
+  defp handle_result({:noreply, %Socket{} = new_socket}, {_from, _arity, promise}, state) do
+    handle_changed(state, new_socket, promise)
   end
 
   defp handle_result(result, {name, arity, _ref}, state) do
@@ -333,26 +399,24 @@ defmodule LocalLiveView.Server do
     """
   end
 
-  defp handle_changed(state, %Socket{} = new_socket, ref, pending_live_patch \\ nil) do
+  defp handle_changed(state, %Socket{} = new_socket, promise) do
     new_state = %{state | socket: new_socket}
 
     case maybe_diff(new_state, false) do
       {:diff, diff, new_state} ->
-        {:noreply,
-         new_state
-         |> clear_live_patch_counter()
-         |> push_live_patch(pending_live_patch)
-         |> push_diff(diff, ref)}
+        new_state = clear_live_patch_counter(new_state)
+        push_diff(new_state, diff, promise)
+        {:noreply, new_state}
 
       {:live, :patch, opts} ->
-        handle_live_patch(new_state, opts, ref)
+        handle_live_patch(new_state, opts, promise)
 
       _result ->
         {:noreply, state}
     end
   end
 
-  defp handle_live_patch(state, opts, ref) do
+  defp handle_live_patch(state, opts, promise) do
     to = opts.to
     replace = opts.kind == :replace
 
@@ -373,7 +437,7 @@ defmodule LocalLiveView.Server do
     if lifecycle.any? do
       socket
       |> call_handle_params(view, lifecycle.exported?, url_params, to)
-      |> handle_result({:handle_params, 3, ref}, new_state)
+      |> handle_result({:handle_params, 3, promise}, new_state)
     else
       {:noreply, new_state}
     end
@@ -399,15 +463,25 @@ defmodule LocalLiveView.Server do
     %{state | redirect_count: 0}
   end
 
-  defp push_live_patch(state, nil), do: state
-  defp push_live_patch(state, opts), do: push(state, "live_patch", opts)
+  defp push_noop(nil = _promise), do: :ok
+  defp push_noop(promise), do: reply(promise, :ok, %{})
 
-  defp push_noop(state, nil = _ref), do: state
-  defp push_noop(state, ref), do: reply(state, ref, :ok, %{})
+  defp push_diff(_state, diff, promise) when diff == %{}, do: push_noop(promise)
 
-  defp push_diff(state, diff, ref) when diff == %{}, do: push_noop(state, ref)
-  defp push_diff(state, diff, nil = _ref), do: push(state, "diff", diff)
-  defp push_diff(state, diff, ref), do: reply(state, ref, :ok, %{diff: diff})
+  defp push_diff(state, diff, nil = _promise) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        window.__popcornTransportReceive(args.id, args.diff);
+      }
+      """,
+      %{id: state.llv_id, diff: diff}
+    )
+
+    :ok
+  end
+
+  defp push_diff(_state, diff, promise), do: reply(promise, :ok, %{diff: diff})
 
   defp maybe_diff(%{socket: socket} = state, force?) do
     socket.redirected || render_diff(state, socket, force?)
@@ -432,6 +506,12 @@ defmodule LocalLiveView.Server do
         {socket, %{}, state.fingerprints, state.components}
       end
 
+    # Same as Phoenix.LiveView.Channel: fold the handle_event reply (:r) and
+    # push_event events (:e) into the diff — even when nothing re-rendered —
+    # so the browser's Rendered.extract delivers them. clear_temp below
+    # ensures they ride at most one diff.
+    diff = Diff.render_private(socket, diff)
+
     new_socket = Utils.clear_temp(socket)
 
     {:diff, diff,
@@ -442,44 +522,21 @@ defmodule LocalLiveView.Server do
     Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
   end
 
-  defp reply(state, {ref, extra}, status, payload) do
-    reply(state, ref, status, Map.merge(payload, extra))
+  defp reply(promise, status, payload) do
+    Popcorn.Wasm.resolve(%{status: status, payload: payload}, promise)
+    :ok
   end
-
-  defp reply(state, _ref, _status, %{diff: diff}) do
-    push(state, "diff", diff)
-  end
-
-  defp reply(state, _ref, _status, _payload), do: state
-
-  defp push(state, "diff", diff) do
-    llv_id = state.llv_id
-
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        window.__popcornTransportReceive(args.id, args.diff);
-      }
-      """,
-      %{id: llv_id, diff: diff}
-    )
-
-    state
-  end
-
-  defp push(state, _event, _payload), do: state
 
   ## Mount
 
-  defp mount(%{"session" => session} = params, from, phx_socket) do
+  defp mount(%{"session" => session} = params, from) do
     with %Phoenix.LiveView.Session{view: view} <- session,
          {:ok, config} <- load_live_view(view) do
       verified_mount(
         session,
         config,
         params,
-        from,
-        phx_socket
+        from
       )
     else
       {:error, _reason} ->
@@ -488,8 +545,11 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  defp mount(%{}, from, phx_socket) do
-    Logger.error("Mounting #{phx_socket.topic} failed because no session was provided")
+  defp mount(%{} = params, from) do
+    Logger.error(
+      "Mounting LocalLiveView #{inspect(params["id"])} failed because no session was provided"
+    )
+
     GenServer.reply(from, {:error, %{reason: "stale"}})
     {:stop, :shutdown, :no_session}
   end
@@ -506,13 +566,11 @@ defmodule LocalLiveView.Server do
     _ -> {:error, :stale}
   end
 
-  #
   defp verified_mount(
          %Session{} = verified,
          config,
          params,
-         from,
-         phx_socket
+         from
        ) do
     %Session{
       view: view
@@ -521,7 +579,7 @@ defmodule LocalLiveView.Server do
     # Assigns passed via the `<.local_live_view assigns... />` component reach us
     # here as a string-keyed map. They become the first argument to the view's
     # mount/3 callback and are then fed through its update/2.
-    initial_assigns = params["assigns"] || %{}
+    initial_assigns = normalize_assigns(params["assigns"] || %{})
     llv_id = params["id"]
 
     socket = %Socket{
@@ -541,18 +599,15 @@ defmodule LocalLiveView.Server do
         }
 
         try do
-          # Seed the @default / @server target sentinels, run mount/3 (params are
-          # the host-passed assigns), then feed those assigns through update/2,
-          # LiveComponent-style.
+          # Run mount/3 (params are the host-passed assigns), then feed those
+          # assigns through update/2, LiveComponent-style.
           mounted_socket =
             %Socket{socket | view: view}
-            |> Phoenix.Component.assign(:default, @default_target)
-            |> Phoenix.Component.assign(:server, @server_target)
             |> Utils.maybe_call_live_view_mount!(view, params, verified)
             |> then(&call_update!(view, initial_assigns, &1))
 
           mounted_socket
-          |> build_state(phx_socket, llv_id)
+          |> build_state(llv_id, initial_assigns)
           |> maybe_call_mount_handle_params(params)
           |> reply_mount(from, verified)
         rescue
@@ -597,8 +652,8 @@ defmodule LocalLiveView.Server do
     case result do
       {:ok, diff, :mount, new_state} ->
         reply = put_container(session, nil, diff)
-        GenServer.reply(from, {:ok, reply})
-        {:noreply, post_verified_mount(new_state)}
+        GenServer.reply(from, :ok)
+        {:noreply, post_verified_mount(%{new_state | initial_rendered: reply})}
 
       {:ok, diff, {:live_patch, opts}, new_state} ->
         reply =
@@ -608,8 +663,8 @@ defmodule LocalLiveView.Server do
             liveview_version: lv_vsn
           })
 
-        GenServer.reply(from, {:ok, reply})
-        {:noreply, post_verified_mount(new_state)}
+        GenServer.reply(from, :ok)
+        {:noreply, post_verified_mount(%{new_state | initial_rendered: reply})}
 
       {:live_redirect, opts, new_state} ->
         GenServer.reply(from, {:error, %{live_redirect: opts}})
@@ -621,18 +676,19 @@ defmodule LocalLiveView.Server do
     end
   end
 
-  defp build_state(%Socket{} = lv_socket, %Phoenix.Socket{} = phx_socket, llv_id) do
+  defp build_state(%Socket{} = lv_socket, llv_id, server_assigns) do
     %{
-      join_ref: phx_socket.join_ref,
-      serializer: phx_socket.serializer,
       socket: lv_socket,
-      topic: phx_socket.topic,
       components: Diff.new_components(),
       fingerprints: Diff.new_fingerprints(),
       redirect_count: 0,
-      upload_names: %{},
-      upload_pids: %{},
-      llv_id: llv_id
+      llv_id: llv_id,
+      # The mount rendered, held until the channel join ack consumes it.
+      initial_rendered: nil,
+      # Last (normalized) assigns received from the host, for handle_push_error.
+      # Updated only on mount and "update_assigns"; if the mirror channel's
+      # "set_assigns" push ever gets a JS consumer, it must update this too.
+      server_assigns: server_assigns
     }
   end
 

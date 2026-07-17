@@ -3,23 +3,6 @@ defmodule Local.Kanban do
 
   alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
 
-  # The board is a plain map `%{id => column}`; each column carries its tasks as
-  # `%{id => task}`. Nothing tracks order explicitly — columns and tasks are
-  # sorted by their `position` on render. Tasks use fractional-index string ranks
-  # (`Rank`) with the task's id baked on (so positions are globally unique);
-  # columns use the server's integer position. THE CLIENT generates task
-  # positions: a drag/add computes the new rank locally and sends the literal
-  # `position` to the host, which just persists it.
-  #
-  # This is the OPTIMISTIC, collaborative client: every edit is applied here
-  # instantly AND sent to the host `BoardLive`, which writes the DB and broadcasts
-  # so all viewers reconcile. add_column/removes ride `phx-target={targets([@default,
-  # @server])}` (the same DOM event runs here and on the server); add_task and
-  # drag-moves carry a client-generated position, so they apply locally and notify
-  # the server via `push_server_event/3`. The server is authoritative: `update/2`
-  # rebuilds the whole board (preserving server ids) whenever a new `rev` arrives,
-  # so a successful edit reconciles seamlessly and a failed one rolls back.
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -48,6 +31,20 @@ defmodule Local.Kanban do
        |> assign(:last_rev, assigns[:rev])
        |> assign(:columns, build_board(assigns.board))}
     end
+  end
+
+  @impl true
+  def handle_push_error(_event, _params, server_assigns, socket) do
+    # The default (feeding server_assigns through update/2) would no-op here:
+    # the rolled-back rev already equals last_rev, so the guard skips the
+    # rebuild. Force it, and drop any in-flight drag state that referenced the
+    # rolled-back board.
+    {:noreply,
+     assign(socket,
+       columns: build_board(server_assigns.board),
+       dragging: nil,
+       drag_target: nil
+     )}
   end
 
   # --- Columns & tasks (optimistic) ------------------------------------------
@@ -118,14 +115,22 @@ defmodule Local.Kanban do
     end
   end
 
-  def handle_event("remove_column", %{"id" => id}, socket) do
+  def handle_event("remove_column", %{"id" => id} = payload, socket) do
     {_column, columns} = pop_in(socket.assigns.columns, [id])
-    {:noreply, assign(socket, :columns, columns)}
+
+    {:noreply,
+     socket
+     |> assign(:columns, columns)
+     |> push_server_event("remove_column", payload)}
   end
 
-  def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid}, socket) do
+  def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid} = payload, socket) do
     {_task, columns} = pop_in(socket.assigns.columns, [cid, :tasks, tid])
-    {:noreply, assign(socket, :columns, columns)}
+
+    {:noreply,
+     socket
+     |> assign(:columns, columns)
+     |> push_server_event("remove_task", payload)}
   end
 
   # --- Task modal (local-only UI state) --------------------------------------
@@ -293,13 +298,9 @@ defmodule Local.Kanban do
 
   @impl true
   def render(assigns) do
-    # Removes run both locally (optimistic) and on the host LiveView, so target
-    # both the local view (@default) and the server (@server). add_task/add_column
-    # are client-only (the client pushes its generated position itself).
     assigns =
-      assigns
-      |> assign(:target, targets([assigns.default, assigns.server]))
-      |> assign(
+      assign(
+        assigns,
         :columns_sorted,
         assigns.columns |> Map.values() |> Enum.sort_by(&{&1.position, &1.id})
       )
@@ -312,7 +313,6 @@ defmodule Local.Kanban do
         <ColumnComponent.column
           :for={col <- @columns_sorted}
           col={col}
-          target={@target}
           dragging={@dragging}
           drag_target={@drag_target}
         />

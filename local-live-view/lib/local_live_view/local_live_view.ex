@@ -71,28 +71,32 @@ defmodule LocalLiveView do
 
   ## Sending events to the server
 
-  When a local live view is rendered inside a `Phoenix.LiveView`,
-  it's possible to send events to that server-side live view, by using
-  `phx-target={@server}`, for example:
+  When a local live view is rendered inside a `Phoenix.LiveView`, it can
+  send events to that server-side live view by calling `push_server_event/3`
+  from `c:Phoenix.LiveView.handle_event/3` or `c:handle_info/2`:
 
   ```
-  <button phx-click="archive" phx-target={@server}>Archive</button>
+  def handle_event("archive", %{"id" => id}, socket) do
+    {:noreply,
+     socket
+     |> assign(:items, archive_item(socket.assigns.items, id))
+     |> push_server_event("archive", %{"id" => id})}
+  end
   ```
 
-  or by calling `push_server_event/3`.
+  This pattern gives optimistic updates: the event is handled locally
+  first (the optimistic edit), then delivered to the host LiveView's
+  `handle_event/3`, whose authoritative state can later override it.
 
-  Events can be sent to multiple targets with `targets/1`.
-  For example, to send an event to the LocalLiveView itself _and_ the server,
-  set the target to `targets([@default, @server])`:
+  ## Handling failed server pushes
 
-  ```
-  <button phx-click="archive" phx-target={targets([@default, @server])}>Archive</button>
-  ```
-
-  This approach is useful for optimistic updates. The event is first
-  handled locally, then it's also handled on the server. Each of them
-  updates the LocalLiveView's assigns: the local update is optimistic,
-  then the server update can possibly override it.
+  A `push_server_event/3` can fail: the page may have no host LiveView,
+  the websocket may be disconnected, or the host may reply with an error
+  or time out. When that happens, the view's `c:handle_push_error/4`
+  callback is invoked with the event, its params and `server_assigns` —
+  the last value of each assign received from the host server. The
+  default implementation feeds `server_assigns` through `c:update/2`,
+  rolling optimistic local edits back to the latest authoritative state.
 
   Another way of communicating the server is by using `mirror_sync/2`.
   '''
@@ -133,32 +137,15 @@ defmodule LocalLiveView do
   """
   def connected?(_socket), do: true
 
-  # Delimiter joining composed phx-target tokens (see targets/1). ASCII Unit
-  # Separator — it never appears in a CSS selector or cid, so the JS can split it
-  # back unambiguously. Keep in sync with LLV_TARGET_SEP in assets/local_live_view.js.
-  @target_sep "\x1f"
-
-  @doc """
-  Composes a `phx-target` from a list of targets.
-
-  Combine the `@default` (local, as if no target) and `@server` (host LiveView)
-  assigns with each other and/or ordinary `phx-target` selectors/cids, dispatching
-  the event to every target in the list:
-
-      <button phx-click="save" phx-target={targets([@default, @server])}>Save</button>
-      <button phx-click="ping" phx-target={targets([@default, @server, "#cart"])}>Ping</button>
-
-  A single target needs no helper — `phx-target={@server}` works on its own.
-  """
-  def targets(list) when is_list(list), do: Enum.map_join(list, @target_sep, &to_string/1)
-
   @doc """
   Sends an event to the host (server) `LiveView` that mounts this local live view.
 
-  The programmatic counterpart of `phx-target={@server}`: callable from
-  `handle_event/3` or `handle_info/2` (so the payload can be computed — e.g. a
-  drag result), it delivers `event`/`payload` to the host LiveView's
-  `handle_event(event, payload, socket)` over the regular Phoenix websocket.
+  Callable from `handle_event/3` or `handle_info/2`, it delivers
+  `event`/`payload` to the host LiveView's `handle_event(event, payload, socket)`
+  over the regular Phoenix websocket.
+
+  If the push fails (no host LiveView, disconnected socket, error reply or
+  timeout), the view's `c:handle_push_error/4` callback is invoked.
   """
   def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
     Popcorn.Wasm.run_js(
@@ -181,7 +168,7 @@ defmodule LocalLiveView do
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
-      import LocalLiveView, only: [mirror_sync: 2, targets: 1, push_server_event: 3]
+      import LocalLiveView, only: [mirror_sync: 2, push_server_event: 2, push_server_event: 3]
       @behaviour LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
       @phoenix_live_opts []
@@ -209,7 +196,13 @@ defmodule LocalLiveView do
         {:noreply, socket}
       end
 
-      defoverridable handle_server_event: 3, update: 2, handle_info: 2
+      @impl true
+      def handle_push_error(_event, _params, server_assigns, socket) do
+        {:ok, socket} = update(server_assigns, socket)
+        {:noreply, socket}
+      end
+
+      defoverridable handle_server_event: 3, update: 2, handle_info: 2, handle_push_error: 4
     end
   end
 
@@ -299,5 +292,34 @@ defmodule LocalLiveView do
 
   @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
 
-  @optional_callbacks mount: 3, update: 2, handle_event: 3, handle_info: 2, handle_params: 3
+  @doc """
+  Invoked when a `push_server_event/3` fails: there is no host LiveView on the
+  page, the websocket is disconnected, or the host replies with an error or
+  times out.
+
+  `event` and `params` are the event name and payload the failed push carried
+  (`params` has string keys, after a JSON round-trip, like `c:handle_event/3`
+  params). `server_assigns` holds the last value of each assign received from
+  the host server (through mount and `c:update/2`) — assigns only ever set
+  locally are absent.
+
+  The default implementation feeds `server_assigns` through `c:update/2`, as if
+  the host had re-sent them — restoring the latest authoritative state through
+  the view's usual derivation path. A view whose `c:update/2` skips unchanged
+  data (e.g. guarded by a revision counter) should override this callback and
+  force its rollback explicitly.
+  """
+  @callback handle_push_error(
+              event :: binary,
+              params :: unsigned_params(),
+              server_assigns :: map(),
+              socket :: Socket.t()
+            ) :: {:noreply, Socket.t()}
+
+  @optional_callbacks mount: 3,
+                      update: 2,
+                      handle_event: 3,
+                      handle_info: 2,
+                      handle_params: 3,
+                      handle_push_error: 4
 end

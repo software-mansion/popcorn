@@ -84,6 +84,9 @@ defmodule LocalLiveView.Component do
       phx-update="ignore"
     >
     </div>
+    <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
+    <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
+    </div>
     """
   end
 
