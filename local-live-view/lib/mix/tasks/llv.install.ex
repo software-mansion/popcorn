@@ -46,8 +46,13 @@ defmodule Mix.Tasks.Llv.Install do
     |> inject_dev_watcher()
     |> inject_setup_alias()
     |> generate_local_project()
+    |> add_local_dep()
     |> generate_hello_live_view()
     |> inject_hello_route()
+  end
+
+  defp add_local_dep(igniter) do
+    Igniter.Project.Deps.add_dep(igniter, {:local, path: "local"})
   end
 
   # --- Endpoint ---
