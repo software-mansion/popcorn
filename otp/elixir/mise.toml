@@ -1,0 +1,7 @@
+# The OTP/WASM runtime ships OTP 28 / Elixir 1.19.5, and this package is
+# compiled to BEAM that runs inside it, so the local toolchain must match.
+# The repo-root mise.toml still pins the older AtomVM toolchain (1.17 / OTP 26);
+# once AtomVM support is dropped, this nested config can be removed.
+[tools]
+elixir = "1.19.5-otp-28"
+erlang = "28.3.1"

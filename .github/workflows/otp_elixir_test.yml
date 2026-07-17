@@ -1,0 +1,46 @@
+name: OTP Elixir tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "otp/elixir/**"
+      - ".github/workflows/otp_elixir_test.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: otp/elixir
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Run tests
+        run: mix test
