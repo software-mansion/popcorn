@@ -33,24 +33,39 @@ runs:
       shell: bash
       run: echo "hash=$(echo -n '${{ inputs.cmake-opts }}' | sha256sum | cut -c1-8)" >> $GITHUB_OUTPUT
 
+    # actions/cache derives its cache version from `path`, so a consumer-specific
+    # path would fragment otherwise identical keys into separate entries. Build
+    # into a canonical location instead and copy to the consumer afterwards.
+    - name: Compute canonical build directory
+      id: canonical
+      shell: bash
+      run: echo "dir=${{ github.workspace }}/.atomvm-runtime/${{ inputs.build-mode }}-${{ steps.cmake-opts-hash.outputs.hash }}" >> $GITHUB_OUTPUT
+
     - name: Cache AtomVM build
       id: atomvm-cache
       uses: actions/cache@v4
       with:
-        path: ${{ inputs.working-directory }}/${{ inputs.outdir }}
+        path: ${{ steps.canonical.outputs.dir }}
         key: atomvm-${{ runner.os }}-${{ steps.fvm-hash.outputs.hash }}-${{ inputs.build-mode }}-${{ steps.cmake-opts-hash.outputs.hash }}
 
     - name: Build AtomVM
       if: steps.atomvm-cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
       run: |
         SCRIPT_PATH="${{ github.workspace }}/scripts/build-atomvm.sh"
         if [ -n "${{ inputs.cmake-opts }}" ]; then
-          "$SCRIPT_PATH" --outdir "${{ inputs.outdir }}" --cmake-opts "${{ inputs.cmake-opts }}" "${{ inputs.build-mode }}"
+          "$SCRIPT_PATH" --outdir "${{ steps.canonical.outputs.dir }}" --cmake-opts "${{ inputs.cmake-opts }}" "${{ inputs.build-mode }}"
         else
-          "$SCRIPT_PATH" --outdir "${{ inputs.outdir }}" "${{ inputs.build-mode }}"
+          "$SCRIPT_PATH" --outdir "${{ steps.canonical.outputs.dir }}" "${{ inputs.build-mode }}"
         fi
+
+    - name: Copy AtomVM to consumer directory
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ inputs.outdir }}"
+        cp -a "${{ steps.canonical.outputs.dir }}/." "${{ inputs.outdir }}/"
 
     - name: Build Popcorn JS
       if: contains(inputs.build-mode, 'wasm')
