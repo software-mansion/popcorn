@@ -6,11 +6,10 @@ import type {
   LLVConfig,
   LLVSocket,
   LLVServerMessageDetail,
-  LLVView,
   RenderedDiff,
   ViewRegistry,
 } from "./types";
-import { setupFakeView } from "./view_setup";
+import { setupFakeView, setPhxResolutionAttrs } from "./view_setup";
 import { createPopcornSocket, type PopcornLink } from "./transport";
 import { registerNavigationHandlers } from "./navigation";
 import { registerCustomEventBindings } from "./events";
@@ -149,7 +148,6 @@ export class LLVEngine {
 
     engine.setupMirrorChannels();
     engine.exposeGlobals();
-    engine.patchOwner();
     registerCustomEventBindings(engine.socket);
 
     await engine.scanAndMount();
@@ -226,6 +224,7 @@ export class LLVEngine {
   // Popcorn was ready) and the per-view event bus.
   private registerHooks(): void {
     const pop = this.pop;
+    const views = this.views;
     const mountView = (el: HTMLElement) => this.mountView(el);
     const unmountView = (el: HTMLElement) => this.unmountView(el);
     this.socket.hooks.LocalLiveView = {
@@ -234,6 +233,11 @@ export class LLVEngine {
         if (pop.ready) mountView(this.el);
       },
       updated() {
+        // The host patch that fired this callback just stripped the
+        // client-added resolution attrs (see setPhxResolutionAttrs) —
+        // re-assert them before anything can dispatch.
+        if (views.has(this.el.id)) setPhxResolutionAttrs(this.el);
+
         const raw = this.el.getAttribute("data-pop-assigns");
         if (raw === this.llvLastAssigns) return;
         this.llvLastAssigns = raw;
@@ -363,22 +367,6 @@ export class LLVEngine {
         console.error("LLV push_server_event failed", err);
         this.pop.pushError(llvId, event, payload);
       });
-    };
-  }
-
-  // owner: route events from inside [data-pop-view] elements to our fake views.
-  // We never set data-phx-session on LLV elements, so Phoenix's default closestViewEl()
-  // would walk up to the parent LiveView and dispatch events there instead.
-  private patchOwner(): void {
-    const views = this.views;
-    const origOwner = this.socket.owner.bind(this.socket);
-    this.socket.owner = function (childEl: Element, callback?: (view: LLVView) => unknown) {
-      const llvEl = childEl.closest("[data-pop-view]");
-      const view = llvEl ? views.get(llvEl.id) : undefined;
-      if (view) {
-        return callback ? callback(view) : view;
-      }
-      return origOwner(childEl, callback);
     };
   }
 

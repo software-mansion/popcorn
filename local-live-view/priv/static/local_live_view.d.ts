@@ -76,7 +76,6 @@ declare class LLVEngine {
     private bootPopcorn;
     private setupMirrorChannels;
     private exposeGlobals;
-    private patchOwner;
     private scanAndMount;
     private flushBufferedServerMessages;
     /**
