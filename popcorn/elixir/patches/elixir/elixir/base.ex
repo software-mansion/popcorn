@@ -21,18 +21,19 @@ defmodule Base do
     decode64base!(string, opts[:ignore], pad?)
   end
 
-  # :base64.decode/2 skips whitespace unconditionally, while the original
-  # accepts it only with `ignore: :whitespace`, so it must be rejected upfront
+  # :base64.decode/2 whitespace handling differs from the original (OTP skips
+  # whitespace unconditionally, AtomVM's implementation rejects it), so it's
+  # handled upfront: rejected without `ignore: :whitespace`, stripped with it
   defp decode64base!(string, nil, pad?) do
     reject_whitespace!(string)
-    erl_decode64!(string, nil, pad?)
+    erl_decode64!(string, pad?)
   end
 
   defp decode64base!(string, :whitespace, pad?) do
-    erl_decode64!(string, :whitespace, pad?)
+    string |> remove_whitespace() |> erl_decode64!(pad?)
   end
 
-  defp erl_decode64!(string, ignore, pad?) do
+  defp erl_decode64!(string, pad?) do
     # with padding: false, :base64 accepts incomplete padding (e.g. a lone
     # trailing "="), while the original requires padding to be either complete
     # or absent, so anything containing "=" is decoded with padding: true
@@ -42,12 +43,10 @@ defmodule Base do
     _e in [ArgumentError, ArithmeticError, CaseClauseError, ErlangError, FunctionClauseError] ->
       # :base64 errors don't say what was wrong with the input, so scan it
       # to raise an ArgumentError matching the original implementation
-      string |> remove_ignored(ignore) |> raise_decode64_error!()
+      raise_decode64_error!(string)
   end
 
-  defp remove_ignored(string, nil), do: string
-
-  defp remove_ignored(string, :whitespace) do
+  defp remove_whitespace(string) do
     for <<char <- string>>, char not in ~c"\s\t\r\n", into: <<>>, do: <<char>>
   end
 
