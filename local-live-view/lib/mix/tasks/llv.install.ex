@@ -222,7 +222,7 @@ defmodule Mix.Tasks.Llv.Install do
 
   @llv_js """
   import { LLVEngine } from "local_live_view";
-  await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
   """
 
   defp inject_app_js(igniter) do

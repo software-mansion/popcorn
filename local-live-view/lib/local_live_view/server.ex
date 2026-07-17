@@ -120,7 +120,8 @@ defmodule LocalLiveView.Server do
           {rendered, %{state | initial_rendered: nil}}
       end
 
-    {:noreply, reply(state, msg.promise, :ok, %{rendered: rendered})}
+    reply(msg.promise, :ok, %{rendered: rendered})
+    {:noreply, state}
   end
 
   # Component-destruction bookkeeping, mirroring Phoenix.LiveView.Channel: the
@@ -133,7 +134,8 @@ defmodule LocalLiveView.Server do
     components =
       Enum.reduce(cids, state.components, &Diff.mark_for_deletion_component/2)
 
-    {:noreply, reply(%{state | components: components}, msg.promise, :ok, %{})}
+    reply(msg.promise, :ok, %{})
+    {:noreply, %{state | components: components}}
   end
 
   def handle_info(
@@ -145,7 +147,8 @@ defmodule LocalLiveView.Server do
 
     # The ack carries the cids actually deleted; the browser prunes exactly
     # those from its rendered tree (a cid re-added mid-flight is kept).
-    {:noreply, reply(%{state | components: components}, msg.promise, :ok, %{cids: deleted_cids})}
+    reply(msg.promise, :ok, %{cids: deleted_cids})
+    {:noreply, %{state | components: components}}
   end
 
   def handle_info(
@@ -181,7 +184,9 @@ defmodule LocalLiveView.Server do
   def handle_info({:phoenix, :send_update, update}, state) do
     case Diff.update_component(state.socket, state.components, update) do
       {diff, new_components} ->
-        {:noreply, push_diff(%{state | components: new_components}, diff, nil)}
+        new_state = %{state | components: new_components}
+        push_diff(new_state, diff, nil)
+        {:noreply, new_state}
 
       :noop ->
         {:noreply, state}
@@ -209,10 +214,13 @@ defmodule LocalLiveView.Server do
 
     case result do
       {diff, new_components, _extra} ->
-        {:noreply, push_diff(%{state | components: new_components}, diff, promise)}
+        new_state = %{state | components: new_components}
+        push_diff(new_state, diff, promise)
+        {:noreply, new_state}
 
       :error ->
-        {:noreply, push_noop(state, promise)}
+        push_noop(promise)
+        {:noreply, state}
     end
   end
 
@@ -396,10 +404,9 @@ defmodule LocalLiveView.Server do
 
     case maybe_diff(new_state, false) do
       {:diff, diff, new_state} ->
-        {:noreply,
-         new_state
-         |> clear_live_patch_counter()
-         |> push_diff(diff, promise)}
+        new_state = clear_live_patch_counter(new_state)
+        push_diff(new_state, diff, promise)
+        {:noreply, new_state}
 
       {:live, :patch, opts} ->
         handle_live_patch(new_state, opts, promise)
@@ -456,15 +463,11 @@ defmodule LocalLiveView.Server do
     %{state | redirect_count: 0}
   end
 
-  defp push_noop(state, nil = _promise), do: state
-  defp push_noop(state, promise), do: reply(state, promise, :ok, %{})
+  defp push_noop(nil = _promise), do: :ok
+  defp push_noop(promise), do: reply(promise, :ok, %{})
 
-  defp push_diff(state, diff, promise) when diff == %{}, do: push_noop(state, promise)
+  defp push_diff(_state, diff, promise) when diff == %{}, do: push_noop(promise)
 
-  # Out-of-band diff (handle_info renders, update_assigns, push_error
-  # rollbacks, server messages — nothing answering a browser frame): injected
-  # browser-side as a channel "diff" frame, handled exactly like a
-  # server-pushed diff.
   defp push_diff(state, diff, nil = _promise) do
     Popcorn.Wasm.run_js(
       """
@@ -475,10 +478,10 @@ defmodule LocalLiveView.Server do
       %{id: state.llv_id, diff: diff}
     )
 
-    state
+    :ok
   end
 
-  defp push_diff(state, diff, promise), do: reply(state, promise, :ok, %{diff: diff})
+  defp push_diff(_state, diff, promise), do: reply(promise, :ok, %{diff: diff})
 
   defp maybe_diff(%{socket: socket} = state, force?) do
     socket.redirected || render_diff(state, socket, force?)
@@ -519,14 +522,9 @@ defmodule LocalLiveView.Server do
     Phoenix.LiveView.Renderer.to_rendered(socket, socket.view)
   end
 
-  # Answer a browser frame by settling its popcorn.call promise (threaded
-  # through Message.promise by the dispatcher). The browser transport turns
-  # the resolved {status, payload} — %{diff: diff} or %{} for a no-op —
-  # into the channel push ack, driving LiveView's stock push lifecycle:
-  # apply the ack diff, undo the push's element refs, resolve the reply.
-  defp reply(state, promise, status, payload) do
+  defp reply(promise, status, payload) do
     Popcorn.Wasm.resolve(%{status: status, payload: payload}, promise)
-    state
+    :ok
   end
 
   ## Mount
@@ -548,7 +546,10 @@ defmodule LocalLiveView.Server do
   end
 
   defp mount(%{} = params, from) do
-    Logger.error("Mounting LocalLiveView #{inspect(params["id"])} failed because no session was provided")
+    Logger.error(
+      "Mounting LocalLiveView #{inspect(params["id"])} failed because no session was provided"
+    )
+
     GenServer.reply(from, {:error, %{reason: "stale"}})
     {:stop, :shutdown, :no_session}
   end

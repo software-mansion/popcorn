@@ -541,31 +541,14 @@ function setupFakeView(socket, views, popcornSocket, pop_view_el) {
     view.join();
 }
 
-// ---- Popcorn channel transport -----------------------------------------
-//
-// Each fake view gets a REAL Phoenix Channel on a dedicated Socket whose
-// transport is the class below — the same public seam Phoenix.LongPoll
-// plugs into. No network connection ever exists: the "wire" is
-// popcorn.call one way and injected frames the other, and the socket's
-// encode/decode passthrough keeps frames plain objects (no serializer).
-//
-// The transport honors the channel ack contract: frames the WASM view
-// must answer (join, events, component-destruction bookkeeping) ride
-// popcorn.call, whose promise the view's process settles once the frame
-// is processed — the resolved {status, payload} (initial rendered, render
-// diff or %{} no-op, pruned cids) becomes the channel ack. So LiveView's
-// stock push lifecycle runs unmodified: apply the ack diff, undo the
-// push's element refs, resolve the {:reply, ...} payload. Ref locks and
-// phx-disable-with span the local round-trip exactly like a server
-// round-trip.
 const llvIdFromTopic = (topic) => topic.slice("lv:".length);
-// Frames the WASM view must answer: the channel join (ack carries the
-// initial rendered), DOM events (ack carries the render diff and reply)
-// and component-destruction bookkeeping (ack carries the pruned cids).
-// Anything else — heartbeats, phx_leave — is acked in place so the socket
-// stays healthy and teardown completes. Each entry needs a matching
+// Frames the WASM view must answer. Each entry needs a matching
 // Message clause in LocalLiveView.Server.
+// Anything else — heartbeats, phx_leave — is acked in place
+// as Popcorn may be not booted yet.
 const ANSWERED_EVENTS = ["phx_join", "event", "cids_will_destroy", "cids_destroyed"];
+// A fake socket that connects LLV vievs to Popcorn.
+// Phoenix channels can be normally constructed on top of this socket.
 function createPopcornSocket(SocketClass, pop) {
     let transport = null;
     class PopcornTransport {
@@ -611,12 +594,7 @@ function createPopcornSocket(SocketClass, pop) {
                 this.ack(frame, "ok", {});
                 return;
             }
-            // The view's process settles the call promise with {status, payload}
-            // once the frame is processed; a dispatcher-side reject resolves with
-            // ok: false. A call left unsettled (crashed view process) rejects at
-            // the call timeout. Every failure acks "error" — never "timeout",
-            // whose Push path triggers liveSocket.reloadWithJitter.
-            pop.transportFrame(llvIdFromTopic(topic), event, payload).then((result) => {
+            pop.handleTransportFrame(llvIdFromTopic(topic), event, payload).then((result) => {
                 if (result.ok) {
                     const { status, payload: response } = result.data;
                     this.ack(frame, status, response);
@@ -859,9 +837,7 @@ function resolveLlvId(viewOrId) {
     const el = Array.from(document.querySelectorAll("[data-pop-view]")).find((e) => e.getAttribute("data-pop-view") === viewOrId);
     return el ? el.id : viewOrId;
 }
-// Host-pushed server messages are not channel pushes — there is no ack to
-// carry the render, so the view delivers any resulting diff out-of-band
-// (__popcornTransportReceive). Hence the dedicated fire-and-forget action.
+// handles messages sent by the server via LocalLiveView.push_server_message
 function sendServerMessage(pop, detail) {
     pop.serverMessage(resolveLlvId(detail.view), {
         event: "llv_server_message",
@@ -930,7 +906,7 @@ class PopcornClient {
     // A channel frame the view must answer: the view's process settles the
     // call promise (Popcorn.Wasm.resolve) once the frame is processed, so the
     // result carries the channel ack. The transport consumes it — no `fire`.
-    transportFrame(id, event, payload) {
+    handleTransportFrame(id, event, payload) {
         return this.call({ action: "transport_frame", id, event, payload });
     }
     serverMessage(id, payload) {
@@ -985,12 +961,14 @@ class LLVEngine {
         engine.flushBufferedServerMessages();
         return engine;
     }
-    // The dedicated never-networked socket the fake views' channels live on.
-    // Connected before Popcorn boots: heartbeats are acked in place by the
-    // transport, and no answered frame flows until a view mounts (post-boot).
+    // The app's Phoenix Socket class, recovered from the live instance the
+    // LiveSocket already holds — same class, same version, same module as the
+    // one LiveView runs on, with nothing to configure.
+    socketClass() {
+        return this.socket.getSocket().constructor;
+    }
     connectPopcornSocket() {
-        const SocketClass = this.config.Socket ?? this.socket.getSocket().constructor;
-        this.popcornLink = createPopcornSocket(SocketClass, this.pop);
+        this.popcornLink = createPopcornSocket(this.socketClass(), this.pop);
     }
     // Start a view and wire it up.
     async mountView(pop_view_el) {
@@ -1073,12 +1051,10 @@ class LLVEngine {
                 unmountView(this.el);
             },
         };
-        // Event bus for local→server pushes: a hidden sibling of each mount
-        // point, owned by the HOST LiveView (see LocalLiveView.Component). Its
-        // lifecycle IS the host resolution — LiveView mounts and destroys it
-        // with the host view across reconnects and re-renders, so the registry
-        // always holds a live hook and no host-element lookup can go stale.
-        // __llvPushServer pushes through it via the documented hook pushEvent.
+        // Hook for sending events from client to server via `LocalLiveView.push_server_event`
+        // Sending an event via a hook freezes the element the hook binds to along with all
+        // its descendants until the event is internally ACKed by LiveView, thus we use
+        // a dedicated, empty div for that.
         const eventBusHooks = this.eventBusHooks;
         this.socket.hooks.LocalLiveViewEventBus = {
             mounted() {
@@ -1117,11 +1093,8 @@ class LLVEngine {
         const mirrorEls = document.querySelectorAll("[data-pop-view][data-pop-mirror-token]");
         if (mirrorEls.length === 0)
             return;
-        const { Socket } = this.config;
+        const Socket = this.socketClass();
         const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
-        if (!Socket) {
-            throw new Error("LLV: config.Socket is required when using mirror channels");
-        }
         const llvSocket = new Socket("/llv_socket", {
             params: { _csrf_token: csrfToken },
         });

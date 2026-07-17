@@ -10,9 +10,7 @@ export function resolveLlvId(viewOrId: string): string {
   return el ? el.id : viewOrId;
 }
 
-// Host-pushed server messages are not channel pushes — there is no ack to
-// carry the render, so the view delivers any resulting diff out-of-band
-// (__popcornTransportReceive). Hence the dedicated fire-and-forget action.
+// handles messages sent by the server via LocalLiveView.push_server_message
 export function sendServerMessage(pop: PopcornClient, detail: LLVServerMessageDetail) {
   pop.serverMessage(resolveLlvId(detail.view), {
     event: "llv_server_message",

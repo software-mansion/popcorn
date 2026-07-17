@@ -2,32 +2,12 @@ import type { Socket as PhoenixSocket, SocketConnectOption } from "phoenix";
 import type { TransportFrame } from "./types";
 import type { PopcornClient } from "./index";
 
-// ---- Popcorn channel transport -----------------------------------------
-//
-// Each fake view gets a REAL Phoenix Channel on a dedicated Socket whose
-// transport is the class below — the same public seam Phoenix.LongPoll
-// plugs into. No network connection ever exists: the "wire" is
-// popcorn.call one way and injected frames the other, and the socket's
-// encode/decode passthrough keeps frames plain objects (no serializer).
-//
-// The transport honors the channel ack contract: frames the WASM view
-// must answer (join, events, component-destruction bookkeeping) ride
-// popcorn.call, whose promise the view's process settles once the frame
-// is processed — the resolved {status, payload} (initial rendered, render
-// diff or %{} no-op, pruned cids) becomes the channel ack. So LiveView's
-// stock push lifecycle runs unmodified: apply the ack diff, undo the
-// push's element refs, resolve the {:reply, ...} payload. Ref locks and
-// phx-disable-with span the local round-trip exactly like a server
-// round-trip.
-
 const llvIdFromTopic = (topic: string) => topic.slice("lv:".length);
 
-// Frames the WASM view must answer: the channel join (ack carries the
-// initial rendered), DOM events (ack carries the render diff and reply)
-// and component-destruction bookkeeping (ack carries the pruned cids).
-// Anything else — heartbeats, phx_leave — is acked in place so the socket
-// stays healthy and teardown completes. Each entry needs a matching
+// Frames the WASM view must answer. Each entry needs a matching
 // Message clause in LocalLiveView.Server.
+// Anything else — heartbeats, phx_leave — is acked in place
+// as Popcorn may be not booted yet.
 const ANSWERED_EVENTS = ["phx_join", "event", "cids_will_destroy", "cids_destroyed"];
 
 export interface PopcornLink {
@@ -37,6 +17,8 @@ export interface PopcornLink {
   inject(frame: TransportFrame): void;
 }
 
+// A fake socket that connects LLV vievs to Popcorn.
+// Phoenix channels can be normally constructed on top of this socket.
 export function createPopcornSocket(
   SocketClass: typeof PhoenixSocket,
   pop: PopcornClient,
@@ -91,12 +73,7 @@ export function createPopcornSocket(
         return;
       }
 
-      // The view's process settles the call promise with {status, payload}
-      // once the frame is processed; a dispatcher-side reject resolves with
-      // ok: false. A call left unsettled (crashed view process) rejects at
-      // the call timeout. Every failure acks "error" — never "timeout",
-      // whose Push path triggers liveSocket.reloadWithJitter.
-      pop.transportFrame(llvIdFromTopic(topic), event, payload).then(
+      pop.handleTransportFrame(llvIdFromTopic(topic), event, payload).then(
         (result) => {
           if (result.ok) {
             const { status, payload: response } = result.data as {

@@ -351,7 +351,6 @@ liveSocket.connect();
 window.liveSocket = liveSocket;
 
 window.llvEngine = await LLVEngine.create(liveSocket, {
-  Socket,
   bundlePaths: ["/assets/js/wasm/bundle.avm"],
 });
 window.dispatchEvent(new CustomEvent("llv:ready"));

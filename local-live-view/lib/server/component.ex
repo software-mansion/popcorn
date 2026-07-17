@@ -84,11 +84,7 @@ defmodule LocalLiveView.Component do
       phx-update="ignore"
     >
     </div>
-    <%!-- Event bus for local→server pushes (push_server_event): the browser
-          runtime sends them through this element's hook, whose mounted /
-          destroyed lifecycle tracks the host LiveView across reconnects and
-          re-renders. A sibling (not a child) of the mount point, so the host
-          LiveView owns it. Renders inert on pages without a host. --%>
+    <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>
     """

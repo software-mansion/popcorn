@@ -3,23 +3,6 @@ defmodule Local.Kanban do
 
   alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
 
-  # The board is a plain map `%{id => column}`; each column carries its tasks as
-  # `%{id => task}`. Nothing tracks order explicitly — columns and tasks are
-  # sorted by their `position` on render. Tasks use fractional-index string ranks
-  # (`Rank`) with the task's id baked on (so positions are globally unique);
-  # columns use the server's integer position. THE CLIENT generates task
-  # positions: a drag/add computes the new rank locally and sends the literal
-  # `position` to the host, which just persists it.
-  #
-  # This is the OPTIMISTIC, collaborative client: every edit is applied here
-  # instantly AND sent to the host `BoardLive` via `push_server_event/3`, which
-  # writes the DB and broadcasts so all viewers reconcile. The server is
-  # authoritative: `update/2` rebuilds the whole board (preserving server ids)
-  # whenever a new `rev` arrives, so a successful edit reconciles seamlessly and
-  # a failed one rolls back. When a push never reaches the host at all
-  # (disconnected socket), `handle_push_error/4` rolls the board back to the
-  # last authoritative state.
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -132,22 +115,22 @@ defmodule Local.Kanban do
     end
   end
 
-  def handle_event("remove_column", %{"id" => id}, socket) do
+  def handle_event("remove_column", %{"id" => id} = payload, socket) do
     {_column, columns} = pop_in(socket.assigns.columns, [id])
 
     {:noreply,
      socket
      |> assign(:columns, columns)
-     |> push_server_event("remove_column", %{"id" => id})}
+     |> push_server_event("remove_column", payload)}
   end
 
-  def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid}, socket) do
+  def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid} = payload, socket) do
     {_task, columns} = pop_in(socket.assigns.columns, [cid, :tasks, tid])
 
     {:noreply,
      socket
      |> assign(:columns, columns)
-     |> push_server_event("remove_task", %{"column_id" => cid, "task_id" => tid})}
+     |> push_server_event("remove_task", payload)}
   end
 
   # --- Task modal (local-only UI state) --------------------------------------

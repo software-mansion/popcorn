@@ -73,7 +73,7 @@ defmodule Mix.Tasks.Llv.InstallTest do
       + |import { LLVEngine } from "local_live_view";
       """)
       |> assert_has_patch(@app_js_path, """
-      + |await LLVEngine.create(liveSocket, { Socket, bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+      + |await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
       """)
     end
   end

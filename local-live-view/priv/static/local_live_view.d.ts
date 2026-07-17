@@ -1,10 +1,7 @@
 import { Popcorn } from '@swmansion/popcorn';
 import { LiveSocketInstanceInterface } from 'phoenix_live_view';
-import { Socket } from 'phoenix';
 
 interface LLVConfig {
-    /** Phoenix Socket class — required when using mirror channels */
-    Socket?: typeof Socket;
     /** Paths to compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]` */
     bundlePaths?: string[];
     /** Enable Popcorn debug logging */
@@ -47,7 +44,7 @@ declare class PopcornClient {
     reconnected(id: string): void;
     updateAssigns(id: string, assigns: Record<string, unknown>): void;
     handleParams(id: string, params: Record<string, string>, url: string): void;
-    transportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
+    handleTransportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
     serverMessage(id: string, payload: Record<string, unknown>): void;
     pushError(id: string, event: string, payload: Record<string, unknown>): void;
     push(id: string, event: string, payload: Record<string, unknown>): Promise<CallResult>;
@@ -69,6 +66,7 @@ declare class LLVEngine {
      * @param config - Optional LLV configuration.
      */
     static create(liveSocket: LiveSocketInstanceInterface, config?: LLVConfig): Promise<LLVEngine>;
+    private socketClass;
     private connectPopcornSocket;
     private mountView;
     private unmountView;

@@ -1,11 +1,9 @@
-import type { Channel, Socket as PhoenixSocket } from "phoenix";
+import type { Channel } from "phoenix";
 import type { LiveSocketInstanceInterface } from "phoenix_live_view";
 
 // --- Public API ---
 
 export interface LLVConfig {
-  /** Phoenix Socket class — required when using mirror channels */
-  Socket?: typeof PhoenixSocket;
   /** Paths to compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]` */
   bundlePaths?: string[];
   /** Enable Popcorn debug logging */
@@ -57,17 +55,9 @@ export interface LLVServerMessageDetail {
   payload: unknown;
 }
 
-/**
- * Phoenix View surface LLV touches on the object returned by
- * socket.newRootView(). `channel` and `addHook` are reassigned in
- * view_setup (property syntax so TypeScript allows reassignment on the
- * concrete instance); everything else is stock and merely called.
- */
 export interface LLVView {
   el: HTMLElement;
-  /** Reassigned to a channel on the popcorn socket before join(). */
   channel: Channel;
-  /** Stock join: bindChannel + channel.join over the popcorn transport. */
   join(): void;
   pushEvent(
     type: string,
@@ -86,7 +76,7 @@ export type ViewRegistry = Map<string, LLVView>;
 
 /**
  * A mounted LocalLiveViewEventBus hook instance: the host-side channel used
- * by __llvPushServer. pushEvent is the documented promise-returning hook API.
+ * by __llvPushServer.
  */
 export interface EventBusHook {
   el: HTMLElement;

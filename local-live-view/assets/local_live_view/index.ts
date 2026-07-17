@@ -88,7 +88,7 @@ class PopcornClient {
   // A channel frame the view must answer: the view's process settles the
   // call promise (Popcorn.Wasm.resolve) once the frame is processed, so the
   // result carries the channel ack. The transport consumes it — no `fire`.
-  transportFrame(id: string, event: string, payload: unknown): Promise<CallResult> {
+  handleTransportFrame(id: string, event: string, payload: unknown): Promise<CallResult> {
     return this.call({ action: "transport_frame", id, event, payload });
   }
 
@@ -158,13 +158,15 @@ export class LLVEngine {
     return engine;
   }
 
-  // The dedicated never-networked socket the fake views' channels live on.
-  // Connected before Popcorn boots: heartbeats are acked in place by the
-  // transport, and no answered frame flows until a view mounts (post-boot).
+  // The app's Phoenix Socket class, recovered from the live instance the
+  // LiveSocket already holds — same class, same version, same module as the
+  // one LiveView runs on, with nothing to configure.
+  private socketClass(): typeof PhoenixSocket {
+    return this.socket.getSocket().constructor as typeof PhoenixSocket;
+  }
+
   private connectPopcornSocket(): void {
-    const SocketClass =
-      this.config.Socket ?? (this.socket.getSocket().constructor as typeof PhoenixSocket);
-    this.popcornLink = createPopcornSocket(SocketClass, this.pop);
+    this.popcornLink = createPopcornSocket(this.socketClass(), this.pop);
   }
 
   // Start a view and wire it up.
@@ -246,12 +248,10 @@ export class LLVEngine {
       },
     } satisfies Hook;
 
-    // Event bus for local→server pushes: a hidden sibling of each mount
-    // point, owned by the HOST LiveView (see LocalLiveView.Component). Its
-    // lifecycle IS the host resolution — LiveView mounts and destroys it
-    // with the host view across reconnects and re-renders, so the registry
-    // always holds a live hook and no host-element lookup can go stale.
-    // __llvPushServer pushes through it via the documented hook pushEvent.
+    // Hook for sending events from client to server via `LocalLiveView.push_server_event`
+    // Sending an event via a hook freezes the element the hook binds to along with all
+    // its descendants until the event is internally ACKed by LiveView, thus we use
+    // a dedicated, empty div for that.
     const eventBusHooks = this.eventBusHooks;
     this.socket.hooks.LocalLiveViewEventBus = {
       mounted() {
@@ -295,12 +295,8 @@ export class LLVEngine {
     );
     if (mirrorEls.length === 0) return;
 
-    const { Socket } = this.config;
+    const Socket = this.socketClass();
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
-
-    if (!Socket) {
-      throw new Error("LLV: config.Socket is required when using mirror channels");
-    }
 
     const llvSocket = new Socket("/llv_socket", {
       params: { _csrf_token: csrfToken },
