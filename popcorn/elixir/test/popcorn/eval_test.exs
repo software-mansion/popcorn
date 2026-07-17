@@ -315,6 +315,40 @@ defmodule Popcorn.EvalTest do
     |> AtomVM.assert_result("666F6F626172")
   end
 
+  async_test "Base64", %{tmp_dir: dir} do
+    quote do
+      {
+        Base.encode64("foobar"),
+        Base.encode64("foob"),
+        Base.encode64("foob", padding: false),
+        Base.decode64("Zm9vYmFy"),
+        Base.decode64("Zm9vYg=="),
+        Base.decode64("Zm9vYg", padding: false),
+        Base.decode64!("Zm9v\tYmFy", ignore: :whitespace),
+        # whitespace must be rejected without ignore: :whitespace
+        Base.decode64("Zm9v YmFy"),
+        # incomplete padding
+        Base.decode64("Zm9vYg"),
+        # non-alphabet character
+        Base.decode64("Zm9(Yg==")
+      }
+    end
+    |> Macro.to_string()
+    |> AtomVM.eval(:elixir, run_dir: dir)
+    |> AtomVM.assert_result({
+      "Zm9vYmFy",
+      "Zm9vYg==",
+      "Zm9vYg",
+      {:ok, "foobar"},
+      {:ok, "foob"},
+      {:ok, "foob"},
+      "foobar",
+      :error,
+      :error,
+      :error
+    })
+  end
+
   async_test "Bitwise module", %{tmp_dir: dir} do
     """
     import Bitwise

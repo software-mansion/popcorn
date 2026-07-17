@@ -1,7 +1,7 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
-  @version "0.3.1"
+  @version "0.3.2"
   @github "https://github.com/software-mansion/popcorn"
   @repo_root "../.."
   @package_metadata_files ~w(README.md LICENSE)
