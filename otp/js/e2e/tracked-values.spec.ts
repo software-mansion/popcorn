@@ -23,6 +23,49 @@ test("tracked values keep identity", async ({ otp }) => {
   expect(otp.events).toContainEqual({ roundtrip: 2 });
 });
 
+test("run_js: refs refer to the same value", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    % initial
+    H = wasm:run_js(<<"() => ({n: 0})">>, #{}, [{return, ref}]),
+    % update
+    wasm:run_js(<<"({h}) => { h.n = 100; }">>, #{h => H}),
+    % read
+    V = wasm:run_js(<<"({h}) => h.n">>, #{h => H}),
+    ok = wasm:send(#{var_value => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("var_value");
+  expect(otp.events).toContainEqual({ var_value: 100 });
+});
+
+test("run_js: refs work with unserializable values", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    H = wasm:run_js(<<"() => document.createElement('div')">>, #{}, [{return, ref}]),
+    V = wasm:run_js(<<"({h}) => h.tagName">>, #{h => H}),
+    ok = wasm:send(#{ref_unsupported => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("ref_unsupported");
+  expect(otp.events).toContainEqual({ ref_unsupported: "DIV" });
+});
+
+test("run_js: refs don't nest TrackedValues", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    H = wasm:run_js(<<"() => new TrackedValue({n: 1})">>, #{}, [{return, ref}]),
+    V = wasm:run_js(<<"({h}) => h.n">>, #{h => H}),
+    ok = wasm:send(#{ref_no_nest => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("ref_no_nest");
+  expect(otp.events).toContainEqual({ ref_no_nest: 1 });
+});
+
 test("nested tracked values", async ({ otp }) => {
   const RUN_JS_BOOT_EVAL = trimLeft(`
     H = wasm:run_js(<<"() => new TrackedValue({n: 5})">>, #{}),
@@ -215,4 +258,3 @@ test("tracked values isolated cleanup", async ({ createOtp, page }) => {
   expect(liveEvent).toEqual({ v: 42 });
   expect(cleanupCalls).toBe(1);
 });
-

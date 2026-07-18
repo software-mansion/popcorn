@@ -1,5 +1,5 @@
 import { type Result, type SerializedError } from "./errors";
-import { tuple2 } from "./etf";
+import { tuple2, type Mapper } from "./etf";
 import type {
   AnyValue,
   BeamBootOptions,
@@ -73,6 +73,7 @@ type BridgeEnvelope =
       code: string;
       args: AnyValue;
       reply_to: string;
+      return: "value" | "ref";
     };
 
 export function readMainEvent(value: unknown): MainToVmEvent | null {
@@ -117,14 +118,15 @@ export function serializeSendPayload(
   target: BeamTarget,
   payload: AnyValue,
   meta: AnyValue,
-): Result<BeamSendPayload> {
+  mapper?: Mapper,
+): Result<BeamSendPayload, "bridge:unserializable"> {
   if (isNameTarget(target)) {
     check(target.name.length > 0);
   } else {
     check(target.pid.byteLength > 0);
   }
 
-  const etf = tuple2(payload, meta);
+  const etf = tuple2(payload, meta, mapper);
   if (!etf.ok) return etf;
   return { ok: true, data: { target, etf: etf.data } };
 }
@@ -160,6 +162,7 @@ export function deserializeBridgeMessage(
             code: parsed.code,
             args: parsed.args,
             replyTo: base64ToBytes(parsed.reply_to),
+            return: parsed.return,
           },
         };
       default:

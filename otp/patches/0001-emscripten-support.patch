@@ -1025,10 +1025,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..289c344682d7ac40fcc71c45c77736a79f440efc
+index 0000000000000000000000000000000000000000..76a13760969bd11829dd4a9df4d48269da4197ae
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,101 @@
+@@ -0,0 +1,122 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1068,16 +1068,20 @@ index 0000000000000000000000000000000000000000..289c344682d7ac40fcc71c45c77736a7
 +    ?MODULE:keep_alive(Envelope),
 +    ok.
 +
-+-spec run_js(binary(), map()) -> json:decode_value().
++%% Returns the decoded result, which may contain pids and, in `ref` mode, a
++%% `{wasm_tracked_value, _}` handle — so not strictly a json:decode_value().
++-spec run_js(binary(), map()) -> term().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
 +    run_js(Code, Args, []).
 +
-+-spec run_js(binary(), map(), proplists:proplist()) -> json:decode_value().
++-spec run_js(binary(), map(), proplists:proplist()) -> term().
 +run_js(Code, Args, Opts) when is_binary(Code), is_map(Args), is_list(Opts) ->
 +    Timeout = proplists:get_value(timeout, Opts, ?RUN_JS_TIMEOUT),
++    Return = validate_return(proplists:get_value(return, Opts, value)),
 +    Token = erlang:unique_integer(),
 +    ReplyTo = base64:encode(term_to_binary({self(), Token})),
-+    Envelope = #{type => run_js, code => Code, args => Args, reply_to => ReplyTo},
++    Envelope = #{type => run_js, code => Code, args => Args,
++                 reply_to => ReplyTo, return => Return},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
 +    Reply = receive
 +                {wasm, {Token, Payload}, _Meta} -> Payload
@@ -1094,12 +1098,29 @@ index 0000000000000000000000000000000000000000..289c344682d7ac40fcc71c45c77736a7
 +keep_alive(Term) ->
 +    Term.
 +
++%% `value` transports the decoded result; `ref` tracks the whole result and
++%% returns one opaque handle. Invalid options are programmer errors and fail loud.
++validate_return(value) -> value;
++validate_return(ref) -> ref.
++
 +handle_run_js_reply(#{<<"ok">> := true, <<"value">> := Value}) ->
 +    revive_refs(Value);
 +handle_run_js_reply(#{<<"ok">> := true}) ->
 +    null;
-+handle_run_js_reply(#{<<"ok">> := false, <<"error">> := Reason}) ->
++handle_run_js_reply(#{<<"ok">> := false,
++                      <<"error">> := #{<<"unserializable">> := Reason}}) ->
++    error({run_js, {unserializable, unserializable_reason(Reason)}});
++handle_run_js_reply(#{<<"ok">> := false, <<"error">> := Reason})
++  when is_binary(Reason) ->
 +    error({run_js, Reason}).
++
++%% Map the codec's stable reasons to known atoms; never build atoms from
++%% arbitrary JavaScript strings.
++unserializable_reason(<<"cyclic-object">>) -> cyclic_object;
++unserializable_reason(<<"non-plain-object">>) -> non_plain_object;
++unserializable_reason(<<"lossy-int">>) -> lossy_int;
++unserializable_reason(<<"non-finite-float">>) -> non_finite_float;
++unserializable_reason(<<"unsupported">>) -> unsupported.
 +
 +encode_arg({wasm_tracked_value, Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
