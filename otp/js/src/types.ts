@@ -32,6 +32,7 @@ export type RunJsRequest = {
   code: string;
   args: AnyValue;
   replyTo: Uint8Array;
+  return: "value" | "ref";
 };
 
 export type OtpErrorPayload =

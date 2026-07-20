@@ -37,12 +37,15 @@ export class RawTerm {
   }
 }
 
+export type Mapper = (value: object) => object;
+
 export function tuple2(
   data: unknown,
   meta: unknown,
+  mapper?: Mapper,
 ): Result<Uint8Array<ArrayBuffer>, "bridge:unserializable"> {
   try {
-    return { ok: true, data: new Encoder().tuple2(data, meta) };
+    return { ok: true, data: new Encoder(mapper).tuple2(data, meta) };
   } catch (error) {
     let reason: UnserializableReason = "unsupported";
     let part = data;
@@ -62,6 +65,8 @@ class Encoder {
   private readonly output: number[] = [];
   private readonly buffer = new ArrayBuffer(8);
   private readonly view = new DataView(this.buffer);
+
+  public constructor(private readonly mapper: Mapper = (value) => value) {}
 
   tuple2(left: unknown, right: unknown): Uint8Array<ArrayBuffer> {
     this.byte(VERSION);
@@ -136,7 +141,8 @@ class Encoder {
     this.bytes(digits);
   }
 
-  private object(value: object): void {
+  private object(rawValue: object): void {
+    const value = this.mapper(rawValue);
     if (value instanceof RawTerm) {
       this.bytes(value.bytes);
       return;

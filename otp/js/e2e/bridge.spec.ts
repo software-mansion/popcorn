@@ -242,6 +242,94 @@ test("throwing run_js raises in VM", async ({ otp }) => {
   expect(otp.events).toContainEqual({ run_js_error: "Error: boom" });
 });
 
+test("run_js: return nested value", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    V = wasm:run_js(
+      <<"() => ({a: 1, s: 'x', nested: {b: [2, 3]}, flag: true})">>,
+      #{},
+      [{return, value}]
+    ),
+    ok = wasm:send(#{value_mode => V}).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("value_mode");
+  expect(otp.events).toContainEqual({
+    value_mode: { a: 1, s: "x", nested: { b: [2, 3] }, flag: true },
+  });
+});
+
+test("run_js: throws when returning unserializable value", async ({ otp }) => {
+  // One case per codec reason (unsupported/non_finite_float/lossy_int/
+  // non_plain_object/cyclic_object).
+  const REJECTIONS = [
+    ["func", "() => () => 1", "unsupported"],
+    ["symbol", "() => Symbol('x')", "unsupported"],
+    ["bigint", "() => 1n", "unsupported"],
+    ["pos_inf", "() => Infinity", "non_finite_float"],
+    ["neg_inf", "() => -Infinity", "non_finite_float"],
+    ["nan", "() => NaN", "non_finite_float"],
+    ["unsafe_int", "() => Number.MAX_SAFE_INTEGER + 1", "lossy_int"],
+    ["non_plain", "() => new Date()", "non_plain_object"],
+    ["cyclic", "() => { const a = []; a.push(a); return a; }", "cyclic_object"],
+  ] as const;
+  const cases = REJECTIONS.map(
+    ([name, code]) => `{${name}, <<"${code}">>}`,
+  ).join(",\n      ");
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    Cases = [
+      ${cases}
+    ],
+    lists:foreach(fun({Name, Code}) ->
+      Result = try wasm:run_js(Code, #{}) of
+        _ -> #{outcome => no_error}
+      catch
+        error:{run_js, {unserializable, Reason}} ->
+          #{outcome => rejected, reason => Reason};
+        error:run_js_timeout -> #{outcome => timeout}
+      end,
+      ok = wasm:send(#{reject => Name, result => Result})
+    end, Cases).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  for (const [name, , reason] of REJECTIONS) {
+    await otp.waitForEvent("reject");
+    expect(otp.events).toContainEqual({
+      reject: name,
+      result: { outcome: "rejected", reason },
+    });
+  }
+});
+
+test("run_js: options validation", async ({ otp }) => {
+  const RUN_JS_BOOT_EVAL = trimLeft(`
+    Value = wasm:run_js(<<"() => 1">>, #{}, [{return, value}]),
+    Ref = wasm:run_js(<<"() => 1">>, #{}, [{return, ref}]),
+    Invalid = try wasm:run_js(<<"() => 1">>, #{}, [{return, bogus}]) of
+      _ -> ok
+    catch
+      error:function_clause -> invalid_option
+    end,
+    ok = wasm:send(#{
+      value_ok => Value =:= 1,
+      ref_ok => is_tuple(Ref) andalso element(1, Ref) =:= wasm_tracked_value,
+      invalid_return => Invalid
+    }).
+  `);
+  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
+  assert(boot.ok);
+
+  await otp.waitForEvent("invalid_return");
+  expect(otp.events).toContainEqual({
+    value_ok: true,
+    ref_ok: true,
+    invalid_return: "invalid_option",
+  });
+});
+
 test("send() to unregistered process", async ({ otp }) => {
   const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
   const boot = await otp.boot(evalOpts(READY_BOOT_EVAL));

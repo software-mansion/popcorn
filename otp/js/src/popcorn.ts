@@ -1,5 +1,5 @@
 import { PopcornError, err, type Result } from "./errors";
-import { RawTerm } from "./etf";
+import { RawTerm, type Mapper } from "./etf";
 import {
   readWorkerEvent,
   serializeSendPayload,
@@ -10,6 +10,7 @@ import {
 import type {
   AnyValue,
   BeamBootOptions,
+  BeamSendPayload,
   BeamTarget,
   OtpErrorPayload,
   Pid,
@@ -18,6 +19,7 @@ import type {
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
+type PendingTracked = TrackedEntry & { key: number };
 
 const TRACKED_REF_KEY = "popcorn_ref";
 const PID_REF_KEY = "popcorn_pid";
@@ -250,13 +252,18 @@ export class Popcorn {
       return { ok: false, error: err("bridge:invalid-target", {}) };
     }
 
+    const tracked: PendingTracked[] = [];
     const command = serializeSendPayload(
       target,
-      this.serializeHandles(payload ?? {}),
+      payload ?? {},
       opts?.meta ?? {},
+      this.handleMapper(tracked),
     );
     if (!command.ok) {
       return command;
+    }
+    for (const { key, value, cleanup } of tracked) {
+      this.trackedValues.set(key, { value, cleanup });
     }
 
     const requestId = this.nextRequestId();
@@ -338,21 +345,48 @@ export class Popcorn {
       const send: SendFn = (target, sendPayload, sendOpts) =>
         this.send(target, sendPayload, sendOpts);
       const result = await fn(args, send);
-      payload = { ok: true, value: this.serializeHandles(result) ?? null };
+      const value = request.return === "ref" ? this.asRef(result) : result;
+      payload = { ok: true, value: value ?? null };
     } catch (error) {
       check(error instanceof Error);
       payload = { ok: false, error: error.toString() };
     }
 
-    const command = serializeSendPayload({ pid: request.replyTo }, payload, {});
-    check(command.ok);
+    const target = { pid: request.replyTo };
+    const tracked: PendingTracked[] = [];
+    const command = serializeSendPayload(
+      target,
+      payload,
+      {},
+      this.handleMapper(tracked),
+    );
+    if (command.ok) {
+      for (const { key, value, cleanup } of tracked) {
+        this.trackedValues.set(key, { value, cleanup });
+      }
+      this.sendRunJsReply(command.data);
+      return;
+    }
+
+    const failure = serializeSendPayload(
+      target,
+      { ok: false, error: { unserializable: command.error.data.reason } },
+      {},
+    );
+    check(failure.ok);
+    this.sendRunJsReply(failure.data);
+  }
+
+  private asRef(value: unknown): unknown {
+    if (value instanceof this.TrackedValue) return value;
+    return new this.TrackedValue(value);
+  }
+
+  private sendRunJsReply(message: BeamSendPayload): void {
     toVm(
       this.vmWorker,
-      {
-        type: "popcorn:run-js-reply",
-        payload: { message: command.data },
-      },
-      [command.data.etf.buffer],
+      { type: "popcorn:run-js-reply", payload: { message } },
+      [message.etf.buffer],
     );
   }
 
@@ -389,32 +423,20 @@ export class Popcorn {
     return value;
   }
 
-  private serializeHandles(value: unknown): unknown {
-    if (value instanceof this.Pid) {
-      // Splice the pid's own ETF bytes so binary_to_term revives a real pid.
-      return RawTerm.fromExternal(value.bytes);
-    }
-    if (value instanceof this.TrackedValue) {
-      this.trackedKeySeq += 1;
-      const key = this.trackedKeySeq;
-      this.trackedValues.set(key, {
-        value: value.value,
-        cleanup: value.cleanup,
-      });
-      return { [TRACKED_REF_KEY]: key };
-    }
-    if (Array.isArray(value)) {
-      return value.map((item) => this.serializeHandles(item));
-    }
-    const obj = objectWithKeys(value, []);
-    if (obj !== null) {
-      const serialized: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(obj)) {
-        serialized[k] = this.serializeHandles(v);
+  /** Maps pids and `TrackedValue`s during encoding, collecting handles into
+   * `tracked` for the caller to register once encoding succeeds. */
+  private handleMapper(tracked: PendingTracked[]): Mapper {
+    return (value) => {
+      if (value instanceof this.Pid) {
+        return RawTerm.fromExternal(value.bytes);
       }
-      return serialized;
-    }
-    return value;
+      if (value instanceof this.TrackedValue) {
+        const key = (this.trackedKeySeq += 1);
+        tracked.push({ key, value: value.value, cleanup: value.cleanup });
+        return { [TRACKED_REF_KEY]: key };
+      }
+      return value;
+    };
   }
 
   private deleteTrackedValue(key: number): void {
