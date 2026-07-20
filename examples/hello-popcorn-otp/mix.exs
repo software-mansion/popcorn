@@ -24,9 +24,7 @@ defmodule HelloPopcornOtp.MixProject do
   end
 
   defp deps do
-    # No `:popcorn` dependency: the JS<->BEAM bridge is the preloaded `:wasm`
-    # module, baked into the OTP/WASM runtime itself.
-    []
+    [{:popcorn_otp, path: "../../otp/elixir"}]
   end
 
   defp aliases do
