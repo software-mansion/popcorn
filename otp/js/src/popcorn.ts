@@ -36,10 +36,6 @@ export type PopcornOpts = {
   workerUrl?: string | URL;
 };
 
-export type PopcornSendOpts = {
-  meta?: AnyValue;
-};
-
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
@@ -63,7 +59,6 @@ type PendingSend = (result: Result<null>) => void;
 type SendFn = (
   target: string | Pid,
   payload?: AnyValue,
-  opts?: PopcornSendOpts,
 ) => Promise<Result<null>>;
 type RunJsFn = (args: AnyValue, send: SendFn) => AnyValue;
 
@@ -234,7 +229,6 @@ export class Popcorn {
   public async send(
     rawTarget: string | Pid,
     payload?: AnyValue,
-    opts?: PopcornSendOpts,
   ): Promise<Result<null>> {
     if (this.state.status !== "booted") {
       if (this.state.status === "closed") {
@@ -256,7 +250,6 @@ export class Popcorn {
     const command = serializeSendPayload(
       target,
       payload ?? {},
-      opts?.meta ?? {},
       this.handleMapper(tracked),
     );
     if (!command.ok) {
@@ -342,8 +335,8 @@ export class Popcorn {
       const fn = this.jsWithCurrentEnv(request.code);
       assertRunJsFn(fn);
       const args = this.reviveHandles(request.args);
-      const send: SendFn = (target, sendPayload, sendOpts) =>
-        this.send(target, sendPayload, sendOpts);
+      const send: SendFn = (target, sendPayload) =>
+        this.send(target, sendPayload);
       const result = await fn(args, send);
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
@@ -357,7 +350,6 @@ export class Popcorn {
     const command = serializeSendPayload(
       target,
       payload,
-      {},
       this.handleMapper(tracked),
     );
     if (command.ok) {
@@ -371,7 +363,6 @@ export class Popcorn {
     const failure = serializeSendPayload(
       target,
       { ok: false, error: { unserializable: command.error.data.reason } },
-      {},
     );
     check(failure.ok);
     this.sendRunJsReply(failure.data);

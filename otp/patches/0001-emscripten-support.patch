@@ -191,10 +191,10 @@ index 0000000000000000000000000000000000000000..ed09e8dd4ff11df4fe5e8b9adcb4dc70
 +});
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..730183d503d8b85a95083be2b9b7719ed99cd009
+index 0000000000000000000000000000000000000000..e39af2a963bdf9697de3e9f61d18d17629a7228d
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,651 @@
+@@ -0,0 +1,644 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -772,14 +772,10 @@ index 0000000000000000000000000000000000000000..730183d503d8b85a95083be2b9b7719e
 +  ErlNifEnv *env;
 +  ERL_NIF_TERM atom;
 +  ErlNifPid pid;
-+  ERL_NIF_TERM pair;
 +  ERL_NIF_TERM payload_term;
 +  ERL_NIF_TERM message_payload;
-+  ERL_NIF_TERM meta_term;
 +  ERL_NIF_TERM message;
 +  ERL_NIF_TERM token;
-+  const ERL_NIF_TERM *pair_elems;
-+  int pair_arity;
 +  int decoded_size;
 +  bool has_token = false;
 +
@@ -791,14 +787,11 @@ index 0000000000000000000000000000000000000000..730183d503d8b85a95083be2b9b7719e
 +    abort();
 +  }
 +
-+  decoded_size = enif_binary_to_term(env, etf, (size_t)etf_len, &pair,
++  decoded_size = enif_binary_to_term(env, etf, (size_t)etf_len, &payload_term,
 +                                     ERL_NIF_BIN2TERM_SAFE);
-+  if (decoded_size != etf_len ||
-+      !enif_get_tuple(env, pair, &pair_arity, &pair_elems) || pair_arity != 2) {
++  if (decoded_size != etf_len) {
 +    abort();
 +  }
-+  payload_term = pair_elems[0];
-+  meta_term = pair_elems[1];
 +
 +  if (target_kind == WASM_TARGET_PID_BYTES) {
 +    if (!decode_pid_target(env, target_name, target_name_len, &pid, &has_token,
@@ -825,7 +818,7 @@ index 0000000000000000000000000000000000000000..730183d503d8b85a95083be2b9b7719e
 +
 +  message_payload =
 +      has_token ? enif_make_tuple2(env, token, payload_term) : payload_term;
-+  message = enif_make_tuple3(env, am_wasm, message_payload, meta_term);
++  message = enif_make_tuple2(env, am_wasm, message_payload);
 +
 +  if (!enif_send(NULL, &pid, env, message)) {
 +    enif_free_env(env);
@@ -1025,7 +1018,7 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..76a13760969bd11829dd4a9df4d48269da4197ae
+index 0000000000000000000000000000000000000000..cd6de3257fcf336f481167e83ee4e5cf3b6baad7
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
 @@ -0,0 +1,122 @@
@@ -1084,7 +1077,7 @@ index 0000000000000000000000000000000000000000..76a13760969bd11829dd4a9df4d48269
 +                 reply_to => ReplyTo, return => Return},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
 +    Reply = receive
-+                {wasm, {Token, Payload}, _Meta} -> Payload
++                {wasm, {Token, Payload}} -> Payload
 +            after Timeout ->
 +                timeout
 +            end,

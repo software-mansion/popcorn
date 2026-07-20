@@ -18,18 +18,18 @@ defmodule Popcorn.WasmTest do
 
   describe "is_message/1" do
     test "matches messages from JS" do
-      assert Wasm.is_message({:wasm, %{"a" => 1}, %{}})
+      assert Wasm.is_message({:wasm, %{"a" => 1}})
     end
 
     test "rejects other terms" do
-      refute Wasm.is_message({:wasm, :payload})
+      refute Wasm.is_message({:wasm, :payload, :meta})
       refute Wasm.is_message({:other, :payload, :meta})
       refute Wasm.is_message(:wasm)
       refute Wasm.is_message("wasm")
     end
 
     test "is usable in a guard" do
-      assert match?(msg when Wasm.is_message(msg), {:wasm, :payload, :meta})
+      assert match?(msg when Wasm.is_message(msg), {:wasm, :payload})
     end
   end
 

@@ -1,5 +1,5 @@
 import { type Result, type SerializedError } from "./errors";
-import { tuple2, type Mapper } from "./etf";
+import { encode, type Mapper } from "./etf";
 import type {
   AnyValue,
   BeamBootOptions,
@@ -117,7 +117,6 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
 export function serializeSendPayload(
   target: BeamTarget,
   payload: AnyValue,
-  meta: AnyValue,
   mapper?: Mapper,
 ): Result<BeamSendPayload, "bridge:unserializable"> {
   if (isNameTarget(target)) {
@@ -126,7 +125,7 @@ export function serializeSendPayload(
     check(target.pid.byteLength > 0);
   }
 
-  const etf = tuple2(payload, meta, mapper);
+  const etf = encode(payload, mapper);
   if (!etf.ok) return etf;
   return { ok: true, data: { target, etf: etf.data } };
 }
