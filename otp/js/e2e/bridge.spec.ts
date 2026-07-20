@@ -1,5 +1,5 @@
 import { assert, evalOpts, expect, test, trimLeft } from "./helpers";
-import { tuple2 } from "../src/etf";
+import { encode } from "../src/etf";
 
 const PAYLOAD = {
   text: "zażółć",
@@ -24,15 +24,13 @@ const PAYLOAD = {
   nested: [{ value: "ok" }],
 };
 
-const META = { requestId: "req-1" };
-
 test("ETF sorts map keys", () => {
   assert.equal(hex({ b: 2, a: 1 }), hex({ a: 1, b: 2 }));
 });
 
 test("ETF accepts null-prototype plain objects", () => {
   const value = Object.assign(Object.create(null), { key: "value" });
-  assert(tuple2(value, {}).ok);
+  assert(encode(value).ok);
 });
 
 for (const [name, value, reason] of [
@@ -46,7 +44,7 @@ for (const [name, value, reason] of [
   ["non-plain object", new Date(), "non-plain-object"],
 ] as const) {
   test(`ETF reports ${name}`, () => {
-    const result = tuple2(value, {});
+    const result = encode(value);
     assert(!result.ok);
     assert.equal(result.error.t, "bridge:unserializable");
     assert.equal(result.error.data.data, value);
@@ -58,7 +56,7 @@ for (const [name, value, reason] of [
 test("ETF reports cyclic values", () => {
   const value: unknown[] = [];
   value.push(value);
-  const result = tuple2(value, {});
+  const result = encode(value);
   assert(!result.ok);
   assert.equal(result.error.data.data, value);
   assert.equal(result.error.data.part, value);
@@ -79,7 +77,7 @@ test("ETF encodes enumerable string properties", () => {
   assert.equal(hex(accessor), hex({ value: true }));
   assert.equal(hex(extendedArray), hex([]));
   const sparse = new Array(1);
-  const result = tuple2(sparse, {});
+  const result = encode(sparse);
   assert(!result.ok);
   assert.equal(result.error.data.data, sparse);
   assert.equal(result.error.data.part, undefined);
@@ -94,22 +92,12 @@ test("ETF reports unsupported nested values", () => {
     [[fn], fn],
     [{ value: symbol }, symbol],
   ] as const) {
-    const result = tuple2(value, {});
+    const result = encode(value);
     assert(!result.ok);
     assert.equal(result.error.data.data, value);
     assert.equal(result.error.data.part, part);
     assert.equal(result.error.data.reason, "unsupported");
   }
-});
-
-test("ETF reports the failing metadata part with the full payload", () => {
-  const data = { value: "ok" };
-  const part = new Date();
-  const result = tuple2(data, { part });
-  assert(!result.ok);
-  assert.equal(result.error.data.data, data);
-  assert.equal(result.error.data.part, part);
-  assert.equal(result.error.data.reason, "non-plain-object");
 });
 
 test("handles events in both directions", async ({ otp }) => {
@@ -137,20 +125,19 @@ test("handles events in both directions", async ({ otp }) => {
         <<"emptyMap">> => #{},
         <<"nested">> => [#{<<"value">> => <<"ok">>}]
       },
-      ExpectedMeta = #{<<"requestId">> => <<"req-1">>},
-      ExpectedEtf = base64:encode(term_to_binary({ExpectedPayload, ExpectedMeta})),
+      ExpectedEtf = base64:encode(term_to_binary(ExpectedPayload)),
       ok = wasm:send(#{etf_expected => ExpectedEtf}),
       ok = wasm:send(#{direct => true, nested => #{count => 1}}),
       true = register(bridge, self()),
       Loop = fun(F) ->
         ok = wasm:send(#{bridge_ready => true}),
         receive
-          {wasm, Payload, Meta} ->
-            Shape = case {Payload, Meta} of
-              {ExpectedPayload, ExpectedMeta} -> decoded;
+          {wasm, Payload} ->
+            Shape = case Payload of
+              ExpectedPayload -> decoded;
               _ -> unexpected
             end,
-            ok = wasm:send(#{reply => Payload, meta => Meta, shape => Shape})
+            ok = wasm:send(#{reply => Payload, shape => Shape})
         after 100 ->
             F(F)
         end
@@ -163,7 +150,7 @@ test("handles events in both directions", async ({ otp }) => {
   assert(boot.ok);
   const expectedEtf = await otp.waitForEvent("etf_expected");
   expect(expectedEtf).toEqual({
-    etf_expected: Buffer.from(encode(PAYLOAD, META)).toString("base64"),
+    etf_expected: Buffer.from(encodePayload(PAYLOAD)).toString("base64"),
   });
   await otp.waitForEvent("direct");
   expect(otp.events).toContainEqual({
@@ -173,15 +160,12 @@ test("handles events in both directions", async ({ otp }) => {
 
   await otp.waitForEvent("bridge_ready");
 
-  const send = await otp.send("bridge", structuredClone(PAYLOAD), {
-    meta: structuredClone(META),
-  });
+  const send = await otp.send("bridge", structuredClone(PAYLOAD));
   assert(send.ok);
 
   await otp.waitForEvent("reply");
   expect(otp.events).toContainEqual({
     reply: { ...PAYLOAD, nullValue: "nil" },
-    meta: META,
     shape: "decoded",
   });
 });
@@ -360,12 +344,12 @@ test("send() timeout", async ({ otp }) => {
   });
 });
 
-function hex(payload: unknown, meta: unknown = {}): string {
-  return Buffer.from(encode(payload, meta)).toString("hex");
+function hex(payload: unknown): string {
+  return Buffer.from(encodePayload(payload)).toString("hex");
 }
 
-function encode(payload: unknown, meta: unknown): Uint8Array<ArrayBuffer> {
-  const result = tuple2(payload, meta);
+function encodePayload(payload: unknown): Uint8Array<ArrayBuffer> {
+  const result = encode(payload);
   assert(result.ok);
   return result.data;
 }

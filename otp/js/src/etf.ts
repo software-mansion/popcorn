@@ -9,7 +9,6 @@ const VERSION = 0x83;
 const NEW_FLOAT_EXT = 0x46;
 const SMALL_INTEGER_EXT = 0x61;
 const INTEGER_EXT = 0x62;
-const SMALL_TUPLE_EXT = 0x68;
 const NIL_EXT = 0x6a;
 const LIST_EXT = 0x6c;
 const BINARY_EXT = 0x6d;
@@ -39,13 +38,12 @@ export class RawTerm {
 
 export type Mapper = (value: object) => object;
 
-export function tuple2(
+export function encode(
   data: unknown,
-  meta: unknown,
   mapper?: Mapper,
 ): Result<Uint8Array<ArrayBuffer>, "bridge:unserializable"> {
   try {
-    return { ok: true, data: new Encoder(mapper).tuple2(data, meta) };
+    return { ok: true, data: new Encoder(mapper).encode(data) };
   } catch (error) {
     let reason: UnserializableReason = "unsupported";
     let part = data;
@@ -68,12 +66,9 @@ class Encoder {
 
   public constructor(private readonly mapper: Mapper = (value) => value) {}
 
-  tuple2(left: unknown, right: unknown): Uint8Array<ArrayBuffer> {
+  encode(value: unknown): Uint8Array<ArrayBuffer> {
     this.byte(VERSION);
-    this.byte(SMALL_TUPLE_EXT);
-    this.byte(2);
-    this.value(left);
-    this.value(right);
+    this.value(value);
     return new Uint8Array(this.output);
   }
 

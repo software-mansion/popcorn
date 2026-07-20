@@ -41,9 +41,7 @@ defmodule Popcorn.Wasm do
 
   ## Receiving messages
 
-  Messages from JS have `{:wasm, payload, meta}` shape. `payload` is fully controlled by user,
-  `meta` contains user-controlled metadata (can be specific in JS options object).
-  <!-- TODO: remove `meta` -->
+  Messages from JS have `{:wasm, payload}` shape. `payload` is fully controlled by user.
 
   You can use `is_message/1` guard for filtering this type of messages.
 
@@ -84,7 +82,7 @@ defmodule Popcorn.Wasm do
   The payload is already decoded into Elixir terms. Only value serializable to JSON are supported.
   TrackedValues and PID handles are special-cased in communication.
   """
-  @type message :: {:wasm, payload :: term(), metadata :: term()}
+  @type message :: {:wasm, payload :: term()}
 
   @type run_js_opts :: [{:timeout, timeout()}]
 
@@ -92,7 +90,7 @@ defmodule Popcorn.Wasm do
   Matches a `t:message/0` sent from JavaScript.
   """
   defguard is_message(message)
-           when is_tuple(message) and tuple_size(message) == 3 and elem(message, 0) == :wasm
+           when is_tuple(message) and tuple_size(message) == 2 and elem(message, 0) == :wasm
 
   @doc """
   Returns true when running inside the Popcorn OTP runtime.

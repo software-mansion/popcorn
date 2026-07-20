@@ -11,7 +11,6 @@ import type {
   Popcorn,
   PopcornOpts,
   PopcornEvent,
-  PopcornSendOpts,
   OtpErrorPayload,
   Pid,
   SerializedError,
@@ -36,7 +35,6 @@ type Otp = {
   send(
     target: string | Pid,
     payload?: unknown,
-    opts?: PopcornSendOpts,
   ): Promise<BootResult>;
   waitForEvent(name: string): Promise<PopcornEvent>;
   deinit(): void;
@@ -195,11 +193,10 @@ export class OtpHandle {
   public async send(
     target: string,
     payload?: unknown,
-    opts?: PopcornSendOpts,
   ): Promise<BootResult> {
     const result = await this.otp.evaluate(
-      (otp, args) => otp.send(args.target, args.payload, args.opts),
-      { target, payload, opts },
+      (otp, args) => otp.send(args.target, args.payload),
+      { target, payload },
     );
     await this.syncEvents();
     return result;
@@ -338,9 +335,8 @@ function createOtp(id: string): Otp {
     public async send(
       target: string | Pid,
       payload?: unknown,
-      opts?: PopcornSendOpts,
     ): Promise<BootResult> {
-      const result = await this.popcorn.send(target, payload, opts);
+      const result = await this.popcorn.send(target, payload);
       if (result.ok) return { ok: true, data: null };
       return { ok: false, error: result.error.serialize() };
     }

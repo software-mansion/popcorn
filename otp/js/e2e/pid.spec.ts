@@ -8,7 +8,7 @@ test("injected send delivers to a named process (sync)", async ({ otp }) => {
       #{}
     ),
     receive
-      {wasm, Payload, _} ->
+      {wasm, Payload} ->
         #{<<"from_js">> := true} = Payload,
         ok = wasm:send(#{named_send_ok => true})
     end.
@@ -28,7 +28,7 @@ test("injected send works from a later timer callback", async ({ otp }) => {
       #{}
     ),
     receive
-      {wasm, Payload, _} ->
+      {wasm, Payload} ->
         #{<<"delayed">> := true} = Payload,
         ok = wasm:send(#{delayed_send_ok => true})
     end.
@@ -48,7 +48,7 @@ test("injected send addresses a pid passed via args", async ({ otp }) => {
       #{target => Self}
     ),
     receive
-      {wasm, Payload, _} ->
+      {wasm, Payload} ->
         #{<<"via_pid">> := true} = Payload,
         ok = wasm:send(#{pid_send_ok => true})
     end.
@@ -85,7 +85,7 @@ test("pid forwarded inside a send payload revives to a real pid", async ({
     Parent = self(),
     Receiver = spawn(fun() ->
       receive
-        {wasm, Payload, _} ->
+        {wasm, Payload} ->
           #{<<"forwarded">> := Pid} = Payload,
           Parent ! {forwarded_pid, Pid}
       end
