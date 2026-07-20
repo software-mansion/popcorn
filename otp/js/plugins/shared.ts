@@ -87,9 +87,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
       });
 
       if (!report.ok) {
-        throw new Error(
-          `[popcorn-otp] tarballs.exs failed: ${JSON.stringify(report.error)}`,
-        );
+        throw new Error(`[popcorn-otp] ${formatPackError(report.error)}`);
       }
 
       await Promise.all([
@@ -139,6 +137,36 @@ async function packTarballs({
 
   const { stdout } = await execFileAsync("elixir", args);
   return JSON.parse(stdout) as Report;
+}
+
+type MissingDepError = {
+  code: "missing_dep";
+  app: string;
+  dep: string;
+  provided_apps: string[];
+  user_apps: string[];
+};
+
+function isMissingDepError(error: unknown): error is MissingDepError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "missing_dep"
+  );
+}
+
+function formatPackError(error: unknown): string {
+  if (isMissingDepError(error)) {
+    const { app, dep, provided_apps, user_apps } = error;
+    return [
+      `${app} depends on ${dep}, which isn't packable.`,
+      `Apps provided by the runtime: ${provided_apps.join(", ")}.`,
+      `Apps in your project: ${user_apps.join(", ")}.`,
+      `Only these can be listed in applications/extra_applications.`,
+    ].join("\n  ");
+  }
+
+  return `tarballs.exs failed: ${JSON.stringify(error)}`;
 }
 
 async function copy(
