@@ -423,8 +423,8 @@ importers:
         specifier: ^12.3.0
         version: 12.3.0(rollup@4.60.3)(tslib@2.8.1)(typescript@5.9.3)
       '@swmansion/popcorn':
-        specifier: ^0.3.1
-        version: 0.3.1(esbuild@0.28.0)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0))
+        specifier: ^0.3.2
+        version: 0.3.2(esbuild@0.28.0)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0))
       '@types/phoenix':
         specifier: ^1.6.7
         version: 1.6.7
@@ -1956,8 +1956,8 @@ packages:
     peerDependencies:
       '@svgr/core': '*'
 
-  '@swmansion/popcorn@0.3.1':
-    resolution: {integrity: sha512-N+Qi09DKpt+FczWIh4geU+zeja9xgm8+MvuV8qrg7UPVkvStgjTjUeRYQqcaEuFrHmCfhWC2rYLnfvZIXd8Lkw==}
+  '@swmansion/popcorn@0.3.2':
+    resolution: {integrity: sha512-cdNJdgxDs3Uuw0LMf9bQKEVl4uZYYKv6+7pUT6nkhMwaZs0VEq5Lo7r8a75GoVAHLY7czkPPLF2C09wVxWY68g==}
     peerDependencies:
       esbuild: '>=0.17.0'
       rollup: '>=4.59.0'
@@ -5990,7 +5990,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@swmansion/popcorn@0.3.1(esbuild@0.28.0)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0))':
+  '@swmansion/popcorn@0.3.2(esbuild@0.28.0)(rollup@4.60.3)(vite@8.0.10(@types/node@25.6.0)(esbuild@0.28.0)(jiti@2.7.0))':
     optionalDependencies:
       esbuild: 0.28.0
       rollup: 4.60.3
