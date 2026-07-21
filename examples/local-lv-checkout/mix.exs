@@ -63,7 +63,8 @@ defmodule LocalLvCheckout.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:local_live_view, path: "../../local-live-view"}
+      {:local_live_view, path: "../../local-live-view"},
+      {:local, path: "local"}
     ]
   end
 

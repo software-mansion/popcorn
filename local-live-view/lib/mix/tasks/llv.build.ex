@@ -28,9 +28,15 @@ defmodule Mix.Tasks.Llv.Build do
   @runtime_files ~w(iframe.mjs AtomVM.mjs AtomVM.wasm)
 
   @impl Mix.Task
-  def run(_args) do
-    unless File.dir?("local") do
-      Mix.raise("local/ directory not found. Run `mix llv.install` first.")
+  def run(args) do
+    # `--local` points at the local (WASM) project. Defaults to "local" (a
+    # subdirectory of the host app); in an umbrella it's a sibling, e.g.
+    # `mix llv.build --local ../local`.
+    {opts, _} = OptionParser.parse!(args, strict: [local: :string])
+    local_dir = opts[:local] || "local"
+
+    unless File.dir?(local_dir) do
+      Mix.raise("#{local_dir}/ directory not found. Run `mix llv.install` first.")
     end
 
     llv_path = Mix.Project.deps_paths()[:local_live_view]
@@ -45,6 +51,6 @@ defmodule Mix.Tasks.Llv.Build do
     end
 
     Mix.shell().info("[llv] Building WASM bundle...")
-    0 = Mix.shell().cmd("mix build", cd: "local")
+    0 = Mix.shell().cmd("mix build", cd: local_dir)
   end
 end

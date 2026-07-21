@@ -51,7 +51,8 @@ defmodule Burrito.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:local_live_view,
-       path: System.get_env("LOCAL_LIVE_VIEW_PATH", "../../local-live-view"), runtime: false}
+       path: System.get_env("LOCAL_LIVE_VIEW_PATH", "../../local-live-view"), runtime: false},
+      {:local, path: "local"}
     ]
   end
 
