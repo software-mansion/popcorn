@@ -47,12 +47,12 @@ jobs:
       - name: Setup BEAM
         uses: ./.github/actions/setup-beam
 
-      - name: Restore dependencies cache
+      - name: Restore Mix cache
         uses: actions/cache@v4
         with:
           path: examples/local-lv-thermostat/deps
-          key: ${{ runner.os }}-mix-local_lv_thermostat-${{ hashFiles('examples/local-lv-thermostat/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_lv_thermostat-
+          key: ${{ runner.os }}-mix-local_lv_thermostat-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-thermostat/mix.exs', 'examples/local-lv-thermostat/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_thermostat-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
 
       - name: Install Hex dependencies
         run: mix deps.get
@@ -91,12 +91,12 @@ jobs:
         run: pnpm install
         working-directory: .
 
-      - name: Restore dependencies cache
+      - name: Restore Mix cache
         uses: actions/cache@v4
         with:
-          path: examples/local-lv-thermostat/local/deps
-          key: ${{ runner.os }}-mix-local_lv_thermostat_local-${{ hashFiles('examples/local-lv-thermostat/local/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_lv_thermostat_local-
+          path: examples/local-lv-thermostat/deps
+          key: ${{ runner.os }}-mix-local_lv_thermostat_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-thermostat/mix.exs', 'examples/local-lv-thermostat/local/mix.exs', 'examples/local-lv-thermostat/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_thermostat_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
 
       - name: Install Hex dependencies
         run: mix deps.get

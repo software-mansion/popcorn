@@ -49,12 +49,12 @@ jobs:
       - name: Setup BEAM
         uses: ./.github/actions/setup-beam
 
-      - name: Restore dependencies cache
+      - name: Restore Mix cache
         uses: actions/cache@v4
         with:
           path: examples/local-lv-forms/deps
-          key: ${{ runner.os }}-mix-local_lv_forms-${{ hashFiles('examples/local-lv-forms/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_lv_forms-
+          key: ${{ runner.os }}-mix-local_lv_forms-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-forms/mix.exs', 'examples/local-lv-forms/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_forms-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
 
       - name: Install Hex dependencies
         run: mix deps.get
@@ -93,12 +93,12 @@ jobs:
         run: pnpm install
         working-directory: .
 
-      - name: Restore dependencies cache
+      - name: Restore Mix cache
         uses: actions/cache@v4
         with:
-          path: examples/local-lv-forms/local/deps
-          key: ${{ runner.os }}-mix-local_lv_forms_local-${{ hashFiles('examples/local-lv-forms/local/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-local_lv_forms_local-
+          path: examples/local-lv-forms/deps
+          key: ${{ runner.os }}-mix-local_lv_forms_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-forms/mix.exs', 'examples/local-lv-forms/local/mix.exs', 'examples/local-lv-forms/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_forms_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
 
       - name: Install Hex dependencies
         run: mix deps.get
