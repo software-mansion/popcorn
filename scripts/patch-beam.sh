@@ -106,10 +106,31 @@ apply_patches() {
         cp -a "${OTP_ORIGINAL_DIR}" "${OTP_DIR}"
     fi
 
-    # Check if already patched
-    if [[ -f "${STAMP_FILE}" ]]; then
-        log "Patches already applied, skipping."
+    # The stamp records a hash of the patch set, not just that a patch ran.
+    # When otp/patches/ changes, the hash no longer matches and we re-apply —
+    # otherwise an edited patch is silently ignored and the built VM keeps
+    # running the previous protocol.
+    local patches_hash
+    patches_hash=$(echo "${patches}" | xargs cat | git hash-object --stdin)
+
+    if [[ -f "${STAMP_FILE}" ]] && [[ "$(cat "${STAMP_FILE}")" == "${patches_hash}" ]]; then
+        log "Patches already applied and up to date, skipping."
         return
+    fi
+
+    # Stamp exists but is stale: the tree was patched with an older patch set.
+    # git apply can't stack the new patch on top, so revert to pristine first.
+    if [[ -f "${STAMP_FILE}" ]]; then
+        log "Patch set changed since last apply; reverting sources to pristine..."
+        if [[ -d "${OTP_DIR}/.git" ]]; then
+            # Reset tracked files, then drop patch-added files. Build artifacts
+            # live in .git/info/exclude, so plain clean (no -x) preserves them.
+            git -C "${OTP_DIR}" reset --hard --quiet
+            git -C "${OTP_DIR}" clean -fdq
+        else
+            rm -rf "${OTP_DIR}"
+            cp -a "${OTP_ORIGINAL_DIR}" "${OTP_DIR}"
+        fi
     fi
 
     setup_git_excludes
@@ -122,7 +143,7 @@ apply_patches() {
         (cd "${OTP_DIR}" && git apply "${patch}")
     done <<< "${patches}"
 
-    touch "${STAMP_FILE}"
+    echo "${patches_hash}" > "${STAMP_FILE}"
     success "Patches applied."
 }
 
