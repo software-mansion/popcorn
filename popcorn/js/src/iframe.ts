@@ -34,6 +34,11 @@ type AtomVMModule = {
     | null;
   onGetTrackedObjects: ((keys: number[]) => string[]) | null;
   sendEvent: (eventName: string, payload: AnySerializable) => void;
+  trackWithCleanup: (
+    value: AnySerializable,
+    cleanupFn: () => void,
+  ) => TrackedValue;
+  releaseTracked: (key: number) => void;
 };
 
 let Module: AtomVMModule | null = null;
@@ -199,6 +204,24 @@ async function startVm(avmBundles: Int8Array[]): Promise<void> {
     payload: AnySerializable,
   ) => {
     sendIframeResponse(MESSAGES.EVENT, { eventName, payload });
+  };
+
+  moduleInstance["trackWithCleanup"] = (
+    value: AnySerializable,
+    cleanupFn: () => void,
+  ): TrackedValue => {
+    const key = moduleInstance["nextTrackedObjectKey"]();
+    let done = false;
+    moduleInstance["cleanupFunctions"].set(key, () => {
+      if (done) return;
+      done = true;
+      cleanupFn();
+    });
+    return new TrackedValue({ key, value });
+  };
+
+  moduleInstance["releaseTracked"] = (key: number): void => {
+    moduleInstance["onTrackedObjectDelete"]?.(key);
   };
 }
 
