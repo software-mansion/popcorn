@@ -41,6 +41,7 @@ defmodule LocalLvKanban.MixProject do
   defp deps do
     [
       {:local_live_view, path: "../../local-live-view"},
+      {:local, path: "local"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},

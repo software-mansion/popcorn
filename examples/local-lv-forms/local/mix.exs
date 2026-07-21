@@ -7,7 +7,10 @@ defmodule Local.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
+      deps_path: "../deps",
+      lockfile: "../mix.lock",
       deps: deps(),
+      elixirc_paths: elixirc_paths(Mix.target()),
       compilers: Mix.compilers(),
       aliases: aliases()
     ]
@@ -18,9 +21,19 @@ defmodule Local.MixProject do
   end
 
   def application do
+    [extra_applications: [:logger]] ++ app_mod(Mix.target())
+  end
+
+  defp elixirc_paths(:host), do: []
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp app_mod(:host), do: []
+  defp app_mod(_), do: [mod: {Local.Application, []}]
+
+  defp aliases do
     [
-      extra_applications: [:logger],
-      mod: {Local.Application, []}
+      build: ["deps.get", "popcorn.cook"],
+      dev: ["build", "popcorn.server"]
     ]
   end
 
@@ -28,13 +41,6 @@ defmodule Local.MixProject do
     [
       {:gettext, "~> 0.26"},
       {:local_live_view, path: "../../../local-live-view"}
-    ]
-  end
-
-  defp aliases do
-    [
-      build: ["deps.get", "popcorn.cook"],
-      dev: ["build", "popcorn.server"]
     ]
   end
 end

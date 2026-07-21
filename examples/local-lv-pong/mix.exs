@@ -41,6 +41,7 @@ defmodule LocalLvPong.MixProject do
   defp deps do
     [
       {:local_live_view, path: "../../local-live-view"},
+      {:local, path: "local"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
