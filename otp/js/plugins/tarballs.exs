@@ -160,7 +160,7 @@ defmodule Tarballs do
                 {:error, _} = error -> {:halt, error}
               end
             else
-              {:halt, err(:missing_dep, {app, dep})}
+              {:halt, err(:missing_dep, {app, dep, provided_apps, user_apps})}
             end
         end)
     end
@@ -259,8 +259,15 @@ defmodule Tarballs do
     {:error, %{code: "bad_provided_app_manifest", path: path}}
   end
 
-  defp err(:missing_dep, {app, dep}) do
-    {:error, %{code: "missing_dep", app: app, dep: dep}}
+  defp err(:missing_dep, {app, dep, provided_apps, user_apps}) do
+    {:error,
+     %{
+       code: "missing_dep",
+       app: app,
+       dep: dep,
+       provided_apps: provided_apps |> MapSet.to_list() |> Enum.sort(),
+       user_apps: user_apps |> Map.keys() |> Enum.sort()
+     }}
   end
 
   defp encode_json(term) do
