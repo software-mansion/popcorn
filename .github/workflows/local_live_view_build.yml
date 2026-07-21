@@ -111,41 +111,8 @@ jobs:
         run: pnpm run ci
         working-directory: local-live-view
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: Linux-playwright-local-live-view-${{ hashFiles('local-live-view/mix.lock') }}
-          save-always: true
-
-      # Workaround: `playwright install` hangs at archive extraction on GH runners
-      # (disk is fine, just stuck). Download + unzip with system tools instead,
-      # then create the marker file Playwright expects.
-      # TODO: switch to shared ./.github/actions/setup-playwright once our primary
-      # cache key is populated (it'll skip install entirely on cache hit).
-      - name: Install Chromium for Playwright (manual)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          sudo apt-get install -y libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-            libcups2 libxkbcommon0 libatspi2.0-0 libxdamage1 libpango-1.0-0 libcairo2
-
-          install_browser() {
-            local dir_name="$1" url="$2"
-            local target="$HOME/.cache/ms-playwright/$dir_name"
-            mkdir -p "$target"
-            curl -L --fail -o /tmp/browser.zip "$url"
-            unzip -q /tmp/browser.zip -d "$target"
-            touch "$target/INSTALLATION_COMPLETE"
-            rm /tmp/browser.zip
-          }
-
-          install_browser chromium-1148 \
-            https://playwright.azureedge.net/builds/chromium/1148/chromium-linux.zip
-          install_browser chromium_headless_shell-1148 \
-            https://playwright.azureedge.net/builds/chromium/1148/chromium-headless-shell-linux.zip
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
 
       - name: Lint
         run: mix lint
