@@ -13,7 +13,7 @@ on:
       - "scripts/_common.sh"
       - ".github/workflows/otp_js_e2e_test.yml"
       - ".github/actions/build-otp-wasm/action.yml"
-      - ".github/actions/setup-toolchain/action.yml"
+      - ".github/actions/setup-atomvm-builder/action.yml"
       - ".github/actions/setup-playwright/action.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"

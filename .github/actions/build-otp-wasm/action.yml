@@ -34,7 +34,7 @@ runs:
               find otp/patches -type f -print
               printf '%s\n' \
                 .github/actions/build-otp-wasm/action.yml \
-                .github/actions/setup-toolchain/action.yml \
+                .github/actions/setup-atomvm-builder/action.yml \
                 scripts/_common.sh \
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh \
@@ -47,7 +47,7 @@ runs:
             {
               printf '%s\n' \
                 .github/actions/build-otp-wasm/action.yml \
-                .github/actions/setup-toolchain/action.yml \
+                .github/actions/setup-atomvm-builder/action.yml \
                 scripts/_common.sh \
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh
@@ -67,9 +67,9 @@ runs:
       shell: bash
       run: echo "Using cached OTP WASM build from otp/out"
 
-    - name: Setup toolchain
+    - name: Setup WASM builder
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
-      uses: ./.github/actions/setup-toolchain
+      uses: ./.github/actions/setup-atomvm-builder
 
     - name: Install autoconf 2.72
       if: steps.otp-build-cache.outputs.cache-hit != 'true'

@@ -1,0 +1,12 @@
+name: Setup BEAM
+description: Install the Elixir and Erlang versions used by AtomVM applications
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Elixir
+      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      with:
+        elixir-version: "1.17.3"
+        otp-version: "26.0.2"
+        rebar3-version: "3.18.0"

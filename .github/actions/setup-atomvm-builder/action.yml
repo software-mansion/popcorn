@@ -1,0 +1,21 @@
+name: Setup AtomVM builder
+description: Install Emscripten and the system dependencies used to build AtomVM
+
+inputs:
+  with-emsdk:
+    description: Whether to install Emscripten for a WASM build
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup emsdk
+      if: inputs.with-emsdk == 'true'
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 4.0.8
+
+    - name: Install AtomVM dependencies
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y gperf libmbedtls-dev zlib1g-dev

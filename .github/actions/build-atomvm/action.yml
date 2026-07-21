@@ -45,6 +45,12 @@ runs:
         path: ${{ steps.canonical.outputs.dir }}
         key: atomvm-${{ runner.os }}-${{ steps.fvm-hash.outputs.hash }}-${{ inputs.build-mode }}-${{ steps.cmake-opts-hash.outputs.hash }}
 
+    - name: Setup AtomVM builder
+      if: steps.atomvm-cache.outputs.cache-hit != 'true'
+      uses: ./.github/actions/setup-atomvm-builder
+      with:
+        with-emsdk: ${{ contains(inputs.build-mode, 'wasm') }}
+
     - name: Build AtomVM
       if: steps.atomvm-cache.outputs.cache-hit != 'true'
       shell: bash

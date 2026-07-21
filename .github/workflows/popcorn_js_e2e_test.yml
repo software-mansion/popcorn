@@ -31,9 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 

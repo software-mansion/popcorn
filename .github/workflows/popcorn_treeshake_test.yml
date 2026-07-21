@@ -13,7 +13,7 @@ on:
       - "popcorn/elixir/test/treeshake/**"
       - "popcorn/elixir/test/fixtures/treeshake/**"
       - ".github/**"
-      - ".github/workflows/popcorn_treeshake_build_test.yml"
+      - ".github/workflows/popcorn_treeshake_test.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,8 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+      - name: Setup BEAM
+        uses: ./.github/actions/setup-beam
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
