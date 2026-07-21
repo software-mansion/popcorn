@@ -12,6 +12,7 @@ packages:
   - examples/eval-in-wasm/assets
   - examples/iex-wasm/assets
   - examples/game-of-life/assets
+  - examples/game-of-life-otp/assets
   - examples/local-lv-kanban/test/playwright
   - local-live-view
   - landing-page

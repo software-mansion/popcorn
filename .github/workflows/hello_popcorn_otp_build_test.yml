@@ -1,10 +1,11 @@
-name: Hello Popcorn OTP - Build & test
+name: OTP examples - Build & test
 
 on:
   push:
     branches: ["**"]
     paths:
       - "examples/hello-popcorn-otp/**"
+      - "examples/game-of-life-otp/**"
       - "otp/**"
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"
@@ -77,6 +78,26 @@ jobs:
         with:
           version: "1.60.0"
 
-      - name: Run tests
+      - name: Run Hello Popcorn OTP e2e tests
         run: pnpm test
         working-directory: examples/hello-popcorn-otp/assets
+
+      - name: Run Game of Life OTP unit tests
+        run: mix test
+        working-directory: examples/game-of-life-otp
+
+      - name: Run Game of Life OTP e2e tests
+        run: pnpm test
+        working-directory: examples/game-of-life-otp/assets
+
+      - name: Upload Playwright test artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-examples-playwright-results
+          path: |
+            examples/hello-popcorn-otp/assets/playwright-report/
+            examples/hello-popcorn-otp/assets/test-results/
+            examples/game-of-life-otp/assets/playwright-report/
+            examples/game-of-life-otp/assets/test-results/
+          if-no-files-found: ignore

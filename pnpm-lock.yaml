@@ -74,6 +74,19 @@ importers:
         specifier: ^0.25.0
         version: 0.25.12
 
+  examples/game-of-life-otp/assets:
+    dependencies:
+      '@swmansion/popcorn-otp':
+        specifier: workspace:*
+        version: link:../../../otp/js
+    devDependencies:
+      '@playwright/test':
+        specifier: ^1.60.0
+        version: 1.60.0
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+
   examples/game-of-life/assets:
     dependencies:
       '@swmansion/popcorn':
