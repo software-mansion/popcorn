@@ -70,7 +70,7 @@ jobs:
         uses: ./.github/actions/build-atomvm
         with:
           build-mode: debug-wasm
-          outdir: popcorn/js/assets
+          output-directories: popcorn/js/assets
 
       - name: Build Popcorn JS release
         run: pnpm build:release

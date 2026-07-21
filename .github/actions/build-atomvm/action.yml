@@ -2,14 +2,11 @@ name: Build AtomVM
 description: Cache and build AtomVM artifacts for a specific mode
 
 inputs:
-  working-directory:
-    description: Working directory to run the build from
-    default: "."
   build-mode:
     description: AtomVM build mode (debug-wasm, debug-unix, etc.)
     required: true
-  outdir:
-    description: Output directory for AtomVM build (relative to working-directory)
+  output-directories:
+    description: Newline-separated output directories relative to the repository root
     required: true
   cmake-opts:
     description: Additional cmake options for AtomVM build
@@ -59,10 +56,14 @@ runs:
           "$SCRIPT_PATH" --outdir "${{ steps.canonical.outputs.dir }}" "${{ inputs.build-mode }}"
         fi
 
-    - name: Copy AtomVM to consumer directory
+    - name: Copy AtomVM to output directories
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: ${{ github.workspace }}
       run: |
         set -euo pipefail
-        mkdir -p "${{ inputs.outdir }}"
-        cp -a "${{ steps.canonical.outputs.dir }}/." "${{ inputs.outdir }}/"
+        while IFS= read -r output_directory; do
+          if [ -n "$output_directory" ]; then
+            mkdir -p "$output_directory"
+            cp -a "${{ steps.canonical.outputs.dir }}/." "$output_directory/"
+          fi
+        done <<< "${{ inputs.output-directories }}"

@@ -76,17 +76,15 @@ jobs:
       - name: Build AtomVM
         uses: ./.github/actions/build-atomvm
         with:
-          working-directory: local-live-view
           build-mode: debug-wasm
-          outdir: popcorn_runtime_source/artifacts/wasm
+          output-directories: |
+            local-live-view/popcorn_runtime_source/artifacts/wasm
+            popcorn/js/assets
           cmake-opts: "SANITIZER=OFF"
 
       - name: Build Popcorn JS release
-        run: |
-          mkdir -p popcorn/js/assets
-          cp local-live-view/popcorn_runtime_source/artifacts/wasm/AtomVM.{mjs,wasm} popcorn/js/assets/
-          pnpm --filter @swmansion/popcorn build:release
-        working-directory: .
+        run: pnpm build:release
+        working-directory: popcorn/js
 
       - name: Configure runtime source
         run: |
