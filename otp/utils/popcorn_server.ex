@@ -25,6 +25,11 @@ defmodule Mix.Tasks.Popcorn.Server do
 
   defmacrop server_script do
     quote do
+      # Plug.Logger writes `µs` in request timings; keep stdout unicode so the
+      # byte survives the trip through the parent's port instead of arriving as
+      # raw latin-1.
+      :io.setopts(:standard_io, encoding: :unicode)
+
       Mix.install([:bandit, :plug])
 
       defmodule Popcorn.DevServer.Router do
