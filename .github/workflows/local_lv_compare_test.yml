@@ -34,7 +34,7 @@ jobs:
   # with Phoenix.LiveViewTest (no AtomVM involved).
   online:
     name: Online (Phoenix LiveView, BEAM)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     defaults:
@@ -64,7 +64,7 @@ jobs:
   # We test it headless on the native (unix) AtomVM through Popcorn.Support.AtomVM.
   offline-atomvm:
     name: Offline (LocalLiveView, AtomVM)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     defaults:
@@ -83,7 +83,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
+          # See https://github.com/nodejs/node/issues/63487.
+          node-version: "24.15.0"
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
