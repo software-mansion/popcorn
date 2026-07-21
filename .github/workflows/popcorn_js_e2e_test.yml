@@ -49,8 +49,14 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install
 
-      - name: Build popcorn JS package
-        run: pnpm build:prod
+      - name: Build AtomVM
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-wasm
+          outdir: popcorn/js/assets
+
+      - name: Build Popcorn JS release
+        run: pnpm build:release
         working-directory: popcorn/js
 
       - name: Setup Playwright

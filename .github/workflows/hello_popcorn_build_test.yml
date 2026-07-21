@@ -75,6 +75,13 @@ jobs:
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
+      - name: Build Popcorn JS release
+        run: |
+          mkdir -p popcorn/js/assets
+          cp examples/hello-popcorn/popcorn_runtime_source/artifacts/wasm/AtomVM.{mjs,wasm} popcorn/js/assets/
+          pnpm --filter @swmansion/popcorn build:release
+        working-directory: .
+
       - name: Compile Hex dependencies
         run: mix deps.compile
 

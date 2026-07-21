@@ -81,6 +81,13 @@ jobs:
           outdir: popcorn_runtime_source/artifacts/wasm
           cmake-opts: "SANITIZER=OFF"
 
+      - name: Build Popcorn JS release
+        run: |
+          mkdir -p popcorn/js/assets
+          cp local-live-view/popcorn_runtime_source/artifacts/wasm/AtomVM.{mjs,wasm} popcorn/js/assets/
+          pnpm --filter @swmansion/popcorn build:release
+        working-directory: .
+
       - name: Configure runtime source
         run: |
           printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs

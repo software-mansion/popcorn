@@ -66,14 +66,3 @@ runs:
         set -euo pipefail
         mkdir -p "${{ inputs.outdir }}"
         cp -a "${{ steps.canonical.outputs.dir }}/." "${{ inputs.outdir }}/"
-
-    - name: Build Popcorn JS
-      if: contains(inputs.build-mode, 'wasm')
-      shell: bash
-      run: |
-        if command -v pnpm &> /dev/null; then
-          ARTIFACTS="${{ github.workspace }}/${{ inputs.working-directory }}/${{ inputs.outdir }}"
-          mkdir -p popcorn/js/assets
-          cp "$ARTIFACTS"/AtomVM.mjs "$ARTIFACTS"/AtomVM.wasm popcorn/js/assets/
-          pnpm --filter @swmansion/popcorn exec rollup -c
-        fi
