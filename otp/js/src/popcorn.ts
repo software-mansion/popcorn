@@ -15,6 +15,7 @@ import type {
   OtpErrorPayload,
   Pid,
   RunJsRequest,
+  TtySize,
 } from "./types";
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
@@ -23,20 +24,30 @@ type PendingTracked = TrackedEntry & { key: number };
 
 const TRACKED_REF_KEY = "popcorn_ref";
 const PID_REF_KEY = "popcorn_pid";
+const UTF8 = new TextEncoder();
+const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
+const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 
 export type PopcornOpts = {
-  beam: Pick<BeamBootOptions, "manifestUrl" | "emulatorArgs" | "extraArgs">;
+  beam: Pick<
+    BeamBootOptions,
+    "manifestUrl" | "emulatorArgs" | "extraArgs" | "env"
+  >;
+  ttySize?: TtySize;
   timeoutsMs?: {
     boot?: number;
     send?: number;
   };
-  onStdout?: (text: string) => void;
-  onStderr?: (text: string) => void;
+  onStdout?: (chunk: Uint8Array) => void;
+  onStderr?: (chunk: Uint8Array) => void;
   onError?: (event: OtpErrorPayload) => void;
   workerUrl?: string | URL;
 };
 
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
+type ResolvedPopcornOpts = Omit<PopcornOpts, "ttySize"> & {
+  ttySize: TtySize;
+};
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
   send: 5_000,
@@ -154,7 +165,7 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
 export class Popcorn {
   private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
-  private readonly opts: PopcornOpts;
+  private readonly opts: ResolvedPopcornOpts;
   private requestSeq = 0;
   private settleBoot: ((result: Result<Popcorn>) => void) | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
@@ -163,6 +174,7 @@ export class Popcorn {
   private callSeq = 0;
   private readonly trackedValues = new Map<number, TrackedEntry>();
   private trackedKeySeq = 0;
+  private io = createIoState();
 
   public readonly genserver: GenServer = {
     call: (target, request, opts) => this.call(target, request, opts),
@@ -179,7 +191,6 @@ export class Popcorn {
   private Pid = createPidClass();
   private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
     const data = readWorkerEvent(event.data);
-    check(data !== null);
 
     switch (data.type) {
       case "popcorn:boot-end":
@@ -200,6 +211,10 @@ export class Popcorn {
       case "otp:stderr":
         this.handleStderr(data.payload);
         return;
+      case "otp:stdin-consumed":
+        check(data.payload > 0 && data.payload <= this.io.stdin.reservedBytes);
+        this.io.stdin.reservedBytes -= data.payload;
+        return;
       case "otp:error":
         this.handleOtpError(data.payload);
         return;
@@ -213,6 +228,8 @@ export class Popcorn {
   };
 
   public constructor(opts: PopcornOpts) {
+    const ttySize = opts.ttySize ?? DEFAULT_TTY_SIZE;
+    check(isValidTtySize(ttySize));
     this.opts = {
       ...opts,
       beam: {
@@ -221,6 +238,7 @@ export class Popcorn {
           opts.beam.emulatorArgs ??
           schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
       },
+      ttySize: { ...ttySize },
     };
     this.spawnWorker();
   }
@@ -266,6 +284,7 @@ export class Popcorn {
     }
 
     this.Pid = createPidClass();
+    this.io = createIoState();
     this.state = { status: "booting" };
 
     return await new Promise<Result<Popcorn>>((resolve) => {
@@ -289,7 +308,6 @@ export class Popcorn {
 
       const onBootMessage = (event: MessageEvent<unknown>) => {
         const data = readWorkerEvent(event.data);
-        check(data !== null);
 
         switch (data.type) {
           case "popcorn:boot-end":
@@ -313,8 +331,59 @@ export class Popcorn {
       };
 
       this.vmWorker.addEventListener("message", onBootMessage);
-      toVm(this.vmWorker, { type: "popcorn:boot", payload: this.opts.beam });
+      toVm(this.vmWorker, {
+        type: "popcorn:boot",
+        payload: { ...this.opts.beam, ttySize: this.opts.ttySize },
+      });
     });
+  }
+
+  public writeStdin(chunk: string | Uint8Array): Result<null> {
+    if (this.state.status === "closed") {
+      return { ok: false, error: this.state.error };
+    }
+    check(this.state.status === "booted");
+    check(
+      !this.io.stdin.closed,
+      "ctrl-d (byte 0x04) was sent to input stream before, stdin is closed",
+    );
+
+    const bytes = toBytes(chunk);
+    check(bytes.byteLength > 0);
+    if (isEof(bytes)) {
+      this.io.stdin.closed = true;
+      toVm(this.vmWorker, { type: "popcorn:stdin-close", payload: {} });
+      return { ok: true, data: null };
+    }
+
+    const attemptedBytes = this.io.stdin.reservedBytes + bytes.byteLength;
+    if (attemptedBytes > STDIN_QUEUE_CAPACITY_BYTES) {
+      const error = err("stdio:overflow", {
+        capacityBytes: STDIN_QUEUE_CAPACITY_BYTES,
+        attemptedBytes,
+      });
+      return { ok: false, error };
+    }
+
+    this.io.stdin.reservedBytes = attemptedBytes;
+    const event = { type: "popcorn:stdin", payload: { chunk: bytes } } as const;
+    toVm(this.vmWorker, event, [bytes.buffer]);
+
+    return { ok: true, data: null };
+  }
+
+  public resizeTty(columns: number, rows: number): Result<null> {
+    if (this.state.status === "closed") {
+      return { ok: false, error: this.state.error };
+    }
+    check(this.state.status === "booted");
+    check(isValidTtySize({ columns, rows }));
+
+    toVm(this.vmWorker, {
+      type: "popcorn:tty-resize",
+      payload: { columns, rows },
+    });
+    return { ok: true, data: null };
   }
 
   /**
@@ -672,14 +741,14 @@ export class Popcorn {
     return `send:${this.requestSeq}`;
   }
 
-  private handleStdout(text: string): void {
+  private handleStdout(chunk: Uint8Array): void {
     const onStdout = this.opts.onStdout ?? defaultOnStdout;
-    onStdout(text);
+    onStdout(chunk);
   }
 
-  private handleStderr(text: string): void {
+  private handleStderr(chunk: Uint8Array): void {
     const onStderr = this.opts.onStderr ?? defaultOnStderr;
-    onStderr(text);
+    onStderr(chunk);
   }
 
   private handleOtpError(payload: OtpErrorPayload): void {
@@ -715,6 +784,30 @@ export function schedulers(opts: SchedulerOptions): string[] {
   check(dirtyIo > 0);
 
   return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
+}
+
+function isValidTtySize({ columns, rows }: TtySize): boolean {
+  const colInRange = 0 < columns && columns <= 0xffff;
+  const rowInRange = 0 < rows && rows <= 0xffff;
+  return colInRange && rowInRange;
+}
+
+function createIoState() {
+  return {
+    stdin: {
+      closed: false,
+      reservedBytes: 0,
+    },
+  };
+}
+
+function toBytes(chunk: string | Uint8Array): Uint8Array {
+  return typeof chunk === "string" ? UTF8.encode(chunk) : chunk.slice();
+}
+
+function isEof(bytes: Uint8Array): boolean {
+  const CTRL_D_BYTE = 0x04;
+  return bytes.byteLength === 1 && bytes[0] === CTRL_D_BYTE;
 }
 
 function exitReason(payload: OtpErrorPayload): VmExitReason {
@@ -766,12 +859,12 @@ function canEval(): boolean {
   }
 }
 
-function defaultOnStdout(text: string): void {
-  console.log(`${LOG_PREFIX} stdout:`, text);
+function defaultOnStdout(chunk: Uint8Array): void {
+  console.log(`${LOG_PREFIX} stdout:`, chunk);
 }
 
-function defaultOnStderr(text: string): void {
-  console.error(`${LOG_PREFIX} stderr:`, text);
+function defaultOnStderr(chunk: Uint8Array): void {
+  console.error(`${LOG_PREFIX} stderr:`, chunk);
 }
 
 function defaultOnError(payload: OtpErrorPayload): void {

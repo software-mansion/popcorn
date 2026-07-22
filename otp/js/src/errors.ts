@@ -1,6 +1,9 @@
 export type Result<T, E extends Tag = Tag> =
   | { ok: true; data: T }
-  | { ok: false; error: PopcornError<E> };
+  | {
+      ok: false;
+      error: PopcornError<E>;
+    };
 
 type Tag = keyof PopcornErrors;
 export type PopcornErrors = {
@@ -16,6 +19,7 @@ export type PopcornErrors = {
   "genserver:noproc": { target: string };
   "genserver:exit": { reason: string };
   "genserver:unserializable": EmptyData;
+  "stdio:overflow": { capacityBytes: number; attemptedBytes: number };
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
@@ -123,6 +127,8 @@ function message(error: SerializedError): string {
       return `Genserver exited: ${error.data.reason}`;
     case "genserver:unserializable":
       return "Genserver reply can't be serialized to JSON";
+    case "stdio:overflow":
+      return `Stdin chunk exceeds the ${error.data.capacityBytes} byte queue capacity`;
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
@@ -167,6 +173,9 @@ function parse(value: unknown): SerializedError {
     case "bridge:listener-not-found":
       check(isListenerNotFoundData(value.data));
       return { t: value.t, data: value.data };
+    case "stdio:overflow":
+      check(isStdioOverflowData(value.data));
+      return { t: value.t, data: value.data };
     case "beam:missing-boot-script":
     case "beam:missing-manifest":
       check(isUrlData(value.data));
@@ -186,9 +195,7 @@ function parse(value: unknown): SerializedError {
   }
 }
 
-function isTimeoutData(
-  value: unknown,
-): value is PopcornErrors["timeout:init"] {
+function isTimeoutData(value: unknown): value is PopcornErrors["timeout:init"] {
   return objectWithKeys(value, ["timeoutMs"]) !== null;
 }
 
@@ -206,6 +213,12 @@ function isListenerNotFoundData(
   value: unknown,
 ): value is PopcornErrors["bridge:listener-not-found"] {
   return objectWithKeys(value, ["targetName"]) !== null;
+}
+
+function isStdioOverflowData(
+  value: unknown,
+): value is PopcornErrors["stdio:overflow"] {
+  return objectWithKeys(value, ["capacityBytes", "attemptedBytes"]) !== null;
 }
 
 function isUnserializableData(
