@@ -7,14 +7,29 @@ import type {
   BeamSendPayload,
   BeamTarget,
 } from "./types";
-import { base64ToBytes, check, objectWithKeys } from "./utils";
+import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
   payload: Pick<
     BeamBootOptions,
-    "manifestUrl" | "emulatorArgs" | "extraArgs"
+    "manifestUrl" | "emulatorArgs" | "extraArgs" | "env" | "ttySize"
   >;
+};
+
+type StdinEvent = {
+  type: "popcorn:stdin";
+  payload: { chunk: Uint8Array };
+};
+
+type StdinCloseEvent = {
+  type: "popcorn:stdin-close";
+  payload: {};
+};
+
+type TtyResizeEvent = {
+  type: "popcorn:tty-resize";
+  payload: { columns: number; rows: number };
 };
 
 type SendEvent = {
@@ -37,8 +52,7 @@ export type SendRequestPayload = {
 };
 
 export type SerializedSendResult =
-  | { ok: true; data: null }
-  | { ok: false; error: SerializedError };
+  { ok: true; data: null } | { ok: false; error: SerializedError };
 
 export type SendCompletionPayload = {
   id: string;
@@ -54,7 +68,13 @@ type BootEndEvent =
   | { type: "popcorn:boot-end"; payload: {} }
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
-export type MainToVmEvent = BootEvent | SendEvent | RunJsReplyEvent;
+export type MainToVmEvent =
+  | BootEvent
+  | SendEvent
+  | RunJsReplyEvent
+  | StdinEvent
+  | StdinCloseEvent
+  | TtyResizeEvent;
 
 export type PopcornEvent = AnyValue;
 
@@ -79,27 +99,26 @@ type BridgeEnvelope =
       return: "value" | "ref";
     };
 
-export function readMainEvent(value: unknown): MainToVmEvent | null {
+export function readMainEvent(value: unknown): MainToVmEvent {
   const data = objectWithKeys(value, ["type", "payload"]);
-  if (data === null || typeof data.type !== "string") {
-    return null;
-  }
+  check(data !== null && typeof data.type === "string");
 
   switch (data.type) {
     case "popcorn:boot":
+    case "popcorn:stdin":
+    case "popcorn:stdin-close":
+    case "popcorn:tty-resize":
     case "popcorn:send":
     case "popcorn:run-js-reply":
       return data as MainToVmEvent;
     default:
-      return null;
+      unreachable();
   }
 }
 
-export function readWorkerEvent(value: unknown): VmToMainEvent | null {
+export function readWorkerEvent(value: unknown): VmToMainEvent {
   const data = objectWithKeys(value, ["type", "payload"]);
-  if (data === null || typeof data.type !== "string") {
-    return null;
-  }
+  check(data !== null && typeof data.type === "string");
 
   switch (data.type) {
     case "otp:stdout":
@@ -112,8 +131,11 @@ export function readWorkerEvent(value: unknown): VmToMainEvent | null {
     case "popcorn:boot-fail":
     case "popcorn:send-end":
       return data as VmToMainEvent;
+    case "otp:stdin-consumed":
+      check(Number(data.payload) > 0);
+      return data as VmToMainEvent;
     default:
-      return null;
+      unreachable();
   }
 }
 
@@ -186,7 +208,14 @@ export function toVm(
 
 /** Usable only from webworkers. */
 export function toMain(event: VmToMainEvent): void {
-  self.postMessage(event);
+  self.postMessage(event, { transfer: getTransferables(event) });
+}
+
+function getTransferables(event: VmToMainEvent): Transferable[] {
+  const isTtyEvent = event.type === "otp:stdout" || event.type === "otp:stderr";
+  if (!isTtyEvent) return [];
+  check(event.payload.buffer instanceof ArrayBuffer);
+  return [event.payload.buffer];
 }
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {

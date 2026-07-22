@@ -17,13 +17,16 @@ export type BeamBootOptions = {
   manifestUrl: string;
   emulatorArgs?: string[];
   extraArgs?: string[];
+  env?: Record<string, string>;
+  ttySize: TtySize;
   createModule: CreateModuleFn<EmscriptenModule>;
   emit: (event: BeamEvent) => void;
 };
 
 export type BeamEvent =
-  | { type: "otp:stdout"; payload: string }
-  | { type: "otp:stderr"; payload: string }
+  | { type: "otp:stdout"; payload: Uint8Array }
+  | { type: "otp:stderr"; payload: Uint8Array }
+  | { type: "otp:stdin-consumed"; payload: number }
   | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue }
   | { type: "otp:run_js"; payload: RunJsRequest }
@@ -41,6 +44,11 @@ export type OtpErrorPayload =
   | { kind: "error"; data: string }
   | { kind: "exit"; data: number };
 
+export type TtySize = {
+  columns: number;
+  rows: number;
+};
+
 export type EmscriptenFS = {
   mkdir: (path: string) => void;
   writeFile: (path: string, data: Uint8Array) => void;
@@ -50,11 +58,20 @@ export type EmscriptenFS = {
   ) => Uint8Array | string;
 };
 
+type TtyWrite = (
+  stream: { fd: number },
+  buffer: Uint8Array,
+  offset: number,
+  length: number,
+  position: number,
+) => number;
+
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
   ENV: Record<string, string>;
   FS: EmscriptenFS;
   HEAPU8: Uint8Array;
+  TTY: { stream_ops: { write: TtyWrite } };
   ccall: (
     ident: string,
     returnType: string | null,
@@ -71,6 +88,7 @@ export type EmscriptenModule = {
   _free: (ptr: number) => void;
   onBeamMessage?: (text: string) => void | Promise<void>;
   onError?: (text: string) => void | Promise<void>;
+  onStdinConsumed?: (size: number) => void;
   onTrackedValueDelete?: (key: number) => void;
   addRunDependency: (id: string) => void;
   removeRunDependency: (id: string) => void;

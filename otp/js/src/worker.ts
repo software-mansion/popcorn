@@ -9,7 +9,6 @@ let instance: EmscriptenModule | null = null;
 
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const data = readMainEvent(event.data);
-  check(data !== null);
 
   switch (data.type) {
     case "popcorn:boot": {
@@ -19,6 +18,8 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         manifestUrl: data.payload.manifestUrl,
         emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
+        env: data.payload.env,
+        ttySize: data.payload.ttySize,
         createModule,
         emit: toMain,
       });
@@ -50,6 +51,34 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     case "popcorn:run-js-reply": {
       // ignore the `send()` result, process could've died
       send(instance, data.payload.message);
+      break;
+    }
+    case "popcorn:stdin": {
+      check(instance !== null);
+      const status = instance.ccall(
+        "popcornStdinEnqueue",
+        "number",
+        ["array", "number"],
+        [data.payload.chunk, data.payload.chunk.byteLength],
+      );
+      check(status === 0);
+      break;
+    }
+    case "popcorn:stdin-close": {
+      check(instance !== null);
+      const status = instance.ccall("popcornStdinClose", "number", [], []);
+      check(status === 0);
+      break;
+    }
+    case "popcorn:tty-resize": {
+      check(instance !== null);
+      const status = instance.ccall(
+        "popcornTtyResize",
+        "number",
+        ["number", "number"],
+        [data.payload.columns, data.payload.rows],
+      );
+      check(status === 0);
       break;
     }
     default:
