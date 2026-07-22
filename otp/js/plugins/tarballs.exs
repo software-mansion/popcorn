@@ -8,7 +8,8 @@ defmodule Tarballs do
     root_dir: :string,
     entrypoint_app: :string,
     out_dir: :string,
-    provided_apps_manifest_path: :string
+    provided_apps_manifest_path: :string,
+    strip: :boolean
   ]
 
   @required_options [:root_dir, :out_dir, :provided_apps_manifest_path]
@@ -26,6 +27,37 @@ defmodule Tarballs do
         |> encode_json()
         |> IO.puts()
     end
+  end
+
+  defp strip_tarball(path, out_dir) do
+    {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
+
+    stripped =
+      entries
+      |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
+      |> Enum.map(&strip_entry/1)
+
+    output = Path.join(out_dir, Path.basename(path))
+    opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
+
+    :ok = :erl_tar.create(to_charlist(output), stripped, opts)
+  end
+
+  defp strip_entry({name, content}) do
+    is_beam? = fn path -> Path.extname(path) == ".beam" end
+
+    with true <- is_beam?.(to_string(name)),
+         {:ok, {_module, stripped}} <- strip_beam(content) do
+      {name, stripped}
+    else
+      _ -> {name, content}
+    end
+  end
+
+  defp strip_beam(content) do
+    :beam_lib.strip(content)
+  rescue
+    _error -> :error
   end
 
   defp run(argv) do
@@ -65,6 +97,8 @@ defmodule Tarballs do
         |> Map.values()
         |> Enum.map(&Path.expand(Path.join(args.out_dir, &1.tar)))
 
+      tar_paths = maybe_strip_tarballs(tar_paths ++ args.tar_paths, args.strip, args.out_dir)
+
       manifest = %{
         entrypoint: args.entrypoint_app,
         apps: manifest_apps,
@@ -84,6 +118,15 @@ defmodule Tarballs do
          notes: notes
        }}
     end
+  end
+
+  defp maybe_strip_tarballs(paths, false, _out_dir), do: paths
+
+  defp maybe_strip_tarballs(paths, true, out_dir) do
+    Enum.map(paths, fn path ->
+      :ok = strip_tarball(path, out_dir)
+      Path.expand(Path.join(out_dir, Path.basename(path)))
+    end)
   end
 
   defp fetch_user_apps(root_dir) do
@@ -227,13 +270,20 @@ defmodule Tarballs do
   end
 
   defp parse_argv(argv) do
-    {opts, _rest, invalid} = OptionParser.parse(argv, strict: @options)
+    {opts, tar_paths, invalid} = OptionParser.parse(argv, strict: @options)
 
     missing_opts = Enum.reject(@required_options, &Keyword.has_key?(opts, &1))
 
     case {invalid, missing_opts} do
       {[], []} ->
-        {:ok, opts |> Map.new() |> Map.put_new(:entrypoint_app, nil)}
+        args =
+          opts
+          |> Map.new()
+          |> Map.put_new(:entrypoint_app, nil)
+          |> Map.put_new(:strip, false)
+          |> Map.put(:tar_paths, tar_paths)
+
+        {:ok, args}
 
       _ ->
         err(:bad_args, {invalid, missing_opts})
