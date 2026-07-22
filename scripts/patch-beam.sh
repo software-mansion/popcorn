@@ -12,6 +12,7 @@
 #   --without-zstd
 #   --without-native-sockets
 #   --without-distribution
+#   --without-crash-dumps
 #   -h, --help    Show this help
 #
 # Requires otp/sources/otp to exist (created by build-beam.sh).
@@ -102,6 +103,7 @@ apply_patches() {
     [[ "${WITHOUT_ZSTD}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0001-without-zstd.patch")
     [[ "${WITHOUT_NATIVE_SOCKETS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0002-without-native-sockets.patch")
     [[ "${WITHOUT_DISTRIBUTION}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0003-without-distribution.patch")
+    [[ "${WITHOUT_CRASH_DUMPS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0004-without-crash-dumps.patch")
 
     local patches_list
     patches_list=$(printf '%s\n' "${patches[@]}")
@@ -193,6 +195,7 @@ main() {
     WITHOUT_ZSTD=false
     WITHOUT_NATIVE_SOCKETS=false
     WITHOUT_DISTRIBUTION=false
+    WITHOUT_CRASH_DUMPS=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -213,6 +216,10 @@ main() {
                 ;;
             --without-distribution)
                 WITHOUT_DISTRIBUTION=true
+                shift
+                ;;
+            --without-crash-dumps)
+                WITHOUT_CRASH_DUMPS=true
                 shift
                 ;;
             *)

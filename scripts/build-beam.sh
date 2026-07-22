@@ -15,6 +15,7 @@
 #                         Exclude the native inet driver
 #   --without-distribution
 #                         Exclude remote distribution
+#   --without-crash-dumps Exclude filesystem crash dump generation
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
@@ -66,6 +67,7 @@ Options:
                         Exclude the native inet driver
   --without-distribution
                         Exclude remote distribution
+  --without-crash-dumps Exclude filesystem crash dump generation
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
@@ -474,6 +476,7 @@ main() {
     local without_zstd=false
     local without_native_sockets=false
     local without_distribution=false
+    local without_crash_dumps=false
     local clean=false
     local jobs=""
     local mode=""
@@ -497,6 +500,10 @@ main() {
                 ;;
             --without-distribution)
                 without_distribution=true
+                shift
+                ;;
+            --without-crash-dumps)
+                without_crash_dumps=true
                 shift
                 ;;
             --otp-tag)
@@ -541,6 +548,7 @@ main() {
         without_zstd=true
         without_native_sockets=true
         without_distribution=true
+        without_crash_dumps=true
     fi
 
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
@@ -571,6 +579,7 @@ main() {
     [[ "${without_zstd}" == "true" ]] && patch_args+=(--without-zstd)
     [[ "${without_native_sockets}" == "true" ]] && patch_args+=(--without-native-sockets)
     [[ "${without_distribution}" == "true" ]] && patch_args+=(--without-distribution)
+    [[ "${without_crash_dumps}" == "true" ]] && patch_args+=(--without-crash-dumps)
     patch_otp "${patch_args[@]}"
 
     run_autoconf "${beam_dir}"
