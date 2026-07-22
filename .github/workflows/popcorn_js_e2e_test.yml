@@ -21,6 +21,7 @@ permissions:
 
 env:
   CI: true
+  POPCORN_PREBUILT_RUNTIME: true
 
 jobs:
   e2e:

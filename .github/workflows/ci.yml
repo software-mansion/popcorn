@@ -244,6 +244,7 @@ jobs:
     env:
       CI: true
       MIX_ENV: dev
+      POPCORN_PREBUILT_RUNTIME: true
     steps:
       - uses: actions/checkout@v4
 

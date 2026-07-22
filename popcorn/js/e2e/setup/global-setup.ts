@@ -19,7 +19,10 @@ function runCommand(command: string, cwd: string, description: string) {
 }
 
 async function globalSetup() {
-  runCommand("pnpm run build", jsRootDir, "building JS library");
+  const buildCommand = process.env.POPCORN_PREBUILT_RUNTIME
+    ? "pnpm run build:release"
+    : "pnpm run build";
+  runCommand(buildCommand, jsRootDir, "building JS library");
   runCommand("mix deps.get", elixirDir, "fetching Elixir dependencies");
   runCommand("mix popcorn.cook", elixirDir, "creating Elixir bundle");
 
