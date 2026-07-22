@@ -290,10 +290,6 @@ run_configure() {
         LDFLAGS+=" -sASSERTIONS=2"
     else
         LDFLAGS+=" -sASSERTIONS=0"
-        # LTO: -Oz runs binaryen's size passes and minifies the JS glue.
-        # --closure additionally Closure-minifies the glue.
-        # ref: https://emscripten.org/docs/tools_reference/emcc.html
-        LDFLAGS+=" -Oz --closure 1"
     fi
 
     # Autoconf cache variables for cross-compilation
@@ -391,8 +387,15 @@ build_beam() {
 
     # Set up JS bridge link flags if the bridge exists in the patched source
     local js_bridge_dir="${beam_dir}/erts/emulator/js_bridge"
+    export EXTRA_EMCC_LINK_FLAGS=""
     if [[ -d "${js_bridge_dir}" ]]; then
-        export EXTRA_EMCC_LINK_FLAGS="--pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
+        EXTRA_EMCC_LINK_FLAGS="--pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
+    fi
+    if [[ "${mode}" == "release" ]]; then
+        # LTO: -Oz runs binaryen's size passes and minifies the JS glue.
+        # --closure additionally Closure-minifies the glue.
+        # ref: https://emscripten.org/docs/tools_reference/emcc.html
+        EXTRA_EMCC_LINK_FLAGS+=" -Oz --closure 1"
     fi
 
     # erts/lib_src target dir is created on first build only
