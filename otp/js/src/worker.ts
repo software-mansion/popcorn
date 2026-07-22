@@ -17,6 +17,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
 
       const result = await boot({
         manifestUrl: data.payload.manifestUrl,
+        emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
         createModule,
         emit: toMain,

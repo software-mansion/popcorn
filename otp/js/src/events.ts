@@ -11,7 +11,10 @@ import { base64ToBytes, check, objectWithKeys } from "./utils";
 
 type BootEvent = {
   type: "popcorn:boot";
-  payload: Pick<BeamBootOptions, "manifestUrl" | "extraArgs">;
+  payload: Pick<
+    BeamBootOptions,
+    "manifestUrl" | "emulatorArgs" | "extraArgs"
+  >;
 };
 
 type SendEvent = {
