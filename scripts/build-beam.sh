@@ -133,7 +133,7 @@ setup_otp_source() {
 
 patch_otp() {
     log "Patching OTP sources..."
-    run "${PROJECT_ROOT}/scripts/patch-beam.sh"
+    run "${PROJECT_ROOT}/scripts/patch-beam.sh" "$@"
 }
 
 
@@ -178,9 +178,14 @@ build_bootstrap() {
 compile_preloaded_modules() {
     local beam_dir="$1"
     local force="${2:-false}"
+    local compile_prim_inet="${3:-false}"
     local ebin="${beam_dir}/erts/preloaded/ebin"
     local erlc="${beam_dir}/bootstrap/bin/erlc"
-    local module
+    local modules=(wasm erl_init)
+
+    if [[ "${compile_prim_inet}" == "true" ]]; then
+        modules+=(prim_inet)
+    fi
 
     if [[ ! -x "${erlc}" ]]; then
         erlc="$(command -v erlc || true)"
@@ -190,7 +195,7 @@ compile_preloaded_modules() {
     fi
 
     mkdir -p "${ebin}"
-    for module in wasm erl_init; do
+    for module in "${modules[@]}"; do
         local src="${beam_dir}/erts/preloaded/src/${module}.erl"
         local beam="${ebin}/${module}.beam"
 
@@ -206,7 +211,10 @@ compile_preloaded_modules() {
 
         log "Compiling preloaded ${module}.beam with ${erlc}..."
         # +deterministic matches how the committed preloaded beams are produced.
-        run "${erlc}" +deterministic -o "${ebin}" "${src}"
+        run "${erlc}" +deterministic \
+            -I "${beam_dir}/lib/kernel/src" \
+            -I "${beam_dir}/lib/kernel/include" \
+            -o "${ebin}" "${src}"
     done
     success "Preloaded modules compiled."
 }
@@ -528,17 +536,22 @@ main() {
 
     setup_otp_source "${source}" "${otp_tag}"
 
-    patch_otp
+    patch_otp \
+        --without-zstd \
+        --without-native-sockets \
+        --without-distribution \
+        --without-crash-dumps \
+        --without-dynamic-loading
 
     run_autoconf "${beam_dir}"
 
     # The native bootstrap emulator embeds erts/preloaded/ebin/*.beam while
     # building preload.c, before bootstrap/bin/erlc has been created.
-    compile_preloaded_modules "${beam_dir}" true
+    compile_preloaded_modules "${beam_dir}" true true
 
     build_bootstrap "${beam_dir}" "${jobs}"
 
-    compile_preloaded_modules "${beam_dir}" true
+    compile_preloaded_modules "${beam_dir}" true true
 
     local openssl_prefix=""
     if [[ "${with_crypto}" == "true" ]]; then

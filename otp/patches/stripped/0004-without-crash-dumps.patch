@@ -1,0 +1,26 @@
+diff --git a/erts/emulator/beam/break.c b/erts/emulator/beam/break.c
+--- a/erts/emulator/beam/break.c
++++ b/erts/emulator/beam/break.c
+@@ -797,4 +797,15 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+ {
++#ifdef __EMSCRIPTEN__
++    erts_fprintf(stderr, "\nBEAM fatal error");
++    if (file != NULL)
++        erts_fprintf(stderr, " in %s:%d", file, line);
++    if (fmt != NULL && *fmt != '\0') {
++        erts_fprintf(stderr, ": ");
++        erts_vfprintf(stderr, fmt, args);
++    }
++    erts_fprintf(stderr, "\n");
++    return;
++#else
+     ErtsThrPrgrData tpd_buf; /* in case we aren't a managed thread... */
+     int fd;
+     size_t envsz;
+@@ -1048,5 +1059,6 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+ 
+     erts_fprintf(stderr,"done\n");
++#endif
+ }
+ 
+ void

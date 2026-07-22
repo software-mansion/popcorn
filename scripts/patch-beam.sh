@@ -9,6 +9,11 @@
 #   --regen       Regenerate patches from current otp/sources/otp state
 #
 # Options:
+#   --without-zstd
+#   --without-native-sockets
+#   --without-distribution
+#   --without-crash-dumps
+#   --without-dynamic-loading
 #   -h, --help    Show this help
 #
 # Requires otp/sources/otp to exist (created by build-beam.sh).
@@ -41,6 +46,7 @@ Options:
 Apply mode:
   Expects otp/sources/otp-original to exist (cloned OTP).
   Copies otp-original to otp/ if not present, then applies patches.
+  Stripped patches are applied only when their --without-* option is present.
 
 Regen mode:
   Expects otp/sources/otp to exist with local modifications.
@@ -94,11 +100,15 @@ apply_patches() {
         error "otp/patches/ not found. No patches to apply."
     fi
 
-    local patches
-    patches=$(find "${PATCHES_DIR}" -name "*.patch" -type f | sort)
-    if [[ -z "${patches}" ]]; then
-        error "No .patch files found in otp/patches/."
-    fi
+    local -a patches=("${PATCHES_DIR}/0001-emscripten-support.patch")
+    [[ "${WITHOUT_ZSTD}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0001-without-zstd.patch")
+    [[ "${WITHOUT_NATIVE_SOCKETS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0002-without-native-sockets.patch")
+    [[ "${WITHOUT_DISTRIBUTION}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0003-without-distribution.patch")
+    [[ "${WITHOUT_CRASH_DUMPS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0004-without-crash-dumps.patch")
+    [[ "${WITHOUT_DYNAMIC_LOADING}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0005-without-dynamic-loading.patch")
+
+    local patches_list
+    patches_list=$(printf '%s\n' "${patches[@]}")
 
     # Copy otp-original to otp if not present
     if [[ ! -d "${OTP_DIR}" ]]; then
@@ -111,7 +121,7 @@ apply_patches() {
     # otherwise an edited patch is silently ignored and the built VM keeps
     # running the previous protocol.
     local patches_hash
-    patches_hash=$(echo "${patches}" | xargs cat | git hash-object --stdin)
+    patches_hash=$(cat "${patches[@]}" | git hash-object --stdin)
 
     if [[ -f "${STAMP_FILE}" ]] && [[ "$(cat "${STAMP_FILE}")" == "${patches_hash}" ]]; then
         log "Patches already applied and up to date, skipping."
@@ -141,7 +151,7 @@ apply_patches() {
         patch_name=$(basename "${patch}")
         log "  Applying ${patch_name}..."
         (cd "${OTP_DIR}" && git apply "${patch}")
-    done <<< "${patches}"
+    done <<< "${patches_list}"
 
     echo "${patches_hash}" > "${STAMP_FILE}"
     success "Patches applied."
@@ -184,6 +194,11 @@ regen_patches() {
 
 main() {
     local regen=false
+    WITHOUT_ZSTD=false
+    WITHOUT_NATIVE_SOCKETS=false
+    WITHOUT_DISTRIBUTION=false
+    WITHOUT_CRASH_DUMPS=false
+    WITHOUT_DYNAMIC_LOADING=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -192,6 +207,26 @@ main() {
                 ;;
             --regen)
                 regen=true
+                shift
+                ;;
+            --without-zstd)
+                WITHOUT_ZSTD=true
+                shift
+                ;;
+            --without-native-sockets)
+                WITHOUT_NATIVE_SOCKETS=true
+                shift
+                ;;
+            --without-distribution)
+                WITHOUT_DISTRIBUTION=true
+                shift
+                ;;
+            --without-crash-dumps)
+                WITHOUT_CRASH_DUMPS=true
+                shift
+                ;;
+            --without-dynamic-loading)
+                WITHOUT_DYNAMIC_LOADING=true
                 shift
                 ;;
             *)
