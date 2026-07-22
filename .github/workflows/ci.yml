@@ -36,10 +36,57 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: scripts/ci-changed-groups.sh "$BASE_SHA" "$HEAD_SHA"
 
+  atomvm-runtime:
+    name: AtomVM runtime
+    if: needs.changes.outputs.atomvm-runtime == 'true'
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone FissionVM
+        id: fissionvm
+        run: |
+          git clone --depth 1 --branch swm https://github.com/software-mansion-labs/FissionVM.git .atomvm-source
+          echo "revision=$(git -C .atomvm-source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug WASM runtime
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-wasm
+          source: .atomvm-source
+          source-revision: ${{ steps.fissionvm.outputs.revision }}
+          output-directories: .ci-artifacts/atomvm/wasm
+
+      - name: Build debug Unix runtime
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-unix
+          source: .atomvm-source
+          source-revision: ${{ steps.fissionvm.outputs.revision }}
+          output-directories: .ci-artifacts/atomvm/unix
+
+      - name: Upload debug WASM runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomvm-debug-wasm
+          path: .ci-artifacts/atomvm/wasm
+          if-no-files-found: error
+
+      - name: Upload debug Unix runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: atomvm-debug-unix
+          path: .ci-artifacts/atomvm/unix
+          if-no-files-found: error
+
   ci:
     name: CI
     if: always()
-    needs: changes
+    needs:
+      - changes
+      - atomvm-runtime
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -52,6 +99,10 @@ jobs:
           OTP_CRYPTO: ${{ needs.changes.outputs.otp-crypto }}
         run: |
           if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$ATOMVM_RUNTIME" == "true" && "${{ needs.atomvm-runtime.result }}" != "success" ]]; then
             exit 1
           fi
 
