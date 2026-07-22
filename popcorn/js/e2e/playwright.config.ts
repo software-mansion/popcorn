@@ -2,9 +2,11 @@ import { defineConfig, devices } from "@playwright/test";
 import { fileURLToPath } from "url";
 
 const jsRootDir = fileURLToPath(new URL("..", import.meta.url));
-const buildCommand = process.env.POPCORN_PREBUILT_RUNTIME
-  ? "pnpm run build:release"
-  : "pnpm run build";
+const buildCommand = process.env.POPCORN_PREBUILT_PACKAGE
+  ? "true"
+  : process.env.POPCORN_PREBUILT_RUNTIME
+    ? "pnpm run build:release"
+    : "pnpm run build";
 const webServerCommand = [
   buildCommand,
   "cd e2e/elixir",

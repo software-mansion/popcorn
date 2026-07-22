@@ -151,7 +151,10 @@ defmodule Popcorn.MixProject do
         do: "pnpm run build:release",
         else: "pnpm run build"
 
-    run_cmd!(build_command, cd: js_dir)
+    if System.get_env("POPCORN_PREBUILT_PACKAGE") != "true" do
+      run_cmd!(build_command, cd: js_dir)
+    end
+
     run_cmd!("npx documentation build #{js_entry} -f html -o doc/js-api", [])
   end
 
