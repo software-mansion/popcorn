@@ -36,13 +36,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Produces otp/out with the OTP/BEAM WASM runtime (cached across runs).
-      - name: Build OTP/BEAM for WASM
-        uses: ./.github/actions/build-otp-wasm
-        with:
-          build-mode: debug
-          with-crypto: "false"
-
       # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.19.5
       # runtime shipped in the WASM VM, so the host toolchain must match it.
       # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
@@ -51,6 +44,13 @@ jobs:
         with:
           elixir-version: "1.19.5"
           otp-version: "28.3.1"
+
+      # Produces otp/out with the OTP/BEAM WASM runtime (cached across runs).
+      - name: Build OTP/BEAM for WASM
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: "false"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

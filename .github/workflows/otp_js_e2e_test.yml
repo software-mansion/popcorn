@@ -48,6 +48,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The build compiles preloaded modules, and the e2e suite compiles an OTP
+      # fixture app, so both need a host toolchain matching the WASM runtime.
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
@@ -73,14 +81,6 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           version: "1.60.0"
-
-      # The e2e suite compiles and packages an OTP fixture app, so a host
-      # toolchain matching the WASM runtime is required even on cache hits.
-      - name: Setup Elixir and Erlang
-        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
-        with:
-          elixir-version: "1.19.5"
-          otp-version: "28.3.1"
 
       - name: Run e2e tests
         run: pnpm e2e

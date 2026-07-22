@@ -653,17 +653,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build OTP/BEAM for WASM (no crypto)
-        uses: ./.github/actions/build-otp-wasm
-        with:
-          build-mode: debug
-          with-crypto: "false"
-
       - name: Setup Elixir and Erlang
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.19.5"
           otp-version: "28.3.1"
+
+      - name: Build OTP/BEAM for WASM (no crypto)
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: "false"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -764,6 +764,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
       - name: Build OTP/BEAM for WASM (crypto)
         uses: ./.github/actions/build-otp-wasm
         with:
@@ -787,12 +793,6 @@ jobs:
         uses: ./.github/actions/setup-playwright
         with:
           version: "1.60.0"
-
-      - name: Setup Elixir and Erlang
-        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
-        with:
-          elixir-version: "1.19.5"
-          otp-version: "28.3.1"
 
       - name: Run OTP JS E2E tests (crypto)
         id: otp-js
