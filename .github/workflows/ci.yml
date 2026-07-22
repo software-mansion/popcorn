@@ -753,6 +753,71 @@ jobs:
             fi
           done
 
+  otp-crypto:
+    name: OTP (crypto)
+    if: needs.changes.outputs.otp-crypto == 'true'
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build OTP/BEAM for WASM (crypto)
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: "true"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.60.0"
+
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
+      - name: Run OTP JS E2E tests (crypto)
+        id: otp-js
+        continue-on-error: true
+        working-directory: otp/js
+        run: pnpm e2e
+
+      - name: Upload OTP JS crypto Playwright report
+        if: steps.otp-js.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-js-crypto-playwright-report
+          path: |
+            otp/js/playwright-report/
+            otp/js/test-results/
+          retention-days: 7
+
+      - name: Check crypto OTP suite result
+        env:
+          OTP_JS_RESULT: ${{ steps.otp-js.outcome }}
+        run: |
+          if [[ "$OTP_JS_RESULT" != "success" ]]; then
+            exit 1
+          fi
+
   ci:
     name: CI
     if: always()
@@ -763,6 +828,7 @@ jobs:
       - browser-apps
       - llv
       - otp-no-crypto
+      - otp-crypto
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -795,6 +861,10 @@ jobs:
           fi
 
           if [[ "$OTP_NO_CRYPTO" == "true" && "${{ needs.otp-no-crypto.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$OTP_CRYPTO" == "true" && "${{ needs.otp-crypto.result }}" != "success" ]]; then
             exit 1
           fi
 
