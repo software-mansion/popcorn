@@ -342,6 +342,306 @@ jobs:
             exit 1
           fi
 
+  llv:
+    name: LocalLiveView
+    if: needs.changes.outputs.llv == 'true'
+    needs:
+      - changes
+      - atomvm-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: true
+      MIX_ENV: test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AtomVM WASM runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: atomvm-debug-wasm
+          path: .ci-artifacts/atomvm/wasm
+
+      - name: Download AtomVM Unix runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: atomvm-debug-unix
+          path: .ci-artifacts/atomvm/unix
+
+      - name: Install shared AtomVM runtimes
+        run: |
+          chmod +x .ci-artifacts/atomvm/unix/AtomVM
+
+          for output_directory in \
+            local-live-view/popcorn_runtime_source/artifacts/wasm \
+            popcorn/js/assets
+          do
+            mkdir -p "$output_directory"
+            cp -a .ci-artifacts/atomvm/wasm/. "$output_directory/"
+          done
+
+          for output_directory in \
+            examples/local-lv-thermostat/local/test/popcorn_runtime_source/artifacts/unix \
+            examples/local-lv-forms/local/test/popcorn_runtime_source/artifacts/unix \
+            examples/local-lv-compare/local/test/popcorn_runtime_source/artifacts/unix
+          do
+            mkdir -p "$output_directory"
+            cp -a .ci-artifacts/atomvm/unix/. "$output_directory/"
+          done
+
+      - name: Setup BEAM
+        uses: ./.github/actions/setup-beam
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Popcorn JS release
+        working-directory: popcorn/js
+        run: pnpm build:release
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+
+      - name: Restore LocalLiveView Mix cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            local-live-view/deps
+            local-live-view/_build
+          key: ${{ runner.os }}-mix-local_live_view-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('local-live-view/mix.exs', 'local-live-view/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_live_view-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install LocalLiveView Hex dependencies
+        working-directory: local-live-view
+        run: mix deps.get
+
+      - name: Install Phoenix installer
+        run: mix archive.install hex phx_new --force
+
+      - name: Configure LocalLiveView runtime source
+        working-directory: local-live-view
+        run: |
+          printf "\nconfig :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}\n" >> config/config.exs
+
+      - name: Compile LocalLiveView Hex dependencies
+        working-directory: local-live-view
+        run: mix deps.compile
+
+      - name: Verify LocalLiveView priv/static
+        id: llv-static
+        continue-on-error: true
+        run: |
+          pnpm -F ./local-live-view build
+          git diff --exit-code -- local-live-view/priv/static
+
+      - name: Typecheck, lint and format LocalLiveView JS
+        id: llv-js
+        continue-on-error: true
+        working-directory: local-live-view
+        run: pnpm run ci
+
+      - name: Lint LocalLiveView Elixir
+        id: llv-lint
+        continue-on-error: true
+        working-directory: local-live-view
+        run: mix lint
+
+      - name: Test LocalLiveView
+        id: llv-test
+        continue-on-error: true
+        working-directory: local-live-view
+        run: mix test
+
+      - name: Test LocalLiveView E2E
+        id: llv-e2e
+        continue-on-error: true
+        working-directory: local-live-view
+        run: mix test --only e2e
+
+      - name: Build LocalLiveView
+        id: llv-build
+        continue-on-error: true
+        working-directory: local-live-view
+        run: mix build
+
+      - name: Restore Thermostat Mix cache
+        uses: actions/cache@v4
+        with:
+          path: examples/local-lv-thermostat/deps
+          key: ${{ runner.os }}-mix-local_lv_thermostat_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-thermostat/mix.exs', 'examples/local-lv-thermostat/local/mix.exs', 'examples/local-lv-thermostat/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_thermostat_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Thermostat online Hex dependencies
+        working-directory: examples/local-lv-thermostat
+        run: mix deps.get
+
+      - name: Install Thermostat offline Hex dependencies
+        working-directory: examples/local-lv-thermostat/local
+        run: mix deps.get
+
+      - name: Test Thermostat online (Phoenix, BEAM)
+        id: thermostat-online
+        continue-on-error: true
+        working-directory: examples/local-lv-thermostat
+        run: mix test
+
+      - name: Test Thermostat offline (LocalLiveView, AtomVM)
+        id: thermostat-offline
+        continue-on-error: true
+        working-directory: examples/local-lv-thermostat/local
+        run: mix test
+
+      - name: Restore Forms Mix cache
+        uses: actions/cache@v4
+        with:
+          path: examples/local-lv-forms/deps
+          key: ${{ runner.os }}-mix-local_lv_forms_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-forms/mix.exs', 'examples/local-lv-forms/local/mix.exs', 'examples/local-lv-forms/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_forms_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Forms online Hex dependencies
+        working-directory: examples/local-lv-forms
+        run: mix deps.get
+
+      - name: Install Forms offline Hex dependencies
+        working-directory: examples/local-lv-forms/local
+        run: mix deps.get
+
+      - name: Test Forms online (Phoenix LiveView and Mirror, BEAM)
+        id: forms-online
+        continue-on-error: true
+        working-directory: examples/local-lv-forms
+        run: mix test
+
+      - name: Test Forms offline (LocalLiveView, AtomVM)
+        id: forms-offline
+        continue-on-error: true
+        working-directory: examples/local-lv-forms/local
+        run: mix test
+
+      - name: Restore Compare Mix cache
+        uses: actions/cache@v4
+        with:
+          path: examples/local-lv-compare/deps
+          key: ${{ runner.os }}-mix-local_lv_compare_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/local-lv-compare/mix.exs', 'examples/local-lv-compare/local/mix.exs', 'examples/local-lv-compare/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_compare_local-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Compare online Hex dependencies
+        working-directory: examples/local-lv-compare
+        run: mix deps.get
+
+      - name: Install Compare offline Hex dependencies
+        working-directory: examples/local-lv-compare/local
+        run: mix deps.get
+
+      - name: Test Compare online (Phoenix LiveView, BEAM)
+        id: compare-online
+        continue-on-error: true
+        working-directory: examples/local-lv-compare
+        run: mix test
+
+      - name: Test Compare offline (LocalLiveView, AtomVM)
+        id: compare-offline
+        continue-on-error: true
+        working-directory: examples/local-lv-compare/local
+        run: mix test
+
+      - name: Restore Kanban Mix cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            examples/local-lv-kanban/deps
+            examples/local-lv-kanban/_build
+          key: ${{ runner.os }}-mix-local_lv_kanban-elixir-1.17.3-otp-26.0.2-dev-test-${{ hashFiles('examples/local-lv-kanban/mix.exs', 'examples/local-lv-kanban/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-local_lv_kanban-elixir-1.17.3-otp-26.0.2-dev-test-
+
+      - name: Install Kanban Hex dependencies
+        working-directory: examples/local-lv-kanban
+        run: mix deps.get
+
+      - name: Build Kanban browser assets
+        working-directory: examples/local-lv-kanban
+        run: |
+          MIX_ENV=dev mix assets.setup
+          MIX_ENV=dev mix assets.build
+
+      - name: Test Kanban (unit and E2E)
+        id: kanban
+        continue-on-error: true
+        working-directory: examples/local-lv-kanban
+        env:
+          PW_CHANNEL: chrome
+        run: mix test
+
+      - name: Upload Kanban Playwright report
+        if: steps.kanban.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-lv-kanban-playwright-report
+          path: |
+            examples/local-lv-kanban/test/playwright/playwright-report
+            examples/local-lv-kanban/test/playwright/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Check LocalLiveView suite results
+        env:
+          LLV_STATIC_RESULT: ${{ steps.llv-static.outcome }}
+          LLV_JS_RESULT: ${{ steps.llv-js.outcome }}
+          LLV_LINT_RESULT: ${{ steps.llv-lint.outcome }}
+          LLV_TEST_RESULT: ${{ steps.llv-test.outcome }}
+          LLV_E2E_RESULT: ${{ steps.llv-e2e.outcome }}
+          LLV_BUILD_RESULT: ${{ steps.llv-build.outcome }}
+          THERMOSTAT_ONLINE_RESULT: ${{ steps.thermostat-online.outcome }}
+          THERMOSTAT_OFFLINE_RESULT: ${{ steps.thermostat-offline.outcome }}
+          FORMS_ONLINE_RESULT: ${{ steps.forms-online.outcome }}
+          FORMS_OFFLINE_RESULT: ${{ steps.forms-offline.outcome }}
+          COMPARE_ONLINE_RESULT: ${{ steps.compare-online.outcome }}
+          COMPARE_OFFLINE_RESULT: ${{ steps.compare-offline.outcome }}
+          KANBAN_RESULT: ${{ steps.kanban.outcome }}
+        run: |
+          for result in \
+            "$LLV_STATIC_RESULT" \
+            "$LLV_JS_RESULT" \
+            "$LLV_LINT_RESULT" \
+            "$LLV_TEST_RESULT" \
+            "$LLV_E2E_RESULT" \
+            "$LLV_BUILD_RESULT" \
+            "$THERMOSTAT_ONLINE_RESULT" \
+            "$THERMOSTAT_OFFLINE_RESULT" \
+            "$FORMS_ONLINE_RESULT" \
+            "$FORMS_OFFLINE_RESULT" \
+            "$COMPARE_ONLINE_RESULT" \
+            "$COMPARE_OFFLINE_RESULT" \
+            "$KANBAN_RESULT"
+          do
+            if [[ "$result" != "success" ]]; then
+              exit 1
+            fi
+          done
+
   ci:
     name: CI
     if: always()
@@ -350,6 +650,7 @@ jobs:
       - atomvm-runtime
       - core
       - browser-apps
+      - llv
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -374,6 +675,10 @@ jobs:
           fi
 
           if [[ "$BROWSER_APPS" == "true" && "${{ needs.browser-apps.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$LLV" == "true" && "${{ needs.llv.result }}" != "success" ]]; then
             exit 1
           fi
 
