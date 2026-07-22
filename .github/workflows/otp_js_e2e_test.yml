@@ -72,7 +72,7 @@ jobs:
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          version: "1.60.0"
+          version: "1.61.1"
 
       # The e2e suite compiles and packages an OTP fixture app, so a host
       # toolchain matching the WASM runtime is required even on cache hits.
