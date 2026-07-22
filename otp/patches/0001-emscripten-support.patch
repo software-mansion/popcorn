@@ -230,14 +230,16 @@ index d5b3b9d52b710538f0c3a94ad62dcb54654ac12a..6702ab0f2a2fc3adc2b089c0e125eda3
              erts_add_taint(dp->name_atom);
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4d3bfbe60
+index 0000000000000000000000000000000000000000..a01c5d18cd1c394a85535694775299d279876c61
 --- /dev/null
 +++ b/erts/emulator/js_bridge/beam-bridge.pre.js
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,24 @@
 +var __beamBridgeOnMessage =
 +  typeof Module['onBeamMessage'] === 'function' ? Module['onBeamMessage'] : null;
 +var __beamBridgeOnError =
 +  typeof Module['onError'] === 'function' ? Module['onError'] : null;
++var __beamBridgeOnStdinConsumed =
++  typeof Module['onStdinConsumed'] === 'function' ? Module['onStdinConsumed'] : null;
 +
 +Module['onBeamMessage'] = function(envelope) {
 +  if (typeof __beamBridgeOnMessage === 'function') {
@@ -250,12 +252,18 @@ index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4
 +    __beamBridgeOnError(envelope);
 +  }
 +};
++
++Module['onStdinConsumed'] = function(size) {
++  if (typeof __beamBridgeOnStdinConsumed === 'function') {
++    __beamBridgeOnStdinConsumed(size);
++  }
++};
 diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..ed09e8dd4ff11df4fe5e8b9adcb4dc7036722f5c
+index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc08c15a0cb
 --- /dev/null
 +++ b/erts/emulator/js_bridge/js_bridge.js
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,42 @@
 +mergeInto(LibraryManager.library, {
 +  js_bridge_on_from_beam_async__proxy: 'async',
 +  js_bridge_on_from_beam_async__sig: 'vii',
@@ -289,10 +297,332 @@ index 0000000000000000000000000000000000000000..ed09e8dd4ff11df4fe5e8b9adcb4dc70
 +      Module['onError'](envelope);
 +    }
 +  },
++
++  js_bridge_on_stdin_consumed__proxy: 'async',
++  js_bridge_on_stdin_consumed__sig: 'vi',
++  js_bridge_on_stdin_consumed: function(size) {
++    if (typeof Module['onStdinConsumed'] === 'function') {
++      Module['onStdinConsumed'](size);
++    }
++  },
 +});
+diff --git a/erts/emulator/nifs/common/prim_tty_nif.c b/erts/emulator/nifs/common/prim_tty_nif.c
+index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989c07a7089 100644
+--- a/erts/emulator/nifs/common/prim_tty_nif.c
++++ b/erts/emulator/nifs/common/prim_tty_nif.c
+@@ -38,6 +38,7 @@
+ #include "erl_driver.h"
+ 
+ #include <errno.h>
++#include <stdlib.h>
+ #include <string.h>
+ #include <ctype.h>
+ #include <wchar.h>
+@@ -66,6 +67,9 @@
+ #ifdef HAVE_POLL_H
+ #include <poll.h>
+ #endif
++#ifdef __EMSCRIPTEN__
++#include <emscripten/emscripten.h>
++#endif
+ 
+ #if defined IOV_MAX
+ #define MAXIOV IOV_MAX
+@@ -109,6 +113,11 @@ typedef struct {
+ #endif
+     ErlNifPid self;
+     ErlNifPid reader;
++#ifdef __EMSCRIPTEN__
++    ErlNifEnv *select_env;
++    ERL_NIF_TERM select_ref;
++    int has_reader;
++#endif
+     enum TTYState tty;       /* if the tty is initialized */
+ #ifdef HAVE_TERMCAP
+     struct termios tty_smode;
+@@ -116,6 +125,105 @@ typedef struct {
+ #endif
+ } TTYResource;
+ 
++#ifdef __EMSCRIPTEN__
++#define POPCORN_STDIN_CAPACITY (64 * 1024)
++
++typedef struct {
++    ErlNifMutex *lock;
++    TTYResource *tty;
++    unsigned char data[POPCORN_STDIN_CAPACITY];
++    size_t head;
++    size_t size;
++    int closed;
++    int notified;
++    int columns;
++    int rows;
++} PopcornStdin;
++
++static PopcornStdin popcorn_stdin;
++
++extern void js_bridge_on_stdin_consumed(int size);
++
++static void popcorn_stdin_notify_locked(void) {
++    TTYResource *tty = popcorn_stdin.tty;
++    ErlNifEnv *env;
++    ERL_NIF_TERM message;
++
++    if (popcorn_stdin.notified || tty == NULL || !tty->has_reader)
++        return;
++
++    env = enif_alloc_env();
++    ASSERT(env != NULL);
++    message = enif_make_tuple4(
++        env,
++        enif_make_atom(env, "select"),
++        enif_make_resource(env, tty),
++        enif_make_copy(env, tty->select_ref),
++        enif_make_atom(env, "ready_input"));
++    enif_send(NULL, &tty->reader, env, message);
++    enif_free_env(env);
++    popcorn_stdin.notified = 1;
++}
++
++EMSCRIPTEN_KEEPALIVE
++int popcornStdinEnqueue(const unsigned char *data, int size) {
++    size_t tail;
++    size_t first;
++
++    ASSERT(data != NULL && size > 0);
++    enif_mutex_lock(popcorn_stdin.lock);
++    ASSERT(!popcorn_stdin.closed);
++    ASSERT((size_t)size <= POPCORN_STDIN_CAPACITY - popcorn_stdin.size);
++
++    tail = (popcorn_stdin.head + popcorn_stdin.size) % POPCORN_STDIN_CAPACITY;
++    first = MIN((size_t)size, POPCORN_STDIN_CAPACITY - tail);
++    memcpy(popcorn_stdin.data + tail, data, first);
++    memcpy(popcorn_stdin.data, data + first, (size_t)size - first);
++    popcorn_stdin.size += (size_t)size;
++    popcorn_stdin_notify_locked();
++    enif_mutex_unlock(popcorn_stdin.lock);
++    return 0;
++}
++
++EMSCRIPTEN_KEEPALIVE
++int popcornStdinClose(void) {
++    enif_mutex_lock(popcorn_stdin.lock);
++    ASSERT(!popcorn_stdin.closed);
++    popcorn_stdin.closed = 1;
++    popcorn_stdin_notify_locked();
++    enif_mutex_unlock(popcorn_stdin.lock);
++    return 0;
++}
++
++EMSCRIPTEN_KEEPALIVE
++int popcornTtyResize(int columns, int rows) {
++    TTYResource *tty;
++    ErlNifEnv *env;
++    ERL_NIF_TERM message;
++
++    ASSERT(columns > 0 && columns <= 65535 && rows > 0 && rows <= 65535);
++    enif_mutex_lock(popcorn_stdin.lock);
++    popcorn_stdin.columns = columns;
++    popcorn_stdin.rows = rows;
++    tty = popcorn_stdin.tty;
++    if (tty != NULL && tty->has_reader) {
++        env = enif_alloc_env();
++        ASSERT(env != NULL);
++        message = enif_make_tuple2(
++            env,
++            enif_make_copy(env, tty->select_ref),
++            enif_make_tuple2(
++                env,
++                enif_make_atom(env, "signal"),
++                enif_make_atom(env, "sigwinch")));
++        enif_send(NULL, &tty->self, env, message);
++        enif_free_env(env);
++    }
++    enif_mutex_unlock(popcorn_stdin.lock);
++    return 0;
++}
++#endif
++
+ // #define HARD_DEBUG
+ #ifdef HARD_DEBUG
+ static FILE *logFile = NULL;
+@@ -641,6 +749,34 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+             return make_errno_error(env, errorFunction);
+         }
+     }
++#else
++#ifdef __EMSCRIPTEN__
++    {
++        size_t first;
++        size_t consumed;
++
++        enif_alloc_binary(n, &bin);
++        enif_mutex_lock(popcorn_stdin.lock);
++        popcorn_stdin.notified = 0;
++        consumed = MIN((size_t)n, popcorn_stdin.size);
++        if (consumed == 0 && popcorn_stdin.closed) {
++            enif_mutex_unlock(popcorn_stdin.lock);
++            enif_release_binary(&bin);
++            return make_error(env, enif_make_atom(env, "closed"));
++        }
++        first = MIN(consumed, POPCORN_STDIN_CAPACITY - popcorn_stdin.head);
++        memcpy(bin.data, popcorn_stdin.data + popcorn_stdin.head, first);
++        memcpy(bin.data + first, popcorn_stdin.data, consumed - first);
++        popcorn_stdin.head =
++            (popcorn_stdin.head + consumed) % POPCORN_STDIN_CAPACITY;
++        popcorn_stdin.size -= consumed;
++        res = (ssize_t)consumed;
++        if (popcorn_stdin.size > 0 || popcorn_stdin.closed)
++            popcorn_stdin_notify_locked();
++        enif_mutex_unlock(popcorn_stdin.lock);
++        if (consumed > 0)
++            js_bridge_on_stdin_consumed((int)consumed);
++    }
+ #else
+     enif_alloc_binary(n, &bin);
+     res = read(tty->ifd, bin.data, bin.size);
+@@ -654,9 +790,12 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+         enif_release_binary(&bin);
+         return make_error(env, enif_make_atom(env, "closed"));
+     }
++#endif
+ #endif
+     debug("select on %d\r\n",select_event);
++#ifndef __EMSCRIPTEN__
+     enif_select(env, select_event, ERL_NIF_SELECT_READ, tty, NULL, argv[1]);
++#endif
+     if (res == bin.size) {
+ 	res_term = enif_make_binary(env, &bin);
+     } else if (res < bin.size / 2) {
+@@ -949,6 +1088,17 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+ 
+     enif_set_pid_undefined(&tty->self);
+     enif_set_pid_undefined(&tty->reader);
++#ifdef __EMSCRIPTEN__
++    tty->select_env = enif_alloc_env();
++    ASSERT(tty->select_env != NULL);
++    tty->has_reader = 0;
++    if (tty->ofd == 1) {
++        enif_mutex_lock(popcorn_stdin.lock);
++        ASSERT(popcorn_stdin.tty == NULL);
++        popcorn_stdin.tty = tty;
++        enif_mutex_unlock(popcorn_stdin.lock);
++    }
++#endif
+ 
+     return enif_make_tuple2(env, atom_ok, tty_term);
+ }
+@@ -1056,7 +1206,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
+     if (!enif_get_resource(env, argv[0], tty_rt, (void **)&tty))
+         return enif_make_badarg(env);
+     {
+-#ifdef TIOCGWINSZ
++#ifdef __EMSCRIPTEN__
++        enif_mutex_lock(popcorn_stdin.lock);
++        width = popcorn_stdin.columns;
++        height = popcorn_stdin.rows;
++        enif_mutex_unlock(popcorn_stdin.lock);
++#elif defined(TIOCGWINSZ)
+         struct winsize ws;
+         if (ioctl(tty->ifd,TIOCGWINSZ,&ws) == 0) {
+             if (ws.ws_col > 0)
+@@ -1106,9 +1261,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+     using_oldshell = 0;
+ #endif
+     debug("Select on %d\r\n", tty->ifd);
++#ifdef __EMSCRIPTEN__
++    enif_mutex_lock(popcorn_stdin.lock);
++    enif_clear_env(tty->select_env);
++    tty->select_ref = enif_make_copy(tty->select_env, argv[1]);
++    enif_self(env, &tty->reader);
++    tty->has_reader = 1;
++    if (popcorn_stdin.size > 0 || popcorn_stdin.closed)
++        popcorn_stdin_notify_locked();
++    enif_mutex_unlock(popcorn_stdin.lock);
++#else
+     enif_select(env, tty->ifd, ERL_NIF_SELECT_READ, tty, NULL, argv[1]);
+ 
+     enif_self(env, &tty->reader);
++#endif
+     enif_monitor_process(env, tty, &tty->reader, NULL);
+ 
+     return atom_ok;
+@@ -1122,7 +1288,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
+     }
+ #endif
+     if (enif_compare_pids(pid, &tty->reader) == 0) {
++#ifdef __EMSCRIPTEN__
++        enif_mutex_lock(popcorn_stdin.lock);
++        tty->has_reader = 0;
++        popcorn_stdin.notified = 0;
++        enif_mutex_unlock(popcorn_stdin.lock);
++#else
+         enif_select(caller_env, tty->ifd, ERL_NIF_SELECT_STOP, tty, NULL, atom_undefined);
++#endif
+     }
+ }
+ 
+@@ -1134,9 +1307,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
+ #endif
+ }
+ 
++static void tty_dtor(ErlNifEnv* env, void* obj) {
++    (void)env;
++#ifdef __EMSCRIPTEN__
++    TTYResource *tty = obj;
++
++    enif_mutex_lock(popcorn_stdin.lock);
++    if (popcorn_stdin.tty == tty)
++        popcorn_stdin.tty = NULL;
++    enif_mutex_unlock(popcorn_stdin.lock);
++    if (tty->select_env != NULL)
++        enif_free_env(tty->select_env);
++#else
++    (void)obj;
++#endif
++}
++
+ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
+     ErlNifResourceTypeInit rt = {
+-        NULL /* dtor */,
++        tty_dtor,
+         tty_select_stop,
+         tty_monitor_down};
+ 
+@@ -1150,13 +1339,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
+ static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
+ {
+     *priv_data = NULL;
++#ifdef __EMSCRIPTEN__
++    const char *columns;
++    const char *rows;
++
++    memset(&popcorn_stdin, 0, sizeof(popcorn_stdin));
++    popcorn_stdin.lock = enif_mutex_create("popcorn_stdin");
++    ASSERT(popcorn_stdin.lock != NULL);
++    columns = getenv("COLUMNS");
++    rows = getenv("LINES");
++    ASSERT(columns != NULL && rows != NULL);
++    popcorn_stdin.columns = atoi(columns);
++    popcorn_stdin.rows = atoi(rows);
++#endif
+     load_resources(env, ERL_NIF_RT_CREATE);
+     return 0;
+ }
+ 
+ static void unload(ErlNifEnv* env, void* priv_data)
+ {
+-
++#ifdef __EMSCRIPTEN__
++    enif_mutex_destroy(popcorn_stdin.lock);
++    popcorn_stdin.lock = NULL;
++#endif
+ }
+ 
+ static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..e39af2a963bdf9697de3e9f61d18d17629a7228d
+index 0000000000000000000000000000000000000000..ad4a8fa2b6776814a1e6e5ac83ecadfa242590f5
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
 @@ -0,0 +1,645 @@
