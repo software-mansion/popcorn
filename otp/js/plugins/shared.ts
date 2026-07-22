@@ -23,6 +23,7 @@ export type Options = {
   rootDir: string;
   app: string | null;
   brotli?: boolean;
+  strip?: boolean;
 };
 
 export type Prepared = {
@@ -46,6 +47,7 @@ type CopyOptions = {
 
 export async function popcorn(opts: Options): Promise<Prepared> {
   const useBrotli = opts.brotli ?? false;
+  const strip = opts.strip ?? true;
   const assetVariants: CopyOptions["variants"] = [
     "gzip",
     useBrotli && "brotli",
@@ -73,9 +75,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         p`${distDir}/assets/lib/tarballs.json`,
         p`${preparedDir}/${OTP_DIR}/lib/tarballs.json`,
       ),
-      copy(coreTarballs, p`${preparedDir}/${OTP_DIR}/lib`, {
-        variants: assetVariants,
-      }),
     ]);
 
     const report = await withTmp(async (packedDir) => {
@@ -84,6 +83,8 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         outDir: packedDir,
         providedAppsManifestPath: p`${distDir}/assets/manifest.json`,
         app: opts.app,
+        tarPaths: coreTarballs,
+        strip,
       });
 
       if (!report.ok) {
@@ -114,11 +115,15 @@ async function packTarballs({
   outDir,
   providedAppsManifestPath,
   app,
+  tarPaths,
+  strip,
 }: {
   rootDir: string;
   outDir: string;
   providedAppsManifestPath: string;
   app: string | null;
+  tarPaths: string[];
+  strip: boolean;
 }): Promise<Report> {
   const scriptPath = p`${dirname(fileURLToPath(import.meta.url))}/tarballs.exs`;
   const args = [
@@ -134,6 +139,12 @@ async function packTarballs({
   if (app !== null) {
     args.push("--entrypoint-app", app);
   }
+
+  if (strip) {
+    args.push("--strip");
+  }
+
+  args.push(...tarPaths);
 
   const { stdout } = await execFileAsync("elixir", args);
   return JSON.parse(stdout) as Report;
