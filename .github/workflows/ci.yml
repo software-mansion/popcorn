@@ -221,6 +221,127 @@ jobs:
         working-directory: examples/eval-in-wasm
         run: mix test --no-start
 
+  browser-apps:
+    name: Browser apps
+    if: needs.changes.outputs.browser-apps == 'true'
+    needs:
+      - changes
+      - atomvm-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: true
+      MIX_ENV: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AtomVM WASM runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: atomvm-debug-wasm
+          path: popcorn/js/assets
+
+      - name: Setup BEAM
+        uses: ./.github/actions/setup-beam
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Popcorn JS release
+        working-directory: popcorn/js
+        run: pnpm build:release
+
+      - name: Fetch Popdoc Elixir dependencies
+        working-directory: popdoc
+        run: mix deps.get
+
+      - name: Build Popdoc runtime assets
+        working-directory: popdoc
+        run: mix popdoc.build
+
+      - name: Restore Language Tour Mix cache
+        uses: actions/cache@v4
+        with:
+          path: language-tour/elixir_tour/deps
+          key: ${{ runner.os }}-mix-language_tour-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('language-tour/elixir_tour/mix.exs', 'language-tour/elixir_tour/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-language_tour-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Language Tour Elixir dependencies
+        working-directory: language-tour/elixir_tour
+        run: mix deps.get
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.60.0"
+
+      - name: Run Popcorn JS E2E tests
+        id: popcorn-js
+        continue-on-error: true
+        working-directory: popcorn/js
+        run: pnpm test:e2e
+
+      - name: Upload Popcorn JS Playwright report
+        if: steps.popcorn-js.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-js-playwright-report
+          path: |
+            popcorn/js/playwright-report/
+            popcorn/js/test-results/
+          retention-days: 7
+
+      - name: Run Popdoc E2E tests
+        id: popdoc
+        continue-on-error: true
+        run: bash scripts/test.sh --popdoc
+
+      - name: Upload Popdoc Playwright report
+        if: steps.popdoc.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: popdoc-playwright-report
+          path: |
+            popdoc/e2e/playwright-report/
+            popdoc/e2e/test-results/
+          retention-days: 7
+
+      - name: Run Language Tour E2E tests
+        id: language-tour
+        continue-on-error: true
+        working-directory: language-tour
+        run: pnpm test
+
+      - name: Upload Language Tour Playwright report
+        if: steps.language-tour.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-tour-playwright-report
+          path: |
+            language-tour/playwright-report/
+            language-tour/test-results/
+          retention-days: 7
+
+      - name: Check browser suite results
+        env:
+          POPCORN_JS_RESULT: ${{ steps.popcorn-js.outcome }}
+          POPDOC_RESULT: ${{ steps.popdoc.outcome }}
+          LANGUAGE_TOUR_RESULT: ${{ steps.language-tour.outcome }}
+        run: |
+          if [[ "$POPCORN_JS_RESULT" != "success" || "$POPDOC_RESULT" != "success" || "$LANGUAGE_TOUR_RESULT" != "success" ]]; then
+            exit 1
+          fi
+
   ci:
     name: CI
     if: always()
@@ -228,6 +349,7 @@ jobs:
       - changes
       - atomvm-runtime
       - core
+      - browser-apps
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -248,6 +370,10 @@ jobs:
           fi
 
           if [[ "$CORE" == "true" && "${{ needs.core.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$BROWSER_APPS" == "true" && "${{ needs.browser-apps.result }}" != "success" ]]; then
             exit 1
           fi
 
