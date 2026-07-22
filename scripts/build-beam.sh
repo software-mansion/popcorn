@@ -290,8 +290,6 @@ run_configure() {
     LDFLAGS+=" -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8"
     LDFLAGS+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
     LDFLAGS+=" -sFORCE_FILESYSTEM=1"
-    # May need removal for Emscripten 3.x+
-    LDFLAGS+=" -sEMULATE_FUNCTION_POINTER_CASTS"
     LDFLAGS+=" -sEXIT_RUNTIME=1"
     LDFLAGS+=" -sMALLOC=emmalloc"
     if [[ "${mode}" == "debug" ]]; then
