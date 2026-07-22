@@ -9,10 +9,10 @@ defmodule EvalInWasm.BrowserTest do
       Playwright.Browser.close(browser)
     end)
 
-    port = 9876
+    port = System.get_env("TEST_SERVER_PORT", "9876")
     url = "http://localhost:#{port}"
 
-    Task.start_link(fn -> Mix.Tasks.Popcorn.Server.run(["--port", to_string(port)]) end)
+    Task.start_link(fn -> Mix.Tasks.Popcorn.Server.run(["--port", port]) end)
 
     # Wait until the server is ready
     page = Playwright.Browser.new_page(browser)

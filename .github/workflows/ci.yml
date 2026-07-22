@@ -234,7 +234,7 @@ jobs:
 
       - name: Test Eval in WASM
         working-directory: examples/eval-in-wasm
-        run: mix test --no-start
+        run: TEST_SERVER_PORT=9878 mix test --no-start
 
   browser-apps:
     name: Browser apps
