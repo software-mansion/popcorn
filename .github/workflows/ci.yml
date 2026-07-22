@@ -83,12 +83,151 @@ jobs:
           path: .ci-artifacts/atomvm/unix
           if-no-files-found: error
 
+  core:
+    name: Core
+    if: needs.changes.outputs.core == 'true'
+    needs:
+      - changes
+      - atomvm-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: true
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download AtomVM WASM runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: atomvm-debug-wasm
+          path: .ci-artifacts/atomvm/wasm
+
+      - name: Install shared AtomVM runtime
+        run: |
+          for output_directory in \
+            popcorn/js/assets \
+            examples/hello-popcorn/popcorn_runtime_source/artifacts/wasm \
+            examples/eval-in-wasm/popcorn_runtime_source/artifacts/wasm
+          do
+            mkdir -p "$output_directory"
+            cp -a .ci-artifacts/atomvm/wasm/. "$output_directory/"
+          done
+
+      - name: Setup BEAM
+        uses: ./.github/actions/setup-beam
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+
+      - name: Restore Popcorn Mix cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            popcorn/elixir/deps
+            popcorn/elixir/_build
+          key: ${{ runner.os }}-mix-popcorn-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('popcorn/elixir/mix.exs', 'popcorn/elixir/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-popcorn-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Popcorn Hex dependencies
+        working-directory: popcorn/elixir
+        run: mix deps.get
+
+      - name: Lint Popcorn
+        working-directory: popcorn/elixir
+        run: mix lint
+
+      - name: Run Popcorn native tests
+        working-directory: popcorn/elixir
+        run: mix test
+
+      - name: Run Popcorn WASM tests
+        working-directory: popcorn/elixir
+        run: TARGET=wasm mix test
+
+      - name: Run Popcorn tree-shaking tests
+        working-directory: popcorn/elixir
+        run: mix test test/treeshake --only treeshake
+
+      - name: Build Popcorn JS release
+        working-directory: popcorn/js
+        run: pnpm build:release
+
+      - name: Restore Hello Popcorn Mix cache
+        uses: actions/cache@v4
+        with:
+          path: examples/hello-popcorn/deps
+          key: ${{ runner.os }}-mix-hello_popcorn-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/hello-popcorn/mix.exs', 'examples/hello-popcorn/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-hello_popcorn-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Hello Popcorn Hex dependencies
+        working-directory: examples/hello-popcorn
+        run: mix deps.get
+
+      - name: Compile Hello Popcorn Hex dependencies
+        working-directory: examples/hello-popcorn
+        run: mix deps.compile
+
+      - name: Build Hello Popcorn
+        working-directory: examples/hello-popcorn
+        run: mix build
+
+      - name: Test Hello Popcorn
+        working-directory: examples/hello-popcorn
+        run: mix test --no-start
+
+      - name: Test Hello Popcorn with tree shaking
+        working-directory: examples/hello-popcorn
+        run: TEST_SERVER_PORT=9877 POPCORN_TREESHAKE=true mix test --no-start
+
+      - name: Restore Eval in WASM Mix cache
+        uses: actions/cache@v4
+        with:
+          path: examples/eval-in-wasm/deps
+          key: ${{ runner.os }}-mix-eval_in_wasm-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-${{ hashFiles('examples/eval-in-wasm/mix.exs', 'examples/eval-in-wasm/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-eval_in_wasm-elixir-1.17.3-otp-26.0.2-${{ env.MIX_ENV }}-
+
+      - name: Install Eval in WASM Hex dependencies
+        working-directory: examples/eval-in-wasm
+        run: mix deps.get
+
+      - name: Configure Eval in WASM runtime source
+        working-directory: examples/eval-in-wasm
+        run: |
+          printf "\nconfig :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}\n" >> config/config.exs
+
+      - name: Compile Eval in WASM Hex dependencies
+        working-directory: examples/eval-in-wasm
+        run: mix deps.compile
+
+      - name: Build Eval in WASM
+        working-directory: examples/eval-in-wasm
+        run: mix build
+
+      - name: Test Eval in WASM
+        working-directory: examples/eval-in-wasm
+        run: mix test --no-start
+
   ci:
     name: CI
     if: always()
     needs:
       - changes
       - atomvm-runtime
+      - core
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -105,6 +244,10 @@ jobs:
           fi
 
           if [[ "$ATOMVM_RUNTIME" == "true" && "${{ needs.atomvm-runtime.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$CORE" == "true" && "${{ needs.core.result }}" != "success" ]]; then
             exit 1
           fi
 
