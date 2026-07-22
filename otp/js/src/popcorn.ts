@@ -127,7 +127,15 @@ export class Popcorn {
   };
 
   public constructor(opts: PopcornOpts) {
-    this.opts = opts;
+    this.opts = {
+      ...opts,
+      beam: {
+        ...opts.beam,
+        emulatorArgs:
+          opts.beam.emulatorArgs ??
+          schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
+      },
+    };
     this.spawnWorker();
   }
 

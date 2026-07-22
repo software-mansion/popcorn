@@ -28,7 +28,7 @@ test("configures BEAM schedulers", async ({ otp }) => {
   const result = await otp.boot({
     beam: {
       manifestUrl: "/assets/otp/manifest.json",
-      emulatorArgs: schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
+      emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
       extraArgs: ["-eval", SCHED_EVAL],
     },
   });
@@ -36,9 +36,9 @@ test("configures BEAM schedulers", async ({ otp }) => {
   expect(result).toEqual({ ok: true, data: null });
   await otp.waitForEvent("schedulers");
   expect(otp.events).toContainEqual({
-    schedulers: 1,
-    dirty_cpu_schedulers: 1,
-    dirty_io_schedulers: 1,
+    schedulers: 2,
+    dirty_cpu_schedulers: 2,
+    dirty_io_schedulers: 2,
   });
 });
 
