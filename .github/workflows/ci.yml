@@ -642,6 +642,117 @@ jobs:
             fi
           done
 
+  otp-no-crypto:
+    name: OTP (no crypto)
+    if: needs.changes.outputs.otp-no-crypto == 'true'
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build OTP/BEAM for WASM (no crypto)
+        uses: ./.github/actions/build-otp-wasm
+        with:
+          build-mode: debug
+          with-crypto: "false"
+
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19.5"
+          otp-version: "28.3.1"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.60.0"
+
+      - name: Install OTP Elixir dependencies
+        working-directory: otp/elixir
+        run: mix deps.get
+
+      - name: Check OTP Elixir formatting
+        id: otp-elixir-format
+        continue-on-error: true
+        working-directory: otp/elixir
+        run: mix format --check-formatted
+
+      - name: Run OTP Elixir tests
+        id: otp-elixir-test
+        continue-on-error: true
+        working-directory: otp/elixir
+        run: mix test
+
+      - name: Run OTP JS E2E tests (no crypto)
+        id: otp-js
+        continue-on-error: true
+        working-directory: otp/js
+        run: pnpm e2e
+
+      - name: Upload OTP JS Playwright report
+        if: steps.otp-js.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-js-no-crypto-playwright-report
+          path: |
+            otp/js/playwright-report/
+            otp/js/test-results/
+          retention-days: 7
+
+      - name: Build Popcorn OTP JS package
+        working-directory: otp/js
+        run: pnpm build
+
+      - name: Test Hello Popcorn OTP
+        id: hello-popcorn-otp
+        continue-on-error: true
+        working-directory: examples/hello-popcorn-otp/assets
+        run: pnpm test
+
+      - name: Upload Hello Popcorn OTP Playwright report
+        if: steps.hello-popcorn-otp.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-popcorn-otp-playwright-report
+          path: |
+            examples/hello-popcorn-otp/assets/playwright-report/
+            examples/hello-popcorn-otp/assets/test-results/
+          retention-days: 7
+
+      - name: Check no-crypto OTP suite results
+        env:
+          OTP_ELIXIR_FORMAT_RESULT: ${{ steps.otp-elixir-format.outcome }}
+          OTP_ELIXIR_TEST_RESULT: ${{ steps.otp-elixir-test.outcome }}
+          OTP_JS_RESULT: ${{ steps.otp-js.outcome }}
+          HELLO_POPCORN_OTP_RESULT: ${{ steps.hello-popcorn-otp.outcome }}
+        run: |
+          for result in \
+            "$OTP_ELIXIR_FORMAT_RESULT" \
+            "$OTP_ELIXIR_TEST_RESULT" \
+            "$OTP_JS_RESULT" \
+            "$HELLO_POPCORN_OTP_RESULT"
+          do
+            if [[ "$result" != "success" ]]; then
+              exit 1
+            fi
+          done
+
   ci:
     name: CI
     if: always()
@@ -651,6 +762,7 @@ jobs:
       - core
       - browser-apps
       - llv
+      - otp-no-crypto
     runs-on: ubuntu-24.04
     steps:
       - name: Report selected suite groups
@@ -679,6 +791,10 @@ jobs:
           fi
 
           if [[ "$LLV" == "true" && "${{ needs.llv.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          if [[ "$OTP_NO_CRYPTO" == "true" && "${{ needs.otp-no-crypto.result }}" != "success" ]]; then
             exit 1
           fi
 
