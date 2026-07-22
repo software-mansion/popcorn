@@ -1,4 +1,18 @@
 import { defineConfig, devices } from "@playwright/test";
+import { fileURLToPath } from "url";
+
+const jsRootDir = fileURLToPath(new URL("..", import.meta.url));
+const buildCommand = process.env.POPCORN_PREBUILT_RUNTIME
+  ? "pnpm run build:release"
+  : "pnpm run build";
+const webServerCommand = [
+  buildCommand,
+  "cd e2e/elixir",
+  "mix deps.get",
+  "mix popcorn.cook",
+  "cd ../setup",
+  "exec pnpm exec vite",
+].join(" && ");
 
 export default defineConfig({
   testDir: ".",
@@ -17,7 +31,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  globalSetup: "./setup/global-setup.ts",
-  globalTeardown: "./setup/global-teardown.ts",
+  webServer: {
+    command: webServerCommand,
+    cwd: jsRootDir,
+    url: "http://localhost:5173",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
   timeout: 60000,
 });
