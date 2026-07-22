@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    outputs:
+      atomvm-runtime: ${{ steps.groups.outputs.atomvm_runtime }}
+      core: ${{ steps.groups.outputs.core }}
+      browser-apps: ${{ steps.groups.outputs.browser_apps }}
+      llv: ${{ steps.groups.outputs.llv }}
+      otp-no-crypto: ${{ steps.groups.outputs.otp_no_crypto }}
+      otp-crypto: ${{ steps.groups.outputs.otp_crypto }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select suite groups
+        id: groups
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: scripts/ci-changed-groups.sh "$BASE_SHA" "$HEAD_SHA"
+
+  ci:
+    name: CI
+    if: always()
+    needs: changes
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report selected suite groups
+        env:
+          ATOMVM_RUNTIME: ${{ needs.changes.outputs.atomvm-runtime }}
+          CORE: ${{ needs.changes.outputs.core }}
+          BROWSER_APPS: ${{ needs.changes.outputs.browser-apps }}
+          LLV: ${{ needs.changes.outputs.llv }}
+          OTP_NO_CRYPTO: ${{ needs.changes.outputs.otp-no-crypto }}
+          OTP_CRYPTO: ${{ needs.changes.outputs.otp-crypto }}
+        run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            exit 1
+          fi
+
+          printf '%s\n' \
+            "atomvm-runtime=$ATOMVM_RUNTIME" \
+            "core=$CORE" \
+            "browser-apps=$BROWSER_APPS" \
+            "llv=$LLV" \
+            "otp-no-crypto=$OTP_NO_CRYPTO" \
+            "otp-crypto=$OTP_CRYPTO"
