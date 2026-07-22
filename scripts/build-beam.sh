@@ -10,14 +10,6 @@
 #
 # Options:
 #   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
-#   --without-zstd        Exclude Zstandard support
-#   --without-native-sockets
-#                         Exclude the native inet driver
-#   --without-distribution
-#                         Exclude remote distribution
-#   --without-crash-dumps Exclude filesystem crash dump generation
-#   --without-dynamic-loading
-#                         Exclude filesystem-backed driver and NIF loading
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
@@ -64,14 +56,6 @@ Build modes (positional):
 
 Options:
   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
-  --without-zstd        Exclude Zstandard support
-  --without-native-sockets
-                        Exclude the native inet driver
-  --without-distribution
-                        Exclude remote distribution
-  --without-crash-dumps Exclude filesystem crash dump generation
-  --without-dynamic-loading
-                        Exclude filesystem-backed driver and NIF loading
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
@@ -477,11 +461,6 @@ main() {
     local otp_tag="${DEFAULT_OTP_TAG}"
     local outdir=""
     local with_crypto=false
-    local without_zstd=false
-    local without_native_sockets=false
-    local without_distribution=false
-    local without_crash_dumps=false
-    local without_dynamic_loading=false
     local clean=false
     local jobs=""
     local mode=""
@@ -493,26 +472,6 @@ main() {
                 ;;
             --with-crypto)
                 with_crypto=true
-                shift
-                ;;
-            --without-zstd)
-                without_zstd=true
-                shift
-                ;;
-            --without-native-sockets)
-                without_native_sockets=true
-                shift
-                ;;
-            --without-distribution)
-                without_distribution=true
-                shift
-                ;;
-            --without-crash-dumps)
-                without_crash_dumps=true
-                shift
-                ;;
-            --without-dynamic-loading)
-                without_dynamic_loading=true
                 shift
                 ;;
             --otp-tag)
@@ -553,14 +512,6 @@ main() {
         error "Build mode is required. Use: debug, release"
     fi
 
-    if [[ "${mode}" == "release" ]]; then
-        without_zstd=true
-        without_native_sockets=true
-        without_distribution=true
-        without_crash_dumps=true
-        without_dynamic_loading=true
-    fi
-
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
     if [[ -n "${CI:-}" ]] && [[ -z "${jobs}" ]]; then
         jobs="1"
@@ -585,23 +536,22 @@ main() {
 
     setup_otp_source "${source}" "${otp_tag}"
 
-    local patch_args=()
-    [[ "${without_zstd}" == "true" ]] && patch_args+=(--without-zstd)
-    [[ "${without_native_sockets}" == "true" ]] && patch_args+=(--without-native-sockets)
-    [[ "${without_distribution}" == "true" ]] && patch_args+=(--without-distribution)
-    [[ "${without_crash_dumps}" == "true" ]] && patch_args+=(--without-crash-dumps)
-    [[ "${without_dynamic_loading}" == "true" ]] && patch_args+=(--without-dynamic-loading)
-    patch_otp "${patch_args[@]}"
+    patch_otp \
+        --without-zstd \
+        --without-native-sockets \
+        --without-distribution \
+        --without-crash-dumps \
+        --without-dynamic-loading
 
     run_autoconf "${beam_dir}"
 
     # The native bootstrap emulator embeds erts/preloaded/ebin/*.beam while
     # building preload.c, before bootstrap/bin/erlc has been created.
-    compile_preloaded_modules "${beam_dir}" true "${without_native_sockets}"
+    compile_preloaded_modules "${beam_dir}" true true
 
     build_bootstrap "${beam_dir}" "${jobs}"
 
-    compile_preloaded_modules "${beam_dir}" true "${without_native_sockets}"
+    compile_preloaded_modules "${beam_dir}" true true
 
     local openssl_prefix=""
     if [[ "${with_crypto}" == "true" ]]; then
