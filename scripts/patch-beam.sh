@@ -13,6 +13,7 @@
 #   --without-native-sockets
 #   --without-distribution
 #   --without-crash-dumps
+#   --without-dynamic-loading
 #   -h, --help    Show this help
 #
 # Requires otp/sources/otp to exist (created by build-beam.sh).
@@ -104,6 +105,7 @@ apply_patches() {
     [[ "${WITHOUT_NATIVE_SOCKETS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0002-without-native-sockets.patch")
     [[ "${WITHOUT_DISTRIBUTION}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0003-without-distribution.patch")
     [[ "${WITHOUT_CRASH_DUMPS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0004-without-crash-dumps.patch")
+    [[ "${WITHOUT_DYNAMIC_LOADING}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0005-without-dynamic-loading.patch")
 
     local patches_list
     patches_list=$(printf '%s\n' "${patches[@]}")
@@ -196,6 +198,7 @@ main() {
     WITHOUT_NATIVE_SOCKETS=false
     WITHOUT_DISTRIBUTION=false
     WITHOUT_CRASH_DUMPS=false
+    WITHOUT_DYNAMIC_LOADING=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -220,6 +223,10 @@ main() {
                 ;;
             --without-crash-dumps)
                 WITHOUT_CRASH_DUMPS=true
+                shift
+                ;;
+            --without-dynamic-loading)
+                WITHOUT_DYNAMIC_LOADING=true
                 shift
                 ;;
             *)
