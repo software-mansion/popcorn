@@ -9,6 +9,7 @@
 #   --regen       Regenerate patches from current otp/sources/otp state
 #
 # Options:
+#   --without-zstd
 #   -h, --help    Show this help
 #
 # Requires otp/sources/otp to exist (created by build-beam.sh).
@@ -41,6 +42,7 @@ Options:
 Apply mode:
   Expects otp/sources/otp-original to exist (cloned OTP).
   Copies otp-original to otp/ if not present, then applies patches.
+  Stripped patches are applied only when their --without-* option is present.
 
 Regen mode:
   Expects otp/sources/otp to exist with local modifications.
@@ -94,11 +96,11 @@ apply_patches() {
         error "otp/patches/ not found. No patches to apply."
     fi
 
-    local patches
-    patches=$(find "${PATCHES_DIR}" -name "*.patch" -type f | sort)
-    if [[ -z "${patches}" ]]; then
-        error "No .patch files found in otp/patches/."
-    fi
+    local -a patches=("${PATCHES_DIR}/0001-emscripten-support.patch")
+    [[ "${WITHOUT_ZSTD}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0001-without-zstd.patch")
+
+    local patches_list
+    patches_list=$(printf '%s\n' "${patches[@]}")
 
     # Copy otp-original to otp if not present
     if [[ ! -d "${OTP_DIR}" ]]; then
@@ -111,7 +113,7 @@ apply_patches() {
     # otherwise an edited patch is silently ignored and the built VM keeps
     # running the previous protocol.
     local patches_hash
-    patches_hash=$(echo "${patches}" | xargs cat | git hash-object --stdin)
+    patches_hash=$(cat "${patches[@]}" | git hash-object --stdin)
 
     if [[ -f "${STAMP_FILE}" ]] && [[ "$(cat "${STAMP_FILE}")" == "${patches_hash}" ]]; then
         log "Patches already applied and up to date, skipping."
@@ -141,7 +143,7 @@ apply_patches() {
         patch_name=$(basename "${patch}")
         log "  Applying ${patch_name}..."
         (cd "${OTP_DIR}" && git apply "${patch}")
-    done <<< "${patches}"
+    done <<< "${patches_list}"
 
     echo "${patches_hash}" > "${STAMP_FILE}"
     success "Patches applied."
@@ -184,6 +186,7 @@ regen_patches() {
 
 main() {
     local regen=false
+    WITHOUT_ZSTD=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -192,6 +195,10 @@ main() {
                 ;;
             --regen)
                 regen=true
+                shift
+                ;;
+            --without-zstd)
+                WITHOUT_ZSTD=true
                 shift
                 ;;
             *)

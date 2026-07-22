@@ -10,6 +10,7 @@
 #
 # Options:
 #   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
+#   --without-zstd        Exclude Zstandard support
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
@@ -56,6 +57,7 @@ Build modes (positional):
 
 Options:
   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
+  --without-zstd        Exclude Zstandard support
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
@@ -133,7 +135,7 @@ setup_otp_source() {
 
 patch_otp() {
     log "Patching OTP sources..."
-    run "${PROJECT_ROOT}/scripts/patch-beam.sh"
+    run "${PROJECT_ROOT}/scripts/patch-beam.sh" "$@"
 }
 
 
@@ -453,6 +455,7 @@ main() {
     local otp_tag="${DEFAULT_OTP_TAG}"
     local outdir=""
     local with_crypto=false
+    local without_zstd=false
     local clean=false
     local jobs=""
     local mode=""
@@ -464,6 +467,10 @@ main() {
                 ;;
             --with-crypto)
                 with_crypto=true
+                shift
+                ;;
+            --without-zstd)
+                without_zstd=true
                 shift
                 ;;
             --otp-tag)
@@ -504,6 +511,10 @@ main() {
         error "Build mode is required. Use: debug, release"
     fi
 
+    if [[ "${mode}" == "release" ]]; then
+        without_zstd=true
+    fi
+
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
     if [[ -n "${CI:-}" ]] && [[ -z "${jobs}" ]]; then
         jobs="1"
@@ -528,7 +539,9 @@ main() {
 
     setup_otp_source "${source}" "${otp_tag}"
 
-    patch_otp
+    local patch_args=()
+    [[ "${without_zstd}" == "true" ]] && patch_args+=(--without-zstd)
+    patch_otp "${patch_args[@]}"
 
     run_autoconf "${beam_dir}"
 
