@@ -1,3 +1,4 @@
+import { schedulers } from "@swmansion/popcorn-otp";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 function evalElixirOpts(code: string) {
@@ -14,6 +15,31 @@ test("boots", async ({ otp }) => {
   });
 
   expect(result).toEqual({ ok: true, data: null });
+});
+
+test("configures BEAM schedulers", async ({ otp }) => {
+  const SCHED_EVAL = `
+    ok = wasm:send(#{
+      schedulers => erlang:system_info(schedulers),
+      dirty_cpu_schedulers => erlang:system_info(dirty_cpu_schedulers),
+      dirty_io_schedulers => erlang:system_info(dirty_io_schedulers)
+    }).
+  `;
+  const result = await otp.boot({
+    beam: {
+      manifestUrl: "/assets/otp/manifest.json",
+      emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
+      extraArgs: ["-eval", SCHED_EVAL],
+    },
+  });
+
+  expect(result).toEqual({ ok: true, data: null });
+  await otp.waitForEvent("schedulers");
+  expect(otp.events).toContainEqual({
+    schedulers: 2,
+    dirty_cpu_schedulers: 2,
+    dirty_io_schedulers: 2,
+  });
 });
 
 test("auto-starts the manifest entrypoint app", async ({ otp }) => {
@@ -184,7 +210,6 @@ test("failing boot fails immediately", async ({ page }) => {
   expect(result.elapsedMs).toBeLessThan(5_000);
 });
 
-
 test("loads manifest apps before eval", async ({ otp }) => {
   const boot = await otp.boot(
     evalOpts(`
@@ -223,5 +248,3 @@ test("starts the provided logger app", async ({ otp }) => {
   await otp.waitForEvent("logger_started");
   expect(otp.events).toContainEqual({ logger_started: true });
 });
-
-

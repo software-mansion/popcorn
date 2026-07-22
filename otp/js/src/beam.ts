@@ -22,7 +22,6 @@ const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
-  "--",
   "-root",
   "/",
   "-bindir",
@@ -37,6 +36,7 @@ const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
 
 export async function boot({
   manifestUrl,
+  emulatorArgs,
   extraArgs,
   createModule,
   emit,
@@ -67,6 +67,7 @@ export async function boot({
     arguments: buildArgs({
       appNames: fsData.appNames,
       entrypoint: fsData.entrypoint,
+      emulator: emulatorArgs ?? [],
       extra: extraArgs ?? [],
     }),
     ENV: {
@@ -96,11 +97,17 @@ function toPopcornError(error: unknown): PopcornError {
 type BuildArgsArgs = {
   appNames: string[];
   entrypoint: string | null;
+  emulator: string[];
   extra: string[];
 };
 
-function buildArgs({ appNames, entrypoint, extra }: BuildArgsArgs): string[] {
-  const args = [...BASE_ARGS, "-boot", BOOT_NAME];
+function buildArgs({
+  appNames,
+  entrypoint,
+  emulator,
+  extra,
+}: BuildArgsArgs): string[] {
+  const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (true) {
     args.push("-noshell");

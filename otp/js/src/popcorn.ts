@@ -25,7 +25,7 @@ const TRACKED_REF_KEY = "popcorn_ref";
 const PID_REF_KEY = "popcorn_pid";
 
 export type PopcornOpts = {
-  beam: Pick<BeamBootOptions, "manifestUrl" | "extraArgs">;
+  beam: Pick<BeamBootOptions, "manifestUrl" | "emulatorArgs" | "extraArgs">;
   timeoutsMs?: {
     boot?: number;
     send?: number;
@@ -127,7 +127,15 @@ export class Popcorn {
   };
 
   public constructor(opts: PopcornOpts) {
-    this.opts = opts;
+    this.opts = {
+      ...opts,
+      beam: {
+        ...opts.beam,
+        emulatorArgs:
+          opts.beam.emulatorArgs ??
+          schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
+      },
+    };
     this.spawnWorker();
   }
 
@@ -360,10 +368,10 @@ export class Popcorn {
       return;
     }
 
-    const failure = serializeSendPayload(
-      target,
-      { ok: false, error: { unserializable: command.error.data.reason } },
-    );
+    const failure = serializeSendPayload(target, {
+      ok: false,
+      error: { unserializable: command.error.data.reason },
+    });
     check(failure.ok);
     this.sendRunJsReply(failure.data);
   }
@@ -488,6 +496,21 @@ export class Popcorn {
 
     this.deinit(exitReason(payload));
   }
+}
+
+export type SchedulerOptions = {
+  base: number;
+  dirtyCpu: number;
+  dirtyIo: number;
+};
+
+export function schedulers(opts: SchedulerOptions): string[] {
+  const { base, dirtyCpu, dirtyIo } = opts;
+  check(base > 0);
+  check(dirtyCpu > 0);
+  check(dirtyIo > 0);
+
+  return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
 }
 
 function exitReason(payload: OtpErrorPayload): VmExitReason {

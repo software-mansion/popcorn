@@ -15,6 +15,7 @@ export type BeamSendPayload = {
 
 export type BeamBootOptions = {
   manifestUrl: string;
+  emulatorArgs?: string[];
   extraArgs?: string[];
   createModule: CreateModuleFn<EmscriptenModule>;
   emit: (event: BeamEvent) => void;
