@@ -13,6 +13,8 @@
 #   --without-zstd        Exclude Zstandard support
 #   --without-native-sockets
 #                         Exclude the native inet driver
+#   --without-distribution
+#                         Exclude remote distribution
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
@@ -62,6 +64,8 @@ Options:
   --without-zstd        Exclude Zstandard support
   --without-native-sockets
                         Exclude the native inet driver
+  --without-distribution
+                        Exclude remote distribution
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
@@ -469,6 +473,7 @@ main() {
     local with_crypto=false
     local without_zstd=false
     local without_native_sockets=false
+    local without_distribution=false
     local clean=false
     local jobs=""
     local mode=""
@@ -488,6 +493,10 @@ main() {
                 ;;
             --without-native-sockets)
                 without_native_sockets=true
+                shift
+                ;;
+            --without-distribution)
+                without_distribution=true
                 shift
                 ;;
             --otp-tag)
@@ -531,6 +540,7 @@ main() {
     if [[ "${mode}" == "release" ]]; then
         without_zstd=true
         without_native_sockets=true
+        without_distribution=true
     fi
 
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
@@ -560,6 +570,7 @@ main() {
     local patch_args=()
     [[ "${without_zstd}" == "true" ]] && patch_args+=(--without-zstd)
     [[ "${without_native_sockets}" == "true" ]] && patch_args+=(--without-native-sockets)
+    [[ "${without_distribution}" == "true" ]] && patch_args+=(--without-distribution)
     patch_otp "${patch_args[@]}"
 
     run_autoconf "${beam_dir}"

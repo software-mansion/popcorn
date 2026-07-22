@@ -1,0 +1,281 @@
+diff --git a/lib/kernel/src/Makefile b/lib/kernel/src/Makefile
+--- a/lib/kernel/src/Makefile
++++ b/lib/kernel/src/Makefile
+@@ -66,14 +66,11 @@ MODULES = \
+ 	disk_log_server \
+ 	disk_log_sup \
+ 	dist_ac \
+-	dist_util \
+ 	erl_boot_server \
+ 	erl_compile_server \
+ 	erl_ddll \
+ 	erl_debugger \
+-	erl_distribution \
+ 	erl_erts_errors \
+-	erl_epmd \
+ 	erl_kernel_errors \
+ 	erl_reply \
+ 	erl_signal_handler \
+@@ -97,21 +94,17 @@ MODULES = \
+ 	heart \
+ 	inet \
+ 	inet6_tcp \
+-	inet6_tcp_dist \
+ 	inet6_udp \
+ 	inet6_sctp \
+ 	inet_config \
+ 	inet_db \
+ 	inet_dns \
+ 	inet_dns_tsig \
+-	inet_epmd_dist \
+-	inet_epmd_socket \
+ 	inet_gethost_native \
+ 	inet_hosts \
+ 	inet_parse \
+ 	inet_res \
+ 	inet_tcp \
+-	inet_tcp_dist \
+ 	inet_udp \
+ 	inet_sctp \
+ 	kernel \
+diff --git a/lib/kernel/src/kernel.app.src b/lib/kernel/src/kernel.app.src
+--- a/lib/kernel/src/kernel.app.src
++++ b/lib/kernel/src/kernel.app.src
+@@ -32,11 +32,9 @@
+ 	     auth,
+ 	     code,
+ 	     code_server,
+-	     dist_util,
+ 	     erl_boot_server,
+ 	     erl_compile_server,
+ 	     erl_debugger,
+-	     erl_distribution,
+              erl_erts_errors,
+ 	     erl_reply,
+              erl_kernel_errors,
+@@ -54,15 +52,11 @@
+ 	     group_history,
+ 	     heart,
+ 	     inet6_tcp,
+-	     inet6_tcp_dist,
+ 	     inet6_udp,
+ 	     inet6_sctp,
+ 	     inet_config,
+-             inet_epmd_dist,
+-             inet_epmd_socket,
+ 	     inet_hosts,
+ 	     inet_gethost_native,
+-	     inet_tcp_dist,
+ 	     kernel,
+ 	     kernel_config,
+ 	     kernel_refc,
+@@ -99,7 +93,6 @@
+              disk_log_sup,
+              dist_ac,
+              erl_ddll,
+-             erl_epmd,
+ 	     erts_debug,
+              gen_tcp,
+ 	     gen_tcp_socket,
+diff --git a/lib/kernel/src/kernel.erl b/lib/kernel/src/kernel.erl
+--- a/lib/kernel/src/kernel.erl
++++ b/lib/kernel/src/kernel.erl
+@@ -260,13 +260,6 @@ start_distribution() ->
+ 
+     DistAC = start_dist_ac(),
+ 
+-    NetSup = #{id => net_sup,
+-               start => {erl_distribution, start_link, []},
+-               restart => permanent,
+-               shutdown => infinity,
+-               type => supervisor,
+-               modules => [erl_distribution]},
+-
+     GlGroup = #{id => global_group,
+                 start => {global_group,start_link,[]},
+                 restart => permanent,
+@@ -274,7 +267,7 @@ start_distribution() ->
+                 type => worker,
+                 modules => [global_group]},
+ 
+-    [Rpc, Global | DistAC] ++ [NetSup, GlGroup].
++    [Rpc, Global | DistAC] ++ [GlGroup].
+ 
+ start_dist_ac() ->
+     Spec = [#{id => dist_ac,
+diff --git a/lib/kernel/src/net_kernel.erl b/lib/kernel/src/net_kernel.erl
+--- a/lib/kernel/src/net_kernel.erl
++++ b/lib/kernel/src/net_kernel.erl
+@@ -345,10 +345,9 @@ Only possible when the net kernel was started using `start/2`, otherwise
+ `{error, not_allowed}` is returned. Returns `{error, not_found}` if the local
+ node is not alive.
+ """.
+--spec stop() -> ok | {error, Reason} when
+-      Reason :: not_allowed | not_found.
++-spec stop() -> {error, enotsup}.
+ stop() ->
+-    erl_distribution:stop().
++    {error, enotsup}.
+ 
+ -type node_info() ::
+     {address, #net_address{}} |
+@@ -834,28 +833,8 @@ Currently supported options:
+       Reason :: {already_started, pid()} | term().
+ 
+ start(Name, Options) when is_atom(Name), is_map(Options) ->
+-    try
+-        maps:foreach(fun (name_domain, Val) when Val == shortnames;
+-                                                 Val == longnames ->
+-                             ok;
+-                         (net_ticktime, Val) when is_integer(Val),
+-                                                  Val > 0 ->
+-                             ok;
+-                         (net_tickintensity, Val) when is_integer(Val),
+-                                                       4 =< Val,
+-                                                       Val =< 1000 ->
+-                             ok;
+-                         (dist_listen, Val) when is_boolean(Val) ->
+-                             ok;
+-                         (hidden, Val) when is_boolean(Val) ->
+-                             ok;
+-                         (Opt, Val) ->
+-                             error({invalid_option, Opt, Val})
+-                     end, Options)
+-    catch error:Reason ->
+-            error(Reason, [Name, Options])
+-    end,
+-    erl_distribution:start(Options#{name => Name});
++    _ = {Name, Options},
++    {error, enotsup};
+ start(Name, Options) when is_map(Options) ->
+     error(invalid_name, [Name, Options]);
+ start(Name, Options) ->
+diff --git a/erts/emulator/beam/dist.c b/erts/emulator/beam/dist.c
+--- a/erts/emulator/beam/dist.c
++++ b/erts/emulator/beam/dist.c
+@@ -2020,6 +2020,8 @@ int erts_net_message(Port *prt,
+ 		     const byte *buf,
+ 		     ErlDrvSizeT len)
+ {
++    return -1;
++
+     ErtsDistExternal ede, *edep = &ede;
+     ErtsDistExternalData ede_data;
+     ErlHeapFragment *ede_hfrag = NULL;
+@@ -3220,6 +3222,8 @@ erts_dsig_prepare(ErtsDSigSendContext *ctx,
+                   int no_trap,
+ 		  int connect)
+ {
++    return ERTS_DSIG_PREP_NOT_CONNECTED;
++
+     /*
+      * No process imply that we should force data through. That
+      * is, ignore busy state of dist entry and allow enqueue
+@@ -4271,6 +4275,8 @@ erts_dist_command(Port *prt, int initial_reds)
+ BIF_RETTYPE
+ dist_ctrl_get_data_notification_1(BIF_ALIST_1)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
+     erts_aint32_t notify;
+     erts_aint_t qsize;
+@@ -4331,6 +4337,8 @@ dist_ctrl_get_data_notification_1(BIF_ALIST_1)
+ BIF_RETTYPE
+ dist_ctrl_put_data_2(BIF_ALIST_2)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry *dep;
+     Eterm input_handler;
+     Uint32 conn_id;
+@@ -4407,6 +4415,8 @@ dist_ctrl_put_data_2(BIF_ALIST_2)
+ BIF_RETTYPE
+ dist_ctrl_set_opt_3(BIF_ALIST_3)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
+     Uint32 conn_id;
+     BIF_RETTYPE ret;
+@@ -4450,6 +4460,8 @@ dist_ctrl_set_opt_3(BIF_ALIST_3)
+ BIF_RETTYPE
+ dist_ctrl_get_opt_2(BIF_ALIST_2)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
+     Uint32 conn_id;
+     BIF_RETTYPE ret;
+@@ -4487,6 +4499,8 @@ dist_ctrl_get_opt_2(BIF_ALIST_2)
+ BIF_RETTYPE
+ dist_get_stat_1(BIF_ALIST_1)
+ {
++    BIF_RET(am_notsup);
++
+     Sint64 read, write, pend;
+     Eterm res, *hp, **hpp;
+     Uint sz, *szp;
+@@ -4531,6 +4545,8 @@ dist_get_stat_1(BIF_ALIST_1)
+ BIF_RETTYPE
+ dist_ctrl_input_handler_2(BIF_ALIST_2)
+ {
++    BIF_RET(am_notsup);
++
+     Uint32 conn_id;
+     DistEntry *dep = erts_dhandle_to_dist_entry(BIF_ARG_1, &conn_id);
+ 
+@@ -4557,6 +4573,8 @@ dist_ctrl_input_handler_2(BIF_ALIST_2)
+ BIF_RETTYPE
+ dist_ctrl_get_data_1(BIF_ALIST_1)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
+     const Sint initial_reds = ERTS_BIF_REDS_LEFT(BIF_P);
+     Sint reds = initial_reds, ix, vlen;
+@@ -4977,6 +4995,8 @@ int distribution_info(fmtfn_t to, void *arg)
+ 
+ BIF_RETTYPE setnode_2(BIF_ALIST_2)
+ {
++    BIF_RET(am_notsup);
++
+     Process *net_kernel = NULL;
+     Uint32 creation;
+     int success;
+@@ -5126,6 +5146,8 @@ setup_connection_distctrl(Process *c_p, void *arg,
+ 
+ BIF_RETTYPE erts_internal_create_dist_channel_3(BIF_ALIST_3)
+ {
++    BIF_RET(am_notsup);
++
+     BIF_RETTYPE ret;
+     Uint64 flags;
+     Uint32 creation;
+@@ -5587,6 +5609,8 @@ BIF_RETTYPE erts_internal_get_creation_0(BIF_ALIST_0)
+ 
+ BIF_RETTYPE erts_internal_new_connection_1(BIF_ALIST_1)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry* dep;
+     Uint32 conn_id;
+     Eterm* hp;
+@@ -5692,6 +5716,8 @@ static Sint abort_pending_connection(DistEntry *dep, Uint32 conn_id,
+ 
+ BIF_RETTYPE erts_internal_abort_pending_connection_2(BIF_ALIST_2)
+ {
++    BIF_RET(am_notsup);
++
+     DistEntry* dep;
+     Uint32 conn_id;
+     Sint reds;
+@@ -5712,6 +5738,8 @@ BIF_RETTYPE erts_internal_abort_pending_connection_2(BIF_ALIST_2)
+ 
+ int erts_auto_connect(DistEntry* dep, Process *proc, ErtsProcLocks proc_locks)
+ {
++    return 0;
++
+     erts_de_rwlock(dep);
+     if (dep->state != ERTS_DE_STATE_IDLE) {
+         erts_de_rwunlock(dep);
