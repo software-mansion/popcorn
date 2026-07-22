@@ -10,6 +10,7 @@
 #
 # Options:
 #   --without-zstd
+#   --without-native-sockets
 #   -h, --help    Show this help
 #
 # Requires otp/sources/otp to exist (created by build-beam.sh).
@@ -98,6 +99,7 @@ apply_patches() {
 
     local -a patches=("${PATCHES_DIR}/0001-emscripten-support.patch")
     [[ "${WITHOUT_ZSTD}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0001-without-zstd.patch")
+    [[ "${WITHOUT_NATIVE_SOCKETS}" == "true" ]] && patches+=("${PATCHES_DIR}/stripped/0002-without-native-sockets.patch")
 
     local patches_list
     patches_list=$(printf '%s\n' "${patches[@]}")
@@ -187,6 +189,7 @@ regen_patches() {
 main() {
     local regen=false
     WITHOUT_ZSTD=false
+    WITHOUT_NATIVE_SOCKETS=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -199,6 +202,10 @@ main() {
                 ;;
             --without-zstd)
                 WITHOUT_ZSTD=true
+                shift
+                ;;
+            --without-native-sockets)
+                WITHOUT_NATIVE_SOCKETS=true
                 shift
                 ;;
             *)

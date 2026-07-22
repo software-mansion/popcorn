@@ -11,6 +11,8 @@
 # Options:
 #   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
 #   --without-zstd        Exclude Zstandard support
+#   --without-native-sockets
+#                         Exclude the native inet driver
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
@@ -58,6 +60,8 @@ Build modes (positional):
 Options:
   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
   --without-zstd        Exclude Zstandard support
+  --without-native-sockets
+                        Exclude the native inet driver
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
@@ -180,9 +184,14 @@ build_bootstrap() {
 compile_preloaded_modules() {
     local beam_dir="$1"
     local force="${2:-false}"
+    local compile_prim_inet="${3:-false}"
     local ebin="${beam_dir}/erts/preloaded/ebin"
     local erlc="${beam_dir}/bootstrap/bin/erlc"
-    local module
+    local modules=(wasm erl_init)
+
+    if [[ "${compile_prim_inet}" == "true" ]]; then
+        modules+=(prim_inet)
+    fi
 
     if [[ ! -x "${erlc}" ]]; then
         erlc="$(command -v erlc || true)"
@@ -192,7 +201,7 @@ compile_preloaded_modules() {
     fi
 
     mkdir -p "${ebin}"
-    for module in wasm erl_init; do
+    for module in "${modules[@]}"; do
         local src="${beam_dir}/erts/preloaded/src/${module}.erl"
         local beam="${ebin}/${module}.beam"
 
@@ -208,7 +217,10 @@ compile_preloaded_modules() {
 
         log "Compiling preloaded ${module}.beam with ${erlc}..."
         # +deterministic matches how the committed preloaded beams are produced.
-        run "${erlc}" +deterministic -o "${ebin}" "${src}"
+        run "${erlc}" +deterministic \
+            -I "${beam_dir}/lib/kernel/src" \
+            -I "${beam_dir}/lib/kernel/include" \
+            -o "${ebin}" "${src}"
     done
     success "Preloaded modules compiled."
 }
@@ -456,6 +468,7 @@ main() {
     local outdir=""
     local with_crypto=false
     local without_zstd=false
+    local without_native_sockets=false
     local clean=false
     local jobs=""
     local mode=""
@@ -471,6 +484,10 @@ main() {
                 ;;
             --without-zstd)
                 without_zstd=true
+                shift
+                ;;
+            --without-native-sockets)
+                without_native_sockets=true
                 shift
                 ;;
             --otp-tag)
@@ -513,6 +530,7 @@ main() {
 
     if [[ "${mode}" == "release" ]]; then
         without_zstd=true
+        without_native_sockets=true
     fi
 
     # Use single-threaded build in CI to avoid OOM (unless explicitly set)
@@ -541,17 +559,18 @@ main() {
 
     local patch_args=()
     [[ "${without_zstd}" == "true" ]] && patch_args+=(--without-zstd)
+    [[ "${without_native_sockets}" == "true" ]] && patch_args+=(--without-native-sockets)
     patch_otp "${patch_args[@]}"
 
     run_autoconf "${beam_dir}"
 
     # The native bootstrap emulator embeds erts/preloaded/ebin/*.beam while
     # building preload.c, before bootstrap/bin/erlc has been created.
-    compile_preloaded_modules "${beam_dir}" true
+    compile_preloaded_modules "${beam_dir}" true "${without_native_sockets}"
 
     build_bootstrap "${beam_dir}" "${jobs}"
 
-    compile_preloaded_modules "${beam_dir}" true
+    compile_preloaded_modules "${beam_dir}" true "${without_native_sockets}"
 
     local openssl_prefix=""
     if [[ "${with_crypto}" == "true" ]]; then

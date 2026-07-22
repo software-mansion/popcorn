@@ -1,0 +1,65 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -1178,6 +1178,5 @@ ifeq ($(TARGET),win32)
+ DRV_OBJS = \
+ 	$(OBJDIR)/registry_drv.o \
+-	$(OBJDIR)/inet_drv.o \
+ 	$(OBJDIR)/ram_file_drv.o
+ OS_OBJS = \
+ 	$(OBJDIR)/dll_sys.o \
+@@ -1205,6 +1204,5 @@ OS_OBJS = \
+ 	$(OBJDIR)/unix_socket_syncio.o
+ 
+ DRV_OBJS = \
+-	$(OBJDIR)/inet_drv.o \
+ 	$(OBJDIR)/ram_file_drv.o
+ endif
+ 
+diff --git a/erts/preloaded/src/prim_inet.erl b/erts/preloaded/src/prim_inet.erl
+--- a/erts/preloaded/src/prim_inet.erl
++++ b/erts/preloaded/src/prim_inet.erl
+@@ -97,26 +97,3 @@ fdopen(Protocol, Family, Type, Fd, Bound)
+-open(Protocol, Family, Type, Opts, Req, Data) ->
+-    Drv = protocol2drv(Protocol),
+-    AF = enc_family(Family),
+-    T = enc_type(Type),
+-    try erlang:open_port({spawn_driver,Drv}, [binary]) of
+-	S ->
+-	    case setopts(S, Opts) of
+-		ok ->
+-		    case ctl_cmd(S, Req, [AF,T,Data]) of
+-			{ok,_} -> {ok,S};
+-			{error,_}=E1 ->
+-			    close(S),
+-			    E1
+-		    end;
+-		{error,_}=E2 ->
+-		    close(S),
+-		    E2
+-	    end
+-    catch
+-	%% The only (?) way to get here is to try to open
+-	%% the sctp driver when it does not exist (badarg)
+-	error:badarg       -> {error, eprotonosupport};
+-	%% system_limit if out of port slots
+-	error:system_limit -> {error, system_limit}
+-    end.
++open(_Protocol, _Family, _Type, _Opts, _Req, _Data) ->
++    {error, eprotonosupport}.
+ 
+@@ -123,14 +100,1 @@ open(Protocol, Family, Type, Opts, Req, Data) ->
+-enc_family(inet)  -> ?INET_AF_INET;
+-enc_family(inet6) -> ?INET_AF_INET6;
+-enc_family(local) -> ?INET_AF_LOCAL.
+-
+-enc_type(stream) -> ?INET_TYPE_STREAM;
+-enc_type(dgram) -> ?INET_TYPE_DGRAM;
+-enc_type(seqpacket) -> ?INET_TYPE_SEQPACKET.
+-
+-protocol2drv(tcp)   -> "tcp_inet";
+-protocol2drv(udp)   -> "udp_inet";
+-protocol2drv(sctp)  -> "sctp_inet";
+-protocol2drv(mptcp) -> "tcp_inet".
+-
+ drv2protocol("tcp_inet")  -> tcp;
