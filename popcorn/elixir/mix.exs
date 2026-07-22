@@ -146,7 +146,12 @@ defmodule Popcorn.MixProject do
     js_dir = Path.expand("../js", __DIR__)
     js_entry = Path.join(js_dir, "dist/popcorn.mjs")
 
-    run_cmd!("pnpm run build", cd: js_dir)
+    build_command =
+      if System.get_env("POPCORN_PREBUILT_RUNTIME") == "true",
+        do: "pnpm run build:release",
+        else: "pnpm run build"
+
+    run_cmd!(build_command, cd: js_dir)
     run_cmd!("npx documentation build #{js_entry} -f html -o doc/js-api", [])
   end
 

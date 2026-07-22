@@ -70,6 +70,13 @@ jobs:
         working-directory: .
         run: pnpm install
 
+      - name: Build AtomVM Unix test runtime
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-unix
+          output-directories: popcorn/elixir/test/fixtures/unix
+          cmake-opts: "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
+
       - name: Run tests
         # Limiting to test/treeshake avoids compiling other tests
         run: mix test test/treeshake --only treeshake

@@ -67,7 +67,7 @@ jobs:
           source: .atomvm-source
           source-revision: ${{ steps.fissionvm.outputs.revision }}
           output-directories: .ci-artifacts/atomvm/unix
-          cmake-opts: "SANITIZER=OFF"
+          cmake-opts: "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
 
       - name: Upload debug WASM runtime
         uses: actions/upload-artifact@v4
@@ -94,6 +94,7 @@ jobs:
     env:
       CI: true
       MIX_ENV: test
+      POPCORN_PREBUILT_RUNTIME: true
     steps:
       - uses: actions/checkout@v4
 
@@ -103,8 +104,16 @@ jobs:
           name: atomvm-debug-wasm
           path: .ci-artifacts/atomvm/wasm
 
-      - name: Install shared AtomVM runtime
+      - name: Download AtomVM Unix runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: atomvm-debug-unix
+          path: .ci-artifacts/atomvm/unix
+
+      - name: Install shared AtomVM runtimes
         run: |
+          chmod +x .ci-artifacts/atomvm/unix/AtomVM
+
           for output_directory in \
             popcorn/js/assets \
             examples/hello-popcorn/popcorn_runtime_source/artifacts/wasm \
@@ -113,6 +122,9 @@ jobs:
             mkdir -p "$output_directory"
             cp -a .ci-artifacts/atomvm/wasm/. "$output_directory/"
           done
+
+          mkdir -p popcorn/elixir/test/fixtures/unix
+          cp -a .ci-artifacts/atomvm/unix/. popcorn/elixir/test/fixtures/unix/
 
       - name: Setup BEAM
         uses: ./.github/actions/setup-beam

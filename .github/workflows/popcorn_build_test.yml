@@ -28,6 +28,7 @@ permissions:
 env:
   CI: true
   MIX_ENV: test
+  POPCORN_PREBUILT_RUNTIME: true
 
 jobs:
   build:
@@ -72,6 +73,20 @@ jobs:
       - name: Install JS dependencies
         working-directory: .
         run: pnpm install
+
+      - name: Build AtomVM WASM runtime
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-wasm
+          output-directories: popcorn/js/assets
+          cmake-opts: "SANITIZER=OFF"
+
+      - name: Build AtomVM Unix test runtime
+        uses: ./.github/actions/build-atomvm
+        with:
+          build-mode: debug-unix
+          output-directories: popcorn/elixir/test/fixtures/unix
+          cmake-opts: "SANITIZER=OFF DEBUG_ASSERTIONS=ON DEBUG_GC=ON"
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
