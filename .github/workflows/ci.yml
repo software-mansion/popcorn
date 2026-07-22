@@ -473,7 +473,9 @@ jobs:
           - task: Elixir lint
             command: (cd local-live-view && mix deps.get && mix lint)
           - task: unit tests
-            command: (cd local-live-view && mix deps.get && mix test)
+            command: |
+              mix archive.install hex phx_new --force
+              (cd local-live-view && mix deps.get && mix test)
     steps:
       - uses: actions/checkout@v4
 
@@ -541,6 +543,7 @@ jobs:
             mix-files: local-live-view/{mix.exs,mix.lock}
             command: |
               printf "\nconfig :popcorn, runtime: {:path, \"popcorn_runtime_source/artifacts/\$target\"}\n" >> local-live-view/config/config.exs
+              mix archive.install hex phx_new --force
               (cd local-live-view && mix deps.get && mix deps.compile && mix test --only e2e)
           - task: build
             cache-name: local_live_view
