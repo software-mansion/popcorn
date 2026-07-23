@@ -54,7 +54,7 @@
     }
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
+    "@playwright/test": "^1.61.1",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
     "esbuild": "^0.25.0",
