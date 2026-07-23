@@ -73,3 +73,28 @@ export const TPL_STACKTRACE_TOGGLE = tpl(`
 export const TPL_STACKTRACE = tpl(`
   <pre class="popdoc-stacktrace" hidden></pre>
 `);
+
+export const TPL_IEX_ICON = tpl(`
+  <span class="popdoc-iex-icon" aria-hidden="true"></span>
+`);
+
+export const TPL_LAUNCHER = tpl(`
+  <button type="button" class="popdoc-iex-launcher" title="Open IEx terminal">iex</button>
+`);
+
+export const TPL_TERMINAL = tpl(`
+  <div class="popdoc-terminal">
+    <div class="popdoc-terminal-header">
+      <span class="popdoc-terminal-title">IEx</span>
+      <div class="popdoc-terminal-actions">
+        <button type="button" class="popdoc-terminal-btn" data-action="clear" title="Clear screen">Clear</button>
+        <button type="button" class="popdoc-terminal-btn" data-action="reset" title="Restart session">Reset</button>
+        <button type="button" class="popdoc-terminal-btn popdoc-terminal-collapse" data-action="collapse" title="Collapse">─</button>
+        <button type="button" class="popdoc-terminal-btn" data-action="close" title="Close">✕</button>
+      </div>
+    </div>
+    <div class="popdoc-terminal-body">
+      <div class="popdoc-terminal-mount"></div>
+    </div>
+  </div>
+`);
