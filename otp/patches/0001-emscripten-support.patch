@@ -127,6 +127,107 @@ index a09675e3552f985b3f416dd83f07824f0e5d3860..80e625774c76ad03b804dcc15e9c7162
  typedef void (*ChksumFun)(void *sum_in_out, const byte *buf,
  			  unsigned buflen);
  
+diff --git a/erts/emulator/beam/global.h b/erts/emulator/beam/global.h
+index 15ffdb2f6fe850e1b431135fa6f7435d0febfa53..9a2b34eb328a3349ddf885f8899dcd83f41052c3 100644
+--- a/erts/emulator/beam/global.h
++++ b/erts/emulator/beam/global.h
+@@ -225,7 +225,9 @@ struct erts_driver_t_ {
+     DE_Handle *handle;
+     erts_mtx_t *lock;
+     ErlDrvEntry *entry;
+-    ErlDrvData (*start)(ErlDrvPort port, char *command, SysDriverOpts* opts);
++    ErlDrvData (*start)(ErlDrvPort port, char *command);
++    ErlDrvData (*system_start)(ErlDrvPort port, char *command,
++                               SysDriverOpts* opts);
+     void (*stop)(ErlDrvData drv_data);
+     void (*finish)(void);
+     void (*flush)(ErlDrvData drv_data);
+diff --git a/erts/emulator/beam/io.c b/erts/emulator/beam/io.c
+index d5b3b9d52b710538f0c3a94ad62dcb54654ac12a..6702ab0f2a2fc3adc2b089c0e125eda39ec70f4e 100644
+--- a/erts/emulator/beam/io.c
++++ b/erts/emulator/beam/io.c
+@@ -93,7 +93,7 @@ static erts_atomic64_t bytes_in;
+ static erts_atomic64_t bytes_out;
+ 
+ static void deliver_result(Port *p, Eterm sender, Eterm pid, Eterm res);
+-static int init_driver(erts_driver_t *, ErlDrvEntry *, DE_Handle *);
++static int init_driver(erts_driver_t *, ErlDrvEntry *, DE_Handle *, int);
+ static void terminate_port(Port *p);
+ static void pdl_init(void);
+ static int driver_failure_term(ErlDrvPort ix, Eterm term, int eof);
+@@ -685,7 +685,7 @@ erts_open_driver(erts_driver_t* driver,	/* Pointer to driver. */
+                                  &opts->high_msgq_watermark);
+ 
+     error_number = error_type = 0;
+-    if (driver->start) {
++    if (driver->start || driver->system_start) {
+         ERTS_MSACC_PUSH_STATE_M();
+ 	if (ERTS_IS_P_TRACED_FL(port, F_TRACE_SCHED_PORTS)) {
+ 	    trace_sched_ports_where(port, am_in, am_open);
+@@ -710,7 +710,13 @@ erts_open_driver(erts_driver_t* driver,	/* Pointer to driver. */
+         }
+ #endif
+ 
+-	drv_data = (*driver->start)(ERTS_Port2ErlDrvPort(port), name, opts);
++	if (driver->system_start) {
++	    drv_data = (*driver->system_start)(ERTS_Port2ErlDrvPort(port),
++					     name, opts);
++	}
++	else {
++	    drv_data = (*driver->start)(ERTS_Port2ErlDrvPort(port), name);
++	}
+ 	if (((SWord) drv_data) == -1)
+ 	    error_type = -1;
+ 	else if (((SWord) drv_data) == -2) {
+@@ -3024,10 +3030,10 @@ void erts_init_io(int port_tab_size,
+     erts_tsd_set(driver_list_lock_status_key, (void *) 1);
+     erts_rwmtx_rwlock(&erts_driver_list_lock);
+ 
+-    init_driver(&fd_driver, &fd_driver_entry, NULL);
+-    init_driver(&spawn_driver, &spawn_driver_entry, NULL);
++    init_driver(&fd_driver, &fd_driver_entry, NULL, 1);
++    init_driver(&spawn_driver, &spawn_driver_entry, NULL, 1);
+ #ifndef __WIN32__
+-    init_driver(&forker_driver, &forker_driver_entry, NULL);
++    init_driver(&forker_driver, &forker_driver_entry, NULL, 1);
+ #endif
+     erts_init_static_drivers();
+     for (dp = driver_tab; dp->de != NULL; dp++)
+@@ -7547,7 +7553,8 @@ no_stop_select_callback(ErlDrvEvent event, void* private)
+      ((DE)->major_version == (MAJOR) && (DE)->minor_version >= (MINOR)))
+ 
+ static int
+-init_driver(erts_driver_t *drv, ErlDrvEntry *de, DE_Handle *handle)
++init_driver(erts_driver_t *drv, ErlDrvEntry *de, DE_Handle *handle,
++	    int is_system_driver)
+ {
+     drv->name_atom = erts_atom_put((byte*)de->driver_name,
+                                    sys_strlen(de->driver_name),
+@@ -7570,7 +7577,14 @@ init_driver(erts_driver_t *drv, ErlDrvEntry *de, DE_Handle *handle)
+     }
+     drv->entry = de;
+ 
+-    drv->start = de->start;
++    if (is_system_driver) {
++	drv->start = NULL;
++	drv->system_start = de->start;
++    }
++    else {
++	drv->start = (ErlDrvData (*)(ErlDrvPort, char *)) de->start;
++	drv->system_start = NULL;
++    }
+     drv->stop = de->stop;
+     drv->finish = de->finish;
+     drv->flush = de->flush;
+@@ -7651,7 +7665,7 @@ int erts_add_driver_entry(ErlDrvEntry *de, DE_Handle *handle,
+     }
+ 
+     if (!err) {
+-        err = init_driver(dp, de, handle);
++        err = init_driver(dp, de, handle, 0);
+ 
+         if (taint) {
+             erts_add_taint(dp->name_atom);
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
 index 0000000000000000000000000000000000000000..2e85c729e92e9948fd15302a88ed12a4d3bfbe60
@@ -1224,10 +1325,10 @@ index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8
      AC_MSG_RESULT($ARCH)
 diff --git a/xcomp/erl-xcomp-wasm32-emscripten.conf b/xcomp/erl-xcomp-wasm32-emscripten.conf
 new file mode 100644
-index 0000000000000000000000000000000000000000..d9d35a2f177b97c9b324e1a83dc19138e5d51541
+index 0000000000000000000000000000000000000000..1170f6b6e2839f1246de95bffdc315c0941f2c9d
 --- /dev/null
 +++ b/xcomp/erl-xcomp-wasm32-emscripten.conf
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,112 @@
 +## -*-shell-script-*-
 +##
 +## Cross compilation configuration for WebAssembly via Emscripten
@@ -1303,8 +1404,7 @@ index 0000000000000000000000000000000000000000..d9d35a2f177b97c9b324e1a83dc19138
 +    -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8 \
 +    -sEXPORTED_FUNCTIONS=['_main','_malloc','_free'] \
 +    -sFORCE_FILESYSTEM=1 \
-+    -sASSERTIONS=2 \
-+    -sEMULATE_FUNCTION_POINTER_CASTS"
++    -sASSERTIONS=2"
 +
 +## -- Cross System Root Locations ----------------------------------------------
 +
