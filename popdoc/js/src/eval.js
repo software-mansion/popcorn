@@ -10,7 +10,7 @@ import {
   TPL_STACKTRACE,
   TPL_STATUS,
 } from "./templates.js";
-import { getPopcorn } from "./popdoc.js";
+import { getPopcorn, initPopcorn } from "./popdoc.js";
 
 const PENDING_DELAY_MS = 200;
 export const EVAL_TIMEOUT_MS = 30_000;
@@ -45,7 +45,6 @@ export function formatError(error) {
 }
 
 export async function runCode(block) {
-  const popcorn = getPopcorn();
   const { code, blockId, button, output, status } = block;
 
   button.disabled = true;
@@ -64,6 +63,21 @@ export async function runCode(block) {
       output.appendChild(instantiate(TPL_TOGGLE));
     }
   }, PENDING_DELAY_MS);
+
+  // A first-interaction boot rides under the pending skeleton; the global
+  // runtime toast reports its progress and failure, so the block only has
+  // to restore itself when the boot falls through.
+  let popcorn;
+  try {
+    popcorn = await initPopcorn();
+  } catch (_e) {
+    clearTimeout(pendingTimer);
+    output.classList.remove("popdoc-output-pending");
+    output.hidden = true;
+    output.replaceChildren();
+    button.disabled = false;
+    return;
+  }
 
   const deadline = performance.now() + EVAL_TIMEOUT_MS;
   const remaining = () => Math.max(0, deadline - performance.now());
