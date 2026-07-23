@@ -6,7 +6,9 @@
     "build": "node build.mjs"
   },
   "dependencies": {
-    "@swmansion/popcorn": "workspace:*"
+    "@swmansion/popcorn": "workspace:*",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0"
   },
   "devDependencies": {
     "esbuild": "0.28.0"
