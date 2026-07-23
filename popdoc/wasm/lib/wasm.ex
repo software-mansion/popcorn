@@ -3,10 +3,12 @@ defmodule PopdocWasm do
 
   import Popcorn.Wasm, only: [is_wasm_message: 1]
   alias Popcorn.Wasm
+  alias PopdocWasm.IexSession
 
   @process_name :main
   @ellipsis_sentinel :__popdoc_ellipsis__
   @snippet_max_len 40
+  @syntax_colors IO.ANSI.syntax_colors()
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: @process_name)
@@ -14,10 +16,13 @@ defmodule PopdocWasm do
 
   @impl true
   def init(_args) do
+    # Evaluated user code runs in this process; a crashing linked process
+    # (spawn_link, Task.async) must deliver an exit message instead of
+    # killing the session with all its bindings. The exit messages land in
+    # the catch-all handle_info below.
+    Process.flag(:trap_exit, true)
     Wasm.ready(@process_name)
-    # TODO: needed?
-    :application.set_env(:elixir, :ansi_enabled, false)
-    {:ok, %{sessions: %{}}}
+    {:ok, %{sessions: %{}, iex: nil}}
   end
 
   @impl true
@@ -44,7 +49,7 @@ defmodule PopdocWasm do
             }
           end)
 
-        session = %{exprs: exprs, binding: [], env: fresh_env()}
+        session = %{exprs: exprs, binding: [], env: IexSession.fresh_env("playground")}
         new_state = put_in(state.sessions[block_id], session)
         {:resolve, %{expressions: expressions}, new_state}
 
@@ -56,7 +61,7 @@ defmodule PopdocWasm do
   defp handle_wasm({:wasm_call, ["eval_one", block_id, index]}, state) when index >= 0 do
     with {:ok, session} <- Map.fetch(state.sessions, block_id),
          {_source, quoted} <- Enum.at(session.exprs, index) do
-      case eval_quoted(quoted, session.binding, session.env) do
+      case IexSession.eval_quoted(quoted, session.binding, session.env) do
         {:ok, result, new_binding, new_env} ->
           bindings = diff_binding(session.binding, new_binding)
           updated = %{session | binding: new_binding, env: new_env}
@@ -72,11 +77,45 @@ defmodule PopdocWasm do
     end
   end
 
+  # Sent on SPA navigation: eval-block sessions never outlive their page, and
+  # a run that spans the navigation gets a clean "no active session" reject.
+  defp handle_wasm({:wasm_call, ["clear_sessions"]}, state) do
+    {:resolve, %{}, %{state | sessions: %{}}}
+  end
+
+  # Idempotent: re-calls (launcher, markdown clicks) must not wipe bindings.
+  defp handle_wasm({:wasm_call, ["start_iex"]}, state) do
+    state = ensure_iex(state)
+    {:resolve, %{prompt: state.iex.counter}, state}
+  end
+
+  defp handle_wasm({:wasm_call, ["iex_eval", code]}, state) when is_binary(code) do
+    state = ensure_iex(state)
+
+    # Terminal-only path, so results carry IEx-style ANSI syntax colors;
+    # eval blocks keep plain inspect via eval_one.
+    case IexSession.eval(state.iex, code, syntax_colors: @syntax_colors) do
+      {:incomplete, session} ->
+        {:resolve, %{status: "incomplete", prompt: session.counter}, %{state | iex: session}}
+
+      {:ok, result, session} ->
+        {:resolve, %{status: "ok", result: result, prompt: session.counter},
+         %{state | iex: session}}
+
+      {:error, error_map, session} ->
+        {:resolve, %{status: "error", error: error_map, prompt: session.counter},
+         %{state | iex: session}}
+    end
+  end
+
   defp handle_wasm({:wasm_call, message}, state) do
     {:reject, "unknown wasm call: #{inspect(message)}", state}
   end
 
   defp handle_wasm({:wasm_cast, _message}, state), do: state
+
+  defp ensure_iex(%{iex: nil} = state), do: %{state | iex: IexSession.new()}
+  defp ensure_iex(state), do: state
 
   defp diff_binding(old, new) do
     old_map = Map.new(old)
@@ -84,16 +123,6 @@ defmodule PopdocWasm do
     for {name, value} <- new, is_atom(name), Map.get(old_map, name) !== value do
       %{name: Atom.to_string(name), value: inspect(value, charlists: :as_lists)}
     end
-  end
-
-  defp fresh_env do
-    %Macro.Env{
-      __ENV__
-      | file: "playground",
-        line: 1,
-        module: nil,
-        function: nil
-    }
   end
 
   defp parse(code) do
@@ -108,54 +137,6 @@ defmodule PopdocWasm do
     {:ok, Enum.map(exprs, fn expr -> {Macro.to_string(expr), expr} end)}
   rescue
     error -> {:error, Exception.format(:error, error)}
-  end
-
-  defp eval_quoted(quoted, binding, env) do
-    {value, new_binding, new_env} = Code.eval_quoted_with_env(quoted, binding, env)
-    {:ok, inspect(value, charlists: :as_lists), new_binding, new_env}
-  rescue
-    err ->
-      {:error,
-       %{
-         kind: :error,
-         type: inspect(err.__struct__),
-         message: Exception.message(err),
-         stacktrace: format_user_stacktrace(__STACKTRACE__)
-       }}
-  catch
-    kind, reason ->
-      {:error,
-       %{
-         kind: kind,
-         type: nil,
-         message: inspect(reason),
-         stacktrace: format_user_stacktrace(__STACKTRACE__)
-       }}
-  end
-
-  defp format_user_stacktrace(stacktrace) do
-    frames =
-      stacktrace
-      |> Enum.take_while(fn
-        {:elixir, :eval_external_handler, _, _} -> false
-        _ -> true
-      end)
-      |> Enum.reject(fn
-        {:erlang, :apply, _, _} -> true
-        _ -> false
-      end)
-
-    if length(frames) >= 2 do
-      frames
-      |> Exception.format_stacktrace()
-      |> String.split("\n")
-      |> Enum.map_join("\n", fn
-        "    " <> rest -> rest
-        line -> line
-      end)
-    else
-      ""
-    end
   end
 
   defp start_line({_, meta, _}) when is_list(meta), do: Keyword.get(meta, :line, 1)
