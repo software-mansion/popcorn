@@ -112,6 +112,76 @@ body.dark .popdoc-stacktrace {
     color: var(--popdoc-err);
 }
 
+/* Page-level runtime toast: boot progress and runtime/session failures.
+   Sits above the launcher and the terminal so a Reset reboot shows too. */
+.popdoc-toast {
+    position: fixed;
+    bottom: 3.25rem;
+    right: 1.5rem;
+    z-index: calc(var(--popdoc-z-terminal) + 1);
+    display: flex;
+    align-items: center;
+    gap: calc(var(--popdoc-space) * 2);
+    max-width: 22rem;
+    padding: 0.5em 0.9em;
+    font-size: 0.85rem;
+    background: var(--popdoc-bg);
+    border: 1px solid var(--popdoc-border);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.popdoc-toast[hidden] {
+    display: none;
+}
+
+/* The spinner's own display rule would beat the UA [hidden] style. */
+.popdoc-toast [hidden] {
+    display: none;
+}
+
+.popdoc-toast-icon {
+    flex: 0 0 auto;
+}
+
+.popdoc-toast-error {
+    color: var(--popdoc-err);
+    border-color: var(--popdoc-err);
+}
+
+.popdoc-toast-close {
+    padding: 0 0 0 calc(var(--popdoc-space) * 2);
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.popdoc-toast-close:hover {
+    opacity: 1;
+}
+
+.popdoc-spinner,
+.popdoc-iex-launcher--loading::after {
+    content: "";
+    display: inline-block;
+    box-sizing: border-box;
+    width: 0.85em;
+    height: 0.85em;
+    border: 1.5px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: popdoc-iex-spin 0.7s linear infinite;
+    flex: 0 0 auto;
+}
+
+.popdoc-iex-launcher--loading::after {
+    margin-left: 0.5em;
+    vertical-align: -0.1em;
+}
+
 .popdoc-output {
     padding: calc(var(--popdoc-space) * 3) 0;
     font-family: var(--monoFontFamily, monospace);
@@ -370,7 +440,9 @@ pre.popcorn-iex
 @media (prefers-reduced-motion: reduce) {
     pre.popcorn-iex
         .gp.popdoc-iex-prompt[data-iex-state="running"]
-        .popdoc-iex-icon::before {
+        .popdoc-iex-icon::before,
+    .popdoc-spinner,
+    .popdoc-iex-launcher--loading::after {
         animation: none;
     }
 }
@@ -713,5 +785,10 @@ body.popdoc-terminal-open .popdoc-iex-launcher {
 
     .popdoc-iex-launcher {
         right: 1rem;
+    }
+
+    .popdoc-toast {
+        right: 1rem;
+        max-width: calc(100vw - 2rem);
     }
 }
