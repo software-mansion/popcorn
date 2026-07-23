@@ -7,11 +7,19 @@
     --popdoc-accent: var(--mainDark);
     --popdoc-ok: var(--tipHeading);
     --popdoc-err: var(--errorHeading);
+    --popdoc-z-terminal: 250;
 }
 
+/* ExDoc declares its dark palette on `body.dark`, one level below :root. A
+   var() is substituted at the element that declares it, so the wrappers above
+   resolve against <html> and would stay light forever — every ExDoc token
+   popdoc wraps has to be re-declared here to pick up the dark value. */
 body.dark {
+    --popdoc-bg: var(--codeBackground);
+    --popdoc-border: var(--codeBorder);
     --popdoc-text-tertiary: var(--gray400);
-    --popdoc-border: var(--gray700);
+    --popdoc-accent: var(--mainLight);
+    --popdoc-ok: var(--tipHeading);
     --popdoc-err: #ff5385;
 }
 
@@ -40,6 +48,28 @@ body.dark .popdoc-stacktrace {
     padding: calc(var(--popdoc-space) * 2) 0;
 }
 
+.popdoc-run,
+.popdoc-iex-launcher {
+    color: #fff;
+    background: var(--popdoc-accent);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+        filter 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.popdoc-run:hover:not(:disabled),
+.popdoc-iex-launcher:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.popdoc-run:disabled,
+.popdoc-iex-launcher:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
 .popdoc-run {
     display: inline-flex;
     align-items: center;
@@ -48,23 +78,7 @@ body.dark .popdoc-stacktrace {
     font: inherit;
     font-size: 0.85em;
     line-height: 1.4;
-    color: #fff;
-    background: var(--popdoc-accent);
-    border: 1px solid transparent;
     border-radius: 5px;
-    cursor: pointer;
-    transition:
-        filter 0.15s ease,
-        opacity 0.15s ease;
-}
-
-.popdoc-run:hover:not(:disabled) {
-    filter: brightness(1.1);
-}
-
-.popdoc-run:disabled {
-    cursor: wait;
-    opacity: 0.55;
 }
 
 .popdoc-run::before {
@@ -252,6 +266,416 @@ body.dark .popdoc-stacktrace {
     opacity: 0.5;
 }
 
+/* Clickable iex> prompts in documentation */
+
+/* The ▶ marker lives in a gutter carved out of the block instead of inline,
+   so `iex>`, its continuations and the result lines all keep one column.
+   .popdoc-iex-aligned (added by JS to plain iex blocks) gets the same gutter
+   so prompts sit at the same x whether or not the block is runnable. */
+pre.popcorn-iex > code,
+pre.popdoc-iex-aligned > code {
+    display: block;
+    padding-left: 1.4em;
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt {
+    cursor: pointer;
+    position: relative;
+    vertical-align: baseline;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+        color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+/* Continuations: connector bar in the gutter instead of a glyph. Drawn with
+   ::after, not ::before, so the span's first content quad stays on the text —
+   automation (and assistive tech) hit-test the text, not the 2px bar. */
+pre.popcorn-iex .gp.popdoc-iex-prompt--cont::after {
+    content: "";
+    position: absolute;
+    right: 100%;
+    margin-right: 0.72em; /* centered under the ▶ column above */
+    top: -0.55em; /* bridge the line gap upward */
+    bottom: 0.1em;
+    width: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, currentColor 30%, transparent);
+    pointer-events: none;
+}
+
+/* Glyph: sits left of the prompt, inside the gutter — never shifts the code.
+   Padding widens the hit area; it is part of the prompt's click target. */
+pre.popcorn-iex .popdoc-iex-icon {
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0.9em;
+    /* right padding spans the gap to `iex>`, so glyph + gap + prompt are one
+       uninterrupted click target */
+    padding: 0.3em 0.45em 0.3em 0.25em;
+    box-sizing: content-box;
+    text-align: center;
+    font-size: 0.8em;
+    line-height: 1;
+    opacity: 0.4;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+pre.popcorn-iex .popdoc-iex-icon::before {
+    content: "▶";
+}
+
+/* "Run next" cue at rest — no hover required (lands on cont els too). */
+pre.popcorn-iex .gp.popdoc-iex-prompt--runnable {
+    color: var(--popdoc-accent);
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt--runnable .popdoc-iex-icon {
+    opacity: 0.85;
+}
+
+/* States (setCmdState puts data-iex-state on prompt AND cont els) */
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="running"] {
+    cursor: wait;
+    opacity: 0.75;
+}
+
+/* Loader: the glyph becomes a spinning ring while the shell is busy. */
+pre.popcorn-iex
+    .gp.popdoc-iex-prompt[data-iex-state="running"]
+    .popdoc-iex-icon::before {
+    content: "";
+    display: block;
+    box-sizing: border-box;
+    width: 0.85em;
+    height: 0.85em;
+    margin: 0 auto;
+    border: 1.5px solid color-mix(in srgb, currentColor 25%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: popdoc-iex-spin 0.7s linear infinite;
+}
+
+@keyframes popdoc-iex-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    pre.popcorn-iex
+        .gp.popdoc-iex-prompt[data-iex-state="running"]
+        .popdoc-iex-icon::before {
+        animation: none;
+    }
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="success"] {
+    color: var(--popdoc-ok);
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state] .popdoc-iex-icon {
+    opacity: 0.9;
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="success"] .popdoc-iex-icon::before {
+    content: "✓";
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="failure"] {
+    color: var(--popdoc-err);
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="failure"] .popdoc-iex-icon::before {
+    content: "!";
+}
+
+/* Hover: color only; .popdoc-iex-hover (JS mirror) lights the whole command */
+@media (hover: hover) {
+    pre.popcorn-iex .gp.popdoc-iex-prompt:hover,
+    pre.popcorn-iex .gp.popdoc-iex-prompt.popdoc-iex-hover {
+        color: var(--popdoc-accent);
+    }
+
+    pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="success"]:hover,
+    pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="success"].popdoc-iex-hover {
+        color: var(--popdoc-ok);
+        opacity: 0.8;
+    }
+
+    /* A command that already ran keeps its result glyph on hover; only the
+       colour reacts, so ✓ / ! are never masked by ▶ or ↓. */
+    pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="failure"]:hover,
+    pre.popcorn-iex .gp.popdoc-iex-prompt[data-iex-state="failure"].popdoc-iex-hover {
+        color: var(--popdoc-err);
+        opacity: 0.8;
+    }
+
+    pre.popcorn-iex .gp.popdoc-iex-prompt:hover .popdoc-iex-icon,
+    pre.popcorn-iex .gp.popdoc-iex-prompt.popdoc-iex-hover .popdoc-iex-icon {
+        opacity: 1;
+    }
+
+    pre.popcorn-iex .gp.popdoc-iex-prompt--cont:hover::after,
+    pre.popcorn-iex .gp.popdoc-iex-prompt--cont.popdoc-iex-hover::after {
+        background: color-mix(in srgb, currentColor 55%, transparent);
+    }
+
+    /* chain-run preview: earlier pending commands that would auto-run.
+       Skipped for commands that already ran — their ✓ / ! outranks a preview. */
+    pre.popcorn-iex
+        .gp.popdoc-iex-prompt.popdoc-iex-hover-chain:not([data-iex-state]) {
+        color: color-mix(in srgb, var(--popdoc-accent) 60%, transparent);
+    }
+
+    pre.popcorn-iex
+        .gp.popdoc-iex-prompt.popdoc-iex-hover-chain:not([data-iex-state])
+        .popdoc-iex-icon {
+        opacity: 0.75;
+    }
+
+    /* Chained commands are not the one being started — they run on the way
+       down to it, so they read as a flow marker rather than a play button. */
+    pre.popcorn-iex
+        .gp.popdoc-iex-prompt.popdoc-iex-hover-chain:not([data-iex-state])
+        .popdoc-iex-icon::before {
+        content: "↓";
+        font-size: 1.05em;
+    }
+}
+
+pre.popcorn-iex .gp.popdoc-iex-prompt:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--popdoc-accent) 45%, transparent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+/* Tap feedback without hover */
+pre.popcorn-iex .gp.popdoc-iex-prompt:active {
+    opacity: 0.6;
+}
+
+/* Touch: everything already visible at rest; just grow the target */
+@media (hover: none), (pointer: coarse) {
+    pre.popcorn-iex .gp.popdoc-iex-prompt:not(.popdoc-iex-prompt--cont)::after {
+        content: "";
+        position: absolute;
+        inset: -0.5em -0.35em; /* invisible tap-target extender */
+    }
+}
+
+/* Terminal (IEx panel — ExDoc code theme) */
+
+/* Terminal color palette. xterm.js renders through its own theme object and
+   cannot read CSS, so terminal.js bridges these variables into it with
+   getComputedStyle (re-read on every dark-mode flip) — edit colors here, not
+   in JS. Matches ExDoc Makeup: dark-gray prompts (.gp), purple for
+   atoms/exprs. */
+:root {
+    --popdoc-term-background: var(--codeBackground, #f5f5f5);
+    --popdoc-term-foreground: #4d4d4c;
+    --popdoc-term-cursor: var(--mainDark, #6c5ce7);
+    --popdoc-term-cursor-accent: var(--popdoc-term-cursor);
+    --popdoc-term-selection-background: var(--gray200, #d4d4d4);
+    --popdoc-term-black: #4d4d4d;
+    --popdoc-term-red: #a40000;
+    --popdoc-term-green: #408200;
+    --popdoc-term-yellow: #a06600;
+    --popdoc-term-blue: #0000cf;
+    --popdoc-term-magenta: #5c35cc;
+    --popdoc-term-cyan: #5c35cc;
+    --popdoc-term-white: #4d4d4c;
+    --popdoc-term-bright-black: #4d4d4d;
+    --popdoc-term-bright-red: #c00;
+    --popdoc-term-bright-green: #408200;
+    --popdoc-term-bright-yellow: #a06600;
+    --popdoc-term-bright-blue: #0000cf;
+    --popdoc-term-bright-magenta: #7c5cbf;
+    --popdoc-term-bright-cyan: #7c5cbf;
+    --popdoc-term-bright-white: #1a1a1a;
+}
+
+body.dark {
+    --popdoc-term-background: var(--codeBackground, #1c1c1c);
+    --popdoc-term-foreground: #dce1e6;
+    --popdoc-term-cursor: var(--main, #8e7ce6);
+    --popdoc-term-cursor-accent: var(--popdoc-term-cursor);
+    --popdoc-term-selection-background: var(--gray700, #3f3f3f);
+    --popdoc-term-black: #969386;
+    --popdoc-term-red: #ff5385;
+    --popdoc-term-green: #a6e22e;
+    --popdoc-term-yellow: #e6db74;
+    --popdoc-term-blue: #66d9ef;
+    --popdoc-term-magenta: #ae81ff;
+    --popdoc-term-cyan: #ae81ff;
+    --popdoc-term-white: #dce1e6;
+    --popdoc-term-bright-black: #969386;
+    --popdoc-term-bright-red: #ff5385;
+    --popdoc-term-bright-green: #a6e22e;
+    --popdoc-term-bright-yellow: #e6db74;
+    --popdoc-term-bright-blue: #66d9ef;
+    --popdoc-term-bright-magenta: #c4a0ff;
+    --popdoc-term-bright-cyan: #c4a0ff;
+    --popdoc-term-bright-white: #ffffff;
+}
+
+.popdoc-terminal {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    right: 1.5rem;
+    width: 640px;
+    max-width: calc(100vw - 3rem);
+    height: min(52vh, 480px);
+    background: var(--popdoc-bg);
+    border: 1px solid var(--popdoc-border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+    font-family: var(--monoFontFamily, monospace);
+    font-size: 0.875em;
+    color: var(--textBody, inherit);
+    z-index: var(--popdoc-z-terminal);
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.popdoc-terminal--open {
+    display: flex;
+}
+
+.popdoc-terminal--collapsed {
+    height: auto;
+}
+
+.popdoc-terminal--collapsed .popdoc-terminal-body {
+    display: none;
+}
+
+.popdoc-terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(var(--popdoc-space) * 2) calc(var(--popdoc-space) * 3);
+    border-bottom: 1px solid var(--popdoc-border);
+    background: var(--popdoc-bg);
+    flex-shrink: 0;
+}
+
+.popdoc-terminal--collapsed .popdoc-terminal-header {
+    border-bottom: none;
+}
+
+.popdoc-terminal--collapsed .popdoc-terminal-btn[data-action="clear"],
+.popdoc-terminal--collapsed .popdoc-terminal-btn[data-action="reset"] {
+    display: none;
+}
+
+.popdoc-terminal-title {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--popdoc-text-tertiary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.popdoc-terminal-actions {
+    display: flex;
+    gap: calc(var(--popdoc-space) * 2);
+}
+
+.popdoc-terminal-btn {
+    padding: 0.15em 0.55em;
+    background: transparent;
+    border: 1px solid var(--popdoc-border);
+    border-radius: 4px;
+    color: var(--popdoc-text-tertiary);
+    font: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition:
+        color 0.15s,
+        border-color 0.15s,
+        background-color 0.15s;
+}
+
+.popdoc-terminal-btn:hover {
+    color: inherit;
+    border-color: currentColor;
+    background: color-mix(in srgb, var(--popdoc-accent) 8%, transparent);
+}
+
+.popdoc-terminal-body {
+    flex: 1;
+    min-height: 0;
+    padding: calc(var(--popdoc-space) * 3) calc(var(--popdoc-space) * 2)
+        calc(var(--popdoc-space) * 5) calc(var(--popdoc-space) * 3);
+    display: flex;
+    flex-direction: column;
+    background: var(--popdoc-bg);
+    scrollbar-color: var(--popdoc-accent) var(--popdoc-bg);
+}
+
+.popdoc-terminal-mount {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+}
+
+.popdoc-terminal-mount .xterm {
+    height: 100% !important;
+    padding: 0;
+}
+
+.popdoc-terminal-mount .xterm-viewport {
+    overflow-y: auto !important;
+}
+
+/* ExDoc theme-scopes the tokens --popdoc-bg/--popdoc-border wrap, so the base
+   rules already resolve to the dark palette; only these deltas are needed. */
+body.dark .popdoc-terminal {
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+}
+
+body.dark .popdoc-terminal-btn {
+    color: var(--gray300);
+}
+
+body.dark .popdoc-terminal-btn:hover {
+    border-color: var(--mainLight);
+    background: color-mix(in srgb, var(--main) 16%, transparent);
+}
+
+/* Floating launcher: opens the terminal from any page */
+
+.popdoc-iex-launcher {
+    position: fixed;
+    bottom: 1rem;
+    right: 1.5rem;
+    z-index: calc(var(--popdoc-z-terminal) - 1);
+    padding: 0.35em 0.9em;
+    font-family: var(--monoFontFamily, monospace);
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.popdoc-iex-launcher:focus-visible {
+    outline: 2px solid var(--popdoc-accent);
+    outline-offset: 2px;
+}
+
+body.popdoc-terminal-open .popdoc-iex-launcher {
+    display: none;
+}
+
 /* Mobile: stack rows; let snippet wrap and remove the rigid grid. */
 @media (max-width: 600px) {
     .popdoc-header {
@@ -278,5 +702,16 @@ body.dark .popdoc-stacktrace {
 
     .popdoc-cell-result {
         flex-basis: 100%;
+    }
+
+    .popdoc-terminal {
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .popdoc-iex-launcher {
+        right: 1rem;
     }
 }

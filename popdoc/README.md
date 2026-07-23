@@ -45,6 +45,17 @@ To make a block runnable, use the `elixir-popcorn` fence:
 ```
 ````
 
+For interactive IEx examples, use `iex-popcorn`. Clicking an `iex>` prompt runs the command in an on-page xterm.js terminal (you can also type freely there). The terminal can also be opened on any page with the floating `iex` button in the bottom-right corner. Its `Clear` button wipes the screen only, while `Reset` restarts the whole Popcorn runtime — variables, modules, and eval-block state are shared in one VM, so they reset together:
+
+````
+```iex-popcorn
+iex> x = 1 + 1
+2
+iex> x * 10
+20
+```
+````
+
 Then generate docs normally:
 
 ```bash
