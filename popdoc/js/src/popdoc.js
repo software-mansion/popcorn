@@ -7,13 +7,13 @@ import {
   startIexSession,
   resetIexSession,
 } from "./iex.js";
-import { instantiate, TPL_BLOCK, TPL_LAUNCHER } from "./templates.js";
 import {
   getTerm,
   getTerminalGeneration,
   openTerminal,
   writeSystemError,
 } from "./terminal.js";
+import { instantiate, TPL_BLOCK, TPL_LAUNCHER, TPL_TOAST } from "./templates.js";
 
 const BUNDLES_SEL = 'meta[name="popcorn-user-bundle"]';
 const EVAL_BLOCK_SEL = "pre.popcorn-eval code";
@@ -31,6 +31,33 @@ export function getPopcorn() {
 // Bumped per exdoc:loaded so auto block ids never collide across SPA
 // navigations; the VM (and its per-block sessions) outlives the page.
 let pageEpoch = 0;
+
+let toastEl = null;
+
+function ensureToast() {
+  if (toastEl && document.body.contains(toastEl)) return toastEl;
+
+  toastEl = instantiate(TPL_TOAST);
+  toastEl
+    .querySelector(".popdoc-toast-close")
+    .addEventListener("click", hideRuntimeToast);
+  document.body.appendChild(toastEl);
+  return toastEl;
+}
+
+export function showRuntimeToast(state, message) {
+  const toast = ensureToast();
+  toast.hidden = false;
+  toast.classList.toggle("popdoc-toast-error", state === "error");
+  toast.querySelector(".popdoc-spinner").hidden = state !== "loading";
+  toast.querySelector(".popdoc-toast-icon").hidden = state !== "error";
+  toast.querySelector(".popdoc-toast-close").hidden = state !== "error";
+  toast.querySelector(".popdoc-toast-message").textContent = message;
+}
+
+export function hideRuntimeToast() {
+  if (toastEl) toastEl.hidden = true;
+}
 
 // The lib transparently reloads its iframe when the VM crashes (heartbeat
 // loss, abort): a fresh runtime boots behind the same instance, so all
@@ -68,13 +95,14 @@ function restartIexSession() {
   attempt();
 }
 
-async function initPopcorn() {
+export async function initPopcorn() {
   if (popcornInstance) return popcornInstance;
   if (popcornInitPromise) return popcornInitPromise;
 
   popcornInitPromise = (async () => {
     const bundlePaths = ["./bundle.avm"];
     try {
+      showRuntimeToast("loading", "Loading Popcorn runtime…");
       // TODO: maybe simplify by making `consumer.avm` mandatory
       const userBundles = document.querySelectorAll(BUNDLES_SEL);
       for (const bundleMeta of userBundles) {
@@ -87,9 +115,11 @@ async function initPopcorn() {
         onReload: handleRuntimeReload,
       });
       window.popcorn = popcornInstance;
+      hideRuntimeToast();
       return popcornInstance;
     } catch (e) {
       popcornInitPromise = null;
+      showRuntimeToast("error", `Popcorn failed to load: ${errorMessage(e)}`);
       console.error("Failed to initialize Popcorn runtime:", e);
       throw e;
     }
@@ -150,7 +180,6 @@ function decorateBlocks() {
 
 function addClickHandlers(blocks) {
   for (const block of blocks) {
-    block.button.disabled = false;
     block.button.addEventListener("click", () => runCode(block));
   }
 }
@@ -164,14 +193,17 @@ function ensureIexLauncher() {
   launcherEl = instantiate(TPL_LAUNCHER);
   launcherEl.addEventListener("click", async () => {
     launcherEl.disabled = true;
+    launcherEl.classList.add("popdoc-iex-launcher--loading");
     try {
       await initPopcorn();
       await startIexSession();
       openTerminal();
     } catch (error) {
+      // initPopcorn/startIexSession already reported through the toast.
       console.error("popdoc: failed to open the IEx terminal:", error);
     } finally {
       launcherEl.disabled = false;
+      launcherEl.classList.remove("popdoc-iex-launcher--loading");
     }
   });
 
@@ -182,22 +214,20 @@ function ensureIexLauncher() {
 window.addEventListener("exdoc:loaded", async () => {
   const blocks = decorateBlocks();
   decorateIexBlocks();
-  const popcorn = await initPopcorn();
+  addClickHandlers(blocks);
+  ensureIexLauncher();
+  addIexClickHandlers();
+
+  if (!popcornInstance) return;
 
   // Eval-block sessions from the previous page are unreachable now; drop
   // them before any new Run can start (the GenServer handles calls in
   // order, so this cannot outrun a fresh parse_elixir).
-  popcorn
+  popcornInstance
     .call(["clear_sessions"])
     .catch((error) =>
       console.error("popdoc: failed to clear stale sessions:", error),
     );
-
-  addClickHandlers(blocks);
-  ensureIexLauncher();
-  // Prompts must be clickable even if the session fails to start below —
-  // clicking lazily revives it.
-  addIexClickHandlers();
 
   if (iexCommands.length > 0) {
     try {
