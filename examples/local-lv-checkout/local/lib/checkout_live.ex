@@ -2,16 +2,17 @@ defmodule CheckoutLive do
   use LocalLiveView
 
   def mount(params, _session, socket) do
-    {:ok, assign(socket,
-      current_step: 1,
-      form_data: %{
-        "email" => "",
-        "name" => "",
-        "card_number" => "",
-        "expiry" => ""
-      },
-      errors: []
-    )}
+    {:ok,
+     assign(socket,
+       current_step: 1,
+       form_data: %{
+         "email" => "",
+         "name" => "",
+         "card_number" => "",
+         "expiry" => ""
+       },
+       errors: []
+     )}
   end
 
   def handle_params(%{"step" => step_str}, _uri, socket) do
@@ -33,7 +34,7 @@ defmodule CheckoutLive do
           <.step_2_payment form_data={@form_data} errors={@errors} />
         <% 3 -> %>
           <.step_3_confirmation form_data={@form_data} />
-        <% 4 -> %>
+        <% _ -> %>
           <.step_4_success />
       <% end %>
 
@@ -116,15 +117,29 @@ defmodule CheckoutLive do
 
   defp validate_step(1, form_data) do
     errors = []
-    errors = if String.trim(form_data["email"]) == "", do: ["Email is required" | errors], else: errors
-    errors = if String.trim(form_data["name"]) == "", do: ["Name is required" | errors], else: errors
+
+    errors =
+      if String.trim(form_data["email"]) == "", do: ["Email is required" | errors], else: errors
+
+    errors =
+      if String.trim(form_data["name"]) == "", do: ["Name is required" | errors], else: errors
+
     Enum.reverse(errors)
   end
 
   defp validate_step(2, form_data) do
     errors = []
-    errors = if String.trim(form_data["card_number"]) == "", do: ["Card number is required" | errors], else: errors
-    errors = if String.trim(form_data["expiry"]) == "", do: ["Expiry date is required" | errors], else: errors
+
+    errors =
+      if String.trim(form_data["card_number"]) == "",
+        do: ["Card number is required" | errors],
+        else: errors
+
+    errors =
+      if String.trim(form_data["expiry"]) == "",
+        do: ["Expiry date is required" | errors],
+        else: errors
+
     Enum.reverse(errors)
   end
 
@@ -134,7 +149,9 @@ defmodule CheckoutLive do
   defp step_1_shipping(assigns) do
     ~H"""
     <div>
-      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">Shipping Information</h2>
+      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">
+        Shipping Information
+      </h2>
       <form style="display: flex; flex-direction: column; gap: 16px;">
         <div>
           <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Email</label>
@@ -162,7 +179,9 @@ defmodule CheckoutLive do
 
         <%= if @errors != [] do %>
           <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 16px;">
-            <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px; margin-top: 0;">Please fix the following:</p>
+            <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px; margin-top: 0;">
+              Please fix the following:
+            </p>
             <ul style="list-style: disc; margin-left: 20px; color: #b91c1c; margin-top: 0; margin-bottom: 0;">
               <%= for error <- @errors do %>
                 <li>{error}</li>
@@ -178,7 +197,9 @@ defmodule CheckoutLive do
   defp step_2_payment(assigns) do
     ~H"""
     <div>
-      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">Payment Information</h2>
+      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">
+        Payment Information
+      </h2>
       <form style="display: flex; flex-direction: column; gap: 16px;">
         <div>
           <label style="display: block; font-size: 14px; font-weight: 500; color: #374151; margin-bottom: 8px;">Card Number</label>
@@ -208,7 +229,9 @@ defmodule CheckoutLive do
 
         <%= if @errors != [] do %>
           <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 16px;">
-            <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px; margin-top: 0;">Please fix the following:</p>
+            <p style="color: #991b1b; font-weight: 600; margin-bottom: 8px; margin-top: 0;">
+              Please fix the following:
+            </p>
             <ul style="list-style: disc; margin-left: 20px; color: #b91c1c; margin-top: 0; margin-bottom: 0;">
               <%= for error <- @errors do %>
                 <li>{error}</li>
@@ -224,7 +247,9 @@ defmodule CheckoutLive do
   defp step_3_confirmation(assigns) do
     ~H"""
     <div>
-      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">Order Summary</h2>
+      <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 24px; color: #1f2937;">
+        Order Summary
+      </h2>
       <div style="background-color: #f3f4f6; border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
         <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #d1d5db;">
           <span style="font-weight: 500;">Email:</span>
@@ -241,7 +266,9 @@ defmodule CheckoutLive do
       </div>
 
       <div style="margin-top: 24px; padding: 16px; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px;">
-        <p style="color: #1e40af; margin: 0;">✓ All information looks correct. Click "Complete Order" to finish.</p>
+        <p style="color: #1e40af; margin: 0;">
+          ✓ All information looks correct. Click "Complete Order" to finish.
+        </p>
       </div>
     </div>
     """
@@ -253,10 +280,11 @@ defmodule CheckoutLive do
       <div style="width: 64px; height: 64px; background-color: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
         <span style="font-size: 32px;">✓</span>
       </div>
-      <h2 style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 8px;">Order Complete!</h2>
+      <h2 style="font-size: 24px; font-weight: bold; color: #15803d; margin-bottom: 8px;">
+        Order Complete!
+      </h2>
       <p style="color: #6b7280; font-size: 14px;">Your order has been placed successfully.</p>
     </div>
     """
   end
-
 end

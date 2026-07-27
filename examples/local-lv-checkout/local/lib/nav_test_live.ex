@@ -5,7 +5,8 @@ defmodule NavTestLive do
     {:ok, assign(socket, page: "products", count: 0)}
   end
 
-  def handle_params(%{"page" => page}, _uri, socket) when page in ["products", "orders", "profile"] do
+  def handle_params(%{"page" => page}, _uri, socket)
+      when page in ["products", "orders", "profile"] do
     {:noreply, assign(socket, page: page)}
   end
 
@@ -30,7 +31,9 @@ defmodule NavTestLive do
         <% "products" -> %>
           <div>
             <h3 style="font-weight: 600; color: #111827; margin-bottom: 12px;">Products</h3>
-            <p style="color: #6b7280; font-size: 14px;">Counter (persists across tab navigation): <%= @count %></p>
+            <p style="color: #6b7280; font-size: 14px;">
+              Counter (persists across tab navigation): {@count}
+            </p>
             <button
               phx-click="inc"
               style="margin-top: 8px; padding: 6px 14px; background-color: #3b82f6; color: white; border-radius: 4px; border: none; cursor: pointer; font-size: 14px;"
@@ -55,6 +58,7 @@ defmodule NavTestLive do
 
   defp tab_link(assigns) do
     assigns = assign(assigns, :active, assigns.page == assigns.target)
+
     ~H"""
     <.link
       patch={"/plain/?page=#{@target}"}

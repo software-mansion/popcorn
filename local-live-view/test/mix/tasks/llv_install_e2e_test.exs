@@ -4,8 +4,8 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
 
   Spins up a fresh Phoenix project via `mix phx.new` in a temp dir,
   injects local_live_view as a path dep, runs `mix llv.install` + `mix setup`,
-  starts `mix phx.server`, and uses Playwright to assert that the generated
-  HelloLocalLive route renders "Hello from WASM!" in the browser.
+  starts `mix phx.server`, and uses Playwright to assert that the bundled
+  HelloLocal component renders "Hello from WASM!" in the browser.
 
   Slow (~1-2 min) — covers what unit tests can't: real `mix llv.build`,
   real esbuild + popcorn.cook + AtomVM bootstrap, real DOM render.
@@ -53,9 +53,9 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     [browser: browser]
   end
 
-  test "HelloLocal renders on the generated /hello_local route", %{browser: browser} do
+  test "HelloLocal renders inside the Phoenix page via live_local route", %{browser: browser} do
     page = Playwright.Browser.new_page(browser)
-    Playwright.Page.goto(page, "#{@url}/hello_local")
+    Playwright.Page.goto(page, "#{@url}/hello_wasm")
 
     wait_for(
       fn ->
@@ -67,6 +67,8 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
 
     Playwright.Page.close(page)
   end
+
+  # --- Project setup helpers ---
 
   defp setup_phoenix_project(llv_path) do
     tmp_root = System.tmp_dir!() |> Path.join("llv_e2e_#{System.unique_integer([:positive])}")
@@ -80,6 +82,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     add_llv_path_dep(app_dir, llv_path)
     run!("mix", ["deps.get"], cd: app_dir)
     run!("mix", ["llv.install", "--yes"], cd: app_dir)
+    patch_router(app_dir)
     run!("mix", ["setup"], cd: app_dir)
 
     app_dir
@@ -89,7 +92,6 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     mix_path = Path.join(app_dir, "mix.exs")
     content = File.read!(mix_path)
 
-    # Insert the local_live_view dep at the top of the `defp deps do [ ... ]` list.
     new =
       String.replace(
         content,
@@ -101,16 +103,21 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     File.write!(mix_path, new)
   end
 
-  defp kill_port(port) do
-    System.shell("lsof -ti :#{port} | xargs -r kill -9 2>/dev/null", into: "")
+  defp patch_router(app_dir) do
+    path = Path.join(app_dir, "lib/test_app_web/router.ex")
+    content = File.read!(path)
+
+    content =
+      String.replace(
+        content,
+        "get \"/\", PageController, :home",
+        "get \"/\", PageController, :home\n\n    live_local \"/hello_wasm\", \"HelloLocal\""
+      )
+
+    File.write!(path, content)
   end
 
-  defp kill_phoenix_subprocesses do
-    # Watchers don't bind the port — match by command name.
-    kill_port(@port)
-    System.shell("pkill -f 'esbuild.*test_app' 2>/dev/null", into: "")
-    System.shell("pkill -f 'tailwind.*test_app' 2>/dev/null", into: "")
-  end
+  # --- Server helpers ---
 
   defp start_phoenix_server(project_dir) do
     Task.start_link(fn ->
@@ -122,6 +129,18 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
       )
     end)
   end
+
+  defp kill_port(port) do
+    System.shell("lsof -ti :#{port} | xargs -r kill -9 2>/dev/null", into: "")
+  end
+
+  defp kill_phoenix_subprocesses do
+    kill_port(@port)
+    System.shell("pkill -f 'esbuild.*test_app' 2>/dev/null", into: "")
+    System.shell("pkill -f 'tailwind.*test_app' 2>/dev/null", into: "")
+  end
+
+  # --- Utilities ---
 
   defp run!(cmd, args, opts) do
     {_, 0} = System.cmd(cmd, args, [{:into, IO.stream(:stdio, :line)} | opts])
