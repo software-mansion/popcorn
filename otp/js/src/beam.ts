@@ -304,6 +304,16 @@ export function send(
       error: err("bridge:listener-not-found", { targetName: t }),
     };
   }
+  if (status === 2) {
+    return {
+      ok: false,
+      error: err("bridge:unserializable", {
+        data: null,
+        part: null,
+        reason: "unsupported",
+      }),
+    };
+  }
   unreachable();
 }
 

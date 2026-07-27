@@ -295,7 +295,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..e39af2a963bdf9697de3e9f61d18d17629a7228d
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,644 @@
+@@ -0,0 +1,645 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -891,7 +891,8 @@ index 0000000000000000000000000000000000000000..e39af2a963bdf9697de3e9f61d18d176
 +  decoded_size = enif_binary_to_term(env, etf, (size_t)etf_len, &payload_term,
 +                                     ERL_NIF_BIN2TERM_SAFE);
 +  if (decoded_size != etf_len) {
-+    abort();
++    enif_free_env(env);
++    return 2;
 +  }
 +
 +  if (target_kind == WASM_TARGET_PID_BYTES) {

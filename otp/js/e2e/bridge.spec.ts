@@ -1,4 +1,4 @@
-import { encode } from "../src/etf";
+import { a, atom, encode, t, tuple } from "../src/etf";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 const OVERFLOWED = Number.MAX_SAFE_INTEGER + 1;
@@ -26,6 +26,14 @@ const PAYLOAD = {
 };
 
 test.describe("ETF", () => {
+  test("atoms and tuples", () => {
+    const tupleJs = tuple as (...entries: unknown[]) => unknown;
+
+    assert.equal(hex(atom("ok")), hex(a("ok")));
+    assert.equal(hex(tuple(atom("ok"), "value")), hex(t(a("ok"), "value")));
+    assert.throws(() => tupleJs("only"), /at least two entries/);
+  });
+
   test("objects", () => {
     const nullPrototype = Object.assign(Object.create(null), { key: "value" });
     const symbolKey = { visible: true, [Symbol("key")]: true };
@@ -75,6 +83,50 @@ test.describe("ETF", () => {
 });
 
 test.describe("events", () => {
+  test("atoms and tuples", async ({ otp, page }) => {
+    function inJs<Result>(fn: () => Result) {
+      return page.evaluateHandle(fn);
+    }
+
+    const boot = await otp.boot(
+      evalOpts(`
+          true = register(term_receiver, self()),
+          ok = wasm:send(#{bridge_ready => true}),
+          receive
+            {wasm, Payload} ->
+              ok = wasm:send(#{
+                term_received => Payload =:= {ok, <<"value">>}
+              })
+          end,
+          receive
+            stop -> ok
+          end.
+        `),
+    );
+    assert(boot.ok);
+
+    await otp.waitForEvent("bridge_ready");
+    const tuplePayload = await inJs(() => {
+      const a = window.popcorn.atom;
+      const t = window.popcorn.tuple;
+      return t(a("ok"), "value");
+    });
+    assert((await otp.send("term_receiver", tuplePayload)).ok);
+    await tuplePayload.dispose();
+    expect(await otp.waitForEvent("term_received")).toEqual({
+      term_received: true,
+    });
+
+    const atomPayload = await inJs(() => {
+      const a = window.popcorn.atom;
+      return a("popcorn_atom_that_does_not_exist");
+    });
+    const result = await otp.send("term_receiver", atomPayload);
+    await atomPayload.dispose();
+    assert(!result.ok);
+    assert.equal(result.error.t, "bridge:unserializable");
+  });
+
   test("round trip", async ({ otp }) => {
     const boot = await otp.boot(
       evalOpts(`
