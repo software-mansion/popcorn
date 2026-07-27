@@ -1120,10 +1120,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..cd6de3257fcf336f481167e83ee4e5cf3b6baad7
+index 0000000000000000000000000000000000000000..3679b690583605c17f185b5f2f4008a8bb3d9a9e
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,128 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1156,7 +1156,9 @@ index 0000000000000000000000000000000000000000..cd6de3257fcf336f481167e83ee4e5cf
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
-+-spec send(json:encode_value()) -> ok.
++%% Accepts more than a json:encode_value(): pids, `{wasm_tracked_value, _}` handles and
++%% tuples are encoded by encode_arg/2.
++-spec send(term()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
 +    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
@@ -1221,6 +1223,10 @@ index 0000000000000000000000000000000000000000..cd6de3257fcf336f481167e83ee4e5cf
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
 +encode_arg(Pid, Encoder) when is_pid(Pid) ->
 +    json:encode_value(#{popcorn_pid => base64:encode(term_to_binary(Pid))}, Encoder);
++%% JavaScript has no tuple type, so tuples are normalized to lists. The clause must
++%% stay below the ones above, which match tuples of their own.
++encode_arg(Tuple, Encoder) when is_tuple(Tuple) ->
++    json:encode_value(tuple_to_list(Tuple), Encoder);
 +encode_arg(Other, Encoder) ->
 +    json:encode_value(Other, Encoder).
 +
