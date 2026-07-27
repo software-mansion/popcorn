@@ -63,7 +63,8 @@ type SendFn = (
   target: string | Pid,
   payload?: AnyValue,
 ) => Promise<Result<null>>;
-type RunJsFn = (args: AnyValue, actions: { send: SendFn }) => AnyValue;
+type RunJsActions = { send: SendFn } & GenServer;
+type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
 
 type CallOpts = { timeoutMs?: number; proxy?: string };
 type PendingCall = {
@@ -548,7 +549,7 @@ export class Popcorn {
       const args = this.reviveHandles(request.args);
       const send: SendFn = (target, sendPayload) =>
         this.send(target, sendPayload);
-      const result = await fn(args, { send });
+      const result = await fn(args, { send, ...this.genserver });
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
     } catch (error) {
