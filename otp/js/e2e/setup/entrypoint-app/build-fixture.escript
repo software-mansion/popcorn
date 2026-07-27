@@ -6,6 +6,8 @@ main([SrcDir]) ->
     {ok, _} =
         compile:file(filename:join(SrcDir, "test_entrypoint_app.erl"), [{outdir, EbinDir}, report]),
     {ok, _} =
+        compile:file(filename:join(SrcDir, "test_gen_server.erl"), [{outdir, EbinDir}, report]),
+    {ok, _} =
         file:copy(
             filename:join(SrcDir, "test_entrypoint.app"),
             filename:join(EbinDir, "test_entrypoint.app")
