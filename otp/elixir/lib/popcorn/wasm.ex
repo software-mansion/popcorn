@@ -115,10 +115,14 @@ defmodule Popcorn.Wasm do
   @doc """
   Runs JavaScript synchrounously on the page and returns a handle to JS result.
 
-  `code` is a JavaScript function written as a string, called as `(args, {send}) => { ... }`.
+  `code` is a JavaScript function written as a string, called as `(args, {send, call, cast}) => { ... }`.
 
   - `args` are arguments passed from elixir in a map (types from Elixir are converted to JS ones).
   - `send` is used to send events from JS running in `run_js/3`, same as `popcorn.send()` JS API.
+  - `call` and `cast` talk to GenServers through `Popcorn.Proxy`, same as `popcorn.genserver` JS API.
+    Both are async and resolve to a result object.
+
+    Awaiting a `call` on the process that runs `run_js/3` deadlocks until the call times out.
 
   `run_js/3` returns result converted to Elixir types. You can use `new TrackedValue(value, cleanup_fn)` (`t:tracked_value/0`) to return a handle.
   Underlying TrackedValue is kept on JS side until OTP/BEAM drops all references to a handle.

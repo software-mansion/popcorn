@@ -30,6 +30,7 @@ declare global {
 
 type InitOptions = PopcornOpts;
 type BootResult = Result<null>;
+type CallOptions = { timeoutMs?: number };
 type EventWaiter = (event: PopcornEvent) => void;
 type OtpFactory = (id?: string) => Promise<OtpHandle>;
 type Otp = {
@@ -37,6 +38,14 @@ type Otp = {
   events: PopcornEvent[];
   boot(options: InitOptions): Promise<BootResult>;
   send(target: string | Pid, payload?: unknown): Promise<BootResult>;
+  genserver: {
+    call(
+      target: string | Pid,
+      request?: unknown,
+      options?: CallOptions,
+    ): Promise<Result<unknown>>;
+    cast(target: string | Pid, request?: unknown): Promise<BootResult>;
+  };
   waitForEvent(name: string): Promise<PopcornEvent>;
   eventValue(name: string): unknown;
   deinit(): void;
@@ -81,6 +90,25 @@ export const test = base.extend<Fixtures>({
 
 export class OtpHandle {
   public readonly events = new Set<PopcornEvent>();
+  public readonly genserver = {
+    call: async (
+      target: string | JSHandle<Pid>,
+      request?: unknown,
+      options?: CallOptions,
+    ): Promise<Result<unknown>> =>
+      await this.otp.evaluate(
+        (otp, args) => otp.genserver.call(args.target, args.request, args.options),
+        { target, request, options },
+      ),
+    cast: async (
+      target: string | JSHandle<Pid>,
+      request?: unknown,
+    ): Promise<BootResult> =>
+      await this.otp.evaluate(
+        (otp, args) => otp.genserver.cast(args.target, args.request),
+        { target, request },
+      ),
+  };
   private otpHandle: JSHandle<Otp> | null;
 
   private constructor(
@@ -193,6 +221,29 @@ function createOtp(id: string): Otp {
   class Otp {
     public readonly id = id;
     public readonly events: PopcornEvent[] = [];
+    public readonly genserver = {
+      call: async (
+        target: string | Pid,
+        request?: unknown,
+        options?: CallOptions,
+      ): Promise<Result<unknown>> => {
+        const result = await this.popcorn.genserver.call(
+          target,
+          request,
+          options,
+        );
+        if (result.ok) return result;
+        return { ok: false, error: result.error.serialize() };
+      },
+      cast: async (
+        target: string | Pid,
+        request?: unknown,
+      ): Promise<BootResult> => {
+        const result = await this.popcorn.genserver.cast(target, request);
+        if (result.ok) return result;
+        return { ok: false, error: result.error.serialize() };
+      },
+    };
 
     private popcornHandle: Popcorn | null = null;
     private readonly eventWaiters = new Map<string, Array<EventWaiter>>();

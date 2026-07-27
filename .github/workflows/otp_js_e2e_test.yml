@@ -5,6 +5,7 @@ on:
     branches: ["**"]
     paths:
       - "otp/js/**"
+      - "otp/elixir/**"
       - "otp/patches/**"
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"

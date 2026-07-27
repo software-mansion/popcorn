@@ -76,11 +76,10 @@ async function buildEntrypointFixture(env: NodeJS.ProcessEnv): Promise<void> {
   console.log("e2e: building entrypoint fixture app...");
 
   const fixtureSrcDir = resolve(__dirname, "entrypoint-app");
-  const escript = resolve(fixtureSrcDir, "build-fixture.escript");
 
   await runCommand(
-    "escript",
-    [escript, fixtureSrcDir],
+    "mix",
+    ["compile"],
     fixtureSrcDir,
     "compiling entrypoint fixture",
     env,

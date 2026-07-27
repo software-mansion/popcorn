@@ -6,12 +6,16 @@ type Tag = keyof PopcornErrors;
 export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
   "timeout:send": { timeoutMs: number };
+  "timeout:call": { timeoutMs: number };
   "worker:load": { message: string };
   "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
   "bridge:invalid-target": EmptyData;
   "bridge:unserializable": UnserializableData;
   "bridge:listener-not-found": { targetName: string };
+  "genserver:noproc": { target: string };
+  "genserver:exit": { reason: string };
+  "genserver:unserializable": EmptyData;
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
@@ -99,6 +103,8 @@ function message(error: SerializedError): string {
       return `Init timed out after ${error.data.timeoutMs}ms`;
     case "timeout:send":
       return `Send timed out after ${error.data.timeoutMs}ms`;
+    case "timeout:call":
+      return `Call timed out after ${error.data.timeoutMs}ms`;
     case "worker:load":
       return error.data.message;
     case "vm:exited":
@@ -111,6 +117,12 @@ function message(error: SerializedError): string {
       return "Message can't be serialized to ETF";
     case "bridge:listener-not-found":
       return `Target listener not found: '${error.data.targetName}'`;
+    case "genserver:noproc":
+      return `No process registered for genserver target: '${error.data.target}'`;
+    case "genserver:exit":
+      return `Genserver exited: ${error.data.reason}`;
+    case "genserver:unserializable":
+      return "Genserver reply can't be serialized to JSON";
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
