@@ -7,18 +7,24 @@ import {
   type Page,
 } from "@playwright/test";
 import type {
+  atom,
   Popcorn,
   PopcornOpts,
   PopcornEvent,
   OtpErrorPayload,
   Pid,
   SerializedError,
+  tuple,
 } from "@swmansion/popcorn-otp";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Window {
     Popcorn: typeof Popcorn;
+    popcorn: {
+      atom: typeof atom;
+      tuple: typeof tuple;
+    };
   }
 }
 

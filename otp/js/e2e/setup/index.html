@@ -7,7 +7,8 @@
     </head>
     <body>
         <script type="module">
-            import { Popcorn } from "@swmansion/popcorn-otp";
+            import { atom, Popcorn, tuple } from "@swmansion/popcorn-otp";
+            window.popcorn = { atom, tuple };
             window.Popcorn = Popcorn;
         </script>
     </body>

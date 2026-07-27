@@ -4,21 +4,48 @@ import {
   type Result,
   type UnserializableReason,
 } from "./errors";
+import { check } from "./utils";
 
 const VERSION = 0x83;
 const NEW_FLOAT_EXT = 0x46;
 const SMALL_INTEGER_EXT = 0x61;
 const INTEGER_EXT = 0x62;
+const SMALL_TUPLE_EXT = 0x68;
+const LARGE_TUPLE_EXT = 0x69;
 const NIL_EXT = 0x6a;
 const LIST_EXT = 0x6c;
 const BINARY_EXT = 0x6d;
 const SMALL_BIG_EXT = 0x6e;
 const MAP_EXT = 0x74;
+const ATOM_UTF8_EXT = 0x76;
 const SMALL_ATOM_UTF8_EXT = 0x77;
 
 const UTF8 = new TextEncoder();
 
-type Atom = "true" | "false" | "nil";
+class AtomTerm {
+  public constructor(public readonly name: string) {}
+}
+
+class TupleTerm {
+  public constructor(public readonly entries: unknown[]) {}
+}
+
+export function atom(name: string): AtomTerm {
+  return new AtomTerm(name);
+}
+
+export const a = atom;
+
+export function tuple(
+  first: unknown,
+  second: unknown,
+  ...rest: unknown[]
+): TupleTerm {
+  check(arguments.length > 1, "tuple requires at least two entries");
+  return new TupleTerm([first, second, ...rest]);
+}
+
+export const t = tuple;
 
 /** Pre-encoded ETF sub-term bytes (no version prefix), spliced verbatim. */
 export class RawTerm {
@@ -142,11 +169,19 @@ class Encoder {
       this.bytes(value.bytes);
       return;
     }
+    if (value instanceof AtomTerm) {
+      this.atom(value.name);
+      return;
+    }
     if (this.ancestors.has(value)) {
       throw err("cyclic-object", value);
     }
     this.ancestors.add(value);
     try {
+      if (value instanceof TupleTerm) {
+        this.tuple(value.entries);
+        return;
+      }
       if (Array.isArray(value)) {
         this.array(value);
         return;
@@ -160,6 +195,19 @@ class Encoder {
       this.map(value);
     } finally {
       this.ancestors.delete(value);
+    }
+  }
+
+  private tuple(entries: unknown[]): void {
+    if (entries.length < 2 ** 8) {
+      this.byte(SMALL_TUPLE_EXT);
+      this.byte(entries.length);
+    } else {
+      this.byte(LARGE_TUPLE_EXT);
+      this.uint32(entries.length);
+    }
+    for (const entry of entries) {
+      this.value(entry);
     }
   }
 
@@ -187,10 +235,18 @@ class Encoder {
     }
   }
 
-  private atom(atom: Atom): void {
+  private atom(atom: string): void {
     const bytes = UTF8.encode(atom);
-    this.byte(SMALL_ATOM_UTF8_EXT);
-    this.byte(bytes.length);
+    if (bytes.length >= 2 ** 16) {
+      throw err("unsupported", atom);
+    }
+    if (bytes.length < 2 ** 8) {
+      this.byte(SMALL_ATOM_UTF8_EXT);
+      this.byte(bytes.length);
+    } else {
+      this.byte(ATOM_UTF8_EXT);
+      this.uint16(bytes.length);
+    }
     this.bytes(bytes);
   }
 
@@ -214,6 +270,11 @@ class Encoder {
   private uint32(value: number): void {
     this.view.setUint32(0, value);
     this.bytes(new Uint8Array(this.buffer, 0, 4));
+  }
+
+  private uint16(value: number): void {
+    this.view.setUint16(0, value);
+    this.bytes(new Uint8Array(this.buffer, 0, 2));
   }
 
   private int32(value: number): void {
