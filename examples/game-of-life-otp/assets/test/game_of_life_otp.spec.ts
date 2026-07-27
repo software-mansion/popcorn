@@ -27,6 +27,14 @@ test("renders the grid and runs a glider simulation", async ({ page }) => {
   const stoppedCells = await liveCellCoordinates(page);
   await page.waitForTimeout(700);
   expect(await liveCellCoordinates(page)).toEqual(stoppedCells);
+
+  await page.locator("#start").click();
+  await expect(page.locator("#stop")).toBeVisible();
+  await page.locator("#stop").click();
+  await expect(page.locator("#start")).toBeVisible();
+
+  await page.locator("#reset").click();
+  await expect(page.locator(".cell-alive")).toHaveCount(0);
 });
 
 test("toggles cells by clicking when stopped", async ({ page }) => {

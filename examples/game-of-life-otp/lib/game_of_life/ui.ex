@@ -1,19 +1,16 @@
 defmodule GameOfLife.Ui do
   use GenServer
 
-  import Popcorn.Wasm, only: [is_message: 1]
-
   alias Popcorn.Wasm
   alias GameOfLife.Grid
   alias GameOfLife.Supervisor, as: GridSupervisor
 
   defguardp is_running(state) when is_pid(state.grid_pid)
 
-  @receiver_name :ui
   @tick_speed_ms 300
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: @receiver_name)
+    GenServer.start_link(__MODULE__, args)
   end
 
   @impl GenServer
@@ -24,7 +21,7 @@ defmodule GameOfLife.Ui do
     init_grid(size)
 
     listener_refs =
-      register_click_listeners(["#start", "#stop", "#reset", "#glider", ".cell"])
+      register_click_listeners(["#start", "#stop", "#reset", "#glider", ".cell"], self())
 
     {:ok,
      %{
@@ -38,12 +35,16 @@ defmodule GameOfLife.Ui do
   end
 
   @impl GenServer
-  def handle_info(msg, state) when is_message(msg) do
-    {:wasm, payload} = msg
-    {:noreply, handle_wasm(payload, state)}
+  def handle_info({:wasm, "tick"}, state) do
+    {:noreply, handle_tick(state)}
   end
 
-  defp handle_wasm(["click", "#start", _data], state) when not is_running(state) do
+  @impl GenServer
+  def handle_cast(event, state) do
+    {:noreply, handle_dom_event(event, state)}
+  end
+
+  defp handle_dom_event(["click", "#start", _data], state) when not is_running(state) do
     alive = Enum.map(state.alive, fn [x, y] -> {x, y} end)
 
     set_element_visiblity(start: false, stop: true, reset: false, examples: false)
@@ -51,12 +52,12 @@ defmodule GameOfLife.Ui do
     {:ok, sup, %{grid_pid: pid}} =
       GridSupervisor.start_simulation(state.size, state.size, alive)
 
-    timer = start_timer(@tick_speed_ms)
+    timer = start_timer(@tick_speed_ms, self())
 
     %{state | sup_pid: sup, grid_pid: pid, timer: timer}
   end
 
-  defp handle_wasm(["click", "#glider", _data], state) when not is_running(state) do
+  defp handle_dom_event(["click", "#glider", _data], state) when not is_running(state) do
     new_alive = [
       [2, 0],
       [2, 1],
@@ -69,7 +70,7 @@ defmodule GameOfLife.Ui do
     %{state | alive: new_alive}
   end
 
-  defp handle_wasm(["click", "#stop", _data], state) when is_running(state) do
+  defp handle_dom_event(["click", "#stop", _data], state) when is_running(state) do
     set_element_visiblity(start: true, stop: false, reset: true, examples: true)
     stop_timer(state.timer)
     :ok = GridSupervisor.stop_simulation(state.sup_pid)
@@ -77,25 +78,12 @@ defmodule GameOfLife.Ui do
     %{state | timer: nil, sup_pid: nil, grid_pid: nil}
   end
 
-  defp handle_wasm(["click", "#reset", _data], state) when not is_running(state) do
+  defp handle_dom_event(["click", "#reset", _data], state) when not is_running(state) do
     set_alive_cells([])
     %{state | alive: []}
   end
 
-  defp handle_wasm("tick", state) when is_running(state) do
-    new_alive =
-      state.grid_pid
-      |> Grid.tick()
-      |> grid_to_alive_list()
-
-    set_alive_cells(new_alive)
-    %{state | alive: new_alive}
-  end
-
-  # Stale tick, ignore
-  defp handle_wasm("tick", state), do: state
-
-  defp handle_wasm(["click", ".cell", %{"coordsX" => x, "coordsY" => y}], state)
+  defp handle_dom_event(["click", ".cell", %{"coordsX" => x, "coordsY" => y}], state)
        when not is_running(state) do
     x = String.to_integer(x)
     y = String.to_integer(y)
@@ -110,6 +98,19 @@ defmodule GameOfLife.Ui do
     set_alive_cells(new_alive)
     %{state | alive: new_alive}
   end
+
+  defp handle_tick(state) when is_running(state) do
+    new_alive =
+      state.grid_pid
+      |> Grid.tick()
+      |> grid_to_alive_list()
+
+    set_alive_cells(new_alive)
+    %{state | alive: new_alive}
+  end
+
+  # Stale tick, ignore
+  defp handle_tick(state), do: state
 
   defp html() do
     """
@@ -126,7 +127,7 @@ defmodule GameOfLife.Ui do
     """
   end
 
-  defp start_timer(ms) do
+  defp start_timer(ms, receiver) do
     Wasm.run_js!(
       """
       (args, {send}) => {
@@ -145,7 +146,7 @@ defmodule GameOfLife.Ui do
         return new TrackedValue({ dispose }, dispose);
       }
       """,
-      %{ms: ms, receiver: Atom.to_string(@receiver_name)}
+      %{ms: ms, receiver: receiver}
     )
   end
 
@@ -242,16 +243,16 @@ defmodule GameOfLife.Ui do
 
   # Returns a tracked handle; listeners are removed when the handle is
   # garbage-collected on the BEAM side, so it's kept in the state.
-  defp register_click_listeners(selectors) do
+  defp register_click_listeners(selectors, receiver) do
     Wasm.run_js!(
       """
-      (args, {send}) => {
+      (args, {cast}) => {
         const { selectors, event_name, event_receiver } = args;
         const removeListenersFunctions = [];
         selectors.forEach((selector) => {
           const nodes = document.querySelectorAll(selector);
           const fn = (event) => {
-            send(event_receiver, ["click", selector, { ...event.target.dataset }]);
+            cast(event_receiver, ["click", selector, { ...event.target.dataset }]);
           };
           nodes.forEach((node) => node.addEventListener(event_name, fn));
 
@@ -267,7 +268,7 @@ defmodule GameOfLife.Ui do
       %{
         event_name: "click",
         selectors: selectors,
-        event_receiver: Atom.to_string(@receiver_name)
+        event_receiver: receiver
       }
     )
   end

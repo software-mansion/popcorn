@@ -19,7 +19,7 @@ defmodule GameOfLife.Application do
   # (e.g. `mix test`) the app runs without the UI.
   defp ui() do
     if Popcorn.Wasm.available?() do
-      [{GameOfLife.Ui, %{size: 20}}]
+      [Popcorn.Proxy, {GameOfLife.Ui, %{size: 20}}]
     else
       []
     end
