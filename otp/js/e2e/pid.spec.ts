@@ -7,7 +7,7 @@ test.describe("pid", () => {
       evalOpts(`
           true = register(controller, self()),
           wasm:run_js(
-            <<"(args, send) => {
+            <<"(args, {send}) => {
               setTimeout(() => send('controller', {delayed: true}), 10);
               return null;
             }">>,
@@ -35,7 +35,7 @@ test.describe("pid", () => {
               #{target => Self}
             ),
           wasm:run_js(
-            <<"(args, send) => {
+            <<"(args, {send}) => {
               send(args.target, {forwarded: args.target});
               return null;
             }">>,
@@ -61,7 +61,7 @@ test.describe("pid", () => {
           Ref = erlang:monitor(process, Dead),
           receive {'DOWN', Ref, process, Dead, _} -> ok end,
           Ok = wasm:run_js(
-            <<"(args, send) => send(args.target, {}).then(result => result.ok)">>,
+            <<"(args, {send}) => send(args.target, {}).then(result => result.ok)">>,
             #{target => Dead}
           ),
           ok = wasm:send(#{dead => Ok}).

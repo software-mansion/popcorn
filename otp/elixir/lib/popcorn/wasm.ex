@@ -50,7 +50,7 @@ defmodule Popcorn.Wasm do
   `run_js/3` takes a JavaScript function written as a string and a map of
   arguments for it:
   ```elixir
-  Popcorn.Wasm.run_js("({ args }) => args.n + 1", %{n: 1})
+  Popcorn.Wasm.run_js("(args) => args.n + 1", %{n: 1})
   #=> {:ok, 2}
   ```
 
@@ -115,8 +115,7 @@ defmodule Popcorn.Wasm do
   @doc """
   Runs JavaScript synchrounously on the page and returns a handle to JS result.
 
-  `code` is a JavaScript function written as a string. The function takes a `{args, send}` JS object.
-  <!-- TODO: split args from the rest of args, `(args, {send}) => { ... }` -->
+  `code` is a JavaScript function written as a string, called as `(args, {send}) => { ... }`.
 
   - `args` are arguments passed from elixir in a map (types from Elixir are converted to JS ones).
   - `send` is used to send events from JS running in `run_js/3`, same as `popcorn.send()` JS API.
@@ -133,7 +132,7 @@ defmodule Popcorn.Wasm do
   ## Examples
 
   ```elixir
-  Popcorn.Wasm.run_js("({ args }) => args.n + 1", %{n: 1})
+  Popcorn.Wasm.run_js("(args) => args.n + 1", %{n: 1})
   #=> {:ok, 2}
   ```
   """
