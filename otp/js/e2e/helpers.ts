@@ -4,7 +4,6 @@ import {
   expect,
   test as base,
   type JSHandle,
-  type ConsoleMessage,
   type Page,
 } from "@playwright/test";
 import type {
@@ -31,12 +30,9 @@ type Otp = {
   id: string;
   events: PopcornEvent[];
   boot(options: InitOptions): Promise<BootResult>;
-  reboot(): Promise<BootResult>;
-  send(
-    target: string | Pid,
-    payload?: unknown,
-  ): Promise<BootResult>;
+  send(target: string | Pid, payload?: unknown): Promise<BootResult>;
   waitForEvent(name: string): Promise<PopcornEvent>;
+  eventValue(name: string): unknown;
   deinit(): void;
 };
 
@@ -49,89 +45,9 @@ export function evalOpts(code: string): PopcornOpts {
   return {
     beam: {
       manifestUrl: "/assets/otp/manifest.json",
-      extraArgs: ["-eval", code],
+      extraArgs: ["-eval", trimLeft(code)],
     },
   };
-}
-
-function pidCaptureEval(): PopcornOpts {
-  return evalOpts(
-    trimLeft(`
-      ok = wasm:send(#{pid_captured => self()}),
-      receive _ -> ok end.
-    `),
-  );
-}
-
-type PopcornHooksGlobal = typeof globalThis & {
-  popcorn: {
-    cleanups: number;
-    cleanup: () => void;
-    runJs: {
-      isPaused: () => boolean;
-      pause: () => Promise<void>;
-      finish: () => void;
-    };
-  };
-};
-
-async function addPopcornHooks(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    let paused = false;
-    let finishRunJs!: () => void;
-    const resume = new Promise<void>((resolve) => {
-      finishRunJs = resolve;
-    });
-    const scope = globalThis as PopcornHooksGlobal;
-    scope.popcorn = {
-      cleanups: 0,
-      cleanup() {
-        this.cleanups += 1;
-      },
-      runJs: {
-        isPaused: () => paused,
-        pause: async () => {
-          paused = true;
-          await resume;
-          paused = false;
-        },
-        finish: finishRunJs,
-      },
-    };
-  });
-}
-
-export async function getCleanups(page: Page): Promise<number> {
-  return await page.evaluate(() => {
-    return (globalThis as PopcornHooksGlobal).popcorn.cleanups;
-  });
-}
-
-export async function waitForRunJsSuspension(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    return (globalThis as PopcornHooksGlobal).popcorn.runJs.isPaused();
-  });
-}
-
-export async function finishRunJs(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    (globalThis as PopcornHooksGlobal).popcorn.runJs.finish();
-  });
-}
-
-export function valuesWithKey<K extends PropertyKey>(
-  values: Iterable<unknown>,
-  key: K,
-): unknown[] {
-  return Array.from(values)
-    .filter((value): value is Record<K, unknown> => {
-      return (
-        typeof value === "object" &&
-        value !== null &&
-        Object.hasOwn(value, key)
-      );
-    })
-    .map((value) => value[key]);
 }
 
 export const test = base.extend<Fixtures>({
@@ -141,7 +57,6 @@ export const test = base.extend<Fixtures>({
     await use(page);
   },
   createOtp: async ({ page }, use) => {
-    await addPopcornHooks(page);
     const handles = new Set<OtpHandle>();
     const createOtp = async (id = randomOtpId()) => {
       const otp = await OtpHandle.create(page, id);
@@ -163,7 +78,6 @@ export class OtpHandle {
   private otpHandle: JSHandle<Otp> | null;
 
   private constructor(
-    private readonly page: Page,
     public readonly id: string,
     otp: JSHandle<Otp>,
   ) {
@@ -172,7 +86,7 @@ export class OtpHandle {
 
   public static async create(page: Page, id: string): Promise<OtpHandle> {
     const otp = await page.evaluateHandle(createOtp, id);
-    return new OtpHandle(page, id, otp);
+    return new OtpHandle(id, otp);
   }
 
   public async boot(options: InitOptions): Promise<BootResult> {
@@ -184,14 +98,8 @@ export class OtpHandle {
     return result;
   }
 
-  public async reboot(): Promise<BootResult> {
-    const result = await this.otp.evaluate((otp) => otp.reboot());
-    await this.syncEvents();
-    return result;
-  }
-
   public async send(
-    target: string,
+    target: string | JSHandle<Pid>,
     payload?: unknown,
   ): Promise<BootResult> {
     const result = await this.otp.evaluate(
@@ -211,43 +119,16 @@ export class OtpHandle {
     return event;
   }
 
-  /**
-   * Boots the instance and captures its main process as a JS `Pid` (the way the
-   * feature delivers one — a `run_js` closure receiving it in args). Returns a
-   * handle usable with `sendToPid`.
-   */
-  public async captureOwnPid(): Promise<JSHandle<Pid>> {
-    const boot = await this.boot(pidCaptureEval());
-    assert(boot.ok, "pid-capture boot failed");
-    await this.waitForEvent("pid_captured");
-
-    return this.otp.evaluateHandle((otp) => {
-      const event = otp.events.find(
-        (value): value is { pid_captured: Pid } =>
-          typeof value === "object" &&
-          value !== null &&
-          Object.hasOwn(value, "pid_captured"),
-      );
-      if (event === undefined) throw new Error("no captured pid");
-      return event.pid_captured;
-    });
+  public async eventValueHandle<T>(name: string): Promise<JSHandle<T>> {
+    await this.waitForEvent(name);
+    return await this.otp.evaluateHandle(
+      (otp, eventName) => otp.eventValue(eventName) as T,
+      name,
+    );
   }
 
-  /** Sends to a captured pid through this instance. */
-  public async sendToPid(pid: JSHandle<Pid>): Promise<BootResult> {
-    const result = await this.otp.evaluate((otp, p) => otp.send(p, {}), pid);
-    await this.syncEvents();
-    return result;
-  }
-
-  public async waitForStderr(text: string): Promise<ConsoleMessage> {
-    return await this.page.waitForEvent("console", (message) => {
-      return (
-        message.type() === "error" &&
-        message.text().includes(`[Popcorn-${this.id}]`) &&
-        message.text().includes(text)
-      );
-    });
+  public async deinit(): Promise<void> {
+    await this.otp.evaluate((otp) => otp.deinit());
   }
 
   public async dispose(): Promise<void> {
@@ -288,14 +169,19 @@ function createOtp(id: string): Otp {
     }
   }
 
-  function hasKey(event: PopcornEvent, key: string) {
-    return (
-      typeof event === "object" && event !== null && Object.hasOwn(event, key)
-    );
-  }
-
   function check(condition: boolean, message: string): asserts condition {
     if (!condition) throw new Error(message);
+  }
+
+  function hasKey(
+    value: unknown,
+    key: string,
+  ): value is Record<string, unknown> {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      Object.hasOwn(value, key)
+    );
   }
 
   class Otp {
@@ -324,14 +210,6 @@ function createOtp(id: string): Otp {
       return result;
     }
 
-    public async reboot(): Promise<BootResult> {
-      const popcorn = this.popcorn;
-      popcorn.deinit();
-      const boot = await popcorn.boot();
-      if (boot.ok) return { ok: true, data: null };
-      return { ok: false, error: boot.error.serialize() };
-    }
-
     public async send(
       target: string | Pid,
       payload?: unknown,
@@ -350,6 +228,13 @@ function createOtp(id: string): Otp {
         waiters.push(resolve);
         this.eventWaiters.set(name, waiters);
       });
+    }
+
+    public eventValue(name: string): unknown {
+      const event = this.findEvent(name);
+      check(event !== null, `Missing event: ${name}`);
+      check(hasKey(event, name), `Missing event value: ${name}`);
+      return event[name];
     }
 
     public deinit(): void {
