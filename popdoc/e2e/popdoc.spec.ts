@@ -21,9 +21,8 @@ async function runBlock(block: Locator) {
   await expect(run).toBeEnabled({ timeout: EVAL_TIMEOUT_MS });
 }
 
-// Prompts are decorated before the WASM runtime finishes booting, but click
-// handlers exist only once popdoc marks them bound — interacting earlier is
-// silently lost.
+// Click handlers exist only once popdoc marks prompts bound (right after
+// decoration on exdoc:loaded) — interacting earlier is silently lost.
 async function awaitPromptReady(prompt: Locator) {
   await expect(prompt).toHaveAttribute("data-popdoc-iex-bound", "true", {
     timeout: RUN_READY_TIMEOUT_MS,
@@ -38,14 +37,72 @@ async function runPrompt(prompt: Locator) {
   });
 }
 
-test("decorates elixir-popcorn blocks and enables Run once Popcorn is ready", async ({
+test("decorates elixir-popcorn blocks with Run enabled immediately", async ({
   page,
 }) => {
   const blocks = page.locator(".popdoc-block");
   await expect(blocks).toHaveCount(4);
 
+  // Lazy runtime: buttons are usable right away, no boot to wait for.
   const firstRun = blocks.first().locator(".popdoc-run");
-  await expect(firstRun).toBeEnabled({ timeout: RUN_READY_TIMEOUT_MS });
+  await expect(firstRun).toBeEnabled();
+});
+
+test("loads the runtime only on first user interaction", async ({ page }) => {
+  const runtimeRequests: string[] = [];
+  page.on("request", (request) => {
+    if (/\.(wasm|avm)(\?|$)/.test(request.url())) {
+      runtimeRequests.push(request.url());
+    }
+  });
+
+  // Fresh navigation so the listener sees every request of this page load.
+  await page.goto("/readme.html");
+  await page.waitForLoadState("networkidle");
+  expect(runtimeRequests).toHaveLength(0);
+
+  const run = page.locator(".popdoc-run").first();
+  await run.click();
+  await expect(page.locator(".popdoc-toast")).toContainText("Loading");
+  await expect
+    .poll(() => runtimeRequests.length, { timeout: EVAL_TIMEOUT_MS })
+    .toBeGreaterThan(0);
+  await expect(run).toBeEnabled({ timeout: EVAL_TIMEOUT_MS });
+  await expect(page.locator(".popdoc-toast")).toBeHidden();
+});
+
+test("shows an error toast when the runtime fails to load", async ({
+  page,
+}) => {
+  await page.route(/\.(wasm|avm)(\?|$)/, (route) => route.abort());
+
+  const block = await getBlock(page, 0);
+  const run = block.locator(".popdoc-run");
+  await run.click();
+
+  const toast = page.locator(".popdoc-toast");
+  await expect(toast).toContainText(/Popcorn failed to load/, {
+    timeout: EVAL_TIMEOUT_MS,
+  });
+  await expect(run).toBeEnabled({ timeout: EVAL_TIMEOUT_MS });
+
+  await toast.locator(".popdoc-toast-close").click();
+  await expect(toast).toBeHidden();
+});
+
+test("shows an error toast when an iex prompt cannot start the runtime", async ({
+  page,
+}) => {
+  await page.route(/\.(wasm|avm)(\?|$)/, (route) => route.abort());
+
+  const prompt = page.locator(".popdoc-iex-prompt").first();
+  await awaitPromptReady(prompt);
+  await prompt.click();
+
+  await expect(page.locator(".popdoc-toast")).toContainText(
+    /Popcorn failed to load/,
+    { timeout: EVAL_TIMEOUT_MS },
+  );
 });
 
 test("evaluates a single expression and renders the result", async ({
@@ -129,11 +186,12 @@ test("decorates iex-popcorn prompts as clickable and opens the IEx terminal", as
   await expect(prompt).toBeAttached({ timeout: RUN_READY_TIMEOUT_MS });
   await expect(prompt).toHaveAttribute("title", "Run in IEx");
 
+  // The terminal is created lazily together with the runtime.
   const terminal = page.locator(".popdoc-terminal");
-  await expect(terminal).toBeAttached({ timeout: RUN_READY_TIMEOUT_MS });
-  await expect(terminal).not.toHaveClass(/popdoc-terminal--open/);
+  await expect(terminal).toHaveCount(0);
 
   await runPrompt(prompt);
+  await expect(terminal).toBeAttached();
   await expect(terminal).toHaveClass(/popdoc-terminal--open/);
 });
 
@@ -180,7 +238,10 @@ test("shows the iex launcher and opens the terminal from it", async ({
 
   const terminal = page.locator(".popdoc-terminal");
   await launcher.click();
-  await expect(terminal).toHaveClass(/popdoc-terminal--open/);
+  // The first interaction boots the runtime before the terminal opens.
+  await expect(terminal).toHaveClass(/popdoc-terminal--open/, {
+    timeout: EVAL_TIMEOUT_MS,
+  });
   await expect(launcher).toBeHidden();
 
   await page.locator(".popdoc-terminal-btn", { hasText: "✕" }).click();
@@ -200,6 +261,7 @@ test("launcher starts an IEx session on pages without popcorn blocks", async ({
 
   await expect(page.locator(".popdoc-terminal")).toHaveClass(
     /popdoc-terminal--open/,
+    { timeout: EVAL_TIMEOUT_MS },
   );
   await expect(page.locator(".popdoc-terminal .xterm-rows")).toContainText(
     "iex(",
@@ -213,7 +275,9 @@ test("collapses and closes the IEx terminal", async ({ page }) => {
   await prompt.click();
 
   const terminal = page.locator(".popdoc-terminal");
-  await expect(terminal).toHaveClass(/popdoc-terminal--open/);
+  await expect(terminal).toHaveClass(/popdoc-terminal--open/, {
+    timeout: EVAL_TIMEOUT_MS,
+  });
 
   const collapse = page.locator(".popdoc-terminal-collapse");
   await collapse.click();

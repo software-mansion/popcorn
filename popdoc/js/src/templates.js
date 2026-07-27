@@ -11,7 +11,7 @@ export function instantiate(template) {
 export const TPL_BLOCK = tpl(`
   <div class="popdoc-block">
     <div class="popdoc-header">
-      <button class="popdoc-run" type="button" disabled>Run</button>
+      <button class="popdoc-run" type="button">Run</button>
       <span class="popdoc-status" hidden></span>
     </div>
     <div class="popdoc-output" hidden></div>
@@ -23,6 +23,15 @@ export const TPL_STATUS = tpl(`
     <span class="popdoc-dot"></span>
     <span></span>
   </span>
+`);
+
+export const TPL_TOAST = tpl(`
+  <div class="popdoc-toast" role="status" aria-live="polite" hidden>
+    <span class="popdoc-spinner" hidden></span>
+    <span class="popdoc-toast-icon" hidden>⚠</span>
+    <span class="popdoc-toast-message"></span>
+    <button type="button" class="popdoc-toast-close" title="Dismiss" hidden>✕</button>
+  </div>
 `);
 
 export const TPL_SKELETON = tpl(`

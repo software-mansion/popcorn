@@ -8,7 +8,7 @@ import {
   getTerminalGeneration,
 } from "./terminal.js";
 import { EVAL_TIMEOUT_MS, errorMessage } from "./eval.js";
-import { getPopcorn } from "./popdoc.js";
+import { getPopcorn, initPopcorn } from "./popdoc.js";
 import { instantiate, TPL_IEX_ICON } from "./templates.js";
 
 const IEX_BLOCK_SEL = "pre.popcorn-iex";
@@ -256,6 +256,8 @@ export async function startIexSession() {
   // a second prompt.
   if (!startPromise) {
     startPromise = (async () => {
+      // A failed boot throws before any terminal DOM is created.
+      await initPopcorn();
       const gen = getTerminalGeneration();
       ensureTerminal();
       const result = await getPopcorn().call(["start_iex"], {
