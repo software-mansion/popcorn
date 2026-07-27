@@ -1,87 +1,29 @@
-import { Popcorn } from "@swmansion/popcorn";
+import {
+  instantiate,
+  TPL_SKELETON,
+  TPL_TOGGLE,
+  TPL_TOP,
+  TPL_STDIO,
+  TPL_ROW,
+  TPL_ERROR_TOP,
+  TPL_STACKTRACE_TOGGLE,
+  TPL_STACKTRACE,
+  TPL_STATUS,
+} from "./templates.js";
+import { getPopcorn } from "./popdoc.js";
 
-const BUNDLES_SEL = 'meta[name="popcorn-user-bundle"]';
-const EVAL_BLOCK_SEL = "pre.popcorn-eval code";
 const PENDING_DELAY_MS = 200;
-const EVAL_TIMEOUT_MS = 30_000;
+export const EVAL_TIMEOUT_MS = 30_000;
 
-const tpl = (html) => {
-  const t = document.createElement("template");
-  t.innerHTML = html.trim();
-  return t;
-};
-
-const TPL_BLOCK = tpl(`
-  <div class="popdoc-block">
-    <div class="popdoc-header">
-      <button class="popdoc-run" type="button" disabled>Run</button>
-      <span class="popdoc-status" hidden></span>
-    </div>
-    <div class="popdoc-output" hidden></div>
-  </div>
-`);
-
-const TPL_STATUS = tpl(`
-  <span>
-    <span class="popdoc-dot"></span>
-    <span></span>
-  </span>
-`);
-
-const TPL_SKELETON = tpl(`
-  <div class="popdoc-result"><span class="popdoc-empty">(empty)</span></div>
-`);
-
-const TPL_TOGGLE = tpl(`
-  <button type="button" class="popdoc-toggle">
-    <span class="popdoc-chev">▸</span>
-    <span>show all results</span>
-  </button>
-`);
-
-const TPL_TOP = tpl(`
-  <div class="popdoc-top">
-    <div class="popdoc-result"></div>
-  </div>
-`);
-
-const TPL_STDIO = tpl(`
-  <div class="popdoc-stdio">
-    <span class="popdoc-label"></span>
-    <span></span>
-  </div>
-`);
-
-const TPL_ROW = tpl(`
-  <div class="popdoc-row">
-    <span class="popdoc-cell-snippet"></span>
-    <span class="popdoc-cell-result"></span>
-  </div>
-`);
-
-const TPL_ERROR_TOP = tpl(`
-  <div class="popdoc-top-error">
-    <span class="popdoc-cell-snippet"></span>
-    <span class="popdoc-cell-result popdoc-result-err"></span>
-  </div>
-`);
-
-const TPL_STACKTRACE_TOGGLE = tpl(`
-  <button type="button" class="popdoc-toggle popdoc-stacktrace-toggle">
-    <span class="popdoc-chev">▸</span>
-    <span>show stacktrace</span>
-  </button>
-`);
-
-const TPL_STACKTRACE = tpl(`
-  <pre class="popdoc-stacktrace" hidden></pre>
-`);
-
-function instantiate(template) {
-  return template.content.firstElementChild.cloneNode(true);
+export function errorMessage(error) {
+  return String(error?.message ?? error);
 }
 
-function hasMultipleExpressions(code) {
+export function ensureTrailingNewline(text) {
+  return text.endsWith("\n") ? text : text + "\n";
+}
+
+export function hasMultipleExpressions(code) {
   return (
     code
       .trim()
@@ -90,19 +32,20 @@ function hasMultipleExpressions(code) {
   );
 }
 
-function displayResult({ result, bindings }) {
+export function displayResult({ result, bindings }) {
   if (!bindings || bindings.length === 0) return result;
   return bindings.map((b) => `${b.name} = ${b.value}`).join(", ");
 }
 
-function formatError(error) {
+export function formatError(error) {
   if (error === null) return "";
   return error.type !== null
     ? `${error.type}: ${error.message}`
     : error.message;
 }
 
-async function runCode(popcorn, block) {
+export async function runCode(block) {
+  const popcorn = getPopcorn();
   const { code, blockId, button, output, status } = block;
 
   button.disabled = true;
@@ -175,7 +118,7 @@ async function runCode(popcorn, block) {
       break;
     }
 
-    const stopLogCapture = startLogCapture(popcorn);
+    const stopLogCapture = startLogCapture();
     const step = await popcorn.call(["eval_one", blockId, i], {
       timeoutMs: budget,
     });
@@ -332,67 +275,12 @@ function stdioRow(labelText, body, cls = null) {
 // then drop any trailing newline once joined.
 function joinLogs(messages) {
   if (messages.length === 0) return "";
-  const joined = messages
-    .map((m) => (m.endsWith("\n") ? m : m + "\n"))
-    .join("");
+  const joined = messages.map(ensureTrailingNewline).join("");
   return joined.endsWith("\n") ? joined.slice(0, -1) : joined;
 }
 
-function decorateBlocks() {
-  let blockIndex = 0;
-  const blocks = [];
-
-  for (const codeEl of document.querySelectorAll(EVAL_BLOCK_SEL)) {
-    const preEl = codeEl.parentElement;
-    if (preEl === null || preEl.dataset.popdocProcessed === "true") continue;
-
-    preEl.dataset.popdocProcessed = "true";
-    const blockId =
-      preEl.id.length > 0 ? preEl.id : `popdoc-eval-${++blockIndex}`;
-
-    const wrapper = instantiate(TPL_BLOCK);
-    preEl.insertAdjacentElement("afterend", wrapper);
-    wrapper.insertBefore(preEl, wrapper.querySelector(".popdoc-output"));
-
-    blocks.push({
-      code: codeEl.textContent,
-      blockId,
-      button: wrapper.querySelector(".popdoc-run"),
-      output: wrapper.querySelector(".popdoc-output"),
-      status: wrapper.querySelector(".popdoc-status"),
-    });
-  }
-
-  return blocks;
-}
-
-function addClickHandlers(popcorn, blocks) {
-  for (const block of blocks) {
-    block.button.disabled = false;
-    block.button.addEventListener("click", () => runCode(popcorn, block));
-  }
-}
-
-async function initPopcorn() {
-  const bundlePaths = ["./bundle.avm"];
-  try {
-    // TODO: maybe simplify by making `consumer.avm` mandatory
-    const userBundles = document.querySelectorAll(BUNDLES_SEL);
-    for (const bundleMeta of userBundles) {
-      bundlePaths.push(bundleMeta.content);
-    }
-
-    return Popcorn.init({
-      debug: true,
-      bundlePaths: [...new Set(bundlePaths)],
-    });
-  } catch (e) {
-    console.error("Failed to initialize Popcorn runtime:", e);
-    throw e;
-  }
-}
-
-function startLogCapture(popcorn) {
+export function startLogCapture() {
+  const popcorn = getPopcorn();
   const stdout = [];
   const stderr = [];
 
@@ -408,10 +296,3 @@ function startLogCapture(popcorn) {
     return { stdout, stderr };
   };
 }
-
-window.addEventListener("exdoc:loaded", async () => {
-  const blocks = decorateBlocks();
-  const popcorn = await initPopcorn();
-  window.popcorn = popcorn;
-  addClickHandlers(popcorn, blocks);
-});

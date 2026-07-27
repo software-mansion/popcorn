@@ -12,13 +12,13 @@ const bundlePath = resolve(rootDir, "wasm/out/bundle.avm");
 await mkdir(assetsDir, { recursive: true });
 
 await esbuild.build({
-  entryPoints: [resolve(__dirname, "popdoc.js")],
+  entryPoints: [resolve(__dirname, "src/popdoc.js")],
   bundle: true,
   format: "esm",
   outfile: resolve(assetsDir, "popdoc.js"),
   plugins: [popcorn({ bundlePaths: [bundlePath] })],
 });
 
-await copyFile(resolve(__dirname, "popdoc.css"), resolve(assetsDir, "popdoc.css"));
+await copyFile(resolve(__dirname, "src/popdoc.css"), resolve(assetsDir, "popdoc.css"));
 
 console.log("[popdoc] runtime scaffold built into assets/");
