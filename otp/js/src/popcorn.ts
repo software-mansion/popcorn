@@ -44,6 +44,9 @@ const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
 
 const LOG_PREFIX = "[Popcorn]";
 
+const DEFAULT_PROXY_NAME = "popcorn_proxy";
+const DEFAULT_CALL_TIMEOUT_MS = 5_000;
+
 type VmExitReason =
   | { reason: "deinit" }
   | { reason: "abort"; data: string }
@@ -61,6 +64,81 @@ type SendFn = (
   payload?: AnyValue,
 ) => Promise<Result<null>>;
 type RunJsFn = (args: AnyValue, actions: { send: SendFn }) => AnyValue;
+
+type CallOpts = { timeoutMs?: number; proxy?: string };
+type PendingCall = {
+  settle: (result: Result<AnyValue>) => void;
+  target: string | Pid;
+  timeoutMs: number;
+};
+type ProxyReply =
+  | { ok: true; value: AnyValue }
+  | {
+      ok: false;
+      error:
+        | { kind: "noproc" }
+        | { kind: "exit"; reason: string }
+        | { kind: "unserializable" }
+        | { kind: "timeout" };
+    };
+export type GenServer = {
+  /**
+   * Sends a `call` to the `target` GenServer (through the `proxy`), waiting for a response.
+   *
+   * ## Parameters
+   *
+   * - `target` — the GenServer to call, either a registered name or a `Pid`.
+   * - `request` — the request payload.
+   * - `opts` — call options.
+   *
+   * ### Options
+   *
+   * - `timeoutMs` — the maximum time to wait for a response, in milliseconds.
+   * - `proxy` — the name of the `Popcorn.Proxy` process to use for the call.
+   *
+   * ## Returns
+   *
+   * A `Promise` that resolves with the server's reply, or rejects with an error.
+   *
+   * ## Errors
+   *
+   * TODO: gather errors
+   *
+   */
+  call(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>>;
+
+  /**
+   * Sends a `cast` to the `target` GenServer (through the `proxy`), in fire-and-forget manner.
+   *
+   * ## Parameters
+   *
+   * - `target` — the GenServer to cast to, either a registered name or a `Pid`.
+   * - `request` — the request payload.
+   * - `opts` — cast options.
+   *
+   * ### Options
+   *
+   * - `proxy` — the registered name or `Pid` of the `Popcorn.Proxy` process to use for the cast.
+   *
+   * ## Returns
+   *
+   * A `Promise` that resolves once the message is delivered to the proxy.
+   *
+   * ## Errors
+   *
+   * TODO: gather errors
+   *
+   */
+  cast(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>>;
+};
 
 function createPidClass() {
   return class {
@@ -80,8 +158,15 @@ export class Popcorn {
   private settleBoot: ((result: Result<Popcorn>) => void) | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly pendingSends = new Map<string, PendingSend>();
+  private readonly pendingCalls = new Map<string, PendingCall>();
+  private callSeq = 0;
   private readonly trackedValues = new Map<number, TrackedEntry>();
   private trackedKeySeq = 0;
+
+  public readonly genserver: GenServer = {
+    call: (target, request, opts) => this.call(target, request, opts),
+    cast: (target, request, opts) => this.cast(target, request, opts),
+  };
 
   private readonly TrackedValue = class {
     public constructor(
@@ -316,6 +401,10 @@ export class Popcorn {
       resolve({ ok: false, error });
     }
     this.pendingSends.clear();
+    for (const pending of this.pendingCalls.values()) {
+      pending.settle({ ok: false, error });
+    }
+    this.pendingCalls.clear();
     this.clearTrackedValues();
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.vmWorker.terminate();
@@ -332,9 +421,123 @@ export class Popcorn {
   }
 
   private emit(event: PopcornEvent): void {
+    const popcorn = objectWithKeys(event, ["_popcorn"])?._popcorn;
+    const envelope = objectWithKeys(popcorn, ["t", "id", "payload"]);
+
+    if (envelope !== null) {
+      check(envelope.t === "proxy");
+      this.completeCall(envelope.id as string, envelope.payload);
+      return;
+    }
+
     for (const handler of this.eventHandlers) {
       handler(event);
     }
+  }
+
+  private completeCall(id: string, payload: unknown): void {
+    const pending = this.pendingCalls.get(id);
+    const lateReply = pending === undefined;
+    if (lateReply) return;
+
+    this.pendingCalls.delete(id);
+    pending.settle(this.parseCallReply(pending, payload));
+  }
+
+  private parseCallReply(
+    pending: PendingCall,
+    payload: unknown,
+  ): Result<AnyValue> {
+    const reply = payload as ProxyReply;
+    if (reply.ok) return { ok: true, data: reply.value };
+
+    switch (reply.error.kind) {
+      case "noproc": {
+        const rawTarget = pending.target;
+        const isName = typeof rawTarget === "string";
+        const target = isName ? rawTarget : "<pid>";
+        return {
+          ok: false,
+          error: err("genserver:noproc", { target }),
+        };
+      }
+      case "exit":
+        return {
+          ok: false,
+          error: err("genserver:exit", { reason: reply.error.reason }),
+        };
+      case "unserializable":
+        return { ok: false, error: err("genserver:unserializable", {}) };
+      case "timeout":
+        return {
+          ok: false,
+          error: err("timeout:call", { timeoutMs: pending.timeoutMs }),
+        };
+      default:
+        unreachable();
+    }
+  }
+
+  private async call(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>> {
+    const timeoutMs = opts?.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
+    const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
+    const id = this.nextCallId();
+
+    const result = new Promise<Result<AnyValue>>((resolve) => {
+      const timer = setTimeout(() => {
+        const isUnresolved = this.pendingCalls.delete(id);
+        if (isUnresolved) {
+          resolve({ ok: false, error: err("timeout:call", { timeoutMs }) });
+        }
+      }, timeoutMs);
+
+      this.pendingCalls.set(id, {
+        target: rawTarget,
+        timeoutMs,
+        settle: (settled) => {
+          clearTimeout(timer);
+          resolve(settled);
+        },
+      });
+    });
+
+    const sent = await this.send(proxy, {
+      kind: "call",
+      id,
+      target: rawTarget,
+      request: request,
+      timeout_ms: timeoutMs,
+    });
+
+    if (!sent.ok) {
+      const pending = this.pendingCalls.get(id);
+      this.pendingCalls.delete(id);
+      pending?.settle({ ok: false, error: sent.error });
+    }
+
+    return result;
+  }
+
+  private async cast(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>> {
+    const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
+    return await this.send(proxy, {
+      kind: "cast",
+      target: rawTarget,
+      request: request,
+    });
+  }
+
+  private nextCallId(): string {
+    this.callSeq += 1;
+    return `call:${this.callSeq}`;
   }
 
   private async runJs(request: RunJsRequest): Promise<void> {
