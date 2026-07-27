@@ -14,7 +14,7 @@ import { setupFakeView } from "./view_setup";
 import { createPopcornSocket, type PopcornLink } from "./transport";
 import { registerNavigationHandlers } from "./navigation";
 import { registerCustomEventBindings } from "./events";
-import { sendServerMessage, parseAssigns, resolveLlvId } from "./helpers";
+import { sendServerMessage, resolveLlvId } from "./helpers";
 
 export type { LLVConfig };
 export type { PopcornClient };
@@ -28,7 +28,7 @@ interface CreateArgs {
   view: string | null;
   url: string;
   urlParams: Record<string, string>;
-  assigns: Record<string, unknown>;
+  assigns: string;
 }
 
 class PopcornClient {
@@ -77,7 +77,7 @@ class PopcornClient {
     this.fire("reconnect sync", { action: "reconnected", id, payload: {} });
   }
 
-  updateAssigns(id: string, assigns: Record<string, unknown>): void {
+  updateAssigns(id: string, assigns: string): void {
     this.fire("update assigns", { action: "update_assigns", id, assigns });
   }
 
@@ -178,7 +178,7 @@ export class LLVEngine {
       view: pop_view_el.getAttribute("data-pop-view"),
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
-      assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns")),
+      assigns: pop_view_el.getAttribute("data-pop-assigns")!,
     });
     // A rejected call resolves with ok: false (it does not throw). Bail on
     // failed or duplicate creates — wiring a fake view without a live
@@ -230,18 +230,18 @@ export class LLVEngine {
     const unmountView = (el: HTMLElement) => this.unmountView(el);
     this.socket.hooks.LocalLiveView = {
       mounted() {
-        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
+        this.llvLastAssigns = this.el.getAttribute("data-pop-assigns")!;
         if (pop.ready) mountView(this.el);
       },
       updated() {
-        const raw = this.el.getAttribute("data-pop-assigns");
-        if (raw === this.llvLastAssigns) return;
-        this.llvLastAssigns = raw;
+        const assigns = this.el.getAttribute("data-pop-assigns")!;
+        if (assigns === this.llvLastAssigns) return;
+        this.llvLastAssigns = assigns;
         // Not mounted yet (Popcorn still booting): the mount reads the current
         // assigns, so there's nothing to forward. Once mounted, the dispatcher
         // processes this after the mount (it's sent after, and calls are FIFO).
         if (!pop.ready) return;
-        pop.updateAssigns(this.el.id, parseAssigns(raw));
+        pop.updateAssigns(this.el.id, assigns);
       },
       destroyed() {
         unmountView(this.el);

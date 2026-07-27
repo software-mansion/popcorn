@@ -29,7 +29,7 @@ defmodule Local.Kanban do
       {:ok,
        socket
        |> assign(:last_rev, assigns[:rev])
-       |> assign(:columns, build_board(assigns.board))}
+       |> assign(:columns, assigns.board)}
     end
   end
 
@@ -41,7 +41,7 @@ defmodule Local.Kanban do
     # rolled-back board.
     {:noreply,
      assign(socket,
-       columns: build_board(server_assigns.board),
+       columns: server_assigns.board,
        dragging: nil,
        drag_target: nil
      )}
@@ -274,17 +274,6 @@ defmodule Local.Kanban do
     columns
     |> Enum.map(fn {_id, %{position: pos}} -> pos + 1 end)
     |> Enum.max(fn -> 0 end)
-  end
-
-  defp build_board(data) when is_list(data) do
-    Map.new(data, fn entity ->
-      entity = Map.new(entity, fn {k, v} -> {String.to_atom(k), build_board(v)} end)
-      {entity.id, entity}
-    end)
-  end
-
-  defp build_board(data) do
-    data
   end
 
   defp uuid do

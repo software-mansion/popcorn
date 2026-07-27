@@ -31,7 +31,7 @@ interface CreateArgs {
     view: string | null;
     url: string;
     urlParams: Record<string, string>;
-    assigns: Record<string, unknown>;
+    assigns: string;
 }
 declare class PopcornClient {
     private popcorn;
@@ -42,7 +42,7 @@ declare class PopcornClient {
     create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult>;
     destroy(id: string): void;
     reconnected(id: string): void;
-    updateAssigns(id: string, assigns: Record<string, unknown>): void;
+    updateAssigns(id: string, assigns: string): void;
     handleParams(id: string, params: Record<string, string>, url: string): void;
     handleTransportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
     serverMessage(id: string, payload: Record<string, unknown>): void;

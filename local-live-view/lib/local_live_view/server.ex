@@ -164,7 +164,6 @@ defmodule LocalLiveView.Server do
     # The host LiveView re-rendered with new assigns for this view: run its
     # update/2 and push the resulting diff. data-pop-assigns carries the full
     # set of host-forwarded assigns each render, so it replaces server_assigns.
-    assigns = normalize_assigns(assigns)
     new_socket = call_update!(socket.view, assigns, socket)
     handle_changed(%{state | server_assigns: assigns}, new_socket, nil)
   end
@@ -264,16 +263,6 @@ defmodule LocalLiveView.Server do
         #{inspect(other)}
         """
     end
-  end
-
-  # Top-level assign keys cross the JSON boundary as strings; convert them back to
-  # atoms so they read like Phoenix assigns (`@items`). Nested values are left as
-  # is — deeply atomizing arbitrary maps would be unsafe.
-  defp normalize_assigns(assigns) do
-    Map.new(assigns, fn
-      {key, value} when is_atom(key) -> {key, value}
-      {key, value} when is_binary(key) -> {String.to_atom(key), value}
-    end)
   end
 
   defp decode_event_type("form", url_encoded, raw_payload) do
@@ -576,10 +565,7 @@ defmodule LocalLiveView.Server do
       view: view
     } = verified
 
-    # Assigns passed via the `<.local_live_view assigns... />` component reach us
-    # here as a string-keyed map. They become the first argument to the view's
-    # mount/3 callback and are then fed through its update/2.
-    initial_assigns = normalize_assigns(params["assigns"] || %{})
+    initial_assigns = params["assigns"]
     llv_id = params["id"]
 
     socket = %Socket{

@@ -61,19 +61,15 @@ defmodule LocalLvKanban.Boards do
     end)
   end
 
-  @doc """
-  Turns a preloaded `%Board{}` into the JSON-serializable shape the
-  `Local.Kanban` local live view expects: columns and tasks each carrying their
-  `position` so the client can sort them on render.
-  """
   def board_to_data(%Board{} = board) do
-    Enum.map(board.columns, fn col ->
-      col
-      |> Map.take([:id, :name, :position])
-      |> Map.put(
-        :tasks,
-        Enum.map(col.tasks, &Map.take(&1, [:id, :text, :description, :position]))
-      )
+    Map.new(board.columns, fn col ->
+      {col.id,
+       col
+       |> Map.take([:id, :name, :position])
+       |> Map.put(
+         :tasks,
+         Map.new(col.tasks, &{&1.id, Map.take(&1, [:id, :text, :description, :position])})
+       )}
     end)
   end
 
