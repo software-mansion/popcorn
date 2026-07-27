@@ -38,6 +38,31 @@ Example.hello()
 Example.divide_all(10, [2, 5, 0])
 ```
 
+## IEx session
+
+Click an `iex>` prompt to run it in the on-page terminal, or open the terminal
+any time with the floating `iex` button in the bottom-right corner. You can also
+type freely there. `Clear` wipes the screen; `Reset` restarts the whole Popcorn
+runtime (variables, modules, and eval-block state).
+
+```iex-popcorn
+iex> x = 1 + 1
+2
+iex> x * 10
+20
+```
+
+```iex-popcorn
+iex> Enum.sort([3, 2, 1])
+[1, 2, 3]
+iex> total =
+...>   [10, 20, 30]
+...>   |> Enum.sum()
+60
+iex> total * 2
+120
+```
+
 Build the docs with:
 
 ```bash
