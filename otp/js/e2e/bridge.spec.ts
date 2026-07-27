@@ -1,8 +1,9 @@
-import { assert, evalOpts, expect, test, trimLeft } from "./helpers";
 import { encode } from "../src/etf";
+import { assert, evalOpts, expect, test } from "./helpers";
 
+const OVERFLOWED = Number.MAX_SAFE_INTEGER + 1;
 const PAYLOAD = {
-  text: "zażółć",
+  text: "żółw",
   nullValue: null,
   boolTrue: true,
   boolFalse: false,
@@ -24,323 +25,212 @@ const PAYLOAD = {
   nested: [{ value: "ok" }],
 };
 
-test("ETF sorts map keys", () => {
-  assert.equal(hex({ b: 2, a: 1 }), hex({ a: 1, b: 2 }));
-});
-
-test("ETF accepts null-prototype plain objects", () => {
-  const value = Object.assign(Object.create(null), { key: "value" });
-  assert(encode(value).ok);
-});
-
-for (const [name, value, reason] of [
-  ["unsafe integer", Number.MAX_SAFE_INTEGER + 1, "lossy-int"],
-  ["positive infinity", Infinity, "non-finite-float"],
-  ["negative infinity", -Infinity, "non-finite-float"],
-  ["NaN", NaN, "non-finite-float"],
-  ["undefined", undefined, "unsupported"],
-  ["function", () => null, "unsupported"],
-  ["symbol", Symbol("value"), "unsupported"],
-  ["non-plain object", new Date(), "non-plain-object"],
-] as const) {
-  test(`ETF reports ${name}`, () => {
-    const result = encode(value);
-    assert(!result.ok);
-    assert.equal(result.error.t, "bridge:unserializable");
-    assert.equal(result.error.data.data, value);
-    assert.equal(result.error.data.part, value);
-    assert.equal(result.error.data.reason, reason);
-  });
-}
-
-test("ETF reports cyclic values", () => {
-  const value: unknown[] = [];
-  value.push(value);
-  const result = encode(value);
-  assert(!result.ok);
-  assert.equal(result.error.data.data, value);
-  assert.equal(result.error.data.part, value);
-  assert.equal(result.error.data.reason, "cyclic-object");
-});
-
-test("ETF encodes enumerable string properties", () => {
-  const symbolKey = { visible: true, [Symbol("key")]: true };
-  const hidden = Object.defineProperty({}, "hidden", { value: true });
-  const accessor = Object.defineProperty({}, "value", {
-    enumerable: true,
-    get: () => true,
-  });
-  const extendedArray = Object.assign([], { extra: true });
-
-  assert.equal(hex(symbolKey), hex({ visible: true }));
-  assert.equal(hex(hidden), hex({}));
-  assert.equal(hex(accessor), hex({ value: true }));
-  assert.equal(hex(extendedArray), hex([]));
-  const sparse = new Array(1);
-  const result = encode(sparse);
-  assert(!result.ok);
-  assert.equal(result.error.data.data, sparse);
-  assert.equal(result.error.data.part, undefined);
-  assert.equal(result.error.data.reason, "unsupported");
-});
-
-test("ETF reports unsupported nested values", () => {
-  const fn = () => null;
-  const symbol = Symbol();
-  for (const [value, part] of [
-    [{ value: undefined }, undefined],
-    [[fn], fn],
-    [{ value: symbol }, symbol],
-  ] as const) {
-    const result = encode(value);
-    assert(!result.ok);
-    assert.equal(result.error.data.data, value);
-    assert.equal(result.error.data.part, part);
-    assert.equal(result.error.data.reason, "unsupported");
-  }
-});
-
-test("handles events in both directions", async ({ otp }) => {
-  const BRIDGE_BOOT_EVAL = trimLeft(`
-    spawn(fun() ->
-      ExpectedPayload = #{
-        <<"text">> => <<"zażółć"/utf8>>,
-        <<"nullValue">> => nil,
-        <<"boolTrue">> => true,
-        <<"boolFalse">> => false,
-        <<"numbers">> => [
-          0,
-          (1 bsl 8) - 1,
-          1 bsl 8,
-          -1,
-          (1 bsl 31) - 1,
-          -(1 bsl 31),
-          1 bsl 31,
-          -(1 bsl 31) - 1,
-          (1 bsl 53) - 1,
-          -((1 bsl 53) - 1),
-          1.5
-        ],
-        <<"emptyList">> => [],
-        <<"emptyMap">> => #{},
-        <<"nested">> => [#{<<"value">> => <<"ok">>}]
-      },
-      ExpectedEtf = base64:encode(term_to_binary(ExpectedPayload)),
-      ok = wasm:send(#{etf_expected => ExpectedEtf}),
-      ok = wasm:send(#{direct => true, nested => #{count => 1}}),
-      true = register(bridge, self()),
-      Loop = fun(F) ->
-        ok = wasm:send(#{bridge_ready => true}),
-        receive
-          {wasm, Payload} ->
-            Shape = case Payload of
-              ExpectedPayload -> decoded;
-              _ -> unexpected
-            end,
-            ok = wasm:send(#{reply => Payload, shape => Shape})
-        after 100 ->
-            F(F)
-        end
-      end,
-      Loop(Loop)
-    end).
-  `);
-  const boot = await otp.boot(evalOpts(BRIDGE_BOOT_EVAL));
-
-  assert(boot.ok);
-  const expectedEtf = await otp.waitForEvent("etf_expected");
-  expect(expectedEtf).toEqual({
-    etf_expected: Buffer.from(encodePayload(PAYLOAD)).toString("base64"),
-  });
-  await otp.waitForEvent("direct");
-  expect(otp.events).toContainEqual({
-    direct: true,
-    nested: { count: 1 },
-  });
-
-  await otp.waitForEvent("bridge_ready");
-
-  const send = await otp.send("bridge", structuredClone(PAYLOAD));
-  assert(send.ok);
-
-  await otp.waitForEvent("reply");
-  expect(otp.events).toContainEqual({
-    reply: { ...PAYLOAD, nullValue: "nil" },
-    shape: "decoded",
-  });
-});
-
-test("run_js -> send", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    V = wasm:run_js(<<"(args) => 1 + 2">>, #{}),
-    ok = wasm:send(#{run_js_result => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("run_js_result");
-  expect(otp.events).toContainEqual({ run_js_result: 3 });
-});
-
-test("async run_js", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    V = wasm:run_js(<<"async ({a, b}) => a + b">>, #{a => 2, b => 5}),
-    ok = wasm:send(#{run_js_async => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("run_js_async");
-  expect(otp.events).toContainEqual({ run_js_async: 7 });
-});
-
-test("run_js timeout", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    R = try
-      wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
-    catch
-      error:run_js_timeout -> <<"timeout">>
-    end,
-    ok = wasm:send(#{run_js_timeout => R}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("run_js_timeout");
-  expect(otp.events).toContainEqual({ run_js_timeout: "timeout" });
-});
-
-test("throwing run_js raises in VM", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    R = try
-      wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
-    catch
-      error:{run_js, Msg} -> Msg
-    end,
-    ok = wasm:send(#{run_js_error => R}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("run_js_error");
-  expect(otp.events).toContainEqual({ run_js_error: "Error: boom" });
-});
-
-test("run_js: return nested value", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    V = wasm:run_js(
-      <<"() => ({a: 1, s: 'x', nested: {b: [2, 3]}, flag: true})">>,
-      #{},
-      [{return, value}]
-    ),
-    ok = wasm:send(#{value_mode => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("value_mode");
-  expect(otp.events).toContainEqual({
-    value_mode: { a: 1, s: "x", nested: { b: [2, 3] }, flag: true },
-  });
-});
-
-test("run_js: throws when returning unserializable value", async ({ otp }) => {
-  // One case per codec reason (unsupported/non_finite_float/lossy_int/
-  // non_plain_object/cyclic_object).
-  const REJECTIONS = [
-    ["func", "() => () => 1", "unsupported"],
-    ["symbol", "() => Symbol('x')", "unsupported"],
-    ["bigint", "() => 1n", "unsupported"],
-    ["pos_inf", "() => Infinity", "non_finite_float"],
-    ["neg_inf", "() => -Infinity", "non_finite_float"],
-    ["nan", "() => NaN", "non_finite_float"],
-    ["unsafe_int", "() => Number.MAX_SAFE_INTEGER + 1", "lossy_int"],
-    ["non_plain", "() => new Date()", "non_plain_object"],
-    ["cyclic", "() => { const a = []; a.push(a); return a; }", "cyclic_object"],
-  ] as const;
-  const cases = REJECTIONS.map(
-    ([name, code]) => `{${name}, <<"${code}">>}`,
-  ).join(",\n      ");
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    Cases = [
-      ${cases}
-    ],
-    lists:foreach(fun({Name, Code}) ->
-      Result = try wasm:run_js(Code, #{}) of
-        _ -> #{outcome => no_error}
-      catch
-        error:{run_js, {unserializable, Reason}} ->
-          #{outcome => rejected, reason => Reason};
-        error:run_js_timeout -> #{outcome => timeout}
-      end,
-      ok = wasm:send(#{reject => Name, result => Result})
-    end, Cases).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  for (const [name, , reason] of REJECTIONS) {
-    await otp.waitForEvent("reject");
-    expect(otp.events).toContainEqual({
-      reject: name,
-      result: { outcome: "rejected", reason },
+test.describe("ETF", () => {
+  test("objects", () => {
+    const nullPrototype = Object.assign(Object.create(null), { key: "value" });
+    const symbolKey = { visible: true, [Symbol("key")]: true };
+    const hidden = Object.defineProperty({}, "hidden", { value: true });
+    const accessor = Object.defineProperty({}, "value", {
+      enumerable: true,
+      get: () => true,
     });
-  }
-});
 
-test("run_js: options validation", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    Value = wasm:run_js(<<"() => 1">>, #{}, [{return, value}]),
-    Ref = wasm:run_js(<<"() => 1">>, #{}, [{return, ref}]),
-    Invalid = try wasm:run_js(<<"() => 1">>, #{}, [{return, bogus}]) of
-      _ -> ok
-    catch
-      error:function_clause -> invalid_option
-    end,
-    ok = wasm:send(#{
-      value_ok => Value =:= 1,
-      ref_ok => is_tuple(Ref) andalso element(1, Ref) =:= wasm_tracked_value,
-      invalid_return => Invalid
-    }).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
+    assert.equal(hex({ b: 2, a: 1 }), hex({ a: 1, b: 2 }));
+    assert(encode(nullPrototype).ok);
+    assert.equal(hex(symbolKey), hex({ visible: true }));
+    assert.equal(hex(hidden), hex({}));
+    assert.equal(hex(accessor), hex({ value: true }));
+    assert.equal(hex(Object.assign([], { extra: true })), hex([]));
+  });
 
-  await otp.waitForEvent("invalid_return");
-  expect(otp.events).toContainEqual({
-    value_ok: true,
-    ref_ok: true,
-    invalid_return: "invalid_option",
+  test("errors", () => {
+    const cyclic: unknown[] = [];
+    cyclic.push(cyclic);
+    const fn = () => null;
+    const symbol = Symbol("value");
+    const date = new Date();
+    const sparse = new Array(1);
+
+    for (const [value, part, reason] of [
+      [OVERFLOWED, OVERFLOWED, "lossy-int"],
+      [Infinity, Infinity, "non-finite-float"],
+      [-Infinity, -Infinity, "non-finite-float"],
+      [NaN, NaN, "non-finite-float"],
+      [cyclic, cyclic, "cyclic-object"],
+      [undefined, undefined, "unsupported"],
+      [fn, fn, "unsupported"],
+      [symbol, symbol, "unsupported"],
+      [date, date, "non-plain-object"],
+      [{ value: undefined }, undefined, "unsupported"],
+      [[fn], fn, "unsupported"],
+      [sparse, undefined, "unsupported"],
+    ] as const) {
+      const result = encode(value);
+      assert(!result.ok);
+      assert.equal(result.error.data.data, value);
+      assert.equal(result.error.data.part, part);
+      assert.equal(result.error.data.reason, reason);
+    }
   });
 });
 
-test("send() to unregistered process", async ({ otp }) => {
-  const READY_BOOT_EVAL = "ok = wasm:send(#{ready => true}).";
-  const boot = await otp.boot(evalOpts(READY_BOOT_EVAL));
-  assert(boot.ok);
-  await otp.waitForEvent("ready");
+test.describe("events", () => {
+  test("round trip", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          spawn(fun() ->
+            ExpectedPayload = #{
+              <<"text">> => <<"żółw"/utf8>>,
+              <<"nullValue">> => nil,
+              <<"boolTrue">> => true,
+              <<"boolFalse">> => false,
+              <<"numbers">> => [
+                0, 255, 256, -1, 2147483647, -2147483648,
+                2147483648, -2147483649, 9007199254740991,
+                -9007199254740991, 1.5
+              ],
+              <<"emptyList">> => [],
+              <<"emptyMap">> => #{},
+              <<"nested">> => [#{<<"value">> => <<"ok">>}]
+            },
+            ExpectedEtf = base64:encode(term_to_binary(ExpectedPayload)),
+            ok = wasm:send(#{etf_expected => ExpectedEtf}),
+            true = register('żółw', self()),
+            ok = wasm:send(#{bridge_ready => true}),
+            receive
+              {wasm, Payload} ->
+                ok = wasm:send(#{
+                  reply => Payload,
+                  decoded => Payload =:= ExpectedPayload
+                })
+            end
+          end).
+        `),
+    );
+    assert(boot.ok);
 
-  const send = await otp.send("missing-listener", { ping: true });
-  expect(send).toEqual({
-    ok: false,
-    error: {
-      t: "bridge:listener-not-found",
-      data: { targetName: "missing-listener" },
-    },
+    expect(await otp.waitForEvent("etf_expected")).toEqual({
+      etf_expected: Buffer.from(encodePayload(PAYLOAD)).toString("base64"),
+    });
+    await otp.waitForEvent("bridge_ready");
+    assert((await otp.send("żółw", structuredClone(PAYLOAD))).ok);
+    expect(await otp.waitForEvent("reply")).toEqual({
+      reply: { ...PAYLOAD, nullValue: "nil" },
+      decoded: true,
+    });
   });
 });
 
-test("send() timeout", async ({ otp }) => {
-  const boot = await otp.boot({
-    beam: { manifestUrl: "/assets/otp/manifest.json" },
-    timeoutsMs: { send: 0 },
-  });
-  assert(boot.ok);
+test.describe("run_js", () => {
+  test("values", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Sync = wasm:run_js(<<"({a, b}) => a + b">>, #{a => 1, b => 2}),
+          Async = wasm:run_js(
+            <<"async ({a, b}) => a + b">>,
+            #{a => 2, b => 5}
+          ),
+          Nested = wasm:run_js(
+            <<"() => ({a: 1, nested: {b: [2, 3]}, flag: true})">>,
+            #{},
+            [{return, value}]
+          ),
+          ok = wasm:send(#{sync => Sync, async => Async, nested => Nested}).
+        `),
+    );
+    assert(boot.ok);
 
-  const send = await otp.send("any-target", { ping: true });
-  expect(send).toEqual({
-    ok: false,
-    error: { t: "timeout:send", data: { timeoutMs: 0 } },
+    expect(await otp.waitForEvent("sync")).toEqual({
+      sync: 3,
+      async: 7,
+      nested: { a: 1, nested: { b: [2, 3] }, flag: true },
+    });
+  });
+
+  test("errors", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Timeout = try
+            wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
+          catch
+            error:run_js_timeout -> timeout
+          end,
+          Thrown = try
+            wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
+          catch
+            error:{run_js, Message} -> Message
+          end,
+          Unserializable = try
+            wasm:run_js(<<"() => () => 1">>, #{})
+          catch
+            error:{run_js, {unserializable, Reason}} -> Reason
+          end,
+          Invalid = try
+            wasm:run_js(<<"() => 1">>, #{}, [{return, bogus}])
+          catch
+            error:function_clause -> invalid_option
+          end,
+          ok = wasm:send(#{
+            timeout => Timeout,
+            thrown => Thrown,
+            unserializable => Unserializable,
+            invalid => Invalid
+          }).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("timeout")).toEqual({
+      timeout: "timeout",
+      thrown: "Error: boom",
+      unserializable: "unsupported",
+      invalid: "invalid_option",
+    });
+  });
+});
+
+test.describe("send", () => {
+  test("errors", async ({ createOtp }) => {
+    const otp = await createOtp();
+    const boot = await otp.boot(
+      evalOpts(`
+        true = register(controller, self()),
+        ok = wasm:send(#{ready => true}),
+        receive _ -> ok end.
+      `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("ready");
+
+    expect(await otp.send("unknown", {})).toEqual({
+      ok: false,
+      error: {
+        t: "bridge:listener-not-found",
+        data: { targetName: "unknown" },
+      },
+    });
+    expect(await otp.send("controller", OVERFLOWED)).toEqual({
+      ok: false,
+      error: {
+        t: "bridge:unserializable",
+        data: {
+          data: OVERFLOWED,
+          part: OVERFLOWED,
+          reason: "lossy-int",
+        },
+      },
+    });
+
+    const timedOut = await createOtp();
+    const bootOpts = {
+      beam: { manifestUrl: "/assets/otp/manifest.json" },
+      timeoutsMs: { send: 0 },
+    };
+    assert((await timedOut.boot(bootOpts)).ok);
+    expect(await timedOut.send("any-target", {})).toEqual({
+      ok: false,
+      error: { t: "timeout:send", data: { timeoutMs: 0 } },
+    });
   });
 });
 

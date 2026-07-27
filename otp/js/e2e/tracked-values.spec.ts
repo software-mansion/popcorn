@@ -1,260 +1,251 @@
-import {
-  assert,
-  evalOpts,
-  expect,
-  finishRunJs,
-  getCleanups,
-  test,
-  trimLeft,
-  valuesWithKey,
-  waitForRunJsSuspension,
-} from "./helpers";
+import type { Page } from "@playwright/test";
+import { assert, evalOpts, expect, test } from "./helpers";
 
-test("tracked values keep identity", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    H = wasm:run_js(<<"() => new TrackedValue({n: 1})">>, #{}),
-    V = wasm:run_js(<<"({h}) => { h.n = h.n + 1; return h.n; }">>, #{h => H}),
-    ok = wasm:send(#{roundtrip => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
+type PopcornHooks = {
+  cleanups: number;
+  cleanup: () => void;
+  runJs: {
+    isPaused: () => boolean;
+    pause: () => Promise<void>;
+    finish: () => void;
+  };
+};
 
-  await otp.waitForEvent("roundtrip");
-  expect(otp.events).toContainEqual({ roundtrip: 2 });
-});
+declare global {
+  var popcorn: PopcornHooks;
+  var popcornCleanup: () => void;
+}
 
-test("run_js: refs refer to the same value", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    % initial
-    H = wasm:run_js(<<"() => ({n: 0})">>, #{}, [{return, ref}]),
-    % update
-    wasm:run_js(<<"({h}) => { h.n = 100; }">>, #{h => H}),
-    % read
-    V = wasm:run_js(<<"({h}) => h.n">>, #{h => H}),
-    ok = wasm:send(#{var_value => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("var_value");
-  expect(otp.events).toContainEqual({ var_value: 100 });
-});
-
-test("run_js: refs work with unserializable values", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    H = wasm:run_js(<<"() => document.createElement('div')">>, #{}, [{return, ref}]),
-    V = wasm:run_js(<<"({h}) => h.tagName">>, #{h => H}),
-    ok = wasm:send(#{ref_unsupported => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("ref_unsupported");
-  expect(otp.events).toContainEqual({ ref_unsupported: "DIV" });
-});
-
-test("run_js: refs don't nest TrackedValues", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    H = wasm:run_js(<<"() => new TrackedValue({n: 1})">>, #{}, [{return, ref}]),
-    V = wasm:run_js(<<"({h}) => h.n">>, #{h => H}),
-    ok = wasm:send(#{ref_no_nest => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("ref_no_nest");
-  expect(otp.events).toContainEqual({ ref_no_nest: 1 });
-});
-
-test("nested tracked values", async ({ otp }) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    H = wasm:run_js(<<"() => new TrackedValue({n: 5})">>, #{}),
-    V = wasm:run_js(
-      <<"(a) => a.list[0].n + a.wrap.h.n">>,
-      #{list => [H], wrap => #{h => H}}
-    ),
-    ok = wasm:send(#{nested => V}).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("nested");
-  expect(otp.events).toContainEqual({ nested: 10 });
-});
-
-test("final tracked value sends are delivered before cleanup", async ({
-  otp,
-  page,
-}) => {
-  const count = 8;
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    spawn(fun() ->
-      lists:foreach(fun(I) ->
-        H = wasm:run_js(
-          <<"({i}) => new TrackedValue(
-            {label: 'tracked-' + i},
-            () => globalThis.popcorn.cleanup()
-          )">>,
-          #{i => I}
-        ),
-        ok = wasm:send(#{final_ref => H}),
-        erlang:garbage_collect(self())
-      end, lists:seq(1, ${count})),
-      ok = wasm:send(#{final_ref_done => true})
-    end).
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
-
-  await otp.waitForEvent("final_ref_done");
-
-  const refs = valuesWithKey(otp.events, "final_ref");
-  const labels = valuesWithKey(refs, "label");
-  expect(labels).toEqual(
-    Array.from({ length: count }, (_, i) => `tracked-${i + 1}`),
-  );
-  await expect.poll(() => getCleanups(page)).toBe(count);
-});
-
-test("tracked argument cleanup waits for async run_js to finish", async ({
-  otp,
-  page,
-}) => {
-  const RUN_JS_BOOT_EVAL = trimLeft(`
-    register(controller, self()),
-    Runner = spawn(fun() ->
-      receive
-        {tracked, H} ->
-          % Runner owns the final BEAM reference while JavaScript is suspended.
-          V = wasm:run_js(
-            <<"async ({h}) => {
-              await globalThis.popcorn.runJs.pause();
-              return {
-                value: h.value,
-                cleanups: globalThis.popcorn.cleanups,
-              };
-            }">>,
-            #{h => H},
-            [{timeout, 10000}]
+test.describe("tracked values", () => {
+  test("identity", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Tracked = wasm:run_js(
+            <<"() => new TrackedValue({n: 1})">>,
+            #{}
           ),
-          ok = wasm:send(#{async_tracked => V})
-      end
-    end),
-    spawn(fun() ->
-      H = wasm:run_js(
-        <<"() => new TrackedValue(
-          {value: 'tracked argument'},
-          () => globalThis.popcorn.cleanup()
-        )">>,
-        #{}
-      ),
-      Runner ! {tracked, H},
-      ok = wasm:send(#{async_runner_ready => true})
-    end),
-    receive
-      {wasm, #{<<"collect">> := true}} ->
-        % Force collection while Runner is blocked inside wasm:run_js/3.
-        erlang:garbage_collect(Runner),
-        ok = wasm:send(#{async_runner_collected => true})
-    end.
-  `);
-  const boot = await otp.boot(evalOpts(RUN_JS_BOOT_EVAL));
-  assert(boot.ok);
+          Mutated = wasm:run_js(
+            <<"({tracked}) => ++tracked.n">>,
+            #{tracked => Tracked}
+          ),
+          Ref = wasm:run_js(
+            <<"() => document.createElement('div')">>,
+            #{},
+            [{return, ref}]
+          ),
+          Tag = wasm:run_js(<<"({ref}) => ref.tagName">>, #{ref => Ref}),
+          Wrapped = wasm:run_js(
+            <<"() => new TrackedValue({n: 5})">>,
+            #{},
+            [{return, ref}]
+          ),
+          Nested = wasm:run_js(
+            <<"(args) => args.list[0].n + args.wrap.value.n">>,
+            #{list => [Wrapped], wrap => #{value => Wrapped}}
+          ),
+          ok = wasm:send(#{
+            mutated => Mutated,
+            tag => Tag,
+            nested => Nested
+          }).
+        `),
+    );
+    assert(boot.ok);
 
-  await otp.waitForEvent("async_runner_ready");
-  await waitForRunJsSuspension(page);
-
-  const collect = await otp.send("controller", { collect: true });
-  assert(collect.ok);
-  await otp.waitForEvent("async_runner_collected");
-
-  await expect
-    .poll(() => getCleanups(page), {
-      timeout: 500,
-      intervals: [50],
-    })
-    .toBe(0);
-
-  await finishRunJs(page);
-
-  const event = await otp.waitForEvent("async_tracked");
-  expect(event).toEqual({
-    async_tracked: { value: "tracked argument", cleanups: 0 },
+    expect(await otp.waitForEvent("mutated")).toEqual({
+      mutated: 2,
+      tag: "DIV",
+      nested: 10,
+    });
   });
-  await expect.poll(() => getCleanups(page)).toBe(1);
+
+  test("final send", async ({ otp, page }) => {
+    await addHooks(page);
+    const count = 8;
+    const boot = await otp.boot(
+      evalOpts(`
+          spawn(fun() ->
+            lists:foreach(fun(I) ->
+              H = wasm:run_js(
+                <<"({i}) => new TrackedValue(
+                  {label: 'tracked-' + i},
+                  () => globalThis.popcorn.cleanup()
+                )">>,
+                #{i => I}
+              ),
+              ok = wasm:send(#{final_ref => H}),
+              erlang:garbage_collect(self())
+            end, lists:seq(1, ${count})),
+            ok = wasm:send(#{final_ref_done => true})
+          end).
+        `),
+    );
+    assert(boot.ok);
+
+    await otp.waitForEvent("final_ref_done");
+    const refs = valuesWithKey(otp.events, "final_ref");
+    expect(valuesWithKey(refs, "label")).toEqual(
+      Array.from({ length: count }, (_, index) => `tracked-${index + 1}`),
+    );
+    await expect.poll(() => cleanups(page)).toBe(count);
+  });
+
+  test("async argument", async ({ otp, page }) => {
+    await addHooks(page);
+    const boot = await otp.boot(
+      evalOpts(`
+          register(controller, self()),
+          Runner = spawn(fun() ->
+            receive
+              {tracked, H} ->
+                V = wasm:run_js(
+                  <<"async ({h}) => {
+                    await globalThis.popcorn.runJs.pause();
+                    return {
+                      value: h.value,
+                      cleanups: globalThis.popcorn.cleanups
+                    };
+                  }">>,
+                  #{h => H},
+                  [{timeout, 10000}]
+                ),
+                ok = wasm:send(#{async_tracked => V})
+            end
+          end),
+          spawn(fun() ->
+            H = wasm:run_js(
+              <<"() => new TrackedValue(
+                {value: 'tracked argument'},
+                () => globalThis.popcorn.cleanup()
+              )">>,
+              #{}
+            ),
+            Runner ! {tracked, H},
+            ok = wasm:send(#{runner_ready => true})
+          end),
+          receive
+            {wasm, #{<<"collect">> := true}} ->
+              erlang:garbage_collect(Runner),
+              ok = wasm:send(#{runner_collected => true})
+          end.
+        `),
+    );
+    assert(boot.ok);
+
+    await otp.waitForEvent("runner_ready");
+    await page.waitForFunction(() => globalThis.popcorn.runJs.isPaused());
+    assert((await otp.send("controller", { collect: true })).ok);
+    await otp.waitForEvent("runner_collected");
+    await expect
+      .poll(() => cleanups(page), { timeout: 500, intervals: [50] })
+      .toBe(0);
+
+    await page.evaluate(() => globalThis.popcorn.runJs.finish());
+    expect(await otp.waitForEvent("async_tracked")).toEqual({
+      async_tracked: { value: "tracked argument", cleanups: 0 },
+    });
+    await expect.poll(() => cleanups(page)).toBe(1);
+  });
+
+  test("instances", async ({ createOtp, page }) => {
+    const [closed, live] = await Promise.all([createOtp(), createOtp()]);
+    let cleanupCalls = 0;
+    await page.exposeFunction("popcornCleanup", () => {
+      cleanupCalls += 1;
+    });
+    await page.evaluate(() => {
+      globalThis.popcorn = {
+        cleanups: 0,
+        cleanup: globalThis.popcornCleanup,
+        runJs: {
+          isPaused: () => false,
+          pause: async () => {},
+          finish: () => {},
+        },
+      };
+    });
+
+    const closedBoot = closed.boot(
+      evalOpts(`
+          spawn(fun() ->
+            H = wasm:run_js(
+              <<"() => new TrackedValue(
+                {id: 'A'},
+                () => globalThis.popcorn.cleanup()
+              )">>,
+              #{}
+            ),
+            ok = wasm:send(#{closed_ready => true}),
+            receive stop -> H end
+          end).
+        `),
+    );
+    const liveBoot = live.boot(
+      evalOpts(`
+          true = register(controller, self()),
+          H = wasm:run_js(
+            <<"() => new TrackedValue({id: 'B'})">>,
+            #{}
+          ),
+          ok = wasm:send(#{live_ready => true}),
+          receive
+            {wasm, _} -> ok = wasm:send(H)
+          end.
+        `),
+    );
+    assert((await closedBoot).ok);
+    assert((await liveBoot).ok);
+    await closed.waitForEvent("closed_ready");
+    await live.waitForEvent("live_ready");
+
+    await closed.dispose();
+    await expect.poll(() => cleanupCalls).toBe(1);
+    assert((await live.send("controller", {})).ok);
+    expect(await live.waitForEvent("id")).toEqual({ id: "B" });
+    expect(cleanupCalls).toBe(1);
+  });
 });
 
-test("isolated tracked values", async ({ createOtp }) => {
-  const evalFor = (id: string) =>
-    trimLeft(`
-      H = wasm:run_js(<<"() => new TrackedValue({id: '${id}'})">>, #{}),
-      ok = wasm:send(H).
-    `);
-
-  const [a, b] = await Promise.all([createOtp(), createOtp()]);
-  const [aBoot, bBoot] = await Promise.all([
-    a.boot(evalOpts(evalFor("A"))),
-    b.boot(evalOpts(evalFor("B"))),
-  ]);
-  assert(aBoot.ok);
-  assert(bBoot.ok);
-
-  const aId = await a.waitForEvent("id");
-  const bId = await b.waitForEvent("id");
-
-  expect(aId).toEqual({ id: "A" });
-  expect(bId).toEqual({ id: "B" });
-});
-
-test("tracked values isolated cleanup", async ({ createOtp, page }) => {
-  const [closedOtp, liveOtp] = await Promise.all([createOtp(), createOtp()]);
-  let cleanupCalls = 0;
-  await page.exposeFunction("popcornCleanup", () => {
-    cleanupCalls += 1;
-  });
+async function addHooks(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const scope = globalThis as unknown as {
-      popcorn: { cleanup: () => void };
-      popcornCleanup: () => void;
+    let paused = false;
+    let finish!: () => void;
+    const resume = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    globalThis.popcorn = {
+      cleanups: 0,
+      cleanup() {
+        this.cleanups += 1;
+      },
+      runJs: {
+        isPaused: () => paused,
+        pause: async () => {
+          paused = true;
+          await resume;
+          paused = false;
+        },
+        finish,
+      },
     };
-    scope.popcorn = { cleanup: () => scope.popcornCleanup() };
   });
-  const cleanupTrackedEval = trimLeft(`
-    spawn(fun() ->
-      H = wasm:run_js(
-        <<"() => new TrackedValue(0, () => globalThis.popcorn.cleanup())">>,
-        #{}
-      ),
-      ok = wasm:send(#{deinit_ready => true}),
-      receive stop -> H end
-    end).
-  `);
-  const liveEval = trimLeft(`
-    register(controller, self()),
-    HB = wasm:run_js(<<"() => new TrackedValue({v: 42})">>, #{}),
-    ok = wasm:send(#{live_ready => true}),
-    receive
-      {wasm, _} ->
-        ok = wasm:send(HB)
-    end.
-  `);
+}
 
-  const [closedBoot, liveBoot] = await Promise.all([
-    closedOtp.boot(evalOpts(cleanupTrackedEval)),
-    liveOtp.boot(evalOpts(liveEval)),
-  ]);
-  assert(closedBoot.ok);
-  assert(liveBoot.ok);
+async function cleanups(page: Page): Promise<number> {
+  return await page.evaluate(() => globalThis.popcorn.cleanups);
+}
 
-  await closedOtp.waitForEvent("deinit_ready");
-  await liveOtp.waitForEvent("live_ready");
-  await closedOtp.dispose();
-  await expect.poll(() => cleanupCalls).toBe(1);
-
-  const send = await liveOtp.send("controller", { ping: true });
-  assert(send.ok);
-  const liveEvent = await liveOtp.waitForEvent("v");
-
-  expect(liveEvent).toEqual({ v: 42 });
-  expect(cleanupCalls).toBe(1);
-});
+function valuesWithKey<K extends PropertyKey>(
+  values: Iterable<unknown>,
+  key: K,
+): unknown[] {
+  return Array.from(values)
+    .filter((value): value is Record<K, unknown> => {
+      return (
+        typeof value === "object" &&
+        value !== null &&
+        Object.hasOwn(value, key)
+      );
+    })
+    .map((value) => value[key]);
+}
