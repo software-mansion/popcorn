@@ -60,7 +60,7 @@ type SendFn = (
   target: string | Pid,
   payload?: AnyValue,
 ) => Promise<Result<null>>;
-type RunJsFn = (args: AnyValue, send: SendFn) => AnyValue;
+type RunJsFn = (args: AnyValue, actions: { send: SendFn }) => AnyValue;
 
 function createPidClass() {
   return class {
@@ -345,7 +345,7 @@ export class Popcorn {
       const args = this.reviveHandles(request.args);
       const send: SendFn = (target, sendPayload) =>
         this.send(target, sendPayload);
-      const result = await fn(args, send);
+      const result = await fn(args, { send });
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
     } catch (error) {
