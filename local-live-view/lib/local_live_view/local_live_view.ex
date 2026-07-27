@@ -168,13 +168,13 @@ defmodule LocalLiveView do
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
-      import LocalLiveView, only: [mirror_sync: 2, push_server_event: 2, push_server_event: 3]
+      import LocalLiveView,
+        only: [mirror_sync: 2, push_patch: 2, push_server_event: 2, push_server_event: 3]
       @behaviour LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
       @phoenix_live_opts []
       Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
       @before_compile LocalLiveView
-      alias LocalLiveView.Message
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
       @impl true
@@ -217,11 +217,67 @@ defmodule LocalLiveView do
 
     live = LocalLiveView.__live__([on_mount: on_mount] ++ opts)
 
+    # Wrap the view's mount/3 (or provide one) so LocalLiveView.Hooks.mount
+    # always runs: it applies the LLV extras (private llv_id, the handle_info
+    # hook, update/2 with the host assigns, the initial handle_params) on top
+    # of the plain LiveView mount the channel performs.
+    mount_wrapper =
+      if Module.defines?(env.module, {:mount, 3}) do
+        quote do
+          defoverridable mount: 3
+
+          @doc false
+          def mount(params, session, socket) do
+            LocalLiveView.Hooks.mount(params, session, socket, fn params, session, socket ->
+              super(params, session, socket)
+            end)
+          end
+        end
+      else
+        quote do
+          @doc false
+          def mount(params, session, socket) do
+            LocalLiveView.Hooks.mount(params, session, socket, nil)
+          end
+        end
+      end
+
+    handle_params_defs = LocalLiveView.__rewrite_handle_params__(env)
+
     quote do
       @doc false
       def __live__ do
         unquote(Macro.escape(live))
       end
+
+      unquote(mount_wrapper)
+      unquote(handle_params_defs)
+    end
+  end
+
+  @doc false
+  def __rewrite_handle_params__(env) do
+    # Phoenix.LiveView.Channel refuses to mount a router-less view that
+    # exports handle_params/3 ("not mounted at the router"). Local views have
+    # no router, so re-emit the callback's clauses under __llv_handle_params__/3
+    # — invoked by LocalLiveView.Hooks at mount and on navigation — and drop
+    # the original export.
+    case Module.get_definition(env.module, {:handle_params, 3}) do
+      {:v1, _kind, _meta, clauses} ->
+        Module.delete_definition(env.module, {:handle_params, 3})
+
+        for {meta, args, guards, body} <- clauses do
+          head = {:__llv_handle_params__, meta, args}
+          head = if guards == [], do: head, else: {:when, meta, [head | guards]}
+
+          quote do
+            @doc false
+            unquote({:def, meta, [head, [do: body]]})
+          end
+        end
+
+      nil ->
+        []
     end
   end
 
@@ -265,7 +321,14 @@ defmodule LocalLiveView do
   def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
     to = Keyword.fetch!(opts, :to)
     kind = if opts[:replace], do: :replace, else: :push
-    %{socket | redirected: {:live, :patch, %{to: to, kind: kind}}}
+
+    # Setting socket.redirected would send Phoenix.LiveView.Channel down its
+    # router-backed live-patch path, which router-less local views can't take.
+    # Instead the {:llv, :patch} hook (LocalLiveView.Hooks) picks this up right
+    # after the current callback: it updates the browser URL and runs
+    # handle_params.
+    send(self(), {:llv, :patch, to, kind})
+    socket
   end
 
   @type unsigned_params :: map

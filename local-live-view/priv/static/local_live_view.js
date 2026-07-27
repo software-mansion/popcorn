@@ -551,6 +551,24 @@ function setupFakeView(socket, views, popcornSocket, pop_view_el) {
     // attr would hand the mount points to Phoenix. And never set
     // data-phx-parent-id, or the host view would adopt them as children.
     setPhxResolutionAttrs(pop_view_el);
+    // The view's OWN join patch also strips the attrs (DOMPatch merges the
+    // container's attrs from the rendered HTML, which doesn't carry them) —
+    // and unlike a host patch, it fires no updated() hook to re-assert them.
+    // Watch the element and re-assert whenever anything drops the session
+    // attr; the observer fires in a microtask, before any event can dispatch.
+    const observer = new MutationObserver(() => {
+        if (!pop_view_el.hasAttribute("data-phx-session"))
+            setPhxResolutionAttrs(pop_view_el);
+    });
+    observer.observe(pop_view_el, {
+        attributes: true,
+        attributeFilter: ["data-phx-session", "data-phx-root-id"],
+    });
+    const origDestroy = view.destroy?.bind(view);
+    view.destroy = (callback) => {
+        observer.disconnect();
+        origDestroy?.(callback);
+    };
     // addHook: skip the root element to prevent Phoenix from trying to register it
     // as a hook within this view's scope — hooks on children are still processed normally.
     const origAddHook = view.addHook.bind(view);
