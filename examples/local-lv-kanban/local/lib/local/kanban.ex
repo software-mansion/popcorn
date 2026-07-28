@@ -8,8 +8,7 @@ defmodule Local.Kanban do
     {:ok,
      assign(socket,
        name: nil,
-       columns: %{},
-       last_rev: nil,
+       board: %{},
        task_modal: nil,
        dragging: nil,
        drag_target: nil,
@@ -19,35 +18,34 @@ defmodule Local.Kanban do
 
   @impl true
   def update(assigns, socket) do
-    socket = assign(socket, :name, assigns[:name])
+    socket = assign(socket, name: assigns.name, board: assigns.board)
+    board = assigns.board
 
-    # The host bumps `rev` on every authoritative push (incl. failure rollback,
-    # where the board value is unchanged). Rebuild only when it changes.
-    if assigns[:rev] == socket.assigns.last_rev do
-      {:ok, socket}
-    else
-      {:ok,
-       socket
-       |> assign(:last_rev, assigns[:rev])
-       |> assign(:columns, assigns.board)}
-    end
+    is_drag_valid =
+      case socket.assigns.dragging do
+        %{task_id: tid, source_column_id: cid} -> get_in(board, [cid, :tasks, tid]) != nil
+        nil -> true
+      end
+
+    is_drag_target_valid =
+      case socket.assigns.drag_target do
+        %{column_id: cid, before_task_id: nil} -> Map.has_key?(board, cid)
+        %{column_id: cid, before_task_id: btid} -> get_in(board, [cid, :tasks, btid]) != nil
+        nil -> true
+      end
+
+    socket =
+      if is_drag_valid and is_drag_target_valid do
+        socket
+      else
+        # Affected task/column was removed by the server update, cancel dragging
+        assign(socket, dragging: nil, drag_target: nil)
+      end
+
+    {:ok, socket}
   end
 
-  @impl true
-  def handle_push_error(_event, _params, server_assigns, socket) do
-    # The default (feeding server_assigns through update/2) would no-op here:
-    # the rolled-back rev already equals last_rev, so the guard skips the
-    # rebuild. Force it, and drop any in-flight drag state that referenced the
-    # rolled-back board.
-    {:noreply,
-     assign(socket,
-       columns: server_assigns.board,
-       dragging: nil,
-       drag_target: nil
-     )}
-  end
-
-  # --- Columns & tasks (optimistic) ------------------------------------------
+  # --- Board & tasks (optimistic) ------------------------------------------
 
   @impl true
   def handle_event("add_column", %{"name" => name}, socket) do
@@ -58,16 +56,16 @@ defmodule Local.Kanban do
       name ->
         # The client owns the position: generate the id + an append position
         # (max + 1) and tell the host to persist them verbatim (reusing the same
-        # id, so optimistic and authoritative columns converge). Bumping add_seq
+        # id, so optimistic and authoritative board converge). Bumping add_seq
         # re-mounts the (uncontrolled) add-column input so it clears — but only
         # after *this* client adds.
         id = uuid()
-        position = next_column_position(socket.assigns.columns)
+        position = next_column_position(socket.assigns.board)
         column = %{id: id, name: name, position: position, tasks: %{}}
 
         {:noreply,
          socket
-         |> assign(:columns, Map.put(socket.assigns.columns, id, column))
+         |> assign(:board, Map.put(socket.assigns.board, id, column))
          |> assign(:add_seq, socket.assigns.add_seq + 1)
          |> push_server_event("add_column", %{
            "id" => id,
@@ -78,7 +76,7 @@ defmodule Local.Kanban do
   end
 
   def handle_event("add_task", %{"column_id" => cid, "text" => text} = params, socket) do
-    case {String.trim(text), socket.assigns.columns[cid]} do
+    case {String.trim(text), socket.assigns.board[cid]} do
       {"", _} ->
         {:noreply, assign(socket, :task_modal, nil)}
 
@@ -101,7 +99,7 @@ defmodule Local.Kanban do
 
         socket =
           socket
-          |> assign(:columns, put_in(socket.assigns.columns, [cid, :tasks, id], task))
+          |> assign(:board, put_in(socket.assigns.board, [cid, :tasks, id], task))
           |> assign(:task_modal, nil)
           |> push_server_event("add_task", %{
             "column_id" => cid,
@@ -116,27 +114,27 @@ defmodule Local.Kanban do
   end
 
   def handle_event("remove_column", %{"id" => id} = payload, socket) do
-    {_column, columns} = pop_in(socket.assigns.columns, [id])
+    {_column, board} = pop_in(socket.assigns.board, [id])
 
     {:noreply,
      socket
-     |> assign(:columns, columns)
+     |> assign(:board, board)
      |> push_server_event("remove_column", payload)}
   end
 
   def handle_event("remove_task", %{"column_id" => cid, "task_id" => tid} = payload, socket) do
-    {_task, columns} = pop_in(socket.assigns.columns, [cid, :tasks, tid])
+    {_task, board} = pop_in(socket.assigns.board, [cid, :tasks, tid])
 
     {:noreply,
      socket
-     |> assign(:columns, columns)
+     |> assign(:board, board)
      |> push_server_event("remove_task", payload)}
   end
 
   # --- Task modal (local-only UI state) --------------------------------------
 
   def handle_event("open_task_modal", %{"column_id" => cid}, socket) do
-    case socket.assigns.columns[cid] do
+    case socket.assigns.board[cid] do
       nil ->
         {:noreply, socket}
 
@@ -153,7 +151,7 @@ defmodule Local.Kanban do
 
   def handle_event("drag_start", %{"column_id" => cid, "task_id" => tid}, socket) do
     # get_in is nil-safe, so this validates that both the column and task exist.
-    if get_in(socket.assigns.columns, [cid, :tasks, tid]) do
+    if get_in(socket.assigns.board, [cid, :tasks, tid]) do
       {:noreply,
        assign(socket, dragging: %{task_id: tid, source_column_id: cid}, drag_target: nil)}
     else
@@ -168,8 +166,8 @@ defmodule Local.Kanban do
         {:noreply, socket}
 
       %{} = dragging ->
-        before_id = insertion_point(socket.assigns.columns, dragging, cid, tid, params)
-        target = resolve_target(socket.assigns.columns, dragging, cid, before_id)
+        before_id = insertion_point(socket.assigns.board, dragging, cid, tid, params)
+        target = resolve_target(socket.assigns.board, dragging, cid, before_id)
         {:noreply, assign(socket, :drag_target, target)}
 
       nil ->
@@ -182,7 +180,7 @@ defmodule Local.Kanban do
     # brushing the gaps between cards doesn't snap the placeholder to the end).
     with %{} = dragging <- socket.assigns.dragging,
          false <- match?(%{column_id: ^cid}, socket.assigns.drag_target) do
-      target = resolve_target(socket.assigns.columns, dragging, cid, nil)
+      target = resolve_target(socket.assigns.board, dragging, cid, nil)
       {:noreply, assign(socket, :drag_target, target)}
     else
       _ -> {:noreply, socket}
@@ -195,13 +193,13 @@ defmodule Local.Kanban do
         # Generate the new position locally (a rank between the destination
         # neighbors, with this task's id baked on) and move the card optimistically.
         position =
-          socket.assigns.columns[dst].tasks |> Map.values() |> Rank.key_before(before_id, tid)
+          socket.assigns.board[dst].tasks |> Map.values() |> Rank.key_before(before_id, tid)
 
-        columns = move_task(socket.assigns.columns, src, tid, dst, position)
+        board = move_task(socket.assigns.board, src, tid, dst, position)
 
         socket =
           socket
-          |> assign(columns: columns, dragging: nil, drag_target: nil)
+          |> assign(board: board, dragging: nil, drag_target: nil)
           |> push_server_event("move_task", %{
             "task_id" => tid,
             "to_column_id" => dst,
@@ -219,7 +217,7 @@ defmodule Local.Kanban do
 
   # Where to insert when hovering `tid`: before the task when the cursor is in its
   # top half, after it otherwise.
-  defp insertion_point(columns, dragging, cid, tid, params) do
+  defp insertion_point(board, dragging, cid, tid, params) do
     offset_y = params["clientY"] - params["rect"]["top"]
 
     if offset_y < params["rect"]["height"] / 2 do
@@ -229,8 +227,8 @@ defmodule Local.Kanban do
       # right there (it is about to leave this slot).
       dragged = dragging.task_id
 
-      case successor_id(columns, cid, tid) do
-        ^dragged -> successor_id(columns, cid, dragged)
+      case successor_id(board, cid, tid) do
+        ^dragged -> successor_id(board, cid, dragged)
         after_id -> after_id
       end
     end
@@ -238,25 +236,25 @@ defmodule Local.Kanban do
 
   # A same-column drop onto the card's own slot (its original successor, or the
   # end when it is already last) is a no-op, so drop the placeholder entirely.
-  defp resolve_target(columns, %{task_id: tid, source_column_id: src}, cid, before_id) do
-    if cid == src and before_id == successor_id(columns, src, tid) do
+  defp resolve_target(board, %{task_id: tid, source_column_id: src}, cid, before_id) do
+    if cid == src and before_id == successor_id(board, src, tid) do
       nil
     else
       %{column_id: cid, before_task_id: before_id}
     end
   end
 
-  defp move_task(columns, src_id, task_id, dst_id, position) do
-    task = %{get_in(columns, [src_id, :tasks, task_id]) | position: position}
+  defp move_task(board, src_id, task_id, dst_id, position) do
+    task = %{get_in(board, [src_id, :tasks, task_id]) | position: position}
 
-    {_task, columns} = pop_in(columns, [src_id, :tasks, task_id])
-    put_in(columns, [dst_id, :tasks, task_id], task)
+    {_task, board} = pop_in(board, [src_id, :tasks, task_id])
+    put_in(board, [dst_id, :tasks, task_id], task)
   end
 
   # The id of the task following `tid` in `cid`'s on-screen (position) order, or
   # nil when it is last/absent.
-  defp successor_id(columns, cid, tid) do
-    ids = columns[cid].tasks |> sorted_tasks() |> Enum.map(& &1.id)
+  defp successor_id(board, cid, tid) do
+    ids = board[cid].tasks |> sorted_tasks() |> Enum.map(& &1.id)
 
     case Enum.find_index(ids, &(&1 == tid)) do
       nil -> nil
@@ -270,8 +268,8 @@ defmodule Local.Kanban do
 
   # Append after the last column. max + 1 (not count) so it never collides with an
   # existing position once deletes leave gaps.
-  defp next_column_position(columns) do
-    columns
+  defp next_column_position(board) do
+    board
     |> Enum.map(fn {_id, %{position: pos}} -> pos + 1 end)
     |> Enum.max(fn -> 0 end)
   end
@@ -290,8 +288,8 @@ defmodule Local.Kanban do
     assigns =
       assign(
         assigns,
-        :columns_sorted,
-        assigns.columns |> Map.values() |> Enum.sort_by(&{&1.position, &1.id})
+        :board_sorted,
+        assigns.board |> Map.values() |> Enum.sort_by(&{&1.position, &1.id})
       )
 
     ~H"""
@@ -300,7 +298,7 @@ defmodule Local.Kanban do
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
-          :for={col <- @columns_sorted}
+          :for={col <- @board_sorted}
           col={col}
           dragging={@dragging}
           drag_target={@drag_target}
