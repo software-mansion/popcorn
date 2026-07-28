@@ -20,6 +20,8 @@ const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
+const STDOUT_FD = 1;
+const STDERR_FD = 2;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
   "-root",
@@ -38,6 +40,8 @@ export async function boot({
   manifestUrl,
   emulatorArgs,
   extraArgs,
+  env,
+  ttySize,
   createModule,
   emit,
 }: BeamBootOptions): Promise<Result<EmscriptenModule>> {
@@ -47,9 +51,20 @@ export async function boot({
   }
 
   const fsData = loadedFsData.data;
+  const runtimeEnv = {
+    ...env,
+    BINDIR: "/bin",
+    EMU: "beam",
+    HOME: DEFAULT_HOME_DIR,
+    USER: DEFAULT_USER,
+    LOGNAME: DEFAULT_USER,
+    COLUMNS: String(ttySize.columns),
+    LINES: String(ttySize.rows),
+  };
   const moduleConfig: Partial<EmscriptenModule> = {
-    print: (text) => emit({ type: "otp:stdout", payload: text }),
-    printErr: (text) => emit({ type: "otp:stderr", payload: text }),
+    print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
+    printErr: (text) =>
+      emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
     onExit: (code) =>
       emit({ type: "otp:error", payload: { kind: "exit", data: code } }),
     onAbort: (text) =>
@@ -62,6 +77,8 @@ export async function boot({
     },
     onError: (text) =>
       emit({ type: "otp:error", payload: { kind: "error", data: text } }),
+    onStdinConsumed: (size) =>
+      emit({ type: "otp:stdin-consumed", payload: size }),
     onTrackedValueDelete: (key) =>
       emit({ type: "otp:tracked-value-delete", payload: key }),
     arguments: buildArgs({
@@ -70,14 +87,13 @@ export async function boot({
       emulator: emulatorArgs ?? [],
       extra: extraArgs ?? [],
     }),
-    ENV: {
-      BINDIR: "/bin",
-      EMU: "beam",
-      HOME: DEFAULT_HOME_DIR,
-      USER: DEFAULT_USER,
-      LOGNAME: DEFAULT_USER,
-    },
-    preRun: [(mod) => initFs({ module: mod, fsData })],
+    preRun: [
+      (mod) => {
+        Object.assign(mod.ENV, runtimeEnv);
+        forwardTtyOutput(mod, emit);
+        initFs({ module: mod, fsData });
+      },
+    ],
   };
 
   try {
@@ -86,6 +102,25 @@ export async function boot({
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
   }
+}
+
+function forwardTtyOutput(
+  module: EmscriptenModule,
+  emit: BeamBootOptions["emit"],
+): void {
+  const originalWrite = module.TTY.stream_ops.write;
+  module.TTY.stream_ops.write = (stream, buffer, offset, length, position) => {
+    const interceptable = stream.fd === STDOUT_FD || stream.fd === STDERR_FD;
+    if (!interceptable) {
+      return originalWrite(stream, buffer, offset, length, position);
+    }
+
+    const chunk = new Uint8Array(length);
+    chunk.set(buffer.subarray(offset, offset + length));
+    const type = stream.fd === STDOUT_FD ? "otp:stdout" : "otp:stderr";
+    emit({ type, payload: chunk });
+    return length;
+  };
 }
 
 function toPopcornError(error: unknown): PopcornError {
