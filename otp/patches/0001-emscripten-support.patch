@@ -307,7 +307,7 @@ index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc0
 +  },
 +});
 diff --git a/erts/emulator/nifs/common/prim_tty_nif.c b/erts/emulator/nifs/common/prim_tty_nif.c
-index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989c07a7089 100644
+index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391adb0c6d20 100644
 --- a/erts/emulator/nifs/common/prim_tty_nif.c
 +++ b/erts/emulator/nifs/common/prim_tty_nif.c
 @@ -38,6 +38,7 @@
@@ -494,11 +494,12 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
      if (res == bin.size) {
  	res_term = enif_make_binary(env, &bin);
      } else if (res < bin.size / 2) {
-@@ -949,6 +1088,17 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
- 
+@@ -949,6 +1088,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+
      enif_set_pid_undefined(&tty->self);
      enif_set_pid_undefined(&tty->reader);
 +#ifdef __EMSCRIPTEN__
++    tty->tty = disabled;
 +    tty->select_env = enif_alloc_env();
 +    ASSERT(tty->select_env != NULL);
 +    tty->has_reader = 0;
@@ -512,7 +513,21 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
  
      return enif_make_tuple2(env, atom_ok, tty_term);
  }
-@@ -1056,7 +1206,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
+@@ -976,6 +1127,13 @@ static ERL_NIF_TERM tty_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+         return atom_ok;
+     }
+ 
++#ifdef __EMSCRIPTEN__
++    tty->tty = enif_is_identical(input, atom_raw) ? enabled : disabled;
++    enif_self(env, &tty->self);
++    enif_monitor_process(env, tty, &tty->self, NULL);
++    return atom_ok;
++#endif
++
+ #if defined(HAVE_TERMCAP) || defined(__WIN32__)
+ 
+     tty->tty = enif_is_identical(input, atom_raw) ? enabled : disabled;
+@@ -1056,7 +1214,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
      if (!enif_get_resource(env, argv[0], tty_rt, (void **)&tty))
          return enif_make_badarg(env);
      {
@@ -526,7 +541,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
          struct winsize ws;
          if (ioctl(tty->ifd,TIOCGWINSZ,&ws) == 0) {
              if (ws.ws_col > 0)
-@@ -1106,9 +1261,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+@@ -1106,9 +1269,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
      using_oldshell = 0;
  #endif
      debug("Select on %d\r\n", tty->ifd);
@@ -547,7 +562,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
      enif_monitor_process(env, tty, &tty->reader, NULL);
  
      return atom_ok;
-@@ -1122,7 +1288,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
+@@ -1122,7 +1296,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
      }
  #endif
      if (enif_compare_pids(pid, &tty->reader) == 0) {
@@ -562,7 +577,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
      }
  }
  
-@@ -1134,9 +1307,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
+@@ -1134,9 +1315,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
  #endif
  }
  
@@ -589,7 +604,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..820780659b35f8a9e9c7131af0c26989
          tty_select_stop,
          tty_monitor_down};
  
-@@ -1150,13 +1339,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
+@@ -1150,13 +1347,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
  static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
  {
      *priv_data = NULL;
@@ -1582,6 +1597,40 @@ index 0000000000000000000000000000000000000000..3679b690583605c17f185b5f2f4008a8
 +
 +ref_key(_Resource) ->
 +    erlang:nif_error(undef).
+diff --git a/lib/kernel/src/prim_tty.erl b/lib/kernel/src/prim_tty.erl
+index f438f9f816371d7721fe1c0ce3c7f367fd1a3bab..2f206e9519f1539078d89c2f9b722fe9425466a7 100644
+--- a/lib/kernel/src/prim_tty.erl
++++ b/lib/kernel/src/prim_tty.erl
+@@ -357,6 +357,16 @@ options(UserOptions) ->
+ init(State, ssh) ->
+     State#state{ xn = true };
+ init(State, {unix,_}) ->
++    case erlang:system_info(system_architecture) of
++        "wasm32-unknown-emscripten" -> State;
++        _ -> init_unix(State)
++    end;
++init(State, {win32, _}) ->
++    State#state{
++      %% position = false,
++      xn = true }.
++
++init_unix(State) ->
+ 
+     case os:getenv("TERM") of
+         false ->
+@@ -445,11 +455,7 @@ init(State, {unix,_}) ->
+       tab = Tab,
+       position = Position,
+       delete_after_cursor = DeleteAfter
+-     };
+-init(State, {win32, _}) ->
+-    State#state{
+-      %% position = false,
+-      xn = true }.
++     }.
+ 
+ -spec handles(state()) -> #{ read := undefined | reference(),
+                              write := reference() }.
 diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
 index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
 --- a/lib/asn1/src/asn1rtt_ber.erl
