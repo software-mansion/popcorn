@@ -116,6 +116,23 @@ test.describe("boot", () => {
 test.describe("lifecycle", () => {
   test("TTY output", async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const command = async (
+        popcorn: {
+          onEvent: (handler: (event: unknown) => void) => () => void;
+          writeStdin: (chunk: Uint8Array) => { ok: boolean };
+        },
+        value: number,
+      ) =>
+        await new Promise<unknown>((resolve) => {
+          const unsubscribe = popcorn.onEvent((event) => {
+            unsubscribe();
+            resolve(event);
+          });
+          const write = popcorn.writeStdin(new Uint8Array([value]));
+          if (!write.ok) throw new Error("stdin command failed");
+        });
+
+      // Default text decodes split UTF-8 and uses 80×24.
       const stdout: string[] = [];
       const stderr: string[] = [];
       const text = new window.Popcorn({
@@ -125,21 +142,52 @@ test.describe("lifecycle", () => {
         onStderr: (chunk) => stderr.push(chunk),
       });
       await text.boot();
+      const defaultSize = await command(text, 2);
       text.deinit();
 
+      // init infers byte callbacks and forwards custom size.
       const rawStdout: number[][] = [];
       const rawStderr: number[][] = [];
-      const bytes = new window.Popcorn({
+      const init = await window.Popcorn.init({
         beam: { manifestUrl: "/unused.json" },
         workerUrl: "/output-worker.mjs",
-        tty: { output: "bytes" },
+        tty: {
+          size: { columns: 100, rows: 30 },
+          output: "bytes",
+        },
         onStdout: (chunk) => rawStdout.push(Array.from(chunk)),
         onStderr: (chunk) => rawStderr.push(Array.from(chunk)),
       });
-      await bytes.boot();
+      if (!init.ok) throw init.error;
+      const bytes = init.data;
+      const customSize = await command(bytes, 2);
       bytes.deinit();
 
-      return { stdout, stderr, rawStdout, rawStderr };
+      // Reboot discards an incomplete UTF-8 sequence.
+      const rebootStdout: string[] = [];
+      const reboot = new window.Popcorn({
+        beam: { manifestUrl: "/unused.json" },
+        workerUrl: "/output-worker.mjs",
+        onStdout: (chunk) => rebootStdout.push(chunk),
+      });
+      await reboot.boot();
+      rebootStdout.length = 0;
+      await command(reboot, 0);
+      reboot.deinit();
+      await reboot.boot();
+      rebootStdout.length = 0;
+      await command(reboot, 1);
+      reboot.deinit();
+
+      return {
+        stdout,
+        stderr,
+        rawStdout,
+        rawStderr,
+        defaultSize,
+        customSize,
+        rebootStdout,
+      };
     });
 
     expect(result).toEqual({
@@ -151,6 +199,9 @@ test.describe("lifecycle", () => {
         [0x8d, 0xf0, 0x9f, 0x9a, 0x80],
       ],
       rawStderr: [[0xf0, 0x9f, 0x9a], [0x80]],
+      defaultSize: { ttySize: { columns: 80, rows: 24 } },
+      customSize: { ttySize: { columns: 100, rows: 30 } },
+      rebootStdout: ["👩‍🚀"],
     });
   });
 
