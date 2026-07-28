@@ -358,18 +358,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       return { ok: false, error: this.state.error };
     }
     check(this.state.status === "booted");
-    check(
-      !this.io.stdin.closed,
-      "ctrl-d (byte 0x04) was sent to input stream before, stdin is closed",
-    );
 
     const bytes = toBytes(chunk);
     check(bytes.byteLength > 0);
-    if (isEof(bytes)) {
-      this.io.stdin.closed = true;
-      toVm(this.vmWorker, { type: "popcorn:stdin-close", payload: {} });
-      return { ok: true, data: null };
-    }
 
     const attemptedBytes = this.io.stdin.reservedBytes + bytes.byteLength;
     if (attemptedBytes > STDIN_QUEUE_CAPACITY_BYTES) {
@@ -842,7 +833,6 @@ function decodeOutput(
 function createIoState() {
   return {
     stdin: {
-      closed: false,
       reservedBytes: 0,
     },
   };
@@ -850,11 +840,6 @@ function createIoState() {
 
 function toBytes(chunk: string | Uint8Array): Uint8Array {
   return typeof chunk === "string" ? UTF8.encode(chunk) : chunk.slice();
-}
-
-function isEof(bytes: Uint8Array): boolean {
-  const CTRL_D_BYTE = 0x04;
-  return bytes.byteLength === 1 && bytes[0] === CTRL_D_BYTE;
 }
 
 function exitReason(payload: OtpErrorPayload): VmExitReason {

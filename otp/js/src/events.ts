@@ -22,11 +22,6 @@ type StdinEvent = {
   payload: { chunk: Uint8Array };
 };
 
-type StdinCloseEvent = {
-  type: "popcorn:stdin-close";
-  payload: {};
-};
-
 type TtyResizeEvent = {
   type: "popcorn:tty-resize";
   payload: { columns: number; rows: number };
@@ -73,7 +68,6 @@ export type MainToVmEvent =
   | SendEvent
   | RunJsReplyEvent
   | StdinEvent
-  | StdinCloseEvent
   | TtyResizeEvent;
 
 export type PopcornEvent = AnyValue;
@@ -106,7 +100,6 @@ export function readMainEvent(value: unknown): MainToVmEvent {
   switch (data.type) {
     case "popcorn:boot":
     case "popcorn:stdin":
-    case "popcorn:stdin-close":
     case "popcorn:tty-resize":
     case "popcorn:send":
     case "popcorn:run-js-reply":
