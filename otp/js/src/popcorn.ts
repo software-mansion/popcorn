@@ -28,25 +28,34 @@ const UTF8 = new TextEncoder();
 const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
 const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 
-export type PopcornOpts = {
+type TtyOutput = "text" | "bytes";
+type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
+  ? Uint8Array
+  : string;
+
+export type PopcornOpts<Output extends TtyOutput = "text"> = {
   beam: Pick<
     BeamBootOptions,
     "manifestUrl" | "emulatorArgs" | "extraArgs" | "env"
   >;
-  ttySize?: TtySize;
+  tty?: {
+    size?: TtySize;
+    output?: Output;
+  };
   timeoutsMs?: {
     boot?: number;
     send?: number;
   };
-  onStdout?: (chunk: Uint8Array) => void;
-  onStderr?: (chunk: Uint8Array) => void;
+  onStdout?: (chunk: OutputChunk<Output>) => void;
+  onStderr?: (chunk: OutputChunk<Output>) => void;
   onError?: (event: OtpErrorPayload) => void;
   workerUrl?: string | URL;
 };
 
 type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
-type ResolvedPopcornOpts = Omit<PopcornOpts, "ttySize"> & {
-  ttySize: TtySize;
+type OutputHandlers = {
+  stdout: (chunk: Uint8Array) => void;
+  stderr: (chunk: Uint8Array) => void;
 };
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
@@ -162,12 +171,14 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
   check(typeof value === "function");
 }
 
-export class Popcorn {
+export class Popcorn<Output extends TtyOutput = "text"> {
   private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
-  private readonly opts: ResolvedPopcornOpts;
+  private readonly opts: PopcornOpts<Output>;
+  private readonly ttySize: TtySize;
+  private output: OutputHandlers;
   private requestSeq = 0;
-  private settleBoot: ((result: Result<Popcorn>) => void) | null = null;
+  private settleBoot: ((result: Result<Popcorn<Output>>) => void) | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
@@ -227,8 +238,8 @@ export class Popcorn {
     }
   };
 
-  public constructor(opts: PopcornOpts) {
-    const ttySize = opts.ttySize ?? DEFAULT_TTY_SIZE;
+  public constructor(opts: PopcornOpts<Output>) {
+    const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
     check(isValidTtySize(ttySize));
     this.opts = {
       ...opts,
@@ -238,8 +249,9 @@ export class Popcorn {
           opts.beam.emulatorArgs ??
           schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
       },
-      ttySize: { ...ttySize },
     };
+    this.ttySize = { ...ttySize };
+    this.output = resolveOutputHandlers(opts);
     this.spawnWorker();
   }
 
@@ -250,7 +262,9 @@ export class Popcorn {
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
   }
 
-  public static async init(opts: PopcornOpts): Promise<Result<Popcorn>> {
+  public static async init<Output extends TtyOutput = "text">(
+    opts: PopcornOpts<Output>,
+  ): Promise<Result<Popcorn<Output>>> {
     if (!canEval()) {
       return { ok: false, error: err("runtime:eval-unavailable", {}) };
     }
@@ -265,7 +279,7 @@ export class Popcorn {
     return { ok: true, data: popcorn };
   }
 
-  public async boot(): Promise<Result<Popcorn>> {
+  public async boot(): Promise<Result<Popcorn<Output>>> {
     if (this.state.status === "booted") {
       return { ok: true, data: this };
     }
@@ -285,12 +299,13 @@ export class Popcorn {
 
     this.Pid = createPidClass();
     this.io = createIoState();
+    this.output = resolveOutputHandlers(this.opts);
     this.state = { status: "booting" };
 
-    return await new Promise<Result<Popcorn>>((resolve) => {
+    return await new Promise<Result<Popcorn<Output>>>((resolve) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
 
-      const settle = (result: Result<Popcorn>) => {
+      const settle = (result: Result<Popcorn<Output>>) => {
         if (this.settleBoot === null) return;
         clearTimeout(timer);
         cleanup();
@@ -333,7 +348,7 @@ export class Popcorn {
       this.vmWorker.addEventListener("message", onBootMessage);
       toVm(this.vmWorker, {
         type: "popcorn:boot",
-        payload: { ...this.opts.beam, ttySize: this.opts.ttySize },
+        payload: { ...this.opts.beam, ttySize: this.ttySize },
       });
     });
   }
@@ -742,13 +757,11 @@ export class Popcorn {
   }
 
   private handleStdout(chunk: Uint8Array): void {
-    const onStdout = this.opts.onStdout ?? defaultOnStdout;
-    onStdout(chunk);
+    this.output.stdout(chunk);
   }
 
   private handleStderr(chunk: Uint8Array): void {
-    const onStderr = this.opts.onStderr ?? defaultOnStderr;
-    onStderr(chunk);
+    this.output.stderr(chunk);
   }
 
   private handleOtpError(payload: OtpErrorPayload): void {
@@ -790,6 +803,40 @@ function isValidTtySize({ columns, rows }: TtySize): boolean {
   const colInRange = 0 < columns && columns <= 0xffff;
   const rowInRange = 0 < rows && rows <= 0xffff;
   return colInRange && rowInRange;
+}
+
+function resolveOutputHandlers<Output extends TtyOutput>(
+  opts: PopcornOpts<Output>,
+): OutputHandlers {
+  type BytesHandler = (chunk: Uint8Array) => void;
+  type TextHandler = (chunk: string) => void;
+
+  if (opts.tty?.output === "bytes") {
+    const onStdout = opts.onStdout as BytesHandler | undefined;
+    const onStderr = opts.onStderr as BytesHandler | undefined;
+    return {
+      stdout: onStdout ?? defaultOnStdoutBytes,
+      stderr: onStderr ?? defaultOnStderrBytes,
+    };
+  }
+
+  const stdoutDecoder = new TextDecoder();
+  const stderrDecoder = new TextDecoder();
+  const onStdout = (opts.onStdout as TextHandler | undefined) ?? defaultOnStdout;
+  const onStderr = (opts.onStderr as TextHandler | undefined) ?? defaultOnStderr;
+  return {
+    stdout: (chunk) => decodeOutput(stdoutDecoder, onStdout, chunk),
+    stderr: (chunk) => decodeOutput(stderrDecoder, onStderr, chunk),
+  };
+}
+
+function decodeOutput(
+  decoder: TextDecoder,
+  onOutput: (chunk: string) => void,
+  chunk: Uint8Array,
+): void {
+  const output = decoder.decode(chunk, { stream: true });
+  if (output.length > 0) onOutput(output);
 }
 
 function createIoState() {
@@ -859,11 +906,19 @@ function canEval(): boolean {
   }
 }
 
-function defaultOnStdout(chunk: Uint8Array): void {
+function defaultOnStdout(chunk: string): void {
   console.log(`${LOG_PREFIX} stdout:`, chunk);
 }
 
-function defaultOnStderr(chunk: Uint8Array): void {
+function defaultOnStderr(chunk: string): void {
+  console.error(`${LOG_PREFIX} stderr:`, chunk);
+}
+
+function defaultOnStdoutBytes(chunk: Uint8Array): void {
+  console.log(`${LOG_PREFIX} stdout:`, chunk);
+}
+
+function defaultOnStderrBytes(chunk: Uint8Array): void {
   console.error(`${LOG_PREFIX} stderr:`, chunk);
 }
 

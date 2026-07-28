@@ -114,6 +114,46 @@ test.describe("boot", () => {
 });
 
 test.describe("lifecycle", () => {
+  test("TTY output", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const text = new window.Popcorn({
+        beam: { manifestUrl: "/unused.json" },
+        workerUrl: "/output-worker.mjs",
+        onStdout: (chunk) => stdout.push(chunk),
+        onStderr: (chunk) => stderr.push(chunk),
+      });
+      await text.boot();
+      text.deinit();
+
+      const rawStdout: number[][] = [];
+      const rawStderr: number[][] = [];
+      const bytes = new window.Popcorn({
+        beam: { manifestUrl: "/unused.json" },
+        workerUrl: "/output-worker.mjs",
+        tty: { output: "bytes" },
+        onStdout: (chunk) => rawStdout.push(Array.from(chunk)),
+        onStderr: (chunk) => rawStderr.push(Array.from(chunk)),
+      });
+      await bytes.boot();
+      bytes.deinit();
+
+      return { stdout, stderr, rawStdout, rawStderr };
+    });
+
+    expect(result).toEqual({
+      stdout: ["👩", "‍🚀"],
+      stderr: ["🚀"],
+      rawStdout: [
+        [0xf0, 0x9f],
+        [0x91, 0xa9, 0xe2, 0x80],
+        [0x8d, 0xf0, 0x9f, 0x9a, 0x80],
+      ],
+      rawStderr: [[0xf0, 0x9f, 0x9a], [0x80]],
+    });
+  });
+
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const init = await window.Popcorn.init({
