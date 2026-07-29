@@ -883,7 +883,7 @@ class PopcornClient {
     reconnected(id) {
         this.fire("reconnect sync", { action: "reconnected", id, payload: {} });
     }
-    connect_mirror(id, mirror_id) {
+    connectMirror(id, mirror_id) {
         this.fire("connect mirror", {
             action: "connect_mirror",
             id,
