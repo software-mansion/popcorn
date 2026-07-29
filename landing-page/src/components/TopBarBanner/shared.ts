@@ -43,6 +43,10 @@ export const topBarBannerReservationScript = (
     `(function(){try{` +
     `var hp=${JSON.stringify(hiddenPaths ?? [])};var p=location.pathname;` +
     `if(hp.some(function(x){return p===x||p.indexOf(x+"/")===0}))return;` +
+    `var cs=window.CookieScript;` +
+    `if(!cs||!cs.instance||typeof cs.instance.currentState!=="function")return;` +
+    `var state=cs.instance.currentState();` +
+    `if(!state||!state.categories||state.categories.indexOf("targeting")===-1)return;` +
     `var k=${JSON.stringify(cacheKey(zoneId, contentId))};` +
     `var raw=localStorage.getItem(k);if(!raw)return;` +
     `var c=JSON.parse(raw);` +

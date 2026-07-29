@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "test": "vitest run",
     "preview": "astro preview",
     "astro": "astro"
   },
@@ -42,6 +43,7 @@
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.6.14",
     "vite": "catalog:",
-    "vite-plugin-devtools-json": "^0.2.1"
+    "vite-plugin-devtools-json": "^0.2.1",
+    "vitest": "^4.1.5"
   }
 }
