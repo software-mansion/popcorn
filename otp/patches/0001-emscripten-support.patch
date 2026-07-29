@@ -307,7 +307,7 @@ index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc0
 +  },
 +});
 diff --git a/erts/emulator/nifs/common/prim_tty_nif.c b/erts/emulator/nifs/common/prim_tty_nif.c
-index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391adb0c6d20 100644
+index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f76136108fa1c18 100644
 --- a/erts/emulator/nifs/common/prim_tty_nif.c
 +++ b/erts/emulator/nifs/common/prim_tty_nif.c
 @@ -38,6 +38,7 @@
@@ -340,7 +340,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
      enum TTYState tty;       /* if the tty is initialized */
  #ifdef HAVE_TERMCAP
      struct termios tty_smode;
-@@ -116,6 +125,105 @@ typedef struct {
+@@ -116,6 +125,93 @@ typedef struct {
  #endif
  } TTYResource;
  
@@ -353,7 +353,6 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +    unsigned char data[POPCORN_STDIN_CAPACITY];
 +    size_t head;
 +    size_t size;
-+    int closed;
 +    int notified;
 +    int columns;
 +    int rows;
@@ -391,7 +390,6 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +
 +    ASSERT(data != NULL && size > 0);
 +    enif_mutex_lock(popcorn_stdin.lock);
-+    ASSERT(!popcorn_stdin.closed);
 +    ASSERT((size_t)size <= POPCORN_STDIN_CAPACITY - popcorn_stdin.size);
 +
 +    tail = (popcorn_stdin.head + popcorn_stdin.size) % POPCORN_STDIN_CAPACITY;
@@ -399,16 +397,6 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +    memcpy(popcorn_stdin.data + tail, data, first);
 +    memcpy(popcorn_stdin.data, data + first, (size_t)size - first);
 +    popcorn_stdin.size += (size_t)size;
-+    popcorn_stdin_notify_locked();
-+    enif_mutex_unlock(popcorn_stdin.lock);
-+    return 0;
-+}
-+
-+EMSCRIPTEN_KEEPALIVE
-+int popcornStdinClose(void) {
-+    enif_mutex_lock(popcorn_stdin.lock);
-+    ASSERT(!popcorn_stdin.closed);
-+    popcorn_stdin.closed = 1;
 +    popcorn_stdin_notify_locked();
 +    enif_mutex_unlock(popcorn_stdin.lock);
 +    return 0;
@@ -446,7 +434,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
  // #define HARD_DEBUG
  #ifdef HARD_DEBUG
  static FILE *logFile = NULL;
-@@ -641,6 +749,34 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -641,6 +737,30 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
              return make_errno_error(env, errorFunction);
          }
      }
@@ -460,11 +448,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +        enif_mutex_lock(popcorn_stdin.lock);
 +        popcorn_stdin.notified = 0;
 +        consumed = MIN((size_t)n, popcorn_stdin.size);
-+        if (consumed == 0 && popcorn_stdin.closed) {
-+            enif_mutex_unlock(popcorn_stdin.lock);
-+            enif_release_binary(&bin);
-+            return make_error(env, enif_make_atom(env, "closed"));
-+        }
++        ASSERT(consumed > 0);
 +        first = MIN(consumed, POPCORN_STDIN_CAPACITY - popcorn_stdin.head);
 +        memcpy(bin.data, popcorn_stdin.data + popcorn_stdin.head, first);
 +        memcpy(bin.data + first, popcorn_stdin.data, consumed - first);
@@ -472,7 +456,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +            (popcorn_stdin.head + consumed) % POPCORN_STDIN_CAPACITY;
 +        popcorn_stdin.size -= consumed;
 +        res = (ssize_t)consumed;
-+        if (popcorn_stdin.size > 0 || popcorn_stdin.closed)
++        if (popcorn_stdin.size > 0)
 +            popcorn_stdin_notify_locked();
 +        enif_mutex_unlock(popcorn_stdin.lock);
 +        if (consumed > 0)
@@ -481,7 +465,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
  #else
      enif_alloc_binary(n, &bin);
      res = read(tty->ifd, bin.data, bin.size);
-@@ -654,9 +790,12 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -654,9 +774,12 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
          enif_release_binary(&bin);
          return make_error(env, enif_make_atom(env, "closed"));
      }
@@ -494,7 +478,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
      if (res == bin.size) {
  	res_term = enif_make_binary(env, &bin);
      } else if (res < bin.size / 2) {
-@@ -949,6 +1088,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+@@ -949,6 +1072,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
 
      enif_set_pid_undefined(&tty->self);
      enif_set_pid_undefined(&tty->reader);
@@ -513,7 +497,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
  
      return enif_make_tuple2(env, atom_ok, tty_term);
  }
-@@ -976,6 +1127,13 @@ static ERL_NIF_TERM tty_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -976,6 +1111,13 @@ static ERL_NIF_TERM tty_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
          return atom_ok;
      }
  
@@ -527,7 +511,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
  #if defined(HAVE_TERMCAP) || defined(__WIN32__)
  
      tty->tty = enif_is_identical(input, atom_raw) ? enabled : disabled;
-@@ -1056,7 +1214,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
+@@ -1056,7 +1198,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
      if (!enif_get_resource(env, argv[0], tty_rt, (void **)&tty))
          return enif_make_badarg(env);
      {
@@ -541,7 +525,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
          struct winsize ws;
          if (ioctl(tty->ifd,TIOCGWINSZ,&ws) == 0) {
              if (ws.ws_col > 0)
-@@ -1106,9 +1269,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+@@ -1106,9 +1253,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
      using_oldshell = 0;
  #endif
      debug("Select on %d\r\n", tty->ifd);
@@ -551,7 +535,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
 +    tty->select_ref = enif_make_copy(tty->select_env, argv[1]);
 +    enif_self(env, &tty->reader);
 +    tty->has_reader = 1;
-+    if (popcorn_stdin.size > 0 || popcorn_stdin.closed)
++    if (popcorn_stdin.size > 0)
 +        popcorn_stdin_notify_locked();
 +    enif_mutex_unlock(popcorn_stdin.lock);
 +#else
@@ -562,7 +546,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
      enif_monitor_process(env, tty, &tty->reader, NULL);
  
      return atom_ok;
-@@ -1122,7 +1296,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
+@@ -1122,7 +1280,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
      }
  #endif
      if (enif_compare_pids(pid, &tty->reader) == 0) {
@@ -577,7 +561,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
      }
  }
  
-@@ -1134,9 +1315,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
+@@ -1134,9 +1299,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
  #endif
  }
  
@@ -604,7 +588,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..171c29d7d36b0427a89b79106efc391a
          tty_select_stop,
          tty_monitor_down};
  
-@@ -1150,13 +1347,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
+@@ -1150,13 +1331,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
  static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
  {
      *priv_data = NULL;

@@ -143,6 +143,7 @@ test.describe("lifecycle", () => {
       });
       await text.boot();
       const defaultSize = await command(text, 2);
+      const ctrlD = await command(text, 4);
       text.deinit();
 
       // init infers byte callbacks and forwards custom size.
@@ -185,6 +186,7 @@ test.describe("lifecycle", () => {
         rawStdout,
         rawStderr,
         defaultSize,
+        ctrlD,
         customSize,
         rebootStdout,
       };
@@ -200,6 +202,7 @@ test.describe("lifecycle", () => {
       ],
       rawStderr: [[0xf0, 0x9f, 0x9a], [0x80]],
       defaultSize: { ttySize: { columns: 80, rows: 24 } },
+      ctrlD: { command: 4 },
       customSize: { ttySize: { columns: 100, rows: 30 } },
       rebootStdout: ["👩‍🚀"],
     });

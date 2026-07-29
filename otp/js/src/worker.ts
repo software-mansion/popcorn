@@ -64,12 +64,6 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       check(status === 0);
       break;
     }
-    case "popcorn:stdin-close": {
-      check(instance !== null);
-      const status = instance.ccall("popcornStdinClose", "number", [], []);
-      check(status === 0);
-      break;
-    }
     case "popcorn:tty-resize": {
       check(instance !== null);
       const status = instance.ccall(
