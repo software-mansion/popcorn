@@ -845,20 +845,6 @@ function sendServerMessage(pop, detail) {
         type: "llv_server_message",
     });
 }
-// data-pop-assigns holds the JSON a local_component serialized from its inline
-// assigns. Absent/empty for plain local views — default to {} so the process is
-// always handed a map.
-function parseAssigns(raw) {
-    if (!raw)
-        return {};
-    try {
-        return JSON.parse(raw);
-    }
-    catch (err) {
-        console.error("LLV failed to parse data-pop-assigns:", raw, err);
-        return {};
-    }
-}
 
 const DEFAULT_CALL_TIMEOUT_MS = 10_000;
 class PopcornClient {
@@ -980,7 +966,7 @@ class LLVEngine {
             view: pop_view_el.getAttribute("data-pop-view"),
             url: window.location.href,
             urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
-            assigns: parseAssigns(pop_view_el.getAttribute("data-pop-assigns")),
+            assigns: pop_view_el.getAttribute("data-pop-assigns"),
         });
         // A rejected call resolves with ok: false (it does not throw). Bail on
         // failed or duplicate creates — wiring a fake view without a live
@@ -1036,16 +1022,16 @@ class LLVEngine {
                     mountView(this.el);
             },
             updated() {
-                const raw = this.el.getAttribute("data-pop-assigns");
-                if (raw === this.llvLastAssigns)
+                const assigns = this.el.getAttribute("data-pop-assigns");
+                if (assigns === this.llvLastAssigns)
                     return;
-                this.llvLastAssigns = raw;
+                this.llvLastAssigns = assigns;
                 // Not mounted yet (Popcorn still booting): the mount reads the current
                 // assigns, so there's nothing to forward. Once mounted, the dispatcher
                 // processes this after the mount (it's sent after, and calls are FIFO).
                 if (!pop.ready)
                     return;
-                pop.updateAssigns(this.el.id, parseAssigns(raw));
+                pop.updateAssigns(this.el.id, assigns);
             },
             destroyed() {
                 unmountView(this.el);

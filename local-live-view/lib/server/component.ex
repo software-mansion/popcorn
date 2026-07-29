@@ -22,8 +22,7 @@ defmodule LocalLiveView.Component do
   Like `Phoenix.Component.live_component/1`, any attribute other than `view` is
   forwarded to the view as the assigns of its `c:LocalLiveView.update/2`
   callback. `id` is forwarded too, and additionally used as the mount point's DOM
-  id. Assigns are serialized as JSON and arrive with atom keys at the top level
-  (nested maps keep string keys, as they cross the JSON boundary).
+  id.
 
   ## Attributes
 
@@ -90,8 +89,7 @@ defmodule LocalLiveView.Component do
     """
   end
 
-  defp encode_assigns(assigns) when assigns == %{}, do: nil
-  defp encode_assigns(assigns), do: Jason.encode!(assigns)
+  defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))
 
   # The mount point lives under `phx-update="ignore"`, so its id MUST be stable
   # across the host LiveView's dead and connected renders — otherwise morphdom

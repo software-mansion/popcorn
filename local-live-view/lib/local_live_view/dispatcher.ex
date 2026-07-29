@@ -78,7 +78,7 @@ defmodule LocalLiveView.Dispatcher do
          _promise,
          state
        ) do
-    send_to_view(state, id, %Message{event: "update_assigns", payload: assigns})
+    send_to_view(state, id, %Message{event: "update_assigns", payload: parse_assigns(assigns)})
     {:resolve, :ok, state}
   end
 
@@ -101,6 +101,7 @@ defmodule LocalLiveView.Dispatcher do
     params =
       Map.take(msg, ~w"id assigns url url_params")
       |> Map.put("session", %Session{view: view})
+      |> Map.update!("assigns", &parse_assigns/1)
 
     case start_local_live_view(params) do
       {:ok, pid} ->
@@ -157,4 +158,6 @@ defmodule LocalLiveView.Dispatcher do
       {^ref, {:error, _reply}} -> :error
     end
   end
+
+  defp parse_assigns(assigns), do: :erlang.binary_to_term(Base.decode64!(assigns))
 end

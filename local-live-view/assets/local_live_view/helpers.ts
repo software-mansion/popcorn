@@ -18,16 +18,3 @@ export function sendServerMessage(pop: PopcornClient, detail: LLVServerMessageDe
     type: "llv_server_message",
   });
 }
-
-// data-pop-assigns holds the JSON a local_component serialized from its inline
-// assigns. Absent/empty for plain local views — default to {} so the process is
-// always handed a map.
-export function parseAssigns(raw: string | null): Record<string, unknown> {
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("LLV failed to parse data-pop-assigns:", raw, err);
-    return {};
-  }
-}
