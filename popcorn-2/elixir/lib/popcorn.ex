@@ -89,8 +89,15 @@ defmodule Popcorn do
       output_dir: treeshaked_dir,
       # stub_removed_functions: true,
       keep: [
-        Popcorn.Init,
-        %{behaviour_impls: LocalLiveView}
+        # Phoenix resolves Jason via `Phoenix.json_library/0`, what makes it
+        # invisible for treeshaking. Jason is low overhead and needed for
+        # most Popcorn stuff anyway, so at least for now we keep it unconditionally.
+        Jason,
+        # LiveView/LLV modules are resolved via Heex templates, which are just strings,
+        # what makes them invisible for treeshaking. For now we keep all LLV impls.
+        %{behaviour_impls: LocalLiveView},
+        # Popcorn.Init is called by the boot module, which is ignored (see `:ignore`)
+        Popcorn.Init
         | start_fun
       ],
       ignore: [
@@ -149,6 +156,7 @@ defmodule Popcorn do
     ]
 
     Treeshake.run(opts)
+
     ls_paths(treeshaked_dir)
   end
 
