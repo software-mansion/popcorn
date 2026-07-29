@@ -13,6 +13,7 @@ import {
   varNames,
   type BannerZone,
 } from "./shared";
+import { hasTargetingConsent } from "./consent";
 
 export type { BannerZone };
 export { topBarBannerReservationScript } from "./shared";
@@ -29,6 +30,34 @@ const SCRIPT_SRC = "https://swm-delivery.com/www/assets/js/lib.js";
 
 const FALLBACK_BG_COLOR = "#2a47ff";
 
+// CookieScript signals every consent change with one of these; re-reading its
+// current state on each is enough, the events carry no state we need.
+const CONSENT_EVENTS = [
+  "CookieScriptLoaded",
+  "CookieScriptAccept",
+  "CookieScriptAcceptAll",
+  "CookieScriptReject",
+  "CookieScriptCategory-targeting",
+];
+
+// Starts false so SSR and the first client render agree; the effect below picks
+// up the real state right after mount.
+function useTargetingConsent() {
+  const [allowed, setAllowed] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setAllowed(hasTargetingConsent(window.CookieScript));
+
+    CONSENT_EVENTS.forEach((name) => window.addEventListener(name, sync));
+    sync();
+
+    return () =>
+      CONSENT_EVENTS.forEach((name) => window.removeEventListener(name, sync));
+  }, []);
+
+  return allowed;
+}
+
 const useIsoLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -37,7 +66,7 @@ const useIsoLayoutEffect =
 // lets the bar be reserved at the right size before the live load arrives.
 // Wait this long for the live banner before treating the slot as empty...
 const BANNER_SETTLE_MS = 4000;
-// ...unless Revive already signalled done (data-content-loaded), then this.
+// ...unless Revive completed its response, then this.
 const BANNER_CONFIRM_MS = 500;
 
 type TopBarBannerCache = { height: number; bgColor: string; timestamp: number };
@@ -141,38 +170,26 @@ interface BannerZoneSlotProps {
 const BannerZoneSlot = ({ zone, index, onChange }: BannerZoneSlotProps) => {
   const fallbackBgColor = zone.fallbackBgColor ?? FALLBACK_BG_COLOR;
   const contentRef = useRef<HTMLDivElement>(null);
-  const insRef = useRef<HTMLModElement | null>(null);
-
   const keyRef = useRef(cacheKey(zone.zoneId, zone.contentId));
   const varsRef = useRef(varNames(zone.zoneId, zone.contentId));
 
   const [hasBanner, setHasBanner] = useState(false);
-  // Revive finished the slot (filled or empty) then can collapse an empty one fast.
-  const [reviveDone, setReviveDone] = useState(false);
+  const [responseDone, setResponseDone] = useState(false);
 
   useEffect(() => {
     const content = contentRef.current;
     if (!content) return;
-
-    const getIns = () => {
-      const current = content.querySelector("ins");
-      if (current && current !== insRef.current) {
-        insRef.current = current as HTMLModElement;
-      }
-      return insRef.current;
-    };
 
     const detectBanner = () => {
       const height = Math.max(content.scrollHeight, content.offsetHeight);
       return height >= MIN_VISIBLE_HEIGHT;
     };
 
-    const updateState = () => {
-      setHasBanner(detectBanner());
-      // Revive stamps data-content-loaded="1" when done, even for an empty slot.
-      if (getIns()?.getAttribute("data-content-loaded") === "1") {
-        setReviveDone(true);
-      }
+    const updateState = () => setHasBanner(detectBanner());
+    const completedEvent = `content-${zone.contentId}-completed`;
+    const handleCompleted = () => {
+      updateState();
+      setResponseDone(true);
     };
 
     const containerObserver = new MutationObserver(updateState);
@@ -181,26 +198,14 @@ const BannerZoneSlot = ({ zone, index, onChange }: BannerZoneSlotProps) => {
       subtree: true,
       attributes: true,
     });
-
-    const ins = getIns();
-    let insObserver: MutationObserver | null = null;
-    if (ins) {
-      insObserver = new MutationObserver(updateState);
-      insObserver.observe(ins, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["data-content-loaded", "style", "class", "id"],
-      });
-    }
-
+    document.addEventListener(completedEvent, handleCompleted);
     updateState();
 
     return () => {
       containerObserver.disconnect();
-      if (insObserver) insObserver.disconnect();
+      document.removeEventListener(completedEvent, handleCompleted);
     };
-  }, []);
+  }, [zone.contentId]);
 
   // Reconcile the live banner against the reserved size, then persist.
   useEffect(() => {
@@ -237,7 +242,7 @@ const BannerZoneSlot = ({ zone, index, onChange }: BannerZoneSlotProps) => {
 
     // No banner yet: a real one arriving flips hasBanner and cancels this;
     // otherwise, once it's confirmed empty, collapse + drop the cache.
-    const delay = reviveDone ? BANNER_CONFIRM_MS : BANNER_SETTLE_MS;
+    const delay = responseDone ? BANNER_CONFIRM_MS : BANNER_SETTLE_MS;
     const settle = window.setTimeout(() => {
       const content = contentRef.current;
       if (!content) return;
@@ -249,7 +254,7 @@ const BannerZoneSlot = ({ zone, index, onChange }: BannerZoneSlotProps) => {
       }
     }, delay);
     return () => window.clearTimeout(settle);
-  }, [hasBanner, reviveDone, fallbackBgColor, onChange, index]);
+  }, [hasBanner, responseDone, fallbackBgColor, onChange, index]);
 
   return (
     <div
@@ -342,6 +347,7 @@ export const TopBarBanner = ({
       ? [{ zoneId, contentId, fallbackBgColor }]
       : [];
 
+  const targetingConsent = useTargetingConsent();
   const [zoneStates, setZoneStates] = useState<ZoneState[]>(() =>
     normalizedZones.map(() => ({ height: 0, hasBanner: false }))
   );
@@ -386,16 +392,33 @@ export const TopBarBanner = ({
     });
   }, []);
 
-  // Inject the Revive loader once; it drives every zone's <ins>.
+  // Inject the Revive loader once consent is given; it drives every zone's
+  // <ins>. The loader's request is credentialed and counts an impression, so it
+  // must not run before the targeting category is accepted.
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (document.querySelector(`script[src="${SCRIPT_SRC}"]`)) return;
+    if (!targetingConsent || normalizedZones.length === 0) return;
+
+    // The loader scans for <ins> exactly once on load. Consent toggled off and
+    // back on unmounts and remounts them, so ask it to scan again; zones it
+    // already filled are skipped, so this costs no extra impression.
+    const loader = window.contentAsync?.[normalizedZones[0].contentId];
+    if (loader) {
+      loader.dispatchEvent("refresh");
+      return;
+    }
 
     const script = document.createElement("script");
     script.async = true;
     script.src = SCRIPT_SRC;
     document.body.appendChild(script);
-  }, []);
+  }, [targetingConsent, normalizedZones.length]);
+
+  // Without consent nothing renders, so drop any bar height the page reserved.
+  useEffect(() => {
+    if (targetingConsent) return;
+    document.documentElement.dataset.bannerLoaded = "false";
+    setBannerHeight?.(0);
+  }, [targetingConsent, setBannerHeight]);
 
   // Arm transition only after the first frame is painted (double rAF), so the
   // reserved bar appears instantly but later size changes still animate.
@@ -410,7 +433,7 @@ export const TopBarBanner = ({
   // order so the loop is seamless (never bounces back at the wrap). Empty zones
   // are skipped. Returns timer/raf ids the interval can cancel on cleanup.
   useEffect(() => {
-    if (normalizedZones.length <= 1) return;
+    if (!targetingConsent || normalizedZones.length <= 1) return;
 
     let pendingTimer = 0;
     let pendingRaf = 0;
@@ -485,7 +508,7 @@ export const TopBarBanner = ({
       if (pendingRaf) cancelAnimationFrame(pendingRaf);
       busyRef.current = false;
     };
-  }, [normalizedZones.length, rotateIntervalMs]);
+  }, [targetingConsent, normalizedZones.length, rotateIntervalMs]);
 
   // Report the active zone height + global loaded flag. Held until at least one
   // zone reports so the flag isn't stamped "false" before any zone has settled.
@@ -498,7 +521,7 @@ export const TopBarBanner = ({
     setBannerHeight?.(zoneStates[view.active]?.height ?? 0);
   }, [zoneStates, view.active, setBannerHeight, anyReported]);
 
-  if (normalizedZones.length === 0) return null;
+  if (normalizedZones.length === 0 || !targetingConsent) return null;
 
   const activeZone = normalizedZones[view.active] ?? normalizedZones[0];
   const activeVars = varNames(activeZone.zoneId, activeZone.contentId);
