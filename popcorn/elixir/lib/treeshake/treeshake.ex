@@ -217,8 +217,11 @@ defmodule Treeshake do
     end
 
     stats = Treeshake.Shaker.shake(opts, call_graph, module_index)
+    stub_functions = Map.get(opts, :stub_removed_functions, false)
+    stub_modules = Map.get(opts, :stub_removed_modules, false)
+    add_stubs = stub_functions or stub_modules
 
-    unless opts.dry_run do
+    if not opts.dry_run and add_stubs do
       helper_path = :code.which(:treeshake_helper)
       File.cp!(helper_path, Path.join(opts.output_dir, Path.basename(helper_path)))
     end
