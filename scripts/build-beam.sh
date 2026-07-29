@@ -281,7 +281,7 @@ run_configure() {
     # Linker flags
     export LDFLAGS="-pthread -flto"
     LDFLAGS+=" -sUSE_PTHREADS=1"
-    LDFLAGS+=" -sPTHREAD_POOL_SIZE=4"
+    LDFLAGS+=" -sPTHREAD_POOL_SIZE=8"
     LDFLAGS+=" -sPROXY_TO_PTHREAD=1"
     LDFLAGS+=" -sENVIRONMENT=web,worker,node"
     LDFLAGS+=" -sEXPORT_ES6=1"
