@@ -86,6 +86,13 @@ defmodule LocalLiveView.Server do
     {:noreply, state}
   end
 
+  def handle_info(%Message{event: "connect_mirror", payload: %{"mirror_id" => mirror_id}}, state) do
+    new_socket_private = Map.put(state.socket.private, :mirror_id, mirror_id)
+    new_socket = Map.put(state.socket, :private, new_socket_private)
+    new_state = Map.put(state, :socket, new_socket)
+    {:noreply, new_state}
+  end
+
   def handle_info(%Message{event: "event"} = msg, state) do
     %{"value" => raw_val, "event" => event, "type" => type} = msg.payload
     val = decode_event_type(type, raw_val, msg.payload)

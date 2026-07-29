@@ -1,26 +1,28 @@
 defmodule LocalLiveView.Channel do
   use Phoenix.Channel
 
-  def get_mirror_assigns(llv_id) do
-    case Registry.lookup(LocalLiveView.ChannelRegistry, llv_id) do
+  def get_mirror_assigns(mirror_id) do
+    case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
       [{pid, _}] -> GenServer.call(pid, :get_mirror_assigns)
       [] -> %{}
     end
   end
 
-  def set_mirror_assigns(llv_id, assigns) do
-    case Registry.lookup(LocalLiveView.ChannelRegistry, llv_id) do
+  def set_mirror_assigns(mirror_id, assigns) do
+    case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
       [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
       [] -> {:error, :not_found}
     end
   end
 
-  def join("llv:" <> llv_id, %{"view" => view_string, "token" => token}, socket) do
+  def join("llv:" <> mirror_id, %{"view" => view_string, "token" => token}, socket) do
     case LocalLiveView.MirrorToken.verify(socket.endpoint, token, max_age: :infinity) do
-      {:ok, %{id: ^llv_id, view: ^view_string}} ->
-        Registry.register(LocalLiveView.ChannelRegistry, llv_id, view_string)
+      {:ok, %{id: ^mirror_id, view: ^view_string}} ->
+        Registry.register(LocalLiveView.ChannelRegistry, mirror_id, view_string)
         mirror_module = LocalLiveView.Mirror.find_module(view_string)
-        {:ok, assign(socket, llv_id: llv_id, mirror_assigns: %{}, mirror_module: mirror_module)}
+
+        {:ok,
+         assign(socket, mirror_id: mirror_id, mirror_assigns: %{}, mirror_module: mirror_module)}
 
       {:error, _} ->
         {:error, %{reason: "unauthorized"}}
@@ -41,7 +43,7 @@ defmodule LocalLiveView.Channel do
   end
 
   def handle_in("sync", local_assigns, socket) do
-    session = %{llv_id: socket.assigns.llv_id}
+    session = %{mirror_id: socket.assigns.mirror_id}
 
     new_mirror_assigns =
       merge_assigns(

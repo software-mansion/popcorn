@@ -42,62 +42,167 @@ defmodule LocalLiveView.Component do
   '''
   def local_live_view(assigns) do
     view = assigns[:view]
+    id = assigns[:id] || default_id(view)
+
+    assigns = assign(assigns, id: id)
+
+    if mirror_exists?(view) do
+      ~H"""
+      <.live_component module={__MODULE__.Live} {assigns} />
+      """
+    else
+      render_dead(assigns)
+    end
+  end
+
+  defp render_dead(assigns) do
+    view = assigns[:view]
 
     unless is_binary(view) do
-      raise ArgumentError, """
-      <.local_live_view> expects view="..." parameter to be a string, got:
-        #{inspect(view)}
-      """
-    end
-
-    if mirror_exists?(view) && !assigns[:endpoint] do
-      raise ArgumentError, """
-      <.local_live_view> with mirror mechanism requires endpoint="..." parameter.
-      View "#{view}" uses mirror, but no endpoint was provided.
-      Add endpoint to your component call:
-        <.local_live_view view="#{view}" endpoint={@endpoint} />
-      """
+      raise ArgumentError, "<.local_live_view> expects view=\"...\" parameter to be a string"
     end
 
     if Map.has_key?(assigns, :inner_block) do
       raise ArgumentError, "<.local_live_view> does not accept inner content"
     end
 
-    assigns = assign_new(assigns, :id, fn -> default_id(view) end)
-
-    comp_assigns = Map.drop(assigns, [:__changed__, :view])
-
-    mirror_token =
-      if mirror_exists?(view),
-        do: LocalLiveView.MirrorToken.sign(assigns.endpoint, view, assigns.id)
-
-    assigns = assign(assigns, mirror_token: mirror_token, comp_assigns: comp_assigns)
+    comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id, :endpoint])
+    assigns = assign(assigns, comp_assigns: comp_assigns)
 
     ~H"""
     <div
       data-pop-view={@view}
       id={@id}
       phx-hook="LocalLiveView"
-      data-pop-mirror-token={@mirror_token}
       data-pop-assigns={encode_assigns(@comp_assigns)}
       phx-update="ignore"
     >
-    </div>
-    <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
-    <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
+      <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
+      </div>
     </div>
     """
   end
 
-  defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))
+  defmodule Live do
+    @moduledoc false
+    use Phoenix.LiveComponent
 
-  # The mount point lives under `phx-update="ignore"`, so its id MUST be stable
-  # across the host LiveView's dead and connected renders — otherwise morphdom
-  # rebuilds the element on connect and the serialized assigns are lost before
-  # the runtime reads them. A random id would differ between renders, so derive a
-  # deterministic one from the module name. Pass an explicit `id` when mounting
-  # more than one instance of the same module on a page.
-  defp default_id(name), do: "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
+    @impl true
+    def update(assigns, socket) do
+      view = assigns[:view]
+
+      unless is_binary(view) do
+        raise ArgumentError, """
+        <.local_live_view> expects view="..." parameter to be a string, got:
+          #{inspect(view)}
+        """
+      end
+
+      endpoint = resolve_endpoint(assigns)
+
+      if !endpoint do
+        raise ArgumentError, """
+        <.local_live_view> with mirror mechanism requires endpoint="..." parameter.
+        View "#{view}" uses mirror, but no endpoint was provided.
+        Add endpoint to your component call:
+          <.local_live_view view="#{view}" endpoint={@endpoint} />
+        """
+      end
+
+      if Map.has_key?(assigns, :inner_block) do
+        raise ArgumentError, "<.local_live_view> does not accept inner content"
+      end
+
+      mirror_id = socket.id <> assigns.id
+
+      mirror_token =
+        if Phoenix.LiveView.connected?(socket) do
+          LocalLiveView.MirrorToken.sign(endpoint, view, mirror_id)
+        else
+          nil
+        end
+
+      comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id, :endpoint])
+
+      socket =
+        assign(socket,
+          view: view,
+          id: assigns.id,
+          mirror_token: mirror_token,
+          comp_assigns: comp_assigns,
+          mirror_id: mirror_id
+        )
+
+      {:ok, socket}
+    end
+
+    @impl true
+    def render(assigns) do
+      ~H"""
+      <div>
+      <div
+        data-pop-view={@view}
+        id={@id}
+        phx-hook="LocalLiveView"
+        data-pop-mirror-token={@mirror_token}
+        data-pop-mirror-id={@mirror_id}
+        data-pop-assigns={encode_assigns(@comp_assigns)}
+        phx-update="ignore"
+      >
+      </div>
+      <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
+      <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
+      </div>
+      </div>
+      """
+    end
+
+    defp encode_assigns(assigns) when assigns == %{}, do: nil
+    defp encode_assigns(assigns), do: Jason.encode!(assigns)
+
+    defp resolve_endpoint(assigns) do
+      assigns[:endpoint] || Application.get_env(:local_live_view, :default_endpoint)
+    end
+  end
+
+  @doc """
+  Assembles the deterministic `mirror_id` for a given LocalLiveView component
+  within a parent LiveView process.
+
+  Accepts the parent `socket` (or directly its `socket.id`), and either:
+  * a view module name / string (calculates the default DOM ID)
+  * an explicit custom DOM ID provided to `<.local_live_view id="..." />`
+
+  ## Examples
+
+      # Explicit ID passed to component:
+      mirror_id = LocalLiveView.Component.mirror_id(socket, "my-custom-cart")
+
+      # Default ID derived from view name:
+      mirror_id = LocalLiveView.Component.mirror_id(socket, "Cart")
+  """
+  def mirror_id(%Phoenix.LiveView.Socket{id: socket_id}, view_or_id) do
+    mirror_id(socket_id, view_or_id)
+  end
+
+  def mirror_id(socket_id, view_or_id) when is_binary(socket_id) and is_binary(view_or_id) do
+    dom_id =
+      if String.starts_with?(view_or_id, "llv-") do
+        view_or_id
+      else
+        default_id(view_or_id)
+      end
+
+    socket_id <> dom_id
+  end
+
+  defp default_id(name) when is_binary(name) do
+    "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
+  end
+
+  defp default_id(_), do: "llv-view"
+
+  defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))
 
   defp mirror_exists?(view_name), do: LocalLiveView.Mirror.find_module(view_name) != nil
 end

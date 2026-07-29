@@ -59,6 +59,19 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, state}
   end
 
+  defp handle_wasm_call(
+         %{"action" => "connect_mirror", "id" => id, "payload" => payload},
+         _promise,
+         state
+       ) do
+    send_to_view(state, id, %Message{
+      event: "connect_mirror",
+      payload: payload
+    })
+
+    {:resolve, :ok, state}
+  end
+
   defp handle_wasm_call(%{"action" => "push", "id" => id, "payload" => payload}, _promise, state) do
     send_to_view(state, id, %Message{event: "js_push", payload: payload})
     {:resolve, :ok, state}

@@ -883,6 +883,13 @@ class PopcornClient {
     reconnected(id) {
         this.fire("reconnect sync", { action: "reconnected", id, payload: {} });
     }
+    connect_mirror(id, mirror_id) {
+        this.fire("connect mirror", {
+            action: "connect_mirror",
+            id,
+            payload: { mirror_id: mirror_id },
+        });
+    }
     updateAssigns(id, assigns) {
         this.fire("update assigns", { action: "update_assigns", id, assigns });
     }
@@ -919,9 +926,17 @@ class LLVEngine {
     // by __llvPushServer.
     eventBusHooks = new Map();
     popcornLink;
+    llvMirrorSocket;
     constructor(socket, config) {
         this.socket = socket;
         this.config = config;
+        const Socket = this.socketClass();
+        const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
+        const llvSocket = new Socket("/llv_socket", {
+            params: { _csrf_token: csrfToken },
+        });
+        llvSocket.connect();
+        this.llvMirrorSocket = llvSocket;
     }
     /**
      * Initializes LLVEngine and connects the LiveSocket.
@@ -939,7 +954,7 @@ class LLVEngine {
         engine.bindFormsIfHostless();
         engine.connectPopcornSocket();
         await engine.bootPopcorn();
-        engine.setupMirrorChannels();
+        engine.setupMirrorSync();
         engine.exposeGlobals();
         engine.patchOwner();
         registerCustomEventBindings(engine.socket);
@@ -1015,13 +1030,16 @@ class LLVEngine {
         const pop = this.pop;
         const mountView = (el) => this.mountView(el);
         const unmountView = (el) => this.unmountView(el);
+        const maybeSetupMirrorChannel = (el) => this.maybeSetupMirrorChannel(el);
         this.socket.hooks.LocalLiveView = {
             mounted() {
+                maybeSetupMirrorChannel(this.el);
                 this.llvLastAssigns = this.el.getAttribute("data-pop-assigns");
                 if (pop.ready)
                     mountView(this.el);
             },
             updated() {
+                maybeSetupMirrorChannel(this.el);
                 const assigns = this.el.getAttribute("data-pop-assigns");
                 if (assigns === this.llvLastAssigns)
                     return;
@@ -1075,38 +1093,35 @@ class LLVEngine {
         }
     }
     // Mirror channels: only created for views with a server-side Mirror module.
-    setupMirrorChannels() {
-        const mirrorEls = document.querySelectorAll("[data-pop-view][data-pop-mirror-token]");
-        if (mirrorEls.length === 0)
-            return;
-        const Socket = this.socketClass();
-        const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
-        const llvSocket = new Socket("/llv_socket", {
-            params: { _csrf_token: csrfToken },
-        });
-        llvSocket.connect();
-        mirrorEls.forEach((el) => {
-            const llvId = el.id;
-            const channel = llvSocket.channel(`llv:${llvId}`, {
-                view: el.dataset.popView,
-                token: el.dataset.popMirrorToken,
-            });
-            this.channels[llvId] = channel;
-            channel
-                .join()
-                .receive("ok", () => {
-                if (this.views.has(llvId)) {
-                    this.pop.reconnected(llvId);
-                }
-            })
-                .receive("error", (err) => console.error("LLV channel join error", err));
-        });
-        window.__llvSync = (id, eventName, payload) => {
-            const channel = this.channels[id];
+    setupMirrorSync() {
+        window.__llvSync = (mirror_id, eventName, payload) => {
+            const channel = this.channels[mirror_id];
             if (channel) {
                 channel.push(eventName, payload);
             }
         };
+    }
+    maybeSetupMirrorChannel(el) {
+        const mirrorId = el.dataset.popMirrorId;
+        if (!mirrorId || (mirrorId && this.channels[mirrorId]))
+            return;
+        const llvId = el.id;
+        const channel = this.llvMirrorSocket.channel(`llv:${mirrorId}`, {
+            view: el.dataset.popView,
+            token: el.dataset.popMirrorToken,
+        });
+        if (typeof mirrorId === "string") {
+            this.channels[mirrorId] = channel;
+            this.pop.connectMirror(llvId, mirrorId);
+        }
+        channel
+            .join()
+            .receive("ok", () => {
+            if (this.views.has(llvId)) {
+                this.pop.reconnected(llvId);
+            }
+        })
+            .receive("error", (err) => console.error("LLV channel join error", err));
     }
     exposeGlobals() {
         // Out-of-band diffs (handle_info renders, send_update, push_error

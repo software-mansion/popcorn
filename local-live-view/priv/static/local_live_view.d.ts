@@ -42,6 +42,7 @@ declare class PopcornClient {
     create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult>;
     destroy(id: string): void;
     reconnected(id: string): void;
+    connectMirror(id: string, mirror_id: string): void;
     updateAssigns(id: string, assigns: string): void;
     handleParams(id: string, params: Record<string, string>, url: string): void;
     handleTransportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
@@ -58,6 +59,7 @@ declare class LLVEngine {
     private bufferedServerMessages;
     private eventBusHooks;
     private popcornLink;
+    private llvMirrorSocket;
     private constructor();
     /**
      * Initializes LLVEngine and connects the LiveSocket.
@@ -74,7 +76,8 @@ declare class LLVEngine {
     private registerHooks;
     private bindFormsIfHostless;
     private bootPopcorn;
-    private setupMirrorChannels;
+    private setupMirrorSync;
+    private maybeSetupMirrorChannel;
     private exposeGlobals;
     private patchOwner;
     private scanAndMount;
