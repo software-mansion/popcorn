@@ -1764,7 +1764,7 @@ index 0000000000000000000000000000000000000000..1170f6b6e2839f1246de95bffdc315c0
 +## Note: These are passed to emcc during linking
 +LDFLAGS="-pthread \
 +    -sUSE_PTHREADS=1 \
-+    -sPTHREAD_POOL_SIZE=4 \
++    -sPTHREAD_POOL_SIZE=8 \
 +    -sPROXY_TO_PTHREAD=1 \
 +    -sENVIRONMENT=web,worker,node \
 +    -sEXPORT_ES6=1 \
