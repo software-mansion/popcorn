@@ -24,6 +24,7 @@ export type Options = {
   app: string | null;
   brotli?: boolean;
   strip?: boolean;
+  treeshake?: boolean;
 };
 
 export type Prepared = {
@@ -85,6 +86,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         app: opts.app,
         tarPaths: coreTarballs,
         strip,
+        treeshake: opts.treeshake ?? false,
       });
 
       if (!report.ok) {
@@ -117,6 +119,7 @@ async function packTarballs({
   app,
   tarPaths,
   strip,
+  treeshake,
 }: {
   rootDir: string;
   outDir: string;
@@ -124,6 +127,7 @@ async function packTarballs({
   app: string | null;
   tarPaths: string[];
   strip: boolean;
+  treeshake: boolean;
 }): Promise<Report> {
   const scriptPath = p`${dirname(fileURLToPath(import.meta.url))}/tarballs.exs`;
   const args = [
@@ -142,6 +146,10 @@ async function packTarballs({
 
   if (strip) {
     args.push("--strip");
+  }
+
+  if (treeshake) {
+    args.push("--treeshake");
   }
 
   args.push(...tarPaths);

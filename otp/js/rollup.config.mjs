@@ -1,6 +1,10 @@
-import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { copyFile, cp, mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { promisify } from "node:util";
 import typescript from "@rollup/plugin-typescript";
+
+const execFileAsync = promisify(execFile);
 
 function copyFiles(targets) {
   return {
@@ -35,6 +39,24 @@ function cleanModules(dir) {
         entries
           .filter((entry) => entry.isFile() && entry.name.endsWith(".mjs"))
           .map((entry) => rm(join(dir, entry.name))),
+      );
+    },
+  };
+}
+
+function buildTreeshake() {
+  return {
+    name: "build-treeshake",
+    async buildEnd() {
+      const cwd = "plugins/treeshake";
+      await execFileAsync("mix", ["compile"], {
+        cwd,
+        env: { ...process.env, MIX_ENV: "prod" },
+      });
+      await cp(
+        join(cwd, "_build/prod/lib/popcorn_treeshake/ebin"),
+        "dist/plugins/treeshake/ebin",
+        { recursive: true },
       );
     },
   };
@@ -88,6 +110,7 @@ export default [
         tsconfig: "./plugins/tsconfig.json",
         outputToFilesystem: true,
       }),
+      buildTreeshake(),
       copyFiles([
         { src: "plugins/tarballs.exs", dest: "dist/plugins/tarballs.exs" },
       ]),

@@ -9,7 +9,8 @@ defmodule Tarballs do
     entrypoint_app: :string,
     out_dir: :string,
     provided_apps_manifest_path: :string,
-    strip: :boolean
+    strip: :boolean,
+    treeshake: :boolean
   ]
 
   @required_options [:root_dir, :out_dir, :provided_apps_manifest_path]
@@ -66,7 +67,8 @@ defmodule Tarballs do
     with {:ok, args} <- parse_argv(argv),
          {:ok, provided_apps} <- fetch_provided_apps(args.provided_apps_manifest_path),
          {:ok, user_apps} <- fetch_user_apps(args.root_dir),
-         {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, args.entrypoint_app) do
+         {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, args.entrypoint_app),
+         {:ok, user_apps} <- maybe_treeshake(args, apps, user_apps) do
       vm_version = provided_apps.version
 
       File.mkdir_p!(args.out_dir)
@@ -129,6 +131,54 @@ defmodule Tarballs do
       :ok = strip_tarball(path, out_dir)
       Path.expand(Path.join(out_dir, Path.basename(path)))
     end)
+  end
+
+  defp maybe_treeshake(%{treeshake: false}, _apps, user_apps), do: {:ok, user_apps}
+
+  defp maybe_treeshake(args, apps, user_apps) do
+    selected_apps = Map.take(user_apps, apps)
+    apps_dir = Path.join([args.out_dir, "treeshake", "apps"])
+    treeshake_out_dir = Path.join([args.out_dir, "treeshake", "output"])
+    File.rm_rf!(Path.dirname(apps_dir))
+    staged_apps = Map.new(selected_apps, &stage_app(&1, apps_dir))
+    ebin_dir = Path.join([__DIR__, "treeshake", "ebin"])
+
+    arguments = [
+      "-pa",
+      ebin_dir,
+      "-e",
+      "Popcorn.Treeshake.CLI.main(System.argv())",
+      "--",
+      "--apps-dir",
+      apps_dir,
+      "--out-dir",
+      treeshake_out_dir
+    ]
+
+    case System.cmd("elixir", arguments, stderr_to_stdout: true) do
+      {_output, 0} ->
+        staged_apps =
+          Map.new(selected_apps, fn {app, info} ->
+            {app, %{info | ebin_dir: Map.fetch!(staged_apps, app)}}
+          end)
+
+        {:ok, Map.merge(user_apps, staged_apps)}
+
+      {output, status} ->
+        {:error, %{code: "treeshake_process_failed", status: status, output: output}}
+    end
+  end
+
+  defp stage_app({app, info}, apps_dir) do
+    staged_ebin = Path.join([apps_dir, app, "ebin"])
+    File.mkdir_p!(staged_ebin)
+
+    info.ebin_dir
+    |> Path.join("*")
+    |> Path.wildcard()
+    |> Enum.each(&File.cp!(&1, Path.join(staged_ebin, Path.basename(&1))))
+
+    {app, staged_ebin}
   end
 
   defp fetch_user_apps(root_dir) do
@@ -283,6 +333,7 @@ defmodule Tarballs do
           |> Map.new()
           |> Map.put_new(:entrypoint_app, nil)
           |> Map.put_new(:strip, false)
+          |> Map.put_new(:treeshake, false)
           |> Map.put(:tar_paths, tar_paths)
 
         {:ok, args}
