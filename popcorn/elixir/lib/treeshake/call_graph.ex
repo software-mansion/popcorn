@@ -150,18 +150,25 @@ defmodule Treeshake.CallGraph do
       Enum.map(info.behaviour_impls, &{info.module, &1})
     end)
     |> Enum.flat_map(fn {module, behaviour} ->
-      case module_index[behaviour] do
-        %{abstraction: {:behaviour, callbacks}} ->
-          callbacks
-
-        nil ->
-          []
-
-        _non_behaviour ->
-          raise "Module #{module} implements #{behaviour} as if it was a behaviour, but it's not"
-      end
+      behaviour_callbacks(module_index[behaviour], module, behaviour)
       |> Enum.map(fn {f, a} -> {module, f, a} end)
     end)
+  end
+
+  defp behaviour_callbacks(%{abstraction: {:behaviour, callbacks}}, _module, _behaviour),
+    do: callbacks
+
+  defp behaviour_callbacks(nil, _module, behaviour) do
+    with {:module, ^behaviour} <- Code.ensure_loaded(behaviour),
+         true <- function_exported?(behaviour, :behaviour_info, 1) do
+      behaviour.behaviour_info(:callbacks)
+    else
+      _not_available -> []
+    end
+  end
+
+  defp behaviour_callbacks(_non_behaviour, module, behaviour) do
+    raise "Module #{module} implements #{behaviour} as if it was a behaviour, but it's not"
   end
 
   # When a module atom appears as a literal (e.g. passed to Supervisor.start_link),
