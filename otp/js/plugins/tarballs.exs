@@ -55,7 +55,9 @@ defmodule Tarballs do
   end
 
   defp strip_beam(content) do
-    :beam_lib.strip(content)
+    with {:ok, {module, stripped}} <- :beam_lib.strip(content) do
+      {:ok, {module, :zlib.gunzip(stripped)}}
+    end
   rescue
     _error -> :error
   end
