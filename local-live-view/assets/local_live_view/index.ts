@@ -159,13 +159,13 @@ export class LLVEngine {
     // registerServerMessageListener / registerHooks comments).
     engine.registerServerMessageListener();
     registerNavigationHandlers(engine.socket, engine.views, engine.pop, engine.config);
-    engine.registerHooks();
     engine.bindFormsIfHostless();
     engine.connectPopcornSocket();
 
     await engine.bootPopcorn();
 
     engine.setupMirrorSync();
+    engine.registerHooks();
     engine.exposeGlobals();
     engine.patchOwner();
     registerCustomEventBindings(engine.socket);
@@ -249,9 +249,11 @@ export class LLVEngine {
     const maybeSetupMirrorChannel = (el: HTMLElement) => this.maybeSetupMirrorChannel(el);
     this.socket.hooks.LocalLiveView = {
       mounted() {
-        maybeSetupMirrorChannel(this.el);
         this.llvLastAssigns = this.el.getAttribute("data-pop-assigns")!;
-        if (pop.ready) mountView(this.el);
+        if (pop.ready) {
+          maybeSetupMirrorChannel(this.el);
+          mountView(this.el);
+        }
       },
       updated() {
         maybeSetupMirrorChannel(this.el);

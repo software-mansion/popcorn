@@ -47,7 +47,7 @@ defmodule LocalLiveView.Component do
 
     if mirror_exists?(view) do
       ~H"""
-      <.live_component module={__MODULE__.Live} {assigns} />
+      <.live_component module={__MODULE__.Mirrored} {assigns} />
       """
     else
       render_static(assigns)
@@ -64,7 +64,7 @@ defmodule LocalLiveView.Component do
     render_markup(assigns)
   end
 
-  defmodule Live do
+  defmodule Mirrored do
     @moduledoc false
     use Phoenix.LiveComponent
     alias LocalLiveView.Component
@@ -81,6 +81,8 @@ defmodule LocalLiveView.Component do
         else
           nil
         end
+
+      assigns = Component.add_comp_assigns(assigns)
 
       socket =
         assign(socket,
@@ -118,14 +120,7 @@ defmodule LocalLiveView.Component do
   @doc false
   def render_markup(assigns) do
     validate_assigns!(assigns)
-
-    comp_assigns =
-      Map.drop(assigns, [:__changed__, :view, :flash, :id, :mirror_id, :mirror_token])
-
-    assigns =
-      assign(assigns,
-        comp_assigns: comp_assigns
-      )
+    assigns = add_comp_assigns(assigns)
 
     ~H"""
     <div>
@@ -147,6 +142,15 @@ defmodule LocalLiveView.Component do
   end
 
   @doc false
+  def add_comp_assigns(assigns) do
+    comp_assigns =
+      Map.drop(assigns, [:__changed__, :view, :flash, :id, :mirror_id, :mirror_token])
+
+    assign(assigns,
+      comp_assigns: comp_assigns
+    )
+  end
+
   defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))
 
   @doc false
@@ -170,19 +174,13 @@ defmodule LocalLiveView.Component do
       # Default ID derived from view name:
       mirror_id = LocalLiveView.Component.mirror_id(socket, "Cart")
   """
+  @spec mirror_id(%Phoenix.LiveView.Socket{id: String.t()}, String.t()) :: String.t()
   def mirror_id(%Phoenix.LiveView.Socket{id: socket_id}, view_or_id) do
     mirror_id(socket_id, view_or_id)
   end
 
   def mirror_id(socket_id, view_or_id) when is_binary(socket_id) and is_binary(view_or_id) do
-    dom_id =
-      if String.starts_with?(view_or_id, "llv-") do
-        view_or_id
-      else
-        default_id(view_or_id)
-      end
-
-    socket_id <> dom_id
+    socket_id <> "-" <> view_or_id
   end
 
   defp default_id(name) when is_binary(name) do
