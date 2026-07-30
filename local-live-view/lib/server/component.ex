@@ -28,7 +28,6 @@ defmodule LocalLiveView.Component do
 
     * `view` (required) - the LocalLiveView module name, as a string.
     * `id` - stable element id; defaults to a server-generated random id.
-    * `endpoint` - the Phoenix endpoint module used to sign the mirror token.
 
   ## Examples
 
@@ -51,11 +50,11 @@ defmodule LocalLiveView.Component do
       <.live_component module={__MODULE__.Live} {assigns} />
       """
     else
-      render_dead(assigns)
+      render_static(assigns)
     end
   end
 
-  defp render_dead(assigns) do
+  defp render_static(assigns) do
     view = assigns[:view]
 
     unless is_binary(view) do
@@ -66,7 +65,7 @@ defmodule LocalLiveView.Component do
       raise ArgumentError, "<.local_live_view> does not accept inner content"
     end
 
-    comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id, :endpoint])
+    comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id])
     assigns = assign(assigns, comp_assigns: comp_assigns)
 
     ~H"""
@@ -98,17 +97,6 @@ defmodule LocalLiveView.Component do
         """
       end
 
-      endpoint = resolve_endpoint(assigns)
-
-      if !endpoint do
-        raise ArgumentError, """
-        <.local_live_view> with mirror mechanism requires endpoint="..." parameter.
-        View "#{view}" uses mirror, but no endpoint was provided.
-        Add endpoint to your component call:
-          <.local_live_view view="#{view}" endpoint={@endpoint} />
-        """
-      end
-
       if Map.has_key?(assigns, :inner_block) do
         raise ArgumentError, "<.local_live_view> does not accept inner content"
       end
@@ -117,12 +105,12 @@ defmodule LocalLiveView.Component do
 
       mirror_token =
         if Phoenix.LiveView.connected?(socket) do
-          LocalLiveView.MirrorToken.sign(endpoint, view, mirror_id)
+          LocalLiveView.MirrorToken.sign(socket.endpoint, view, mirror_id)
         else
           nil
         end
 
-      comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id, :endpoint])
+      comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id])
 
       socket =
         assign(socket,
@@ -159,10 +147,6 @@ defmodule LocalLiveView.Component do
 
     defp encode_assigns(assigns) when assigns == %{}, do: nil
     defp encode_assigns(assigns), do: Jason.encode!(assigns)
-
-    defp resolve_endpoint(assigns) do
-      assigns[:endpoint] || Application.get_env(:local_live_view, :default_endpoint)
-    end
   end
 
   @doc """
