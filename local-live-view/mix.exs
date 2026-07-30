@@ -46,9 +46,7 @@ defmodule LocalLiveView.MixProject do
       {:plug, "~> 1.14", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: :host},
-      {:igniter, ">= 0.7.0", targets: :host, runtime: false},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true}
+      {:file_system, "~> 1.0", targets: :host}
     ]
   end
 
