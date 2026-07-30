@@ -159,13 +159,13 @@ export class LLVEngine {
     // registerServerMessageListener / registerHooks comments).
     engine.registerServerMessageListener();
     registerNavigationHandlers(engine.socket, engine.views, engine.pop, engine.config);
+    engine.registerHooks();
     engine.bindFormsIfHostless();
     engine.connectPopcornSocket();
 
     await engine.bootPopcorn();
 
     engine.setupMirrorSync();
-    engine.registerHooks();
     engine.exposeGlobals();
     engine.patchOwner();
     registerCustomEventBindings(engine.socket);
