@@ -1,6 +1,8 @@
 import { schedulers } from "@swmansion/popcorn-otp";
 import { assert, evalOpts, expect, test } from "./helpers";
 
+const FETCH_URL = "/assets/otp/manifest.json";
+
 test.describe("boot", () => {
   test("apps and eval", async ({ otp }) => {
     const boot = await otp.boot(
@@ -268,5 +270,106 @@ test.describe("lifecycle", () => {
     expect(result.second).toBe(true);
     expect(result.events).toContainEqual({ ready: true });
     expect(result.removedEvents).toBe(result.removedAfterFirstBoot);
+  });
+});
+
+test.describe("fetch", () => {
+  test("requests", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+        {ok, Response} = 'Elixir.Popcorn.Fetch':request(#{
+          method => <<"GET">>,
+          url => <<"${FETCH_URL}">>
+        }),
+        #{status := Status, headers := Headers, body := ManifestBody} = Response,
+        Manifest = json:decode(ManifestBody),
+
+        Payload = binary:copy(<<255, 0, 65, 254>>, 25000),
+        {ok, #{body := EchoBody}} = 'Elixir.Popcorn.Fetch':request(#{
+          method => <<"POST">>,
+          url => <<"/echo">>,
+          body => Payload
+        }),
+
+        ok = wasm:send(#{
+          status => Status,
+          has_vm => is_map_key(<<"vm">>, Manifest),
+          header_count => length(Headers),
+          size => byte_size(EchoBody),
+          identical => EchoBody =:= Payload
+        }).
+      `),
+    );
+    assert(boot.ok);
+
+    const event = await otp.waitForEvent("status");
+    expect(event).toMatchObject({
+      status: 200,
+      has_vm: true,
+      size: 100000,
+      identical: true,
+    });
+    expect((event as { header_count: number }).header_count).toBeGreaterThan(0);
+  });
+
+  test("blocked request", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+        Result = 'Elixir.Popcorn.Fetch':request(#{
+          method => <<"GET">>,
+          url => <<"https://example.com/">>
+        }),
+        {error, {fetch, Message}} = Result,
+        ok = wasm:send(#{fetch_error => Message}).
+      `),
+    );
+    assert(boot.ok);
+
+    const event = (await otp.waitForEvent("fetch_error")) as {
+      fetch_error: string;
+    };
+    expect(event.fetch_error).toContain("Failed to fetch");
+    expect(event.fetch_error).toContain("CORS");
+  });
+
+  test("Req adapter", async ({ otp }) => {
+    test.skip(
+      process.env.POPCORN_E2E_REQ !== "1",
+      "requires OTP assets that provide ssl",
+    );
+
+    const boot = await otp.boot(
+      evalOpts(`
+        {ok, DefaultOptions} = application:get_env(req, default_options),
+        'Elixir.Popcorn.Fetch' = proplists:get_value(adapter, DefaultOptions),
+        {ok, _} = application:ensure_all_started(req),
+        Response = 'Elixir.Req':'get!'(<<"${FETCH_URL}">>, [
+          {decode_body, true}
+        ]),
+        Status = maps:get(status, Response),
+        Body = maps:get(body, Response),
+
+        ok = application:stop(popcorn_otp),
+        ok = application:set_env(req, default_options, [
+          {adapter, 'Elixir.Req.Finch'}
+        ]),
+        ok = application:start(popcorn_otp),
+        {ok, UpdatedOptions} = application:get_env(req, default_options),
+        'Elixir.Req.Finch' = proplists:get_value(adapter, UpdatedOptions),
+
+        ok = wasm:send(#{
+          status => Status,
+          has_vm => is_map_key(<<"vm">>, Body),
+          adapter_preserved => true
+        }).
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("status")).toEqual({
+      status: 200,
+      has_vm: true,
+      adapter_preserved: true,
+    });
   });
 });

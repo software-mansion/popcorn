@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
+import { readFile } from "fs/promises";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -24,6 +25,17 @@ async function globalSetup() {
     "building JS library and OTP assets",
     env,
   );
+
+  const manifest = JSON.parse(
+    await readFile(resolve(jsRootDir, "assets/manifest.json"), "utf8"),
+  ) as { apps?: Record<string, unknown> };
+  if (manifest.apps?.ssl !== undefined) {
+    env.POPCORN_E2E_REQ = "1";
+    process.env.POPCORN_E2E_REQ = "1";
+  } else {
+    delete env.POPCORN_E2E_REQ;
+    delete process.env.POPCORN_E2E_REQ;
+  }
 
   await buildEntrypointFixture(env);
 
@@ -76,6 +88,22 @@ async function buildEntrypointFixture(env: NodeJS.ProcessEnv): Promise<void> {
   console.log("e2e: building entrypoint fixture app...");
 
   const fixtureSrcDir = resolve(__dirname, "entrypoint-app");
+
+  await runCommand(
+    "mix",
+    ["deps.get"],
+    fixtureSrcDir,
+    "fetching entrypoint fixture dependencies",
+    env,
+  );
+
+  await runCommand(
+    "mix",
+    ["clean"],
+    fixtureSrcDir,
+    "cleaning entrypoint fixture",
+    env,
+  );
 
   await runCommand(
     "mix",

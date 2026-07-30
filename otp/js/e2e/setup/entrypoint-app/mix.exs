@@ -5,7 +5,9 @@ defmodule TestEntrypoint.MixProject do
     [
       app: :test_entrypoint,
       version: "0.1.0",
-      deps: [{:popcorn_otp, path: "../../../../elixir"}]
+      deps_path: "../../../../elixir/deps",
+      lockfile: "../../../../elixir/mix.lock",
+      deps: deps()
     ]
   end
 
@@ -14,5 +16,15 @@ defmodule TestEntrypoint.MixProject do
       mod: {:test_entrypoint_app, []},
       extra_applications: [:elixir]
     ]
+  end
+
+  defp deps do
+    deps = [{:popcorn_otp, path: "../../../../elixir"}]
+
+    if System.get_env("POPCORN_E2E_REQ") == "1" do
+      [{:req, ">= 0.5.0"} | deps]
+    else
+      deps
+    end
   end
 end

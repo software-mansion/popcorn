@@ -813,8 +813,10 @@ function resolveOutputHandlers<Output extends TtyOutput>(
 
   const stdoutDecoder = new TextDecoder();
   const stderrDecoder = new TextDecoder();
-  const onStdout = (opts.onStdout as TextHandler | undefined) ?? defaultOnStdout;
-  const onStderr = (opts.onStderr as TextHandler | undefined) ?? defaultOnStderr;
+  const onStdout =
+    (opts.onStdout as TextHandler | undefined) ?? defaultOnStdout;
+  const onStderr =
+    (opts.onStderr as TextHandler | undefined) ?? defaultOnStderr;
   return {
     stdout: (chunk) => decodeOutput(stdoutDecoder, onStdout, chunk),
     stderr: (chunk) => decodeOutput(stderrDecoder, onStderr, chunk),
