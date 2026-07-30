@@ -119,7 +119,8 @@ defmodule LocalLiveView.Component do
   def render_markup(assigns) do
     validate_assigns!(assigns)
 
-    comp_assigns = Map.drop(assigns, [:__changed__, :view, :flash, :id, :mirror_id, :mirror_token])
+    comp_assigns =
+      Map.drop(assigns, [:__changed__, :view, :flash, :id, :mirror_id, :mirror_token])
 
     assigns =
       assign(assigns,
@@ -187,8 +188,6 @@ defmodule LocalLiveView.Component do
   defp default_id(name) when is_binary(name) do
     "llv-" <> String.replace(name, ~r/[^A-Za-z0-9_-]/, "-")
   end
-
-  defp default_id(_), do: "llv-view"
 
   defp mirror_exists?(view_name), do: LocalLiveView.Mirror.find_module(view_name) != nil
 end
