@@ -32,6 +32,9 @@ const BASE_ARGS = [
   "erl",
   "-home",
   DEFAULT_HOME_DIR,
+  "-kernel",
+  "start_distribution",
+  "false",
 ];
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
