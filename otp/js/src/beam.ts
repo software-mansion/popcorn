@@ -20,6 +20,14 @@ const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
+
+// https://www.erlang.org/doc/apps/erts/inet_cfg.html
+const INETRC_PATH = "/etc/inetrc";
+// lookup types: `native | file | dns`
+// We need `file` lookup to avoid spawning
+// /bin/inet_gethost which is not available
+const INETRC = "{lookup, [file]}.\n";
+
 const STDOUT_FD = 1;
 const STDERR_FD = 2;
 const UTF8 = new TextEncoder();
@@ -60,6 +68,7 @@ export async function boot({
     LOGNAME: DEFAULT_USER,
     COLUMNS: String(ttySize.columns),
     LINES: String(ttySize.rows),
+    ERL_INETRC: INETRC_PATH,
   };
   const moduleConfig: Partial<EmscriptenModule> = {
     print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
@@ -262,6 +271,7 @@ function initFs({ module, fsData }: InitFsArgs): void {
   }
 
   module.FS.writeFile(BOOT_PATH, fsData.bootFile);
+  module.FS.writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {
     ensureDir(module.FS, dirPath);

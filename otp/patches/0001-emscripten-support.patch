@@ -1409,6 +1409,17 @@ index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d
  }
  
  /* II. Prototypes */
+@@ -482,6 +484,10 @@ static ErlDrvData spawn_start(ErlDrvPort port_num, char* name,
+     char *wd, *cwd;
+     int ifd[2], ofd[2], stderrfd;
+ 
++#ifdef ERTS_EMSCRIPTEN
++    return ERL_DRV_ERROR_BADARG;
++#endif
++
+     if (pipe(ifd) < 0) return ERL_DRV_ERROR_ERRNO;
+     errno = EMFILE;		/* default for next three conditions */
+     if (ifd[0] >= sys_max_files() || pipe(ofd) < 0) {
 diff --git a/erts/preloaded/src/Makefile b/erts/preloaded/src/Makefile
 index e76af6ce766adb16ce964733c7eba6f3554b8f6e..be1005e2490384368dde68305207c50a477e86c3 100644
 --- a/erts/preloaded/src/Makefile
