@@ -55,10 +55,13 @@ defmodule LocalLiveView.Component do
   end
 
   defp render_static(assigns) do
+    comp_assigns = comp_assigns(assigns)
+
     assigns =
       assign(assigns,
         mirror_token: nil,
-        mirror_id: nil
+        mirror_id: nil,
+        comp_assigns: comp_assigns
       )
 
     render_markup(assigns)
@@ -67,29 +70,30 @@ defmodule LocalLiveView.Component do
   defmodule Mirrored do
     @moduledoc false
     use Phoenix.LiveComponent
-    alias LocalLiveView.Component
+    alias LocalLiveView.Component, as: LLVComponent
 
     @impl true
     def update(assigns, socket) do
       view = assigns[:view]
-      mirror_id = socket.id <> assigns.id
+      mirror_id = LLVComponent.mirror_id(socket, assigns.id)
 
       mirror_token =
         if Phoenix.LiveView.connected?(socket) do
-          endpoint = socket.endpoint || Component.resolve_default_endpoint()
+          endpoint = socket.endpoint || LLVComponent.resolve_default_endpoint()
           LocalLiveView.MirrorToken.sign(endpoint, view, mirror_id)
         else
           nil
         end
 
-      assigns = Component.add_comp_assigns(assigns)
+      comp_assings = LLVComponent.comp_assigns(assigns)
 
       socket =
         assign(socket,
           view: view,
           id: assigns.id,
           mirror_token: mirror_token,
-          mirror_id: mirror_id
+          mirror_id: mirror_id,
+          comp_assigns: comp_assings
         )
 
       {:ok, socket}
@@ -97,7 +101,7 @@ defmodule LocalLiveView.Component do
 
     @impl true
     def render(assigns) do
-      Component.render_markup(assigns)
+      LLVComponent.render_markup(assigns)
     end
   end
 
@@ -120,7 +124,6 @@ defmodule LocalLiveView.Component do
   @doc false
   def render_markup(assigns) do
     validate_assigns!(assigns)
-    assigns = add_comp_assigns(assigns)
 
     ~H"""
     <div>
@@ -142,13 +145,8 @@ defmodule LocalLiveView.Component do
   end
 
   @doc false
-  def add_comp_assigns(assigns) do
-    comp_assigns =
-      Map.drop(assigns, [:__changed__, :view, :flash, :id, :mirror_id, :mirror_token])
-
-    assign(assigns,
-      comp_assigns: comp_assigns
-    )
+  def comp_assigns(assigns) do
+    Map.drop(assigns, [:__changed__, :view])
   end
 
   defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))
