@@ -207,6 +207,7 @@ export class LLVEngine {
     }
     const liveEl = document.getElementById(llvId);
     if (liveEl?.matches("[data-pop-view]")) {
+      this.maybeSetupMirrorChannel(liveEl);
       setupFakeView(this.socket, this.views, this.popcornLink.socket, liveEl);
     } else {
       this.pop.destroy(llvId);
@@ -250,10 +251,7 @@ export class LLVEngine {
     this.socket.hooks.LocalLiveView = {
       mounted() {
         this.llvLastAssigns = this.el.getAttribute("data-pop-assigns")!;
-        if (pop.ready) {
-          maybeSetupMirrorChannel(this.el);
-          mountView(this.el);
-        }
+        if (pop.ready) mountView(this.el);
       },
       updated() {
         maybeSetupMirrorChannel(this.el);
