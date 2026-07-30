@@ -16,12 +16,20 @@ defmodule BurritoWeb.Live.SyncTableLive do
     "guacamole" => 2.50
   }
 
-  def mount(_params, %{"llv_id" => llv_id}, socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{llv_id}")
-    end
+  def mount(_params, %{"llv_rendering_socket_id" => llv_rendering_socket_id}, socket) do
+    attrs =
+      case connected?(socket) do
+        true ->
+          mirror_id =
+            LocalLiveView.Component.mirror_id(llv_rendering_socket_id, "llv-BurritoLive")
 
-    attrs = if connected?(socket), do: LocalLiveView.Channel.get_mirror_assigns(llv_id), else: %{}
+          Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{mirror_id}")
+          LocalLiveView.Channel.get_mirror_assigns(mirror_id)
+
+        false ->
+          %{}
+      end
+
     {:ok, apply_attrs(socket, attrs)}
   end
 

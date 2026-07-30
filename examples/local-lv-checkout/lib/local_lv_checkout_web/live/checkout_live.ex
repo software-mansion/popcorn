@@ -4,8 +4,6 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       llv_id: "checkout-#{socket.id}",
-       nav_llv_id: "nav-#{socket.id}",
        current_step: 1
      )}
   end
