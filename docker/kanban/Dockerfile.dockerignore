@@ -1,0 +1,25 @@
+# Exclude everything
+**
+# Re-include only what the Dockerfile COPYs
+!docker/
+!docker/kanban/
+!docker/kanban/entrypoint.sh
+
+!popcorn/
+!popcorn/elixir/
+!popcorn/elixir/**
+
+!local-live-view/
+!local-live-view/**
+
+!examples/
+!examples/local-lv-kanban/
+!examples/local-lv-kanban/**
+
+# Drop local build artifacts from the context
+examples/local-lv-kanban/_build
+examples/local-lv-kanban/deps
+examples/local-lv-kanban/local/_build
+examples/local-lv-kanban/local/deps
+examples/local-lv-kanban/assets/node_modules
+examples/local-lv-kanban/erl_crash.dump
