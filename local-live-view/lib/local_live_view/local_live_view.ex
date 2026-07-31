@@ -119,11 +119,11 @@ defmodule LocalLiveView do
         """
         ({ args }) => {
           if (window.__llvSync) {
-            window.__llvSync(args.id, "sync", args.payload);
+            window.__llvSync(args.mirror_id, "sync", args.payload);
           }
         }
         """,
-        %{id: socket.private[:llv_id], payload: payload}
+        %{mirror_id: socket.private[:mirror_id], payload: payload}
       )
     end
 

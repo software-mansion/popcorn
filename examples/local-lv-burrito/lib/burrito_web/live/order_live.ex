@@ -108,7 +108,7 @@ defmodule BurritoWeb.OrderLive do
               </div>
               <span class="text-xs text-pop-orange-dark/60 font-medium">Loading Local LiveView…</span>
             </div>
-            <.local_live_view id={@llv_id} view="BurritoLive" endpoint={@socket.endpoint} />
+            <.local_live_view id={@llv_id} view="BurritoLive" />
           </div>
         </div>
       </div>
@@ -133,7 +133,11 @@ defmodule BurritoWeb.OrderLive do
         </button>
         <div id="sync-panel-content" class="collapsible-grid open">
           <div>
-            <%= live_render @socket, BurritoWeb.Live.SyncTableLive, id: "sync-table", sticky: true, session: %{"llv_id" => @llv_id} %>
+            {live_render(@socket, BurritoWeb.Live.SyncTableLive,
+              id: "sync-table",
+              sticky: true,
+              session: %{"llv_id" => @llv_id}
+            )}
           </div>
         </div>
       </div>

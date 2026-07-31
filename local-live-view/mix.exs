@@ -31,10 +31,10 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # {:popcorn, "~> 0.3.0-rc2", targets: :wasm},
-      {:popcorn, path: "../popcorn/elixir", targets: :wasm},
+      {:popcorn, "~> 0.3.0-rc2", targets: :wasm},
+      # {:popcorn, path: "../popcorn/elixir", targets: :wasm},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
-      {:igniter, ">= 0.7.0", runtime: false},
+      {:igniter, ">= 0.7.0", targets: :host, runtime: false},
       {:playwright,
        github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test},
       {:phoenix, "~> 1.8", runtime: false},
@@ -45,9 +45,7 @@ defmodule LocalLiveView.MixProject do
       {:plug, "~> 1.14", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: :host},
-      {:igniter, ">= 0.7.0", targets: :host, runtime: false},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true}
+      {:file_system, "~> 1.0", targets: :host}
     ]
   end
 
@@ -58,12 +56,13 @@ defmodule LocalLiveView.MixProject do
       before_closing_body_tag: &before_closing_body_tag/1,
       extras: [
         "pages/introduction/welcome.md",
-        "pages/guides/navigation.md",
-        "README.md"
+        "pages/getting-started/installation.md",
+        "pages/guides/first-view.md",
+        "pages/guides/mirror-sync.md",
+        "pages/guides/navigation.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
-        "Getting started": "README.md",
         Guides: ~r"/guides/"
       ]
     ]
