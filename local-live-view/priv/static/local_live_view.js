@@ -1098,9 +1098,7 @@ class LLVEngine {
             view: popView,
             token: popMirrorToken,
         });
-        if (typeof mirrorId === "string") {
-            this.channels[mirrorId] = channel;
-        }
+        this.channels[mirrorId] = channel;
         channel
             .join()
             .receive("ok", () => {
