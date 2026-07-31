@@ -24,7 +24,7 @@ defmodule LocalLiveView.Channel do
         {:ok,
          assign(socket, mirror_id: mirror_id, mirror_assigns: %{}, mirror_module: mirror_module)}
 
-      {:error, reason} ->
+      {:error, _} ->
         {:error, %{reason: "unauthorized"}}
     end
   end
