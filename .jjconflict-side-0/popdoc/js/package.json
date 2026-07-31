@@ -1,0 +1,14 @@
+{
+  "name": "popdoc-js",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@swmansion/popcorn": "link:../../popcorn-2/js"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

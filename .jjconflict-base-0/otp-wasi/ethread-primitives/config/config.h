@@ -1,0 +1,12 @@
+#ifndef WASI_ETHREAD_CONFIG_H
+#define WASI_ETHREAD_CONFIG_H
+
+#include "ethread_header_config.h"
+
+#define ETHR_HAVE_ETHREAD_DEFINES 1
+#define ETHR_HAVE_PTHREAD_ATTR_SETGUARDSIZE 1
+#define ETHR_HAVE_SYS_TIME_H 1
+#define ETHR_HAVE_USABLE_PTHREAD_STACK_MIN 1
+#define SIZEOF_VOID_P 4
+
+#endif

@@ -1,0 +1,9 @@
+<div class="page">
+  <div class="half" id="left-half">
+    {live_render(@conn, CompareLiveViewsWeb.DemoModalOnline, session: %{})}
+  </div>
+
+  <div class="half" id="right-half">
+    <.local_live_view view="DemoModalOffline" />
+  </div>
+</div>

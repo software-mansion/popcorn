@@ -1,0 +1,63 @@
+wasi-sdk-33.0 (clang 22.1.0), wasm-tools 1.245.1
+
+OTP sources
+- OTP 28.3.1 pthread ethread implementation, unchanged
+- ethr_aux.c, ethr_atomics.c, ethr_mutex.c, ethr_cbf.c
+- pthread/ethread.c, pthread/ethr_event.c
+
+Source-derived minimal ERTS roles (+S 1 +SDcpu 1 +SDio 1 +A 0)
+- 1 VM/main worker
+- 1 normal scheduler
+- 1 dirty CPU scheduler
+- 1 dirty I/O scheduler
+- 1 standard auxiliary thread
+- 1 I/O poll thread
+- 1 system-message dispatcher
+- total required: 7 workers (1 main + 6 child)
+
+Fixed pool accounting
+- 8 total prewarmed browser workers (1 VM/main + 7 child)
+- 6 required role children + 1 capacity spare
+- next creation at capacity: EAGAIN (6)
+- peak workers: 8
+- active after teardown: 0
+- reused workers: 0
+
+Imports
+- env.memory: shared, minimum 2 pages, maximum 256 pages
+- experiment.progress: structured role/phase callback
+- experiment.report: structured result callback
+- wasi_snapshot_preview1: fd_close, fd_seek, fd_write, proc_exit, sched_yield, random_get
+- wasi.thread-spawn: thread creation ABI
+
+Exports
+- _start
+- wasi_thread_start
+
+Artifacts
+- program.wasm: 460,628 bytes raw; 127,459 bytes Brotli-11; 154,706 bytes gzip-9
+- production host JavaScript: 5,261 bytes raw across three bundles
+
+Browser result
+- requiredChildren: 6
+- completed: 7
+- distinctIdentities: true
+- distinctTsd: true
+- synchronized: true
+- capacityError: 6 (EAGAIN)
+- totalPrewarmedWorkers: 8
+- peakWorkers: 8
+- activeWorkers: 0
+- reusedWorkers: 0
+- focused Chromium run: passed
+- five serial repeat runs, one worker: passed
+
+ERTS compile boundary
+- first representative pool owner: erl_process.c::erts_start_schedulers
+- unchanged WASI compile stops in sys/unix/erl_unix_sys.h before scheduler code
+- required/unsupported: signal emulation, process-clock emulation, Wasm SJLJ setjmp, pwd.h
+
+Compatibility shims
+- fixed CPU count for ethread initialization
+- pthread_attr_setscope returns ENOTSUP (accepted by ethread)
+- unused pipe fallback returns ENOSYS and is removed from final imports by LTO/GC

@@ -1,0 +1,43 @@
+#ifndef WASI_ETHREAD_HEADER_CONFIG_H
+#define WASI_ETHREAD_HEADER_CONFIG_H
+
+#define ETHR_SIZEOF_PTR 4
+#define ETHR_SIZEOF_INT 4
+#define ETHR_SIZEOF_LONG 4
+#define ETHR_SIZEOF_LONG_LONG 8
+#define ETHR_SIZEOF___INT64 0
+#define ETHR_SIZEOF___INT128_T 16
+
+#define ETHR_PTHREADS 1
+#define ETHR_HAVE_PTHREAD_H 1
+#define ETHR_HAVE_PTHREAD_SPIN_LOCK 1
+
+#define ETHR_HAVE_GCC_ASM_ARM_DMB_INSTRUCTION 0
+#define ETHR_HAVE_GCC_ASM_ARM_DMB_LD_INSTRUCTION 0
+#define ETHR_HAVE_GCC_ASM_ARM_DMB_ST_INSTRUCTION 0
+#define ETHR_HAVE_GCC_ASM_ARM_ISB_SY_INSTRUCTION 0
+#define ETHR_HAVE___sync_synchronize ~0
+#define ETHR_HAVE___sync_add_and_fetch 28
+#define ETHR_HAVE___sync_fetch_and_and 28
+#define ETHR_HAVE___sync_fetch_and_or 28
+#define ETHR_HAVE___sync_val_compare_and_swap 28
+#define ETHR_HAVE_GCC___ATOMIC_BUILTINS 1
+#define ETHR_TRUST_GCC_ATOMIC_BUILTINS_MEMORY_BARRIERS 0
+#define ETHR_HAVE___atomic_store_n 12
+#define ETHR_HAVE___atomic_load_n 12
+#define ETHR_HAVE___atomic_add_fetch 12
+#define ETHR_HAVE___atomic_fetch_and 12
+#define ETHR_HAVE___atomic_fetch_or 12
+#define ETHR_HAVE___atomic_compare_exchange_n 12
+#define ETHR_SMP_REQUIRE_NATIVE_IMPLS 1
+
+#define ETHR_HAVE_SCHED_H 1
+#define ETHR_HAVE_SCHED_YIELD 1
+#define ETHR_SCHED_YIELD_RET_INT 1
+
+#define ASSUMED_CACHE_LINE_SIZE 64
+#define ETHR_HAVE_CLOCK_GETTIME_MONOTONIC 1
+#define ETHR_MONOTONIC_CLOCK_ID CLOCK_MONOTONIC
+#define ETHR_HAVE_PTHREAD_COND_TIMEDWAIT_MONOTONIC 1
+
+#endif

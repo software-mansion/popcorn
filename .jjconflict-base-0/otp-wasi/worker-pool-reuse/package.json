@@ -1,0 +1,16 @@
+{
+  "name": "otp-wasi-worker-pool-reuse",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "./scripts/build-wasm.sh",
+    "build": "pnpm run build:wasm && vite build",
+    "lint": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

@@ -1,0 +1,86 @@
+diff --git a/erts/emulator/beam/erl_bif_ddll.c b/erts/emulator/beam/erl_bif_ddll.c
+index 018dec7ebd42994666f10c5b6cffa9254e680ff9..e6b31e3066a1473704c3433b9b3fce76f55301ba 100644
+--- a/erts/emulator/beam/erl_bif_ddll.c
++++ b/erts/emulator/beam/erl_bif_ddll.c
+@@ -177,6 +177,12 @@ kill_ports_driver_unloaded(DE_Handle *dh)
+  */
+ BIF_RETTYPE erl_ddll_try_load_3(BIF_ALIST_3)
+ {
++#ifdef __EMSCRIPTEN__
++    Eterm *hp = HAlloc(BIF_P, 3);
++    Eterm error = build_load_error_hp(NULL, ERL_DE_ERROR_NO_DDLL_FUNCTIONALITY);
++
++    BIF_RET(TUPLE2(hp, am_error, error));
++#else
+     Eterm path_term = BIF_ARG_1;
+     Eterm name_term = BIF_ARG_2;
+     Eterm options = BIF_ARG_3;
+@@ -448,6 +454,7 @@ BIF_RETTYPE erl_ddll_try_load_3(BIF_ALIST_3)
+ 	erts_free(ERTS_ALC_T_DDLL_TMP_BUF, (void *) name);
+     }
+     BIF_ERROR(BIF_P, BADARG);
++#endif
+ }
+ 
+ /*
+diff --git a/erts/emulator/beam/erl_nif.c b/erts/emulator/beam/erl_nif.c
+index ae5e6b72dae8425abc2ca3aa2acda86aa567017e..27c1d16378d65f2eee4c9f6901fe7a16eff53a10 100644
+--- a/erts/emulator/beam/erl_nif.c
++++ b/erts/emulator/beam/erl_nif.c
+@@ -3303,6 +3303,13 @@ int enif_dynamic_resource_call(ErlNifEnv* caller_env,
+ void* enif_dlopen(const char* lib,
+ 		  void (*err_handler)(void*,const char*), void* err_arg)
+ {
++#ifdef __EMSCRIPTEN__
++    (void)lib;
++    if (err_handler != NULL) {
++        (*err_handler)(err_arg, "Dynamic loading is not supported in browser");
++    }
++    return NULL;
++#else
+     ErtsSysDdllError errdesc = ERTS_SYS_DDLL_ERROR_INIT;
+     void* handle;
+     void* init_func;
+@@ -3319,11 +3326,20 @@ void* enif_dlopen(const char* lib,
+     }
+     erts_sys_ddll_free_error(&errdesc);
+     return handle;
++#endif
+ }
+ 
+ void* enif_dlsym(void* handle, const char* symbol,
+ 		 void (*err_handler)(void*,const char*), void* err_arg)
+ {
++#ifdef __EMSCRIPTEN__
++    (void)handle;
++    (void)symbol;
++    if (err_handler != NULL) {
++        (*err_handler)(err_arg, "Dynamic loading is not supported in browser");
++    }
++    return NULL;
++#else
+     ErtsSysDdllError errdesc = ERTS_SYS_DDLL_ERROR_INIT;
+     void* ret;
+     if (erts_sys_ddll_sym2(handle, symbol, &ret, &errdesc) != ERL_DE_NO_ERROR) {
+@@ -3334,6 +3350,7 @@ void* enif_dlsym(void* handle, const char* symbol,
+ 	return NULL;
+     }
+     return ret;
++#endif
+ }
+ 
+ int enif_consume_timeslice(ErlNifEnv* env, int percent)
+@@ -4753,6 +4770,13 @@ Eterm erts_load_nif(Process *c_p, ErtsCodePtr I, Eterm filename, Eterm args)
+             is_static = 1;
+         }
+     }
++#ifdef __EMSCRIPTEN__
++    if (!is_static) {
++        ret = load_nif_error(c_p, "load_failed",
++                             "Dynamic loading is not supported in browser");
++        goto error;
++    }
++#endif
+     this_mi = &module_p->curr;
+     prev_mi = &module_p->old;
+     if (in_area(caller, module_p->old.code_hdr, module_p->old.code_length)) {

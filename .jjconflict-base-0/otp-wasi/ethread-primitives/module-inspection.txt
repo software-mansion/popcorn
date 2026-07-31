@@ -1,0 +1,31 @@
+wasi-sdk-33.0 (clang 22.1.0), wasm-tools 1.245.1
+
+OTP sources
+- OTP 28.3.1 pthread ethread implementation, unchanged
+- ethr_aux.c, ethr_atomics.c, ethr_mutex.c, ethr_cbf.c
+- pthread/ethread.c, pthread/ethr_event.c
+
+Imports
+- env.memory: shared, minimum 2 pages, maximum 256 pages
+- experiment.progress: diagnostic phase callback
+- experiment.report: structured result callback
+- wasi_snapshot_preview1: fd_close, fd_seek, fd_write, proc_exit, random_get, sched_yield
+- wasi.thread-spawn: thread creation ABI
+
+Exports
+- _start
+- wasi_thread_start
+
+Artifacts
+- program.wasm: 460,972 bytes raw; 127,544 bytes Brotli-11; 154,763 bytes gzip-9
+- production host JavaScript: 5,262 bytes raw across three bundles
+
+Browser result
+- initialized: true
+- mutexCondition: true
+- event: true
+- atomics: 12
+- completed: 3
+- peakWorkers: 3
+- activeWorkers: 0
+- five serial repeat runs: passed

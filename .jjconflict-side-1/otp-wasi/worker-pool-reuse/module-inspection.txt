@@ -1,0 +1,15 @@
+wasi-sdk-33.0, wasm-tools 1.245.1
+
+Imports
+- env.memory: shared, minimum 2 pages, maximum 256 pages
+- experiment.report: structured result callback
+- wasi_snapshot_preview1: clock_time_get, fd_close, fd_seek, fd_write, proc_exit, sched_yield
+- wasi.thread-spawn: thread creation ABI
+
+Exports
+- _start
+- wasi_thread_start
+
+Artifacts
+- program.wasm: 218,139 bytes raw; 64,993 bytes Brotli-11; 77,411 bytes gzip-9
+- project-owned browser host: measured by `pnpm build`

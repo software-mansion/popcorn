@@ -1,0 +1,14 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# esbuild output and Playwright artifacts.
+/dist/
+/assets/dist/
+/assets/playwright-report/
+/assets/test-results/

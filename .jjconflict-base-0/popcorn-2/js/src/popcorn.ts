@@ -1,0 +1,522 @@
+import { IframeBridge } from "./bridge";
+import {
+  INIT_VM_TIMEOUT_MS,
+  HEARTBEAT_TIMEOUT_MS,
+  CALL_TIMEOUT_MS,
+  MAX_RELOAD_N,
+  MESSAGES,
+  EVENT_NAMES,
+} from "./types";
+import {
+  PopcornError,
+  PopcornInternalError,
+  throwError,
+  buildError,
+} from "./errors";
+
+import type { IframeBridgeArgs } from "./bridge";
+import type { IframeResponse, AnySerializable, ElixirEvent } from "./types";
+import type { PopcornErrorCode, PopcornInternalErrorCode } from "./errors";
+
+export { PopcornError, PopcornInternalError };
+export type { PopcornErrorCode, PopcornInternalErrorCode };
+
+/** Options for Popcorn.init() */
+export type PopcornInitOptions = {
+  /** DOM element to mount an iframe */
+  container?: HTMLElement;
+  /** Paths to compiled Elixir bundles (`.avm` files). */
+  bundlePaths?: string[];
+  /** Handler for stderr messages. */
+  onStderr?: (message: string) => void;
+  /** Handler for stdout messages. */
+  onStdout?: (message: string) => void;
+  /** Handler called when Popcorn reloads due to iframe crash */
+  onReload?: (reason: string) => void;
+  /** Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded. */
+  heartbeatTimeoutMs?: number;
+  /** Directory containing Wasm and scripts used inside iframe. */
+  wasmDir?: string;
+  /** Enable debug logging. */
+  debug?: boolean;
+};
+
+/** Options for cast method */
+export type CastOptions = {
+  /** Receiver process name. */
+  process?: string;
+};
+
+/** Options for call method */
+export type CallOptions = {
+  /** Registered Elixir process name. */
+  process?: string;
+  /** Timeout (in milliseconds) for the call */
+  timeoutMs?: number;
+};
+
+type CallResult =
+  | {
+      ok: true;
+      /** Serialized value returned from Elixir */
+      data: AnySerializable;
+      /** Amount of time it took to process the call */
+      durationMs: number;
+    }
+  | {
+      ok: false;
+      /** Error from failed call */
+      error: Error;
+      /** Amount of time it took to process the call */
+      durationMs: number;
+    };
+
+type LogType = "stdout" | "stderr";
+type LogListener = (message: string) => void;
+type LogListeners = Record<LogType, Set<LogListener>>;
+
+type CallData = {
+  acknowledged: boolean;
+  startTimeMs: number;
+  resolve: (result: CallResult) => void;
+};
+
+type MessageHandler = (eventName: string, payload: AnySerializable) => void;
+
+type State =
+  | { status: "uninitialized" }
+  | { status: "mount" }
+  | { status: "ready" }
+  | { status: "reload" }
+  | { status: "deinit" };
+
+const INIT_TOKEN = Symbol();
+const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
+
+/**
+ * Manages Elixir by setting up iframe, Wasm module, and event listeners. Used to sent messages to Elixir processes.
+ */
+export class Popcorn {
+  public heartbeatTimeoutMs: number | null = null;
+
+  private onReloadCallback: (reason: string) => void;
+
+  private bridge: IframeBridge | null = null;
+  private bridgeConfig: IframeBridgeArgs;
+  private debug = false;
+  private bundleURLs: string[];
+  private state: State = { status: "uninitialized" };
+  private defaultReceiver: string | null = null;
+
+  private requestId = 0;
+  private calls = new Map<number, CallData>();
+  private logListeners: LogListeners = {
+    stdout: new Set(),
+    stderr: new Set(),
+  };
+
+  private messageHandlers = new Set<MessageHandler>();
+  private mountResolve: (() => void) | null = null;
+  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reloadN = 0;
+
+  private constructor(
+    params: PopcornInitOptions & { container: HTMLElement },
+    token: symbol,
+  ) {
+    if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
+
+    const bundlePaths = params.bundlePaths ?? ["/bundle.avm"];
+    this.bundleURLs = bundlePaths.map((p) => new URL(p, import.meta.url).href);
+
+    this.onReloadCallback = params.onReload ?? noop;
+    this.debug = params.debug ?? false;
+
+    this.bridgeConfig = {
+      container: params.container,
+      script: { url: IFRAME_URL, entrypoint: "initVm" },
+      config: Object.fromEntries(
+        this.bundleURLs.map((url, i) => [`bundle-path-${i}`, url]),
+      ),
+      debug: true,
+      onMessage: this.iframeHandler.bind(this),
+    };
+
+    this.logListeners.stdout.add(params.onStdout ?? console.log);
+    this.logListeners.stderr.add(params.onStderr ?? console.warn);
+    this.heartbeatTimeoutMs = params.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+  }
+
+  /**
+   * Creates an iframe and sets up communication channels.
+   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
+   *
+   * @example
+   * import { Popcorn } from "@swmansion/popcorn";
+   * const popcorn = await Popcorn.init({
+   *   onStdout: console.log,
+   *   onStderr: console.error,
+   *   debug: true,
+   * });
+   */
+  static async init(options: PopcornInitOptions): Promise<Popcorn> {
+    const { container, ...constructorParams } = options;
+    const containerWithDefault = container ?? document.documentElement;
+
+    const bundlePaths =
+      constructorParams.bundlePaths && constructorParams.bundlePaths.length > 0
+        ? constructorParams.bundlePaths
+        : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
+
+    const popcorn = new Popcorn(
+      { ...constructorParams, bundlePaths, container: containerWithDefault },
+      INIT_TOKEN,
+    );
+    popcorn.trace("Main: init, params: ", { container, ...constructorParams });
+    await popcorn.mount();
+    return popcorn;
+  }
+
+  private async mount(): Promise<void> {
+    if (this.bridge !== null) throwError({ t: "already_mounted" });
+    this.assertStatus(["uninitialized", "reload"]);
+    this.transition({ status: "mount" });
+    this.trace("Main: mount, container: ", this.bridgeConfig.container);
+
+    this.bridge = new IframeBridge(this.bridgeConfig);
+
+    try {
+      const mountPromise = new Promise<void>((resolve) => {
+        this.mountResolve = resolve;
+      });
+
+      let initTimeout: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        mountPromise,
+        new Promise<never>((_, reject) => {
+          initTimeout = setTimeout(
+            () => reject(buildError({ t: "app_ready_timeout" })),
+            INIT_VM_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      clearTimeout(initTimeout);
+
+      this.transition({ status: "ready" });
+      this.trace("Main: mounted");
+      this.onHeartbeat();
+    } catch (error) {
+      this.deinit();
+      throw error;
+    }
+  }
+
+  /**
+   * Sends a message to an Elixir process and awaits for the response.
+   *
+   * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
+   *
+   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Throws "Unspecified target process" if default process is not set and no process is specified.
+   *
+   * @example
+   * const result = await popcorn.call(
+   *   { action: "get_user", id: 123 },
+   *   { process: "user_server", timeoutMs: 5_000 },
+   * );
+   * console.log(result.data); // Deserialized Elixir response
+   * console.log(result.durationMs); // Entire call duration
+   */
+  async call(
+    args: AnySerializable,
+    { process, timeoutMs }: CallOptions = {},
+  ): Promise<CallResult> {
+    this.assertStatus(["ready"]);
+    const targetProcess = process ?? this.defaultReceiver;
+    if (targetProcess === null) throwError({ t: "bad_target" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
+
+    const requestId = this.requestId++;
+    const startTimeMs = performance.now();
+    const callPromise = new Promise<CallResult>((resolve) => {
+      this.calls.set(requestId, { acknowledged: false, startTimeMs, resolve });
+    });
+
+    this.trace("Main: call: ", { requestId, process, args });
+    this.bridge.sendIframeRequest({
+      type: MESSAGES.CALL,
+      value: { requestId, process: targetProcess, args },
+    });
+
+    const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
+    this.calls.delete(requestId);
+    return result;
+  }
+
+  /**
+   * Sends a message to an Elixir process (default or from options) and returns immediately.
+   *
+   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Throws "Unspecified target process" if default process is not set and no process is specified.
+   */
+  cast(args: AnySerializable, { process }: CastOptions = {}): void {
+    this.assertStatus(["ready"]);
+    const targetProcess = process ?? this.defaultReceiver;
+    if (targetProcess === null) throwError({ t: "bad_target" });
+    if (this.bridge === null) throwError({ t: "unmounted" });
+
+    const requestId = this.requestId++;
+    this.trace("Main: cast: ", { requestId, process, args });
+    this.bridge.sendIframeRequest({
+      type: MESSAGES.CAST,
+      value: { requestId, process: targetProcess, args },
+    });
+  }
+
+  /**
+   * Destroys an iframe and resets the instance.
+   */
+  deinit() {
+    if (this.bridge === null) throwError({ t: "unmounted" });
+    this.trace("Main: deinit");
+    this.transition({ status: "deinit" });
+    this.teardownBridge("deinitialized");
+    this.logListeners.stdout.clear();
+    this.logListeners.stderr.clear();
+    this.messageHandlers.clear();
+  }
+
+  private teardownBridge(errorCode: "deinitialized" | "reload") {
+    if (this.bridge) {
+      this.bridge.deinit();
+      this.bridge = null;
+    }
+    this.mountResolve = null;
+    this.defaultReceiver = null;
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+    for (const callData of this.calls.values()) {
+      const durationMs = performance.now() - callData.startTimeMs;
+      callData.resolve({
+        ok: false,
+        error: new PopcornError(errorCode),
+        durationMs,
+      });
+    }
+    this.calls.clear();
+  }
+
+  /**
+   * Registers a log listener that will be called when output of the specified type is received.
+   */
+  registerLogListener(listener: LogListener, type: LogType): void {
+    this.logListeners[type].add(listener);
+  }
+
+  /**
+   * Unregisters a previously registered log listener.
+   */
+  unregisterLogListener(listener: LogListener, type: LogType): void {
+    this.logListeners[type].delete(listener);
+  }
+
+  private notifyLogListeners(type: LogType, message: string): void {
+    this.logListeners[type].forEach((listener) => {
+      listener(message);
+    });
+  }
+
+  /**
+   * Registers a catch-all event handler. Returns an unsubscribe function.
+   */
+  onMessage(handler: MessageHandler): () => void {
+    this.messageHandlers.add(handler);
+    return () => {
+      this.messageHandlers.delete(handler);
+    };
+  }
+
+  private onEvent({ eventName, payload }: ElixirEvent): void {
+    if (eventName.startsWith("popcorn")) {
+      if (eventName === EVENT_NAMES.ELIXIR_READY) {
+        this.trace("Main: elixir VM ready");
+      } else if (eventName === EVENT_NAMES.APP_READY) {
+        this.defaultReceiver = payload.name;
+        this.mountResolve?.();
+        this.mountResolve = null;
+      } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
+        this.defaultReceiver = payload.name;
+      } else {
+        this.trace("Unknown internal event:", eventName);
+      }
+      return;
+    }
+
+    this.messageHandlers.forEach((handler) => {
+      try {
+        handler(eventName, payload);
+      } catch (error) {
+        console.error(`Error in onMessage handler for '${eventName}':`, error);
+      }
+    });
+  }
+
+  private iframeHandler(data: IframeResponse) {
+    if (data.type === MESSAGES.EVENT) {
+      this.onEvent(data.value);
+    } else if (data.type === MESSAGES.STDOUT) {
+      this.notifyLogListeners("stdout", data.value);
+    } else if (data.type === MESSAGES.STDERR) {
+      this.notifyLogListeners("stderr", data.value);
+    } else if (data.type === MESSAGES.CALL) {
+      this.onCall(data.value);
+    } else if (data.type === MESSAGES.CALL_ACK) {
+      this.onCallAck(data.value);
+    } else if (data.type === MESSAGES.HEARTBEAT) {
+      this.onHeartbeat();
+    } else if (data.type === MESSAGES.RELOAD) {
+      this.reloadIframe();
+    } else {
+      throwError({ t: "assert" });
+    }
+  }
+
+  private onCallAck({ requestId }: { requestId: number }): void {
+    this.assertStatus(["ready"]);
+    this.trace("Main: onCallAck: ", { requestId });
+    const callData = this.calls.get(requestId);
+    if (callData === undefined) throwError({ t: "bad_ack" });
+
+    this.calls.set(requestId, { ...callData, acknowledged: true });
+  }
+
+  private onCall({
+    requestId,
+    error,
+    data,
+  }: {
+    requestId: number;
+    error?: AnySerializable;
+    data?: AnySerializable;
+  }): void {
+    this.assertStatus(["ready"]);
+    this.trace("Main: onCall: ", { requestId, error, data });
+    const callData = this.calls.get(requestId);
+    if (callData === undefined) throwError({ t: "bad_call" });
+    if (!callData.acknowledged) throwError({ t: "no_acked_call" });
+
+    this.calls.delete(requestId);
+
+    const durationMs = performance.now() - callData.startTimeMs;
+    if (error !== undefined) {
+      callData.resolve({ ok: false, error, durationMs });
+    } else {
+      callData.resolve({ ok: true, data, durationMs });
+    }
+  }
+
+  private onHeartbeat(): void {
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+    }
+    this.heartbeatTimeout = setTimeout(() => {
+      this.trace("Main: heartbeat lost");
+      this.reloadIframe("heartbeat_lost");
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    }, this.heartbeatTimeoutMs!);
+  }
+
+  private reloadIframe(reason = "other"): void {
+    if (this.bridge === null) {
+      throwError({ t: "unmounted" });
+    }
+
+    if (document.hidden) {
+      this.trace("Main: reloading iframe skipped, window not visible");
+      return;
+    }
+
+    this.reloadN++;
+    if (this.reloadN > MAX_RELOAD_N) {
+      this.trace("Main: exceeded max reload number");
+      return;
+    }
+
+    this.trace("Main: reloading iframe");
+    this.transition({ status: "reload" });
+    this.teardownBridge("reload");
+    this.onReloadCallback(reason);
+    this.mount();
+  }
+
+  trace(...messages: unknown[]): void {
+    if (this.debug) {
+      console.debug(...messages);
+    }
+  }
+
+  private transition(to: State): void {
+    this.trace(`State: ${this.state.status} -> ${to.status}`);
+    this.state = to;
+  }
+
+  private assertStatus(validStatuses: State["status"][]): void {
+    const currentStatus = this.state.status;
+    if (!validStatuses.includes(currentStatus)) {
+      throwError({
+        t: "bad_status",
+        status: currentStatus,
+        expectedStatus: validStatuses.join(" | "),
+      });
+    }
+  }
+}
+
+async function withTimeout(
+  promise: Promise<CallResult>,
+  ms: number,
+): Promise<CallResult> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<CallResult>((resolve) => {
+    timeout = setTimeout(() => {
+      resolve({
+        ok: false,
+        error: new PopcornError("timeout"),
+        durationMs: ms,
+      });
+    }, ms);
+  });
+
+  const result = await Promise.race([promise, timeoutPromise]);
+
+  if (!timeout) throwError({ t: "assert" });
+  clearTimeout(timeout);
+  return result;
+}
+
+function noop() {
+  /* noop */
+}
+
+async function resolveBundleURL(
+  primary: string,
+  fallback: string,
+): Promise<string> {
+  const fetchBundle = async (path: string): Promise<string> => {
+    const url = new URL(path, import.meta.url).href;
+    const response = await fetch(url, { method: "HEAD" });
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (!response.ok || contentType.includes("text/html")) {
+      throw new Error(`Bundle not found at "${path}"`);
+    }
+    return path;
+  };
+
+  try {
+    return await Promise.any([fetchBundle(primary), fetchBundle(fallback)]);
+  } catch {
+    throwError({ t: "bundle_not_found", primary, fallback });
+  }
+}
