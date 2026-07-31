@@ -978,7 +978,7 @@ class LLVEngine {
             url: window.location.href,
             urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
             assigns: pop_view_el.getAttribute("data-pop-assigns"),
-            mirrorId: mirrorId
+            mirrorId: mirrorId,
         });
         // A rejected call resolves with ok: false (it does not throw). Bail on
         // failed or duplicate creates — wiring a fake view without a live
@@ -1104,7 +1104,6 @@ class LLVEngine {
         if (!el.dataset.popMirrorToken)
             return;
         const llvId = el.id;
-        console.log(el);
         const channel = this.llvMirrorSocket.channel(`llv:${mirrorId}`, {
             view: el.dataset.popView,
             token: el.dataset.popMirrorToken,
