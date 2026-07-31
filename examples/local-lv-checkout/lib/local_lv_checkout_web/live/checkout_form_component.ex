@@ -4,7 +4,7 @@ defmodule LocalLvCheckoutWeb.Live.CheckoutFormComponent do
   def render(assigns) do
     ~H"""
     <div>
-      <.local_live_view id={@llv_id} view="CheckoutLive" />
+      <.local_live_view view="CheckoutLive" />
     </div>
     """
   end

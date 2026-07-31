@@ -4,7 +4,7 @@ defmodule FormDemoWeb.FormDemoLive do
   def render(assigns) do
     ~H"""
     <div class="centered-div">
-      <.local_live_view id={"form-demo-local-#{@socket.id}"} view="FormDemoLocal" endpoint={@socket.endpoint} />
+      <.local_live_view view="FormDemoLocal" />
       <div class="bordered">
         <h1>[Server Runtime] User List:</h1>
         <ul>
@@ -19,9 +19,9 @@ defmodule FormDemoWeb.FormDemoLive do
 
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      llv_id = "form-demo-local-#{socket.id}"
-      Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal:#{llv_id}")
-      users = LocalLiveView.Channel.get_mirror_assigns(llv_id) |> Map.get("users", [])
+      mirror_id = LocalLiveView.Component.mirror_id(socket, "llv-FormDemoLocal")
+      Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal:#{mirror_id}")
+      users = LocalLiveView.Channel.get_mirror_assigns(mirror_id) |> Map.get("users", [])
       {:ok, assign(socket, users: users)}
     else
       {:ok, assign(socket, users: [])}

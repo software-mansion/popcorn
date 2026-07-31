@@ -99,7 +99,7 @@ defmodule LocalLiveView.Dispatcher do
     view = String.to_atom("Elixir." <> Map.fetch!(msg, "view"))
 
     params =
-      Map.take(msg, ~w"id assigns url url_params")
+      Map.take(msg, ~w"id assigns url url_params mirror_id")
       |> Map.put("session", %Session{view: view})
       |> Map.update!("assigns", &parse_assigns/1)
 

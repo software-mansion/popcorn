@@ -32,6 +32,7 @@ interface CreateArgs {
     url: string;
     urlParams: Record<string, string>;
     assigns: string;
+    mirrorId: string | undefined;
 }
 declare class PopcornClient {
     private popcorn;
@@ -39,7 +40,7 @@ declare class PopcornClient {
     attach(popcorn: Popcorn): void;
     private call;
     private fire;
-    create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult>;
+    create({ id, view, url, urlParams, assigns, mirrorId }: CreateArgs): Promise<CallResult>;
     destroy(id: string): void;
     reconnected(id: string): void;
     updateAssigns(id: string, assigns: string): void;
@@ -58,6 +59,7 @@ declare class LLVEngine {
     private bufferedServerMessages;
     private eventBusHooks;
     private popcornLink;
+    private llvMirrorSocket;
     private constructor();
     /**
      * Initializes LLVEngine and connects the LiveSocket.
@@ -74,7 +76,9 @@ declare class LLVEngine {
     private registerHooks;
     private bindFormsIfHostless;
     private bootPopcorn;
-    private setupMirrorChannels;
+    private setupMirrorSync;
+    private maybeSetupMirrorChannel;
+    private setupMirrorSocket;
     private exposeGlobals;
     private patchOwner;
     private scanAndMount;

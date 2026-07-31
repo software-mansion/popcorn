@@ -10,8 +10,8 @@ defmodule LocalLiveView.Mirror do
     use LocalLiveView.Mirror
 
     @impl true
-    def handle_sync(local_assigns, _mirror_assigns, %{llv_id: llv_id}) do
-      Phoenix.PubSub.broadcast(MyApp.PubSub, "llv_mirror:MyLive:#{llv_id}", {:llv_attrs, local_assigns})
+    def handle_sync(local_assigns, _mirror_assigns, %{mirror_id: mirror_id}) do
+      Phoenix.PubSub.broadcast(MyApp.PubSub, "llv_mirror:MyLive:#{mirror_id}", {:llv_attrs, local_assigns})
       {:ok, local_assigns}
     end
   end

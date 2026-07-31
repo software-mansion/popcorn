@@ -29,6 +29,14 @@ interface CreateArgs {
   url: string;
   urlParams: Record<string, string>;
   assigns: string;
+  mirrorId: string | undefined;
+}
+
+interface MirrorChannelOptions {
+  mirrorId?: string;
+  llvId: string;
+  popView?: string;
+  popMirrorToken?: string;
 }
 
 class PopcornClient {
@@ -58,7 +66,7 @@ class PopcornClient {
     );
   }
 
-  create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult> {
+  create({ id, view, url, urlParams, assigns, mirrorId }: CreateArgs): Promise<CallResult> {
     return this.call({
       action: "create",
       id,
@@ -66,6 +74,7 @@ class PopcornClient {
       url,
       url_params: urlParams,
       assigns,
+      mirror_id: mirrorId,
     });
   }
 
@@ -119,6 +128,7 @@ export class LLVEngine {
   // by __llvPushServer.
   private eventBusHooks = new Map<string, EventBusHook>();
   private popcornLink!: PopcornLink;
+  private llvMirrorSocket: PhoenixSocket | undefined = undefined;
 
   private constructor(socket: LLVSocket, config: LLVConfig) {
     this.socket = socket;
@@ -147,7 +157,7 @@ export class LLVEngine {
 
     await engine.bootPopcorn();
 
-    engine.setupMirrorChannels();
+    engine.setupMirrorSync();
     engine.exposeGlobals();
     engine.patchOwner();
     registerCustomEventBindings(engine.socket);
@@ -172,6 +182,10 @@ export class LLVEngine {
   // Start a view and wire it up.
   private async mountView(pop_view_el: HTMLElement): Promise<void> {
     const llvId = pop_view_el.id;
+    const mirrorId = pop_view_el.dataset.popMirrorId;
+    const popView = pop_view_el.dataset.popView;
+    const popMirrorToken = pop_view_el.dataset.popMirrorToken;
+    this.maybeSetupMirrorChannel({ mirrorId, llvId, popView, popMirrorToken });
     if (this.views.has(llvId)) return;
     const result = await this.pop.create({
       id: llvId,
@@ -179,6 +193,7 @@ export class LLVEngine {
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
       assigns: pop_view_el.getAttribute("data-pop-assigns")!,
+      mirrorId: mirrorId,
     });
     // A rejected call resolves with ok: false (it does not throw). Bail on
     // failed or duplicate creates — wiring a fake view without a live
@@ -289,12 +304,39 @@ export class LLVEngine {
   }
 
   // Mirror channels: only created for views with a server-side Mirror module.
-  private setupMirrorChannels(): void {
-    const mirrorEls = document.querySelectorAll<HTMLElement>(
-      "[data-pop-view][data-pop-mirror-token]",
-    );
-    if (mirrorEls.length === 0) return;
+  private setupMirrorSync(): void {
+    window.__llvSync = (mirror_id: string, eventName: string, payload: Record<string, unknown>) => {
+      const channel = this.channels[mirror_id];
+      if (channel) {
+        channel.push(eventName, payload);
+      }
+    };
+  }
 
+  private maybeSetupMirrorChannel({
+    mirrorId,
+    llvId,
+    popView,
+    popMirrorToken,
+  }: MirrorChannelOptions): void {
+    if (!mirrorId || this.channels[mirrorId] || !popMirrorToken) return;
+    const socket = this.llvMirrorSocket ?? this.setupMirrorSocket();
+    const channel = socket.channel(`llv:${mirrorId}`, {
+      view: popView,
+      token: popMirrorToken,
+    });
+    this.channels[mirrorId] = channel;
+    channel
+      .join()
+      .receive("ok", () => {
+        if (this.views.has(llvId)) {
+          this.pop.reconnected(llvId);
+        }
+      })
+      .receive("error", (err: unknown) => console.error("LLV channel join error", err));
+  }
+
+  private setupMirrorSocket(): PhoenixSocket {
     const Socket = this.socketClass();
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
 
@@ -302,31 +344,8 @@ export class LLVEngine {
       params: { _csrf_token: csrfToken },
     });
     llvSocket.connect();
-
-    mirrorEls.forEach((el) => {
-      const llvId = el.id;
-      const channel = llvSocket.channel(`llv:${llvId}`, {
-        view: el.dataset.popView,
-        token: el.dataset.popMirrorToken,
-      });
-      this.channels[llvId] = channel;
-
-      channel
-        .join()
-        .receive("ok", () => {
-          if (this.views.has(llvId)) {
-            this.pop.reconnected(llvId);
-          }
-        })
-        .receive("error", (err: unknown) => console.error("LLV channel join error", err));
-    });
-
-    window.__llvSync = (id: string, eventName: string, payload: Record<string, unknown>) => {
-      const channel = this.channels[id];
-      if (channel) {
-        channel.push(eventName, payload);
-      }
-    };
+    this.llvMirrorSocket = llvSocket;
+    return llvSocket;
   }
 
   private exposeGlobals(): void {

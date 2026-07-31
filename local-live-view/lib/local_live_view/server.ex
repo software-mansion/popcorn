@@ -567,6 +567,7 @@ defmodule LocalLiveView.Server do
 
     initial_assigns = params["assigns"]
     llv_id = params["id"]
+    mirror_id = params["mirror_id"]
 
     socket = %Socket{
       view: view
@@ -576,6 +577,11 @@ defmodule LocalLiveView.Server do
 
     case mount_private(verified, params, nil, lifecycle) do
       {:ok, mount_priv} ->
+        mount_priv =
+          mount_priv
+          |> Map.put(:llv_id, llv_id)
+          |> Map.put(:mirror_id, mirror_id)
+
         socket = %{
           socket
           | id: "phx-",
