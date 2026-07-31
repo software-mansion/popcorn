@@ -113,6 +113,70 @@ test.describe("boot", () => {
   });
 });
 
+test.describe("runtime", () => {
+  test("spawning OS processes don't kill the VM", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+        Ticker = spawn(fun Tick() ->
+          receive
+            {ticks, From} -> From ! {ticks, get(ticks)}
+          after 20 ->
+            put(ticks, case get(ticks) of undefined -> 1; N -> N + 1 end),
+            Tick()
+          end
+        end),
+
+        Fmt = fun(Term) -> iolist_to_binary(io_lib:format("~p", [Term])) end,
+        Raises = fun(Fun) ->
+          Fmt(try Fun() of Value -> {ok, Value}
+              catch Class:Reason -> {Class, Reason}
+              end)
+        end,
+
+        ok = file:write_file("/tmp/executable", <<"code">>),
+        ok = file:change_mode("/tmp/executable", 8#755),
+
+        ok = wasm:send(#{
+          lookup => Fmt(inet_db:res_option(lookup)),
+          getaddr => Fmt(inet:getaddr("example.com", inet)),
+          gethostbyname => Fmt(inet:gethostbyname("example.com")),
+          loopback => Fmt(inet:getaddr({127,0,0,1}, inet)),
+          cmd => Raises(fun() -> os:cmd("echo hi") end),
+          spawn_port => Raises(fun() -> open_port({spawn, "echo hi"}, []) end),
+          spawn_executable =>
+            Raises(fun() -> open_port({spawn_executable, "/tmp/executable"}, []) end),
+          find_executable => os:find_executable("echo"),
+          ram_file => element(1, ram_file:open("x", [read, write, ram]))
+        }),
+
+        receive after 300 -> ok end,
+        Ticker ! {ticks, self()},
+        receive {ticks, Ticks} -> ok = wasm:send(#{ticks => Ticks}) end.
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("lookup")).toEqual({
+      // `native` would spawn /bin/inet_gethost and halt the VM
+      lookup: "[file]",
+      getaddr: "{error,nxdomain}",
+      gethostbyname: "{error,nxdomain}",
+      loopback: "{ok,{127,0,0,1}}",
+      cmd: "{error,badarg}",
+      spawn_port: "{error,badarg}",
+      spawn_executable: "{error,badarg}",
+      find_executable: false,
+      // A linked-in driver opened with the {spawn, _} tag works
+      ram_file: "ok",
+    });
+
+    // Other processes keep working, failure would be getting `undefined` atom
+    expect(await otp.waitForEvent("ticks")).toEqual({
+      ticks: expect.any(Number),
+    });
+  });
+});
+
 test.describe("lifecycle", () => {
   test("TTY output", async ({ page }) => {
     const result = await page.evaluate(async () => {
