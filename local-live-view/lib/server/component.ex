@@ -75,14 +75,24 @@ defmodule LocalLiveView.Component do
     @impl true
     def update(assigns, socket) do
       view = assigns[:view]
-      mirror_id = LLVComponent.mirror_id(socket, assigns.id)
+
+      mirror_id =
+        case socket.assigns[:mirror_id] do
+          nil -> LLVComponent.mirror_id(socket, assigns.id)
+          mirror_id -> mirror_id
+        end
 
       mirror_token =
-        if Phoenix.LiveView.connected?(socket) do
-          endpoint = socket.endpoint || LLVComponent.resolve_default_endpoint()
-          LocalLiveView.MirrorToken.sign(endpoint, view, mirror_id)
-        else
-          nil
+        cond do
+          token = socket.assigns[:mirror_token] ->
+            token
+
+          Phoenix.LiveView.connected?(socket) ->
+            endpoint = socket.endpoint || LLVComponent.resolve_default_endpoint()
+            LocalLiveView.MirrorToken.sign(endpoint, view, mirror_id)
+
+          true ->
+            nil
         end
 
       comp_assings = LLVComponent.comp_assigns(assigns)
@@ -172,13 +182,13 @@ defmodule LocalLiveView.Component do
       # Default ID derived from view name:
       mirror_id = LocalLiveView.Component.mirror_id(socket, "llv-Cart")
   """
-  @spec mirror_id(%Phoenix.LiveView.Socket{id: String.t()}, String.t()) :: String.t()
-  def mirror_id(%Phoenix.LiveView.Socket{id: socket_id}, view_or_id) do
-    mirror_id(socket_id, view_or_id)
+  @spec mirror_id(Phoenix.LiveView.Socket.t(), String.t()) :: String.t()
+  def mirror_id(%Phoenix.LiveView.Socket{id: socket_id}, id) do
+    mirror_id(socket_id, id)
   end
 
-  def mirror_id(socket_id, view_or_id) when is_binary(socket_id) and is_binary(view_or_id) do
-    socket_id <> "-" <> view_or_id
+  def mirror_id(socket_id, id) when is_binary(socket_id) and is_binary(id) do
+    socket_id <> "-" <> id
   end
 
   defp default_id(name) when is_binary(name) do
