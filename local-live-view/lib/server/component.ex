@@ -170,7 +170,7 @@ defmodule LocalLiveView.Component do
       mirror_id = LocalLiveView.Component.mirror_id(socket, "my-custom-cart")
 
       # Default ID derived from view name:
-      mirror_id = LocalLiveView.Component.mirror_id(socket, "Cart")
+      mirror_id = LocalLiveView.Component.mirror_id(socket, "llv-Cart")
   """
   @spec mirror_id(%Phoenix.LiveView.Socket{id: String.t()}, String.t()) :: String.t()
   def mirror_id(%Phoenix.LiveView.Socket{id: socket_id}, view_or_id) do

@@ -29,6 +29,7 @@ interface CreateArgs {
   url: string;
   urlParams: Record<string, string>;
   assigns: string;
+  mirrorId: string | undefined;
 }
 
 class PopcornClient {
@@ -58,7 +59,7 @@ class PopcornClient {
     );
   }
 
-  create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult> {
+  create({ id, view, url, urlParams, assigns, mirrorId }: CreateArgs): Promise<CallResult> {
     return this.call({
       action: "create",
       id,
@@ -66,6 +67,7 @@ class PopcornClient {
       url,
       url_params: urlParams,
       assigns,
+      mirror_id: mirrorId,
     });
   }
 
@@ -75,14 +77,6 @@ class PopcornClient {
 
   reconnected(id: string): void {
     this.fire("reconnect sync", { action: "reconnected", id, payload: {} });
-  }
-
-  connectMirror(id: string, mirror_id: string): void {
-    this.fire("connect mirror", {
-      action: "connect_mirror",
-      id,
-      payload: { mirror_id: mirror_id },
-    });
   }
 
   updateAssigns(id: string, assigns: string): void {
@@ -190,6 +184,8 @@ export class LLVEngine {
   // Start a view and wire it up.
   private async mountView(pop_view_el: HTMLElement): Promise<void> {
     const llvId = pop_view_el.id;
+    const mirrorId = pop_view_el.dataset.popMirrorId;
+    this.maybeSetupMirrorChannel(pop_view_el);
     if (this.views.has(llvId)) return;
     const result = await this.pop.create({
       id: llvId,
@@ -197,6 +193,7 @@ export class LLVEngine {
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
       assigns: pop_view_el.getAttribute("data-pop-assigns")!,
+      mirrorId: mirrorId
     });
     // A rejected call resolves with ok: false (it does not throw). Bail on
     // failed or duplicate creates — wiring a fake view without a live
@@ -207,7 +204,6 @@ export class LLVEngine {
     }
     const liveEl = document.getElementById(llvId);
     if (liveEl?.matches("[data-pop-view]")) {
-      this.maybeSetupMirrorChannel(liveEl);
       setupFakeView(this.socket, this.views, this.popcornLink.socket, liveEl);
     } else {
       this.pop.destroy(llvId);
@@ -322,14 +318,15 @@ export class LLVEngine {
   private maybeSetupMirrorChannel(el: HTMLElement): void {
     const mirrorId = el.dataset.popMirrorId;
     if (!mirrorId || (mirrorId && this.channels[mirrorId])) return;
+    if (!el.dataset.popMirrorToken) return;
     const llvId = el.id;
+    console.log(el)
     const channel = this.llvMirrorSocket.channel(`llv:${mirrorId}`, {
       view: el.dataset.popView,
       token: el.dataset.popMirrorToken,
     });
     if (typeof mirrorId === "string") {
       this.channels[mirrorId] = channel;
-      this.pop.connectMirror(llvId, mirrorId);
     }
     channel
       .join()

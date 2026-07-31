@@ -32,6 +32,7 @@ interface CreateArgs {
     url: string;
     urlParams: Record<string, string>;
     assigns: string;
+    mirrorId: string | undefined;
 }
 declare class PopcornClient {
     private popcorn;
@@ -39,10 +40,9 @@ declare class PopcornClient {
     attach(popcorn: Popcorn): void;
     private call;
     private fire;
-    create({ id, view, url, urlParams, assigns }: CreateArgs): Promise<CallResult>;
+    create({ id, view, url, urlParams, assigns, mirrorId }: CreateArgs): Promise<CallResult>;
     destroy(id: string): void;
     reconnected(id: string): void;
-    connectMirror(id: string, mirror_id: string): void;
     updateAssigns(id: string, assigns: string): void;
     handleParams(id: string, params: Record<string, string>, url: string): void;
     handleTransportFrame(id: string, event: string, payload: unknown): Promise<CallResult>;
