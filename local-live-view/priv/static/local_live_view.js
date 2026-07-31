@@ -1090,7 +1090,7 @@ class LLVEngine {
             }
         };
     }
-    maybeSetupMirrorChannel({ mirrorId, llvId, popView, popMirrorToken }) {
+    maybeSetupMirrorChannel({ mirrorId, llvId, popView, popMirrorToken, }) {
         if (!mirrorId || this.channels[mirrorId] || !popMirrorToken)
             return;
         const socket = this.llvMirrorSocket ?? this.setupMirrorSocket();

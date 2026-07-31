@@ -185,7 +185,7 @@ export class LLVEngine {
     const mirrorId = pop_view_el.dataset.popMirrorId;
     const popView = pop_view_el.dataset.popView;
     const popMirrorToken = pop_view_el.dataset.popMirrorToken;
-    this.maybeSetupMirrorChannel({mirrorId, llvId, popView, popMirrorToken});
+    this.maybeSetupMirrorChannel({ mirrorId, llvId, popView, popMirrorToken });
     if (this.views.has(llvId)) return;
     const result = await this.pop.create({
       id: llvId,
@@ -313,7 +313,12 @@ export class LLVEngine {
     };
   }
 
-  private maybeSetupMirrorChannel({ mirrorId, llvId, popView, popMirrorToken }: MirrorChannelOptions): void {
+  private maybeSetupMirrorChannel({
+    mirrorId,
+    llvId,
+    popView,
+    popMirrorToken,
+  }: MirrorChannelOptions): void {
     if (!mirrorId || this.channels[mirrorId] || !popMirrorToken) return;
     const socket = this.llvMirrorSocket ?? this.setupMirrorSocket();
     const channel = socket.channel(`llv:${mirrorId}`, {
