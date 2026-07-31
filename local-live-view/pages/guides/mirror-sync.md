@@ -18,15 +18,15 @@ Browser                          Server
 │  MyLocal            │          │  Mirror.MyLocal           │
 │  handle_event(...)  │          │  handle_sync(             │
 │    mirror_sync(     │──sync───▶│    local_assigns,         │
-│      socket,        │          │    mirror_assigns         │
-│      [:count]       │          │  )                        │
-│    )                │          └───────────────────────────┘
-└─────────────────────┘
+│      socket,        │          │    mirror_assigns,        │ 
+│      [:count]       │          │    params                 │
+│    )                │          │  )                        │
+└─────────────────────┘          └───────────────────────────┘
 ```
 
 1. Your LocalLiveView calls `mirror_sync/2` with the socket and a list of assign keys.
 2. The JS bridge sends those assigns to the server over a Phoenix Channel.
-3. The server finds `Mirror.<ViewName>` and calls its `handle_sync/2` callback.
+3. The server finds `Mirror.<ViewName>` and calls its `handle_sync/3` callback.
 
 ## Setting up mirror sync
 
@@ -67,7 +67,7 @@ defmodule Mirror.MyLocal do
   use LocalLiveView.Mirror
 
   @impl true
-  def handle_sync(local_assigns, _mirror_assigns) do
+  def handle_sync(local_assigns, _mirror_assigns, _params) do
     {:ok, local_assigns}
   end
 end
@@ -75,9 +75,10 @@ end
 
 The module must be named `Mirror.<ViewName>` — the view name is the last part of your LocalLiveView module name. `LocalLiveView.Component` auto-detects the mirror module and enables the sync channel when rendering the mount point.
 
-`handle_sync/2` receives:
+`handle_sync/3` receives:
 - `local_assigns` — a map of the synced assigns (keys are strings)
 - `mirror_assigns` — the mirror's current state (what was returned from the previous `handle_sync` call)
+- `params` - a map containing its mirror_id (mirror_id is a composition of parent LV socket id and a LLV dom element id which are assembled via `LocalLiveView.Component.mirror_id/2` function)
 
 It must return `{:ok, new_mirror_assigns}`.
 
@@ -121,7 +122,7 @@ end
 
 ## Mirror assigns and conflict resolution
 
-`handle_sync/2` can return different assigns than it received — this is useful when you want the mirror to store derived or enriched state:
+`handle_sync/3` can return different assigns than it received — this is useful when you want the mirror to store derived or enriched state:
 
 ```elixir
 def handle_sync(%{"count" => count} = local_assigns, mirror_assigns) do
