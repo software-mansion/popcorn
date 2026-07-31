@@ -42,31 +42,25 @@ The installer configures your project automatically:
 | Registers `LocalLiveView.ChannelRegistry` | `lib/<app>/application.ex` |
 | Imports `LocalLiveView.Component` | `lib/*_web.ex` (html_helpers) |
 | Changes app.js script tag to `type="module"` | `lib/*_web/components/layouts/root.html.heex` |
-| Adds `setup` call for the JS bridge | `assets/js/app.js` |
+| Adds `LLVEngine.create` call for the JS bridge | `assets/js/app.js` |
 | Adds `local_live_view` JS package | `assets/package.json` |
 | Replaces esbuild watcher with `build.mjs` | `mix.exs`, `config/dev.exs` |
 | Generates the `local/` WASM project | `local/` |
 
 > **Manual fallback:** If the installer can't find a file (e.g. your project has a non-standard structure), it prints the exact snippet to add manually.
 
-## Step 3 — Install JS dependencies
+## Step 3 — Setup project
 
 ```bash
-pnpm install
-# or: npm install --prefix assets
+mix setup
 ```
 
-## Step 4 — Build the WASM bundle
-
-```bash
-mix llv.build
-```
+The installer already added `llv.build` to the `setup` alias in `mix.exs`. `llv.build` creates popcorn runtime for browser-side elixir.
 
 This compiles your `local/` project to a WASM bundle at `priv/static/assets/js/wasm/bundle.avm`.
 
-To build automatically as part of `mix setup`, the installer already adds `llv.build` to the `setup` alias in `mix.exs`.
 
-## Step 5 — Start the server
+## Step 4 — Start the server
 
 ```bash
 mix phx.server
