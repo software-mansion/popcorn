@@ -171,7 +171,7 @@ defmodule LocalLiveView.Component do
   within a parent LiveView process.
 
   Accepts the parent `socket` (or directly its `socket.id`), and either:
-  * a view module name / string (calculates the default DOM ID)
+  * a default ID derived from view name
   * an explicit custom DOM ID provided to `<.local_live_view id="..." />`
 
   ## Examples

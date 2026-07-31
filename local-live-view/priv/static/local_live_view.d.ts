@@ -78,6 +78,7 @@ declare class LLVEngine {
     private bootPopcorn;
     private setupMirrorSync;
     private maybeSetupMirrorChannel;
+    private setupMirrorSocket;
     private exposeGlobals;
     private patchOwner;
     private scanAndMount;

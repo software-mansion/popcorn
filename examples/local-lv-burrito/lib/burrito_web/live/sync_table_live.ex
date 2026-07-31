@@ -18,16 +18,14 @@ defmodule BurritoWeb.Live.SyncTableLive do
 
   def mount(_params, %{"llv_rendering_socket_id" => llv_rendering_socket_id}, socket) do
     attrs =
-      case connected?(socket) do
-        true ->
-          mirror_id =
-            LocalLiveView.Component.mirror_id(llv_rendering_socket_id, "llv-BurritoLive")
+      if connected?(socket) do
+        mirror_id =
+          LocalLiveView.Component.mirror_id(llv_rendering_socket_id, "llv-BurritoLive")
 
-          Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{mirror_id}")
-          LocalLiveView.Channel.get_mirror_assigns(mirror_id)
-
-        false ->
-          %{}
+        Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{mirror_id}")
+        LocalLiveView.Channel.get_mirror_assigns(mirror_id)
+      else
+        %{}
       end
 
     {:ok, apply_attrs(socket, attrs)}
