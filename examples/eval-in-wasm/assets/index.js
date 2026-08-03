@@ -44,12 +44,13 @@ const Elements = {
 };
 
 async function setup() {
-  const popcorn = await Popcorn.init({
-    debug: true,
-    bundlePaths: ["/wasm/bundle.avm"],
+  const result = await Popcorn.init({
+    beam: { manifestUrl: "/assets/otp/manifest.json" },
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
+  if (!result.ok) throw result.error;
+  const popcorn = result.data;
 
   Elements.exampleButtons.forEach((button) => {
     button.onclick = () => {
@@ -77,6 +78,8 @@ async function setup() {
     button.onclick = evalCode;
     input.addEventListener("keydown", onCmdEnter(evalCode));
   }
+
+  document.documentElement.dataset.popcornReady = "true";
 }
 
 function onCmdEnter(fn) {
@@ -92,7 +95,7 @@ function isErlangModule(code) {
   return code.startsWith("-module(");
 }
 
-async function sendEvalRequest(/**@type {Popcorn}*/ popcorn, code) {
+async function sendEvalRequest(popcorn, code) {
   if (code === "") {
     return;
   }
@@ -102,12 +105,16 @@ async function sendEvalRequest(/**@type {Popcorn}*/ popcorn, code) {
 
   try {
     const action = getEvalAction(code);
-    const { data, durationMs } = await popcorn.call([action, code], {
+    const start = performance.now();
+    const result = await popcorn.genserver.call("main", [action, code], {
       timeoutMs: 10_000,
     });
+    const durationMs = performance.now() - start;
+    if (!result.ok) throw result.error;
+    if (result.data.error) throw new Error(result.data.error);
     Elements.stateDisplay.textContent = "Done.";
     Elements.timeDisplay.textContent = `${durationMs.toFixed(3)} ms`;
-    Elements.resultDisplay.textContent = data;
+    Elements.resultDisplay.textContent = result.data.value;
   } catch (error) {
     Elements.stateDisplay.textContent = "Evaluation error!";
     Elements.timeDisplay.textContent = "";

@@ -1,7 +1,5 @@
 defmodule EvalInWasm do
   use GenServer
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
-  alias Popcorn.Wasm
 
   @process_name :main
 
@@ -10,24 +8,16 @@ defmodule EvalInWasm do
   end
 
   @impl GenServer
-  def init(_args) do
-    Wasm.ready(@process_name)
-    {:ok, nil}
-  end
+  def init(_args), do: {:ok, nil}
 
   @impl GenServer
-  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, new_state}
-  end
-
-  defp handle_wasm({:wasm_call, [action, code]}, state) do
+  def handle_call([action, code], _from, state) do
     type = as_type(action)
 
     try do
-      {:resolve, inspect(eval(code, type)), state}
+      {:reply, %{value: inspect(eval(code, type))}, state}
     rescue
-      error -> {:reject, error, state}
+      error -> {:reply, %{error: Exception.message(error)}, state}
     end
   end
 

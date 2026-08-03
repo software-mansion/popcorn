@@ -67,8 +67,8 @@ importers:
   examples/eval-in-wasm/assets:
     dependencies:
       '@swmansion/popcorn':
-        specifier: link:../../../popcorn-2/js
-        version: link:../../../popcorn-2/js
+        specifier: link:../../../popcorn/js
+        version: link:../../../popcorn/js
     devDependencies:
       esbuild:
         specifier: ^0.25.0
