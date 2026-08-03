@@ -1,0 +1,45 @@
+wasi-sdk-33.0 (clang 22.1.0), wasm-tools 1.245.1
+
+Artifact
+- relocatable wasm32-wasip1-threads object: public/erl_process.o
+- raw: 188,730 bytes
+- Brotli-11: 62,742 bytes
+- gzip-9: 77,117 bytes
+- wasm-tools validate: passed
+
+OTP source
+- OTP 28.3.1 erts/emulator/beam/erl_process.c, unchanged
+
+Required scheduling symbols
+- erts_init_scheduling: defined global text symbol
+- erts_start_schedulers: defined global text symbol
+- assertions: scripts/compile-erl-process.sh uses llvm-nm exact-name checks
+
+Final module imports and exports
+- not applicable: the bounded link intentionally fails before a runnable module exists
+- no import/export assertion is claimed for a nonexistent final module
+
+Link frontier after unchanged ethread sources
+- BIN_VH_MIN_SIZE
+- erts_alcu_blockscan_init
+- erts_allctrs
+- erts_alloc_n_enomem
+- erts_alloc_permanent_cache_aligned
+- erts_check_io_interrupt
+- erts_exit
+- erts_init_atom_cache_map
+- erts_no_dirty_alloc_instances
+- erts_os_monotonic_time
+- erts_port_task_init
+- erts_proc_lock_init
+- erts_proc_unlock_failed
+- erts_sched_bif_unique_init
+- erts_sspa_create
+- erts_thr_fatal_error
+- erts_thr_prgr__
+- erts_thr_prgr_data_key__
+- erts_thr_q_initialize
+
+Boundary assertion
+- scripts/verify-boundary.sh asserts all 19 unique undefined symbols
+- it fails if the link succeeds unexpectedly or if the frontier changes
