@@ -33,7 +33,7 @@ See also third-party examples:
 
 - **`popcorn-2/elixir/`** - Elixir library used to patch OTP and Elixir stdlib, create .avm bundles and containing JS interop API.
 - **`popcorn-2/js/`** - JavaScript library loads the VM in Wasm, manages its isolation, and bridges JS and Elixir.
-- **`otp/`** - temporary location for integration with BEAM/OTP.
+- **`popcorn/`** - integration with BEAM/OTP.
 - **`examples/`** - Example projects showcasing Popcorn features, hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples). Examples use development version of Popcorn.
 - **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
 - **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.

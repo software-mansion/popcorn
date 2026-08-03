@@ -4,7 +4,7 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "otp/elixir/**"
+      - "popcorn/elixir/**"
       - ".github/workflows/otp_elixir_test.yml"
 
 concurrency:
@@ -25,7 +25,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: otp/elixir
+        working-directory: popcorn/elixir
 
     steps:
       - uses: actions/checkout@v4
