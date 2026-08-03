@@ -5,7 +5,6 @@ packages:
   - popdoc/e2e
   - examples/hello-react
   - examples/hello-popcorn/assets
-  - examples/hello-popcorn-otp/assets
   - examples/eval-in-wasm/assets
   - examples/iex-wasm/assets
   - examples/game-of-life/assets

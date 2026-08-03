@@ -90,9 +90,12 @@ importers:
   examples/hello-popcorn/assets:
     dependencies:
       '@swmansion/popcorn':
-        specifier: link:../../../popcorn-2/js
-        version: link:../../../popcorn-2/js
+        specifier: link:../../../popcorn/js
+        version: link:../../../popcorn/js
     devDependencies:
+      '@playwright/test':
+        specifier: 1.62.0
+        version: 1.62.0
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

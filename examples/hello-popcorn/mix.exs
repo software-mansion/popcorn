@@ -8,45 +8,43 @@ defmodule HelloPopcorn.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: [
-        build: ["deps.get", &pnpm_install/1, "popcorn.cook", &build_js/1],
-        dev: ["build", "popcorn.server"]
-      ]
+      aliases: aliases()
     ]
   end
 
   def application do
     [
-      extra_applications: [],
+      # Only apps present in the OTP runtime manifest (kernel, stdlib,
+      # compiler, elixir, logger) may be listed — they ship as tarballs baked
+      # into the OTP/WASM build. Other apps make the asset packer fail with a
+      # missing dependency.
+      extra_applications: [:logger],
       mod: {HelloPopcorn.Application, []}
     ]
   end
 
   defp deps do
+    [{:popcorn, path: "../../popcorn/elixir"}]
+  end
+
+  defp aliases do
     [
-      # {:popcorn, github: "software-mansion/popcorn"}
-      {:popcorn, path: "../../popcorn-2/elixir"},
-      # playwright will be started manually
-      {:playwright,
-       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
+      dev: ["compile", &build_assets/1, &serve/1]
     ]
   end
 
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
+  defp build_assets(_) do
     {_, 0} =
       System.cmd("pnpm", ["run", "build"],
         cd: Path.join(File.cwd!(), "assets"),
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )
+  end
+
+  defp serve(_) do
+    task = Path.expand("../../popcorn/utils/popcorn_server.ex", __DIR__)
+    Code.require_file(task)
+    Mix.Tasks.Popcorn.Server.run(["--port", "4000", "--dir", "dist"])
   end
 end
