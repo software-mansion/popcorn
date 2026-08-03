@@ -12,6 +12,24 @@
 #include "erl_thr_queue.h"
 #include "erl_threads.h"
 
+__attribute__((import_module("experiment"), import_name("progress")))
+void progress(int stage);
+__attribute__((import_module("experiment"), import_name("report")))
+void report(int normal_schedulers, int dirty_cpu_schedulers,
+            int dirty_io_schedulers, int poll_threads, int run_queues);
+
+enum {
+  ethread_initialized,
+  allocator_initialized,
+  thread_progress_initialized,
+  check_io_initialized,
+  process_table_initialized,
+  time_initialized,
+  monitor_and_signals_initialized,
+  entered_init_scheduling,
+  returned_from_init_scheduling
+};
+
 static void *thread_alloc(ErtsAlcType_t type, size_t size) {
   return erts_alloc_fnf(type, (Uint)size);
 }
@@ -68,6 +86,7 @@ int main(void) {
   erts_thr_late_init_data_t late_options = ERTS_THR_LATE_INIT_DATA_DEF_INITER;
 
   erts_thr_init(&thread_options);
+  progress(ethread_initialized);
   erts_init_sys_time_sup();
   erts_thr_progress_pre_init();
   erts_atomic32_init_nob(&erts_writing_erl_crash_dump, 0);
@@ -79,8 +98,11 @@ int main(void) {
 
   allocator_options.ncpu = 1;
   erts_alloc_init(&argument_count, arguments, &allocator_options);
+  progress(allocator_initialized);
   erts_init_check_io(&argument_count, arguments);
+  progress(check_io_initialized);
   erts_thr_progress_init(1, 4, 2);
+  progress(thread_progress_initialized);
   erts_thr_q_init();
 
   late_options.mem.std.alloc = standard_alloc;
@@ -99,8 +121,15 @@ int main(void) {
   erts_monitor_link_init();
   erts_bif_unique_init();
   erts_proc_sig_queue_init();
+  progress(monitor_and_signals_initialized);
   erts_init_time(0, ERTS_NO_TIME_WARP_MODE);
+  progress(time_initialized);
   erts_init_process(1, 1024, 0);
+  progress(process_table_initialized);
+  progress(entered_init_scheduling);
   erts_init_scheduling(1, 1, 1, 1, 1, 1);
+  progress(returned_from_init_scheduling);
+  report(erts_no_schedulers, erts_no_dirty_cpu_schedulers,
+         erts_no_dirty_io_schedulers, 1, (int)erts_no_run_queues);
   return 0;
 }

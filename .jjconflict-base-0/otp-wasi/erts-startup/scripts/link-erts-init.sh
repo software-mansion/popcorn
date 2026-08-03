@@ -86,6 +86,10 @@ mkdir -p public
   "$erts/emulator/beam/beam_bif_load.c" \
   "$erts/emulator/beam/code_ix.c" \
   "$erts/emulator/beam/erl_node_tables.c" \
+  "$erts/emulator/beam/io.c" \
+  "$erts/emulator/beam/register.c" \
+  "$erts/emulator/beam/erl_bif_ddll.c" \
+  "$erts/emulator/beam/erl_map.c" \
   "$erts/emulator/beam/erl_posix_str.c" \
   "$erts/emulator/beam/erl_hl_timer.c" \
   "$erts/emulator/beam/erl_time_sup.c" \

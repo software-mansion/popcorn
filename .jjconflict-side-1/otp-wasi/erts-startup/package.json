@@ -1,0 +1,16 @@
+{
+  "name": "otp-wasi-erts-startup",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "bash scripts/link-erts-init.sh",
+    "build": "pnpm run build:wasm && vite build",
+    "lint": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}
