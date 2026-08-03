@@ -6,6 +6,7 @@ defmodule ElixirTour.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      Popcorn.Proxy,
       ElixirTour,
       ElixirTour.Evaluator
     ]

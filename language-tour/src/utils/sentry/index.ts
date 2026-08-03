@@ -95,6 +95,26 @@ export type LogSink = {
   onCrash: (reason: ReloadReason) => void;
 };
 
+const logListeners = {
+  stdout: new Set<(text: string) => void>(),
+  stderr: new Set<(text: string) => void>()
+};
+
+export function startLogCapture() {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const onStdout = (text: string) => stdout.push(text);
+  const onStderr = (text: string) => stderr.push(text);
+  logListeners.stdout.add(onStdout);
+  logListeners.stderr.add(onStderr);
+
+  return () => {
+    logListeners.stdout.delete(onStdout);
+    logListeners.stderr.delete(onStderr);
+    return { stdout, stderr };
+  };
+}
+
 export function createLogSink(): LogSink {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -103,10 +123,12 @@ export function createLogSink(): LogSink {
     onStdout: (text: string) => {
       console.log("Popcorn stdout:", text);
       stdout.push(text);
+      logListeners.stdout.forEach((listener) => listener(text));
     },
     onStderr: (text: string) => {
       console.error("Popcorn stderr:", text);
       stderr.push(text);
+      logListeners.stderr.forEach((listener) => listener(text));
     },
     onCrash: (reason: ReloadReason) => {
       const stdoutJoined = stdout.join("\n");

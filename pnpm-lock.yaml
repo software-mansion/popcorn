@@ -292,8 +292,8 @@ importers:
         specifier: ^10.17.0
         version: 10.51.0(react@19.2.6)
       '@swmansion/popcorn':
-        specifier: link:../popcorn-2/js
-        version: link:../popcorn-2/js
+        specifier: link:../popcorn/js
+        version: link:../popcorn/js
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.4(vite@8.0.10(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0))
