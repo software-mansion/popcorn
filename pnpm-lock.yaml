@@ -103,8 +103,8 @@ importers:
   examples/hello-react:
     dependencies:
       '@swmansion/popcorn':
-        specifier: link:../../popcorn-2/js
-        version: link:../../popcorn-2/js
+        specifier: link:../../popcorn/js
+        version: link:../../popcorn/js
       react:
         specifier: ^19.2.0
         version: 19.2.6
