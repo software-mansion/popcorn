@@ -1,5 +1,5 @@
 {
-  "name": "@swmansion/popcorn-otp",
+  "name": "@swmansion/popcorn",
   "version": "0.1.0",
   "description": "JS bindings for BEAM/OTP in WebAssembly",
   "type": "module",

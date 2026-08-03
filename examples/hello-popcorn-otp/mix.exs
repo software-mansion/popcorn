@@ -24,7 +24,7 @@ defmodule HelloPopcornOtp.MixProject do
   end
 
   defp deps do
-    [{:popcorn_otp, path: "../../popcorn/elixir"}]
+    [{:popcorn, path: "../../popcorn/elixir"}]
   end
 
   defp aliases do

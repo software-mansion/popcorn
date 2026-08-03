@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { popcorn } from "@swmansion/popcorn-otp/esbuild";
+import { popcorn } from "@swmansion/popcorn/esbuild";
 import { copyFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

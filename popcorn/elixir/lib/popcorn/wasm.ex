@@ -169,5 +169,5 @@ defmodule Popcorn.Wasm do
     bridge().send(message)
   end
 
-  defp bridge, do: Application.get_env(:popcorn_otp, :wasm_bridge, :wasm)
+  defp bridge, do: Application.get_env(:popcorn, :wasm_bridge, :wasm)
 end

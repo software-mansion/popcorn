@@ -68,7 +68,7 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install
 
-      # Bundles @swmansion/popcorn-otp and copies the runtime from popcorn/out
+      # Bundles @swmansion/popcorn and copies the runtime from popcorn/out
       # into its dist/assets (consumed by the example's esbuild plugin).
       - name: Build popcorn-otp JS package
         run: pnpm -F ./popcorn/js build

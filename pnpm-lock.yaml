@@ -76,7 +76,7 @@ importers:
 
   examples/game-of-life-otp/assets:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
         version: link:../../../popcorn/js
     devDependencies:
@@ -99,7 +99,7 @@ importers:
 
   examples/hello-popcorn-otp/assets:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
         version: link:../../../popcorn/js
     devDependencies:
@@ -495,7 +495,7 @@ importers:
 
   popcorn/js/e2e/setup:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
         version: link:../..
     devDependencies:

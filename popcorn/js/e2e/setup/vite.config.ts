@@ -1,7 +1,7 @@
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { defineConfig, type Plugin } from "vite";
-import { popcorn } from "@swmansion/popcorn-otp/vite";
+import { popcorn } from "@swmansion/popcorn/vite";
 
 /** The echo endpoint used by the runtime fetch tests. */
 function httpEndpoints(): Plugin {

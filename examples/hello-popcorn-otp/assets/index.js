@@ -1,4 +1,4 @@
-import { Popcorn } from "@swmansion/popcorn-otp";
+import { Popcorn } from "@swmansion/popcorn";
 
 const result = await Popcorn.init({
   beam: {
