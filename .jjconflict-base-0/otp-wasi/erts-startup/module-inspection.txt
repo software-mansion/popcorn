@@ -6,40 +6,99 @@ Artifact
 - Brotli-11: 62,742 bytes
 - gzip-9: 77,117 bytes
 - wasm-tools validate: passed
+- final program.wasm: not produced because the bounded link fails
+- final raw, Brotli, and gzip sizes: not applicable
 
 OTP source
 - OTP 28.3.1 erts/emulator/beam/erl_process.c, unchanged
+- every added OTP source is unchanged; the exact list is link-erts-init.sh
+- no wasi-libc or pthread implementation is patched
 
 Required scheduling symbols
 - erts_init_scheduling: defined global text symbol
 - erts_start_schedulers: defined global text symbol
-- assertions: scripts/compile-erl-process.sh uses llvm-nm exact-name checks
+- assertions: compile-erl-process.sh uses llvm-nm exact-name checks
+- erts_init_scheduling execution: not reached because no final module links
+
+Source-group frontier history
+- erl_message.c: 15 unique symbols; new erts_schedule_delete_node and
+  erts_deref_dist_entry from retained off-heap/external cleanup
+- copy.c: 16; new erts_pin_writable_binary and erts_copy_bits_fwd
+- erl_bits.c: 14; no expansion
+- erl_gc.c: 13; no expansion
+- erl_process_dict.c + erl_term_hashing.c: 11; first compile required the
+  generated erl_version.h include directory, then no link expansion
+- erl_nfunc_sched.c: 13; retained NIF teardown exposed code-modification
+  permission and dynamic-library close
+- erl_msacc.c: 11; no expansion
+- erl_trace.c: 9; retained code-range lookup and legacy trace-session state
+- beam_ranges.c + erl_bif_trace.c: 7; retained the active code index
+- beam_bif_load.c: 6; no expansion after closing literal release
+- code_ix.c: 4; retained busy-port process suspension
+- erl_unix_sys_ddll.c with HAVE_DLOPEN disabled: 3; OTP's existing unsupported
+  platform branch closes the dynamic-loader seam
+- erl_node_tables.c: 4; closes node/distribution cleanup but retains port-table,
+  port-lifetime, and registry behavior
+
+Original 20-symbol ownership and retained caller
+- copy_struct_x: copy.c; erl_proc_sig_queue.c process-signal term copying
+- erts_alloc_message_ref: erl_message.c; inline message allocation retained by
+  process signals, timers, check-I/O, allocators, and NIF paths
+- erts_cleanup_messages: erl_message.c; process signals and check-I/O cleanup
+- erts_cleanup_offheap: erl_message.c; process signals, NIFs, and process exit
+- erts_cleanup_offheap_list: erl_message.c; process exit cleanup
+- erts_clear_all_msgq_low_sessions: erl_trace.c; process exit cleanup
+- erts_deallocate_young_generation: erl_gc.c; process exit cleanup
+- erts_deref_trace_session: erl_trace.c; process-signal trace-info cleanup
+- erts_destroy_nfunc: erl_nfunc_sched.c; process exit cleanup
+- erts_erase_dicts: erl_process_dict.c; process exit cleanup
+- erts_internal_hash: erl_term_hashing.c; process-signal low-session hashing
+- erts_msacc_enabled: erl_msacc.c; process-lock microstate macros
+- erts_msacc_key: erl_msacc.c; process-lock microstate thread-local state
+- erts_queue_message: erl_message.c; timers, check-I/O, allocators, NIFs,
+  process signals, and process lifecycle
+- erts_ref_trace_session: erl_trace.c; process-signal trace-info retention
+- erts_sum_all_trace_flags: erl_trace.c; process-signal/process trace state
+- erts_tracer_update_impl: erl_trace.c; process-signal tracer updates
+- erts_unblock_release_literal_area: beam_bif_load.c; process exit cleanup
+- free_message_buffer: erl_message.c; timers, monitors, NIFs, signals, and GC
+- profile_runnable_proc: erl_trace.c; process runnable-state transitions
+
+Final bounded link diagnostics
+- erl_check_io.c:2850 warning: const char buff[64] default initialization leaves
+  the object uninitialized
+- erl_port_task.o: undefined symbol: erts_port (reported twice)
+- erl_port_task.o: undefined symbol: erts_port_free (reported three times)
+- erl_hl_timer.o: undefined symbol: erts_port_free (reported nine times)
+- erl_hl_timer.o: undefined symbol: erts_whereis_name_to_id
+- erl_process.o: undefined symbol: erts_save_suspend_process_on_port
+
+Unique unresolved frontier and ownership
+- erts_port: io.c; global port table retained by erl_port_task.c
+- erts_port_free: io.c; retained by port-task and high-level-timer cleanup
+- erts_save_suspend_process_on_port: io.c; retained by erl_process.c and needed
+  by code-modification permission when a process must wait on a busy port
+- erts_whereis_name_to_id: register.c; retained by erl_hl_timer.c for named
+  timeout recipients after node-table timer deletion became reachable
+
+Smallest next source-derived unit
+- erts/emulator/beam/io.c
+- erts/emulator/beam/register.c
+- io.c is not safely excludable: the retained code_ix suspension path requires
+  real port-table and busy-port state. Linking it begins the full port/driver
+  runtime, which is a substantially broader emulator port.
 
 Final module imports and exports
-- not applicable: the bounded link intentionally fails before a runnable module exists
-- no import/export assertion is claimed for a nonexistent final module
-
-Link frontier after unchanged ethread sources
-- BIN_VH_MIN_SIZE
-- erts_alcu_blockscan_init
-- erts_allctrs
-- erts_alloc_n_enomem
-- erts_alloc_permanent_cache_aligned
-- erts_check_io_interrupt
-- erts_exit
-- erts_init_atom_cache_map
-- erts_no_dirty_alloc_instances
-- erts_os_monotonic_time
-- erts_port_task_init
-- erts_proc_lock_init
-- erts_proc_unlock_failed
-- erts_sched_bif_unique_init
-- erts_sspa_create
-- erts_thr_fatal_error
-- erts_thr_prgr__
-- erts_thr_prgr_data_key__
-- erts_thr_q_initialize
+- not applicable: the bounded link intentionally fails before a runnable module
+- browser callbacks, worker counts, wasi.thread-spawn assertions, serial browser
+  repeats, and teardown assertions are not applicable
 
 Boundary assertion
-- scripts/verify-boundary.sh asserts all 19 unique undefined symbols
+- scripts/verify-boundary.sh asserts all four unique undefined symbols
 - it fails if the link succeeds unexpectedly or if the frontier changes
+
+Exact commands
+- WASI_SDK_PATH=/private/tmp/wasi-sdk-33.0-arm64-macos bash scripts/compile-erl-process.sh
+- WASI_SDK_PATH=/private/tmp/wasi-sdk-33.0-arm64-macos bash scripts/link-erts-init.sh
+- WASI_SDK_PATH=/private/tmp/wasi-sdk-33.0-arm64-macos bash scripts/verify-boundary.sh
+- bash -n scripts/compile-erl-process.sh scripts/link-erts-init.sh scripts/verify-boundary.sh

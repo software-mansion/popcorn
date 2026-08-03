@@ -31,6 +31,7 @@ common_flags=(
   -include config/wasi_compat.h
   -Iconfig
   -I"$erts/wasm32-unknown-emscripten"
+  -I"$erts/emulator/wasm32-unknown-emscripten"
   -I"$generated"
   -I"$erts/emulator/beam"
   -I"$erts/emulator/sys/unix"
@@ -56,7 +57,55 @@ mkdir -p public
   src/main.c \
   src/otp_cpu_info.c \
   src/wasi_compat.c \
+  "$erts/emulator/beam/erl_alloc.c" \
+  "$erts/emulator/beam/erl_alloc_util.c" \
+  "$erts/emulator/beam/erl_afit_alloc.c" \
+  "$erts/emulator/beam/erl_ao_firstfit_alloc.c" \
+  "$erts/emulator/beam/erl_bestfit_alloc.c" \
+  "$erts/emulator/beam/erl_goodfit_alloc.c" \
+  "$erts/emulator/beam/erl_sched_spec_pre_alloc.c" \
+  "$erts/emulator/beam/erl_process_lock.c" \
+  "$erts/emulator/beam/erl_ptab.c" \
+  "$erts/emulator/beam/erl_thr_progress.c" \
+  "$erts/emulator/beam/erl_thr_queue.c" \
+  "$erts/emulator/beam/erl_port_task.c" \
+  "$erts/emulator/beam/erl_bif_unique.c" \
+  "$erts/emulator/beam/erl_monitor_link.c" \
+  "$erts/emulator/beam/erl_proc_sig_queue.c" \
+  "$erts/emulator/beam/erl_message.c" \
+  "$erts/emulator/beam/copy.c" \
+  "$erts/emulator/beam/erl_bits.c" \
+  "$erts/emulator/beam/erl_gc.c" \
+  "$erts/emulator/beam/erl_process_dict.c" \
+  "$erts/emulator/beam/erl_term_hashing.c" \
+  "$erts/emulator/beam/erl_nfunc_sched.c" \
+  "$erts/emulator/beam/erl_msacc.c" \
+  "$erts/emulator/beam/erl_trace.c" \
+  "$erts/emulator/beam/beam_ranges.c" \
+  "$erts/emulator/beam/erl_bif_trace.c" \
+  "$erts/emulator/beam/beam_bif_load.c" \
+  "$erts/emulator/beam/code_ix.c" \
+  "$erts/emulator/beam/erl_node_tables.c" \
+  "$erts/emulator/beam/erl_posix_str.c" \
+  "$erts/emulator/beam/erl_hl_timer.c" \
+  "$erts/emulator/beam/erl_time_sup.c" \
+  "$erts/emulator/beam/time.c" \
+  "$erts/emulator/beam/utils.c" \
+  "$erts/emulator/beam/atom.c" \
+  "$erts/emulator/beam/index.c" \
+  "$erts/emulator/beam/hash.c" \
+  "$erts/emulator/beam/erl_unicode.c" \
+  "$erts/emulator/beam/big.c" \
+  "$erts/emulator/beam/erl_global_literals.c" \
+  "$erts/emulator/beam/erl_nif.c" \
+  "$erts/emulator/beam/external.c" \
+  "$erts/emulator/sys/unix/sys_time.c" \
+  "$erts/emulator/sys/unix/erl_unix_sys_ddll.c" \
+  "$erts/emulator/sys/common/erl_check_io.c" \
+  "$erts/emulator/sys/common/erl_poll.c" \
   "$erts/emulator/beam/erl_process.c" \
+  "$erts/lib_src/common/erl_printf.c" \
+  "$erts/lib_src/common/erl_printf_format.c" \
   "$erts/lib_src/common/ethr_aux.c" \
   "$erts/lib_src/common/ethr_atomics.c" \
   "$erts/lib_src/common/ethr_mutex.c" \
