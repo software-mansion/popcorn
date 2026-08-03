@@ -1,19 +1,23 @@
-# GameOfLife Popcorn demo
+# Game of life demo
 
-Process-based simulation of Conway's Game of Life (See <https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Popcorn.
+Process-based simulation of Conway's Game of Life (see
+<https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life>) running with Popcorn
+on the OTP/BEAM WebAssembly runtime.
 
-## Code usage
+Each cell is a `GenServer`, one simulation is a `Supervisor` tree, and the UI
+(`lib/game_of_life/ui.ex`) drives the DOM through the preloaded `:wasm` module.
 
-With the `GameOfLife.Application` started, the simulation can be run by calling `GameOfLife.Supervisor.start_link` and then calling `GameOfLife.Grid.tick` to trigger next generation.
-
-See the [AVM entrypoint](./lib/game_of_life.ex)
-
-## Usage
-
-From the repository root:
+Install the JavaScript dependencies and build the OTP package from the
+repository root:
 
 ```bash
 pnpm install
+mise run build-otp-js
+```
+
+Then start the example from the repository root:
+
+```bash
 mise run dev --example game-of-life
 ```
 
@@ -23,4 +27,12 @@ or directly from the example directory:
 mix dev
 ```
 
-and visit [localhost:4000](http://localhost:4000)
+and visit [localhost:4000](http://localhost:4000).
+
+This example also contains [Playwright](https://playwright.dev)-based tests. To
+run them from the `assets` directory, type:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test
+```

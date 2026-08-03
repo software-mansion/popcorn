@@ -8,41 +8,39 @@ defmodule GameOfLife.MixProject do
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      aliases: [
-        build: ["deps.get", &pnpm_install/1, "popcorn.cook", &build_js/1],
-        dev: ["build", "popcorn.server"]
-      ]
+      aliases: aliases()
     ]
   end
 
   def application do
     [
-      extra_applications: [:eex],
+      extra_applications: [:logger],
       mod: {GameOfLife.Application, []}
     ]
   end
 
   defp deps do
+    [{:popcorn, path: "../../popcorn/elixir"}]
+  end
+
+  defp aliases do
     [
-      {:popcorn, path: "../../popcorn-2/elixir"}
+      dev: ["compile", &build_assets/1, &serve/1]
     ]
   end
 
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
-  end
-
-  defp build_js(_) do
+  defp build_assets(_) do
     {_, 0} =
       System.cmd("pnpm", ["run", "build"],
         cd: Path.join(File.cwd!(), "assets"),
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )
+  end
+
+  defp serve(_) do
+    task = Path.expand("../../popcorn/utils/popcorn_server.ex", __DIR__)
+    Code.require_file(task)
+    Mix.Tasks.Popcorn.Server.run(["--port", "4000", "--dir", "dist"])
   end
 end
