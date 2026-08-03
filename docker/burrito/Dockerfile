@@ -3,7 +3,7 @@ ARG POPCORN_BASE_TAG=latest
 
 FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder
 
-COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
+COPY popcorn-2/elixir/ /build/popcorn/popcorn-2/elixir/
 COPY local-live-view/ /build/popcorn/local-live-view/
 
 WORKDIR /build/popcorn

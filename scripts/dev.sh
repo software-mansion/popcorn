@@ -144,14 +144,15 @@ main() {
         esac
     done
 
-    local js_dir="${PROJECT_ROOT}/popcorn/js"
+    local js_dir="${PROJECT_ROOT}/popcorn-2/js"
     WATCHER_CMDS=()
 
     load_env
     require_cmd pnpm
 
     install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
-    install_elixir_deps "${PROJECT_ROOT}/popcorn/elixir" "Popcorn Elixir deps"
+    install_pnpm_workspace_deps "${PROJECT_ROOT}/popcorn-2" "Popcorn 2 pnpm workspace deps"
+    install_elixir_deps "${PROJECT_ROOT}/popcorn-2/elixir" "Popcorn Elixir deps"
 
     if [[ -n "${PROJECT}" ]]; then
         local project_dir="${PROJECT_ROOT}/${PROJECT}"

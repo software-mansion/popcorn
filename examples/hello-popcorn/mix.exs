@@ -25,7 +25,7 @@ defmodule HelloPopcorn.MixProject do
   defp deps do
     [
       # {:popcorn, github: "software-mansion/popcorn"}
-      {:popcorn, path: "../../popcorn/elixir"},
+      {:popcorn, path: "../../popcorn-2/elixir"},
       # playwright will be started manually
       {:playwright,
        github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}

@@ -51,7 +51,7 @@ main() {
         esac
     done
 
-    local elixir_dir="${PROJECT_ROOT}/popcorn/elixir"
+    local elixir_dir="${PROJECT_ROOT}/popcorn-2/elixir"
     case "${MODE}" in
         unix)
             log "Running Elixir tests (unix target)"
@@ -68,8 +68,8 @@ main() {
             ;;
         js)
             log "Running JS e2e tests"
-            install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
-            cd "${PROJECT_ROOT}/popcorn/js"
+            install_pnpm_workspace_deps "${PROJECT_ROOT}/popcorn-2" "Popcorn 2 pnpm workspace deps"
+            cd "${PROJECT_ROOT}/popcorn-2/js"
             pnpm test:e2e ${TEST_PATH}
             ;;
         popdoc)

@@ -58,7 +58,8 @@ runs:
       run: |
         if command -v pnpm &> /dev/null; then
           ARTIFACTS="${{ github.workspace }}/${{ inputs.working-directory }}/${{ inputs.outdir }}"
-          mkdir -p popcorn/js/assets
-          cp "$ARTIFACTS"/AtomVM.mjs "$ARTIFACTS"/AtomVM.wasm popcorn/js/assets/
-          pnpm --filter @swmansion/popcorn exec rollup -c
+          mkdir -p popcorn-2/js/assets
+          cp "$ARTIFACTS"/AtomVM.mjs "$ARTIFACTS"/AtomVM.wasm popcorn-2/js/assets/
+          pnpm --dir popcorn-2 install --frozen-lockfile
+          pnpm --dir popcorn-2 --filter @swmansion/popcorn exec rollup -c
         fi

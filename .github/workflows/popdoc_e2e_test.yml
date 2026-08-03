@@ -46,14 +46,19 @@ jobs:
           # See https://github.com/nodejs/node/issues/63487.
           node-version: "24.15.0"
           cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            popcorn-2/pnpm-lock.yaml
 
       - name: Install JS dependencies
         run: pnpm install
 
+      - name: Install Popcorn 2 JS dependencies
+        run: pnpm --dir popcorn-2 install --frozen-lockfile
+
       - name: Build popcorn JS package
         run: pnpm build:prod
-        working-directory: popcorn/js
+        working-directory: popcorn-2/js
 
       - name: Fetch Elixir dependencies
         run: mix deps.get

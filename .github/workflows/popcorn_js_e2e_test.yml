@@ -4,8 +4,10 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "popcorn/js/**"
-      - "popcorn/elixir/lib/**/wasm.ex"
+      - "popcorn-2/js/**"
+      - "popcorn-2/elixir/lib/**/wasm.ex"
+      - "popcorn-2/pnpm-lock.yaml"
+      - "popcorn-2/pnpm-workspace.yaml"
       - ".github/workflows/popcorn_js_e2e_test.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -44,14 +46,15 @@ jobs:
           # See https://github.com/nodejs/node/issues/63487.
           node-version: "24.15.0"
           cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
+          cache-dependency-path: popcorn-2/pnpm-lock.yaml
 
       - name: Install JS dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+        working-directory: popcorn-2
 
       - name: Build popcorn JS package
         run: pnpm build:prod
-        working-directory: popcorn/js
+        working-directory: popcorn-2/js
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
@@ -60,4 +63,4 @@ jobs:
 
       - name: Run e2e tests
         run: pnpm test:e2e
-        working-directory: popcorn/js
+        working-directory: popcorn-2/js
