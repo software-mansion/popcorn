@@ -1,7 +1,7 @@
 defmodule Popcorn.CompilationTest do
   use ExUnit.Case, async: true
-  require Popcorn.Support.AtomVM
-  alias Popcorn.Support.AtomVM
+  require Popcorn.AtomVM.Support
+  alias Popcorn.AtomVM.Support, as: AtomVM
 
   @moduletag :tmp_dir
 

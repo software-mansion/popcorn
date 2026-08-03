@@ -9,10 +9,10 @@ defmodule ExApp do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.ready(@process_name)
+    Popcorn.AtomVM.Wasm.ready(@process_name)
     IO.puts("Hello console!")
 
-    # Popcorn.Wasm.run_js("""
+    # Popcorn.AtomVM.Wasm.run_js("""
     # () => {
     #   document.body.innerHTML = "Hello from WASM!";
     # }

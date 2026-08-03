@@ -1,4 +1,4 @@
-import { Popcorn } from "@swmansion/popcorn";
+import { AtomVM } from "@swmansion/popcorn";
 
 window.popcornInstances = new Map();
 
@@ -6,7 +6,7 @@ window.createPopcornInstance = async function (bundlePath) {
   const id = crypto.randomUUID();
   const logs = [];
 
-  const popcorn = await Popcorn.init({
+  const popcorn = await AtomVM.init({
     bundlePaths: [bundlePath],
     onStdout: (output) => logs.push(`[popcorn stdout] ${output}\n`),
   });

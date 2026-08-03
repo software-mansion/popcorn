@@ -1,4 +1,4 @@
-defmodule Popcorn do
+defmodule Popcorn.AtomVM do
   @moduledoc """
   Popcorn is a tool for running Elixir in the browser.
   """

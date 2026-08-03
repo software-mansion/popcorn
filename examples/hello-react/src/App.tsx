@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Popcorn } from "@swmansion/popcorn";
+import { AtomVM } from "@swmansion/popcorn";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 
-const instance = await Popcorn.init({
+const instance = await AtomVM.init({
   debug: true,
   onStdout: console.log,
   onStderr: console.warn,

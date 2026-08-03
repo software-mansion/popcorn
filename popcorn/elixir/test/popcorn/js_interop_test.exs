@@ -1,14 +1,14 @@
 defmodule Popcorn.JSInteropTest do
   use ExUnit.Case
 
-  require Popcorn.Support.AtomVM, as: AtomVM
+  require Popcorn.AtomVM.Support, as: AtomVM
 
   @moduletag :tmp_dir
   @moduletag {:skip_target, :unix}
 
   test "run_js cross-realm checks", %{tmp_dir: tmp_dir} do
     quote do
-      Popcorn.Wasm.run_js!(
+      Popcorn.AtomVM.Wasm.run_js!(
         """
         ({ args }) => {
           return [args.a instanceof Array && args.b instanceof Object]

@@ -1,6 +1,6 @@
-import { Popcorn } from "@swmansion/popcorn";
+import { AtomVM } from "@swmansion/popcorn";
 
-await Popcorn.init({
+await AtomVM.init({
   bundlePaths: ["/wasm/bundle.avm"],
   onStdout: console.log,
 });

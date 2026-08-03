@@ -46,7 +46,7 @@ CheckoutLive (Phoenix LiveView)
 3. **Client-side navigation works:**
    ```elixir
    defp navigate_to(_socket, step) do
-     Popcorn.Wasm.run_js("""
+     Popcorn.AtomVM.Wasm.run_js("""
      window.history.pushState({}, "", "/?step=" + args.step);
      """, %{step: step})
    end

@@ -21,8 +21,8 @@ import type { PopcornErrorCode, PopcornInternalErrorCode } from "./errors";
 export { PopcornError, PopcornInternalError };
 export type { PopcornErrorCode, PopcornInternalErrorCode };
 
-/** Options for Popcorn.init() */
-export type PopcornInitOptions = {
+/** Options for AtomVM.init() */
+export type AtomVMInitOptions = {
   /** DOM element to mount an iframe */
   container?: HTMLElement;
   /** Paths to compiled Elixir bundles (`.avm` files). */
@@ -31,7 +31,7 @@ export type PopcornInitOptions = {
   onStderr?: (message: string) => void;
   /** Handler for stdout messages. */
   onStdout?: (message: string) => void;
-  /** Handler called when Popcorn reloads due to iframe crash */
+  /** Handler called when AtomVM reloads due to iframe crash */
   onReload?: (reason: string) => void;
   /** Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded. */
   heartbeatTimeoutMs?: number;
@@ -96,7 +96,7 @@ const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 /**
  * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
  */
-export class Popcorn {
+export class AtomVM {
   public heartbeatTimeoutMs: number | null = null;
 
   private onReloadCallback: (reason: string) => void;
@@ -121,7 +121,7 @@ export class Popcorn {
   private reloadN = 0;
 
   private constructor(
-    params: PopcornInitOptions & { container: HTMLElement },
+    params: AtomVMInitOptions & { container: HTMLElement },
     token: symbol,
   ) {
     if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
@@ -149,17 +149,17 @@ export class Popcorn {
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
+   * Returns after the Elixir app calls `AtomVM.Wasm.ready/0,1`.
    *
    * @example
-   * import { Popcorn } from "@swmansion/popcorn";
-   * const popcorn = await Popcorn.init({
+   * import { AtomVM } from "@swmansion/popcorn";
+   * const popcorn = await AtomVM.init({
    *   onStdout: console.log,
    *   onStderr: console.error,
    *   debug: true,
    * });
    */
-  static async init(options: PopcornInitOptions): Promise<Popcorn> {
+  static async init(options: AtomVMInitOptions): Promise<AtomVM> {
     const { container, ...constructorParams } = options;
     const containerWithDefault = container ?? document.documentElement;
 
@@ -168,7 +168,7 @@ export class Popcorn {
         ? constructorParams.bundlePaths
         : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
 
-    const popcorn = new Popcorn(
+    const popcorn = new AtomVM(
       { ...constructorParams, bundlePaths, container: containerWithDefault },
       INIT_TOKEN,
     );
@@ -216,7 +216,7 @@ export class Popcorn {
    *
    * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `AtomVM.Wasm.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @example
@@ -256,7 +256,7 @@ export class Popcorn {
   /**
    * Sends a message to an Elixir process (default or from options) and returns immediately.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `AtomVM.Wasm.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
   cast(args: AnySerializable, { process }: CastOptions = {}): void {

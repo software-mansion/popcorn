@@ -1,6 +1,6 @@
 defmodule Shell do
   use GenServer
-  alias Popcorn.Wasm
+  alias Popcorn.AtomVM.Wasm
 
   def start_link(args) do
     GenServer.start_link(__MODULE__, args)

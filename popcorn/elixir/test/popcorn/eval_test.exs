@@ -1,9 +1,9 @@
 defmodule Popcorn.EvalTest do
   use ExUnit.Case, async: true
   require Logger
-  require Popcorn.Support.AtomVM
+  require Popcorn.AtomVM.Support
   import AsyncTest
-  alias Popcorn.Support.AtomVM
+  alias Popcorn.AtomVM.Support, as: AtomVM
 
   @examples_path "./test/examples"
   @moduletag :tmp_dir

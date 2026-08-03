@@ -1,28 +1,28 @@
-defmodule Popcorn.TrackedObject do
+defmodule Popcorn.AtomVM.TrackedObject do
   @moduledoc """
   Used to interoperate with JS.
 
   Tracked objects are registered in the VM to keep a reference to JS value.
   If there is no reference to tracked object, corresponding JS value is removed.
 
-  See `Popcorn.Wasm.run_js/3` for more details.
+  See `Popcorn.AtomVM.Wasm.run_js/3` for more details.
   """
   @type t :: %__MODULE__{ref: term()}
   defstruct ref: nil
 end
 
-defimpl Jason.Encoder, for: Popcorn.TrackedObject do
+defimpl Jason.Encoder, for: Popcorn.AtomVM.TrackedObject do
   def encode(value, opts) when value.ref != nil do
     [key] = :emscripten.get_tracked([value.ref], :key)
     Jason.Encode.map(%{popcorn_ref: key}, opts)
   end
 end
 
-defmodule Popcorn.Wasm do
+defmodule Popcorn.AtomVM.Wasm do
   @moduledoc """
   Functions for JS side communication.
   """
-  alias Popcorn.TrackedObject
+  alias Popcorn.AtomVM.TrackedObject
 
   defguardp is_tagged_emscripten(msg) when elem(msg, 0) == :emscripten
   defguardp is_call(msg) when elem(elem(msg, 1), 0) == :call and tuple_size(elem(msg, 1)) == 3
@@ -164,7 +164,7 @@ defmodule Popcorn.Wasm do
 
   ## Example
   ```
-  Popcorn.Wasm.run_js(\"""
+  Popcorn.AtomVM.Wasm.run_js(\"""
   ({ args }) => {
     const n = args.n;
     return [n-1, n, n-1];
@@ -257,7 +257,7 @@ defmodule Popcorn.Wasm do
 
   @doc """
   Signals that the application is fully initialized and ready to accept events from JS.
-  This must be called for `Popcorn.init()` on the JS side to resolve.
+  This must be called for `AtomVM.init()` on the JS side to resolve.
 
   Optionally registers the calling process as the default receiver under `name`,
   which JS `call/cast` will use when no explicit process is specified.

@@ -70,7 +70,7 @@ export function buildError(error: ErrorData): PopcornInternalError {
     case "private_constructor":
       return new PopcornInternalError(
         "private_constructor",
-        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
+        "Don't construct the AtomVM object directly, use AtomVM.init() instead",
       );
     case "bad_call":
       return new PopcornInternalError(
@@ -104,7 +104,7 @@ export function buildError(error: ErrorData): PopcornInternalError {
     case "app_ready_timeout":
       return new PopcornInternalError(
         "app_ready_timeout",
-        `Elixir app did not call Popcorn.Wasm.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
+        `Elixir app did not call AtomVM.Wasm.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
       );
     case "bundle_not_found":
       return new PopcornInternalError(

@@ -2,7 +2,7 @@ defmodule Popcorn.TreeshakeTest do
   use ExUnit.Case, async: true
 
   import AsyncTest
-  require Popcorn.Support.AtomVM, as: AtomVM
+  require Popcorn.AtomVM.Support, as: AtomVM
 
   @moduletag :tmp_dir
 

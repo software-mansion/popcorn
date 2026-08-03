@@ -96,7 +96,9 @@ defmodule LocalLiveView.MixProject do
         &pnpm_install/1,
         fn _args ->
           {_out, 0} =
-            System.shell("MIX_TARGET=wasm mix popcorn.cook", into: IO.stream(:stdio, :line))
+            System.shell("MIX_TARGET=wasm mix popcorn.atomvm.cook",
+              into: IO.stream(:stdio, :line)
+            )
         end
       ]
     ]

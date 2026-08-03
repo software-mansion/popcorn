@@ -167,7 +167,7 @@ async function startVm(avmBundles: Int8Array[]): Promise<void> {
       const indirectEval = eval;
       fn = indirectEval(scriptString);
     } catch (e) {
-      // TODO: send onEvalError for Popcorn object
+      // TODO: send onEvalError for AtomVM object
       console.error(e);
       return null;
     }
@@ -176,7 +176,7 @@ async function startVm(avmBundles: Int8Array[]): Promise<void> {
     try {
       result = fn?.(moduleInstance);
     } catch (e) {
-      // TODO: send onEvalError for Popcorn object
+      // TODO: send onEvalError for AtomVM object
       console.error(e);
       return null;
     }

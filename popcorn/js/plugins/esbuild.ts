@@ -2,13 +2,13 @@ import { copyFile, mkdir } from "fs/promises";
 import { dirname, join, basename, resolve } from "path";
 import { fileURLToPath } from "url";
 import type { Plugin } from "esbuild";
-import { type PopcornPluginOptions } from "./shared";
+import { type AtomVMPluginOptions } from "./shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Plugin is at dist/plugins/esbuild.mjs, dist/ is one level up
 const popcornDistDir = resolve(__dirname, "..");
 
-export function popcorn(options: PopcornPluginOptions): Plugin {
+export function atomvm(options: AtomVMPluginOptions): Plugin {
   const bundles = options.bundlePaths.map((p) => ({
     name: basename(p),
     dir: dirname(p),

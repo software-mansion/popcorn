@@ -89,7 +89,7 @@ defmodule Popcorn.MixProject do
         Reference: ~r"(?:/reference/|js-api/)"
       ],
       groups_for_modules: [
-        "WebAssembly API": [Popcorn.Wasm, Popcorn.TrackedObject]
+        "AtomVM WebAssembly API": [Popcorn.AtomVM.Wasm, Popcorn.AtomVM.TrackedObject]
       ],
       formatters: ["html"],
       before_closing_head_tag: &before_closing_head_tag/1,

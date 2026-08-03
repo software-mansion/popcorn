@@ -51,7 +51,7 @@ const exampleButtonClass =
 </Section>
 
 <script>
-  import { Popcorn } from "@swmansion/popcorn";
+  import { AtomVM } from "@swmansion/popcorn";
   import { init, Terminal, FitAddon } from "ghostty-web";
   import { preventFocus } from "../scripts/utils";
 
@@ -109,7 +109,7 @@ const exampleButtonClass =
       onStdout: (text: string) => displayLog(text, { term, isError: false }),
       onStderr: (text: string) => displayLog(text, { term, isError: true }),
     };
-    const popcorn = await Popcorn.init(POPCORN_CONFIG);
+    const popcorn = await AtomVM.init(POPCORN_CONFIG);
 
     term.clear();
 

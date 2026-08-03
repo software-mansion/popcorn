@@ -1,4 +1,4 @@
-import { Popcorn } from "@swmansion/popcorn";
+import { AtomVM } from "@swmansion/popcorn";
 
 const LANGUAGE = document.querySelector('meta[name="code-language"]').content;
 const LANGUAGE_ERLANG = "erlang";
@@ -44,7 +44,7 @@ const Elements = {
 };
 
 async function setup() {
-  const popcorn = await Popcorn.init({
+  const popcorn = await AtomVM.init({
     debug: true,
     bundlePaths: ["/wasm/bundle.avm"],
     onStdout: (text) => displayLog(text, { isError: false }),

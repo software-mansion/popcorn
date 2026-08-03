@@ -1,5 +1,5 @@
-defmodule Mix.Tasks.Popcorn.Cook do
-  @shortdoc "Builds the `.avm` bundle for a Popcorn project."
+defmodule Mix.Tasks.Popcorn.Atomvm.Cook do
+  @shortdoc "Builds an AtomVM `.avm` bundle."
   @moduledoc """
   #{@shortdoc}
 
@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
     options
     |> Keyword.update(:start_module, nil, &as_module/1)
-    |> Popcorn.cook()
+    |> Popcorn.AtomVM.cook()
   end
 
   defp as_module(module_name) when is_binary(module_name) do

@@ -1,6 +1,6 @@
 defmodule Popcorn.HexdocsTestHelper do
   use ExUnit.Case, async: true
-  alias Popcorn.Support.AtomVM
+  alias Popcorn.AtomVM.Support, as: AtomVM
   alias __MODULE__, as: Helper
   import AsyncTest
 
@@ -155,8 +155,8 @@ end
 
 defmodule Popcorn.HexdocsTest do
   use ExUnit.Case, async: true
-  require Popcorn.Support.AtomVM
-  alias Popcorn.Support.AtomVM
+  require Popcorn.AtomVM.Support
+  alias Popcorn.AtomVM.Support, as: AtomVM
   import Popcorn.HexdocsTestHelper
 
   @moduletag :tmp_dir

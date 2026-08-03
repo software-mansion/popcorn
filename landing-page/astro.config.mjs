@@ -8,7 +8,7 @@ import icon from "astro-icon";
 // import rehypeMermaid from "rehype-mermaid";
 import mermaid from "astro-mermaid";
 import devtoolsJson from "vite-plugin-devtools-json";
-import { popcorn } from "@swmansion/popcorn/vite";
+import { atomvm } from "@swmansion/popcorn/atomvm/vite";
 import { buildBundle, cleanWasmDir } from "./build-wasm.js";
 
 // https://astro.build/config
@@ -26,7 +26,7 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [devtoolsJson(), tailwindcss(), popcorn({ bundlePaths: [] })],
+    plugins: [devtoolsJson(), tailwindcss(), atomvm({ bundlePaths: [] })],
   },
   integrations: [
     react(),

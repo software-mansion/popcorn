@@ -134,11 +134,11 @@ import Section from "../../components/Section.astro";
 </style>
 
 <script>
-  import { Popcorn } from "@swmansion/popcorn";
+  import { AtomVM } from "@swmansion/popcorn";
 
   async function init() {
     try {
-      await Popcorn.init({
+      await AtomVM.init({
         bundlePaths: ["/wasm/gol.avm"],
         debug: false,
         onStdout: (text: string) => console.log(text),

@@ -8,8 +8,8 @@ defmodule LocalLiveView.Dispatcher do
   #  Uses GenServer.
 
   use GenServer
-  import Popcorn.Wasm
-  alias Popcorn.Wasm
+  import Popcorn.AtomVM.Wasm
+  alias Popcorn.AtomVM.Wasm
   alias LocalLiveView.Message
   alias Phoenix.LiveView.Session
   @process_name :main
@@ -21,7 +21,7 @@ defmodule LocalLiveView.Dispatcher do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.ready(@process_name)
+    Popcorn.AtomVM.Wasm.ready(@process_name)
     {:ok, %{views: %{}}}
   end
 

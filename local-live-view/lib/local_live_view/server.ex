@@ -1,7 +1,7 @@
 defmodule LocalLiveView.Message do
   @moduledoc false
   # `promise` is the popcorn.call promise of the browser frame this message
-  # answers (settled via Popcorn.Wasm.resolve when processed); nil for
+  # answers (settled via Popcorn.AtomVM.Wasm.resolve when processed); nil for
   # uncorrelated sends.
   defstruct event: nil, payload: nil, promise: nil
 end
@@ -433,7 +433,7 @@ defmodule LocalLiveView.Server do
   end
 
   defp push_url_update(url, replace) do
-    Popcorn.Wasm.run_js(
+    Popcorn.AtomVM.Wasm.run_js(
       """
       ({ args }) => {
         const event = new CustomEvent("llv:navigate", {
@@ -458,7 +458,7 @@ defmodule LocalLiveView.Server do
   defp push_diff(_state, diff, promise) when diff == %{}, do: push_noop(promise)
 
   defp push_diff(state, diff, nil = _promise) do
-    Popcorn.Wasm.run_js(
+    Popcorn.AtomVM.Wasm.run_js(
       """
       ({ args }) => {
         window.__popcornTransportReceive(args.id, args.diff);
@@ -512,7 +512,7 @@ defmodule LocalLiveView.Server do
   end
 
   defp reply(promise, status, payload) do
-    Popcorn.Wasm.resolve(%{status: status, payload: payload}, promise)
+    Popcorn.AtomVM.Wasm.resolve(%{status: status, payload: payload}, promise)
     :ok
   end
 

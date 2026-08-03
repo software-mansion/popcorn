@@ -94,7 +94,7 @@ defmodule LocalLiveView.Watcher do
 
   defp cook() do
     Logger.debug("Cooking local project")
-    {_output, status} = System.shell("mix popcorn.cook", cd: "local")
+    {_output, status} = System.shell("mix popcorn.atomvm.cook", cd: "local")
     if status != 0, do: Logger.warning("Failed to cook local project")
   end
 end

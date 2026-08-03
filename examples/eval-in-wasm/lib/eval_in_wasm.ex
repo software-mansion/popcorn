@@ -1,7 +1,7 @@
 defmodule EvalInWasm do
   use GenServer
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
-  alias Popcorn.Wasm
+  import Popcorn.AtomVM.Wasm, only: [is_wasm_message: 1]
+  alias Popcorn.AtomVM.Wasm
 
   @process_name :main
 

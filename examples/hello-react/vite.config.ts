@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { popcorn } from "@swmansion/popcorn/vite";
+import { atomvm } from "@swmansion/popcorn/atomvm/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,7 +11,7 @@ export default defineConfig({
       },
     }),
 
-    popcorn({
+    atomvm({
       // Path to your .avm bundle file
       bundlePaths: ["ex_app/_build/wasm/bundle.avm"],
     }),

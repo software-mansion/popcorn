@@ -1,5 +1,5 @@
 import * as esbuild from "esbuild";
-import { popcorn } from "@swmansion/popcorn/esbuild";
+import { atomvm } from "@swmansion/popcorn/atomvm/esbuild";
 import { copyFile, mkdir } from "fs/promises";
 
 await mkdir("../dist", { recursive: true });
@@ -11,5 +11,5 @@ await esbuild.build({
   format: "esm",
   sourcemap: true,
   outfile: "../dist/index.js",
-  plugins: [popcorn({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
+  plugins: [atomvm({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
 });

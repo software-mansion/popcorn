@@ -9,7 +9,7 @@ defmodule ElixirTour.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        build: ["deps.get", "popcorn.cook"]
+        build: ["deps.get", "popcorn.atomvm.cook"]
       ]
     ]
   end

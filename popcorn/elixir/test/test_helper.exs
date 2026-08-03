@@ -1,4 +1,5 @@
-alias Popcorn.Support.{AtomVM, Browser}
+alias Popcorn.AtomVM.Support, as: AtomVM
+alias Popcorn.Support.Browser
 
 Path.wildcard("tmp/*") |> List.delete("tmp/modules") |> Enum.each(&File.rm_rf!/1)
 

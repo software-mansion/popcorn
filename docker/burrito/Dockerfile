@@ -21,7 +21,7 @@ RUN mix tailwind.install --if-missing
 RUN mix esbuild.install --if-missing
 
 COPY examples/local-lv-burrito/local/ local/
-RUN cd local && mix deps.get && MIX_TARGET=wasm mix popcorn.cook
+RUN cd local && mix deps.get && MIX_TARGET=wasm mix popcorn.atomvm.cook
 
 RUN mix llv.build
 

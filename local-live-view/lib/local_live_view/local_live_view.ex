@@ -115,7 +115,7 @@ defmodule LocalLiveView do
       end)
 
     unless payload == %{} do
-      Popcorn.Wasm.run_js(
+      Popcorn.AtomVM.Wasm.run_js(
         """
         ({ args }) => {
           if (window.__llvSync) {
@@ -148,7 +148,7 @@ defmodule LocalLiveView do
   timeout), the view's `c:handle_push_error/4` callback is invoked.
   """
   def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
-    Popcorn.Wasm.run_js(
+    Popcorn.AtomVM.Wasm.run_js(
       """
       ({ args }) => {
         if (window.__llvPushServer) {

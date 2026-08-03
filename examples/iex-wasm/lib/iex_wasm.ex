@@ -1,7 +1,7 @@
 defmodule IexWasm do
   use GenServer
-  import Popcorn.Wasm
-  alias Popcorn.Wasm
+  import Popcorn.AtomVM.Wasm
+  alias Popcorn.AtomVM.Wasm
 
   defguard is_language(language) when language in ["erlang", "elixir"]
 

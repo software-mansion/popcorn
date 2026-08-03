@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
   HelloLocal component renders "Hello from WASM!" in the browser.
 
   Slow (~1-2 min) — covers what unit tests can't: real `mix llv.build`,
-  real esbuild + popcorn.cook + AtomVM bootstrap, real DOM render.
+  real esbuild + popcorn.atomvm.cook + AtomVM bootstrap, real DOM render.
   """
 
   use ExUnit.Case, async: false

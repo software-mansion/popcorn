@@ -2,13 +2,13 @@ import { readFile } from "fs/promises";
 import { dirname, basename, resolve } from "path";
 import { fileURLToPath } from "url";
 import type { Plugin } from "rollup";
-import { type PopcornPluginOptions } from "./shared";
+import { type AtomVMPluginOptions } from "./shared";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Plugin is at dist/plugins/rollup.mjs, dist/ is one level up
 const popcornDistDir = resolve(__dirname, "..");
 
-export function popcorn(options: PopcornPluginOptions): Plugin<unknown> {
+export function atomvm(options: AtomVMPluginOptions): Plugin<unknown> {
   const bundles = options.bundlePaths.map((p) => ({
     path: p,
     name: basename(p),

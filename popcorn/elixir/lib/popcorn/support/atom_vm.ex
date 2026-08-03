@@ -1,4 +1,4 @@
-defmodule Popcorn.Support.AtomVM do
+defmodule Popcorn.AtomVM.Support do
   @moduledoc """
   Used to run AtomVM instances in tests.
 
@@ -213,7 +213,7 @@ defmodule Popcorn.Support.AtomVM do
   Path to the native AtomVM binary used by the :unix target.
 
   Defaults to popcorn's own test fixture location; consumers building the runtime
-  via `mix popcorn.build_runtime --target unix` should point this at their
+  via `mix popcorn.atomvm.build_runtime --target unix` should point this at their
   artifacts dir, e.g. in `test_helper.exs`:
 
       Application.put_env(:popcorn, :atomvm_unix_runtime_path,
@@ -245,7 +245,7 @@ defmodule Popcorn.Support.AtomVM do
 
     beam_paths = Path.wildcard(Path.join(build_dir, "*.beam"))
 
-    Popcorn.cook(
+    Popcorn.AtomVM.cook(
       [extra_beams: beam_paths, start_module: RunExpr, out_dir: build_dir] ++
         Keyword.take(opts, [:treeshake])
     )
@@ -353,7 +353,7 @@ defmodule Popcorn.Support.AtomVM do
     quote location: :keep do
       defmodule RunExpr do
         @moduledoc false
-        alias Popcorn.Wasm
+        alias Popcorn.AtomVM.Wasm
 
         @compile autoload: false, no_warn_undefined: [:atomvm, Wasm]
 

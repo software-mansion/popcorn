@@ -1,4 +1,4 @@
-import { Popcorn } from "@swmansion/popcorn";
+import { AtomVM } from "@swmansion/popcorn";
 import { runCode } from "./eval.js";
 import { instantiate, TPL_BLOCK } from "./templates.js";
 
@@ -20,7 +20,7 @@ async function initPopcorn() {
       bundlePaths.push(bundleMeta.content);
     }
 
-    return Popcorn.init({
+    return AtomVM.init({
       debug: true,
       bundlePaths: [...new Set(bundlePaths)],
     });

@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Popcorn.Gen.Js do
+defmodule Mix.Tasks.Popcorn.Atomvm.Gen.Js do
   @shortdoc "Scaffolds JS asset files for a Popcorn project."
   @moduledoc "#{@shortdoc}"
   use Mix.Task
@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
 
     Next steps:
       npm install --prefix assets
-      mix popcorn.cook
+      mix popcorn.atomvm.cook
       npm run build --prefix assets
       mix popcorn.server
     """)
@@ -46,7 +46,7 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
 
   embed_text(:build_mjs, """
   import * as esbuild from "esbuild";
-  import { popcorn } from "@swmansion/popcorn/esbuild";
+  import { atomvm } from "@swmansion/popcorn/atomvm/esbuild";
   import { copyFile, mkdir } from "fs/promises";
 
   await mkdir("../dist", { recursive: true });
@@ -58,14 +58,14 @@ defmodule Mix.Tasks.Popcorn.Gen.Js do
     format: "esm",
     sourcemap: true,
     outfile: "../dist/index.js",
-    plugins: [popcorn({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
+    plugins: [atomvm({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
   });
   """)
 
   embed_text(:index_js, """
-  import { Popcorn } from "@swmansion/popcorn";
+  import { AtomVM } from "@swmansion/popcorn";
 
-  await Popcorn.init({ bundlePaths: ["/wasm/bundle.avm"], onStdout: console.log });
+  await AtomVM.init({ bundlePaths: ["/wasm/bundle.avm"], onStdout: console.log });
   """)
 
   embed_text(:index_html, """

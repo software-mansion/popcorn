@@ -24,15 +24,15 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs"
     },
-    "./vite": {
+    "./atomvm/vite": {
       "types": "./dist/plugins/vite.d.ts",
       "import": "./dist/plugins/vite.mjs"
     },
-    "./rollup": {
+    "./atomvm/rollup": {
       "types": "./dist/plugins/rollup.d.ts",
       "import": "./dist/plugins/rollup.mjs"
     },
-    "./esbuild": {
+    "./atomvm/esbuild": {
       "types": "./dist/plugins/esbuild.d.ts",
       "import": "./dist/plugins/esbuild.mjs"
     },

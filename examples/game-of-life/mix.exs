@@ -9,7 +9,7 @@ defmodule GameOfLife.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: [
-        build: ["deps.get", &pnpm_install/1, "popcorn.cook", &build_js/1],
+        build: ["deps.get", &pnpm_install/1, "popcorn.atomvm.cook", &build_js/1],
         dev: ["build", "popcorn.server"]
       ]
     ]

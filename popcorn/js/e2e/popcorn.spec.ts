@@ -1,10 +1,10 @@
 import { test, expect, Page, JSHandle } from "@playwright/test";
-import { Popcorn, CallOptions } from "@swmansion/popcorn";
+import { AtomVM, CallOptions } from "@swmansion/popcorn";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Window {
-    Popcorn: typeof Popcorn;
+    AtomVM: typeof AtomVM;
     captureStdout?: (msg: string) => void;
     serializeCallResult: typeof serializeCallResult;
     receivedEvents: unknown[];
@@ -26,7 +26,7 @@ function serializeCallResult<T extends { ok: boolean; error?: unknown }>(
 }
 
 class PopcornHandle {
-  constructor(private handle: JSHandle<Popcorn>) {}
+  constructor(private handle: JSHandle<AtomVM>) {}
 
   async call(payload: unknown, opts?: CallOptions) {
     return this.handle.evaluate(
@@ -40,15 +40,9 @@ class PopcornHandle {
     return this.handle.evaluate((p) => p.deinit());
   }
 
-  evaluate<T>(fn: (p: Popcorn) => T | Promise<T>): Promise<T>;
-  evaluate<T, A>(
-    fn: (p: Popcorn, arg: A) => T | Promise<T>,
-    arg: A,
-  ): Promise<T>;
-  evaluate(
-    fn: (p: Popcorn, ...args: unknown[]) => unknown,
-    ...args: unknown[]
-  ) {
+  evaluate<T>(fn: (p: AtomVM) => T | Promise<T>): Promise<T>;
+  evaluate<T, A>(fn: (p: AtomVM, arg: A) => T | Promise<T>, arg: A): Promise<T>;
+  evaluate(fn: (p: AtomVM, ...args: unknown[]) => unknown, ...args: unknown[]) {
     return this.handle.evaluate(fn, ...args);
   }
 }
@@ -58,7 +52,7 @@ test.beforeEach(async ({ page }) => {
     `window.serializeCallResult = ${serializeCallResult.toString()}`,
   );
   await page.goto("/");
-  await page.waitForFunction(() => window.Popcorn !== undefined);
+  await page.waitForFunction(() => window.AtomVM !== undefined);
 });
 
 test("init", async ({ page }) => {
@@ -68,7 +62,7 @@ test("init", async ({ page }) => {
   await expect(iframe).toBeAttached();
 
   const isPopcorn = await popcorn.evaluate(
-    (p) => p.constructor.name === "Popcorn",
+    (p) => p.constructor.name === "AtomVM",
   );
   expect(isPopcorn).toBe(true);
 });
@@ -160,7 +154,7 @@ test("stdout", async ({ page }) => {
   const handle = await page.evaluateHandle(async () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const container = document.getElementById("popcorn-container")!;
-    return window.Popcorn.init({
+    return window.AtomVM.init({
       container,
       onStdout: (msg: string) => window.captureStdout?.(msg),
     });
@@ -231,7 +225,7 @@ async function initPopcornWithEventListener(page: Page) {
   const handle = await page.evaluateHandle(async () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const container = document.getElementById("popcorn-container")!;
-    const p = await window.Popcorn.init({ container });
+    const p = await window.AtomVM.init({ container });
     window.receivedEvents = [];
     window.unsubscribeOnMessage = p.onMessage(
       (name: string, payload: unknown) => {
@@ -265,7 +259,7 @@ async function initPopcorn(page: Page): Promise<PopcornHandle> {
   const handle = await page.evaluateHandle(async () => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const container = document.getElementById("popcorn-container")!;
-    return window.Popcorn.init({ container });
+    return window.AtomVM.init({ container });
   });
   return new PopcornHandle(handle);
 }

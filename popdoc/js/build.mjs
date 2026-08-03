@@ -1,6 +1,6 @@
 import * as esbuild from "esbuild";
 import { copyFile, mkdir } from "fs/promises";
-import { popcorn } from "@swmansion/popcorn/esbuild";
+import { atomvm } from "@swmansion/popcorn/atomvm/esbuild";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -16,7 +16,7 @@ await esbuild.build({
   bundle: true,
   format: "esm",
   outfile: resolve(assetsDir, "popdoc.js"),
-  plugins: [popcorn({ bundlePaths: [bundlePath] })],
+  plugins: [atomvm({ bundlePaths: [bundlePath] })],
 });
 
 await copyFile(resolve(__dirname, "src/popdoc.css"), resolve(assetsDir, "popdoc.css"));

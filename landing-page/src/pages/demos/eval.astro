@@ -89,7 +89,7 @@ end"
 </style>
 
 <script>
-  import { Popcorn } from "@swmansion/popcorn";
+  import { AtomVM } from "@swmansion/popcorn";
 
   const LANGUAGE = "elixir";
   const EVAL_ELIXIR = "eval_elixir";
@@ -132,7 +132,7 @@ end"
 
   async function setup() {
     try {
-      popcorn = await Popcorn.init({
+      popcorn = await AtomVM.init({
         bundlePaths: ["/wasm/eval.avm"],
         debug: true,
         onStdout: (text) => displayLog(text, { isError: false }),

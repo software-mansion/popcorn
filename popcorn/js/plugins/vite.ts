@@ -1,7 +1,7 @@
 import { readFile, stat } from "fs/promises";
 import { basename, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
-import { type PopcornPluginOptions } from "./shared";
+import { type AtomVMPluginOptions } from "./shared";
 
 import type { IncomingMessage, ServerResponse } from "http";
 import type { Plugin, ResolvedConfig } from "vite";
@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Plugin is at dist/plugins/vite.mjs, dist/ is one level up
 const popcornDistDir = resolve(__dirname, "..");
 
-export function popcorn(options: PopcornPluginOptions): Plugin {
+export function atomvm(options: AtomVMPluginOptions): Plugin {
   const bundlePaths = options.bundlePaths;
   const bundles = bundlePaths.map((p) => ({
     path: p,

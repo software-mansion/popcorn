@@ -1,8 +1,8 @@
-export { Popcorn, PopcornError, PopcornInternalError } from "./popcorn";
+export { AtomVM, PopcornError, PopcornInternalError } from "./popcorn";
 export type {
   PopcornErrorCode,
   PopcornInternalErrorCode,
-  PopcornInitOptions,
+  AtomVMInitOptions,
   CastOptions,
   CallOptions,
 } from "./popcorn";

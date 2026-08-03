@@ -77,7 +77,7 @@ Next, fetch dependencies and compile your Elixir code into a Popcorn `.avm` bund
 
 ```console
 $ mix deps.get
-$ mix popcorn.cook
+$ mix popcorn.atomvm.cook
 ```
 
 ### Setting up the JavaScript build
@@ -101,7 +101,10 @@ The generated `index.js` looks like this:
 // assets/index.js
 import { Popcorn } from "@swmansion/popcorn";
 
-await Popcorn.init({ bundlePaths: ["/wasm/bundle.avm"], onStdout: console.log });
+await Popcorn.init({
+  bundlePaths: ["/wasm/bundle.avm"],
+  onStdout: console.log,
+});
 ```
 
 `bundlePaths` tells Popcorn where to find the compiled Elixir bytecode, matching the `out_dir` you configured earlier. `onStdout` receives anything your Elixir code prints with `IO.puts/1`.
@@ -113,7 +116,7 @@ $ npm install --prefix assets
 $ npm run build --prefix assets
 ```
 
-The JavaScript build step bundles your JavaScript, copies the WebAssembly runtime assets, and outputs everything to the `dist/` directory. `mix popcorn.cook` only produces the `.avm` bundle.
+The JavaScript build step bundles your JavaScript, copies the WebAssembly runtime assets, and outputs everything to the `dist/` directory. `mix popcorn.atomvm.cook` only produces the `.avm` bundle.
 
 > #### Other bundlers {: .info}
 >

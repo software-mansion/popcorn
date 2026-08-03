@@ -21,11 +21,11 @@ export function cookOnChange(): Plugin {
 
         console.log(`[cook] ${path.basename(file)} changed`);
         try {
-          await execPromise("mix popcorn.cook", {
+          await execPromise("mix popcorn.atomvm.cook", {
             cwd: elixirTourDir
           });
         } catch (error) {
-          console.error("[cook] mix popcorn.cook failed", error);
+          console.error("[cook] mix popcorn.atomvm.cook failed", error);
         }
       });
     }

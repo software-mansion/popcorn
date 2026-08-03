@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Popcorn.BuildRuntime do
+defmodule Mix.Tasks.Popcorn.Atomvm.BuildRuntime do
   @shortdoc "Utility for building AtomVM from source"
   @moduledoc """
   #{@shortdoc}

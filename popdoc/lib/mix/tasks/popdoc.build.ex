@@ -17,7 +17,7 @@ defmodule Mix.Tasks.Popdoc.Build do
     ensure_js_deps!(pnpm)
 
     step("Building wasm bundle", fn ->
-      cmd!(mix, ["popcorn.cook", "--out-dir", "out"], @wasm_dir)
+      cmd!(mix, ["popcorn.atomvm.cook", "--out-dir", "out"], @wasm_dir)
     end)
 
     step("Bundling JS runtime assets", fn ->

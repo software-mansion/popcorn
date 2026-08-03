@@ -7,10 +7,10 @@ defmodule DemoModalOfflineAtomVMTest do
 
   Build the runtime once with:
 
-      MIX_TARGET=wasm mix popcorn.build_runtime --target unix --out-dir test/popcorn_runtime_source
+      MIX_TARGET=wasm mix popcorn.atomvm.build_runtime --target unix --out-dir test/popcorn_runtime_source
   """
   use ExUnit.Case
-  alias Popcorn.Support.AtomVM
+  alias Popcorn.AtomVM.Support
 
   @moduletag :tmp_dir
   @moduletag timeout: :timer.minutes(3)

@@ -1,10 +1,10 @@
 defmodule Popcorn.Init do
   # The module below tries to mimic BEAMs boot script, then start user's app
-  @compile autoload: false, no_warn_undefined: [Popcorn.Wasm]
+  @compile autoload: false, no_warn_undefined: [Popcorn.AtomVM.Wasm]
 
   def init(config) do
     start_apps(config.app, config.apps_specs)
-    Popcorn.Wasm.send_event("popcorn_elixir_ready")
+    Popcorn.AtomVM.Wasm.send_event("popcorn_elixir_ready")
 
     case config.start_module do
       nil -> default_start(config.app)

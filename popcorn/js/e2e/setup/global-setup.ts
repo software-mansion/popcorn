@@ -21,7 +21,7 @@ function runCommand(command: string, cwd: string, description: string) {
 async function globalSetup() {
   runCommand("pnpm run build", jsRootDir, "building JS library");
   runCommand("mix deps.get", elixirDir, "fetching Elixir dependencies");
-  runCommand("mix popcorn.cook", elixirDir, "creating Elixir bundle");
+  runCommand("mix popcorn.atomvm.cook", elixirDir, "creating Elixir bundle");
 
   console.log("e2e: starting Vite dev server...");
 
