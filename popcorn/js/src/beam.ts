@@ -7,13 +7,21 @@ import type {
   BeamTarget,
   EmscriptenModule,
 } from "./types";
-import { dirname, fetchBinary, fetchJson, unreachable } from "./utils";
+import {
+  dirname,
+  fetchBinary,
+  fetchJson,
+  objectWithKeys,
+  unreachable,
+} from "./utils";
 
 const DEFAULT_USER = "web_user";
 const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
+const ENTRYPOINT_READY_EXPR =
+  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}}).';
 
 // https://www.erlang.org/doc/apps/erts/inet_cfg.html
 const INETRC_PATH = "/etc/inetrc";
@@ -55,6 +63,16 @@ export async function boot({
   }
 
   const fsData = loadedFsData.data;
+  let entrypointStarted = fsData.entrypoint === null;
+  let resolveEntrypointReady = () => {};
+  let rejectEntrypointReady = (_error: PopcornError) => {};
+  const entrypointReady =
+    fsData.entrypoint === null
+      ? Promise.resolve()
+      : new Promise<void>((resolve, reject) => {
+          resolveEntrypointReady = resolve;
+          rejectEntrypointReady = reject;
+        });
   const runtimeEnv = {
     ...env,
     BINDIR: "/bin",
@@ -76,9 +94,22 @@ export async function boot({
       emit({ type: "otp:error", payload: { kind: "abort", data: text } }),
     onBeamMessage: (text) => {
       const event = deserializeBridgeMessage(text);
-      if (event !== null) {
-        emit(event);
+      if (event === null) return;
+      if (isEntrypointReady(event)) {
+        entrypointStarted = true;
+        resolveEntrypointReady();
+        return;
       }
+      if (
+        !entrypointStarted &&
+        (event.type === "otp:message" || event.type === "otp:run_js")
+      ) {
+        rejectEntrypointReady(
+          err("beam:unexpected-startup-event", { type: event.type }),
+        );
+        return;
+      }
+      emit(event);
     },
     onError: (text) =>
       emit({ type: "otp:error", payload: { kind: "error", data: text } }),
@@ -106,7 +137,10 @@ export async function boot({
   };
 
   try {
-    const module = await createModule(moduleConfig);
+    const [module] = await Promise.all([
+      createModule(moduleConfig),
+      entrypointReady,
+    ]);
     return { ok: true, data: module };
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
@@ -149,6 +183,7 @@ function buildArgs({
 
   if (entrypoint !== null) {
     args.push("-s", "application", "ensure_all_started", entrypoint);
+    args.push("-eval", ENTRYPOINT_READY_EXPR);
   }
 
   for (const arg of extra) {
@@ -156,6 +191,14 @@ function buildArgs({
   }
 
   return args;
+}
+
+function isEntrypointReady(
+  event: ReturnType<typeof deserializeBridgeMessage>,
+): boolean {
+  if (event === null || event.type !== "otp:message") return false;
+  const popcorn = objectWithKeys(event.payload, ["_popcorn"])?._popcorn;
+  return objectWithKeys(popcorn, ["t"])?.t === "boot_ready";
 }
 
 type BeamManifest = {

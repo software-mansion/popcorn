@@ -4,7 +4,7 @@
 
 start(_Type, _Args) ->
     Pid = spawn_link(fun idle/0),
-    ok = wasm:send(#{entrypoint_started => true}),
+    startup_event(os:getenv("POPCORN_STARTUP_EVENT")),
     {ok, Pid}.
 
 stop(_State) ->
@@ -14,3 +14,10 @@ idle() ->
     receive
         _ -> idle()
     end.
+
+startup_event("send") ->
+    ok = wasm:send(#{startup => send});
+startup_event("run_js") ->
+    wasm:run_js(<<"() => null">>, #{});
+startup_event(false) ->
+    ok.

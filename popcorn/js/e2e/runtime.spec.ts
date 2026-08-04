@@ -16,12 +16,29 @@ test.describe("boot", () => {
     );
     assert(boot.ok);
 
-    expect(await otp.waitForEvent("entrypoint_started")).toEqual({
-      entrypoint_started: true,
-    });
     expect(await otp.waitForEvent("runtime_ready")).toEqual({
       runtime_ready: true,
     });
+  });
+
+  test("startup bridge events fail", async ({ createOtp }) => {
+    for (const [mode, type] of [
+      ["send", "otp:message"],
+      ["run_js", "otp:run_js"],
+    ] as const) {
+      const otp = await createOtp();
+      const boot = await otp.boot({
+        beam: {
+          manifestUrl: "/assets/otp/manifest.json",
+          env: { POPCORN_STARTUP_EVENT: mode },
+        },
+      });
+
+      expect(boot).toEqual({
+        ok: false,
+        error: { t: "beam:unexpected-startup-event", data: { type } },
+      });
+    }
   });
 
   test("schedulers", async ({ otp }) => {
