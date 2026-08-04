@@ -34,7 +34,7 @@ importers:
         specifier: ^9.39.0
         version: 9.39.5
       '@playwright/test':
-        specifier: ^1.60.0
+        specifier: 1.62.1
         version: 1.62.1
       '@rollup/plugin-typescript':
         specifier: ^12.1.2

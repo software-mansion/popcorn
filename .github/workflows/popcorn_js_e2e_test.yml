@@ -59,7 +59,8 @@ jobs:
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          version: "1.60.0"
+          # Keep in sync with popcorn-2/js: the version pins the GHA browser cache key.
+          version: "1.62.1"
 
       - name: Run e2e tests
         run: pnpm test:e2e
