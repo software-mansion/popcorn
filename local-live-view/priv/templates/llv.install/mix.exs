@@ -32,7 +32,7 @@ defmodule Local.MixProject do
 
   defp deps do
     [
-      {:local_live_view, path: "<%= @llv_path %>"}
+      <%= @llv_dep %>
     ]
   end
 
