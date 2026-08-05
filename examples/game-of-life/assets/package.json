@@ -1,13 +1,16 @@
 {
   "name": "game_of_life",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "playwright test"
   },
   "dependencies": {
-    "@swmansion/popcorn": "link:../../../popcorn-2/js"
+    "@swmansion/popcorn": "link:../../../popcorn/js"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.0",
     "esbuild": "^0.25.0"
   }
 }

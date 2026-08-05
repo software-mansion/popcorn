@@ -2,6 +2,8 @@ defmodule EvalInWasm.BrowserTest do
   use ExUnit.Case
 
   setup_all do
+    Code.require_file(Path.expand("../../../popcorn/utils/popcorn_server.ex", __DIR__))
+
     {:ok, _apps} = Application.ensure_all_started(:playwright)
     {_pid, browser} = Playwright.BrowserType.launch(:chromium)
 
@@ -12,7 +14,9 @@ defmodule EvalInWasm.BrowserTest do
     port = 9876
     url = "http://localhost:#{port}"
 
-    Task.start_link(fn -> Mix.Tasks.Popcorn.Server.run(["--port", to_string(port)]) end)
+    Task.start_link(fn ->
+      apply(Mix.Tasks.Popcorn.Server, :run, [["--port", to_string(port)]])
+    end)
 
     # Wait until the server is ready
     page = Playwright.Browser.new_page(browser)
@@ -26,8 +30,7 @@ defmodule EvalInWasm.BrowserTest do
     page = Playwright.Browser.new_page(browser)
     response = Playwright.Page.goto(page, url)
     assert response.status == 200
-    # Wait for JS to be ready
-    Process.sleep(1_000)
+    Playwright.Page.wait_for_selector(page, "[data-popcorn-ready]")
 
     on_exit(fn ->
       Playwright.Page.close(page)

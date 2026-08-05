@@ -1,15 +1,21 @@
 import * as esbuild from "esbuild";
 import { popcorn } from "@swmansion/popcorn/esbuild";
-import { copyFile, mkdir } from "fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-await mkdir("../dist", { recursive: true });
-await copyFile("index.html", "../dist/index.html");
+const assetsDir = dirname(fileURLToPath(import.meta.url));
+const rootDir = resolve(assetsDir, "..");
+const outDir = resolve(rootDir, "dist");
+
+await mkdir(outDir, { recursive: true });
+await copyFile(resolve(assetsDir, "index.html"), resolve(outDir, "index.html"));
 
 await esbuild.build({
-  entryPoints: ["index.js"],
+  entryPoints: [resolve(assetsDir, "index.js")],
   bundle: true,
   format: "esm",
   sourcemap: true,
-  outfile: "../dist/index.js",
-  plugins: [popcorn({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
+  outfile: resolve(outDir, "index.js"),
+  plugins: [popcorn({ rootDir, app: "hello_popcorn" })],
 });

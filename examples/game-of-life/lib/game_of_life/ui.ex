@@ -1,35 +1,24 @@
 defmodule GameOfLife.Ui do
   use GenServer
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
+
   alias Popcorn.Wasm
   alias GameOfLife.Grid
   alias GameOfLife.Supervisor, as: GridSupervisor
 
   defguardp is_running(state) when is_pid(state.grid_pid)
 
-  @receiver_name :ui
   @tick_speed_ms 300
+  @process_name :game_of_life_ui
 
   def start_link(args) do
-    GenServer.start_link(__MODULE__, args, name: @receiver_name)
+    GenServer.start_link(__MODULE__, args, name: @process_name)
   end
 
   @impl GenServer
   def init(%{size: size}) do
-    html()
-    |> mount_at_root()
-
-    init_grid(size)
-
-    listener_refs =
-      register_click_listeners(
-        ["#start", "#stop", "#reset", "#glider", ".cell"],
-        @receiver_name
-      )
-
     {:ok,
      %{
-       listener_refs: listener_refs,
+       listener_refs: nil,
        size: size,
        sup_pid: nil,
        grid_pid: nil,
@@ -39,77 +28,101 @@ defmodule GameOfLife.Ui do
   end
 
   @impl GenServer
-  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state =
-      Wasm.handle_message!(raw_msg, fn
-        {:wasm_cast, ["click", "#start", _data]} when not is_running(state) ->
-          alive = Enum.map(state.alive, fn [x, y] -> {x, y} end)
-
-          set_element_visiblity(start: false, stop: true, reset: false, examples: false)
-
-          {:ok, sup, %{grid_pid: pid}} =
-            GridSupervisor.start_simulation(state.size, state.size, alive)
-
-          timer = start_timer(@tick_speed_ms)
-
-          %{state | sup_pid: sup, grid_pid: pid, timer: timer}
-
-        {:wasm_cast, ["click", "#glider", _data]} when not is_running(state) ->
-          new_alive = [
-            [2, 0],
-            [2, 1],
-            [2, 2],
-            [1, 2],
-            [0, 1]
-          ]
-
-          set_alive_cells(new_alive)
-          %{state | alive: new_alive}
-
-        {:wasm_cast, ["click", "#stop", _data]} when is_running(state) ->
-          set_element_visiblity(start: true, stop: false, reset: true, examples: true)
-          stop_timer(state.timer)
-          :ok = GridSupervisor.stop_simulation(state.sup_pid)
-
-          %{state | timer: nil, sup_pid: nil, grid_pid: nil}
-
-        {:wasm_cast, ["click", "#reset", _data]} when not is_running(state) ->
-          set_alive_cells([])
-          %{state | alive: []}
-
-        {:wasm_cast, "tick"} when is_running(state) ->
-          new_alive =
-            state.grid_pid
-            |> Grid.tick()
-            |> grid_to_alive_list()
-
-          set_alive_cells(new_alive)
-          %{state | alive: new_alive}
-
-        {:wasm_cast, "tick"} ->
-          # Stale tick, ignore
-          state
-
-        {:wasm_cast, ["click", ".cell", %{"coordsX" => x, "coordsY" => y}]}
-        when not is_running(state) ->
-          x = String.to_integer(x)
-          y = String.to_integer(y)
-
-          if [x, y] in state.alive do
-            new_alive = List.delete(state.alive, [x, y])
-
-            set_alive_cells(new_alive)
-            %{state | alive: new_alive}
-          else
-            new_alive = [[x, y] | state.alive]
-
-            set_alive_cells(new_alive)
-            %{state | alive: new_alive}
-          end
-      end)
-
-    {:noreply, new_state}
+  def handle_call("mount", from, state) do
+    {:noreply, state, {:continue, {:mount, from}}}
   end
+
+  @impl GenServer
+  def handle_continue({:mount, from}, state) do
+    html()
+    |> mount_at_root()
+
+    init_grid(state.size)
+
+    listener_refs =
+      register_click_listeners(["#start", "#stop", "#reset", "#glider", ".cell"], self())
+
+    GenServer.reply(from, "mounted")
+    {:noreply, %{state | listener_refs: listener_refs}}
+  end
+
+  @impl GenServer
+  def handle_info({:wasm, "tick"}, state) do
+    {:noreply, handle_tick(state)}
+  end
+
+  @impl GenServer
+  def handle_cast(event, state) do
+    {:noreply, handle_dom_event(event, state)}
+  end
+
+  defp handle_dom_event(["click", "#start", _data], state) when not is_running(state) do
+    alive = Enum.map(state.alive, fn [x, y] -> {x, y} end)
+
+    set_element_visiblity(start: false, stop: true, reset: false, examples: false)
+
+    {:ok, sup, %{grid_pid: pid}} =
+      GridSupervisor.start_simulation(state.size, state.size, alive)
+
+    timer = start_timer(@tick_speed_ms, self())
+
+    %{state | sup_pid: sup, grid_pid: pid, timer: timer}
+  end
+
+  defp handle_dom_event(["click", "#glider", _data], state) when not is_running(state) do
+    new_alive = [
+      [2, 0],
+      [2, 1],
+      [2, 2],
+      [1, 2],
+      [0, 1]
+    ]
+
+    set_alive_cells(new_alive)
+    %{state | alive: new_alive}
+  end
+
+  defp handle_dom_event(["click", "#stop", _data], state) when is_running(state) do
+    set_element_visiblity(start: true, stop: false, reset: true, examples: true)
+    stop_timer(state.timer)
+    :ok = GridSupervisor.stop_simulation(state.sup_pid)
+
+    %{state | timer: nil, sup_pid: nil, grid_pid: nil}
+  end
+
+  defp handle_dom_event(["click", "#reset", _data], state) when not is_running(state) do
+    set_alive_cells([])
+    %{state | alive: []}
+  end
+
+  defp handle_dom_event(["click", ".cell", %{"coordsX" => x, "coordsY" => y}], state)
+       when not is_running(state) do
+    x = String.to_integer(x)
+    y = String.to_integer(y)
+
+    new_alive =
+      if [x, y] in state.alive do
+        List.delete(state.alive, [x, y])
+      else
+        [[x, y] | state.alive]
+      end
+
+    set_alive_cells(new_alive)
+    %{state | alive: new_alive}
+  end
+
+  defp handle_tick(state) when is_running(state) do
+    new_alive =
+      state.grid_pid
+      |> Grid.tick()
+      |> grid_to_alive_list()
+
+    set_alive_cells(new_alive)
+    %{state | alive: new_alive}
+  end
+
+  # Stale tick, ignore
+  defp handle_tick(state), do: state
 
   defp html() do
     """
@@ -126,21 +139,34 @@ defmodule GameOfLife.Ui do
     """
   end
 
-  defp start_timer(ms) do
-    # TODO: add unregistration on process exit
-    """
-    ({ wasm, args }) => {
-      return [setInterval(() => wasm.cast(args.receiver, "tick"), args.ms)];
-    }
-    """
-    |> Wasm.run_js!(%{ms: ms, receiver: @receiver_name})
+  defp start_timer(ms, receiver) do
+    Wasm.run_js!(
+      """
+      (args, {send}) => {
+        const id = setInterval(
+          () => send(args.receiver, "tick"),
+          args.ms,
+        );
+
+        let disposed = false;
+        const dispose = () => {
+          if (disposed) return;
+          disposed = true;
+          clearInterval(id);
+        };
+
+        return new TrackedValue({ dispose }, dispose);
+      }
+      """,
+      %{ms: ms, receiver: receiver}
+    )
   end
 
   defp stop_timer(timer_ref) do
     Wasm.run_js!(
       """
-      ({ args }) => {
-        clearInterval(args.timer);
+      (args) => {
+        args.timer.dispose();
       }
       """,
       %{timer: timer_ref}
@@ -162,7 +188,7 @@ defmodule GameOfLife.Ui do
 
     Wasm.run_js!(
       """
-      ({ args }) => {
+      (args) => {
         for (let [id, isVisible] of args.visibility) {
           const el = document.querySelector(id);
           if (isVisible) {
@@ -180,7 +206,7 @@ defmodule GameOfLife.Ui do
   defp init_grid(size) do
     Wasm.run_js!(
       """
-      ({ args }) => {
+      (args) => {
         const root = document.querySelector("#grid-root");
         for (let x = 0; x < args.size; x++) {
           const row = document.createElement("div");
@@ -203,7 +229,7 @@ defmodule GameOfLife.Ui do
   defp mount_at_root(html) do
     Wasm.run_js!(
       """
-      ({ args }) => {
+      (args) => {
         document.querySelector("#root").innerHTML = args.html;
       }
       """,
@@ -214,8 +240,8 @@ defmodule GameOfLife.Ui do
   defp set_alive_cells(coords) do
     Wasm.run_js!(
       """
-      ({ args }) => {
-        const alive = new Set(args.alive_coords.map(([x,y]) => `${x},${y}`));
+      (args) => {
+        const alive = new Set(args.alive_coords.map(([x, y]) => `${x},${y}`));
 
         for (const cell of document.querySelectorAll(".cell")) {
           const coords = cell.getAttribute("data-coords-x") + ',' + cell.getAttribute("data-coords-y");
@@ -227,40 +253,35 @@ defmodule GameOfLife.Ui do
     )
   end
 
-  defp register_click_listeners(selectors, ex_receiver) do
-    """
-    ({ wasm, args }) => {
-      const { selectors, event_name, event_receiver } = args;
-      const removeListenersFunctions = [];
-      selectors.forEach((selector) => {
-        const nodes = document.querySelectorAll(selector);
-        const fn = (event) => {
-          wasm.cast(event_receiver, ["click", selector, event.target.dataset]);
-        };
-        nodes.forEach((node) => node.addEventListener(event_name, fn));
+  # Returns a tracked handle; listeners are removed when the handle is
+  # garbage-collected on the BEAM side, so it's kept in the state.
+  defp register_click_listeners(selectors, receiver) do
+    Wasm.run_js!(
+      """
+      (args, {cast}) => {
+        const { selectors, event_name, event_receiver } = args;
+        const removeListenersFunctions = [];
+        selectors.forEach((selector) => {
+          const nodes = document.querySelectorAll(selector);
+          const fn = (event) => {
+            cast(event_receiver, ["click", selector, { ...event.target.dataset }]);
+          };
+          nodes.forEach((node) => node.addEventListener(event_name, fn));
 
-        removeListenersFunctions.push(() => {
-          nodes.forEach((node) => node.removeEventListener(event_name, fn));
+          removeListenersFunctions.push(() => {
+            nodes.forEach((node) => node.removeEventListener(event_name, fn));
+          });
         });
-      });
 
-      const key = wasm.nextTrackedObjectKey();
-      const cleanupFn = () => {
-        removeListenersFunctions.forEach((fn) => fn());
-        wasm.cleanupFunctions.delete(key);
-      };
-      wasm.cleanupFunctions.set(key, cleanupFn);
-
-      return [new TrackedValue({key: key, value: cleanupFn})];
-    }
-    """
-    |> Wasm.run_js!(
+        const cleanup = () => removeListenersFunctions.forEach((fn) => fn());
+        return new TrackedValue(null, cleanup);
+      }
+      """,
       %{
         event_name: "click",
         selectors: selectors,
-        event_receiver: ex_receiver
-      },
-      return: :ref
+        event_receiver: receiver
+      }
     )
   end
 end

@@ -1,18 +1,18 @@
-name: OTP examples - Build & test
+name: Examples - Build & test
 
 on:
   push:
     branches: ["**"]
     paths:
-      - "examples/hello-popcorn-otp/**"
-      - "examples/game-of-life-otp/**"
+      - "examples/game-of-life/**"
+      - "examples/hello-popcorn/**"
       - "popcorn/**"
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"
       - "scripts/patch-beam.sh"
       - "scripts/stdlib.sh"
       - "scripts/_common.sh"
-      - ".github/workflows/hello_popcorn_otp_build_test.yml"
+      - ".github/workflows/examples_build_test.yml"
       - ".github/actions/build-otp-wasm/action.yml"
       - ".github/actions/setup-playwright/action.yml"
       - "pnpm-workspace.yaml"
@@ -70,34 +70,38 @@ jobs:
 
       # Bundles @swmansion/popcorn and copies the runtime from popcorn/out
       # into its dist/assets (consumed by the example's esbuild plugin).
-      - name: Build popcorn-otp JS package
+      - name: Build Popcorn JS package
         run: pnpm -F ./popcorn/js build
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          version: "1.60.0"
+          version: "1.62.0"
 
-      - name: Run Hello Popcorn OTP e2e tests
-        run: pnpm test
-        working-directory: examples/hello-popcorn-otp/assets
-
-      - name: Run Game of Life OTP unit tests
+      - name: Run Game of Life unit tests
         run: mix test
-        working-directory: examples/game-of-life-otp
+        working-directory: examples/game-of-life
 
-      - name: Run Game of Life OTP e2e tests
+      - name: Run Hello Popcorn unit tests
+        run: mix test
+        working-directory: examples/hello-popcorn
+
+      - name: Run Game of Life e2e tests
         run: pnpm test
-        working-directory: examples/game-of-life-otp/assets
+        working-directory: examples/game-of-life/assets
+
+      - name: Run Hello Popcorn e2e tests
+        run: pnpm test
+        working-directory: examples/hello-popcorn/assets
 
       - name: Upload Playwright test artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: otp-examples-playwright-results
+          name: examples-playwright-results
           path: |
-            examples/hello-popcorn-otp/assets/playwright-report/
-            examples/hello-popcorn-otp/assets/test-results/
-            examples/game-of-life-otp/assets/playwright-report/
-            examples/game-of-life-otp/assets/test-results/
+            examples/game-of-life/assets/playwright-report/
+            examples/game-of-life/assets/test-results/
+            examples/hello-popcorn/assets/playwright-report/
+            examples/hello-popcorn/assets/test-results/
           if-no-files-found: ignore
