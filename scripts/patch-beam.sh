@@ -5,8 +5,8 @@
 #   scripts/patch-beam.sh [OPTIONS]
 #
 # Modes:
-#   (default)     Apply patches from otp/patches/ to otp/sources/otp
-#   --regen       Regenerate patches from current otp/sources/otp state
+#   (default)     Apply patches from popcorn/patches/ to popcorn/sources/otp
+#   --regen       Regenerate patches from current popcorn/sources/otp state
 #
 # Options:
 #   --without-zstd
@@ -16,18 +16,18 @@
 #   --without-dynamic-loading
 #   -h, --help    Show this help
 #
-# Requires otp/sources/otp to exist (created by build-beam.sh).
-# Patches are stored in otp/patches/.
+# Requires popcorn/sources/otp to exist (created by build-beam.sh).
+# Patches are stored in popcorn/patches/.
 set -euo pipefail
 
 LOG_PREFIX="PATCH BEAM"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
+SOURCES_DIR="${PROJECT_ROOT}/popcorn/sources"
 OTP_DIR="${SOURCES_DIR}/otp"
 OTP_ORIGINAL_DIR="${SOURCES_DIR}/otp-original"
-PATCHES_DIR="${PROJECT_ROOT}/otp/patches"
+PATCHES_DIR="${PROJECT_ROOT}/popcorn/patches"
 STAMP_FILE="${OTP_DIR}/.stamp-patched"
 
 usage() {
@@ -37,20 +37,20 @@ Usage: $0 [OPTIONS]
 Patch OTP/BEAM sources for WebAssembly (wasm32-emscripten).
 
 Modes:
-  (default)     Apply patches from otp/patches/ to otp/sources/otp
-  --regen       Regenerate patches from current otp/sources/otp state
+  (default)     Apply patches from popcorn/patches/ to popcorn/sources/otp
+  --regen       Regenerate patches from current popcorn/sources/otp state
 
 Options:
   -h, --help    Show this help
 
 Apply mode:
-  Expects otp/sources/otp-original to exist (cloned OTP).
+  Expects popcorn/sources/otp-original to exist (cloned OTP).
   Copies otp-original to otp/ if not present, then applies patches.
   Stripped patches are applied only when their --without-* option is present.
 
 Regen mode:
-  Expects otp/sources/otp to exist with local modifications.
-  Stages changes, excludes generated files, writes patches to otp/patches/.
+  Expects popcorn/sources/otp to exist with local modifications.
+  Stages changes, excludes generated files, writes patches to popcorn/patches/.
 EOF
     exit 0
 }
@@ -93,11 +93,11 @@ EXCLUDE
 
 apply_patches() {
     if [[ ! -d "${OTP_ORIGINAL_DIR}" ]]; then
-        error "otp/sources/otp-original not found. Run build-beam.sh first to clone OTP."
+        error "popcorn/sources/otp-original not found. Run build-beam.sh first to clone OTP."
     fi
 
     if [[ ! -d "${PATCHES_DIR}" ]]; then
-        error "otp/patches/ not found. No patches to apply."
+        error "popcorn/patches/ not found. No patches to apply."
     fi
 
     local -a patches=("${PATCHES_DIR}/0001-emscripten-support.patch")
@@ -117,7 +117,7 @@ apply_patches() {
     fi
 
     # The stamp records a hash of the patch set, not just that a patch ran.
-    # When otp/patches/ changes, the hash no longer matches and we re-apply —
+    # When popcorn/patches/ changes, the hash no longer matches and we re-apply —
     # otherwise an edited patch is silently ignored and the built VM keeps
     # running the previous protocol.
     local patches_hash
@@ -159,11 +159,11 @@ apply_patches() {
 
 regen_patches() {
     if [[ ! -d "${OTP_DIR}" ]]; then
-        error "otp/sources/otp not found. Nothing to regenerate from."
+        error "popcorn/sources/otp not found. Nothing to regenerate from."
     fi
 
     if [[ ! -d "${OTP_DIR}/.git" ]]; then
-        error "otp/sources/otp is not a git repository."
+        error "popcorn/sources/otp is not a git repository."
     fi
 
     mkdir -p "${PATCHES_DIR}"

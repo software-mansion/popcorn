@@ -1,4 +1,4 @@
-import type { Pid } from "@swmansion/popcorn-otp";
+import type { Pid } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 test.describe("pid", () => {

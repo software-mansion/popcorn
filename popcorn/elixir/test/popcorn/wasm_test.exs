@@ -6,8 +6,8 @@ defmodule Popcorn.WasmTest do
   alias Popcorn.Wasm.FakeBridge
 
   setup do
-    Application.put_env(:popcorn_otp, :wasm_bridge, FakeBridge)
-    on_exit(fn -> Application.delete_env(:popcorn_otp, :wasm_bridge) end)
+    Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
+    on_exit(fn -> Application.delete_env(:popcorn, :wasm_bridge) end)
   end
 
   describe "available?/0" do

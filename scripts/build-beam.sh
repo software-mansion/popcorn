@@ -13,7 +13,7 @@
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
-#   --clean               Clean before building (removes otp/sources/otp)
+#   --clean               Clean before building (removes popcorn/sources/otp)
 #   -j <N>                Parallel jobs
 #   -v, --verbose         Show output of underlying build commands
 #   -h, --help            Show this help
@@ -24,7 +24,7 @@ LOG_PREFIX="BUILD BEAM"
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
 DEFAULT_OTP_TAG="OTP-28.3.1"
-SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
+SOURCES_DIR="${PROJECT_ROOT}/popcorn/sources"
 VERBOSE=false
 
 # Run a command, hiding its output unless --verbose is set. On failure the
@@ -59,7 +59,7 @@ Options:
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
   --outdir <dir>        Output directory (default: ./out)
-  --clean               Clean before building (removes otp/sources/otp)
+  --clean               Clean before building (removes popcorn/sources/otp)
   -j <N>                Parallel jobs
   -v, --verbose         Show output of underlying build commands
   -h, --help            Show this help
@@ -522,14 +522,14 @@ main() {
         jobs=$(default_jobs)
     fi
 
-    local final_outdir="${outdir:-${PROJECT_ROOT}/otp/out}"
+    local final_outdir="${outdir:-${PROJECT_ROOT}/popcorn/out}"
     local beam_dir="${SOURCES_DIR}/otp"
 
     ensure_emscripten
 
     # Clean if requested
     if [[ "${clean}" == "true" ]] && [[ -d "${beam_dir}" ]]; then
-        log "Cleaning otp/sources/otp..."
+        log "Cleaning popcorn/sources/otp..."
         rm -rf "${beam_dir}"
     fi
 

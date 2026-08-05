@@ -31,7 +31,7 @@ runs:
         {
           printf 'key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-%s\n' "$(
             {
-              find otp/patches -type f -print
+              find popcorn/patches -type f -print
               printf '%s\n' \
                 .github/actions/build-otp-wasm/action.yml \
                 .github/actions/setup-toolchain/action.yml \
@@ -59,13 +59,13 @@ runs:
       id: otp-build-cache
       uses: actions/cache@v4
       with:
-        path: otp/out
+        path: popcorn/out
         key: ${{ steps.otp-build-cache-key.outputs.key }}
 
     - name: Reuse cached OTP/BEAM build
       if: steps.otp-build-cache.outputs.cache-hit == 'true'
       shell: bash
-      run: echo "Using cached OTP WASM build from otp/out"
+      run: echo "Using cached OTP WASM build from popcorn/out"
 
     - name: Setup toolchain
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
@@ -94,7 +94,7 @@ runs:
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
-        path: otp/sources/otp-original
+        path: popcorn/sources/otp-original
         key: otp-clone-${{ runner.os }}-${{ inputs.otp-tag }}
 
     - name: Cache OpenSSL
@@ -102,8 +102,8 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          otp/sources/openssl-3.0.15-${{ inputs.build-mode }}
-          otp/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
+          popcorn/sources/openssl-3.0.15-${{ inputs.build-mode }}
+          popcorn/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
         key: ${{ steps.otp-build-cache-key.outputs.openssl_key }}
 
     - name: Diagnose environment size

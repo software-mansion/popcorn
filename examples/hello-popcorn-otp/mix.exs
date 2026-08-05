@@ -24,7 +24,7 @@ defmodule HelloPopcornOtp.MixProject do
   end
 
   defp deps do
-    [{:popcorn_otp, path: "../../otp/elixir"}]
+    [{:popcorn, path: "../../popcorn/elixir"}]
   end
 
   defp aliases do
@@ -43,7 +43,7 @@ defmodule HelloPopcornOtp.MixProject do
   end
 
   defp serve(_) do
-    task = Path.expand("../../otp/utils/popcorn_server.ex", __DIR__)
+    task = Path.expand("../../popcorn/utils/popcorn_server.ex", __DIR__)
     Code.require_file(task)
     Mix.Tasks.Popcorn.Server.run(["--port", "5173", "--dir", "dist"])
   end

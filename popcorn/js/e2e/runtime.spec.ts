@@ -1,4 +1,4 @@
-import { schedulers } from "@swmansion/popcorn-otp";
+import { schedulers } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 const FETCH_URL = "/assets/otp/manifest.json";
@@ -413,11 +413,11 @@ test.describe("fetch", () => {
         Status = maps:get(status, Response),
         Body = maps:get(body, Response),
 
-        ok = application:stop(popcorn_otp),
+        ok = application:stop(popcorn),
         ok = application:set_env(req, default_options, [
           {adapter, 'Elixir.Req.Finch'}
         ]),
-        ok = application:start(popcorn_otp),
+        ok = application:start(popcorn),
         {ok, UpdatedOptions} = application:get_env(req, default_options),
         'Elixir.Req.Finch' = proplists:get_value(adapter, UpdatedOptions),
 

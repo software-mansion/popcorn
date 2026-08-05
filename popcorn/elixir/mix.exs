@@ -1,4 +1,4 @@
-defmodule PopcornOtp.MixProject do
+defmodule Popcorn.MixProject do
   use Mix.Project
 
   @version "0.1.0"
@@ -6,7 +6,7 @@ defmodule PopcornOtp.MixProject do
 
   def project do
     [
-      app: :popcorn_otp,
+      app: :popcorn,
       version: @version,
       elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,

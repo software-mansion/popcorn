@@ -1,9 +1,9 @@
-# popcorn_otp
+# popcorn
 
 ## Installation
 
 ```elixir
 defp deps do
-  [{:popcorn_otp, "~> 0.1"}]
+  [{:popcorn, "~> 0.1"}]
 end
 ```

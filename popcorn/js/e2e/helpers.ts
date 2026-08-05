@@ -15,7 +15,7 @@ import type {
   Pid,
   SerializedError,
   tuple,
-} from "@swmansion/popcorn-otp";
+} from "@swmansion/popcorn";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
@@ -97,7 +97,8 @@ export class OtpHandle {
       options?: CallOptions,
     ): Promise<Result<unknown>> =>
       await this.otp.evaluate(
-        (otp, args) => otp.genserver.call(args.target, args.request, args.options),
+        (otp, args) =>
+          otp.genserver.call(args.target, args.request, args.options),
         { target, request, options },
       ),
     cast: async (
@@ -212,9 +213,7 @@ function createOtp(id: string): Otp {
     key: string,
   ): value is Record<string, unknown> {
     return (
-      typeof value === "object" &&
-      value !== null &&
-      Object.hasOwn(value, key)
+      typeof value === "object" && value !== null && Object.hasOwn(value, key)
     );
   }
 

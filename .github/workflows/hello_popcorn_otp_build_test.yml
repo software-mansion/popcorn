@@ -6,7 +6,7 @@ on:
     paths:
       - "examples/hello-popcorn-otp/**"
       - "examples/game-of-life-otp/**"
-      - "otp/**"
+      - "popcorn/**"
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"
       - "scripts/patch-beam.sh"
@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Produces otp/out with the OTP/BEAM WASM runtime (cached across runs).
+      # Produces popcorn/out with the OTP/BEAM WASM runtime (cached across runs).
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
@@ -68,10 +68,10 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install
 
-      # Bundles @swmansion/popcorn-otp and copies the runtime from otp/out
+      # Bundles @swmansion/popcorn and copies the runtime from popcorn/out
       # into its dist/assets (consumed by the example's esbuild plugin).
       - name: Build popcorn-otp JS package
-        run: pnpm -F ./otp/js build
+        run: pnpm -F ./popcorn/js build
 
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright

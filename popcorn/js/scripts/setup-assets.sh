@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${JS_ROOT}/../.." && pwd)"
-OUT_DIR="${PROJECT_ROOT}/otp/out"
+OUT_DIR="${PROJECT_ROOT}/popcorn/out"
 ASSETS_DIR="${JS_ROOT}/assets"
 DIST_ASSETS_DIR="${JS_ROOT}/dist/assets"
 MODE="${1:-setup}"
@@ -23,11 +23,11 @@ have_runtime_artifacts() {
 
 ensure_runtime_artifacts() {
   if have_runtime_artifacts; then
-    echo "otp/js: using existing OTP WASM artifacts from ${OUT_DIR}"
+    echo "popcorn/js: using existing OTP WASM artifacts from ${OUT_DIR}"
     return
   fi
 
-  echo "otp/js: building OTP WASM artifacts..."
+  echo "popcorn/js: building OTP WASM artifacts..."
   "${PROJECT_ROOT}/scripts/build-beam.sh" debug
 }
 
@@ -37,7 +37,7 @@ copy_runtime_assets() {
 
   for path in beam.wasm beam.smp beam.emu; do
     if [[ ! -f "${OUT_DIR}/${path}" ]]; then
-      echo "otp/js: missing expected artifact '${OUT_DIR}/${path}'" >&2
+      echo "popcorn/js: missing expected artifact '${OUT_DIR}/${path}'" >&2
       exit 1
     fi
   done

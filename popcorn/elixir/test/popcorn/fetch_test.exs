@@ -8,8 +8,8 @@ defmodule Popcorn.FetchTest do
   @binary <<255, 0, 65, 254>>
 
   setup do
-    Application.put_env(:popcorn_otp, :wasm_bridge, FakeBridge)
-    on_exit(fn -> Application.delete_env(:popcorn_otp, :wasm_bridge) end)
+    Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
+    on_exit(fn -> Application.delete_env(:popcorn, :wasm_bridge) end)
   end
 
   describe "request/2" do

@@ -99,7 +99,7 @@ export function popcorn(options: Options): Plugin {
             req.headers["accept-encoding"]?.toString(),
             options.brotli ?? false,
           )
-        : { name: null, suffix: "" } as const;
+        : ({ name: null, suffix: "" } as const);
       if (compressible && encoding.name === null) {
         res.statusCode = 406;
         setHeaders(res);
@@ -128,7 +128,7 @@ export function popcorn(options: Options): Plugin {
     config() {
       return {
         // Exclude from prebundling so import.meta.url resolves correctly.
-        optimizeDeps: { exclude: ["@swmansion/popcorn-otp"] },
+        optimizeDeps: { exclude: ["@swmansion/popcorn"] },
         // COOP/COEP must be on every response (SharedArrayBuffer/pthreads),
         // including the worker/beam files Vite serves from the package itself.
         server: { headers: CORS_HEADERS },
@@ -173,7 +173,10 @@ function isCompressible(path: string): boolean {
   return path.endsWith(".tar") || path.endsWith(".wasm");
 }
 
-function selectEncoding(header: string | undefined, useBrotli: boolean): {
+function selectEncoding(
+  header: string | undefined,
+  useBrotli: boolean,
+): {
   name: "br" | "gzip" | null;
   suffix: ".br" | ".gz" | "";
 } {

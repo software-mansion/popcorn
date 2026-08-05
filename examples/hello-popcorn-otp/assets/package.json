@@ -7,7 +7,7 @@
     "test": "playwright test"
   },
   "dependencies": {
-    "@swmansion/popcorn-otp": "workspace:*"
+    "@swmansion/popcorn": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

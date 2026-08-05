@@ -76,9 +76,9 @@ importers:
 
   examples/game-of-life-otp/assets:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
-        version: link:../../../otp/js
+        version: link:../../../popcorn/js
     devDependencies:
       '@playwright/test':
         specifier: ^1.60.0
@@ -99,9 +99,9 @@ importers:
 
   examples/hello-popcorn-otp/assets:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
-        version: link:../../../otp/js
+        version: link:../../../popcorn/js
     devDependencies:
       '@playwright/test':
         specifier: ^1.60.0
@@ -466,7 +466,7 @@ importers:
         specifier: ^8.63.0
         version: 8.63.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
 
-  otp/js:
+  popcorn/js:
     devDependencies:
       '@playwright/test':
         specifier: ^1.61.1
@@ -493,9 +493,9 @@ importers:
         specifier: 'catalog:'
         version: 7.3.2(@types/node@25.6.0)(jiti@2.7.0)(lightningcss@1.32.0)
 
-  otp/js/e2e/setup:
+  popcorn/js/e2e/setup:
     dependencies:
-      '@swmansion/popcorn-otp':
+      '@swmansion/popcorn':
         specifier: workspace:*
         version: link:../..
     devDependencies:
