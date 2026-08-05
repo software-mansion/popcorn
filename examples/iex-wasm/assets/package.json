@@ -1,14 +1,19 @@
 {
   "name": "iex_wasm",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "serve": "elixir -r ../../../popcorn/utils/popcorn_server.ex -e 'Mix.Tasks.Popcorn.Server.run([\"--port\", \"5173\", \"--dir\", \"../dist\"])'",
+    "dev": "pnpm build && pnpm serve",
+    "test": "playwright test"
   },
   "dependencies": {
-    "@swmansion/popcorn": "link:../../../popcorn-2/js",
+    "@swmansion/popcorn": "link:../../../popcorn/js",
     "ghostty-web": "^0.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.0",
     "esbuild": "^0.25.0"
   }
 }
