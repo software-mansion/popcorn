@@ -53,6 +53,7 @@ defmodule Popcorn.BeamTools.Packager do
         tar_paths: input_tar_paths
       }) do
     with {:ok, provided_apps} <- fetch_provided_apps(manifest_path),
+         {:ok, toolchain} <- compatible_toolchain(provided_apps.version),
          {:ok, user_apps} <- fetch_user_apps(root_dir),
          {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, entrypoint_app) do
       vm_version = provided_apps.version
@@ -78,7 +79,7 @@ defmodule Popcorn.BeamTools.Packager do
         end)
         |> Enum.flat_map(fn {:ok, notes} -> notes end)
 
-      notes = dynamic_nifs ++ otp_version(vm_version)
+      notes = dynamic_nifs
       manifest_path = Path.join(out_dir, "manifest.json")
       manifest_apps = Map.merge(packed_apps, provided_apps.apps)
 
@@ -93,6 +94,7 @@ defmodule Popcorn.BeamTools.Packager do
         entrypoint: entrypoint_app,
         apps: manifest_apps,
         notes: notes,
+        toolchain: toolchain,
         vm: %{boot: "bin/vm.boot", version: vm_version}
       }
 
@@ -105,7 +107,8 @@ defmodule Popcorn.BeamTools.Packager do
          manifestPath: Path.expand(manifest_path),
          tarPaths: tar_paths,
          apps: manifest_apps,
-         notes: notes
+         notes: notes,
+         toolchain: toolchain
        }}
     end
   end
@@ -237,16 +240,40 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  defp otp_version(vm_version) do
-    if otp_major(System.otp_release()) != otp_major(vm_version) do
-      [%{code: "otp_mismatch", local: System.otp_release(), vm: vm_version}]
+  defp compatible_toolchain(runtime_version) do
+    host_version = host_otp_version()
+    host = otp_version(host_version)
+    runtime = otp_version(runtime_version)
+
+    if hd(host) >= hd(runtime) - 2 and version_lte?(host, runtime) do
+      {:ok, %{otp: host_version, elixir: System.version()}}
     else
-      []
+      err(:unsupported_otp, {host_version, runtime_version})
     end
   end
 
-  defp otp_major(version) do
-    version |> to_string() |> String.split(".") |> hd() |> String.to_integer()
+  defp host_otp_version do
+    path =
+      Path.join([to_string(:code.root_dir()), "releases", System.otp_release(), "OTP_VERSION"])
+
+    path
+    |> File.read!()
+    |> String.trim()
+  end
+
+  defp otp_version(version) do
+    version
+    |> to_string()
+    |> String.split("-", parts: 2)
+    |> hd()
+    |> String.split(".")
+    |> Enum.map(&String.to_integer/1)
+  end
+
+  defp version_lte?(left, right) do
+    width = max(length(left), length(right))
+    pad = fn version -> version ++ List.duplicate(0, width - length(version)) end
+    pad.(left) <= pad.(right)
   end
 
   defp get_required_apps(props) do
@@ -266,6 +293,10 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:bad_provided_app_manifest, path) do
     {:error, %{code: "bad_provided_app_manifest", path: path}}
+  end
+
+  defp err(:unsupported_otp, {host, runtime}) do
+    {:error, %{code: "unsupported_otp", host: host, runtime: runtime}}
   end
 
   defp err(:missing_dep, {app, dep, provided_apps, user_apps}) do
