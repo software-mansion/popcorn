@@ -409,10 +409,10 @@ build_beam() {
         extra_emcc_link_flags+=" --pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
     fi
     if [[ "${mode}" == "release" ]]; then
-        # LTO: -Oz runs binaryen's size passes and minifies the JS glue.
-        # --closure additionally Closure-minifies the glue.
-        # ref: https://emscripten.org/docs/tools_reference/emcc.html
-        extra_emcc_link_flags+=" -Oz --closure 1"
+        # -Oz runs binaryen's size passes and minifies the JS glue. Closure
+        # (--closure 1) must stay off: it renames runtime internals like
+        # TTY.stream_ops that the JS library patches by name at preRun.
+        extra_emcc_link_flags+=" -Oz"
     fi
     export EXTRA_EMCC_LINK_FLAGS="${extra_emcc_link_flags}"
 
