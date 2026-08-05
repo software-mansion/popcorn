@@ -60,6 +60,7 @@ type SendEndEvent = {
 };
 
 type BootEndEvent =
+  | { type: "popcorn:boot-vm-ready"; payload: {} }
   | { type: "popcorn:boot-end"; payload: {} }
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
@@ -120,6 +121,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent {
     case "otp:message":
     case "otp:run_js":
     case "otp:tracked-value-delete":
+    case "popcorn:boot-vm-ready":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
     case "popcorn:send-end":
