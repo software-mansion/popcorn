@@ -230,10 +230,10 @@ index d5b3b9d52b710538f0c3a94ad62dcb54654ac12a..6702ab0f2a2fc3adc2b089c0e125eda3
              erts_add_taint(dp->name_atom);
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..a01c5d18cd1c394a85535694775299d279876c61
+index 0000000000000000000000000000000000000000..3a03cf66dc36e38eeeb7142bb0817c4b6d6e8a7f
 --- /dev/null
 +++ b/erts/emulator/js_bridge/beam-bridge.pre.js
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,49 @@
 +var __beamBridgeOnMessage =
 +  typeof Module['onBeamMessage'] === 'function' ? Module['onBeamMessage'] : null;
 +var __beamBridgeOnError =
@@ -258,6 +258,31 @@ index 0000000000000000000000000000000000000000..a01c5d18cd1c394a85535694775299d2
 +    __beamBridgeOnStdinConsumed(size);
 +  }
 +};
++
++// TTY interception lives here rather than in the caller because it patches
++// runtime internals (TTY.stream_ops) whose names Closure rewrites; inside
++// this compilation unit the renaming stays consistent.
++var __beamBridgeOnTtyChunk =
++  typeof Module['onTtyChunk'] === 'function' ? Module['onTtyChunk'] : null;
++
++Module['preRun'] = Module['preRun'] || [];
++Module['preRun'].push(function() {
++  if (__beamBridgeOnTtyChunk === null) {
++    return;
++  }
++
++  var originalWrite = TTY.stream_ops.write;
++  TTY.stream_ops.write = function(stream, buffer, offset, length, position) {
++    if (stream.fd !== 1 && stream.fd !== 2) {
++      return originalWrite(stream, buffer, offset, length, position);
++    }
++
++    var chunk = new Uint8Array(length);
++    chunk.set(buffer.subarray(offset, offset + length));
++    __beamBridgeOnTtyChunk(stream.fd, chunk);
++    return length;
++  };
++});
 diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
 new file mode 100644
 index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc08c15a0cb
@@ -479,7 +504,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  	res_term = enif_make_binary(env, &bin);
      } else if (res < bin.size / 2) {
 @@ -949,6 +1072,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
-
+ 
      enif_set_pid_undefined(&tty->self);
      enif_set_pid_undefined(&tty->reader);
 +#ifdef __EMSCRIPTEN__
@@ -1390,7 +1415,7 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..efd4ce6c49cc2d1a0276af562618308b
      erts_sys_env_init();
  }
 diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
-index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d8c1dc066 100644
+index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..658b15a3c87c303e3d2332ed3450bfdedc0eeb44 100644
 --- a/erts/emulator/sys/unix/sys_drivers.c
 +++ b/erts/emulator/sys/unix/sys_drivers.c
 @@ -169,6 +169,7 @@ typedef struct driver_data {
@@ -1409,7 +1434,7 @@ index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..7fb18a09bc90f80d892eca0102ccfc8d
  }
  
  /* II. Prototypes */
-@@ -482,6 +484,10 @@ static ErlDrvData spawn_start(ErlDrvPort port_num, char* name,
+@@ -481,6 +483,10 @@ static ErlDrvData spawn_start(ErlDrvPort port_num, char* name,
      char *wd, *cwd;
      int ifd[2], ofd[2], stderrfd;
  
@@ -1592,40 +1617,6 @@ index 0000000000000000000000000000000000000000..3679b690583605c17f185b5f2f4008a8
 +
 +ref_key(_Resource) ->
 +    erlang:nif_error(undef).
-diff --git a/lib/kernel/src/prim_tty.erl b/lib/kernel/src/prim_tty.erl
-index f438f9f816371d7721fe1c0ce3c7f367fd1a3bab..2f206e9519f1539078d89c2f9b722fe9425466a7 100644
---- a/lib/kernel/src/prim_tty.erl
-+++ b/lib/kernel/src/prim_tty.erl
-@@ -357,6 +357,16 @@ options(UserOptions) ->
- init(State, ssh) ->
-     State#state{ xn = true };
- init(State, {unix,_}) ->
-+    case erlang:system_info(system_architecture) of
-+        "wasm32-unknown-emscripten" -> State;
-+        _ -> init_unix(State)
-+    end;
-+init(State, {win32, _}) ->
-+    State#state{
-+      %% position = false,
-+      xn = true }.
-+
-+init_unix(State) ->
- 
-     case os:getenv("TERM") of
-         false ->
-@@ -445,11 +455,7 @@ init(State, {unix,_}) ->
-       tab = Tab,
-       position = Position,
-       delete_after_cursor = DeleteAfter
--     };
--init(State, {win32, _}) ->
--    State#state{
--      %% position = false,
--      xn = true }.
-+     }.
- 
- -spec handles(state()) -> #{ read := undefined | reference(),
-                              write := reference() }.
 diff --git a/lib/asn1/src/asn1rtt_ber.erl b/lib/asn1/src/asn1rtt_ber.erl
 index 03fd099cc4786442362bd48f4764b9c31e667de7..3c385df0a66fb48cff3a1699318f1b3a3568c09b 100644
 --- a/lib/asn1/src/asn1rtt_ber.erl
@@ -1676,6 +1667,40 @@ index 72a9397bc1a5863dc88c1458e143ebbca708d891..14160385f06a8229d3b0611ab33e2ed5
    struct hostent *result;
    int err;
  
+diff --git a/lib/kernel/src/prim_tty.erl b/lib/kernel/src/prim_tty.erl
+index f438f9f816371d7721fe1c0ce3c7f367fd1a3bab..2f206e9519f1539078d89c2f9b722fe9425466a7 100644
+--- a/lib/kernel/src/prim_tty.erl
++++ b/lib/kernel/src/prim_tty.erl
+@@ -357,6 +357,16 @@ options(UserOptions) ->
+ init(State, ssh) ->
+     State#state{ xn = true };
+ init(State, {unix,_}) ->
++    case erlang:system_info(system_architecture) of
++        "wasm32-unknown-emscripten" -> State;
++        _ -> init_unix(State)
++    end;
++init(State, {win32, _}) ->
++    State#state{
++      %% position = false,
++      xn = true }.
++
++init_unix(State) ->
+ 
+     case os:getenv("TERM") of
+         false ->
+@@ -445,11 +455,7 @@ init(State, {unix,_}) ->
+       tab = Tab,
+       position = Position,
+       delete_after_cursor = DeleteAfter
+-     };
+-init(State, {win32, _}) ->
+-    State#state{
+-      %% position = false,
+-      xn = true }.
++     }.
+ 
+ -spec handles(state()) -> #{ read := undefined | reference(),
+                              write := reference() }.
 diff --git a/lib/odbc/configure.ac b/lib/odbc/configure.ac
 index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3a503af02 100644
 --- a/lib/odbc/configure.ac
@@ -1706,7 +1731,7 @@ index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8
      AC_MSG_RESULT($ARCH)
 diff --git a/xcomp/erl-xcomp-wasm32-emscripten.conf b/xcomp/erl-xcomp-wasm32-emscripten.conf
 new file mode 100644
-index 0000000000000000000000000000000000000000..1170f6b6e2839f1246de95bffdc315c0941f2c9d
+index 0000000000000000000000000000000000000000..7551ec5f5c5fd9b50103f5625eeed4a208043abd
 --- /dev/null
 +++ b/xcomp/erl-xcomp-wasm32-emscripten.conf
 @@ -0,0 +1,112 @@
