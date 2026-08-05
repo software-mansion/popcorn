@@ -1,21 +1,25 @@
 import * as esbuild from "esbuild";
 import { popcorn } from "@swmansion/popcorn/esbuild";
-import { copyFile, mkdir } from "fs/promises";
+import { copyFile, mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-await mkdir("../dist", { recursive: true });
-await Promise.all([
-  copyFile("index.html", "../dist/index.html"),
-  copyFile("erlang.html", "../dist/erlang.html"),
-  copyFile("style.css", "../dist/style.css"),
-  copyFile("favicon.png", "../dist/favicon.png"),
-  copyFile("favicon-erl.png", "../dist/favicon-erl.png"),
-]);
+const assetsDir = dirname(fileURLToPath(import.meta.url));
+const rootDir = resolve(assetsDir, "..");
+const outDir = resolve(rootDir, "dist");
+
+await mkdir(outDir, { recursive: true });
+await Promise.all(
+  ["index.html", "erlang.html", "style.css", "favicon.png", "favicon-erl.png"].map((name) =>
+    copyFile(resolve(assetsDir, name), resolve(outDir, name)),
+  ),
+);
 
 await esbuild.build({
-  entryPoints: ["index.js"],
+  entryPoints: [resolve(assetsDir, "index.js")],
   bundle: true,
   format: "esm",
   sourcemap: true,
-  outfile: "../dist/index.js",
-  plugins: [popcorn({ bundlePaths: ["../dist/wasm/bundle.avm"] })],
+  outfile: resolve(outDir, "index.js"),
+  plugins: [popcorn({ rootDir, app: "iex", extraApps: ["logger"] })],
 });
