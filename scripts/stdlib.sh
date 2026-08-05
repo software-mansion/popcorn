@@ -329,7 +329,7 @@ create_otp_tarballs() {
         fi
 
         tarball="${outdir}/${app}.tar"
-        tar -C "${src_root}" -cf "${tarball}" "lib/${app}/ebin"
+        tar --format ustar -C "${src_root}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
@@ -351,7 +351,7 @@ create_elixir_tarballs() {
         }
 
         tarball="${outdir}/${app}.tar"
-        tar -C "${elixir_dir}" -cf "${tarball}" "lib/${app}/ebin"
+        tar --format ustar -C "${elixir_dir}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
