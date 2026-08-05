@@ -47,19 +47,20 @@ defmodule Popcorn.BeamTools.Packager do
       tar_paths: input_tar_paths
     } = args
 
-    with {:ok, manifest} <- fetch_manifest(manifest_path),
-         {:ok, toolchain} <- compatible_toolchain(manifest.version),
-         {:ok, user_apps} <- fetch_user_apps(root_dir),
-         manifest_names = manifest.apps |> Map.keys() |> MapSet.new(),
-         {:ok, apps} <- fetch_apps_to_pack(user_apps, manifest_names, entrypoint_app) do
+    with {:ok, manifest} <- read_manifest(manifest_path),
+         {:ok, toolchain} <- fetch_toolchain_info(manifest.version),
+         project_apps = root_dir |> project_build_dir() |> get_apps_info(),
+         builtin_apps = get_builtin_apps(toolchain),
+         {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app) do
       vm_version = manifest.version
+      toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
       File.mkdir_p!(out_dir)
 
+      # TODO: We still use builtin apps, needs to change
       packed_apps =
-        apps
-        |> Task.async_stream(fn app ->
-          info = Map.fetch!(user_apps, app)
+        apps_info
+        |> Task.async_stream(fn {app, info} ->
           version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
           tar_path = create_tarball(out_dir, app, info.ebin_dir)
 
@@ -68,7 +69,7 @@ defmodule Popcorn.BeamTools.Packager do
         |> Map.new(fn {:ok, app} -> app end)
 
       diagnostics =
-        apps_info.project
+        apps_info
         |> Task.async_stream(fn {app, info} ->
           case loaded_dynamic_nifs(app, info.ebin_dir) do
             [] ->
@@ -101,16 +102,17 @@ defmodule Popcorn.BeamTools.Packager do
 
       File.write!(manifest_path, encode_json(manifest))
 
-      {:ok,
-       %{
-         ok: true,
-         entrypoint: entrypoint_app,
-         manifestPath: Path.expand(manifest_path),
-         tarPaths: tar_paths,
-         apps: manifest_apps,
-         notes: diagnostics,
-         toolchain: toolchain
-       }}
+      result = %{
+        ok: true,
+        entrypoint: entrypoint_app,
+        manifestPath: Path.expand(manifest_path),
+        tarPaths: tar_paths,
+        apps: manifest_apps,
+        notes: diagnostics,
+        toolchain: toolchain
+      }
+
+      {:ok, result}
     end
   end
 
@@ -123,21 +125,35 @@ defmodule Popcorn.BeamTools.Packager do
     end)
   end
 
-  defp fetch_user_apps(root_dir) do
+  defp project_build_dir(root_dir) do
     build_env = System.get_env("MIX_ENV", "dev")
     build_lib_dir = Path.join([root_dir, "_build", build_env, "lib"])
-    app_matcher = Path.join(build_lib_dir, "*/ebin/*.app")
-    all_app_paths = Path.wildcard(app_matcher)
 
-    {:ok,
-     Map.new(all_app_paths, fn app_path ->
-       {:ok, [{:application, name, props}]} = :file.consult(app_path)
-
-       {to_string(name), %{props: props, ebin_dir: Path.dirname(app_path)}}
-     end)}
+    build_lib_dir
   end
 
-  defp fetch_manifest(manifest_path) do
+  defp get_apps_info(root_dir) do
+    extract_info = fn app_path ->
+      {:ok, [{:application, name, props}]} = :file.consult(app_path)
+      dir = Path.dirname(app_path)
+
+      {to_string(name), %{props: props, ebin_dir: dir}}
+    end
+
+    root_dir
+    |> Path.join("*/ebin/*.app")
+    |> Path.wildcard()
+    |> Map.new(extract_info)
+  end
+
+  defp get_builtin_apps(toolchain) do
+    elixir_apps = get_apps_info(toolchain.elixir_root)
+    otp_apps = get_apps_info(toolchain.otp_root)
+
+    Map.merge(elixir_apps, otp_apps)
+  end
+
+  defp read_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
          {:ok, %{"apps" => apps, "vm" => %{"version" => version}}} <- decode_json(json) do
       {:ok, %{version: version, apps: apps}}
@@ -146,49 +162,54 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  defp fetch_apps_to_pack(user_apps, _provided_apps, nil) do
-    {:ok, user_apps |> Map.keys() |> Enum.sort()}
+  defp apps_to_pack(project_apps, _builtin_apps, nil) do
+    {:ok, Enum.sort_by(project_apps, fn {app, _info} -> app end)}
   end
 
-  defp fetch_apps_to_pack(user_apps, provided_apps, entrypoint_app) do
-    if Map.has_key?(user_apps, entrypoint_app) do
-      case fetch_needed_apps(user_apps, provided_apps, entrypoint_app, MapSet.new()) do
-        {:ok, apps} -> {:ok, apps |> MapSet.to_list() |> Enum.sort()}
-        {:error, _} = error -> error
-      end
+  defp apps_to_pack(project_apps, builtin_apps, entrypoint)
+       when is_map_key(project_apps, entrypoint) do
+    all_apps_info = Map.merge(builtin_apps, project_apps)
+
+    with {:ok, selected_apps} <-
+           gather_required_apps(all_apps_info, project_apps, entrypoint, MapSet.new()) do
+      project_apps
+      |> Map.filter(fn {app, _info} -> MapSet.member?(selected_apps, app) end)
+      |> Enum.sort()
+      |> then(&{:ok, &1})
+    end
+  end
+
+  defp apps_to_pack(_project_apps, _builtin_apps, entrypoint) do
+    err(:missing_entrypoint, entrypoint)
+  end
+
+  defp gather_required_apps(all_apps_info, project_apps, app, selected) do
+    if MapSet.member?(selected, app) do
+      {:ok, selected}
     else
-      err(:missing_entrypoint, entrypoint_app)
+      info = Map.fetch!(all_apps_info, app)
+      selected = MapSet.put(selected, app)
+
+      info.props
+      |> get_required_apps()
+      |> reduce_while_ok(selected, fn dep, acc ->
+        if Map.has_key?(all_apps_info, dep) do
+          gather_required_apps(all_apps_info, project_apps, dep, acc)
+        else
+          project_app_names = Enum.sort(Map.keys(project_apps))
+          err(:missing_dep, {app, dep, project_app_names})
+        end
+      end)
     end
   end
 
-  defp fetch_needed_apps(user_apps, provided_apps, app, required) do
-    cond do
-      MapSet.member?(required, app) ->
-        {:ok, required}
-
-      MapSet.member?(provided_apps, app) ->
-        {:ok, required}
-
-      true ->
-        info = Map.fetch!(user_apps, app)
-        required = MapSet.put(required, app)
-
-        info.props
-        |> get_required_apps()
-        |> Enum.reduce_while({:ok, required}, fn
-          dep, {:ok, acc} ->
-            available = MapSet.member?(provided_apps, dep) or Map.has_key?(user_apps, dep)
-
-            if available do
-              case fetch_needed_apps(user_apps, provided_apps, dep, acc) do
-                {:ok, acc} -> {:cont, {:ok, acc}}
-                {:error, _} = error -> {:halt, error}
-              end
-            else
-              {:halt, err(:missing_dep, {app, dep, provided_apps, user_apps})}
-            end
-        end)
-    end
+  defp reduce_while_ok(enumerable, acc, f) do
+    Enum.reduce_while(enumerable, {:ok, acc}, fn value, {:ok, acc} ->
+      case f.(value, acc) do
+        {:ok, new_acc} -> {:cont, {:ok, new_acc}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
   defp create_tarball(outdir, app, ebin_dir) do
@@ -219,13 +240,30 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  defp compatible_toolchain(runtime_version) do
+  defp fetch_toolchain_info(runtime_version) do
+    # host: computer this runs on
+    # runtime: vm compiled to wasm
     host_version = host_otp_version()
     host = otp_version(host_version)
     runtime = otp_version(runtime_version)
 
-    if hd(host) >= hd(runtime) - 2 and version_lte?(host, runtime) do
-      {:ok, %{otp: host_version, elixir: System.version()}}
+    [host_major | _] = host
+    [runtime_major | _] = runtime
+
+    compatible = runtime_major - 2 <= host_major and version_lte?(host, runtime)
+
+    if compatible do
+      otp_root = Path.join(to_string(:code.root_dir()), "lib")
+      elixir_root = :elixir |> :code.lib_dir() |> to_string() |> Path.dirname()
+
+      info = %{
+        otp: host_version,
+        elixir: System.version(),
+        otp_root: otp_root,
+        elixir_root: elixir_root
+      }
+
+      {:ok, info}
     else
       err(:unsupported_otp, {host_version, runtime_version})
     end
@@ -278,15 +316,8 @@ defmodule Popcorn.BeamTools.Packager do
     {:error, %{code: "unsupported_otp", host: host, runtime: runtime}}
   end
 
-  defp err(:missing_dep, {app, dep, provided_apps, user_apps}) do
-    {:error,
-     %{
-       code: "missing_dep",
-       app: app,
-       dep: dep,
-       provided_apps: provided_apps |> MapSet.to_list() |> Enum.sort(),
-       user_apps: user_apps |> Map.keys() |> Enum.sort()
-     }}
+  defp err(:missing_dep, {app, dep, project_apps}) do
+    {:error, %{code: "missing_dep", app: app, dep: dep, available_apps: project_apps}}
   end
 
   defp err(:dynamic_nifs_loading, {app, beams}) do
