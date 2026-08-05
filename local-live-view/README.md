@@ -9,19 +9,18 @@ defmodule LocalThermostat.MixProject do
   ...
   defp deps do
     [
-      {:local_live_view, github: "software-mansion/popcorn", sparse: "local-live-view"}
+      {:local_live_view, "~> 0.1"}
     ]
   end
 end
 ```
-2. Attach local_live_view.js script in your .html file:
-```html
-<html>
-    <script type="module" src="./local_live_view/local_live_view.js" defer></script>
-    <body>
-    </body>
-</html>
-```
+2. Run `mix llv.install`. It wires up the JS side for you: the bundle ships in
+   the package, so there is no npm step — Phoenix's esbuild resolves
+   `import { LLVEngine } from "local_live_view"` through `deps/`.
+
+   > Taking LocalLiveView from git instead (`github: "software-mansion/popcorn",
+   > sparse: "local-live-view"`) also works, but then the JS bundle is not
+   > prebuilt and `mix llv.build` needs Node.js + pnpm to build it from source.
 3. Define your LocalLiveView in the `lib` directory:
 ```elixir
 defmodule ThermostatLive do
@@ -47,12 +46,7 @@ end
 ```
 4. Add html tag to render defined view, by using data-pop-view:
 ```html
-<html>
-    <script type="module" src="./local_live_view/local_live_view.js" defer></script>
-    <body>
-    <div data-pop-view="ThermostatLive"></div>
-    </body>
-</html>
+<div data-pop-view="ThermostatLive"></div>
 ```
 
 ## Build

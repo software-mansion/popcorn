@@ -8,11 +8,14 @@ defmodule Mix.Tasks.Llv.Build do
 
   ## Steps
 
-    1. Copies Popcorn runtime files (`iframe.mjs`, `AtomVM.mjs`, `AtomVM.wasm`)
+    1. Runs `mix llv.assets` to make sure `deps/local_live_view/priv/static/`
+       holds the JS bundle. For a published package this is a no-op — the
+       bundle ships in the tarball.
+    2. Copies Popcorn runtime files (`iframe.mjs`, `AtomVM.mjs`, `AtomVM.wasm`)
        from `deps/local_live_view/priv/static/` into `priv/static/assets/js/`.
        These must be served alongside Phoenix's `app.js` so Popcorn's
        `import.meta.url`-based lookups resolve.
-    2. Runs `mix build` inside `local/` to compile the WASM bundle.
+    3. Runs `mix build` inside `local/` to compile the WASM bundle.
 
   ## Usage
 
@@ -38,6 +41,8 @@ defmodule Mix.Tasks.Llv.Build do
     unless File.dir?(local_dir) do
       Mix.raise("#{local_dir}/ directory not found. Run `mix llv.install` first.")
     end
+
+    Mix.Task.run("llv.assets")
 
     llv_path = Mix.Project.deps_paths()[:local_live_view]
     src_dir = Path.join(llv_path, "priv/static")

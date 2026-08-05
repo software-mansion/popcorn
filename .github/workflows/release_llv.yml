@@ -1,0 +1,71 @@
+name: Release LocalLiveView
+
+# LocalLiveView releases on its own cadence, hence the separate `llv-v*` tag
+# namespace (the popcorn release workflows trigger on `v*`).
+#
+# The JS bundle and the vendored Popcorn runtime files are NOT in git. They are
+# built here: `mix hex.publish` runs `mix llv.assets` (wired into the alias in
+# local-live-view/mix.exs), which bundles priv/static/ before packaging. That is
+# also the guard against publishing a tarball without them.
+
+on:
+  push:
+    tags:
+      - "llv-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version to simulate, e.g. llv-v0.1.0"
+        required: true
+      dry_run:
+        description: "Skip actual publish"
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check versions align
+        if: github.ref_type == 'tag' || inputs.tag
+        shell: python
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          import json, os, re
+          from pathlib import Path
+
+          tag = os.environ["TAG"].removeprefix("llv-v")
+          js = json.loads(Path("local-live-view/package.json").read_text())["version"]
+          ex = re.search(r'@version\s+"([^"]+)"', Path("local-live-view/mix.exs").read_text()).group(1)
+
+          versions = {"tag": tag, "js": js, "elixir": ex}
+          core = {k: re.split(r"[-+]", v, 1)[0] for k, v in versions.items()}
+          print(versions)
+          if len(set(core.values())) != 1:
+              raise SystemExit(f"version mismatch (ignoring pre-release): {versions}")
+
+      # Same image as the popcorn releases: it installs the JS workspace and
+      # builds AtomVM from FissionVM, so the runtime files vendored into
+      # priv/static/ are the production ones.
+      - name: Build Docker image
+        run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ github.ref_name }} .
+
+      # LLV_RELEASE makes mix.exs depend on the published :popcorn instead of
+      # the in-repo path dep, which cannot be packaged.
+      - name: Publish to Hex
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+          DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          docker run --rm -e HEX_API_KEY -e LLV_RELEASE=1 \
+            popcorn-builder \
+            sh -c "cd /build/popcorn/local-live-view \
+              && mix deps.get \
+              && mix compile \
+              && mix hex.publish package --yes $DRY_RUN_FLAG \
+              && MIX_ENV=dev mix hex.publish docs --yes $DRY_RUN_FLAG"

@@ -1,19 +1,53 @@
 defmodule LocalLiveView.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @popcorn_version "0.3"
+  @github "https://github.com/software-mansion/popcorn"
+
+  # LICENSE lives in the repo root and is copied in before packaging, see copy_meta/1.
+  @repo_root ".."
+  @package_metadata_files ~w(LICENSE)
+
   def project do
     [
       app: :local_live_view,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
 
+      # hex
+      description: "LiveView that runs locally in the browser, on Popcorn",
+      package: package(),
+
       # docs
       name: "LocalLiveView",
+      source_url: @github,
       docs: docs()
+    ]
+  end
+
+  defp package do
+    [
+      maintainers: ["Software Mansion"],
+      licenses: ["Apache-2.0"],
+      # priv/static holds the JS bundle and Popcorn runtime files. They are not
+      # committed — the release pipeline builds them via `mix llv.assets` (wired
+      # into hex.build/hex.publish below) and they ship inside the tarball, so
+      # apps get all their JS through Mix with no npm involved.
+      #
+      # package.json must ship too: Phoenix's esbuild config puts deps/ on
+      # NODE_PATH, so `import ... from "local_live_view"` resolves through its
+      # "exports" entry. assets/ is deliberately left out — users get the built
+      # bundle, not the TypeScript sources.
+      files: ~w(lib pages priv/static priv/templates package.json mix.exs README.md LICENSE),
+      links: %{
+        "GitHub" => @github,
+        "Popcorn website" => "https://popcorn.swmansion.com"
+      }
     ]
   end
 
@@ -31,14 +65,11 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # {:popcorn, "~> 0.3.0-rc2", targets: :wasm},
-      {:popcorn, path: "../popcorn/elixir", targets: :wasm},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
-      {:igniter, ">= 0.7.0", runtime: false},
+      popcorn_dep(),
       {:playwright,
        github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test},
       {:phoenix, "~> 1.8", runtime: false},
-      {:phoenix_live_view, runtime: false},
+      {:phoenix_live_view, "~> 1.1", runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},
       {:phoenix_ecto, "~> 4.6", runtime: false},
       {:ecto, "~> 3.12", runtime: false},
@@ -49,6 +80,17 @@ defmodule LocalLiveView.MixProject do
       {:igniter, ">= 0.7.0", targets: :host, runtime: false},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true}
     ]
+  end
+
+  # In this repo we develop against the Popcorn source tree, so API changes on
+  # both sides land in one commit. A path dep cannot be published, so the
+  # release pipeline sets LLV_RELEASE=1 to depend on the published Popcorn.
+  defp popcorn_dep do
+    if System.get_env("LLV_RELEASE") do
+      {:popcorn, "~> #{@popcorn_version}", targets: :wasm}
+    else
+      {:popcorn, path: "../popcorn/elixir", targets: :wasm}
+    end
   end
 
   defp docs do
@@ -98,7 +140,11 @@ defmodule LocalLiveView.MixProject do
           {_out, 0} =
             System.shell("MIX_TARGET=wasm mix popcorn.cook", into: IO.stream(:stdio, :line))
         end
-      ]
+      ],
+      # build_assets/1 guarantees priv/static is built and current, so a tarball
+      # can never go out without the JS bundle it is supposed to ship.
+      "hex.build": [&copy_meta/1, &build_assets/1, "hex.build"],
+      "hex.publish": [&copy_meta/1, &build_assets/1, "hex.publish"]
     ]
   end
 
@@ -109,5 +155,20 @@ defmodule LocalLiveView.MixProject do
         into: IO.stream(:stdio, :line),
         stderr_to_stdout: true
       )
+  end
+
+  # In a subprocess on purpose: running llv.assets in-process pulls in
+  # deps/loadpaths, which knocks the Hex archive off the code path and makes the
+  # following hex.build blow up with `Hex.Mix is not available`.
+  defp build_assets(_) do
+    {_out, 0} = System.shell("mix llv.assets", into: IO.stream(:stdio, :line))
+  end
+
+  defp copy_meta(_) do
+    repo_root = Path.expand(@repo_root, __DIR__)
+
+    for filename <- @package_metadata_files do
+      File.cp!(Path.join(repo_root, filename), Path.expand(filename, __DIR__))
+    end
   end
 end

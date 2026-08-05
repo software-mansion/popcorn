@@ -34,6 +34,12 @@ defmodule Mix.Tasks.Llv.Install do
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
   @local_project_dir "local"
 
+  # Evaluated while compiling local_live_view, so this is our own version.
+  @llv_version_requirement (
+                             version = Version.parse!(Mix.Project.config()[:version])
+                             "#{version.major}.#{version.minor}"
+                           )
+
   @impl Igniter.Mix.Task
   def igniter(igniter) do
     igniter
@@ -501,14 +507,23 @@ defmodule Mix.Tasks.Llv.Install do
     if Igniter.exists?(igniter, "#{@local_project_dir}/mix.exs") do
       igniter
     else
-      llv_path = llv_path_from_local()
-
       igniter
-      |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_path: llv_path)
+      |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_dep: llv_dep_from_local())
       |> copy_template("#{@local_project_dir}/config/config.exs", "config.exs")
       |> copy_template("#{@local_project_dir}/.formatter.exs", "formatter.exs")
       |> copy_template("#{@local_project_dir}/lib/local/application.ex", "application.ex")
       |> copy_template("#{@local_project_dir}/lib/hello_local.ex", "hello_local.ex")
+    end
+  end
+
+  # The generated local/ project depends on LocalLiveView as well (it compiles
+  # the WASM side), so it has to declare the dep the same way the host app got
+  # it: a relative path for a path dep, a version requirement otherwise.
+  defp llv_dep_from_local do
+    if llv_path_dep?() do
+      ~s|{:local_live_view, path: "#{llv_path_from_local()}"}|
+    else
+      ~s|{:local_live_view, "~> #{@llv_version_requirement}"}|
     end
   end
 
