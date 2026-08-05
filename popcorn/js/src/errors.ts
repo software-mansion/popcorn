@@ -23,7 +23,6 @@ export type PopcornErrors = {
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
-  "beam:unexpected-startup-event": { type: string };
   "internal:check": { detail?: string };
   "internal:unreachable": EmptyData;
   "runtime:eval-unavailable": EmptyData;
@@ -136,8 +135,6 @@ function message(error: SerializedError): string {
       return `Missing tarball manifest: '${error.data.url}'`;
     case "beam:missing-tarball":
       return `Missing tarball: '${error.data.name}'. Available tarballs: ${error.data.all.join(", ")}`;
-    case "beam:unexpected-startup-event":
-      return `BEAM emitted '${error.data.type}' during application startup`;
     case "internal:check":
       return error.data.detail === undefined
         ? "Check failed"
@@ -185,9 +182,6 @@ function parse(value: unknown): SerializedError {
       return { t: value.t, data: value.data };
     case "beam:missing-tarball":
       check(isMissingTarballData(value.data));
-      return { t: value.t, data: value.data };
-    case "beam:unexpected-startup-event":
-      check(isUnexpectedStartupEventData(value.data));
       return { t: value.t, data: value.data };
     case "internal:check":
       check(isInternalCheckData(value.data));
@@ -258,12 +252,6 @@ function isMissingTarballData(
   value: unknown,
 ): value is PopcornErrors["beam:missing-tarball"] {
   return objectWithKeys(value, ["name", "all"]) !== null;
-}
-
-function isUnexpectedStartupEventData(
-  value: unknown,
-): value is PopcornErrors["beam:unexpected-startup-event"] {
-  return objectWithKeys(value, ["type"]) !== null;
 }
 
 function isInternalCheckData(

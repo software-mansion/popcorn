@@ -186,6 +186,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private readonly trackedValues = new Map<number, TrackedEntry>();
   private trackedKeySeq = 0;
   private io = createIoState();
+  private vmReady = false;
 
   public readonly genserver: GenServer = {
     call: (target, request, opts) => this.call(target, request, opts),
@@ -211,6 +212,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         this.emit(this.reviveHandles(data.payload));
         return;
       case "otp:run_js":
+        this.vmReady = true;
         this.runJs(data.payload);
         return;
       case "otp:tracked-value-delete":
@@ -406,6 +408,13 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       return { ok: false, error: err("bridge:not-started", {}) };
     }
 
+    return await this.sendBridge(rawTarget, payload);
+  }
+
+  private async sendBridge(
+    rawTarget: string | Pid,
+    payload?: AnyValue,
+  ): Promise<Result<null>> {
     let target: BeamTarget;
     if (typeof rawTarget === "string" && rawTarget.length > 0) {
       target = { name: rawTarget };
@@ -473,6 +482,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
 
     this.state = { status: "closed", error };
+    this.vmReady = false;
     for (const resolve of this.pendingSends.values()) {
       resolve({ ok: false, error });
     }
@@ -506,6 +516,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       return;
     }
 
+    if (this.eventHandlers.size === 0) {
+      console.warn(`${LOG_PREFIX} Dropped message with no event handlers`, event);
+    }
     for (const handler of this.eventHandlers) {
       handler(event);
     }
@@ -559,6 +572,21 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     request: AnyValue,
     opts?: CallOpts,
   ): Promise<Result<AnyValue>> {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
+      return { ok: false, error: err("bridge:not-started", {}) };
+    }
+
+    return await this.callBridge(rawTarget, request, opts);
+  }
+
+  private async callBridge(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>> {
     const timeoutMs = opts?.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
     const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
     const id = this.nextCallId();
@@ -581,7 +609,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       });
     });
 
-    const sent = await this.send(proxy, {
+    const sent = await this.sendBridge(proxy, {
       kind: "call",
       id,
       target: rawTarget,
@@ -603,8 +631,23 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     request: AnyValue,
     opts?: { proxy?: string },
   ): Promise<Result<null>> {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
+      return { ok: false, error: err("bridge:not-started", {}) };
+    }
+
+    return await this.castBridge(rawTarget, request, opts);
+  }
+
+  private async castBridge(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>> {
     const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
-    return await this.send(proxy, {
+    return await this.sendBridge(proxy, {
       kind: "cast",
       target: rawTarget,
       request: request,
@@ -622,9 +665,13 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const fn = this.jsWithCurrentEnv(request.code);
       assertRunJsFn(fn);
       const args = this.reviveHandles(request.args);
-      const send: SendFn = (target, sendPayload) =>
-        this.send(target, sendPayload);
-      const result = await fn(args, { send, ...this.genserver });
+      check(this.vmReady);
+      const actions: RunJsActions = {
+        send: (target, payload) => this.sendBridge(target, payload),
+        call: (target, payload, opts) => this.callBridge(target, payload, opts),
+        cast: (target, payload, opts) => this.castBridge(target, payload, opts),
+      };
+      const result = await fn(args, actions);
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
     } catch (error) {

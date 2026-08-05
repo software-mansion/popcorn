@@ -56,6 +56,8 @@ export async function boot({
   ttySize,
   createModule,
   emit,
+  captureModule,
+  markVmReady,
 }: BeamBootOptions): Promise<Result<EmscriptenModule>> {
   const loadedFsData = await loadFsData(manifestUrl);
   if (!loadedFsData.ok) {
@@ -63,15 +65,12 @@ export async function boot({
   }
 
   const fsData = loadedFsData.data;
-  let entrypointStarted = fsData.entrypoint === null;
   let resolveEntrypointReady = () => {};
-  let rejectEntrypointReady = (_error: PopcornError) => {};
   const entrypointReady =
     fsData.entrypoint === null
       ? Promise.resolve()
-      : new Promise<void>((resolve, reject) => {
+      : new Promise<void>((resolve) => {
           resolveEntrypointReady = resolve;
-          rejectEntrypointReady = reject;
         });
   const runtimeEnv = {
     ...env,
@@ -95,18 +94,9 @@ export async function boot({
     onBeamMessage: (text) => {
       const event = deserializeBridgeMessage(text);
       if (event === null) return;
+      markVmReady();
       if (isEntrypointReady(event)) {
-        entrypointStarted = true;
         resolveEntrypointReady();
-        return;
-      }
-      if (
-        !entrypointStarted &&
-        (event.type === "otp:message" || event.type === "otp:run_js")
-      ) {
-        rejectEntrypointReady(
-          err("beam:unexpected-startup-event", { type: event.type }),
-        );
         return;
       }
       emit(event);
@@ -130,6 +120,7 @@ export async function boot({
     }),
     preRun: [
       (mod) => {
+        captureModule(mod);
         Object.assign(mod.ENV, runtimeEnv);
         initFs({ module: mod, fsData });
       },

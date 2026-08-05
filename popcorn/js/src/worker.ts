@@ -6,6 +6,7 @@ import type { EmscriptenModule } from "./types";
 import { check, unreachable } from "./utils";
 
 let instance: EmscriptenModule | null = null;
+let vmReady = false;
 
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const data = readMainEvent(event.data);
@@ -22,6 +23,12 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         ttySize: data.payload.ttySize,
         createModule,
         emit: toMain,
+        captureModule: (module) => {
+          instance = module;
+        },
+        markVmReady: () => {
+          vmReady = true;
+        },
       });
       if (!result.ok) {
         toMain({
@@ -31,12 +38,12 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         return;
       }
 
-      instance = result.data;
+      check(instance === result.data);
       toMain({ type: "popcorn:boot-end", payload: {} });
       break;
     }
     case "popcorn:send": {
-      const result = send(instance, data.payload.message);
+      const result = send(vmReady ? instance : null, data.payload.message);
       toMain({
         type: "popcorn:send-end",
         payload: {
@@ -50,7 +57,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     }
     case "popcorn:run-js-reply": {
       // ignore the `send()` result, process could've died
-      send(instance, data.payload.message);
+      send(vmReady ? instance : null, data.payload.message);
       break;
     }
     case "popcorn:stdin": {
