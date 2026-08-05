@@ -8,6 +8,7 @@ import type {
   EmscriptenModule,
 } from "./types";
 import {
+  check,
   dirname,
   fetchBinary,
   fetchJson,
@@ -50,36 +51,50 @@ const BASE_ARGS = [
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
 
-export async function boot({
-  manifestUrl,
-  emulatorArgs,
-  extraArgs,
-  env,
-  ttySize,
-  createModule,
-  emit,
-  captureModule,
-  markVmReady,
-}: BeamBootOptions): Promise<Result<EmscriptenModule>> {
+type BeamState = {
+  module: EmscriptenModule | null;
+  isVmReady: boolean;
+};
+
+export type Beam = {
+  boot: Promise<Result<null>>;
+  send: (message: BeamSendPayload) => Result<null>;
+  writeStdin: (chunk: Uint8Array) => void;
+  resizeTty: (columns: number, rows: number) => void;
+};
+
+export function start(options: BeamBootOptions): Beam {
+  const state: BeamState = { module: null, isVmReady: false };
+  return {
+    boot: boot(options, state),
+    send: (message) => send(state.isVmReady ? state.module : null, message),
+    writeStdin: (chunk) => writeStdin(state.module, chunk),
+    resizeTty: (columns, rows) => resizeTty(state.module, columns, rows),
+  };
+}
+
+async function boot(
+  opts: BeamBootOptions,
+  state: BeamState,
+): Promise<Result<null>> {
+  const {
+    manifestUrl,
+    emulatorArgs,
+    extraArgs,
+    env,
+    ttySize,
+    createModule,
+    emit,
+  } = opts;
   const loadedFsData = await loadFsData(manifestUrl);
   if (!loadedFsData.ok) {
     return { ok: false, error: loadedFsData.error };
   }
 
   const fsData = loadedFsData.data;
-  let resolveVmReady = () => {};
-  const vmReady = new Promise<void>((resolve) => {
-    resolveVmReady = resolve;
-  });
-  let resolveEntrypointReady = () => {};
-  let rejectEntrypointReady = (_error: PopcornError) => {};
-  const entrypointReady =
-    fsData.entrypoint === null
-      ? Promise.resolve()
-      : new Promise<void>((resolve, reject) => {
-          resolveEntrypointReady = resolve;
-          rejectEntrypointReady = reject;
-        });
+  const { vmReady, handleVmReady } = trackVmReady(state);
+  const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
+
   const runtimeEnv = {
     ...env,
     BINDIR: "/bin",
@@ -102,21 +117,9 @@ export async function boot({
     onBeamMessage: (text) => {
       const event = deserializeBridgeMessage(text);
       if (event === null) return;
-      markVmReady();
-      if (isBridgeMarker(event, "vm_ready")) {
-        resolveVmReady();
-        return;
-      }
-      if (isBridgeMarker(event, "boot_ready")) {
-        resolveEntrypointReady();
-        return;
-      }
-      if (isBridgeMarker(event, "boot_failed")) {
-        rejectEntrypointReady(
-          err("vm:exited", { reason: "exit", data: 1 }),
-        );
-        return;
-      }
+      if (handleVmReady(event)) return;
+      if (handleAppReady(event)) return;
+
       emit(event);
     },
     onError: (text) =>
@@ -138,7 +141,9 @@ export async function boot({
     }),
     preRun: [
       (mod) => {
-        captureModule(mod);
+        state.module = mod;
+      },
+      (mod) => {
         Object.assign(mod.ENV, runtimeEnv);
         initFs({ module: mod, fsData });
       },
@@ -146,15 +151,59 @@ export async function boot({
   };
 
   try {
-    const [module] = await Promise.all([
-      createModule(moduleConfig),
-      vmReady,
-      entrypointReady,
-    ]);
-    return { ok: true, data: module };
+    const ready = Promise.all([vmReady, appReady]);
+    const module = await createModule(moduleConfig);
+    check(state.module === module);
+    await ready;
+    return { ok: true, data: null };
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
   }
+}
+
+type BeamMessage = NonNullable<ReturnType<typeof deserializeBridgeMessage>>;
+
+function trackVmReady(state: BeamState) {
+  let resolve = () => {};
+  const vmReady = new Promise<void>((r) => {
+    resolve = r;
+  });
+
+  const handleVmReady = (event: BeamMessage): boolean => {
+    if (!isBridgeMarker(event, "vm_ready")) return false;
+    state.isVmReady = true;
+    resolve();
+    return true;
+  };
+
+  return { vmReady, handleVmReady };
+}
+
+function trackAppReady(entrypoint: string | null) {
+  let resolve = () => {};
+  let reject = (_error: PopcornError) => {};
+
+  let appReady = Promise.resolve();
+  if (entrypoint !== null) {
+    appReady = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+  }
+
+  const handleAppReady = (event: BeamMessage): boolean => {
+    if (isBridgeMarker(event, "boot_ready")) {
+      resolve();
+      return true;
+    }
+    if (isBridgeMarker(event, "boot_failed")) {
+      reject(err("vm:exited", { reason: "exit", data: 1 }));
+      return true;
+    }
+    return false;
+  };
+
+  return { appReady, handleAppReady };
 }
 
 function toPopcornError(error: unknown): PopcornError {
@@ -339,7 +388,7 @@ function isAbsoluteUrl(path: string): boolean {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path);
 }
 
-export function send(
+function send(
   module: EmscriptenModule | null,
   message: BeamSendPayload,
 ): Result<null> {
@@ -401,6 +450,32 @@ export function send(
     };
   }
   unreachable();
+}
+
+function writeStdin(module: EmscriptenModule | null, chunk: Uint8Array): void {
+  check(module !== null);
+  const status = module.ccall(
+    "popcornStdinEnqueue",
+    "number",
+    ["array", "number"],
+    [chunk, chunk.byteLength],
+  );
+  check(status === 0);
+}
+
+function resizeTty(
+  module: EmscriptenModule | null,
+  columns: number,
+  rows: number,
+): void {
+  check(module !== null);
+  const status = module.ccall(
+    "popcornTtyResize",
+    "number",
+    ["number", "number"],
+    [columns, rows],
+  );
+  check(status === 0);
 }
 
 const TARGET_REGISTERED_NAME = 0;

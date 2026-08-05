@@ -1,12 +1,10 @@
 import createModule from "../assets/beam.mjs";
 
-import { boot, send } from "./beam";
+import { start, type Beam } from "./beam";
 import { readMainEvent, toMain } from "./events";
-import type { EmscriptenModule } from "./types";
 import { check, unreachable } from "./utils";
 
-let instance: EmscriptenModule | null = null;
-let vmReady = false;
+let instance: Beam | null = null;
 
 self.onmessage = async (event: MessageEvent<unknown>) => {
   const data = readMainEvent(event.data);
@@ -15,7 +13,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     case "popcorn:boot": {
       check(instance === null);
 
-      const result = await boot({
+      instance = start({
         manifestUrl: data.payload.manifestUrl,
         emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
@@ -23,13 +21,8 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         ttySize: data.payload.ttySize,
         createModule,
         emit: toMain,
-        captureModule: (module) => {
-          instance = module;
-        },
-        markVmReady: () => {
-          vmReady = true;
-        },
       });
+      const result = await instance.boot;
       if (!result.ok) {
         toMain({
           type: "popcorn:boot-fail",
@@ -38,12 +31,12 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         return;
       }
 
-      check(instance === result.data);
       toMain({ type: "popcorn:boot-end", payload: {} });
       break;
     }
     case "popcorn:send": {
-      const result = send(vmReady ? instance : null, data.payload.message);
+      check(instance !== null);
+      const result = instance.send(data.payload.message);
       toMain({
         type: "popcorn:send-end",
         payload: {
@@ -57,29 +50,18 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     }
     case "popcorn:run-js-reply": {
       // ignore the `send()` result, process could've died
-      send(vmReady ? instance : null, data.payload.message);
+      check(instance !== null);
+      instance.send(data.payload.message);
       break;
     }
     case "popcorn:stdin": {
       check(instance !== null);
-      const status = instance.ccall(
-        "popcornStdinEnqueue",
-        "number",
-        ["array", "number"],
-        [data.payload.chunk, data.payload.chunk.byteLength],
-      );
-      check(status === 0);
+      instance.writeStdin(data.payload.chunk);
       break;
     }
     case "popcorn:tty-resize": {
       check(instance !== null);
-      const status = instance.ccall(
-        "popcornTtyResize",
-        "number",
-        ["number", "number"],
-        [data.payload.columns, data.payload.rows],
-      );
-      check(status === 0);
+      instance.resizeTty(data.payload.columns, data.payload.rows);
       break;
     }
     default:

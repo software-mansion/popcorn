@@ -122,6 +122,10 @@ defmodule Popcorn.Wasm do
   - `call` and `cast` talk to GenServers through `Popcorn.Proxy`, same as `popcorn.genserver` JS API.
     Both are async and resolve to a result object.
 
+  `run_js/3` can run during application startup. Its JavaScript executes before
+  `Popcorn.boot()` resolves, so it must not depend on state initialized after
+  boot. Slow JavaScript also delays application startup.
+
     Awaiting a `call` on the process that runs `run_js/3` deadlocks until the call times out.
 
   `run_js/3` returns result converted to Elixir types. You can use `new TrackedValue(value, cleanup_fn)` (`t:tracked_value/0`) to return a handle.

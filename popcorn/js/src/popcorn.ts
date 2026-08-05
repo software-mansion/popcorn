@@ -281,6 +281,13 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return { ok: true, data: popcorn };
   }
 
+  /**
+   * Starts the VM and resolves after its bridge is ready and the entrypoint
+   * application has started. Register event handlers before calling this
+   * method when the application sends messages during startup. Processes
+   * registered later by handle_continue or spawned work can still return
+   * genserver:noproc immediately after boot.
+   */
   public async boot(): Promise<Result<Popcorn<Output>>> {
     if (this.state.status === "booted") {
       return { ok: true, data: this };
@@ -463,6 +470,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     });
   }
 
+  /**
+   * Receives BEAM messages delivered while this handler is registered.
+   * Messages with no handlers are dropped. A handler registered before boot
+   * can run before the boot promise resolves.
+   */
   public onEvent(handler: (event: PopcornEvent) => void): () => void {
     this.eventHandlers.add(handler);
     return () => {

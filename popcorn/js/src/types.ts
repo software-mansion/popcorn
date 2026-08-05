@@ -21,8 +21,6 @@ export type BeamBootOptions = {
   ttySize: TtySize;
   createModule: CreateModuleFn<EmscriptenModule>;
   emit: (event: BeamEvent) => void;
-  captureModule: (module: EmscriptenModule) => void;
-  markVmReady: () => void;
 };
 
 export type BeamEvent =
