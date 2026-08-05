@@ -22,7 +22,7 @@ defmodule PopcornOtp.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger], mod: {Popcorn.Application, []}]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -50,6 +50,7 @@ defmodule PopcornOtp.MixProject do
 
   defp deps do
     [
+      {:req, ">= 0.5.0", optional: true},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false}
     ]
   end
