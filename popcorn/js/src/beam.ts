@@ -65,6 +65,10 @@ export async function boot({
   }
 
   const fsData = loadedFsData.data;
+  let resolveVmReady = () => {};
+  const vmReady = new Promise<void>((resolve) => {
+    resolveVmReady = resolve;
+  });
   let resolveEntrypointReady = () => {};
   const entrypointReady =
     fsData.entrypoint === null
@@ -95,7 +99,11 @@ export async function boot({
       const event = deserializeBridgeMessage(text);
       if (event === null) return;
       markVmReady();
-      if (isEntrypointReady(event)) {
+      if (isBridgeMarker(event, "vm_ready")) {
+        resolveVmReady();
+        return;
+      }
+      if (isBridgeMarker(event, "boot_ready")) {
         resolveEntrypointReady();
         return;
       }
@@ -130,6 +138,7 @@ export async function boot({
   try {
     const [module] = await Promise.all([
       createModule(moduleConfig),
+      vmReady,
       entrypointReady,
     ]);
     return { ok: true, data: module };
@@ -173,8 +182,10 @@ function buildArgs({
   }
 
   if (entrypoint !== null) {
-    args.push("-s", "application", "ensure_all_started", entrypoint);
-    args.push("-eval", ENTRYPOINT_READY_EXPR);
+    args.push(
+      "-eval",
+      `{ok, _} = application:ensure_all_started(${entrypoint}), ${ENTRYPOINT_READY_EXPR}`,
+    );
   }
 
   for (const arg of extra) {
@@ -184,12 +195,13 @@ function buildArgs({
   return args;
 }
 
-function isEntrypointReady(
+function isBridgeMarker(
   event: ReturnType<typeof deserializeBridgeMessage>,
+  type: "vm_ready" | "boot_ready",
 ): boolean {
   if (event === null || event.type !== "otp:message") return false;
   const popcorn = objectWithKeys(event.payload, ["_popcorn"])?._popcorn;
-  return objectWithKeys(popcorn, ["t"])?.t === "boot_ready";
+  return objectWithKeys(popcorn, ["t"])?.t === type;
 }
 
 type BeamManifest = {

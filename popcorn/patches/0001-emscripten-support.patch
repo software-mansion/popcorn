@@ -649,7 +649,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..ad4a8fa2b6776814a1e6e5ac83ecadfa242590f5
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,645 @@
+@@ -0,0 +1,650 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -764,6 +764,9 @@ index 0000000000000000000000000000000000000000..ad4a8fa2b6776814a1e6e5ac83ecadfa
 +#ifdef ERTS_EMSCRIPTEN
 +int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
 +                  const unsigned char *etf, int etf_len);
++static void schedule_js_message(const unsigned char *data, size_t size);
++static const unsigned char vm_ready_message[] =
++    "{\"type\":\"vm_message\",\"data\":{\"_popcorn\":{\"t\":\"vm_ready\"}}}";
 +#endif
 +
 +static void init_atoms(ErlNifEnv *env) {
@@ -1026,6 +1029,9 @@ index 0000000000000000000000000000000000000000..ad4a8fa2b6776814a1e6e5ac83ecadfa
 +  enif_mutex_unlock(erts_wasm_state_lock);
 +
 +  *priv_data = state;
++#ifdef ERTS_EMSCRIPTEN
++  schedule_js_message(vm_ready_message, sizeof(vm_ready_message) - 1);
++#endif
 +
 +  return 0;
 +}
