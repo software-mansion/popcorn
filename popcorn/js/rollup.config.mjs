@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import typescript from "@rollup/plugin-typescript";
 
@@ -9,7 +9,7 @@ function copyFiles(targets) {
       await Promise.all(
         targets.map(async ({ src, dest }) => {
           await mkdir(dirname(dest), { recursive: true });
-          await copyFile(src, dest);
+          await cp(src, dest, { recursive: true });
         }),
       );
     },
@@ -89,7 +89,14 @@ export default [
         outputToFilesystem: true,
       }),
       copyFiles([
-        { src: "plugins/tarballs.exs", dest: "dist/plugins/tarballs.exs" },
+        {
+          src: "plugins/beam_tools/mix.exs",
+          dest: "dist/plugins/beam_tools/mix.exs",
+        },
+        {
+          src: "plugins/beam_tools/lib",
+          dest: "dist/plugins/beam_tools/lib",
+        },
       ]),
     ],
   },
