@@ -1,5 +1,5 @@
 defmodule Popcorn.BeamTools.Packager do
-  @static_nif_apps MapSet.new(["wasm"])
+  @static_nif_beams MapSet.new(["wasm.beam"])
 
   @type options :: %{
           root_dir: Path.t(),
@@ -67,15 +67,20 @@ defmodule Popcorn.BeamTools.Packager do
         end)
         |> Map.new(fn {:ok, app} -> app end)
 
-      dynamic_nifs =
-        apps
-        |> Task.async_stream(fn app ->
-          info = Map.fetch!(user_apps, app)
-          dynamic_nifs(app, info.ebin_dir)
-        end)
-        |> Enum.flat_map(fn {:ok, notes} -> notes end)
+      diagnostics =
+        apps_info.project
+        |> Task.async_stream(fn {app, info} ->
+          case loaded_dynamic_nifs(app, info.ebin_dir) do
+            [] ->
+              []
 
-      notes = dynamic_nifs
+            beams ->
+              {:error, context} = err(:dynamic_nifs_loading, {app, beams})
+              [context]
+          end
+        end)
+        |> Enum.flat_map(fn {:ok, diagnostics} -> diagnostics end)
+
       manifest_path = Path.join(out_dir, "manifest.json")
       manifest_apps = Map.merge(packed_apps, manifest.apps)
 
@@ -89,7 +94,7 @@ defmodule Popcorn.BeamTools.Packager do
       manifest = %{
         entrypoint: entrypoint_app,
         apps: manifest_apps,
-        notes: notes,
+        notes: diagnostics,
         toolchain: toolchain,
         vm: %{boot: "bin/vm.boot", version: vm_version}
       }
@@ -103,7 +108,7 @@ defmodule Popcorn.BeamTools.Packager do
          manifestPath: Path.expand(manifest_path),
          tarPaths: tar_paths,
          apps: manifest_apps,
-         notes: notes,
+         notes: diagnostics,
          toolchain: toolchain
        }}
     end
@@ -199,21 +204,12 @@ defmodule Popcorn.BeamTools.Packager do
     tar
   end
 
-  defp dynamic_nifs(app, ebin_dir) do
-    if MapSet.member?(@static_nif_apps, app) do
-      []
-    else
-      beams =
-        Path.join(ebin_dir, "*.beam")
-        |> Path.wildcard()
-        |> Enum.filter(&imports_load_nif?/1)
-        |> Enum.map(&Path.basename/1)
-
-      case beams do
-        [] -> []
-        _ -> [%{code: "dynamic_nif", app: app, beams: beams}]
-      end
-    end
+  defp loaded_dynamic_nifs(app, ebin_dir) do
+    Path.join(ebin_dir, "*.beam")
+    |> Path.wildcard()
+    |> Enum.filter(&imports_load_nif?/1)
+    |> Enum.map(&Path.basename/1)
+    |> Enum.reject(&MapSet.member?(@static_nif_beams, &1))
   end
 
   defp imports_load_nif?(beam_path) do
@@ -291,6 +287,10 @@ defmodule Popcorn.BeamTools.Packager do
        provided_apps: provided_apps |> MapSet.to_list() |> Enum.sort(),
        user_apps: user_apps |> Map.keys() |> Enum.sort()
      }}
+  end
+
+  defp err(:dynamic_nifs_loading, {app, beams}) do
+    {:error, %{code: "dynamic_nifs_loading", app: app, beams: beams}}
   end
 
   defp encode_json(term) do
