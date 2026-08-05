@@ -21,24 +21,69 @@ test.describe("boot", () => {
     });
   });
 
-  test("startup bridge events fail", async ({ createOtp }) => {
-    for (const [mode, type] of [
-      ["send", "otp:message"],
-      ["run_js", "otp:run_js"],
-    ] as const) {
-      const otp = await createOtp();
-      const boot = await otp.boot({
+  test("startup bridge", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const events: unknown[] = [];
+      let booted = false;
+      const popcorn = new window.Popcorn({
         beam: {
           manifestUrl: "/assets/otp/manifest.json",
-          env: { POPCORN_STARTUP_EVENT: mode },
+          env: { POPCORN_STARTUP_EVENT: "bridge" },
         },
       });
+      popcorn.onEvent((event) => events.push({ event, beforeBoot: !booted }));
 
-      expect(boot).toEqual({
-        ok: false,
-        error: { t: "beam:unexpected-startup-event", data: { type } },
+      const boot = await popcorn.boot();
+      booted = true;
+      popcorn.deinit();
+      return {
+        boot: boot.ok,
+        events,
+      };
+    });
+
+    expect(result).toEqual({
+      boot: true,
+      events: expect.arrayContaining([
+        { event: { startup_send: true }, beforeBoot: true },
+        { event: { startup_action: true }, beforeBoot: true },
+        { event: { startup_run_js: 42 }, beforeBoot: true },
+      ]),
+    });
+  });
+
+  test("no entrypoint", async ({ page }) => {
+    await page.route("/assets/otp/manifest.json", async (route) => {
+      const response = await route.fetch();
+      const manifest = (await response.json()) as Record<string, unknown>;
+      await route.fulfill({ response, json: { ...manifest, entrypoint: null } });
+    });
+
+    const result = await page.evaluate(async () => {
+      const popcorn = new window.Popcorn({
+        beam: { manifestUrl: "/assets/otp/manifest.json" },
       });
-    }
+      const boot = await popcorn.boot();
+      popcorn.deinit();
+      return boot.ok;
+    });
+
+    expect(result).toBe(true);
+  });
+
+  test("entrypoint failure", async ({ createOtp }) => {
+    const otp = await createOtp();
+    const boot = await otp.boot({
+      beam: {
+        manifestUrl: "/assets/otp/manifest.json",
+        env: { POPCORN_STARTUP_EVENT: "fail" },
+      },
+    });
+
+    expect(boot).toEqual({
+      ok: false,
+      error: { t: "vm:exited", data: { reason: "exit", data: 1 } },
+    });
   });
 
   test("schedulers", async ({ otp }) => {
