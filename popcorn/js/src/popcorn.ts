@@ -44,6 +44,7 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
   };
   timeoutsMs?: {
     boot?: number;
+    appStartup?: number;
     send?: number;
   };
   onStdout?: (chunk: OutputChunk<Output>) => void;
@@ -59,6 +60,7 @@ type OutputHandlers = {
 };
 const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
   boot: 10_000,
+  appStartup: 60_000,
   send: 5_000,
 };
 
@@ -205,6 +207,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     const data = readWorkerEvent(event.data);
 
     switch (data.type) {
+      case "popcorn:boot-vm-ready":
       case "popcorn:boot-end":
       case "popcorn:boot-fail":
         return;
@@ -283,7 +286,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
   /**
    * Starts the VM and resolves after its bridge is ready and the entrypoint
-   * application has started. Register event handlers before calling this
+   * application has started. `timeoutsMs.boot` bounds the wait for the VM
+   * bridge; `timeoutsMs.appStartup` bounds the entrypoint startup that
+   * follows. Register event handlers before calling this
    * method when the application sends messages during startup. Processes
    * registered later by handle_continue or spawned work can still return
    * genserver:noproc immediately after boot.
@@ -325,15 +330,25 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       };
       this.settleBoot = settle;
 
-      const timer = setTimeout(() => {
-        const error = err("timeout:init", { timeoutMs: timeoutsMs.boot });
-        settle({ ok: false, error });
-      }, timeoutsMs.boot);
+      const startPhase = (timeoutMs: number) =>
+        setTimeout(() => {
+          const error = err("timeout:init", { timeoutMs });
+          settle({ ok: false, error });
+        }, timeoutMs);
+
+      // The VM phase covers module instantiation and bridge readiness; the
+      // app phase covers the entrypoint's application tree, which runs
+      // arbitrary user startup code and can be much slower.
+      let timer = startPhase(timeoutsMs.boot);
 
       const onBootMessage = (event: MessageEvent<unknown>) => {
         const data = readWorkerEvent(event.data);
 
         switch (data.type) {
+          case "popcorn:boot-vm-ready":
+            clearTimeout(timer);
+            timer = startPhase(timeoutsMs.appStartup);
+            break;
           case "popcorn:boot-end":
             this.state = { status: "booted" };
             settle({ ok: true, data: this });

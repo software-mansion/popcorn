@@ -22,6 +22,9 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         createModule,
         emit: toMain,
       });
+      void instance.vmReady.then(() =>
+        toMain({ type: "popcorn:boot-vm-ready", payload: {} }),
+      );
       const result = await instance.boot;
       if (!result.ok) {
         toMain({

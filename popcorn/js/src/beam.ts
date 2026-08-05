@@ -58,6 +58,7 @@ type BeamState = {
 
 export type Beam = {
   boot: Promise<Result<null>>;
+  vmReady: Promise<void>;
   send: (message: BeamSendPayload) => Result<null>;
   writeStdin: (chunk: Uint8Array) => void;
   resizeTty: (columns: number, rows: number) => void;
@@ -65,8 +66,10 @@ export type Beam = {
 
 export function start(options: BeamBootOptions): Beam {
   const state: BeamState = { module: null, isVmReady: false };
+  const vm = trackVmReady(state);
   return {
-    boot: boot(options, state),
+    boot: boot(options, state, vm),
+    vmReady: vm.vmReady,
     send: (message) => send(state.isVmReady ? state.module : null, message),
     writeStdin: (chunk) => writeStdin(state.module, chunk),
     resizeTty: (columns, rows) => resizeTty(state.module, columns, rows),
@@ -76,6 +79,7 @@ export function start(options: BeamBootOptions): Beam {
 async function boot(
   opts: BeamBootOptions,
   state: BeamState,
+  vm: ReturnType<typeof trackVmReady>,
 ): Promise<Result<null>> {
   const {
     manifestUrl,
@@ -92,7 +96,7 @@ async function boot(
   }
 
   const fsData = loadedFsData.data;
-  const { vmReady, handleVmReady } = trackVmReady(state);
+  const { vmReady, handleVmReady } = vm;
   const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
 
   const runtimeEnv = {
