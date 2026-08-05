@@ -23,7 +23,7 @@ export function setupFakeView(
   // LLV roots have no data-phx-session, so stock ownsElement (closestViewEl) would
   // assign children to the host LiveView or reject them entirely — and addHook
   // would skip every phx-hook under this container. Own the subtree by containment.
-  view.ownsElement = function (this: LLVView, el: Element) {
+  (view as LLVView & { ownsElement: (el: Element) => boolean }).ownsElement = function (el) {
     return this.el === el || this.el.contains(el);
   };
 

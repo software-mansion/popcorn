@@ -68,7 +68,6 @@ export interface LLVView {
     opts: object,
   ): void;
   addHook: (el: Element) => unknown;
-  ownsElement?: (el: Element) => boolean;
   destroy?: (callback?: () => void) => void;
 }
 
