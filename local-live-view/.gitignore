@@ -39,5 +39,11 @@ config.secret.exs
 # npm
 /assets/node_modules/
 
-# priv/static/ is committed — bundled JS + popcorn runtime files ship in the hex package.
-# Regenerate with: cd assets && npm install && node bundle.mjs
+# Copied in from the repo root by mix.exs before packaging.
+/LICENSE
+
+# Generated JS bundle + Popcorn runtime files. Never committed: built by
+# `mix llv.assets` from source, and by the release pipeline for the hex package.
+# Rebuild manually with: mise run build-llv-js
+/priv/static/
+/priv/.assets_hash
