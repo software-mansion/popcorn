@@ -649,7 +649,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..ad4a8fa2b6776814a1e6e5ac83ecadfa242590f5
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,650 @@
+@@ -0,0 +1,651 @@
 +/*
 + * %CopyrightBegin%
 + *

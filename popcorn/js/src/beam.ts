@@ -21,7 +21,9 @@ const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
 const ENTRYPOINT_READY_EXPR =
-  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}}).';
+  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}})';
+const ENTRYPOINT_FAILED_EXPR =
+  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_failed">>}})';
 
 // https://www.erlang.org/doc/apps/erts/inet_cfg.html
 const INETRC_PATH = "/etc/inetrc";
@@ -70,11 +72,13 @@ export async function boot({
     resolveVmReady = resolve;
   });
   let resolveEntrypointReady = () => {};
+  let rejectEntrypointReady = (_error: PopcornError) => {};
   const entrypointReady =
     fsData.entrypoint === null
       ? Promise.resolve()
-      : new Promise<void>((resolve) => {
+      : new Promise<void>((resolve, reject) => {
           resolveEntrypointReady = resolve;
+          rejectEntrypointReady = reject;
         });
   const runtimeEnv = {
     ...env,
@@ -105,6 +109,12 @@ export async function boot({
       }
       if (isBridgeMarker(event, "boot_ready")) {
         resolveEntrypointReady();
+        return;
+      }
+      if (isBridgeMarker(event, "boot_failed")) {
+        rejectEntrypointReady(
+          err("vm:exited", { reason: "exit", data: 1 }),
+        );
         return;
       }
       emit(event);
@@ -184,7 +194,7 @@ function buildArgs({
   if (entrypoint !== null) {
     args.push(
       "-eval",
-      `{ok, _} = application:ensure_all_started(${entrypoint}), ${ENTRYPOINT_READY_EXPR}`,
+      `case application:ensure_all_started(${entrypoint}) of {ok, _} -> ${ENTRYPOINT_READY_EXPR}; _ -> ${ENTRYPOINT_FAILED_EXPR}, erlang:halt(1) end.`,
     );
   }
 
@@ -197,7 +207,7 @@ function buildArgs({
 
 function isBridgeMarker(
   event: ReturnType<typeof deserializeBridgeMessage>,
-  type: "vm_ready" | "boot_ready",
+  type: "vm_ready" | "boot_ready" | "boot_failed",
 ): boolean {
   if (event === null || event.type !== "otp:message") return false;
   const popcorn = objectWithKeys(event.payload, ["_popcorn"])?._popcorn;
