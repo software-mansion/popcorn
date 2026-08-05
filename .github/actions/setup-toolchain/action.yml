@@ -7,7 +7,7 @@ runs:
     - name: Setup emsdk
       uses: mymindstorm/setup-emsdk@v14
       with:
-        version: 4.0.8
+        version: 6.0.2
 
     - name: Set up Elixir
       uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0

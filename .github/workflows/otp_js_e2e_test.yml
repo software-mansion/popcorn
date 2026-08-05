@@ -52,7 +52,7 @@ jobs:
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
-          build-mode: debug
+          build-mode: release
           with-crypto: ${{ matrix.with-crypto }}
 
       - name: Setup pnpm

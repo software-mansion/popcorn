@@ -278,25 +278,9 @@ run_configure() {
         export CFLAGS="-Os -flto -pthread"
     fi
 
-    # Linker flags
+    # Linker flags. The -s emcc settings belong to the emulator link only, see
+    # emulator_link_settings.
     export LDFLAGS="-pthread -flto"
-    LDFLAGS+=" -sUSE_PTHREADS=1"
-    LDFLAGS+=" -sPTHREAD_POOL_SIZE=8"
-    LDFLAGS+=" -sPROXY_TO_PTHREAD=1"
-    LDFLAGS+=" -sENVIRONMENT=web,worker,node"
-    LDFLAGS+=" -sEXPORT_ES6=1"
-    LDFLAGS+=" -sINITIAL_MEMORY=64MB"
-    LDFLAGS+=" -sALLOW_MEMORY_GROWTH=1"
-    LDFLAGS+=" -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8"
-    LDFLAGS+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
-    LDFLAGS+=" -sFORCE_FILESYSTEM=1"
-    LDFLAGS+=" -sEXIT_RUNTIME=1"
-    LDFLAGS+=" -sMALLOC=emmalloc"
-    if [[ "${mode}" == "debug" ]]; then
-        LDFLAGS+=" -sASSERTIONS=2"
-    else
-        LDFLAGS+=" -sASSERTIONS=0"
-    fi
 
     # Autoconf cache variables for cross-compilation
     export ac_cv_func_pthread_create=yes
@@ -384,6 +368,32 @@ run_configure() {
 }
 
 
+# emcc settings that shape the final emulator module. They must stay out of
+# LDFLAGS: configure derives DED_LDFLAGS from it and links -shared conftests,
+# where emcc >= 6 rejects EXPORTED_FUNCTIONS entries as undefined symbols.
+emulator_link_settings() {
+    local mode="$1"
+    local flags="-sUSE_PTHREADS=1"
+    flags+=" -sPTHREAD_POOL_SIZE=8"
+    flags+=" -sPROXY_TO_PTHREAD=1"
+    flags+=" -sENVIRONMENT=web,worker,node"
+    flags+=" -sEXPORT_ES6=1"
+    flags+=" -sINITIAL_MEMORY=64MB"
+    flags+=" -sALLOW_MEMORY_GROWTH=1"
+    flags+=" -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8"
+    flags+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
+    flags+=" -sFORCE_FILESYSTEM=1"
+    flags+=" -sEXIT_RUNTIME=1"
+    flags+=" -sMALLOC=emmalloc"
+    if [[ "${mode}" == "debug" ]]; then
+        flags+=" -sASSERTIONS=2"
+    else
+        flags+=" -sASSERTIONS=0"
+    fi
+    echo "${flags}"
+}
+
+
 build_beam() {
     local beam_dir="$1"
     local mode="$2"
@@ -391,11 +401,12 @@ build_beam() {
 
     log "Building BEAM for WASM (${mode}, ${jobs} jobs)..."
 
-    local extra_emcc_link_flags=""
+    local extra_emcc_link_flags
+    extra_emcc_link_flags=$(emulator_link_settings "${mode}")
     # Set up JS bridge link flags if the bridge exists in the patched source
     local js_bridge_dir="${beam_dir}/erts/emulator/js_bridge"
     if [[ -d "${js_bridge_dir}" ]]; then
-        extra_emcc_link_flags="--pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
+        extra_emcc_link_flags+=" --pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
     fi
     if [[ "${mode}" == "release" ]]; then
         # LTO: -Oz runs binaryen's size passes and minifies the JS glue.
