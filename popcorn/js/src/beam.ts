@@ -231,10 +231,6 @@ function buildArgs({
 }: BuildArgsArgs): string[] {
   const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
 
-  if (true) {
-    args.push("-noshell");
-  }
-
   for (const app of CORE_APPS) {
     args.push("-pa", `/lib/${app}/ebin`);
   }
