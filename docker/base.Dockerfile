@@ -52,8 +52,9 @@ RUN cp src/AtomVM.mjs src/AtomVM.wasm /build/out/
 # Install JS workspace dependencies
 WORKDIR /build/popcorn
 RUN pnpm install --frozen-lockfile
+RUN pnpm --dir popcorn-2 install --frozen-lockfile
 
 # Build the popcorn JS package (reuse pre-built AtomVM instead of rebuilding)
-RUN mkdir -p popcorn/js/assets && \
-    cp /build/out/AtomVM.mjs /build/out/AtomVM.wasm popcorn/js/assets/
-RUN cd popcorn/js && pnpm exec rollup -c
+RUN mkdir -p popcorn-2/js/assets && \
+    cp /build/out/AtomVM.mjs /build/out/AtomVM.wasm popcorn-2/js/assets/
+RUN cd popcorn-2/js && pnpm exec rollup -c

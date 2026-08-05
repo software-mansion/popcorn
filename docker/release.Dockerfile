@@ -50,10 +50,11 @@ ENV RUNTIME_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm'
 
 WORKDIR /build/popcorn
 RUN pnpm config set --location project enablePrePostScripts true && \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile && \
+    pnpm --dir popcorn-2 install --frozen-lockfile
 
-RUN pnpm -F popcorn build:prod
-RUN pnpm -F popcorn pack
+RUN pnpm --dir popcorn-2/js build:prod
+RUN pnpm --dir popcorn-2/js pack --pack-destination /build/popcorn
 
 RUN mkdir -p /output && \
     cp /build/popcorn/swmansion-popcorn-*.tgz /output/

@@ -24,7 +24,7 @@ defmodule EvalInWasm.MixProject do
 
   defp deps do
     [
-      {:popcorn, path: "../../popcorn/elixir"},
+      {:popcorn, path: "../../popcorn-2/elixir"},
       {:playwright,
        github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
     ]

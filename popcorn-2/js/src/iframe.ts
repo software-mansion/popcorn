@@ -30,8 +30,7 @@ type AtomVMModule = {
   call: (process: string, args: string) => Promise<string>;
   onTrackedObjectDelete: ((key: number) => void) | null;
   onRunTrackedJs:
-    | ((scriptString: string, isDebug: boolean) => number[] | null)
-    | null;
+    ((scriptString: string, isDebug: boolean) => number[] | null) | null;
   onGetTrackedObjects: ((keys: number[]) => string[]) | null;
   sendEvent: (eventName: string, payload: AnySerializable) => void;
 };
@@ -161,8 +160,7 @@ async function startVm(avmBundles: Int8Array[]): Promise<void> {
     };
 
     let fn:
-      | ((module: AtomVMModule) => AnySerializable[] | undefined)
-      | undefined;
+      ((module: AtomVMModule) => AnySerializable[] | undefined) | undefined;
     try {
       const indirectEval = eval;
       fn = indirectEval(scriptString);

@@ -34,22 +34,23 @@ clean_dir() {
 
 clean_elixir() {
     log "Cleaning Elixir build artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn/elixir/_build"
-    clean_dir "${PROJECT_ROOT}/popcorn/elixir/deps"
-    clean_dir "${PROJECT_ROOT}/popcorn/elixir/popcorn_runtime_source/artifacts"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/_build"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/deps"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/popcorn_runtime_source/artifacts"
 }
 
 clean_atomvm() {
     log "Cleaning AtomVM artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn/elixir/popcorn_runtime_source/artifacts"
-    clean_dir "${PROJECT_ROOT}/popcorn/js/assets"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/popcorn_runtime_source/artifacts"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/js/assets"
 }
 
 clean_js() {
     log "Cleaning JS build artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn/js/dist"
-    clean_dir "${PROJECT_ROOT}/popcorn/js/assets"
-    clean_dir "${PROJECT_ROOT}/popcorn/js/node_modules"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/js/dist"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/js/assets"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/js/node_modules"
+    clean_dir "${PROJECT_ROOT}/popcorn-2/node_modules"
     clean_dir "${PROJECT_ROOT}/node_modules"
 }
 

@@ -32,7 +32,7 @@ defmodule LocalLiveView.MixProject do
   defp deps do
     [
       # {:popcorn, "~> 0.3.0-rc2", targets: :wasm},
-      {:popcorn, path: "../popcorn/elixir", targets: :wasm},
+      {:popcorn, path: "../popcorn-2/elixir", targets: :wasm},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
       {:playwright,
