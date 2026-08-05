@@ -138,7 +138,7 @@ defmodule Treeshake do
   - `drop` - List of modules to be removed regardless of the tree-shaking results
   - `leave` - List of modules that must not be changed or removed, but without
     affecting the tree-shaking process. It means that the code they rely on may
-    still be removed unless added to `keep` or `leave`. 
+    still be removed unless added to `keep` or `leave`.
   - `ignore` - List of modules or functions that are not analyzed by the tree-shaker.
     It means they can be tree-shaked as usual, but the code they rely on may be
     tree-shaked even if they're kept, as it is unknown to the tree-shaker.
@@ -217,8 +217,9 @@ defmodule Treeshake do
     end
 
     stats = Treeshake.Shaker.shake(opts, call_graph, module_index)
+    add_stubs = opts.stub_removed_functions or opts.stub_removed_modules
 
-    unless opts.dry_run do
+    if not opts.dry_run and add_stubs do
       helper_path = :code.which(:treeshake_helper)
       File.cp!(helper_path, Path.join(opts.output_dir, Path.basename(helper_path)))
     end
@@ -235,6 +236,8 @@ defmodule Treeshake do
       opts
       |> Keyword.put_new(:verbose, false)
       |> Keyword.put_new(:dry_run, false)
+      |> Keyword.put_new(:stub_removed_functions, false)
+      |> Keyword.put_new(:stub_removed_modules, false)
       |> Keyword.put_new(:drop, [])
       |> keyword_concat_default(:ignore, @default_ignore_modules)
 
