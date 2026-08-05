@@ -132,7 +132,8 @@ defmodule Tarballs do
   end
 
   defp fetch_user_apps(root_dir) do
-    build_lib_dir = Path.join([root_dir, "_build", "dev", "lib"])
+    build_env = System.get_env("MIX_ENV", "dev")
+    build_lib_dir = Path.join([root_dir, "_build", build_env, "lib"])
     app_matcher = Path.join(build_lib_dir, "*/ebin/*.app")
     all_app_paths = Path.wildcard(app_matcher)
 
