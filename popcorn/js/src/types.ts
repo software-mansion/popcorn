@@ -49,29 +49,19 @@ export type TtySize = {
   rows: number;
 };
 
-export type EmscriptenFS = {
-  mkdir: (path: string) => void;
-  writeFile: (path: string, data: Uint8Array) => void;
-  readFile: (
-    path: string,
-    options?: { encoding?: string },
-  ) => Uint8Array | string;
-};
-
-type TtyWrite = (
-  stream: { fd: number },
-  buffer: Uint8Array,
-  offset: number,
-  length: number,
-  position: number,
-) => number;
-
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
   ENV: Record<string, string>;
-  FS: EmscriptenFS;
+  FS_mkdirTree: (path: string) => void;
+  FS_createDataFile: (
+    parent: string,
+    name: string | null,
+    data: Uint8Array,
+    canRead: boolean,
+    canWrite: boolean,
+    canOwn: boolean,
+  ) => void;
   HEAPU8: Uint8Array;
-  TTY: { stream_ops: { write: TtyWrite } };
   ccall: (
     ident: string,
     returnType: string | null,
@@ -90,6 +80,7 @@ export type EmscriptenModule = {
   onError?: (text: string) => void | Promise<void>;
   onStdinConsumed?: (size: number) => void;
   onTrackedValueDelete?: (key: number) => void;
+  onTtyChunk?: (fd: number, chunk: Uint8Array) => void;
   addRunDependency: (id: string) => void;
   removeRunDependency: (id: string) => void;
 };

@@ -380,7 +380,7 @@ emulator_link_settings() {
     flags+=" -sEXPORT_ES6=1"
     flags+=" -sINITIAL_MEMORY=64MB"
     flags+=" -sALLOW_MEMORY_GROWTH=1"
-    flags+=" -sEXPORTED_RUNTIME_METHODS=FS,ENV,TTY,ccall,stringToNewUTF8,lengthBytesUTF8"
+    flags+=" -sEXPORTED_RUNTIME_METHODS=ENV,ccall,stringToNewUTF8,lengthBytesUTF8,FS_mkdirTree,FS_createDataFile"
     flags+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
     flags+=" -sFORCE_FILESYSTEM=1"
     flags+=" -sEXIT_RUNTIME=1"
@@ -409,10 +409,12 @@ build_beam() {
         extra_emcc_link_flags+=" --pre-js ${js_bridge_dir}/beam-bridge.pre.js --js-library ${js_bridge_dir}/js_bridge.js"
     fi
     if [[ "${mode}" == "release" ]]; then
-        # -Oz runs binaryen's size passes and minifies the JS glue. Closure
-        # (--closure 1) must stay off: it renames runtime internals like
-        # TTY.stream_ops that the JS library patches by name at preRun.
-        extra_emcc_link_flags+=" -Oz"
+        # -Oz runs binaryen's size passes; --closure additionally minifies the
+        # JS glue. Closure renames unexported runtime internals, so external
+        # code must only touch exported runtime methods and quoted Module
+        # properties; TTY interception lives in beam-bridge.pre.js for this
+        # reason.
+        extra_emcc_link_flags+=" -Oz --closure 1"
     fi
     export EXTRA_EMCC_LINK_FLAGS="${extra_emcc_link_flags}"
 

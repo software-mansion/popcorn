@@ -7,13 +7,7 @@ import type {
   BeamTarget,
   EmscriptenModule,
 } from "./types";
-import {
-  dirname,
-  ensureDir,
-  fetchBinary,
-  fetchJson,
-  unreachable,
-} from "./utils";
+import { dirname, fetchBinary, fetchJson, unreachable } from "./utils";
 
 const DEFAULT_USER = "web_user";
 const DEFAULT_HOME_DIR = "/home/web_user";
@@ -29,7 +23,6 @@ const INETRC_PATH = "/etc/inetrc";
 const INETRC = "{lookup, [file]}.\n";
 
 const STDOUT_FD = 1;
-const STDERR_FD = 2;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
   "-root",
@@ -93,6 +86,11 @@ export async function boot({
       emit({ type: "otp:stdin-consumed", payload: size }),
     onTrackedValueDelete: (key) =>
       emit({ type: "otp:tracked-value-delete", payload: key }),
+    onTtyChunk: (fd, chunk) =>
+      emit({
+        type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
+        payload: chunk,
+      }),
     arguments: buildArgs({
       appNames: fsData.appNames,
       entrypoint: fsData.entrypoint,
@@ -102,7 +100,6 @@ export async function boot({
     preRun: [
       (mod) => {
         Object.assign(mod.ENV, runtimeEnv);
-        forwardTtyOutput(mod, emit);
         initFs({ module: mod, fsData });
       },
     ],
@@ -114,25 +111,6 @@ export async function boot({
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
   }
-}
-
-function forwardTtyOutput(
-  module: EmscriptenModule,
-  emit: BeamBootOptions["emit"],
-): void {
-  const originalWrite = module.TTY.stream_ops.write;
-  module.TTY.stream_ops.write = (stream, buffer, offset, length, position) => {
-    const interceptable = stream.fd === STDOUT_FD || stream.fd === STDERR_FD;
-    if (!interceptable) {
-      return originalWrite(stream, buffer, offset, length, position);
-    }
-
-    const chunk = new Uint8Array(length);
-    chunk.set(buffer.subarray(offset, offset + length));
-    const type = stream.fd === STDOUT_FD ? "otp:stdout" : "otp:stderr";
-    emit({ type, payload: chunk });
-    return length;
-  };
 }
 
 function toPopcornError(error: unknown): PopcornError {
@@ -269,19 +247,23 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
 }
 
 function initFs({ module, fsData }: InitFsArgs): void {
+  const writeFile = (path: string, content: Uint8Array) => {
+    module.FS_createDataFile(path, null, content, true, true, true);
+  };
+
   for (const dir of FS_DIRS) {
-    ensureDir(module.FS, dir);
+    module.FS_mkdirTree(dir);
   }
 
-  module.FS.writeFile(BOOT_PATH, fsData.bootFile);
-  module.FS.writeFile(INETRC_PATH, UTF8.encode(INETRC));
+  writeFile(BOOT_PATH, fsData.bootFile);
+  writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {
-    ensureDir(module.FS, dirPath);
+    module.FS_mkdirTree(dirPath);
   };
   const createFile = (path: string, content: Uint8Array<ArrayBuffer>) => {
-    ensureDir(module.FS, dirname(path));
-    module.FS.writeFile(path, content);
+    module.FS_mkdirTree(dirname(path));
+    writeFile(path, content);
   };
 
   for (const tarball of fsData.tarballs) {
