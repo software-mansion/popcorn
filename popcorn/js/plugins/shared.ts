@@ -4,7 +4,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -54,7 +53,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
   ];
   const distDir = p`${dirname(fileURLToPath(import.meta.url))}/..`;
   const preparedDir = await mkdtemp(p`${tmpdir()}/popcorn-otp-`);
-  const coreTarballs = await pathsIn(p`${distDir}/assets/lib`, ".tar");
 
   try {
     await Promise.all([
@@ -83,7 +81,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         outDir: packedDir,
         manifestPath: p`${distDir}/assets/manifest.json`,
         app: opts.app,
-        tarPaths: coreTarballs,
         strip,
       });
 
@@ -115,11 +112,10 @@ type PackTarballsParams = {
   outDir: string;
   manifestPath: string;
   app: string | null;
-  tarPaths: string[];
   strip: boolean;
 };
 async function packTarballs(opts: PackTarballsParams): Promise<Report> {
-  const { rootDir, outDir, manifestPath, app, tarPaths, strip } = opts;
+  const { rootDir, outDir, manifestPath, app, strip } = opts;
   const toolDir = p`${dirname(fileURLToPath(import.meta.url))}/beam_tools`;
 
   const packerArgs = [
@@ -142,7 +138,6 @@ async function packTarballs(opts: PackTarballsParams): Promise<Report> {
   if (strip) {
     packerArgs.push("--strip");
   }
-  packerArgs.push(...tarPaths);
 
   const env = {
     ...process.env,
@@ -181,7 +176,7 @@ function formatPackError(error: unknown): string {
     ].join("\n  ");
   }
 
-  return `tarballs.exs failed: ${JSON.stringify(error)}`;
+  return `packaging failed: ${JSON.stringify(error)}`;
 }
 
 async function copy(
@@ -238,12 +233,6 @@ function p(
   ...values: (string | number)[]
 ): string {
   return normalize(String.raw(strings, ...values));
-}
-
-async function pathsIn(dir: string, suffix: string): Promise<string[]> {
-  return (await readdir(dir))
-    .filter((name) => name.endsWith(suffix))
-    .map((name) => p`${dir}/${name}`);
 }
 
 async function withTmp<T>(f: (dir: string) => Promise<T>): Promise<T> {

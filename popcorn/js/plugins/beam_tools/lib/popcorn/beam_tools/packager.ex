@@ -1,13 +1,23 @@
 defmodule Popcorn.BeamTools.Packager do
   @static_nif_beams MapSet.new(["wasm.beam"])
 
+  # To run, Beam needs following apps:
+  # - kernel
+  # - stdlib (kernel dep)
+  #
+  # We also add elixir support out of the box and need:
+  # - compiler (elixir dep)
+  # - elixir
+  #
+  # All of them should be in elixir's transitive dependency closure
+  @base_apps ["elixir"]
+
   @type options :: %{
           root_dir: Path.t(),
           entrypoint_app: String.t() | nil,
           out_dir: Path.t(),
           manifest_path: Path.t(),
-          strip: boolean(),
-          tar_paths: [Path.t()]
+          strip: boolean()
         }
 
   defp strip_tarball(path, out_dir) do
@@ -43,8 +53,7 @@ defmodule Popcorn.BeamTools.Packager do
       entrypoint_app: entrypoint_app,
       out_dir: out_dir,
       manifest_path: manifest_path,
-      strip: strip,
-      tar_paths: input_tar_paths
+      strip: strip
     } = args
 
     with {:ok, manifest} <- read_manifest(manifest_path),
@@ -57,20 +66,19 @@ defmodule Popcorn.BeamTools.Packager do
 
       File.mkdir_p!(out_dir)
 
-      # TODO: We still use builtin apps, needs to change
       packed_apps =
         apps_info
-        |> Task.async_stream(fn {app, info} ->
+        |> async_stream(fn {app, info} ->
           version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
           tar_path = create_tarball(out_dir, app, info.ebin_dir)
 
           {app, %{tar: tar_path, version: version}}
         end)
-        |> Map.new(fn {:ok, app} -> app end)
+        |> Map.new()
 
       diagnostics =
         apps_info
-        |> Task.async_stream(fn {app, info} ->
+        |> async_stream(fn {app, info} ->
           case loaded_dynamic_nifs(app, info.ebin_dir) do
             [] ->
               []
@@ -80,21 +88,20 @@ defmodule Popcorn.BeamTools.Packager do
               [context]
           end
         end)
-        |> Enum.flat_map(fn {:ok, diagnostics} -> diagnostics end)
+        |> Enum.concat()
 
       manifest_path = Path.join(out_dir, "manifest.json")
-      manifest_apps = Map.merge(packed_apps, manifest.apps)
 
       packed_tar_paths =
         packed_apps
         |> Map.values()
         |> Enum.map(&Path.expand(Path.join(out_dir, &1.tar)))
 
-      tar_paths = maybe_strip_tarballs(packed_tar_paths ++ input_tar_paths, strip, out_dir)
+      tar_paths = maybe_strip_tarballs(packed_tar_paths, strip, out_dir)
 
       manifest = %{
         entrypoint: entrypoint_app,
-        apps: manifest_apps,
+        apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain,
         vm: %{boot: "bin/vm.boot", version: vm_version}
@@ -107,13 +114,19 @@ defmodule Popcorn.BeamTools.Packager do
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
         tarPaths: tar_paths,
-        apps: manifest_apps,
+        apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain
       }
 
       {:ok, result}
     end
+  end
+
+  defp async_stream(enumerable, fun) do
+    enumerable
+    |> Task.async_stream(fun, timeout: :infinity)
+    |> Enum.map(fn {:ok, result} -> result end)
   end
 
   defp maybe_strip_tarballs(paths, false, _out_dir), do: paths
@@ -155,33 +168,36 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp read_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"apps" => apps, "vm" => %{"version" => version}}} <- decode_json(json) do
-      {:ok, %{version: version, apps: apps}}
+         {:ok, %{"vm" => %{"version" => version}}} <- decode_json(json) do
+      {:ok, %{version: version}}
     else
       _ -> err(:bad_manifest, manifest_path)
     end
   end
 
-  defp apps_to_pack(project_apps, _builtin_apps, nil) do
-    {:ok, Enum.sort_by(project_apps, fn {app, _info} -> app end)}
-  end
-
-  defp apps_to_pack(project_apps, builtin_apps, entrypoint)
-       when is_map_key(project_apps, entrypoint) do
+  defp apps_to_pack(project_apps, builtin_apps, entrypoint) do
     all_apps_info = Map.merge(builtin_apps, project_apps)
 
-    with {:ok, selected_apps} <-
-           gather_required_apps(all_apps_info, project_apps, entrypoint, MapSet.new()) do
-      project_apps
+    gather_from_root = fn app, selected ->
+      gather_required_apps(all_apps_info, project_apps, app, selected)
+    end
+
+    with {:ok, roots} <- root_apps(project_apps, entrypoint),
+         {:ok, selected_apps} <- reduce_while_ok(roots, MapSet.new(), gather_from_root) do
+      all_apps_info
       |> Map.filter(fn {app, _info} -> MapSet.member?(selected_apps, app) end)
       |> Enum.sort()
       |> then(&{:ok, &1})
     end
   end
 
-  defp apps_to_pack(_project_apps, _builtin_apps, entrypoint) do
-    err(:missing_entrypoint, entrypoint)
+  defp root_apps(_project_apps, nil), do: {:ok, @base_apps}
+
+  defp root_apps(project_apps, entrypoint) when is_map_key(project_apps, entrypoint) do
+    {:ok, [entrypoint | @base_apps]}
   end
+
+  defp root_apps(_project_apps, entrypoint), do: err(:missing_entrypoint, entrypoint)
 
   defp gather_required_apps(all_apps_info, project_apps, app, selected) do
     if MapSet.member?(selected, app) do

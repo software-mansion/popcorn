@@ -13,7 +13,7 @@ defmodule Popcorn.BeamTools.CLI do
 
   def main(argv) do
     if String.to_integer(System.otp_release()) < 27 do
-      IO.puts(:stderr, "tarballs.exs requires host OTP >= 27 for the built-in :json module")
+      IO.puts(:stderr, "Popcorn requires OTP 27 or later")
       System.halt(1)
     end
 
@@ -31,7 +31,7 @@ defmodule Popcorn.BeamTools.CLI do
   end
 
   defp parse_argv(argv) do
-    {opts, tar_paths, invalid} = OptionParser.parse(argv, strict: @options)
+    {opts, [], invalid} = OptionParser.parse(argv, strict: @options)
     missing_opts = Enum.reject(@required_options, &Keyword.has_key?(opts, &1))
 
     case {invalid, missing_opts} do
@@ -41,7 +41,6 @@ defmodule Popcorn.BeamTools.CLI do
           |> Map.new()
           |> Map.put_new(:entrypoint_app, nil)
           |> Map.put_new(:strip, false)
-          |> Map.put(:tar_paths, tar_paths)
 
         {:ok, options}
 
