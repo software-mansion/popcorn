@@ -1,5 +1,5 @@
 {
-  "name": "popcorn-e2e",
+  "name": "popcorn-otp-e2e",
   "private": true,
   "type": "module",
   "dependencies": {

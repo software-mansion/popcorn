@@ -1,125 +1,217 @@
-import { readFile, stat } from "fs/promises";
-import { basename, dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-import { type PopcornPluginOptions } from "./shared";
-
-import type { IncomingMessage, ServerResponse } from "http";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ResolvedConfig } from "vite";
+import { popcorn as prepare, type Options, type Prepared } from "./shared";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Plugin is at dist/plugins/vite.mjs, dist/ is one level up
-const popcornDistDir = resolve(__dirname, "..");
+const CORS_HEADERS = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
 
-export function popcorn(options: PopcornPluginOptions): Plugin {
-  const bundlePaths = options.bundlePaths;
-  const bundles = bundlePaths.map((p) => ({
-    path: p,
-    name: basename(p),
-    url: `/${basename(p)}`,
-  }));
+// Plugin is at dist/plugins/vite.mjs, dist/ is one level up.
+const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-  let assetsDir: string;
+type Res = ServerResponse<IncomingMessage>;
+
+export function popcorn(options: Options): Plugin {
+  let prepared: Prepared | undefined;
+  let repacking: Promise<Prepared> | undefined;
+  let dirty = false;
+  let outDir: string | undefined;
+
+  // Dev/preview: pack once at first request, re-pack lazily after the app's
+  // compiled beams change. A single in-flight promise dedupes concurrent
+  // requests; a change during a re-pack re-sets `dirty` so it isn't lost.
+  const ensurePrepared = (): Promise<Prepared> => {
+    if (prepared !== undefined && !dirty) return Promise.resolve(prepared);
+    if (repacking === undefined) {
+      dirty = false;
+      repacking = prepare(options)
+        .then(async (next) => {
+          if (prepared !== undefined) {
+            await rm(prepared.dir, { recursive: true, force: true });
+          }
+          prepared = next;
+          return next;
+        })
+        .finally(() => {
+          repacking = undefined;
+        });
+    }
+    return repacking;
+  };
+
+  const cleanup = () => {
+    if (prepared !== undefined) {
+      rm(prepared.dir, { recursive: true, force: true });
+      prepared = undefined;
+    }
+  };
+
+  const serve = async (
+    req: IncomingMessage,
+    res: Res,
+    next: (error?: unknown) => void,
+  ) => {
+    const url = req.url;
+    if (url === undefined) {
+      next();
+      return;
+    }
+
+    const requestPath = decodeURIComponent(
+      new URL(url, "http://localhost").pathname,
+    );
+    const isOtpAsset = requestPath.startsWith("/assets/otp/");
+    const isBuiltWasm = requestPath === "/assets/beam.wasm";
+    const isSourceWasm = requestPath === `/@fs${distDir}/assets/beam.wasm`;
+    if (!isOtpAsset && !isBuiltWasm && !isSourceWasm) {
+      next();
+      return;
+    }
+
+    let dir: string;
+    try {
+      ({ dir } = await ensurePrepared());
+    } catch (error) {
+      next(error);
+      return;
+    }
+
+    const assetsRoot = join(dir, "assets");
+    const rel = isSourceWasm
+      ? "beam.wasm"
+      : requestPath.slice("/assets/".length);
+    const filePath = resolve(assetsRoot, rel);
+    if (!isUnder(assetsRoot, filePath)) {
+      res.statusCode = 403;
+      setHeaders(res);
+      res.end("Forbidden");
+      return;
+    }
+
+    try {
+      const compressible = isCompressible(filePath);
+      const encoding = compressible
+        ? selectEncoding(
+            req.headers["accept-encoding"]?.toString(),
+            options.brotli ?? false,
+          )
+        : ({ name: null, suffix: "" } as const);
+      if (compressible && encoding.name === null) {
+        res.statusCode = 406;
+        setHeaders(res);
+        res.setHeader("Vary", "Accept-Encoding");
+        res.end("No supported content encoding");
+        return;
+      }
+      const content = await readFile(`${filePath}${encoding.suffix}`);
+      setHeaders(res);
+      setContentType(res, filePath);
+      res.setHeader("Vary", "Accept-Encoding");
+      if (encoding.name !== null) {
+        res.setHeader("Content-Encoding", encoding.name);
+      }
+      res.end(content);
+    } catch {
+      res.statusCode = 404;
+      setHeaders(res);
+      res.end("Not found");
+    }
+  };
 
   return {
-    name: "popcorn",
+    name: "popcorn-otp",
 
     config() {
       return {
-        // Exclude popcorn from prebundling so import.meta.url resolves correctly
-        optimizeDeps: {
-          exclude: ["@swmansion/popcorn"],
-        },
+        // Exclude from prebundling so import.meta.url resolves correctly.
+        optimizeDeps: { exclude: ["@swmansion/popcorn"] },
+        // COOP/COEP must be on every response (SharedArrayBuffer/pthreads),
+        // including the worker/beam files Vite serves from the package itself.
+        server: { headers: CORS_HEADERS },
+        preview: { headers: CORS_HEADERS },
       };
     },
 
-    async configResolved(config: ResolvedConfig) {
-      const results = await Promise.allSettled(
-        bundles.map((b) => stat(b.path)),
-      );
-      for (const [i, result] of results.entries()) {
-        if (result.status === "rejected") {
-          this.error(`[popcorn] Bundle doesn't exist at '${bundles[i].path}'`);
-        }
-      }
-
-      config.server.fs.allow.push(popcornDistDir);
-      assetsDir = config.build.assetsDir;
+    configResolved(config: ResolvedConfig) {
+      config.server.fs.allow.push(distDir);
+      outDir = resolve(config.root, config.build.outDir);
     },
 
     configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        setSharedArrayBufferHeaders(res);
-
-        for (const bundle of bundles) {
-          const opts = { bundleUrl: bundle.url, bundlePath: bundle.path };
-          const served = await serveAvmBundle(req, res, opts);
-          if (served) return;
-        }
-
-        next();
+      const rootDir = resolve(options.rootDir);
+      server.watcher.add(rootDir);
+      server.watcher.on("all", (_event, file) => {
+        if (isUnder(rootDir, file)) dirty = true;
       });
+      server.middlewares.use(serve);
+      server.httpServer?.once("close", cleanup);
     },
 
     configurePreviewServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        setSharedArrayBufferHeaders(res);
-
-        for (const bundle of bundles) {
-          const opts = { bundleUrl: bundle.url, bundlePath: bundle.path };
-          const served = await serveAvmBundle(req, res, opts);
-          if (served) return;
-        }
-
-        next();
-      });
+      server.middlewares.use(serve);
+      server.httpServer?.once("close", cleanup);
     },
 
-    async generateBundle() {
-      // Emit bundles to assets directory
-      for (const bundle of bundles) {
-        this.emitFile({
-          type: "asset",
-          fileName: `${assetsDir}/${bundle.name}`,
-          source: await readFile(bundle.path),
-        });
-      }
-
-      // Emit AtomVM files to assets directory (same location as iframe.mjs)
-      // Vite treats iframe.mjs as a static asset and doesn't analyze its imports
-      for (const name of ["AtomVM.mjs", "AtomVM.wasm"]) {
-        this.emitFile({
-          type: "asset",
-          fileName: `${assetsDir}/${name}`,
-          source: await readFile(resolve(popcornDistDir, name)),
-        });
+    async closeBundle() {
+      assert(outDir !== undefined, "outDir was not resolved");
+      const built = await prepare(options);
+      try {
+        await mkdir(outDir, { recursive: true });
+        await cp(built.dir, outDir, { recursive: true });
+      } finally {
+        await rm(built.dir, { recursive: true, force: true });
       }
     },
   };
 }
 
-type Res = ServerResponse<IncomingMessage>;
+function isCompressible(path: string): boolean {
+  return path.endsWith(".tar") || path.endsWith(".wasm");
+}
 
-type ServeAvmBundleOpts = { bundleUrl: string; bundlePath: string };
-async function serveAvmBundle(
-  req: IncomingMessage,
-  res: Res,
-  { bundleUrl, bundlePath }: ServeAvmBundleOpts,
-) {
-  try {
-    if (req.url === bundleUrl) {
-      const content = await readFile(bundlePath);
-      res.setHeader("Content-Type", "application/octet-stream");
-      res.end(content);
-      return true;
-    }
-    return false;
-  } catch (err) {
-    console.error(`[popcorn] Failed to serve bundle:`, err);
-    throw err;
+function selectEncoding(
+  header: string | undefined,
+  useBrotli: boolean,
+): {
+  name: "br" | "gzip" | null;
+  suffix: ".br" | ".gz" | "";
+} {
+  if (useBrotli && header?.includes("br")) {
+    return { name: "br", suffix: ".br" };
+  }
+  if (header?.includes("gzip")) return { name: "gzip", suffix: ".gz" };
+  return { name: null, suffix: "" };
+}
+
+function isUnder(dir: string, file: string): boolean {
+  const rel = relative(dir, file);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+function setHeaders(res: Res): void {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    res.setHeader(key, value);
   }
 }
 
-function setSharedArrayBufferHeaders(res: Res): void {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+function setContentType(res: Res, path: string): void {
+  if (path.endsWith(".mjs")) {
+    res.setHeader("Content-Type", "text/javascript");
+  } else if (path.endsWith(".wasm")) {
+    res.setHeader("Content-Type", "application/wasm");
+  } else if (path.endsWith(".json")) {
+    res.setHeader("Content-Type", "application/json");
+  } else {
+    res.setHeader("Content-Type", "application/octet-stream");
+  }
+}
+
+function assert(ok: boolean, message: string): asserts ok {
+  if (!ok) {
+    throw new Error(`[popcorn-otp] ${message}`);
+  }
 }

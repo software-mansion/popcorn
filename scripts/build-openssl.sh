@@ -6,7 +6,7 @@ LOG_PREFIX="BUILD OPENSSL"
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
 DEFAULT_TAG="3.0.15"
-SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
+SOURCES_DIR="${PROJECT_ROOT}/popcorn/sources"
 
 usage() {
     cat << EOF
@@ -26,7 +26,7 @@ Options:
   -h, --help        Show this help
 
 Source is cloned once per (tag, mode) pair into:
-  otp/sources/openssl-<tag>-<mode>/
+  popcorn/sources/openssl-<tag>-<mode>/
 
 If the clone and build artifacts already exist, artifacts are copied to outdir
 without rebuilding. Use --clean to force a rebuild.

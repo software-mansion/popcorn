@@ -4,5 +4,5 @@
     "rootDir": ".",
     "declarationDir": "../dist/plugins"
   },
-  "include": ["./**/*"]
+  "include": ["./**/*.ts"]
 }

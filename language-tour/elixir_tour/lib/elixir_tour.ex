@@ -1,10 +1,7 @@
 defmodule ElixirTour do
   use GenServer
 
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
-
   alias ElixirTour.Evaluator
-  alias Popcorn.Wasm
 
   @process_name :main
 
@@ -21,15 +18,14 @@ defmodule ElixirTour do
 
   @impl GenServer
   def init(_init_arg) do
-    Wasm.ready(@process_name)
     :application.set_env(:elixir, :ansi_enabled, false)
     {:ok, %{editor_order: [], bindings: %{}}}
   end
 
   @impl GenServer
-  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, state}
+  def handle_call(["eval_elixir", editor_id, code, editor_order], _from, state) do
+    {reply, state} = eval(editor_id, code, editor_order, state)
+    {:reply, reply, state}
   end
 
   @impl GenServer
@@ -39,7 +35,7 @@ defmodule ElixirTour do
     {:noreply, state}
   end
 
-  defp handle_wasm({:wasm_call, ["eval_elixir", editor_id, code, editor_order]}, state) do
+  defp eval(editor_id, code, editor_order, state) do
     %{bindings: bindings_map} = state
 
     preceding_editor_ids = get_preceding_editors(state.editor_order, editor_id)
@@ -54,11 +50,11 @@ defmodule ElixirTour do
         editor_bindings = get_changed(preceding_bindings, new_bindings)
         updated_bindings = Map.put(bindings_map, editor_id, editor_bindings)
 
-        {:resolve, inspect(result),
+        {%{data: inspect(result)},
          %{state | editor_order: editor_order, bindings: updated_bindings}}
 
       {:error, error_message} ->
-        {:reject, error_message, state}
+        {%{error: error_message}, state}
     end
   end
 

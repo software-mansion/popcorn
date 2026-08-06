@@ -28,7 +28,7 @@ description = "Build OTP/BEAM for WASM"
 
 [tasks.build-otp-js]
 depends = ["build-otp debug"]
-run = "pnpm -F ./otp/js build"
+run = "pnpm -F ./popcorn/js build"
 description = "Build JS part of OTP/BEAM interop"
 
 [tasks.build-llv-js]
@@ -45,7 +45,7 @@ description = "Build OTP/BEAM for WASM with crypto/asn1 NIFs"
 
 [tasks.regenerate-otp-patches]
 run = "scripts/patch-beam.sh --regen"
-description = "Regenerate OTP patches from current otp/sources/otp state"
+description = "Regenerate OTP patches from current popcorn/sources/otp state"
 
 [tasks.clean]
 run = "scripts/clean.sh"

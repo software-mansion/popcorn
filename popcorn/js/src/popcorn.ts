@@ -1,522 +1,1000 @@
-import { IframeBridge } from "./bridge";
+import { PopcornError, err, type Result } from "./errors";
+import { RawTerm, type Mapper } from "./etf";
 import {
-  INIT_VM_TIMEOUT_MS,
-  HEARTBEAT_TIMEOUT_MS,
-  CALL_TIMEOUT_MS,
-  MAX_RELOAD_N,
-  MESSAGES,
-  EVENT_NAMES,
+  readWorkerEvent,
+  serializeSendPayload,
+  toVm,
+  type PopcornEvent,
+  type SendCompletionPayload,
+} from "./events";
+import type {
+  AnyValue,
+  BeamBootOptions,
+  BeamSendPayload,
+  BeamTarget,
+  OtpErrorPayload,
+  Pid,
+  RunJsRequest,
+  TtySize,
 } from "./types";
-import {
-  PopcornError,
-  PopcornInternalError,
-  throwError,
-  buildError,
-} from "./errors";
+import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
-import type { IframeBridgeArgs } from "./bridge";
-import type { IframeResponse, AnySerializable, ElixirEvent } from "./types";
-import type { PopcornErrorCode, PopcornInternalErrorCode } from "./errors";
+type TrackedEntry = { value: unknown; cleanup?: () => void };
+type PendingTracked = TrackedEntry & { key: number };
 
-export { PopcornError, PopcornInternalError };
-export type { PopcornErrorCode, PopcornInternalErrorCode };
+const TRACKED_REF_KEY = "popcorn_ref";
+const PID_REF_KEY = "popcorn_pid";
+const UTF8 = new TextEncoder();
+const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
+const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 
-/** Options for Popcorn.init() */
-export type PopcornInitOptions = {
-  /** DOM element to mount an iframe */
-  container?: HTMLElement;
-  /** Paths to compiled Elixir bundles (`.avm` files). */
-  bundlePaths?: string[];
-  /** Handler for stderr messages. */
-  onStderr?: (message: string) => void;
-  /** Handler for stdout messages. */
-  onStdout?: (message: string) => void;
-  /** Handler called when Popcorn reloads due to iframe crash */
-  onReload?: (reason: string) => void;
-  /** Heartbeat timeout in milliseconds. If an iframe doesn't respond within this time, it is reloaded. */
-  heartbeatTimeoutMs?: number;
-  /** Directory containing Wasm and scripts used inside iframe. */
-  wasmDir?: string;
-  /** Enable debug logging. */
-  debug?: boolean;
+type TtyOutput = "text" | "bytes";
+type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
+  ? Uint8Array
+  : string;
+
+export type PopcornOpts<Output extends TtyOutput = "text"> = {
+  beam: Pick<
+    BeamBootOptions,
+    "manifestUrl" | "emulatorArgs" | "extraArgs" | "env"
+  >;
+  tty?: {
+    size?: TtySize;
+    output?: Output;
+  };
+  timeoutsMs?: {
+    boot?: number;
+    appStartup?: number;
+    send?: number;
+  };
+  onStdout?: (chunk: OutputChunk<Output>) => void;
+  onStderr?: (chunk: OutputChunk<Output>) => void;
+  onError?: (event: OtpErrorPayload) => void;
+  workerUrl?: string | URL;
 };
 
-/** Options for cast method */
-export type CastOptions = {
-  /** Receiver process name. */
-  process?: string;
+type ResolvedTimeouts = Required<NonNullable<PopcornOpts["timeoutsMs"]>>;
+type OutputHandlers = {
+  stdout: (chunk: Uint8Array) => void;
+  stderr: (chunk: Uint8Array) => void;
+};
+const DEFAULT_TIMEOUTS_MS: ResolvedTimeouts = {
+  boot: 10_000,
+  appStartup: 60_000,
+  send: 5_000,
 };
 
-/** Options for call method */
-export type CallOptions = {
-  /** Registered Elixir process name. */
-  process?: string;
-  /** Timeout (in milliseconds) for the call */
-  timeoutMs?: number;
-};
+const LOG_PREFIX = "[Popcorn]";
 
-type CallResult =
-  | {
-      ok: true;
-      /** Serialized value returned from Elixir */
-      data: AnySerializable;
-      /** Amount of time it took to process the call */
-      durationMs: number;
-    }
+const DEFAULT_PROXY_NAME = "popcorn_proxy";
+const DEFAULT_CALL_TIMEOUT_MS = 5_000;
+
+type VmExitReason =
+  | { reason: "deinit" }
+  | { reason: "abort"; data: string }
+  | { reason: "error"; data: string }
+  | { reason: "exit"; data: number };
+
+type PopcornState =
+  | { status: "created" }
+  | { status: "booting" }
+  | { status: "booted" }
+  | { status: "closed"; error: PopcornError<"vm:exited"> };
+type PendingSend = (result: Result<null>) => void;
+type SendFn = (
+  target: string | Pid,
+  payload?: AnyValue,
+) => Promise<Result<null>>;
+type RunJsActions = { send: SendFn } & GenServer;
+type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
+
+type CallOpts = { timeoutMs?: number; proxy?: string };
+type PendingCall = {
+  settle: (result: Result<AnyValue>) => void;
+  target: string | Pid;
+  timeoutMs: number;
+};
+type ProxyReply =
+  | { ok: true; value: AnyValue }
   | {
       ok: false;
-      /** Error from failed call */
-      error: Error;
-      /** Amount of time it took to process the call */
-      durationMs: number;
+      error:
+        | { kind: "noproc" }
+        | { kind: "exit"; reason: string }
+        | { kind: "unserializable" }
+        | { kind: "timeout" };
     };
+export type GenServer = {
+  /**
+   * Sends a `call` to the `target` GenServer (through the `proxy`), waiting for a response.
+   *
+   * ## Parameters
+   *
+   * - `target` — the GenServer to call, either a registered name or a `Pid`.
+   * - `request` — the request payload.
+   * - `opts` — call options.
+   *
+   * ### Options
+   *
+   * - `timeoutMs` — the maximum time to wait for a response, in milliseconds.
+   * - `proxy` — the name of the `Popcorn.Proxy` process to use for the call.
+   *
+   * ## Returns
+   *
+   * A `Promise` that resolves with the server's reply, or rejects with an error.
+   *
+   * ## Errors
+   *
+   * TODO: gather errors
+   *
+   */
+  call(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>>;
 
-type LogType = "stdout" | "stderr";
-type LogListener = (message: string) => void;
-type LogListeners = Record<LogType, Set<LogListener>>;
-
-type CallData = {
-  acknowledged: boolean;
-  startTimeMs: number;
-  resolve: (result: CallResult) => void;
+  /**
+   * Sends a `cast` to the `target` GenServer (through the `proxy`), in fire-and-forget manner.
+   *
+   * ## Parameters
+   *
+   * - `target` — the GenServer to cast to, either a registered name or a `Pid`.
+   * - `request` — the request payload.
+   * - `opts` — cast options.
+   *
+   * ### Options
+   *
+   * - `proxy` — the registered name or `Pid` of the `Popcorn.Proxy` process to use for the cast.
+   *
+   * ## Returns
+   *
+   * A `Promise` that resolves once the message is delivered to the proxy.
+   *
+   * ## Errors
+   *
+   * TODO: gather errors
+   *
+   */
+  cast(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>>;
 };
 
-type MessageHandler = (eventName: string, payload: AnySerializable) => void;
+function createPidClass() {
+  return class {
+    public constructor(public readonly bytes: Uint8Array) {}
+  };
+}
 
-type State =
-  | { status: "uninitialized" }
-  | { status: "mount" }
-  | { status: "ready" }
-  | { status: "reload" }
-  | { status: "deinit" };
+function assertRunJsFn(value: unknown): asserts value is RunJsFn {
+  check(typeof value === "function");
+}
 
-const INIT_TOKEN = Symbol();
-const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
+export class Popcorn<Output extends TtyOutput = "text"> {
+  private vmWorker!: Worker;
+  private state: PopcornState = { status: "created" };
+  private readonly opts: PopcornOpts<Output>;
+  private readonly ttySize: TtySize;
+  private output: OutputHandlers;
+  private requestSeq = 0;
+  private settleBoot: ((result: Result<Popcorn<Output>>) => void) | null = null;
+  private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
+  private readonly pendingSends = new Map<string, PendingSend>();
+  private readonly pendingCalls = new Map<string, PendingCall>();
+  private callSeq = 0;
+  private readonly trackedValues = new Map<number, TrackedEntry>();
+  private trackedKeySeq = 0;
+  private io = createIoState();
+  private vmReady = false;
 
-/**
- * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
- */
-export class Popcorn {
-  public heartbeatTimeoutMs: number | null = null;
-
-  private onReloadCallback: (reason: string) => void;
-
-  private bridge: IframeBridge | null = null;
-  private bridgeConfig: IframeBridgeArgs;
-  private debug = false;
-  private bundleURLs: string[];
-  private state: State = { status: "uninitialized" };
-  private defaultReceiver: string | null = null;
-
-  private requestId = 0;
-  private calls = new Map<number, CallData>();
-  private logListeners: LogListeners = {
-    stdout: new Set(),
-    stderr: new Set(),
+  public readonly genserver: GenServer = {
+    call: (target, request, opts) => this.call(target, request, opts),
+    cast: (target, request, opts) => this.cast(target, request, opts),
   };
 
-  private messageHandlers = new Set<MessageHandler>();
-  private mountResolve: (() => void) | null = null;
-  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
-  private reloadN = 0;
+  private readonly TrackedValue = class {
+    public constructor(
+      public readonly value: unknown,
+      public readonly cleanup?: () => void,
+    ) {}
+  };
 
-  private constructor(
-    params: PopcornInitOptions & { container: HTMLElement },
-    token: symbol,
-  ) {
-    if (token !== INIT_TOKEN) throwError({ t: "private_constructor" });
+  private Pid = createPidClass();
+  private readonly onWorkerMessage = (event: MessageEvent<unknown>) => {
+    const data = readWorkerEvent(event.data);
 
-    const bundlePaths = params.bundlePaths ?? ["/bundle.avm"];
-    this.bundleURLs = bundlePaths.map((p) => new URL(p, import.meta.url).href);
+    switch (data.type) {
+      case "popcorn:boot-vm-ready":
+      case "popcorn:boot-end":
+      case "popcorn:boot-fail":
+        return;
+      case "otp:message":
+        this.emit(this.reviveHandles(data.payload));
+        return;
+      case "otp:run_js":
+        this.vmReady = true;
+        this.runJs(data.payload);
+        return;
+      case "otp:tracked-value-delete":
+        this.deleteTrackedValue(data.payload);
+        return;
+      case "otp:stdout":
+        this.handleStdout(data.payload);
+        return;
+      case "otp:stderr":
+        this.handleStderr(data.payload);
+        return;
+      case "otp:stdin-consumed":
+        check(data.payload > 0 && data.payload <= this.io.stdin.reservedBytes);
+        this.io.stdin.reservedBytes -= data.payload;
+        return;
+      case "otp:error":
+        this.handleOtpError(data.payload);
+        return;
+      case "popcorn:send-end": {
+        this.completeSend(data.payload);
+        return;
+      }
+      default:
+        unreachable();
+    }
+  };
 
-    this.onReloadCallback = params.onReload ?? noop;
-    this.debug = params.debug ?? false;
-
-    this.bridgeConfig = {
-      container: params.container,
-      script: { url: IFRAME_URL, entrypoint: "initVm" },
-      config: Object.fromEntries(
-        this.bundleURLs.map((url, i) => [`bundle-path-${i}`, url]),
-      ),
-      debug: true,
-      onMessage: this.iframeHandler.bind(this),
+  public constructor(opts: PopcornOpts<Output>) {
+    const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
+    check(isValidTtySize(ttySize));
+    this.opts = {
+      ...opts,
+      beam: {
+        ...opts.beam,
+        emulatorArgs:
+          opts.beam.emulatorArgs ??
+          schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
+      },
     };
+    this.ttySize = { ...ttySize };
+    this.output = resolveOutputHandlers(opts);
+    this.spawnWorker();
+  }
 
-    this.logListeners.stdout.add(params.onStdout ?? console.log);
-    this.logListeners.stderr.add(params.onStderr ?? console.warn);
-    this.heartbeatTimeoutMs = params.heartbeatTimeoutMs ?? HEARTBEAT_TIMEOUT_MS;
+  private spawnWorker(): void {
+    const defaultWorkerUrl = new URL("./worker.mjs", import.meta.url);
+    const workerUrl = this.opts.workerUrl ?? defaultWorkerUrl;
+    this.vmWorker = new Worker(workerUrl, { type: "module" });
+    this.vmWorker.addEventListener("message", this.onWorkerMessage);
+  }
+
+  public static async init<Output extends TtyOutput = "text">(
+    opts: PopcornOpts<Output>,
+  ): Promise<Result<Popcorn<Output>>> {
+    if (!canEval()) {
+      return { ok: false, error: err("runtime:eval-unavailable", {}) };
+    }
+
+    const popcorn = new Popcorn(opts);
+    const result = await popcorn.boot();
+
+    if (!result.ok) {
+      return result;
+    }
+
+    return { ok: true, data: popcorn };
   }
 
   /**
-   * Creates an iframe and sets up communication channels.
-   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
-   *
-   * @example
-   * import { Popcorn } from "@swmansion/popcorn";
-   * const popcorn = await Popcorn.init({
-   *   onStdout: console.log,
-   *   onStderr: console.error,
-   *   debug: true,
-   * });
+   * Starts the VM and resolves after its bridge is ready and the entrypoint
+   * application has started. `timeoutsMs.boot` bounds the wait for the VM
+   * bridge; `timeoutsMs.appStartup` bounds the entrypoint startup that
+   * follows. Register event handlers before calling this
+   * method when the application sends messages during startup. Processes
+   * registered later by handle_continue or spawned work can still return
+   * genserver:noproc immediately after boot.
    */
-  static async init(options: PopcornInitOptions): Promise<Popcorn> {
-    const { container, ...constructorParams } = options;
-    const containerWithDefault = container ?? document.documentElement;
+  public async boot(): Promise<Result<Popcorn<Output>>> {
+    if (this.state.status === "booted") {
+      return { ok: true, data: this };
+    }
 
-    const bundlePaths =
-      constructorParams.bundlePaths && constructorParams.bundlePaths.length > 0
-        ? constructorParams.bundlePaths
-        : [await resolveBundleURL("/bundle.avm", "/assets/bundle.avm")];
+    if (this.state.status === "booting") {
+      // TODO(jgonet): make it easier to construct check() errors without throwing
+      const error = err("internal:check", {
+        detail: "Boot already in progress",
+      });
+      return { ok: false, error };
+    }
 
-    const popcorn = new Popcorn(
-      { ...constructorParams, bundlePaths, container: containerWithDefault },
-      INIT_TOKEN,
-    );
-    popcorn.trace("Main: init, params: ", { container, ...constructorParams });
-    await popcorn.mount();
-    return popcorn;
+    const reboot = this.state.status === "closed";
+    if (reboot) {
+      this.spawnWorker();
+    }
+
+    this.Pid = createPidClass();
+    this.io = createIoState();
+    this.output = resolveOutputHandlers(this.opts);
+    this.state = { status: "booting" };
+
+    return await new Promise<Result<Popcorn<Output>>>((resolve) => {
+      const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
+
+      const settle = (result: Result<Popcorn<Output>>) => {
+        if (this.settleBoot === null) return;
+        clearTimeout(timer);
+        cleanup();
+        if (!result.ok) {
+          this.deinit();
+        }
+        resolve(result);
+      };
+      this.settleBoot = settle;
+
+      const startPhase = (timeoutMs: number) =>
+        setTimeout(() => {
+          const error = err("timeout:init", { timeoutMs });
+          settle({ ok: false, error });
+        }, timeoutMs);
+
+      // The VM phase covers module instantiation and bridge readiness; the
+      // app phase covers the entrypoint's application tree, which runs
+      // arbitrary user startup code and can be much slower.
+      let timer = startPhase(timeoutsMs.boot);
+
+      const onBootMessage = (event: MessageEvent<unknown>) => {
+        const data = readWorkerEvent(event.data);
+
+        switch (data.type) {
+          case "popcorn:boot-vm-ready":
+            clearTimeout(timer);
+            timer = startPhase(timeoutsMs.appStartup);
+            break;
+          case "popcorn:boot-end":
+            this.state = { status: "booted" };
+            settle({ ok: true, data: this });
+            break;
+          case "popcorn:boot-fail": {
+            const error = PopcornError.deserialize(data.payload);
+            settle({ ok: false, error });
+            break;
+          }
+          default:
+            // user-level VM events are handled by the main worker listener.
+            break;
+        }
+      };
+
+      const cleanup = () => {
+        this.settleBoot = null;
+        this.vmWorker.removeEventListener("message", onBootMessage);
+      };
+
+      this.vmWorker.addEventListener("message", onBootMessage);
+      toVm(this.vmWorker, {
+        type: "popcorn:boot",
+        payload: { ...this.opts.beam, ttySize: this.ttySize },
+      });
+    });
   }
 
-  private async mount(): Promise<void> {
-    if (this.bridge !== null) throwError({ t: "already_mounted" });
-    this.assertStatus(["uninitialized", "reload"]);
-    this.transition({ status: "mount" });
-    this.trace("Main: mount, container: ", this.bridgeConfig.container);
+  public writeStdin(chunk: string | Uint8Array): Result<null> {
+    if (this.state.status === "closed") {
+      return { ok: false, error: this.state.error };
+    }
+    check(this.state.status === "booted");
 
-    this.bridge = new IframeBridge(this.bridgeConfig);
+    const bytes = toBytes(chunk);
+    check(bytes.byteLength > 0);
 
-    try {
-      const mountPromise = new Promise<void>((resolve) => {
-        this.mountResolve = resolve;
+    const attemptedBytes = this.io.stdin.reservedBytes + bytes.byteLength;
+    if (attemptedBytes > STDIN_QUEUE_CAPACITY_BYTES) {
+      const error = err("stdio:overflow", {
+        capacityBytes: STDIN_QUEUE_CAPACITY_BYTES,
+        attemptedBytes,
       });
+      return { ok: false, error };
+    }
 
-      let initTimeout: ReturnType<typeof setTimeout> | undefined;
-      await Promise.race([
-        mountPromise,
-        new Promise<never>((_, reject) => {
-          initTimeout = setTimeout(
-            () => reject(buildError({ t: "app_ready_timeout" })),
-            INIT_VM_TIMEOUT_MS,
-          );
-        }),
-      ]);
-      clearTimeout(initTimeout);
+    this.io.stdin.reservedBytes = attemptedBytes;
+    const event = { type: "popcorn:stdin", payload: { chunk: bytes } } as const;
+    toVm(this.vmWorker, event, [bytes.buffer]);
 
-      this.transition({ status: "ready" });
-      this.trace("Main: mounted");
-      this.onHeartbeat();
-    } catch (error) {
-      this.deinit();
-      throw error;
+    return { ok: true, data: null };
+  }
+
+  public resizeTty(columns: number, rows: number): Result<null> {
+    if (this.state.status === "closed") {
+      return { ok: false, error: this.state.error };
+    }
+    check(this.state.status === "booted");
+    check(isValidTtySize({ columns, rows }));
+
+    toVm(this.vmWorker, {
+      type: "popcorn:tty-resize",
+      payload: { columns, rows },
+    });
+    return { ok: true, data: null };
+  }
+
+  /**
+   * Resolves after VM sent message to registered process.
+   */
+  public async send(
+    rawTarget: string | Pid,
+    payload?: AnyValue,
+  ): Promise<Result<null>> {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
+      return { ok: false, error: err("bridge:not-started", {}) };
+    }
+
+    return await this.sendBridge(rawTarget, payload);
+  }
+
+  private async sendBridge(
+    rawTarget: string | Pid,
+    payload?: AnyValue,
+  ): Promise<Result<null>> {
+    let target: BeamTarget;
+    if (typeof rawTarget === "string" && rawTarget.length > 0) {
+      target = { name: rawTarget };
+    } else if (rawTarget instanceof this.Pid) {
+      target = { pid: rawTarget.bytes };
+    } else {
+      return { ok: false, error: err("bridge:invalid-target", {}) };
+    }
+
+    const tracked: PendingTracked[] = [];
+    const command = serializeSendPayload(
+      target,
+      payload ?? {},
+      this.handleMapper(tracked),
+    );
+    if (!command.ok) {
+      return command;
+    }
+    for (const { key, value, cleanup } of tracked) {
+      this.trackedValues.set(key, { value, cleanup });
+    }
+
+    const requestId = this.nextRequestId();
+    const timeoutMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs }.send;
+
+    return await new Promise<Result<null>>((resolve) => {
+      const timer = setTimeout(() => {
+        const wasMessageStale = this.pendingSends.delete(requestId);
+        if (wasMessageStale) {
+          resolve({ ok: false, error: err("timeout:send", { timeoutMs }) });
+        }
+      }, timeoutMs);
+
+      this.pendingSends.set(requestId, (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
+      toVm(
+        this.vmWorker,
+        {
+          type: "popcorn:send",
+          payload: { id: requestId, message: command.data },
+        },
+        [command.data.etf.buffer],
+      );
+    });
+  }
+
+  /**
+   * Receives BEAM messages delivered while this handler is registered.
+   * Messages with no handlers are dropped. A handler registered before boot
+   * can run before the boot promise resolves.
+   */
+  public onEvent(handler: (event: PopcornEvent) => void): () => void {
+    this.eventHandlers.add(handler);
+    return () => {
+      this.eventHandlers.delete(handler);
+    };
+  }
+
+  public deinit(reason: VmExitReason = { reason: "deinit" }): void {
+    if (this.state.status === "closed") {
+      return;
+    }
+
+    const error = err("vm:exited", reason);
+    if (this.settleBoot !== null) {
+      this.settleBoot({ ok: false, error });
+      return;
+    }
+
+    this.state = { status: "closed", error };
+    this.vmReady = false;
+    for (const resolve of this.pendingSends.values()) {
+      resolve({ ok: false, error });
+    }
+    this.pendingSends.clear();
+    for (const pending of this.pendingCalls.values()) {
+      pending.settle({ ok: false, error });
+    }
+    this.pendingCalls.clear();
+    this.clearTrackedValues();
+    this.vmWorker.removeEventListener("message", this.onWorkerMessage);
+    this.vmWorker.terminate();
+    // we keep onEvent() callbacks across reboots
+  }
+
+  private clearTrackedValues(): void {
+    for (const entry of this.trackedValues.values()) {
+      try {
+        entry.cleanup?.();
+      } catch {}
+    }
+    this.trackedValues.clear();
+  }
+
+  private emit(event: PopcornEvent): void {
+    const popcorn = objectWithKeys(event, ["_popcorn"])?._popcorn;
+    const envelope = objectWithKeys(popcorn, ["t", "id", "payload"]);
+
+    if (envelope !== null) {
+      check(envelope.t === "proxy");
+      this.completeCall(envelope.id as string, envelope.payload);
+      return;
+    }
+
+    if (this.eventHandlers.size === 0) {
+      console.warn(`${LOG_PREFIX} Dropped message with no event handlers`, event);
+    }
+    for (const handler of this.eventHandlers) {
+      handler(event);
     }
   }
 
-  /**
-   * Sends a message to an Elixir process and awaits for the response.
-   *
-   * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
-   *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
-   * Throws "Unspecified target process" if default process is not set and no process is specified.
-   *
-   * @example
-   * const result = await popcorn.call(
-   *   { action: "get_user", id: 123 },
-   *   { process: "user_server", timeoutMs: 5_000 },
-   * );
-   * console.log(result.data); // Deserialized Elixir response
-   * console.log(result.durationMs); // Entire call duration
-   */
-  async call(
-    args: AnySerializable,
-    { process, timeoutMs }: CallOptions = {},
-  ): Promise<CallResult> {
-    this.assertStatus(["ready"]);
-    const targetProcess = process ?? this.defaultReceiver;
-    if (targetProcess === null) throwError({ t: "bad_target" });
-    if (this.bridge === null) throwError({ t: "unmounted" });
+  private completeCall(id: string, payload: unknown): void {
+    const pending = this.pendingCalls.get(id);
+    const lateReply = pending === undefined;
+    if (lateReply) return;
 
-    const requestId = this.requestId++;
-    const startTimeMs = performance.now();
-    const callPromise = new Promise<CallResult>((resolve) => {
-      this.calls.set(requestId, { acknowledged: false, startTimeMs, resolve });
+    this.pendingCalls.delete(id);
+    pending.settle(this.parseCallReply(pending, payload));
+  }
+
+  private parseCallReply(
+    pending: PendingCall,
+    payload: unknown,
+  ): Result<AnyValue> {
+    const reply = payload as ProxyReply;
+    if (reply.ok) return { ok: true, data: reply.value };
+
+    switch (reply.error.kind) {
+      case "noproc": {
+        const rawTarget = pending.target;
+        const isName = typeof rawTarget === "string";
+        const target = isName ? rawTarget : "<pid>";
+        return {
+          ok: false,
+          error: err("genserver:noproc", { target }),
+        };
+      }
+      case "exit":
+        return {
+          ok: false,
+          error: err("genserver:exit", { reason: reply.error.reason }),
+        };
+      case "unserializable":
+        return { ok: false, error: err("genserver:unserializable", {}) };
+      case "timeout":
+        return {
+          ok: false,
+          error: err("timeout:call", { timeoutMs: pending.timeoutMs }),
+        };
+      default:
+        unreachable();
+    }
+  }
+
+  private async call(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>> {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
+      return { ok: false, error: err("bridge:not-started", {}) };
+    }
+
+    return await this.callBridge(rawTarget, request, opts);
+  }
+
+  private async callBridge(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: CallOpts,
+  ): Promise<Result<AnyValue>> {
+    const timeoutMs = opts?.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
+    const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
+    const id = this.nextCallId();
+
+    const result = new Promise<Result<AnyValue>>((resolve) => {
+      const timer = setTimeout(() => {
+        const isUnresolved = this.pendingCalls.delete(id);
+        if (isUnresolved) {
+          resolve({ ok: false, error: err("timeout:call", { timeoutMs }) });
+        }
+      }, timeoutMs);
+
+      this.pendingCalls.set(id, {
+        target: rawTarget,
+        timeoutMs,
+        settle: (settled) => {
+          clearTimeout(timer);
+          resolve(settled);
+        },
+      });
     });
 
-    this.trace("Main: call: ", { requestId, process, args });
-    this.bridge.sendIframeRequest({
-      type: MESSAGES.CALL,
-      value: { requestId, process: targetProcess, args },
+    const sent = await this.sendBridge(proxy, {
+      kind: "call",
+      id,
+      target: rawTarget,
+      request: request,
+      timeout_ms: timeoutMs,
     });
 
-    const result = await withTimeout(callPromise, timeoutMs ?? CALL_TIMEOUT_MS);
-    this.calls.delete(requestId);
+    if (!sent.ok) {
+      const pending = this.pendingCalls.get(id);
+      this.pendingCalls.delete(id);
+      pending?.settle({ ok: false, error: sent.error });
+    }
+
     return result;
   }
 
-  /**
-   * Sends a message to an Elixir process (default or from options) and returns immediately.
-   *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
-   * Throws "Unspecified target process" if default process is not set and no process is specified.
-   */
-  cast(args: AnySerializable, { process }: CastOptions = {}): void {
-    this.assertStatus(["ready"]);
-    const targetProcess = process ?? this.defaultReceiver;
-    if (targetProcess === null) throwError({ t: "bad_target" });
-    if (this.bridge === null) throwError({ t: "unmounted" });
+  private async cast(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>> {
+    if (this.state.status !== "booted") {
+      if (this.state.status === "closed") {
+        return { ok: false, error: this.state.error };
+      }
+      return { ok: false, error: err("bridge:not-started", {}) };
+    }
 
-    const requestId = this.requestId++;
-    this.trace("Main: cast: ", { requestId, process, args });
-    this.bridge.sendIframeRequest({
-      type: MESSAGES.CAST,
-      value: { requestId, process: targetProcess, args },
+    return await this.castBridge(rawTarget, request, opts);
+  }
+
+  private async castBridge(
+    rawTarget: string | Pid,
+    request: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<Result<null>> {
+    const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
+    return await this.sendBridge(proxy, {
+      kind: "cast",
+      target: rawTarget,
+      request: request,
     });
   }
 
-  /**
-   * Destroys an iframe and resets the instance.
-   */
-  deinit() {
-    if (this.bridge === null) throwError({ t: "unmounted" });
-    this.trace("Main: deinit");
-    this.transition({ status: "deinit" });
-    this.teardownBridge("deinitialized");
-    this.logListeners.stdout.clear();
-    this.logListeners.stderr.clear();
-    this.messageHandlers.clear();
+  private nextCallId(): string {
+    this.callSeq += 1;
+    return `call:${this.callSeq}`;
   }
 
-  private teardownBridge(errorCode: "deinitialized" | "reload") {
-    if (this.bridge) {
-      this.bridge.deinit();
-      this.bridge = null;
+  private async runJs(request: RunJsRequest): Promise<void> {
+    let payload: AnyValue;
+    try {
+      const fn = this.jsWithCurrentEnv(request.code);
+      assertRunJsFn(fn);
+      const args = this.reviveHandles(request.args);
+      check(this.vmReady);
+      const actions: RunJsActions = {
+        send: (target, payload) => this.sendBridge(target, payload),
+        call: (target, payload, opts) => this.callBridge(target, payload, opts),
+        cast: (target, payload, opts) => this.castBridge(target, payload, opts),
+      };
+      const result = await fn(args, actions);
+      const value = request.return === "ref" ? this.asRef(result) : result;
+      payload = { ok: true, value: value ?? null };
+    } catch (error) {
+      check(error instanceof Error);
+      payload = { ok: false, error: error.toString() };
     }
-    this.mountResolve = null;
-    this.defaultReceiver = null;
-    if (this.heartbeatTimeout) {
-      clearTimeout(this.heartbeatTimeout);
-      this.heartbeatTimeout = null;
+
+    const target = { pid: request.replyTo };
+    const tracked: PendingTracked[] = [];
+    const command = serializeSendPayload(
+      target,
+      payload,
+      this.handleMapper(tracked),
+    );
+    if (command.ok) {
+      for (const { key, value, cleanup } of tracked) {
+        this.trackedValues.set(key, { value, cleanup });
+      }
+      this.sendRunJsReply(command.data);
+      return;
     }
-    for (const callData of this.calls.values()) {
-      const durationMs = performance.now() - callData.startTimeMs;
-      callData.resolve({
-        ok: false,
-        error: new PopcornError(errorCode),
-        durationMs,
-      });
-    }
-    this.calls.clear();
-  }
 
-  /**
-   * Registers a log listener that will be called when output of the specified type is received.
-   */
-  registerLogListener(listener: LogListener, type: LogType): void {
-    this.logListeners[type].add(listener);
-  }
-
-  /**
-   * Unregisters a previously registered log listener.
-   */
-  unregisterLogListener(listener: LogListener, type: LogType): void {
-    this.logListeners[type].delete(listener);
-  }
-
-  private notifyLogListeners(type: LogType, message: string): void {
-    this.logListeners[type].forEach((listener) => {
-      listener(message);
+    const failure = serializeSendPayload(target, {
+      ok: false,
+      error: { unserializable: command.error.data.reason },
     });
+    check(failure.ok);
+    this.sendRunJsReply(failure.data);
   }
 
-  /**
-   * Registers a catch-all event handler. Returns an unsubscribe function.
-   */
-  onMessage(handler: MessageHandler): () => void {
-    this.messageHandlers.add(handler);
-    return () => {
-      this.messageHandlers.delete(handler);
+  private asRef(value: unknown): unknown {
+    if (value instanceof this.TrackedValue) return value;
+    return new this.TrackedValue(value);
+  }
+
+  private sendRunJsReply(message: BeamSendPayload): void {
+    toVm(
+      this.vmWorker,
+      { type: "popcorn:run-js-reply", payload: { message } },
+      [message.etf.buffer],
+    );
+  }
+
+  private jsWithCurrentEnv(code: string): unknown {
+    const make = new Function(
+      "TrackedValue",
+      `"use strict"; return (${code});`,
+    );
+    return make(this.TrackedValue);
+  }
+
+  private reviveHandles(value: unknown): unknown {
+    const key = trackedRefKey(value);
+    if (key !== null) {
+      const entry = this.trackedValues.get(key);
+      check(entry !== undefined);
+      return entry.value;
+    }
+    const pidToken = pidRefToken(value);
+    if (pidToken !== null) {
+      return new this.Pid(base64ToBytes(pidToken));
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => this.reviveHandles(item));
+    }
+    const obj = objectWithKeys(value, []);
+    if (obj !== null) {
+      const revived: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj)) {
+        revived[k] = this.reviveHandles(v);
+      }
+      return revived;
+    }
+    return value;
+  }
+
+  /** Maps pids and `TrackedValue`s during encoding, collecting handles into
+   * `tracked` for the caller to register once encoding succeeds. */
+  private handleMapper(tracked: PendingTracked[]): Mapper {
+    return (value) => {
+      if (value instanceof this.Pid) {
+        return RawTerm.fromExternal(value.bytes);
+      }
+      if (value instanceof this.TrackedValue) {
+        const key = (this.trackedKeySeq += 1);
+        tracked.push({ key, value: value.value, cleanup: value.cleanup });
+        return { [TRACKED_REF_KEY]: key };
+      }
+      return value;
     };
   }
 
-  private onEvent({ eventName, payload }: ElixirEvent): void {
-    if (eventName.startsWith("popcorn")) {
-      if (eventName === EVENT_NAMES.ELIXIR_READY) {
-        this.trace("Main: elixir VM ready");
-      } else if (eventName === EVENT_NAMES.APP_READY) {
-        this.defaultReceiver = payload.name;
-        this.mountResolve?.();
-        this.mountResolve = null;
-      } else if (eventName === EVENT_NAMES.SET_DEFAULT_RECEIVER) {
-        this.defaultReceiver = payload.name;
-      } else {
-        this.trace("Unknown internal event:", eventName);
-      }
+  private deleteTrackedValue(key: number): void {
+    const entry = this.trackedValues.get(key);
+    check(entry !== undefined);
+    try {
+      entry.cleanup?.();
+    } finally {
+      this.trackedValues.delete(key);
+    }
+  }
+
+  private completeSend(payload: SendCompletionPayload): void {
+    const resolve = this.pendingSends.get(payload.id) ?? null;
+
+    const didTimeout = resolve === null;
+    if (didTimeout) return;
+
+    this.pendingSends.delete(payload.id);
+    const result = payload.result;
+    resolve(
+      result.ok
+        ? { ok: true, data: null }
+        : { ok: false, error: PopcornError.deserialize(result.error) },
+    );
+  }
+
+  private nextRequestId(): string {
+    this.requestSeq += 1;
+    return `send:${this.requestSeq}`;
+  }
+
+  private handleStdout(chunk: Uint8Array): void {
+    this.output.stdout(chunk);
+  }
+
+  private handleStderr(chunk: Uint8Array): void {
+    this.output.stderr(chunk);
+  }
+
+  private handleOtpError(payload: OtpErrorPayload): void {
+    const onError = this.opts.onError ?? defaultOnError;
+    onError(payload);
+
+    check(this.state.status === "booting" || this.state.status === "booted");
+
+    // if failed while booting, settle early
+    const booting = this.state.status === "booting";
+    if (booting) {
+      check(this.settleBoot !== null);
+
+      const error = err("vm:exited", exitReason(payload));
+      this.settleBoot({ ok: false, error });
       return;
     }
 
-    this.messageHandlers.forEach((handler) => {
-      try {
-        handler(eventName, payload);
-      } catch (error) {
-        console.error(`Error in onMessage handler for '${eventName}':`, error);
-      }
-    });
-  }
-
-  private iframeHandler(data: IframeResponse) {
-    if (data.type === MESSAGES.EVENT) {
-      this.onEvent(data.value);
-    } else if (data.type === MESSAGES.STDOUT) {
-      this.notifyLogListeners("stdout", data.value);
-    } else if (data.type === MESSAGES.STDERR) {
-      this.notifyLogListeners("stderr", data.value);
-    } else if (data.type === MESSAGES.CALL) {
-      this.onCall(data.value);
-    } else if (data.type === MESSAGES.CALL_ACK) {
-      this.onCallAck(data.value);
-    } else if (data.type === MESSAGES.HEARTBEAT) {
-      this.onHeartbeat();
-    } else if (data.type === MESSAGES.RELOAD) {
-      this.reloadIframe();
-    } else {
-      throwError({ t: "assert" });
-    }
-  }
-
-  private onCallAck({ requestId }: { requestId: number }): void {
-    this.assertStatus(["ready"]);
-    this.trace("Main: onCallAck: ", { requestId });
-    const callData = this.calls.get(requestId);
-    if (callData === undefined) throwError({ t: "bad_ack" });
-
-    this.calls.set(requestId, { ...callData, acknowledged: true });
-  }
-
-  private onCall({
-    requestId,
-    error,
-    data,
-  }: {
-    requestId: number;
-    error?: AnySerializable;
-    data?: AnySerializable;
-  }): void {
-    this.assertStatus(["ready"]);
-    this.trace("Main: onCall: ", { requestId, error, data });
-    const callData = this.calls.get(requestId);
-    if (callData === undefined) throwError({ t: "bad_call" });
-    if (!callData.acknowledged) throwError({ t: "no_acked_call" });
-
-    this.calls.delete(requestId);
-
-    const durationMs = performance.now() - callData.startTimeMs;
-    if (error !== undefined) {
-      callData.resolve({ ok: false, error, durationMs });
-    } else {
-      callData.resolve({ ok: true, data, durationMs });
-    }
-  }
-
-  private onHeartbeat(): void {
-    if (this.heartbeatTimeout) {
-      clearTimeout(this.heartbeatTimeout);
-    }
-    this.heartbeatTimeout = setTimeout(() => {
-      this.trace("Main: heartbeat lost");
-      this.reloadIframe("heartbeat_lost");
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    }, this.heartbeatTimeoutMs!);
-  }
-
-  private reloadIframe(reason = "other"): void {
-    if (this.bridge === null) {
-      throwError({ t: "unmounted" });
-    }
-
-    if (document.hidden) {
-      this.trace("Main: reloading iframe skipped, window not visible");
-      return;
-    }
-
-    this.reloadN++;
-    if (this.reloadN > MAX_RELOAD_N) {
-      this.trace("Main: exceeded max reload number");
-      return;
-    }
-
-    this.trace("Main: reloading iframe");
-    this.transition({ status: "reload" });
-    this.teardownBridge("reload");
-    this.onReloadCallback(reason);
-    this.mount();
-  }
-
-  trace(...messages: unknown[]): void {
-    if (this.debug) {
-      console.debug(...messages);
-    }
-  }
-
-  private transition(to: State): void {
-    this.trace(`State: ${this.state.status} -> ${to.status}`);
-    this.state = to;
-  }
-
-  private assertStatus(validStatuses: State["status"][]): void {
-    const currentStatus = this.state.status;
-    if (!validStatuses.includes(currentStatus)) {
-      throwError({
-        t: "bad_status",
-        status: currentStatus,
-        expectedStatus: validStatuses.join(" | "),
-      });
-    }
+    this.deinit(exitReason(payload));
   }
 }
 
-async function withTimeout(
-  promise: Promise<CallResult>,
-  ms: number,
-): Promise<CallResult> {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<CallResult>((resolve) => {
-    timeout = setTimeout(() => {
-      resolve({
-        ok: false,
-        error: new PopcornError("timeout"),
-        durationMs: ms,
-      });
-    }, ms);
-  });
+export type SchedulerOptions = {
+  base: number;
+  dirtyCpu: number;
+  dirtyIo: number;
+};
 
-  const result = await Promise.race([promise, timeoutPromise]);
+export function schedulers(opts: SchedulerOptions): string[] {
+  const { base, dirtyCpu, dirtyIo } = opts;
+  check(base > 0);
+  check(dirtyCpu > 0);
+  check(dirtyIo > 0);
 
-  if (!timeout) throwError({ t: "assert" });
-  clearTimeout(timeout);
-  return result;
+  return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
 }
 
-function noop() {
-  /* noop */
+function isValidTtySize({ columns, rows }: TtySize): boolean {
+  const colInRange = 0 < columns && columns <= 0xffff;
+  const rowInRange = 0 < rows && rows <= 0xffff;
+  return colInRange && rowInRange;
 }
 
-async function resolveBundleURL(
-  primary: string,
-  fallback: string,
-): Promise<string> {
-  const fetchBundle = async (path: string): Promise<string> => {
-    const url = new URL(path, import.meta.url).href;
-    const response = await fetch(url, { method: "HEAD" });
-    const contentType = response.headers.get("Content-Type") ?? "";
-    if (!response.ok || contentType.includes("text/html")) {
-      throw new Error(`Bundle not found at "${path}"`);
-    }
-    return path;
+function resolveOutputHandlers<Output extends TtyOutput>(
+  opts: PopcornOpts<Output>,
+): OutputHandlers {
+  type BytesHandler = (chunk: Uint8Array) => void;
+  type TextHandler = (chunk: string) => void;
+
+  if (opts.tty?.output === "bytes") {
+    const onStdout = opts.onStdout as BytesHandler | undefined;
+    const onStderr = opts.onStderr as BytesHandler | undefined;
+    return {
+      stdout: onStdout ?? defaultOnStdoutBytes,
+      stderr: onStderr ?? defaultOnStderrBytes,
+    };
+  }
+
+  const stdoutDecoder = new TextDecoder();
+  const stderrDecoder = new TextDecoder();
+  const onStdout =
+    (opts.onStdout as TextHandler | undefined) ?? defaultOnStdout;
+  const onStderr =
+    (opts.onStderr as TextHandler | undefined) ?? defaultOnStderr;
+  return {
+    stdout: (chunk) => decodeOutput(stdoutDecoder, onStdout, chunk),
+    stderr: (chunk) => decodeOutput(stderrDecoder, onStderr, chunk),
   };
+}
 
+function decodeOutput(
+  decoder: TextDecoder,
+  onOutput: (chunk: string) => void,
+  chunk: Uint8Array,
+): void {
+  const output = decoder.decode(chunk, { stream: true });
+  if (output.length > 0) onOutput(output);
+}
+
+function createIoState() {
+  return {
+    stdin: {
+      reservedBytes: 0,
+    },
+  };
+}
+
+function toBytes(chunk: string | Uint8Array): Uint8Array {
+  return typeof chunk === "string" ? UTF8.encode(chunk) : chunk.slice();
+}
+
+function exitReason(payload: OtpErrorPayload): VmExitReason {
+  switch (payload.kind) {
+    case "abort":
+      return { reason: "abort", data: payload.data };
+    case "error":
+      return { reason: "error", data: payload.data };
+    case "exit":
+      return { reason: "exit", data: payload.data };
+    default:
+      return unreachable();
+  }
+}
+
+function trackedRefKey(value: unknown): number | null {
+  const marker = objectWithKeys(value, [TRACKED_REF_KEY]);
+  const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
+  if (!hasOnlyMarker) {
+    return null;
+  }
+  const key = marker[TRACKED_REF_KEY];
+  check(typeof key === "number");
+  return key;
+}
+
+function pidRefToken(value: unknown): string | null {
+  const marker = objectWithKeys(value, [PID_REF_KEY]);
+  const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
+  if (!hasOnlyMarker) {
+    return null;
+  }
+  const token = marker[PID_REF_KEY];
+  check(typeof token === "string");
+  return token;
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval
+function indirectEval(code: string): unknown {
+  return (0, eval)(code);
+}
+
+function canEval(): boolean {
   try {
-    return await Promise.any([fetchBundle(primary), fetchBundle(fallback)]);
+    indirectEval("0");
+    return true;
   } catch {
-    throwError({ t: "bundle_not_found", primary, fallback });
+    return false;
+  }
+}
+
+function defaultOnStdout(chunk: string): void {
+  console.log(`${LOG_PREFIX} stdout:`, chunk);
+}
+
+function defaultOnStderr(chunk: string): void {
+  console.error(`${LOG_PREFIX} stderr:`, chunk);
+}
+
+function defaultOnStdoutBytes(chunk: Uint8Array): void {
+  console.log(`${LOG_PREFIX} stdout:`, chunk);
+}
+
+function defaultOnStderrBytes(chunk: Uint8Array): void {
+  console.error(`${LOG_PREFIX} stderr:`, chunk);
+}
+
+function defaultOnError(payload: OtpErrorPayload): void {
+  switch (payload.kind) {
+    case "abort":
+      console.error(`${LOG_PREFIX} abort:`, payload.data);
+      return;
+    case "error":
+      console.error(`${LOG_PREFIX} error:`, payload.data);
+      return;
+    case "exit":
+      console.info(`${LOG_PREFIX} exit:`, payload.data);
+      return;
+    default:
+      unreachable();
   }
 }

@@ -1,40 +1,46 @@
-import { readFile } from "fs/promises";
-import { dirname, basename, resolve } from "path";
-import { fileURLToPath } from "url";
+import { cp, mkdir, rm } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import type { Plugin } from "rollup";
-import { type PopcornPluginOptions } from "./shared";
+import { popcorn as prepare, type Options } from "./shared";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Plugin is at dist/plugins/rollup.mjs, dist/ is one level up
-const popcornDistDir = resolve(__dirname, "..");
-
-export function popcorn(options: PopcornPluginOptions): Plugin<unknown> {
-  const bundles = options.bundlePaths.map((p) => ({
-    path: p,
-    name: basename(p),
-  }));
+export function popcorn(options: Options): Plugin {
+  let outputDir: string | undefined;
 
   return {
-    name: "popcorn",
+    name: "popcorn-otp",
 
-    async generateBundle() {
-      // Emit bundles
-      for (const bundle of bundles) {
-        this.emitFile({
-          type: "asset",
-          fileName: resolve(popcornDistDir, bundle.name),
-          source: await readFile(bundle.path),
-        });
+    renderStart(outputOptions) {
+      assert(
+        outputOptions.format === "es",
+        "Popcorn OTP works only with esm builds.",
+      );
+
+      let dir = outputOptions.dir;
+      if (dir === undefined && outputOptions.file !== undefined) {
+        dir = dirname(outputOptions.file);
       }
+      assert(dir !== undefined, "output dir is not specified, cannot copy files");
 
-      // Emit popcorn runtime files to output directory
-      // These need to be alongside the bundled code for import.meta.url to work
-      for (const name of ["iframe.mjs", "AtomVM.mjs", "AtomVM.wasm"]) {
-        const sourcePath = resolve(popcornDistDir, name);
-        const source = await readFile(sourcePath);
+      outputDir = resolve(dir);
+    },
 
-        this.emitFile({ type: "asset", fileName: name, source });
+    async writeBundle() {
+      assert(outputDir !== undefined, "output dir was not resolved");
+      const outDir = outputDir;
+      const prepared = await prepare(options);
+
+      try {
+        await mkdir(outDir, { recursive: true });
+        await cp(prepared.dir, outDir, { recursive: true });
+      } finally {
+        await rm(prepared.dir, { recursive: true, force: true });
       }
     },
   };
+}
+
+function assert(ok: boolean, message: string): asserts ok {
+  if (!ok) {
+    throw new Error(`[popcorn-otp] ${message}`);
+  }
 }

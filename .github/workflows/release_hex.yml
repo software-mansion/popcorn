@@ -32,8 +32,8 @@ jobs:
           from pathlib import Path
 
           tag = os.environ["TAG"].removeprefix("v")
-          js = json.loads(Path("popcorn/js/package.json").read_text())["version"]
-          ex = re.search(r'@version\s+"([^"]+)"', Path("popcorn/elixir/mix.exs").read_text()).group(1)
+          js = json.loads(Path("popcorn-2/js/package.json").read_text())["version"]
+          ex = re.search(r'@version\s+"([^"]+)"', Path("popcorn-2/elixir/mix.exs").read_text()).group(1)
 
           versions = {"tag": tag, "js": js, "elixir": ex}
           core = {k: re.split(r"[-+]", v, 1)[0] for k, v in versions.items()}
@@ -51,7 +51,7 @@ jobs:
         run: |
           docker run --rm -e HEX_API_KEY \
             popcorn-builder \
-            sh -c "cd /build/popcorn/popcorn/elixir \
+            sh -c "cd /build/popcorn/popcorn-2/elixir \
               && mix deps.get \
               && mix compile \
               && mix hex.publish package --yes $DRY_RUN_FLAG \

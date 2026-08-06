@@ -4,13 +4,13 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 
-const instance = await Popcorn.init({
-  debug: true,
+const result = await Popcorn.init({
+  beam: { manifestUrl: "/assets/otp/manifest.json" },
   onStdout: console.log,
   onStderr: console.warn,
 });
 
-console.log({ instance });
+if (!result.ok) throw result.error;
 
 function App() {
   const [count, setCount] = useState(0);

@@ -9,8 +9,8 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "popcorn/elixir/**"
-      - "popcorn/js/**"
+      - "popcorn-2/elixir/**"
+      - "popcorn-2/js/**"
       - ".github/**"
       - ".github/workflows/popcorn_build_test.yml"
       - "pnpm-workspace.yaml"
@@ -37,7 +37,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: popcorn/elixir
+        working-directory: popcorn-2/elixir
 
     steps:
       - uses: actions/checkout@v4
@@ -60,8 +60,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: popcorn/elixir/deps
-          key: ${{ runner.os }}-mix-root-${{ hashFiles('popcorn/elixir/mix.lock') }}
+          path: popcorn-2/elixir/deps
+          key: ${{ runner.os }}-mix-root-${{ hashFiles('popcorn-2/elixir/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-root-
 
       - name: Install Hex dependencies

@@ -116,19 +116,19 @@ type InitPopcornArgs = {
 };
 
 async function initPopcorn({
-  debug,
   logSink
 }: InitPopcornArgs): Promise<{ instance: Popcorn | null; error: unknown }> {
   try {
-    const instance = await Popcorn.init({
-      debug,
+    const result = await Popcorn.init({
+      beam: { manifestUrl: "/assets/otp/manifest.json" },
       onStdout: logSink.onStdout,
       onStderr: logSink.onStderr,
-      // TODO(jgonet): prepare closed error set for reloads
-      onReload: logSink.onCrash as (reason: string) => void
+      onError: () => logSink.onCrash("unknown")
     });
 
-    return { instance, error: null };
+    if (!result.ok) return { instance: null, error: result.error };
+
+    return { instance: result.data, error: null };
   } catch (error) {
     return { instance: null, error };
   }

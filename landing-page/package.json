@@ -13,7 +13,7 @@
     "@fontsource-variable/handjet": "^5.2.6",
     "@fontsource-variable/inter": "^5.2.6",
     "@iconify-json/material-symbols-light": "^1.2.30",
-    "@swmansion/popcorn": "workspace:*",
+    "@swmansion/popcorn": "link:../popcorn-2/js",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

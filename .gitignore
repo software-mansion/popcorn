@@ -2,7 +2,7 @@
 
 # Elixir build artifacts
 _build/
-popcorn/elixir/popcorn_runtime_source/
+popcorn-2/elixir/popcorn_runtime_source/
 cover/
 deps/
 doc/
@@ -20,12 +20,13 @@ node_modules/
 .DS_Store
 
 # OTP/OpenSSL build sources
-otp/sources/
-otp/out/
-otp/js/dist/
-otp/js/assets/
-otp/js/playwright-report/
-otp/js/test-results/
+popcorn/sources/
+popcorn/out/
+popcorn/js/dist/
+popcorn/js/assets/
+popcorn/js/e2e/setup/dist/
+popcorn/js/playwright-report/
+popcorn/js/test-results/
 
 # Local environment
 .env

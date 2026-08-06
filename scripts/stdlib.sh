@@ -5,7 +5,7 @@
 #   scripts/stdlib.sh [OPTIONS]
 #
 # Options:
-#   --beam-dir <path>   OTP build directory (default: otp/sources/otp)
+#   --beam-dir <path>   OTP build directory (default: popcorn/sources/otp)
 #   --outdir <path>     Output directory for tarballs + manifest
 #   --preset <name>     App preset: core, core-crypto, all (default: core)
 #   --apps <csv>        Explicit comma-separated app list
@@ -18,7 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
 DEFAULT_ELIXIR_TAG="v1.19.5"
 DEFAULT_PRESET="core"
-SOURCES_DIR="${PROJECT_ROOT}/otp/sources"
+SOURCES_DIR="${PROJECT_ROOT}/popcorn/sources"
 # logger is in core because `mix new` scaffolds `extra_applications: [:logger]`,
 # so almost every user app depends on it. It is pure BEAM (no NIF), so shipping
 # it as a provided tarball is enough for it to load in WASM.
@@ -39,7 +39,7 @@ Usage: $0 [OPTIONS]
 Create OTP and Elixir stdlib tarballs for the wasm BEAM build.
 
 Options:
-  --beam-dir <path>   OTP build directory (default: otp/sources/otp)
+  --beam-dir <path>   OTP build directory (default: popcorn/sources/otp)
   --outdir <path>     Output directory for tarballs + manifest
   --preset <name>     App preset: core, core-crypto, all (default: ${DEFAULT_PRESET})
   --apps <csv>        Explicit comma-separated app list
@@ -329,7 +329,7 @@ create_otp_tarballs() {
         fi
 
         tarball="${outdir}/${app}.tar"
-        tar -C "${src_root}" -cf "${tarball}" "lib/${app}/ebin"
+        tar --format ustar -C "${src_root}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
@@ -351,7 +351,7 @@ create_elixir_tarballs() {
         }
 
         tarball="${outdir}/${app}.tar"
-        tar -C "${elixir_dir}" -cf "${tarball}" "lib/${app}/ebin"
+        tar --format ustar -C "${elixir_dir}" -cf "${tarball}" "lib/${app}/ebin"
         GENERATED_TARBALLS+=("${tarball}")
     done
 
@@ -406,7 +406,7 @@ emit_tarball_paths() {
 
 
 main() {
-    local beam_dir="${PROJECT_ROOT}/otp/sources/otp"
+    local beam_dir="${PROJECT_ROOT}/popcorn/sources/otp"
     local outdir=""
     local preset=""
     local apps_csv=""

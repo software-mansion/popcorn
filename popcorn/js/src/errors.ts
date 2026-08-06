@@ -1,119 +1,283 @@
-/** Error codes for recoverable errors returned in CallResult */
-export type PopcornErrorCode = "timeout" | "deinitialized" | "reload";
+export type Result<T, E extends Tag = Tag> =
+  | { ok: true; data: T }
+  | {
+      ok: false;
+      error: PopcornError<E>;
+    };
 
-const defaultErrorMessages: Record<PopcornErrorCode, string> = {
-  timeout: "Promise timeout",
-  deinitialized: "Call cancelled due to instance deinit",
-  reload: "Call cancelled due to iframe reload",
+type Tag = keyof PopcornErrors;
+export type PopcornErrors = {
+  "timeout:init": { timeoutMs: number };
+  "timeout:send": { timeoutMs: number };
+  "timeout:call": { timeoutMs: number };
+  "worker:load": { message: string };
+  "vm:exited": VmExitedData;
+  "bridge:not-started": EmptyData;
+  "bridge:invalid-target": EmptyData;
+  "bridge:unserializable": UnserializableData;
+  "bridge:listener-not-found": { targetName: string };
+  "genserver:noproc": { target: string };
+  "genserver:exit": { reason: string };
+  "genserver:unserializable": EmptyData;
+  "stdio:overflow": { capacityBytes: number; attemptedBytes: number };
+  "beam:missing-boot-script": { url: string };
+  "beam:missing-manifest": { url: string };
+  "beam:missing-tarball": { name: string; all: string[] };
+  "internal:check": { detail?: string };
+  "internal:unreachable": EmptyData;
+  "runtime:eval-unavailable": EmptyData;
 };
 
-/** Recoverable error returned in CallResult (never thrown) */
-export class PopcornError extends Error {
-  constructor(
-    public readonly code: PopcornErrorCode,
-    message?: string,
-  ) {
-    super(message ?? defaultErrorMessages[code]);
+export type SerializedError<T extends Tag = Tag> = {
+  [K in T]: { t: K; data: PopcornErrors[K] };
+}[T];
+
+type EmptyData = Record<never, never>;
+export type UnserializableReason =
+  | "cyclic-object"
+  | "non-plain-object"
+  | "lossy-int"
+  | "non-finite-float"
+  | "unsupported";
+type UnserializableData = {
+  data: unknown;
+  part: unknown;
+  reason: UnserializableReason;
+};
+type VmExitedData =
+  | { reason: "deinit" }
+  | { reason: "abort"; data: string }
+  | { reason: "error"; data: string }
+  | { reason: "exit"; data: number };
+
+export function err<T extends Tag>(
+  t: T,
+  data: PopcornErrors[T],
+): PopcornError<T> {
+  return new PopcornError({ t, data });
+}
+
+export function isErr<T extends Tag = Tag>(
+  error: unknown,
+  t?: T,
+): error is PopcornError<T> {
+  const isInstance = error instanceof PopcornError;
+  if (!isInstance) return false;
+  if (t === undefined) return true;
+  if (error.t === t) return true;
+  return false;
+}
+
+export class PopcornError<T extends Tag = Tag> extends Error {
+  override readonly cause: SerializedError<T>;
+  private readonly serialized: SerializedError<T>;
+
+  constructor(cause: SerializedError<T>) {
+    super(message(cause), { cause });
     this.name = "PopcornError";
+    Object.setPrototypeOf(this, new.target.prototype);
+    this.cause = cause;
+    this.serialized = cause;
+  }
+
+  public get t(): T {
+    return this.serialized.t;
+  }
+
+  public get data(): PopcornErrors[T] {
+    return this.serialized.data;
+  }
+
+  public serialize(): SerializedError<T> {
+    return {
+      t: this.serialized.t,
+      data: { ...this.serialized.data },
+    };
+  }
+
+  public static deserialize(value: unknown): PopcornError {
+    return new PopcornError(parse(value));
   }
 }
 
-/** Error codes for internal errors that indicate bugs or misuse */
-export type PopcornInternalErrorCode =
-  | "assert"
-  | "private_constructor"
-  | "bad_call"
-  | "no_acked_call"
-  | "bad_ack"
-  | "already_mounted"
-  | "unmounted"
-  | "bad_target"
-  | "bad_status"
-  | "app_ready_timeout"
-  | "bundle_not_found";
-
-const INIT_VM_TIMEOUT_MS = 30_000;
-
-/** Non-recoverable error indicating a bug or library misuse (always thrown) */
-export class PopcornInternalError extends Error {
-  constructor(
-    public readonly code: PopcornInternalErrorCode,
-    message?: string,
-  ) {
-    super(message ?? `Internal error: ${code}`);
-    this.name = "PopcornInternalError";
-  }
-}
-
-/** Internal errors - indicate bugs, protocol violations, or library misuse */
-type ErrorData =
-  | { t: "assert" }
-  | { t: "private_constructor" }
-  | { t: "bad_call" }
-  | { t: "no_acked_call" }
-  | { t: "bad_ack" }
-  | { t: "already_mounted" }
-  | { t: "unmounted" }
-  | { t: "bad_target" }
-  | {
-      t: "bad_status";
-      status: string;
-      expectedStatus: string;
-    }
-  | { t: "app_ready_timeout" }
-  | { t: "bundle_not_found"; primary: string; fallback: string };
-
-export function buildError(error: ErrorData): PopcornInternalError {
+function message<T extends Tag>(error: SerializedError<T>): string;
+function message(error: SerializedError): string {
   switch (error.t) {
-    case "assert":
-      return new PopcornInternalError("assert", "Assertion error");
-    case "private_constructor":
-      return new PopcornInternalError(
-        "private_constructor",
-        "Don't construct the Popcorn object directly, use Popcorn.init() instead",
-      );
-    case "bad_call":
-      return new PopcornInternalError(
-        "bad_call",
-        "Response for non-existent call",
-      );
-    case "no_acked_call":
-      return new PopcornInternalError(
-        "no_acked_call",
-        "Response for non-acknowledged call",
-      );
-    case "bad_ack":
-      return new PopcornInternalError("bad_ack", "Ack for non-existent call");
-    case "already_mounted":
-      return new PopcornInternalError(
-        "already_mounted",
-        "Iframe already mounted",
-      );
-    case "unmounted":
-      return new PopcornInternalError("unmounted", "WASM iframe not mounted");
-    case "bad_target":
-      return new PopcornInternalError(
-        "bad_target",
-        "Unspecified target process",
-      );
-    case "bad_status":
-      return new PopcornInternalError(
-        "bad_status",
-        `Operation not allowed: instance in "${error.status}" state, expected "${error.expectedStatus}"`,
-      );
-    case "app_ready_timeout":
-      return new PopcornInternalError(
-        "app_ready_timeout",
-        `Elixir app did not call Popcorn.Wasm.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
-      );
-    case "bundle_not_found":
-      return new PopcornInternalError(
-        "bundle_not_found",
-        `Could not find a valid .avm bundle at "${error.primary}" or fallback "${error.fallback}"`,
-      );
+    case "timeout:init":
+      return `Init timed out after ${error.data.timeoutMs}ms`;
+    case "timeout:send":
+      return `Send timed out after ${error.data.timeoutMs}ms`;
+    case "timeout:call":
+      return `Call timed out after ${error.data.timeoutMs}ms`;
+    case "worker:load":
+      return error.data.message;
+    case "vm:exited":
+      return "VM exited";
+    case "bridge:not-started":
+      return "Bridge did not start";
+    case "bridge:invalid-target":
+      return "Target must be a non-empty name or a PID from this VM boot";
+    case "bridge:unserializable":
+      return "Message can't be serialized to ETF";
+    case "bridge:listener-not-found":
+      return `Target listener not found: '${error.data.targetName}'`;
+    case "genserver:noproc":
+      return `No process registered for genserver target: '${error.data.target}'`;
+    case "genserver:exit":
+      return `Genserver exited: ${error.data.reason}`;
+    case "genserver:unserializable":
+      return "Genserver reply can't be serialized to JSON";
+    case "stdio:overflow":
+      return `Stdin chunk exceeds the ${error.data.capacityBytes} byte queue capacity`;
+    case "beam:missing-boot-script":
+      return `Missing boot script: '${error.data.url}'`;
+    case "beam:missing-manifest":
+      return `Missing tarball manifest: '${error.data.url}'`;
+    case "beam:missing-tarball":
+      return `Missing tarball: '${error.data.name}'. Available tarballs: ${error.data.all.join(", ")}`;
+    case "internal:check":
+      return error.data.detail === undefined
+        ? "Check failed"
+        : `Check failed: ${error.data.detail}`;
+    case "internal:unreachable":
+      return "Entered unreachable code";
+    case "runtime:eval-unavailable":
+      return "JS eval is unavailable; run_js requires a Content-Security-Policy that allows 'unsafe-eval'";
+    default:
+      unreachable();
   }
 }
 
-export function throwError(error: ErrorData): never {
-  throw buildError(error);
+function parse(value: unknown): SerializedError {
+  check(objectWithKeys(value, ["t", "data"]));
+  switch (value.t) {
+    case "timeout:init":
+    case "timeout:send":
+      check(isTimeoutData(value.data));
+      return { t: value.t, data: value.data };
+    case "worker:load":
+      check(isWorkerLoadData(value.data));
+      return { t: value.t, data: value.data };
+    case "vm:exited":
+      check(isVmExitedData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:not-started":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:invalid-target":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:unserializable":
+      check(isUnserializableData(value.data));
+      return { t: value.t, data: value.data };
+    case "bridge:listener-not-found":
+      check(isListenerNotFoundData(value.data));
+      return { t: value.t, data: value.data };
+    case "stdio:overflow":
+      check(isStdioOverflowData(value.data));
+      return { t: value.t, data: value.data };
+    case "beam:missing-boot-script":
+    case "beam:missing-manifest":
+      check(isUrlData(value.data));
+      return { t: value.t, data: value.data };
+    case "beam:missing-tarball":
+      check(isMissingTarballData(value.data));
+      return { t: value.t, data: value.data };
+    case "internal:check":
+      check(isInternalCheckData(value.data));
+      return { t: value.t, data: value.data };
+    case "internal:unreachable":
+    case "runtime:eval-unavailable":
+      check(isEmptyData(value.data));
+      return { t: value.t, data: value.data };
+    default:
+      unreachable();
+  }
+}
+
+function isTimeoutData(value: unknown): value is PopcornErrors["timeout:init"] {
+  return objectWithKeys(value, ["timeoutMs"]) !== null;
+}
+
+function isWorkerLoadData(
+  value: unknown,
+): value is PopcornErrors["worker:load"] {
+  return objectWithKeys(value, ["message"]) !== null;
+}
+
+function isVmExitedData(value: unknown): value is PopcornErrors["vm:exited"] {
+  return objectWithKeys(value, ["reason"]) !== null;
+}
+
+function isListenerNotFoundData(
+  value: unknown,
+): value is PopcornErrors["bridge:listener-not-found"] {
+  return objectWithKeys(value, ["targetName"]) !== null;
+}
+
+function isStdioOverflowData(
+  value: unknown,
+): value is PopcornErrors["stdio:overflow"] {
+  return objectWithKeys(value, ["capacityBytes", "attemptedBytes"]) !== null;
+}
+
+function isUnserializableData(
+  value: unknown,
+): value is PopcornErrors["bridge:unserializable"] {
+  return (
+    objectWithKeys(value, ["data", "part", "reason"]) &&
+    isUnserializableReason(value.reason)
+  );
+}
+
+export function isUnserializableReason(
+  value: unknown,
+): value is UnserializableReason {
+  return (
+    value === "cyclic-object" ||
+    value === "non-plain-object" ||
+    value === "lossy-int" ||
+    value === "non-finite-float" ||
+    value === "unsupported"
+  );
+}
+
+function isUrlData(
+  value: unknown,
+): value is PopcornErrors["beam:missing-boot-script"] {
+  return objectWithKeys(value, ["url"]) !== null;
+}
+
+function isMissingTarballData(
+  value: unknown,
+): value is PopcornErrors["beam:missing-tarball"] {
+  return objectWithKeys(value, ["name", "all"]) !== null;
+}
+
+function isInternalCheckData(
+  value: unknown,
+): value is PopcornErrors["internal:check"] {
+  return objectWithKeys(value, []) !== null;
+}
+
+function isEmptyData(value: unknown): value is EmptyData {
+  return objectWithKeys(value, []) !== null;
+}
+
+function objectWithKeys<K extends string>(
+  value: unknown,
+  keys: readonly K[],
+): value is Record<K, unknown> {
+  const isObject = value !== null && typeof value === "object";
+  return isObject && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function unreachable(): never {
+  throw err("internal:unreachable", {});
+}
+
+function check(ok: boolean, msg?: string): asserts ok {
+  if (!ok) {
+    throw err("internal:check", { detail: msg });
+  }
 }

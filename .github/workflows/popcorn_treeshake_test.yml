@@ -9,9 +9,9 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "popcorn/elixir/lib/treeshake/**"
-      - "popcorn/elixir/test/treeshake/**"
-      - "popcorn/elixir/test/fixtures/treeshake/**"
+      - "popcorn-2/elixir/lib/treeshake/**"
+      - "popcorn-2/elixir/test/treeshake/**"
+      - "popcorn-2/elixir/test/fixtures/treeshake/**"
       - ".github/**"
       - ".github/workflows/popcorn_treeshake_build_test.yml"
 
@@ -34,7 +34,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: popcorn/elixir
+        working-directory: popcorn-2/elixir
 
     steps:
       - uses: actions/checkout@v4
@@ -55,8 +55,8 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@v4
         with:
-          path: popcorn/elixir/deps
-          key: ${{ runner.os }}-mix-root-${{ hashFiles('popcorn/elixir/mix.lock') }}
+          path: popcorn-2/elixir/deps
+          key: ${{ runner.os }}-mix-root-${{ hashFiles('popcorn-2/elixir/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-root-
 
       - name: Install Hex dependencies

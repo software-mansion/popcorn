@@ -4,9 +4,9 @@ on:
   push:
     branches: ["**"]
     paths:
-      - "otp/js/**"
-      - "otp/elixir/**"
-      - "otp/patches/**"
+      - "popcorn/js/**"
+      - "popcorn/elixir/**"
+      - "popcorn/patches/**"
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"
       - "scripts/patch-beam.sh"
@@ -52,7 +52,7 @@ jobs:
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
-          build-mode: debug
+          build-mode: release
           with-crypto: ${{ matrix.with-crypto }}
 
       - name: Setup pnpm
@@ -85,4 +85,4 @@ jobs:
 
       - name: Run e2e tests
         run: pnpm e2e
-        working-directory: otp/js
+        working-directory: popcorn/js

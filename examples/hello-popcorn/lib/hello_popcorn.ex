@@ -11,13 +11,13 @@ defmodule HelloPopcorn do
   def init(_init_arg) do
     IO.puts("Hello console!")
 
-    Popcorn.Wasm.run_js("""
-    () => {
-      document.body.innerHTML = "Hello from WASM!";
-    }
-    """)
+    {:ok, _} =
+      Popcorn.Wasm.run_js("""
+      () => {
+        document.body.innerHTML = "Hello from WASM!";
+      }
+      """)
 
-    Popcorn.Wasm.ready()
     :ignore
   end
 end

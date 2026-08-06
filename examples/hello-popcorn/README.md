@@ -1,25 +1,29 @@
 # Hello Popcorn 👋
 
-This is a very simple example of using Popcorn: it displays `Hello from WASM!` on the homepage and `Hello console!` in the browser console (see `lib/hello_popcorn.ex`).
+This is a very simple example of using Popcorn with the OTP/BEAM WebAssembly
+runtime: it displays `Hello from WASM!` on the homepage and `Hello console!` in
+the browser console (see `lib/hello_popcorn.ex`).
 
-Usage from the repository root:
+Install the JavaScript dependencies and build the OTP package from the
+repository root:
 
 ```bash
 pnpm install
-mise run dev --example hello-popcorn
+mise run build-otp-js
 ```
 
-or directly from the example directory:
+Then run the example directly from its directory:
 
 ```bash
 mix dev
 ```
 
-and visit [localhost:4000](http://localhost:4000)
+and visit [localhost:4000](http://localhost:4000).
 
-This example also contains [Playwright](https://github.com/mechanical-orchard/playwright-elixir)-based tests. To run them, type:
+This example also contains [Playwright](https://playwright.dev)-based tests. To
+run them from the `assets` directory, type:
 
 ```bash
-mix playwright.install
-mix test
+pnpm exec playwright install chromium
+pnpm test
 ```

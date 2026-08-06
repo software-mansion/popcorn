@@ -1,74 +1,70 @@
-import { copyFile, mkdir } from "fs/promises";
-import { resolve } from "path";
+import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import typescript from "@rollup/plugin-typescript";
 
-// Resolves ./AtomVM.mjs imports to assets/AtomVM.mjs
-function resolveAtomVM() {
+function copyFiles(targets) {
   return {
-    name: "resolve-atomvm",
-    resolveId(source) {
-      if (source === "./AtomVM.mjs") {
-        return resolve("assets/AtomVM.mjs");
-      }
-      return null;
-    },
-  };
-}
-
-function copyAssets(targets) {
-  return {
-    name: "copy-assets",
+    name: "copy-files",
     async buildEnd() {
       await Promise.all(
         targets.map(async ({ src, dest }) => {
-          await mkdir(dest, { recursive: true });
-          await copyFile(src, `${dest}/${src.split("/").pop()}`);
+          await mkdir(dirname(dest), { recursive: true });
+          await copyFile(src, dest);
         }),
       );
     },
   };
 }
 
-function isEvalWarning(log) {
-  return log.code === "EVAL" && log.id?.includes("AtomVM.mjs");
+function cleanDir(dir) {
+  return {
+    name: "clean-dir",
+    async buildStart() {
+      await rm(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+function cleanModules(dir) {
+  return {
+    name: "clean-modules",
+    async buildStart() {
+      await mkdir(dir, { recursive: true });
+      const entries = await readdir(dir, { withFileTypes: true });
+      await Promise.all(
+        entries
+          .filter((entry) => entry.isFile() && entry.name.endsWith(".mjs"))
+          .map((entry) => rm(join(dir, entry.name))),
+      );
+    },
+  };
 }
 
 export default [
-  // Main library
   {
-    input: {
-      AtomVM: "assets/AtomVM.mjs",
-      index: "src/index.ts",
-    },
+    input: "src/index.ts",
     output: {
-      dir: "dist",
+      file: "dist/index.mjs",
       format: "esm",
-      entryFileNames: "[name].mjs",
-      preserveModules: true,
-      preserveModulesRoot: "src",
     },
     cache: false,
-    onwarn(warning, warn) {
-      if (isEvalWarning(warning)) return;
-      warn(warning);
-    },
     plugins: [
-      resolveAtomVM(),
-      typescript({ tsconfig: "./src/tsconfig.json", outputToFilesystem: true }),
-      copyAssets([{ src: "assets/AtomVM.wasm", dest: "dist" }]),
+      cleanModules("dist"),
+      typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
     ],
   },
-  // Iframe runtime
   {
-    input: "src/iframe.ts",
+    input: "src/worker.ts",
     output: {
-      file: "dist/iframe.mjs",
+      file: "dist/worker.mjs",
       format: "esm",
+      paths: (id) =>
+        id.endsWith("/assets/beam.mjs") ? "./assets/beam.mjs" : id,
     },
-    external: ["./AtomVM.mjs"],
+    external: (id) => id.endsWith("/assets/beam.mjs"),
     cache: false,
     plugins: [
-      typescript({ tsconfig: "./src/tsconfig.json", outputToFilesystem: true }),
+      typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
     ],
   },
   {
@@ -81,23 +77,20 @@ export default [
       dir: "dist/plugins",
       format: "esm",
       entryFileNames: "[name].mjs",
+      chunkFileNames: "[name].mjs",
     },
-    external: [
-      "vite",
-      "rollup",
-      "esbuild",
-      "http",
-      "fs",
-      "fs/promises",
-      "path",
-      "url",
-    ],
+    external: (id) =>
+      id.startsWith("node:") || ["esbuild", "rollup", "vite"].includes(id),
     cache: false,
     plugins: [
+      cleanDir("dist/plugins"),
       typescript({
         tsconfig: "./plugins/tsconfig.json",
         outputToFilesystem: true,
       }),
+      copyFiles([
+        { src: "plugins/tarballs.exs", dest: "dist/plugins/tarballs.exs" },
+      ]),
     ],
   },
 ];

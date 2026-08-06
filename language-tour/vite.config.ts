@@ -33,7 +33,7 @@ export default defineConfig({
       rehypePlugins: [[rehypeHighlight, { languages: { elixir } }]]
     }),
     svgr(),
-    popcorn({ bundlePaths: ["./public/wasm/bundle.avm"] }),
+    popcorn({ rootDir: "./elixir_tour", app: "elixir_tour" }),
     cookOnChange()
   ],
   server: {

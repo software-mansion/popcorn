@@ -11,9 +11,6 @@ export default defineConfig({
       },
     }),
 
-    popcorn({
-      // Path to your .avm bundle file
-      bundlePaths: ["ex_app/_build/wasm/bundle.avm"],
-    }),
+    popcorn({ rootDir: "./ex_app", app: "ex_app" }),
   ],
 });

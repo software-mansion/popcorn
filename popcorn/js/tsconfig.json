@@ -1,21 +1,22 @@
 {
   "compilerOptions": {
+    "strict": true,
     "target": "esnext",
-    "lib": ["es2023", "DOM"],
-    "moduleDetection": "force",
     "module": "preserve",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "types": ["node"],
-    "strict": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
     "noUnusedLocals": true,
+    "lib": ["es2023", "WebWorker", "DOM"],
+    "types": ["node"],
     "declaration": true,
     "emitDeclarationOnly": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "declarationDir": "dist",
+    "rootDir": "src"
   },
-  "include": ["src/**/*", "plugins/**/*"],
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -5,10 +5,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   reporter: "html",
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://127.0.0.1:5173",
     trace: "on-first-retry",
   },
   projects: [
@@ -19,5 +19,5 @@ export default defineConfig({
   ],
   globalSetup: "./setup/global-setup.ts",
   globalTeardown: "./setup/global-teardown.ts",
-  timeout: 60000,
+  timeout: 90_000,
 });
