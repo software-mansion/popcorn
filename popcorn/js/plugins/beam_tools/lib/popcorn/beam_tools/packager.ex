@@ -16,7 +16,7 @@ defmodule Popcorn.BeamTools.Packager do
     stripped =
       entries
       |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
-      |> Enum.map(&strip_entry/1)
+      |> Enum.map(&strip_beam/1)
 
     output = Path.join(out_dir, Path.basename(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
@@ -24,34 +24,29 @@ defmodule Popcorn.BeamTools.Packager do
     :ok = :erl_tar.create(to_charlist(output), stripped, opts)
   end
 
-  defp strip_entry({name, content}) do
-    is_beam? = fn path -> Path.extname(path) == ".beam" end
+  defp beam?(path), do: Path.extname(path) == ".beam"
 
-    with true <- is_beam?.(to_string(name)),
-         {:ok, {_module, stripped}} <- strip_beam(content) do
+  defp strip_beam({name, content}) do
+    with {:is_beam, true} <- {:is_beam, beam?(to_string(name))},
+         {:ok, {_module, stripped_and_compressed}} <- :beam_lib.strip(content) do
+      stripped = :zlib.gunzip(stripped_and_compressed)
       {name, stripped}
     else
-      _ -> {name, content}
+      {:is_beam, false} -> {name, content}
     end
-  end
-
-  defp strip_beam(content) do
-    with {:ok, {module, stripped}} <- :beam_lib.strip(content) do
-      {:ok, {module, :zlib.gunzip(stripped)}}
-    end
-  rescue
-    _error -> :error
   end
 
   @spec run(options()) :: {:ok, map()} | {:error, map()}
-  def run(%{
-        root_dir: root_dir,
-        entrypoint_app: entrypoint_app,
-        out_dir: out_dir,
-        manifest_path: manifest_path,
-        strip: strip,
-        tar_paths: input_tar_paths
-      }) do
+  def run(args) do
+    %{
+      root_dir: root_dir,
+      entrypoint_app: entrypoint_app,
+      out_dir: out_dir,
+      manifest_path: manifest_path,
+      strip: strip,
+      tar_paths: input_tar_paths
+    } = args
+
     with {:ok, provided_apps} <- fetch_provided_apps(manifest_path),
          {:ok, toolchain} <- compatible_toolchain(provided_apps.version),
          {:ok, user_apps} <- fetch_user_apps(root_dir),
