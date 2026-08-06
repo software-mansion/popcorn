@@ -1,6 +1,11 @@
 defmodule Popcorn.BeamTools.Packager do
+  alias Popcorn.BeamTools.BeamPatcher
+
   @static_nif_beams MapSet.new(["wasm.beam"])
   @boot_name "bin/vm.boot"
+
+  # Using `__DIR__` is safe – the plugin is compiled on user's machine
+  @patches_dir Path.expand("../../../patches", __DIR__)
 
   # To run, Beam needs following apps:
   # - kernel
@@ -62,13 +67,13 @@ defmodule Popcorn.BeamTools.Packager do
          {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app),
-         {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded) do
+         {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
+         staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
+         :ok <- patch_apps(staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
       File.mkdir_p!(out_dir)
-
-      staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info)
 
       packed_apps =
         staged_apps
@@ -170,7 +175,8 @@ defmodule Popcorn.BeamTools.Packager do
 
   # Apps are copied out of the host installation so packing can modify them.
   defp stage_apps(staging_dir, apps_info) do
-    async_stream(apps_info, fn {app, info} ->
+    apps_info
+    |> async_stream(fn {app, info} ->
       ebin_dir = Path.join([staging_dir, app, "ebin"])
 
       File.mkdir_p!(Path.dirname(ebin_dir))
@@ -178,6 +184,26 @@ defmodule Popcorn.BeamTools.Packager do
 
       {app, %{info | ebin_dir: ebin_dir}}
     end)
+    |> Map.new()
+  end
+
+  # we patch only selected modules from OTP, see patches/
+  defp patch_apps(staged_apps) do
+    [@patches_dir, "*", "*.erl"]
+    |> Path.join()
+    |> Path.wildcard()
+    |> reduce_while_ok(:ok, fn patch_path, :ok ->
+      app = patch_path |> Path.dirname() |> Path.basename()
+      name = Path.basename(patch_path, ".erl") <> ".beam"
+      ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
+      beam_path = Path.join(ebin_dir, name)
+
+      BeamPatcher.patch_beam(beam_path, patch_path)
+    end)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   defp async_stream(enumerable, fun) do
@@ -296,6 +322,7 @@ defmodule Popcorn.BeamTools.Packager do
   defp reduce_while_ok(enumerable, acc, f) do
     Enum.reduce_while(enumerable, {:ok, acc}, fn value, {:ok, acc} ->
       case f.(value, acc) do
+        :ok -> {:cont, {:ok, acc}}
         {:ok, new_acc} -> {:cont, {:ok, new_acc}}
         {:error, _} = error -> {:halt, error}
       end

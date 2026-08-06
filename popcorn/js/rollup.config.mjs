@@ -97,6 +97,10 @@ export default [
           src: "plugins/beam_tools/lib",
           dest: "dist/plugins/beam_tools/lib",
         },
+        {
+          src: "plugins/beam_tools/patches",
+          dest: "dist/plugins/beam_tools/patches",
+        },
       ]),
     ],
   },
