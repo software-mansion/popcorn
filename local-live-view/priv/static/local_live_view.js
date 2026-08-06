@@ -524,6 +524,12 @@ function setupFakeView(socket, views, popcornSocket, pop_view_el) {
     // diffs, out-of-band "diff" frames, ref bookkeeping — runs through the
     // stock Channel/Push machinery over the PopcornTransport.
     view.channel = popcornSocket.channel(`lv:${llvId}`);
+    // LLV roots have no data-phx-session, so stock ownsElement (closestViewEl) would
+    // assign children to the host LiveView or reject them entirely — and addHook
+    // would skip every phx-hook under this container. Own the subtree by containment.
+    view.ownsElement = function (el) {
+        return this.el === el || this.el.contains(el);
+    };
     // addHook: skip the root element to prevent Phoenix from trying to register it
     // as a hook within this view's scope — hooks on children are still processed normally.
     const origAddHook = view.addHook.bind(view);
