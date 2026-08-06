@@ -152,25 +152,75 @@ type MissingDepError = {
   available_apps: string[];
 };
 
-function isMissingDepError(error: unknown): error is MissingDepError {
+type Toolchain = {
+  executable: string;
+  otp: string;
+  elixir: string;
+};
+
+type UnsupportedAppsError = {
+  code: "unsupported_apps";
+  apps: { app: string; capability: string }[];
+};
+
+function hasCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
-    (error as { code?: unknown }).code === "missing_dep"
+    (error as { code?: unknown }).code === code
   );
 }
 
-function formatPackError(error: unknown): string {
-  if (isMissingDepError(error)) {
-    const { app, dep, available_apps } = error;
-    return [
-      `${app} depends on ${dep}, which isn't packable.`,
-      `Apps available from your project: ${available_apps.join(", ")}.`,
-      `Only these can be listed in applications/extra_applications.`,
-    ].join("\n  ");
+function isMissingDepError(error: unknown): error is MissingDepError {
+  return hasCode(error, "missing_dep");
+}
+
+function isUnsupportedAppsError(error: unknown): error is UnsupportedAppsError {
+  return hasCode(error, "unsupported_apps");
+}
+
+function toolchainOf(error: unknown): Toolchain | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
   }
 
-  return `packaging failed: ${JSON.stringify(error)}`;
+  return (error as { toolchain?: Toolchain }).toolchain;
+}
+
+function errorLines(error: unknown): string[] {
+  if (isMissingDepError(error)) {
+    return [
+      `${error.app} depends on ${error.dep}, which isn't available.`,
+      `BEAM applications come from your project build and your active`,
+      `Erlang/Elixir installation; nothing is bundled with the package.`,
+      `Apps built by your project: ${error.available_apps.join(", ")}.`,
+    ];
+  }
+
+  if (isUnsupportedAppsError(error)) {
+    const apps = error.apps
+      .map(({ app, capability }) => `${app} (needs ${capability})`)
+      .join(", ");
+    return [
+      `These applications need native support the WASM runtime wasn't built`,
+      `with: ${apps}.`,
+      `Drop them from your dependencies, or use a runtime built with it.`,
+    ];
+  }
+
+  return [`packaging failed: ${JSON.stringify(error)}`];
+}
+
+function formatPackError(error: unknown): string {
+  const lines = errorLines(error);
+  const toolchain = toolchainOf(error);
+  if (toolchain !== undefined) {
+    lines.push(
+      `Using ${toolchain.executable} (Erlang/OTP ${toolchain.otp}, Elixir ${toolchain.elixir}).`,
+    );
+  }
+
+  return lines.join("\n  ");
 }
 
 async function copy(

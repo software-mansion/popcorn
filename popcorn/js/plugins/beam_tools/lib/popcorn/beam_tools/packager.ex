@@ -2,6 +2,15 @@ defmodule Popcorn.BeamTools.Packager do
   alias Popcorn.BeamTools.BeamPatcher
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
+  # Applications that only work when the emulator was built with the matching
+  # native support. The runtime manifest declares what the build provides.
+  @app_capabilities %{
+    "asn1" => "crypto",
+    "crypto" => "crypto",
+    "public_key" => "crypto",
+    "ssl" => "crypto"
+  }
+
   @boot_name "bin/vm.boot"
 
   # Using `__DIR__` is safe – the plugin is compiled on user's machine
@@ -67,6 +76,7 @@ defmodule Popcorn.BeamTools.Packager do
          {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app),
+         :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
          :ok <- patch_apps(staged_apps) do
@@ -268,8 +278,9 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp read_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"vm" => %{"version" => version, "preloaded" => preloaded}}} <- decode_json(json) do
-      {:ok, %{version: version, preloaded: preloaded}}
+         {:ok, %{"vm" => vm}} <- decode_json(json),
+         %{"version" => version, "preloaded" => preloaded, "capabilities" => capabilities} <- vm do
+      {:ok, %{version: version, preloaded: preloaded, capabilities: capabilities}}
     else
       _ -> err(:bad_manifest, manifest_path)
     end
@@ -289,6 +300,20 @@ defmodule Popcorn.BeamTools.Packager do
       |> Enum.sort()
       |> then(&{:ok, &1})
     end
+  end
+
+  defp check_capabilities(apps_info, capabilities) do
+    unsupported =
+      apps_info
+      |> Enum.flat_map(fn {app, _info} ->
+        case Map.fetch(@app_capabilities, app) do
+          {:ok, capability} -> [%{app: app, capability: capability}]
+          :error -> []
+        end
+      end)
+      |> Enum.reject(&Map.fetch!(capabilities, &1.capability))
+
+    if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
   defp root_apps(_project_apps, nil), do: {:ok, @base_apps}
@@ -440,6 +465,10 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:duplicated_apps, {root_dir, duplicates}) do
     {:error, %{code: "duplicated_apps", root_dir: root_dir, duplicates: duplicates}}
+  end
+
+  defp err(:unsupported_apps, unsupported) do
+    {:error, %{code: "unsupported_apps", apps: Enum.sort_by(unsupported, & &1.app)}}
   end
 
   defp err(:missing_dep, {app, dep, project_apps}) do
