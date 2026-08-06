@@ -212,21 +212,22 @@ async function copy(
                 await copyFile(sourcePath, targetPath);
                 break;
 
-              case "gzip":
-                await writeFile(
-                  `${targetPath}.gz`,
-                  await gzipAsync(await read(), { level: 9 }),
-                );
+              case "gzip": {
+                const input = await read();
+                const buffer = await gzipAsync(input, { level: 9 });
+                await writeFile(`${targetPath}.gz`, buffer);
                 break;
+              }
 
-              case "brotli":
-                await writeFile(
-                  `${targetPath}.br`,
-                  await brotliCompressAsync(await read(), {
-                    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-                  }),
-                );
+              case "brotli": {
+                const Q = constants.BROTLI_PARAM_QUALITY;
+                const opts = { params: { [Q]: 11 } };
+
+                const input = await read();
+                const buffer = await brotliCompressAsync(input, opts);
+                await writeFile(`${targetPath}.br`, buffer);
                 break;
+              }
             }
           }),
       );
