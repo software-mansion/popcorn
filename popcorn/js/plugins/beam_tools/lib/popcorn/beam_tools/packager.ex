@@ -1,7 +1,7 @@
 defmodule Popcorn.BeamTools.Packager do
   alias Popcorn.BeamTools.BeamPatcher
 
-  @static_nif_beams MapSet.new(["wasm.beam"])
+  @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
   @boot_name "bin/vm.boot"
 
   # Using `__DIR__` is safe – the plugin is compiled on user's machine
