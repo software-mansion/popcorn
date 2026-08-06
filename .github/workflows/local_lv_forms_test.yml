@@ -8,7 +8,7 @@ name: local-lv-forms - Test
 on:
   push:
     branches: ["**"]
-    paths:
+    paths: &llv_paths
       - "examples/local-lv-forms/**"
       - "local-live-view/**"
       - ".github/workflows/local_lv_forms_test.yml"
@@ -17,6 +17,9 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
       - ".npmrc"
+
+  pull_request:
+    paths: *llv_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
