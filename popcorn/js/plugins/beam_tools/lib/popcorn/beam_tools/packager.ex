@@ -47,11 +47,12 @@ defmodule Popcorn.BeamTools.Packager do
       tar_paths: input_tar_paths
     } = args
 
-    with {:ok, provided_apps} <- fetch_provided_apps(manifest_path),
-         {:ok, toolchain} <- compatible_toolchain(provided_apps.version),
+    with {:ok, manifest} <- fetch_manifest(manifest_path),
+         {:ok, toolchain} <- compatible_toolchain(manifest.version),
          {:ok, user_apps} <- fetch_user_apps(root_dir),
-         {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, entrypoint_app) do
-      vm_version = provided_apps.version
+         manifest_names = manifest.apps |> Map.keys() |> MapSet.new(),
+         {:ok, apps} <- fetch_apps_to_pack(user_apps, manifest_names, entrypoint_app) do
+      vm_version = manifest.version
 
       File.mkdir_p!(out_dir)
 
@@ -76,7 +77,7 @@ defmodule Popcorn.BeamTools.Packager do
 
       notes = dynamic_nifs
       manifest_path = Path.join(out_dir, "manifest.json")
-      manifest_apps = Map.merge(packed_apps, provided_apps.apps)
+      manifest_apps = Map.merge(packed_apps, manifest.apps)
 
       packed_tar_paths =
         packed_apps
@@ -131,26 +132,13 @@ defmodule Popcorn.BeamTools.Packager do
      end)}
   end
 
-  defp fetch_provided_apps(manifest_path) do
+  defp fetch_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"apps" => data, "vm" => %{"version" => version}}} <- decode_json(json),
-         {:ok, apps} <- normalize_provided_apps(data) do
-      {:ok, %{version: version, apps: apps, names: apps |> Map.keys() |> MapSet.new()}}
+         {:ok, %{"apps" => apps, "vm" => %{"version" => version}}} <- decode_json(json) do
+      {:ok, %{version: version, apps: apps}}
     else
-      _ -> err(:bad_provided_app_manifest, manifest_path)
+      _ -> err(:bad_manifest, manifest_path)
     end
-  end
-
-  defp normalize_provided_apps(data) do
-    data
-    |> Enum.reduce_while({:ok, %{}}, fn
-      {app, %{"tar" => tar, "version" => version} = entry}, {:ok, apps}
-      when is_binary(tar) and is_binary(version) ->
-        {:cont, {:ok, Map.put(apps, app, entry)}}
-
-      _entry, _acc ->
-        {:halt, :error}
-    end)
   end
 
   defp fetch_apps_to_pack(user_apps, _provided_apps, nil) do
@@ -286,8 +274,8 @@ defmodule Popcorn.BeamTools.Packager do
     {:error, %{code: "missing_entrypoint", app: app}}
   end
 
-  defp err(:bad_provided_app_manifest, path) do
-    {:error, %{code: "bad_provided_app_manifest", path: path}}
+  defp err(:bad_manifest, path) do
+    {:error, %{code: "bad_manifest", path: path}}
   end
 
   defp err(:unsupported_otp, {host, runtime}) do
