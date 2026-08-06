@@ -5,8 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "files": [
-    "dist",
-    "assets"
+    "dist"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
