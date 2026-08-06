@@ -8,12 +8,15 @@ name: Local LV Kanban - Build & E2E
 on:
   push:
     branches: ["**"]
-    paths:
+    paths: &llv_paths
       - "examples/local-lv-kanban/**"
       - "local-live-view/**"
       - ".github/workflows/local_lv_kanban_e2e_test.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
+
+  pull_request:
+    paths: *llv_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
