@@ -576,7 +576,8 @@ main() {
 
     run "${PROJECT_ROOT}/scripts/runtime-manifest.sh" \
         --beam-dir "${beam_dir}" \
-        --outdir "${final_outdir}"
+        --outdir "${final_outdir}" \
+        --with-crypto "${with_crypto}"
 
     copy_artifacts "${beam_dir}" "${final_outdir}"
 
