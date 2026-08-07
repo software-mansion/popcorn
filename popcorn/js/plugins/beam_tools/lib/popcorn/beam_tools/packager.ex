@@ -68,8 +68,10 @@ defmodule Popcorn.BeamTools.Packager do
 
       File.mkdir_p!(out_dir)
 
+      staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info)
+
       packed_apps =
-        apps_info
+        staged_apps
         |> async_stream(fn {app, info} ->
           version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
           tar_path = create_tarball(out_dir, app, info.ebin_dir)
@@ -79,7 +81,7 @@ defmodule Popcorn.BeamTools.Packager do
         |> Map.new()
 
       diagnostics =
-        apps_info
+        staged_apps
         |> async_stream(fn {app, info} ->
           case loaded_dynamic_nifs(app, info.ebin_dir) do
             [] ->
@@ -164,6 +166,18 @@ defmodule Popcorn.BeamTools.Packager do
     [app, _version] = String.split(app_version, "-", parts: 2)
 
     to_charlist(Path.join([root, "lib", app, "ebin"]))
+  end
+
+  # Apps are copied out of the host installation so packing can modify them.
+  defp stage_apps(staging_dir, apps_info) do
+    async_stream(apps_info, fn {app, info} ->
+      ebin_dir = Path.join([staging_dir, app, "ebin"])
+
+      File.mkdir_p!(Path.dirname(ebin_dir))
+      File.cp_r!(info.ebin_dir, ebin_dir)
+
+      {app, %{info | ebin_dir: ebin_dir}}
+    end)
   end
 
   defp async_stream(enumerable, fun) do
