@@ -6,7 +6,7 @@ LocalLiveView is installed into an existing Phoenix project using the `mix llv.i
 
 - A Phoenix project generated with `mix phx.new`
 - `:local_live_view` added as a dependency
-- `pnpm` or `npm` for JS package management
+- `npm` for JS package management
 
 ## Step 1 — Add the dependency
 
@@ -66,11 +66,7 @@ This compiles your `local/` project to a WASM bundle at `priv/static/assets/js/w
 mix phx.server
 ```
 
-Visit [localhost:4000](http://localhost:4000). The installer generated a sample `HelloLocal` view — add it to any template to confirm everything works:
-
-```heex
-<.local_live_view view="HelloLocal" />
-```
+The installer generated a sample `HelloLocal` view together with a page that renders it. Visit [localhost:4000/hello_local](http://localhost:4000/hello_local) to confirm everything works.
 
 ## What was generated
 
@@ -88,7 +84,7 @@ local/
 └── mix.exs                 # Compiles to WASM via popcorn.cook
 ```
 
-Add your LocalLiveView modules to `local/lib/`. They will be compiled into the WASM bundle when you run `mix llv.build`.
+Now you can add your LocalLiveView modules to `local/lib/`. When the server is running, the LLV watcher detects changes and automatically rebuilds the local code. To enforce rebuild, run `mix llv.build` and restart the server.
 
 ## Security headers
 

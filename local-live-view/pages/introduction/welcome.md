@@ -45,16 +45,6 @@ Browser                                       Server
 
 ## Relationship to Phoenix LiveView
 
-LocalLiveView deliberately mirrors the Phoenix LiveView API. If you know LiveView, you already know most of LocalLiveView:
+If you know Phoenix LiveView, you already know LocalLiveView. The callbacks (`mount/3`, `render/1` with `~H`, `handle_event/3`), the assign functions (`assign/2`, `update/3`) and the template bindings (`phx-click` and friends) are all the same — LocalLiveView intercepts Phoenix LiveView's standard JavaScript layer, so event attributes work exactly the same way.
 
-| Phoenix LiveView | LocalLiveView |
-|---|---|
-| `use Phoenix.LiveView` | `use LocalLiveView` |
-| `mount/3` | `mount/3` |
-| `render/1` with `~H` | `render/1` with `~H` |
-| `handle_event/3` | `handle_event/3` |
-| `assign/2`, `update/3` | `assign/2`, `update/3` |
-| `phx-click` | `phx-click` |
-| Runs on server | Runs in browser (WASM) |
-
-The API is intentionally identical — LocalLiveView intercepts Phoenix LiveView's standard JavaScript layer, so event attributes work exactly the same way.
+Two things differ: you write `use LocalLiveView` instead of `use Phoenix.LiveView`, and the module runs in the browser as WebAssembly instead of on the server.
