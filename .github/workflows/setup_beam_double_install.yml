@@ -1,0 +1,82 @@
+### Repro for erlef/setup-beam: two installs in one job share $RUNNER_TEMP/.setup-beam
+###
+### The second install copies over the first instead of replacing it. Files that
+### exist in both (bin/erl, ...) are overwritten, but version-suffixed app
+### directories from the first install survive, so $ROOT/lib ends up holding two
+### OTP releases at once.
+###
+### The inspection after the first install doubles as the control: at that point
+### $ROOT/lib holds exactly one version of each app.
+name: setup-beam double install repro
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/setup_beam_double_install.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  repro:
+    name: Two setup-beam installs in one job
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Install OTP 26.0.2
+        uses: erlef/setup-beam@8736e9244717f9207464c14c6051b71d22253f60 # main @ 2026-07-08
+        with:
+          otp-version: "26.0.2"
+
+      - name: Inspect after installing OTP 26.0.2
+        run: &inspect |
+          set -uo pipefail
+
+          root="$(erl -noshell -eval 'io:format("~s", [code:root_dir()]), halt().')"
+
+          echo "RUNNER_TEMP         = ${RUNNER_TEMP}"
+          echo "INSTALL_DIR_FOR_OTP = ${INSTALL_DIR_FOR_OTP:-<unset>}"
+          echo "code:root_dir()     = ${root}"
+          erl -noshell -eval \
+            'io:format("otp_release=~s erts=~s~n", [erlang:system_info(otp_release), erlang:system_info(version)]), halt().'
+
+          echo
+          echo "=== ${root}/bin ==="
+          ls -la "${root}/bin"
+
+          echo
+          echo "=== ${root}/lib ==="
+          ls -1 "${root}/lib"
+
+          echo
+          echo "=== ${root}/releases ==="
+          ls -1 "${root}/releases"
+          for f in "${root}"/releases/*/OTP_VERSION; do
+            [ -f "${f}" ] && echo "  ${f} -> $(cat "${f}")"
+          done
+
+          echo
+          echo "=== ${root}/erts-* ==="
+          ls -1d "${root}"/erts-* 2>/dev/null || echo "  none"
+
+          echo
+          echo "=== apps present in more than one version ==="
+          duplicated="$(ls -1 "${root}/lib" | sed -E 's/-[0-9][0-9.]*$//' | sort | uniq -d)"
+          if [ -z "${duplicated}" ]; then
+            echo "  none"
+          else
+            printf '%s\n' "${duplicated}" | while IFS= read -r app; do
+              echo "  ${app}:"
+              ls -1d "${root}/lib/${app}"-* | sed 's/^/    /'
+            done
+          fi
+
+      - name: Install OTP 28.3.1
+        uses: erlef/setup-beam@8736e9244717f9207464c14c6051b71d22253f60 # main @ 2026-07-08
+        with:
+          otp-version: "28.3.1"
+
+      - name: Inspect after installing OTP 28.3.1
+        run: *inspect
