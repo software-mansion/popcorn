@@ -297,7 +297,8 @@ defmodule Popcorn do
                 :crypto,
                 :asn1,
                 :async_test,
-                :playwright
+                :playwright,
+                :cowlib
               ]
 
               Keyword.update!(spec, :applications, &(&1 -- non_api_deps))
