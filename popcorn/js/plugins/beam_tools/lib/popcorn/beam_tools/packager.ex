@@ -59,8 +59,8 @@ defmodule Popcorn.BeamTools.Packager do
 
     with {:ok, manifest} <- read_manifest(manifest_path),
          {:ok, toolchain} <- fetch_toolchain_info(manifest.version),
-         project_apps = root_dir |> project_build_dir() |> get_apps_info(),
-         builtin_apps = get_builtin_apps(toolchain),
+         {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
+         {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded) do
       vm_version = manifest.version
@@ -193,20 +193,37 @@ defmodule Popcorn.BeamTools.Packager do
       {:ok, [{:application, name, props}]} = :file.consult(app_path)
       dir = Path.dirname(app_path)
 
-      {to_string(name), %{props: props, ebin_dir: dir}}
+      {to_string(name), %{props: props, ebin_dir: dir, app_path: app_path}}
     end
 
-    root_dir
-    |> Path.join("*/ebin/*.app")
-    |> Path.wildcard()
-    |> Map.new(extract_info)
+    get_name = fn {name, _info} -> name end
+    get_app_path = fn {_name, info} -> info.app_path end
+    duplicated? = fn {_name, paths} -> match?([_, _ | _], paths) end
+
+    apps =
+      root_dir
+      |> Path.join("*/ebin/*.app")
+      |> Path.wildcard()
+      |> Enum.map(extract_info)
+
+    duplicates =
+      apps
+      |> Enum.group_by(get_name, get_app_path)
+      |> Enum.filter(duplicated?)
+      |> Map.new()
+
+    if Enum.empty?(duplicates) do
+      {:ok, Map.new(apps)}
+    else
+      err(:duplicated_apps, {root_dir, duplicates})
+    end
   end
 
   defp get_builtin_apps(toolchain) do
-    elixir_apps = get_apps_info(toolchain.elixir_root)
-    otp_apps = get_apps_info(toolchain.otp_root)
-
-    Map.merge(elixir_apps, otp_apps)
+    with {:ok, elixir_apps} <- get_apps_info(toolchain.elixir_root),
+         {:ok, otp_apps} <- get_apps_info(toolchain.otp_root) do
+      {:ok, Map.merge(elixir_apps, otp_apps)}
+    end
   end
 
   defp read_manifest(manifest_path) do
@@ -378,6 +395,10 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:unsupported_otp, {host, runtime}) do
     {:error, %{code: "unsupported_otp", host: host, runtime: runtime}}
+  end
+
+  defp err(:duplicated_apps, {root_dir, duplicates}) do
+    {:error, %{code: "duplicated_apps", root_dir: root_dir, duplicates: duplicates}}
   end
 
   defp err(:missing_dep, {app, dep, project_apps}) do
