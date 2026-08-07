@@ -1,5 +1,5 @@
 name: Build OTP WASM
-description: Setup toolchain, restore caches, and build OTP/BEAM for WASM
+description: Install the build toolchain, restore caches, and build OTP/BEAM for WASM
 
 inputs:
   build-mode:
@@ -7,9 +7,12 @@ inputs:
     required: false
     default: debug
   otp-tag:
-    description: OTP git tag used for the cached clone
+    description: OTP git tag to build for WASM
     required: false
     default: OTP-28.3.1
+  host-otp-version:
+    description: OTP release installed on the runner to bootstrap the build.
+    required: true
   with-crypto:
     description: Build with static OpenSSL-backed crypto/asn1 support
     required: false
@@ -34,7 +37,6 @@ runs:
               find popcorn/patches -type f -print
               printf '%s\n' \
                 .github/actions/build-otp-wasm/action.yml \
-                .github/actions/setup-toolchain/action.yml \
                 scripts/_common.sh \
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh \
@@ -47,7 +49,6 @@ runs:
             {
               printf '%s\n' \
                 .github/actions/build-otp-wasm/action.yml \
-                .github/actions/setup-toolchain/action.yml \
                 scripts/_common.sh \
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh
@@ -67,9 +68,22 @@ runs:
       shell: bash
       run: echo "Using cached OTP WASM build from popcorn/out"
 
-    - name: Setup toolchain
+    # scripts/build-beam.sh needs emconfigure and an erlc to compile the
+    # preloaded modules the native bootstrap emulator embeds.
+    - name: Setup emsdk
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
-      uses: ./.github/actions/setup-toolchain
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 6.0.2
+        actions-cache-folder: emsdk-cache
+
+    - name: Setup bootstrap Erlang
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      with:
+        # setup-beam always installs into $RUNNER_TEMP/.setup-beam, we need to avoid having
+        # two installs with different version
+        otp-version: ${{ inputs.host-otp-version }}
 
     - name: Install autoconf 2.72
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
@@ -120,7 +134,7 @@ runs:
       run: |
         set -euo pipefail
 
-        build_args=("${{ inputs.build-mode }}")
+        build_args=(--otp-tag "${{ inputs.otp-tag }}" "${{ inputs.build-mode }}")
         if [[ "${{ inputs.with-crypto }}" == "true" ]]; then
           build_args=(--with-crypto "${build_args[@]}")
         fi

@@ -43,6 +43,7 @@ jobs:
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
+          host-otp-version: &host_otp "27.2.4"
           build-mode: debug
           with-crypto: "false"
 
@@ -50,7 +51,7 @@ jobs:
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.19.5"
-          otp-version: "27.2.4"
+          otp-version: *host_otp
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
