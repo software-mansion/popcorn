@@ -34,9 +34,7 @@ defmodule CounterLocal do
 end
 ```
 
-This should look familiar if you've used Phoenix LiveView. The differences are:
-
-- `use LocalLiveView` instead of `use Phoenix.LiveView`
+This should look familiar if you've used Phoenix LiveView. The only difference is `use LocalLiveView` instead of `use Phoenix.LiveView`.
 
 ## Mounting the view
 
@@ -47,20 +45,6 @@ Use the `<.local_live_view>` component in any Phoenix template:
 ```
 
 The `view` attribute is the module name as a string. The component renders a `<div>` that becomes the mount point for the WASM view.
-
-## Building and running
-
-After adding the module, rebuild the WASM bundle:
-
-```bash
-mix llv.build
-```
-
-Then start or reload the server:
-
-```bash
-mix phx.server
-```
 
 The counter is now fully local — clicks are handled in the browser with no server round-trips.
 

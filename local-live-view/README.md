@@ -15,3 +15,5 @@ The source code for all examples is in the `examples/` directory of this reposit
 - `local-lv-thermostat` — Basic state management and events
 - `local-lv-forms` — Form handling with validation and Mirror Sync
 - `local-lv-compare` — Side-by-side comparison of Phoenix LiveView vs LocalLiveView
+- `local-lv-kanban` — Kanban board with forms, modals and drag & drop
+- `local-lv-burrito` — In-depth side-by-side comparison: where state is kept in each model, and how LocalLiveView restores it across reconnects
