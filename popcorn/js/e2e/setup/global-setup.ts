@@ -7,6 +7,8 @@ declare global {
   var __VITE_PROCESS__: ChildProcess | undefined;
 }
 
+type Manifest = { vm: { capabilities: { crypto: boolean } } };
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -26,10 +28,8 @@ async function globalSetup() {
     env,
   );
 
-  const manifest = JSON.parse(
-    await readFile(resolve(jsRootDir, "assets/manifest.json"), "utf8"),
-  ) as { apps?: Record<string, unknown> };
-  if (manifest.apps?.ssl !== undefined) {
+  const manifest = await readManifest();
+  if (manifest.vm.capabilities.crypto) {
     env.POPCORN_E2E_REQ = "1";
     process.env.POPCORN_E2E_REQ = "1";
   } else {
@@ -196,4 +196,10 @@ function withNodeOnPath(nodeExecutable: string): NodeJS.ProcessEnv {
     ...process.env,
     PATH: `${dirname(nodeExecutable)}:${process.env.PATH ?? ""}`,
   };
+}
+
+async function readManifest() {
+  const path = resolve(jsRootDir, "assets/manifest.json");
+  const content = await readFile(path, "utf8");
+  return JSON.parse(content) as Manifest;
 }

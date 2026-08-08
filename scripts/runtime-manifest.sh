@@ -9,9 +9,10 @@
 #   scripts/runtime-manifest.sh [OPTIONS]
 #
 # Options:
-#   --beam-dir <path>   OTP build directory (default: popcorn/sources/otp)
-#   --outdir <path>     Directory to write manifest.json into
-#   -h, --help          Show this help
+#   --beam-dir <path>       OTP build directory (default: popcorn/sources/otp)
+#   --outdir <path>         Directory to write manifest.json into
+#   --with-crypto <bool>    Whether the emulator links the crypto NIF
+#   -h, --help              Show this help
 set -euo pipefail
 
 LOG_PREFIX="MANIFEST"
@@ -25,9 +26,10 @@ Usage: $0 [OPTIONS]
 Write the WASM runtime manifest describing the built emulator.
 
 Options:
-  --beam-dir <path>   OTP build directory (default: popcorn/sources/otp)
-  --outdir <path>     Directory to write manifest.json into
-  -h, --help          Show this help
+  --beam-dir <path>       OTP build directory (default: popcorn/sources/otp)
+  --outdir <path>         Directory to write manifest.json into
+  --with-crypto <bool>    Whether the emulator links the crypto NIF
+  -h, --help              Show this help
 EOF
     exit 0
 }
@@ -48,6 +50,7 @@ preloaded_modules() {
 write_manifest() {
     local beam_dir="$1"
     local outdir="$2"
+    local with_crypto="$3"
     local manifest_path="${outdir}/manifest.json"
     local otp_version
     local module
@@ -58,7 +61,8 @@ write_manifest() {
     mkdir -p "${outdir}"
 
     {
-        printf '{"vm":{"version":"%s","preloaded":[' "${otp_version}"
+        printf '{"vm":{"version":"%s","capabilities":{"crypto":%s},"preloaded":[' \
+            "${otp_version}" "${with_crypto}"
         prefix=""
 
         for module in $(preloaded_modules "${beam_dir}"); do
@@ -76,6 +80,7 @@ write_manifest() {
 main() {
     local beam_dir="${PROJECT_ROOT}/popcorn/sources/otp"
     local outdir=""
+    local with_crypto="false"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -88,6 +93,10 @@ main() {
                 ;;
             --outdir)
                 outdir="$2"
+                shift 2
+                ;;
+            --with-crypto)
+                with_crypto="$2"
                 shift 2
                 ;;
             *)
@@ -110,7 +119,12 @@ main() {
         error "OTP build directory not found at ${beam_dir}"
     fi
 
-    write_manifest "${beam_dir}" "${outdir}"
+    case "${with_crypto}" in
+        true|false) ;;
+        *) error "--with-crypto expects true or false, got '${with_crypto}'" ;;
+    esac
+
+    write_manifest "${beam_dir}" "${outdir}" "${with_crypto}"
 }
 
 main "$@"
