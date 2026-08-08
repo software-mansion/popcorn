@@ -361,6 +361,16 @@ create_elixir_tarballs() {
 }
 
 
+preloaded_modules() {
+    local beam_dir="$1"
+    local path
+
+    for path in "${beam_dir}"/erts/preloaded/ebin/*.beam; do
+        basename "${path}" .beam
+    done
+}
+
+
 write_tarball_manifest() {
     local beam_dir="$1"
     local outdir="$2"
@@ -368,6 +378,7 @@ write_tarball_manifest() {
     local manifest_path="${outdir}/tarballs.json"
     local otp_version
     local app
+    local module
     local tarball
     local version
     local prefix
@@ -389,7 +400,15 @@ write_tarball_manifest() {
             prefix=","
         done
 
-        printf '},"notes":[],"vm":{"boot":"bin/vm.boot","version":"%s"}}\n' "${otp_version}"
+        printf '},"notes":[],"vm":{"boot":"bin/vm.boot","version":"%s","preloaded":[' "${otp_version}"
+        prefix=""
+
+        for module in $(preloaded_modules "${beam_dir}"); do
+            printf '%s"%s"' "${prefix}" "${module}"
+            prefix=","
+        done
+
+        printf ']}}\n'
     } > "${manifest_path}"
 
     log "Wrote tarball manifest: ${manifest_path}"

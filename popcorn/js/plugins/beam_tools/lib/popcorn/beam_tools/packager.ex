@@ -1,5 +1,6 @@
 defmodule Popcorn.BeamTools.Packager do
   @static_nif_beams MapSet.new(["wasm.beam"])
+  @boot_name "bin/vm.boot"
 
   # To run, Beam needs following apps:
   # - kernel
@@ -60,7 +61,8 @@ defmodule Popcorn.BeamTools.Packager do
          {:ok, toolchain} <- fetch_toolchain_info(manifest.version),
          project_apps = root_dir |> project_build_dir() |> get_apps_info(),
          builtin_apps = get_builtin_apps(toolchain),
-         {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app) do
+         {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app),
+         {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -104,7 +106,7 @@ defmodule Popcorn.BeamTools.Packager do
         apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{boot: "bin/vm.boot", version: vm_version}
+        vm: %{boot: @boot_name, version: vm_version}
       }
 
       File.write!(manifest_path, encode_json(manifest))
@@ -113,6 +115,7 @@ defmodule Popcorn.BeamTools.Packager do
         ok: true,
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
+        bootPath: Path.expand(boot_path),
         tarPaths: tar_paths,
         apps: packed_apps,
         notes: diagnostics,
@@ -121,6 +124,46 @@ defmodule Popcorn.BeamTools.Packager do
 
       {:ok, result}
     end
+  end
+
+  defp create_boot(out_dir, otp_root, runtime_preloaded) do
+    boot_path = Path.join([Path.dirname(otp_root), "bin", "no_dot_erlang.boot"])
+    {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
+
+    preloaded =
+      Enum.flat_map(commands, fn
+        {:preLoaded, modules} -> Enum.map(modules, &to_string/1)
+        _ -> []
+      end)
+
+    case preloaded -- runtime_preloaded do
+      [] ->
+        boot = {:script, id, Enum.map(commands, &drop_app_versions/1)}
+        path = Path.join(out_dir, @boot_name)
+
+        File.mkdir_p!(Path.dirname(path))
+
+        File.write!(path, :erlang.term_to_binary(boot))
+
+        {:ok, path}
+
+      missing ->
+        err(:unsupported_boot, {boot_path, missing})
+    end
+  end
+
+  # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
+  defp drop_app_versions({:path, dirs}) do
+    {:path, Enum.map(dirs, &drop_version_fragment/1)}
+  end
+
+  defp drop_app_versions(command), do: command
+
+  defp drop_version_fragment(dir) do
+    [root, "lib", app_version, "ebin"] = dir |> to_string() |> Path.split()
+    [app, _version] = String.split(app_version, "-", parts: 2)
+
+    to_charlist(Path.join([root, "lib", app, "ebin"]))
   end
 
   defp async_stream(enumerable, fun) do
@@ -168,8 +211,8 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp read_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"vm" => %{"version" => version}}} <- decode_json(json) do
-      {:ok, %{version: version}}
+         {:ok, %{"vm" => %{"version" => version, "preloaded" => preloaded}}} <- decode_json(json) do
+      {:ok, %{version: version, preloaded: preloaded}}
     else
       _ -> err(:bad_manifest, manifest_path)
     end
@@ -326,6 +369,11 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:bad_manifest, path) do
     {:error, %{code: "bad_manifest", path: path}}
+  end
+
+  defp err(:unsupported_boot, {boot_path, missing_preloaded}) do
+    missing = Enum.sort(missing_preloaded)
+    {:error, %{code: "unsupported_boot", boot: boot_path, missing_preloaded: missing}}
   end
 
   defp err(:unsupported_otp, {host, runtime}) do

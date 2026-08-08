@@ -34,6 +34,7 @@ type Report =
   | {
       ok: true;
       manifestPath: string;
+      bootPath: string;
       tarPaths: string[];
       notes?: unknown[];
     }
@@ -66,10 +67,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         variants: assetVariants,
       }),
       copy(
-        p`${distDir}/assets/bin/vm.boot`,
-        p`${preparedDir}/${OTP_DIR}/bin/vm.boot`,
-      ),
-      copy(
         p`${distDir}/assets/lib/tarballs.json`,
         p`${preparedDir}/${OTP_DIR}/lib/tarballs.json`,
       ),
@@ -90,6 +87,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
 
       await Promise.all([
         copy(report.manifestPath, p`${preparedDir}/${OTP_DIR}/manifest.json`),
+        copy(report.bootPath, p`${preparedDir}/${OTP_DIR}/bin/vm.boot`),
         copy(report.tarPaths, p`${preparedDir}/${OTP_DIR}/lib`, {
           variants: assetVariants,
         }),
