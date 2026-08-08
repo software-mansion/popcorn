@@ -33,9 +33,9 @@ ensure_runtime_artifacts() {
 
 copy_runtime_assets() {
   rm -rf "${ASSETS_DIR}/bin" "${ASSETS_DIR}/lib"
-  mkdir -p "${ASSETS_DIR}" "${ASSETS_DIR}/bin" "${ASSETS_DIR}/lib"
+  mkdir -p "${ASSETS_DIR}"
 
-  for path in beam.wasm beam.smp beam.emu; do
+  for path in beam.wasm beam.smp beam.emu manifest.json; do
     if [[ ! -f "${OUT_DIR}/${path}" ]]; then
       echo "popcorn/js: missing expected artifact '${OUT_DIR}/${path}'" >&2
       exit 1
@@ -45,8 +45,7 @@ copy_runtime_assets() {
   cp "${OUT_DIR}/beam.wasm" "${ASSETS_DIR}/beam.wasm"
   cp "${OUT_DIR}/beam.smp" "${ASSETS_DIR}/beam.mjs"
   cp "${OUT_DIR}/beam.emu" "${ASSETS_DIR}/beam.emu.mjs"
-  cp -R "${OUT_DIR}/bin/." "${ASSETS_DIR}/bin/"
-  cp -R "${OUT_DIR}/lib/." "${ASSETS_DIR}/lib/"
+  cp "${OUT_DIR}/manifest.json" "${ASSETS_DIR}/manifest.json"
 
   ASSETS_DIR="${ASSETS_DIR}" node <<'EOF'
 const { readFileSync, writeFileSync } = require("node:fs");
@@ -68,20 +67,16 @@ for (const filename of ["beam.mjs", "beam.emu.mjs"]) {
 }
 
 EOF
-
-  cp "${ASSETS_DIR}/lib/tarballs.json" "${ASSETS_DIR}/manifest.json"
 }
 
 copy_dist_assets() {
   rm -rf "${DIST_ASSETS_DIR}"
-  mkdir -p "${DIST_ASSETS_DIR}" "${DIST_ASSETS_DIR}/bin" "${DIST_ASSETS_DIR}/lib"
+  mkdir -p "${DIST_ASSETS_DIR}"
 
   cp "${ASSETS_DIR}/beam.mjs" "${DIST_ASSETS_DIR}/beam.mjs"
   cp "${ASSETS_DIR}/beam.emu.mjs" "${DIST_ASSETS_DIR}/beam.emu.mjs"
   cp "${ASSETS_DIR}/beam.wasm" "${DIST_ASSETS_DIR}/beam.wasm"
   cp "${ASSETS_DIR}/manifest.json" "${DIST_ASSETS_DIR}/manifest.json"
-  cp -R "${ASSETS_DIR}/bin/." "${DIST_ASSETS_DIR}/bin/"
-  cp -R "${ASSETS_DIR}/lib/." "${DIST_ASSETS_DIR}/lib/"
 }
 
 case "${MODE}" in

@@ -433,7 +433,7 @@ copy_artifacts() {
     local beam_dir="$1"
     local outdir="$2"
 
-    mkdir -p "${outdir}" "${outdir}/bin" "${outdir}/lib"
+    mkdir -p "${outdir}" "${outdir}/bin"
 
     local wasm_bin_dir="${beam_dir}/bin/wasm32-unknown-emscripten"
 
@@ -574,16 +574,9 @@ main() {
 
     build_beam "${beam_dir}" "${mode}" "${jobs}"
 
-    local stdlib_preset="core"
-    if [[ "${with_crypto}" == "true" ]]; then
-        stdlib_preset="core-crypto"
-    fi
-
-    log "Building stdlib (${stdlib_preset})..."
-    run "${PROJECT_ROOT}/scripts/stdlib.sh" \
+    run "${PROJECT_ROOT}/scripts/runtime-manifest.sh" \
         --beam-dir "${beam_dir}" \
-        --outdir "${final_outdir}/lib" \
-        --preset "${stdlib_preset}"
+        --outdir "${final_outdir}"
 
     copy_artifacts "${beam_dir}" "${final_outdir}"
 

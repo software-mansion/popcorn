@@ -10,7 +10,7 @@ on:
       - "scripts/build-beam.sh"
       - "scripts/build-openssl.sh"
       - "scripts/patch-beam.sh"
-      - "scripts/stdlib.sh"
+      - "scripts/runtime-manifest.sh"
       - "scripts/_common.sh"
       - ".github/workflows/otp_js_e2e_test.yml"
       - ".github/actions/build-otp-wasm/action.yml"

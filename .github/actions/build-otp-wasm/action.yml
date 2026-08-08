@@ -41,7 +41,7 @@ runs:
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh \
                 scripts/patch-beam.sh \
-                scripts/stdlib.sh
+                scripts/runtime-manifest.sh
             } | hash_files
           )"
 

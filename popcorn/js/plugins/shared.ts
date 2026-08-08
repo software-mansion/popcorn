@@ -66,10 +66,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
       copy(p`${distDir}/assets/beam.wasm`, p`${preparedDir}/assets/beam.wasm`, {
         variants: assetVariants,
       }),
-      copy(
-        p`${distDir}/assets/lib/tarballs.json`,
-        p`${preparedDir}/${OTP_DIR}/lib/tarballs.json`,
-      ),
     ]);
 
     const report = await withTmp(async (packedDir) => {
