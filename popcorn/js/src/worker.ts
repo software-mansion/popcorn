@@ -14,7 +14,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       check(instance === null);
 
       instance = start({
-        manifestUrl: data.payload.manifestUrl,
+        otpAssetsRoot: data.payload.otpAssetsRoot,
         emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,

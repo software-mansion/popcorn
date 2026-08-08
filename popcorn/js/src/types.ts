@@ -14,7 +14,7 @@ export type BeamSendPayload = {
 };
 
 export type BeamBootOptions = {
-  manifestUrl: string;
+  otpAssetsRoot: string;
   emulatorArgs?: string[];
   extraArgs?: string[];
   env?: Record<string, string>;

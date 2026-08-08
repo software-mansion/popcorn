@@ -27,7 +27,7 @@ test.describe("boot", () => {
       let booted = false;
       const popcorn = new window.Popcorn({
         beam: {
-          manifestUrl: "/assets/otp/manifest.json",
+          otpAssetsRoot: "/assets/otp/",
           env: { POPCORN_STARTUP_EVENT: "bridge" },
         },
       });
@@ -61,7 +61,7 @@ test.describe("boot", () => {
 
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn({
-        beam: { manifestUrl: "/assets/otp/manifest.json" },
+        beam: { otpAssetsRoot: "/assets/otp/" },
       });
       const boot = await popcorn.boot();
       popcorn.deinit();
@@ -75,7 +75,7 @@ test.describe("boot", () => {
     const otp = await createOtp();
     const boot = await otp.boot({
       beam: {
-        manifestUrl: "/assets/otp/manifest.json",
+        otpAssetsRoot: "/assets/otp/",
         env: { POPCORN_STARTUP_EVENT: "fail" },
       },
     });
@@ -89,7 +89,7 @@ test.describe("boot", () => {
   test("schedulers", async ({ otp }) => {
     const boot = await otp.boot({
       beam: {
-        manifestUrl: "/assets/otp/manifest.json",
+        otpAssetsRoot: "/assets/otp/",
         emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
         extraArgs: [
           "-eval",
@@ -115,7 +115,7 @@ test.describe("boot", () => {
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
     const timeout = await timedOut.boot({
-      beam: { manifestUrl: "/assets/otp/manifest.json" },
+      beam: { otpAssetsRoot: "/assets/otp/" },
       timeoutsMs: { boot: 0 },
     });
     expect(timeout).toEqual({
@@ -126,7 +126,7 @@ test.describe("boot", () => {
     const missing = await page.evaluate(async () => {
       const errors: unknown[] = [];
       const popcorn = new window.Popcorn({
-        beam: { manifestUrl: "/assets/otp/missing/manifest.json" },
+        beam: { otpAssetsRoot: "/assets/otp/missing/" },
         onError: (event) => errors.push(event),
       });
       const result = await popcorn.boot();
@@ -153,7 +153,7 @@ test.describe("boot", () => {
   test("worker exit", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn({
-        beam: { manifestUrl: "/assets/otp/manifest.json" },
+        beam: { otpAssetsRoot: "/assets/otp/" },
         workerUrl: "/fault-worker.mjs",
         timeoutsMs: { boot: 30_000 },
       });
@@ -264,7 +264,7 @@ test.describe("lifecycle", () => {
       const stdout: string[] = [];
       const stderr: string[] = [];
       const text = new window.Popcorn({
-        beam: { manifestUrl: "/unused.json" },
+        beam: { otpAssetsRoot: "/unused/otp/" },
         workerUrl: "/output-worker.mjs",
         onStdout: (chunk) => stdout.push(chunk),
         onStderr: (chunk) => stderr.push(chunk),
@@ -278,7 +278,7 @@ test.describe("lifecycle", () => {
       const rawStdout: number[][] = [];
       const rawStderr: number[][] = [];
       const init = await window.Popcorn.init({
-        beam: { manifestUrl: "/unused.json" },
+        beam: { otpAssetsRoot: "/unused/otp/" },
         workerUrl: "/output-worker.mjs",
         tty: {
           size: { columns: 100, rows: 30 },
@@ -295,7 +295,7 @@ test.describe("lifecycle", () => {
       // Reboot discards an incomplete UTF-8 sequence.
       const rebootStdout: string[] = [];
       const reboot = new window.Popcorn({
-        beam: { manifestUrl: "/unused.json" },
+        beam: { otpAssetsRoot: "/unused/otp/" },
         workerUrl: "/output-worker.mjs",
         onStdout: (chunk) => rebootStdout.push(chunk),
       });
@@ -339,7 +339,7 @@ test.describe("lifecycle", () => {
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const init = await window.Popcorn.init({
-        beam: { manifestUrl: "/assets/otp/manifest.json" },
+        beam: { otpAssetsRoot: "/assets/otp/" },
       });
       if (!init.ok) return { ok: false, error: init.error.serialize() };
       init.data.deinit();
@@ -354,7 +354,7 @@ test.describe("lifecycle", () => {
       const events: unknown[] = [];
       const popcorn = new window.Popcorn({
         beam: {
-          manifestUrl: "/assets/otp/manifest.json",
+          otpAssetsRoot: "/assets/otp/",
           extraArgs: ["-eval", "ok = wasm:send(#{ready => true})."],
         },
       });

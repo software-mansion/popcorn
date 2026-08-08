@@ -21,6 +21,7 @@ const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
+const MANIFEST_NAME = "manifest.json";
 const ENTRYPOINT_READY_EXPR =
   'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}})';
 const ENTRYPOINT_FAILED_EXPR =
@@ -82,7 +83,7 @@ async function boot(
   vm: ReturnType<typeof trackVmReady>,
 ): Promise<Result<null>> {
   const {
-    manifestUrl,
+    otpAssetsRoot,
     emulatorArgs,
     extraArgs,
     env,
@@ -90,7 +91,7 @@ async function boot(
     createModule,
     emit,
   } = opts;
-  const loadedFsData = await loadFsData(manifestUrl);
+  const loadedFsData = await loadFsData(otpAssetsRoot);
   if (!loadedFsData.ok) {
     return { ok: false, error: loadedFsData.error };
   }
@@ -287,7 +288,8 @@ type InitFsArgs = {
   fsData: LoadedFsData;
 };
 
-async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
+async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
+  const manifestUrl = resolveAssetsPath(assetsRoot, MANIFEST_NAME);
   const manifest = await fetchJson<BeamManifest>(manifestUrl);
   if (manifest === null) {
     return {
@@ -306,7 +308,7 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
     }
   }
 
-  const bootUrl = resolveManifestPath(manifestUrl, manifest.vm.boot);
+  const bootUrl = resolveAssetsPath(assetsRoot, manifest.vm.boot);
   const bootFile = await fetchBinary(bootUrl);
   if (bootFile === null) {
     return {
@@ -318,7 +320,7 @@ async function loadFsData(manifestUrl: string): Promise<Result<LoadedFsData>> {
   const loadedTarballs = await Promise.all(
     appNames.map(async (name): Promise<Result<Uint8Array>> => {
       const entry = manifest.apps[name];
-      const tarUrl = resolveManifestPath(manifestUrl, entry.tar);
+      const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
       const tar = await fetchBinary(tarUrl);
       if (tar === null) {
         return {
@@ -376,12 +378,16 @@ function initFs({ module, fsData }: InitFsArgs): void {
   }
 }
 
-function resolveManifestPath(manifestUrl: string, path: string): string {
-  if (path.startsWith("/") || isAbsoluteUrl(path)) {
-    return path;
+function resolveAssetsPath(assetsRoot: string, relativePath: string): string {
+  check(assetsRoot.endsWith("/"));
+  if (relativePath.startsWith("/") || isAbsoluteUrl(relativePath)) {
+    return relativePath;
   }
-
-  return new URL(path, new URL(manifestUrl, self.location.href)).toString();
+  const url = new URL(relativePath, new URL(assetsRoot, self.location.href));
+  if (assetsRoot.startsWith("/")) {
+    return url.pathname;
+  }
+  return url.toString();
 }
 
 function isAbsoluteUrl(path: string): boolean {
