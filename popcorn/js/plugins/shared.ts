@@ -81,7 +81,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
       const report = await packTarballs({
         rootDir: resolve(opts.rootDir),
         outDir: packedDir,
-        providedAppsManifestPath: p`${distDir}/assets/manifest.json`,
+        manifestPath: p`${distDir}/assets/manifest.json`,
         app: opts.app,
         tarPaths: coreTarballs,
         strip,
@@ -110,43 +110,49 @@ export async function popcorn(opts: Options): Promise<Prepared> {
   }
 }
 
-async function packTarballs({
-  rootDir,
-  outDir,
-  providedAppsManifestPath,
-  app,
-  tarPaths,
-  strip,
-}: {
+type PackTarballsParams = {
   rootDir: string;
   outDir: string;
-  providedAppsManifestPath: string;
+  manifestPath: string;
   app: string | null;
   tarPaths: string[];
   strip: boolean;
-}): Promise<Report> {
-  const scriptPath = p`${dirname(fileURLToPath(import.meta.url))}/tarballs.exs`;
-  const args = [
-    scriptPath,
+};
+async function packTarballs(opts: PackTarballsParams): Promise<Report> {
+  const { rootDir, outDir, manifestPath, app, tarPaths, strip } = opts;
+  const toolDir = p`${dirname(fileURLToPath(import.meta.url))}/beam_tools`;
+
+  const packerArgs = [
+    "run",
+    "--no-start",
+    "-e",
+    "Popcorn.BeamTools.CLI.main(System.argv())",
+    "--",
     "--root-dir",
     rootDir,
     "--out-dir",
     outDir,
-    "--provided-apps-manifest-path",
-    providedAppsManifestPath,
+    "--manifest-path",
+    manifestPath,
   ];
 
   if (app !== null) {
-    args.push("--entrypoint-app", app);
+    packerArgs.push("--entrypoint-app", app);
   }
-
   if (strip) {
-    args.push("--strip");
+    packerArgs.push("--strip");
   }
+  packerArgs.push(...tarPaths);
 
-  args.push(...tarPaths);
-
-  const { stdout } = await execFileAsync("elixir", args);
+  const env = {
+    ...process.env,
+    MIX_BUILD_PATH: p`${outDir}/beam_tools_build`,
+    MIX_QUIET: "1",
+  };
+  const { stdout } = await execFileAsync("mix", packerArgs, {
+    cwd: toolDir,
+    env,
+  });
   return JSON.parse(stdout) as Report;
 }
 
@@ -206,21 +212,22 @@ async function copy(
                 await copyFile(sourcePath, targetPath);
                 break;
 
-              case "gzip":
-                await writeFile(
-                  `${targetPath}.gz`,
-                  await gzipAsync(await read(), { level: 9 }),
-                );
+              case "gzip": {
+                const input = await read();
+                const buffer = await gzipAsync(input, { level: 9 });
+                await writeFile(`${targetPath}.gz`, buffer);
                 break;
+              }
 
-              case "brotli":
-                await writeFile(
-                  `${targetPath}.br`,
-                  await brotliCompressAsync(await read(), {
-                    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
-                  }),
-                );
+              case "brotli": {
+                const Q = constants.BROTLI_PARAM_QUALITY;
+                const opts = { params: { [Q]: 11 } };
+
+                const input = await read();
+                const buffer = await brotliCompressAsync(input, opts);
+                await writeFile(`${targetPath}.br`, buffer);
                 break;
+              }
             }
           }),
       );

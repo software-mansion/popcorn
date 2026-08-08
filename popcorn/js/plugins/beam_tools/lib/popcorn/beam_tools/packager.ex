@@ -1,33 +1,14 @@
-if String.to_integer(System.otp_release()) < 27 do
-  IO.puts(:stderr, "tarballs.exs requires host OTP >= 27 for the built-in :json module")
-  System.halt(1)
-end
-
-defmodule Tarballs do
-  @options [
-    root_dir: :string,
-    entrypoint_app: :string,
-    out_dir: :string,
-    provided_apps_manifest_path: :string,
-    strip: :boolean
-  ]
-
-  @required_options [:root_dir, :out_dir, :provided_apps_manifest_path]
+defmodule Popcorn.BeamTools.Packager do
   @static_nif_apps MapSet.new(["wasm"])
 
-  def main(argv) do
-    case run(argv) do
-      {:ok, report} ->
-        report
-        |> encode_json()
-        |> IO.puts()
-
-      {:error, error} ->
-        %{ok: false, error: error}
-        |> encode_json()
-        |> IO.puts()
-    end
-  end
+  @type options :: %{
+          root_dir: Path.t(),
+          entrypoint_app: String.t() | nil,
+          out_dir: Path.t(),
+          manifest_path: Path.t(),
+          strip: boolean(),
+          tar_paths: [Path.t()]
+        }
 
   defp strip_tarball(path, out_dir) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
@@ -62,21 +43,28 @@ defmodule Tarballs do
     _error -> :error
   end
 
-  defp run(argv) do
-    with {:ok, args} <- parse_argv(argv),
-         {:ok, provided_apps} <- fetch_provided_apps(args.provided_apps_manifest_path),
-         {:ok, user_apps} <- fetch_user_apps(args.root_dir),
-         {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, args.entrypoint_app) do
+  @spec run(options()) :: {:ok, map()} | {:error, map()}
+  def run(%{
+        root_dir: root_dir,
+        entrypoint_app: entrypoint_app,
+        out_dir: out_dir,
+        manifest_path: manifest_path,
+        strip: strip,
+        tar_paths: input_tar_paths
+      }) do
+    with {:ok, provided_apps} <- fetch_provided_apps(manifest_path),
+         {:ok, user_apps} <- fetch_user_apps(root_dir),
+         {:ok, apps} <- fetch_apps_to_pack(user_apps, provided_apps.names, entrypoint_app) do
       vm_version = provided_apps.version
 
-      File.mkdir_p!(args.out_dir)
+      File.mkdir_p!(out_dir)
 
       packed_apps =
         apps
         |> Task.async_stream(fn app ->
           info = Map.fetch!(user_apps, app)
           version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
-          tar_path = create_tarball(args.out_dir, app, info.ebin_dir)
+          tar_path = create_tarball(out_dir, app, info.ebin_dir)
 
           {app, %{tar: tar_path, version: version}}
         end)
@@ -91,18 +79,18 @@ defmodule Tarballs do
         |> Enum.flat_map(fn {:ok, notes} -> notes end)
 
       notes = dynamic_nifs ++ otp_version(vm_version)
-      manifest_path = Path.join(args.out_dir, "manifest.json")
+      manifest_path = Path.join(out_dir, "manifest.json")
       manifest_apps = Map.merge(packed_apps, provided_apps.apps)
 
-      tar_paths =
+      packed_tar_paths =
         packed_apps
         |> Map.values()
-        |> Enum.map(&Path.expand(Path.join(args.out_dir, &1.tar)))
+        |> Enum.map(&Path.expand(Path.join(out_dir, &1.tar)))
 
-      tar_paths = maybe_strip_tarballs(tar_paths ++ args.tar_paths, args.strip, args.out_dir)
+      tar_paths = maybe_strip_tarballs(packed_tar_paths ++ input_tar_paths, strip, out_dir)
 
       manifest = %{
-        entrypoint: args.entrypoint_app,
+        entrypoint: entrypoint_app,
         apps: manifest_apps,
         notes: notes,
         vm: %{boot: "bin/vm.boot", version: vm_version}
@@ -113,7 +101,7 @@ defmodule Tarballs do
       {:ok,
        %{
          ok: true,
-         entrypoint: args.entrypoint_app,
+         entrypoint: entrypoint_app,
          manifestPath: Path.expand(manifest_path),
          tarPaths: tar_paths,
          apps: manifest_apps,
@@ -272,38 +260,6 @@ defmodule Tarballs do
     |> Enum.map(&to_string/1)
   end
 
-  defp parse_argv(argv) do
-    {opts, tar_paths, invalid} = OptionParser.parse(argv, strict: @options)
-
-    missing_opts = Enum.reject(@required_options, &Keyword.has_key?(opts, &1))
-
-    case {invalid, missing_opts} do
-      {[], []} ->
-        args =
-          opts
-          |> Map.new()
-          |> Map.put_new(:entrypoint_app, nil)
-          |> Map.put_new(:strip, false)
-          |> Map.put(:tar_paths, tar_paths)
-
-        {:ok, args}
-
-      _ ->
-        err(:bad_args, {invalid, missing_opts})
-    end
-  end
-
-  defp err(:bad_args, {invalid, missing_opts}) do
-    invalid =
-      Enum.map(invalid, fn {option, value} ->
-        %{option: option, value: value}
-      end)
-
-    missing = Enum.map(missing_opts, &to_string/1)
-
-    {:error, %{code: "bad_args", invalid: invalid, missing: missing}}
-  end
-
   defp err(:missing_entrypoint, app) do
     {:error, %{code: "missing_entrypoint", app: app}}
   end
@@ -333,5 +289,3 @@ defmodule Tarballs do
     _ -> :error
   end
 end
-
-Tarballs.main(System.argv())
