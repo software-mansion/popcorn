@@ -160,8 +160,7 @@ type MissingDepError = {
   code: "missing_dep";
   app: string;
   dep: string;
-  provided_apps: string[];
-  user_apps: string[];
+  available_apps: string[];
 };
 
 function isMissingDepError(error: unknown): error is MissingDepError {
@@ -174,11 +173,10 @@ function isMissingDepError(error: unknown): error is MissingDepError {
 
 function formatPackError(error: unknown): string {
   if (isMissingDepError(error)) {
-    const { app, dep, provided_apps, user_apps } = error;
+    const { app, dep, available_apps } = error;
     return [
       `${app} depends on ${dep}, which isn't packable.`,
-      `Apps provided by the runtime: ${provided_apps.join(", ")}.`,
-      `Apps in your project: ${user_apps.join(", ")}.`,
+      `Apps available from your project: ${available_apps.join(", ")}.`,
       `Only these can be listed in applications/extra_applications.`,
     ].join("\n  ");
   }
