@@ -59,7 +59,7 @@ export { assert, expect };
 export function evalOpts(code: string): PopcornOpts {
   return {
     beam: {
-      manifestUrl: "/assets/otp/manifest.json",
+      otpAssetsRoot: "/assets/otp/",
       extraArgs: ["-eval", trimLeft(code)],
     },
   };

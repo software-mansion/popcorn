@@ -49,7 +49,7 @@ terminal.writeln("\x1b[90mBooting BEAM and starting the shell…\x1b[0m");
 
 const result = await Popcorn.init({
   beam: {
-    manifestUrl: "/assets/otp/manifest.json",
+    otpAssetsRoot: "/assets/otp/",
     env: { TERM: "xterm-256color" },
     extraArgs: SHELL_ARGS[LANGUAGE],
   },

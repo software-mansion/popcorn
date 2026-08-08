@@ -2,7 +2,7 @@ import { Popcorn } from "@swmansion/popcorn";
 
 const result = await Popcorn.init({
   beam: {
-    manifestUrl: "/assets/otp/manifest.json",
+    otpAssetsRoot: "/assets/otp/",
   },
   onStdout: console.log,
 });

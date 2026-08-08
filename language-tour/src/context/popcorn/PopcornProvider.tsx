@@ -120,7 +120,7 @@ async function initPopcorn({
 }: InitPopcornArgs): Promise<{ instance: Popcorn | null; error: unknown }> {
   try {
     const result = await Popcorn.init({
-      beam: { manifestUrl: "/assets/otp/manifest.json" },
+      beam: { otpAssetsRoot: "/assets/otp/" },
       onStdout: logSink.onStdout,
       onStderr: logSink.onStderr,
       onError: () => logSink.onCrash("unknown")

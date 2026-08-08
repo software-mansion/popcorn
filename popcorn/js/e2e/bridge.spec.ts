@@ -275,7 +275,7 @@ test.describe("send", () => {
 
     const timedOut = await createOtp();
     const bootOpts = {
-      beam: { manifestUrl: "/assets/otp/manifest.json" },
+      beam: { otpAssetsRoot: "/assets/otp/" },
       timeoutsMs: { send: 0 },
     };
     assert((await timedOut.boot(bootOpts)).ok);
