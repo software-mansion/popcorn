@@ -30,6 +30,7 @@ defmodule Popcorn.BeamTools.Packager do
   @type options :: %{
           root_dir: Path.t(),
           entrypoint_app: String.t() | nil,
+          extra_apps: [String.t()],
           out_dir: Path.t(),
           manifest_path: Path.t(),
           strip: boolean()
@@ -66,6 +67,7 @@ defmodule Popcorn.BeamTools.Packager do
     %{
       root_dir: root_dir,
       entrypoint_app: entrypoint_app,
+      extra_apps: extra_apps,
       out_dir: out_dir,
       manifest_path: manifest_path,
       strip: strip
@@ -75,7 +77,7 @@ defmodule Popcorn.BeamTools.Packager do
          {:ok, toolchain} <- fetch_toolchain_info(manifest.version),
          {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
-         {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, entrypoint_app),
+         {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
@@ -286,14 +288,14 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  defp apps_to_pack(project_apps, builtin_apps, entrypoint) do
+  defp apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint) do
     all_apps_info = Map.merge(builtin_apps, project_apps)
 
     gather_from_root = fn app, selected ->
       gather_required_apps(all_apps_info, project_apps, app, selected)
     end
 
-    with {:ok, roots} <- root_apps(project_apps, entrypoint),
+    with {:ok, roots} <- root_apps(all_apps_info, extra_apps, entrypoint),
          {:ok, selected_apps} <- reduce_while_ok(roots, MapSet.new(), gather_from_root) do
       all_apps_info
       |> Map.filter(fn {app, _info} -> MapSet.member?(selected_apps, app) end)
@@ -316,13 +318,31 @@ defmodule Popcorn.BeamTools.Packager do
     if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
-  defp root_apps(_project_apps, nil), do: {:ok, @base_apps}
+  defp root_apps(all_apps_info, extra_apps, entrypoint) do
+    with {:ok, roots} <- entrypoint_roots(all_apps_info, entrypoint),
+         {:ok, extra} <- extra_roots(all_apps_info, extra_apps) do
+      {:ok, extra ++ roots}
+    end
+  end
 
-  defp root_apps(project_apps, entrypoint) when is_map_key(project_apps, entrypoint) do
+  defp entrypoint_roots(_all_apps_info, nil), do: {:ok, @base_apps}
+
+  # The entrypoint may be a builtin app, so a project with no code of its own
+  # doesn't need a stub application just to depend on one.
+  defp entrypoint_roots(all_apps_info, entrypoint)
+       when is_map_key(all_apps_info, entrypoint) do
     {:ok, [entrypoint | @base_apps]}
   end
 
-  defp root_apps(_project_apps, entrypoint), do: err(:missing_entrypoint, entrypoint)
+  defp entrypoint_roots(_all_apps_info, entrypoint),
+    do: err(:missing_entrypoint, entrypoint)
+
+  defp extra_roots(all_apps_info, extra_apps) do
+    case Enum.reject(extra_apps, &is_map_key(all_apps_info, &1)) do
+      [] -> {:ok, extra_apps}
+      missing -> err(:missing_extra_apps, Enum.sort(missing))
+    end
+  end
 
   defp gather_required_apps(all_apps_info, project_apps, app, selected) do
     if MapSet.member?(selected, app) do
@@ -448,6 +468,10 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:missing_entrypoint, app) do
     {:error, %{code: "missing_entrypoint", app: app}}
+  end
+
+  defp err(:missing_extra_apps, apps) do
+    {:error, %{code: "missing_extra_apps", apps: apps}}
   end
 
   defp err(:bad_manifest, path) do

@@ -4,6 +4,7 @@ defmodule Popcorn.BeamTools.CLI do
   @options [
     root_dir: :string,
     entrypoint_app: :string,
+    extra_app: [:string, :keep],
     out_dir: :string,
     manifest_path: :string,
     strip: :boolean
@@ -38,7 +39,9 @@ defmodule Popcorn.BeamTools.CLI do
       {[], []} ->
         options =
           opts
+          |> Keyword.delete(:extra_app)
           |> Map.new()
+          |> Map.put(:extra_apps, Keyword.get_values(opts, :extra_app))
           |> Map.put_new(:entrypoint_app, nil)
           |> Map.put_new(:strip, false)
 
