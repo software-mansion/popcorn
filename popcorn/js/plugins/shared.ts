@@ -21,6 +21,7 @@ const OTP_DIR = "assets/otp";
 export type Options = {
   rootDir: string;
   app: string | null;
+  extraApps?: string[];
   brotli?: boolean;
   strip?: boolean;
 };
@@ -74,6 +75,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         outDir: packedDir,
         manifestPath: p`${distDir}/assets/manifest.json`,
         app: opts.app,
+        extraApps: opts.extraApps ?? [],
         strip,
       });
 
@@ -106,10 +108,11 @@ type PackTarballsParams = {
   outDir: string;
   manifestPath: string;
   app: string | null;
+  extraApps: string[];
   strip: boolean;
 };
 async function packTarballs(opts: PackTarballsParams): Promise<Report> {
-  const { rootDir, outDir, manifestPath, app, strip } = opts;
+  const { rootDir, outDir, manifestPath, app, extraApps, strip } = opts;
   const toolDir = p`${dirname(fileURLToPath(import.meta.url))}/beam_tools`;
 
   const packerArgs = [
@@ -128,6 +131,9 @@ async function packTarballs(opts: PackTarballsParams): Promise<Report> {
 
   if (app !== null) {
     packerArgs.push("--entrypoint-app", app);
+  }
+  for (const extraApp of extraApps) {
+    packerArgs.push("--extra-app", extraApp);
   }
   if (strip) {
     packerArgs.push("--strip");
@@ -163,6 +169,11 @@ type UnsupportedAppsError = {
   apps: { app: string; capability: string }[];
 };
 
+type MissingExtraAppsError = {
+  code: "missing_extra_apps";
+  apps: string[];
+};
+
 function hasCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
@@ -177,6 +188,12 @@ function isMissingDepError(error: unknown): error is MissingDepError {
 
 function isUnsupportedAppsError(error: unknown): error is UnsupportedAppsError {
   return hasCode(error, "unsupported_apps");
+}
+
+function isMissingExtraAppsError(
+  error: unknown,
+): error is MissingExtraAppsError {
+  return hasCode(error, "missing_extra_apps");
 }
 
 function toolchainOf(error: unknown): Toolchain | undefined {
@@ -205,6 +222,13 @@ function errorLines(error: unknown): string[] {
       `These applications need native support the WASM runtime wasn't built`,
       `with: ${apps}.`,
       `Drop them from your dependencies, or use a runtime built with it.`,
+    ];
+  }
+
+  if (isMissingExtraAppsError(error)) {
+    return [
+      `Extra apps not found: ${error.apps.join(", ")}.`,
+      `They have to come from your project build or your Erlang/Elixir install.`,
     ];
   }
 
