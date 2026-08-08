@@ -25,8 +25,9 @@ defmodule EvalInWasm.MixProject do
   defp deps do
     [
       {:popcorn, path: "../../popcorn/elixir"},
-      {:playwright,
-       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test}
+      {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
+      # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
+      {:cowlib, "~> 2.13", override: true, runtime: false, only: :test}
     ]
   end
 

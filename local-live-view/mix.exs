@@ -35,8 +35,9 @@ defmodule LocalLiveView.MixProject do
       {:popcorn, path: "../popcorn-2/elixir", targets: :wasm},
       {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
-      {:playwright,
-       github: "membraneframework-labs/playwright-elixir", runtime: false, only: :test},
+      {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
+      # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
+      {:cowlib, "~> 2.13", override: true, runtime: false, only: :test},
       {:phoenix, "~> 1.8", runtime: false},
       {:phoenix_live_view, runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},

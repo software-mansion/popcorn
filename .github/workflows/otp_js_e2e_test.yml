@@ -14,7 +14,6 @@ on:
       - "scripts/_common.sh"
       - ".github/workflows/otp_js_e2e_test.yml"
       - ".github/actions/build-otp-wasm/action.yml"
-      - ".github/actions/setup-toolchain/action.yml"
       - ".github/actions/setup-playwright/action.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -52,6 +51,7 @@ jobs:
       - name: Build OTP/BEAM for WASM
         uses: ./.github/actions/build-otp-wasm
         with:
+          host-otp-version: &host_otp "28.3.1"
           build-mode: release
           with-crypto: ${{ matrix.with-crypto }}
 
@@ -81,7 +81,7 @@ jobs:
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.19.5"
-          otp-version: "28.3.1"
+          otp-version: *host_otp
 
       - name: Run e2e tests
         run: pnpm e2e

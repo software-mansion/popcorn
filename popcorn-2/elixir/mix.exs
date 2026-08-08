@@ -173,7 +173,9 @@ defmodule Popcorn.MixProject do
       {:makeup_syntect, ">= 0.0.0", only: :dev, runtime: false, warn_if_outdated: true},
       # Testing
       {:async_test, github: "software-mansion-labs/elixir_async_test", only: :test},
-      {:playwright, github: "membraneframework-labs/playwright-elixir", only: :test}
+      {:playwright, "~> 1.49.1-alpha.2", only: :test},
+      # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
+      {:cowlib, "~> 2.13", override: true, runtime: false, only: :test}
     ]
   end
 end
