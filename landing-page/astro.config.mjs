@@ -2,6 +2,7 @@
 import { defineConfig } from "astro/config";
 
 import react from "@astrojs/react";
+import { unified } from "@astrojs/markdown-remark";
 import tailwindcss from "@tailwindcss/vite";
 import icon from "astro-icon";
 // used for build-time generation of diagrams
@@ -74,6 +75,7 @@ export default defineConfig({
     }),
   ],
   markdown: {
+    processor: unified(),
     // used for build-time generation of diagrams
     // rehypePlugins: [
     //   [
