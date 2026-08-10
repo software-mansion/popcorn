@@ -13,25 +13,29 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 ## How it works
 
 ```
-Browser                                       Server
-┌──────────────────────────────────────┐      ┌──────────────────┐
-│  Phoenix LiveView page               │      │  Phoenix app     │
-│                                      │      │                  │
-│  <.local_live_view view="MyLocal">   │      │  Mirror.MyLocal  │
-│         │                            │      │  (optional)      │
-│         ▼                            │      │       ▲          │
-│  Popcorn (AtomVM WASM)               │─────▶│  mirror_sync     │
-│    MyLocal (your Elixir code)        │      │                  │
-│    ├── mount/3                       │      └──────────────────┘
-│    ├── render/1                      │
-│    └── handle_event/3                │
-└──────────────────────────────────────┘
+        Browser                                          Server
+┌──────────────────────────────┐              ┌───────────────────────────────┐
+│ Popcorn (AtomVM WASM)        │              │ Phoenix LiveView (host)       │
+│                              │              │                               │
+│ MyLocal                      │              │ render/1                      │
+│   mount/3                    │              │   <.local_live_view           │
+│   render/1                   │  ◀─ assigns ─│     view="MyLocal"            │
+│   update/2                   │              │     items={@items} />         │
+│                              │              │                               │
+│   handle_event/3             │              │                               │
+│     push_server_event/3      │ ─── event ──▶│ handle_event/3                │
+│                              │              │                               │
+│   mirror_sync/2              │ ─── sync ───▶│ Mirror.MyLocal.handle_sync/3  │
+│                              │              │   (optional)                  │
+└──────────────────────────────┘              └───────────────────────────────┘
 ```
 
 1. Your `local/` project is compiled to a `.avm` WASM bundle at build time.
-2. When the page loads, Popcorn starts the WASM runtime and mounts your LocalLiveViews.
-3. User interactions are handled in the browser — no round-trip to the server.
-4. Optionally, you can sync selected assigns to the server via `mirror_sync/2`, letting server-side LiveViews react to local state changes.
+2. A server-side LiveView renders the mount point with `<.local_live_view view="MyLocal" />`. Every attribute other than `view` is passed down as assigns and delivered to the local view's `update/2` callback — so the host stays in control of the data, exactly as with `live_component/1`.
+3. When the page loads, Popcorn starts the WASM runtime and mounts your LocalLiveViews.
+4. User interactions are handled in the browser — no round-trip to the server.
+5. A local view can push events back to its host with `push_server_event/3`, which arrives at the host LiveView's `handle_event/3`. Handling the event locally first and pushing afterwards gives you optimistic updates, with the server's authoritative state arriving as the next `update/2`.
+6. Optionally, you can sync selected assigns to a server-side mirror module via `mirror_sync/2`, letting other users' LiveViews react to local state changes.
 
 ## Key concepts
 

@@ -10,10 +10,12 @@ LocalLiveView modules live in the `local/lib/` directory of your project. Create
 defmodule CounterLocal do
   use LocalLiveView
 
+  # Runs once, in the browser, when the view is mounted — the counter starts at zero.
   def mount(_params, _session, socket) do
     {:ok, assign(socket, count: 0)}
   end
 
+  # Renders the current count. Runs again after each event, without touching the server.
   def render(assigns) do
     ~H"""
     <div>
@@ -24,6 +26,8 @@ defmodule CounterLocal do
     """
   end
 
+  # Handles the clicks from the two buttons above. Each one updates :count,
+  # which triggers a re-render.
   def handle_event("increment", _params, socket) do
     {:noreply, update(socket, :count, &(&1 + 1))}
   end
@@ -36,6 +40,8 @@ end
 
 This should look familiar if you've used Phoenix LiveView. The only difference is `use LocalLiveView` instead of `use Phoenix.LiveView`.
 
+`LocalLiveView` documents each callback in full, including the ones this counter does not need — `update/2` for assigns coming from the host LiveView, and `handle_info/2` for messages the view sends itself.
+
 ## Mounting the view
 
 Use the `<.local_live_view>` component in any Phoenix template:
@@ -47,40 +53,6 @@ Use the `<.local_live_view>` component in any Phoenix template:
 The `view` attribute is the module name as a string. The component renders a `<div>` that becomes the mount point for the WASM view.
 
 The counter is now fully local — clicks are handled in the browser with no server round-trips.
-
-## Callbacks
-
-### `mount/3`
-
-Called once when the view is initialized. Use it to set up initial assigns.
-
-```elixir
-def mount(_params, _session, socket) do
-  {:ok, assign(socket, count: 0, label: "Counter")}
-end
-```
-
-### `render/1`
-
-Returns the HEEx template for the current state. Called automatically after every state change.
-
-```elixir
-def render(assigns) do
-  ~H"""
-  <p>{@label}: {@count}</p>
-  """
-end
-```
-
-### `handle_event/3`
-
-Handles events triggered from the template. Returns `{:noreply, socket}` with updated assigns.
-
-```elixir
-def handle_event("reset", _params, socket) do
-  {:noreply, assign(socket, count: 0)}
-end
-```
 
 ## Assigning state
 
