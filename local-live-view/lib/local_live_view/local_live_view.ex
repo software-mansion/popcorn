@@ -270,8 +270,35 @@ defmodule LocalLiveView do
 
   @type unsigned_params :: map
 
+  @doc ~S'''
+  Returns the HEEx template for the view's current state.
+
+  Called on mount and again after every state change, exactly like
+  `c:Phoenix.LiveView.render/1` — except the render happens in the browser, so
+  no diff travels over the network.
+
+  ```
+  def render(assigns) do
+    ~H"""
+    <p>{@label}: {@count}</p>
+    """
+  end
+  ```
+  '''
   @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
 
+  @doc """
+  Invoked once when the view is initialized, before the first `c:render/1`.
+
+  Use it to set up the initial assigns. Assigns passed down from the host
+  LiveView are not available here — they arrive through `c:update/2`.
+
+  ```
+  def mount(_params, _session, socket) do
+    {:ok, assign(socket, count: 0, label: "Counter")}
+  end
+  ```
+  """
   @callback mount(
               params :: unsigned_params() | :not_mounted_at_router,
               session :: map,
@@ -287,6 +314,22 @@ defmodule LocalLiveView do
 
   @callback update(assigns :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
 
+  @doc """
+  Handles an event triggered from the template, such as `phx-click`.
+
+  Bindings work exactly as in `Phoenix.LiveView`, but the event is dispatched to
+  the local process instead of travelling to the server, so the following
+  `c:render/1` happens without a round-trip.
+
+  ```
+  def handle_event("increment", _params, socket) do
+    {:noreply, update(socket, :count, &(&1 + 1))}
+  end
+  ```
+
+  To notify the host LiveView as well, push the event on with
+  `push_server_event/3`.
+  """
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
 
