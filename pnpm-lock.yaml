@@ -186,8 +186,8 @@ importers:
         specifier: ^1.2.30
         version: 1.2.70
       '@swmansion/popcorn':
-        specifier: link:../popcorn-2/js
-        version: link:../popcorn-2/js
+        specifier: link:../popcorn/js
+        version: link:../popcorn/js
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.2.4(vite@7.3.2(@types/node@25.6.0)(jiti@2.7.0)(lightningcss@1.32.0))

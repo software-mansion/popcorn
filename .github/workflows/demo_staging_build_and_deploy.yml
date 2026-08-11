@@ -7,6 +7,11 @@ on:
       - main
     paths:
       - "landing-page/**"
+      - "popcorn/js/**"
+      - "patches/otp/**"
+      - "scripts/_common.sh"
+      - "scripts/build-beam.sh"
+      - "scripts/patch-beam.sh"
       - "language-tour/**"
       - "docker/landing.nginx.conf"
       - "docker/langtour.nginx.conf"

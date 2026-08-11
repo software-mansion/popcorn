@@ -9,7 +9,11 @@ import icon from "astro-icon";
 import mermaid from "astro-mermaid";
 import devtoolsJson from "vite-plugin-devtools-json";
 import { popcorn } from "@swmansion/popcorn/vite";
-import { buildBundle, cleanWasmDir } from "./build-wasm.js";
+import {
+  buildBundle,
+  buildOtpAssets,
+  cleanWasmDir,
+} from "./build-wasm.js";
 
 // https://astro.build/config
 export default defineConfig({
@@ -26,7 +30,15 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [devtoolsJson(), tailwindcss(), popcorn({ bundlePaths: [] })],
+    plugins: [
+      devtoolsJson(),
+      tailwindcss(),
+      popcorn({
+        rootDir: "../examples/iex-wasm",
+        app: "iex",
+        extraApps: ["logger"],
+      }),
+    ],
   },
   integrations: [
     react(),
@@ -40,14 +52,13 @@ export default defineConfig({
       },
     }),
     cleanWasmDir(),
-    buildBundle({ dir: "../examples/iex-wasm", newBundleName: "iex.avm" }),
-    buildBundle({
+    buildOtpAssets({
       dir: "../examples/game-of-life",
-      newBundleName: "gol.avm",
+      assetsName: "game-of-life",
     }),
-    buildBundle({
+    buildOtpAssets({
       dir: "../examples/eval-in-wasm",
-      newBundleName: "eval.avm",
+      assetsName: "eval",
     }),
     buildBundle({
       wasmSrcPathDefault:
