@@ -37,8 +37,18 @@ The bundler plugin selects one from your application's dependencies.
 Use `runtimeVariant` to override the selection. Both variants use this Hex package.
 
 Compile your application with `mix deps.get` and `mix compile` before building its JavaScript assets.
-The bundler plugin invokes Mix to package your application and its standard-library dependencies.
+The bundler plugin invokes `mix popcorn.cook` to package your application and its standard-library dependencies.
 Use the toolchain in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/mise.toml) for this release.
+
+You can also prepare the complete browser asset directory without a JavaScript
+bundler:
+
+```console
+mix popcorn.cook --out-dir priv/static/popcorn
+```
+
+The task uses the current Mix application by default. Use `--no-app` to package
+the base runtime without an entrypoint.
 
 Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.0/introduction.html).
 Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.0/first-application.html).

@@ -1,5 +1,4 @@
-import { cp, mkdir, rm, symlink } from "node:fs/promises";
-import { basename } from "node:path";
+import { mkdir, rm, symlink } from "node:fs/promises";
 import typescript from "@rollup/plugin-typescript";
 
 export default [
@@ -59,15 +58,6 @@ export default [
         tsconfig: "./plugins/tsconfig.json",
         outputToFilesystem: true,
       }),
-      {
-        name: "beam-tools",
-        async buildEnd() {
-          await cp("plugins/beam_tools", "../out/js/plugins/beam_tools", {
-            recursive: true,
-            filter: (source) => !["_build", "deps"].includes(basename(source)),
-          });
-        },
-      },
     ],
   },
 ];

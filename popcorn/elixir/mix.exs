@@ -33,7 +33,7 @@ defmodule Popcorn.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      files: ["lib", "priv/static", "mix.exs", "README.md", "LICENSE"],
+      files: ["lib", "patches", "priv/static", "mix.exs", "README.md", "LICENSE"],
       links: %{
         "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"
@@ -123,6 +123,7 @@ defmodule Popcorn.MixProject do
 
   defp deps do
     [
+      {:brotli, "~> 0.3.3", runtime: false},
       {:req, ">= 0.5.0", optional: true},
       {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
       {:ex_doc_js, github: "software-mansion-labs/ex_doc_js", only: [:dev, :test], runtime: false}
