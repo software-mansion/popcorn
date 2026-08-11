@@ -1,4 +1,5 @@
 %{
+  "brotli": {:hex, :brotli, "0.3.3", "904098c11e08a81768a358514c89468a1ef98ce2303bb865431c28fbd534d1da", [:rebar3], [], "hexpm", "3aa6658786bfe97b2aee2710e1bdac6b5125dce0c6299b95842163d7541c7f2f"},
   "earmark_parser": {:hex, :earmark_parser, "1.4.46", "67607a0532e810c6f630a515c548d0b24949643f168cc556303bee4cf96105c7", [:mix], [], "hexpm", "9c44636e8a1c68c62f526b2dcd85d941dbbcee7ab82cf64ba06ce28bef8e89f5"},
   "ex_doc": {:git, "https://github.com/software-mansion-labs/ex_doc.git", "8829a848fe6d52cd45d7dcc725395fff9122fc09", []},
   "ex_doc_js": {:git, "https://github.com/software-mansion-labs/ex_doc_js.git", "7c4f65bf919e771e045eaa5148dd08a958a07a55", []},

@@ -1,7 +1,7 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Plugin } from "rollup";
-import { copyRuntime, popcorn as prepare, type Options } from "./shared";
+import { popcorn as prepare, type Options } from "./shared";
 
 /**
  * Copies the worker, VM runtime, and `otp/` assets into the output directory after Rollup writes the bundle.
@@ -42,12 +42,7 @@ export function popcorn(options: Options): Plugin {
 
       try {
         await mkdir(outDir, { recursive: true });
-        await Promise.all([
-          copyRuntime(outDir, prepared.runtimeVariant),
-          cp(resolve(prepared.dir, "otp"), resolve(outDir, "otp"), {
-            recursive: true,
-          }),
-        ]);
+        await cp(prepared.dir, outDir, { recursive: true });
       } finally {
         await rm(prepared.dir, { recursive: true, force: true });
       }

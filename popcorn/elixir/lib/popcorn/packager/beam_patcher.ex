@@ -1,4 +1,4 @@
-defmodule Popcorn.BeamTools.BeamPatcher do
+defmodule Popcorn.Packager.BeamPatcher do
   @moduledoc """
   Replaces functions in a compiled BEAM with implementations taken from a patch
   module, by merging both modules as Core Erlang and recompiling with the host
