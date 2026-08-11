@@ -8,7 +8,9 @@ defmodule Popcorn.BeamTools.CLI do
     out_dir: :string,
     runtimes_dir: :string,
     runtime_variant: :string,
-    strip: :boolean
+    strip: :boolean,
+    treeshake: :boolean,
+    preserved_app: [:string, :keep]
   ]
 
   @required_options [:root_dir, :out_dir, :runtimes_dir]
@@ -43,6 +45,13 @@ defmodule Popcorn.BeamTools.CLI do
           |> Keyword.delete(:extra_app)
           |> Map.new()
           |> Map.put(:extra_apps, Keyword.get_values(opts, :extra_app))
+          |> Map.put(
+            :treeshake,
+            if(opts[:treeshake],
+              do: [preserved_apps: Keyword.get_values(opts, :preserved_app)],
+              else: false
+            )
+          )
           |> Map.put_new(:entrypoint_app, nil)
           |> Map.put_new(:runtime_variant, nil)
           |> Map.put_new(:strip, false)
