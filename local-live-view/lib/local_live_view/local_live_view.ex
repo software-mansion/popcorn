@@ -270,7 +270,7 @@ defmodule LocalLiveView do
 
   @type unsigned_params :: map
 
-  @doc """
+  @doc ~S'''
   Returns the HEEx template for the view's current state.
 
   Called on mount and again after every state change, exactly like
@@ -279,12 +279,12 @@ defmodule LocalLiveView do
 
   ```
   def render(assigns) do
-    ~H\"\"\"
+    ~H"""
     <p>{@label}: {@count}</p>
-    \"\"\"
+    """
   end
   ```
-  """
+  '''
   @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
 
   @doc """

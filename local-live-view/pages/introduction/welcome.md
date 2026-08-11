@@ -13,21 +13,21 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 ## How it works
 
 ```
-        Browser                                          Server
-┌──────────────────────────────┐              ┌───────────────────────────────┐
-│ Popcorn (AtomVM WASM)        │              │ Phoenix LiveView (host)       │
-│                              │              │                               │
-│ MyLocal                      │              │ render/1                      │
-│   mount/3                    │              │   <.local_live_view           │
-│   render/1                   │  ◀─ assigns ─│     view="MyLocal"            │
-│   update/2                   │              │     items={@items} />         │
-│                              │              │                               │
-│   handle_event/3             │              │                               │
-│     push_server_event/3      │ ─── event ──▶│ handle_event/3                │
-│                              │              │                               │
-│   mirror_sync/2              │ ─── sync ───▶│ Mirror.MyLocal.handle_sync/3  │
-│                              │              │   (optional)                  │
-└──────────────────────────────┘              └───────────────────────────────┘
+           Server                                      Browser                 
+┌───────────────────────────────┐              ┌──────────────────────────────┐
+│ Phoenix LiveView (host)       │              │ Popcorn (AtomVM WASM)        │
+│                               │              │                              │
+│ render/1                      │              │ MyLocal                      │
+│   <.local_live_view           │              │   mount/3                    │
+│     view="MyLocal"            │─── assigns ─▶│   render/1                   │
+│     items={@items} />         │              │   update/2                   │
+│                               │              │                              │
+│                               │              │   handle_event/3             │
+│ handle_event/3                │◀─── event ───│     push_server_event/3      │
+│                               │              │                              │
+│ Mirror.MyLocal.handle_sync/3  │◀─── sync ────│   mirror_sync/2              │
+│   (optional)                  │              │                              │
+└───────────────────────────────┘              └──────────────────────────────┘
 ```
 
 1. Your `local/` project is compiled to a `.avm` WASM bundle at build time.
@@ -51,4 +51,6 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 
 If you know Phoenix LiveView, you already know LocalLiveView. The callbacks (`mount/3`, `render/1` with `~H`, `handle_event/3`), the assign functions (`assign/2`, `update/3`) and the template bindings (`phx-click` and friends) are all the same — LocalLiveView intercepts Phoenix LiveView's standard JavaScript layer, so event attributes work exactly the same way.
 
-Two things differ: you write `use LocalLiveView` instead of `use Phoenix.LiveView`, and the module runs in the browser as WebAssembly instead of on the server.
+The main differences between LLV and standard LiveView are that LLV uses `use LocalLiveView` instead of `use Phoenix.LiveView`, relies on the `update/3` callback to update its assigns, and runs directly in the browser's Popcorn runtime rather than on the server.
+
+LLV can also render LiveComponents and function components natively. These will similarly execute as part of the browser's Popcorn runtime.
