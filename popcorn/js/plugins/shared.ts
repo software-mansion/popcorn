@@ -65,7 +65,13 @@ export type Options = {
    * Experimental. Defaults to `true`.
    */
   strip?: boolean;
+  /**
+   * Removes unreachable modules and functions.
+   */
+  treeshake?: false | TreeshakeOptions;
 };
+
+export type TreeshakeOptions = { preservedApps?: string[] };
 
 export type Prepared = {
   dir: string;
@@ -108,6 +114,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
         app: opts.app,
         extraApps: opts.extraApps ?? [],
         strip,
+        treeshake: opts.treeshake ?? false,
       });
 
       if (!report.ok) {
@@ -165,9 +172,18 @@ type PackTarballsParams = {
   app: string | null;
   extraApps: string[];
   strip: boolean;
+  treeshake: false | TreeshakeOptions;
 };
 async function packTarballs(opts: PackTarballsParams): Promise<Report> {
-  const { rootDir, outDir, runtimeVariant, app, extraApps, strip } = opts;
+  const {
+    rootDir,
+    outDir,
+    runtimeVariant,
+    app,
+    extraApps,
+    strip,
+    treeshake,
+  } = opts;
   const toolDir = p`${dirname(fileURLToPath(import.meta.url))}/beam_tools`;
 
   const packerArgs = [
@@ -196,6 +212,12 @@ async function packTarballs(opts: PackTarballsParams): Promise<Report> {
   }
   if (strip) {
     packerArgs.push("--strip");
+  }
+  if (treeshake !== false) {
+    packerArgs.push("--treeshake");
+    for (const app of treeshake.preservedApps ?? []) {
+      packerArgs.push("--preserved-app", app);
+    }
   }
 
   const env = {

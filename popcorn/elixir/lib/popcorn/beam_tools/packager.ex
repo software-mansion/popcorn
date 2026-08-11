@@ -37,7 +37,8 @@ defmodule Popcorn.BeamTools.Packager do
           out_dir: Path.t(),
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
-          strip: boolean()
+          strip: boolean(),
+          treeshake: false | [preserved_apps: [String.t()]]
         }
 
   defp strip_tarball(path, out_dir) do
@@ -88,7 +89,8 @@ defmodule Popcorn.BeamTools.Packager do
       out_dir: out_dir,
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
-      strip: strip
+      strip: strip,
+      treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
@@ -102,7 +104,9 @@ defmodule Popcorn.BeamTools.Packager do
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
-         :ok <- patch_apps(staged_apps) do
+         :ok <- patch_apps(staged_apps),
+         {:ok, staged_apps, treeshake_report} <-
+           maybe_treeshake(staged_apps, treeshake, out_dir) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -160,7 +164,8 @@ defmodule Popcorn.BeamTools.Packager do
         tarPaths: tar_paths,
         apps: packed_apps,
         notes: diagnostics,
-        toolchain: toolchain
+        toolchain: toolchain,
+        treeshake: treeshake_report
       }
 
       {:ok, result}
@@ -345,6 +350,115 @@ defmodule Popcorn.BeamTools.Packager do
     if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
+  defp validate_preserved_apps(apps_info, treeshake) do
+    selected = MapSet.new(apps_info, fn {name, _info} -> name end)
+
+    unknown =
+      treeshake
+      |> Keyword.fetch!(:preserved_apps)
+      |> Enum.reject(&MapSet.member?(selected, &1))
+      |> Enum.sort()
+
+    case unknown do
+      [] -> :ok
+      unknown -> err(:unknown_preserved_apps, unknown)
+    end
+  end
+
+  defp maybe_treeshake(staged_apps, false, _out_dir), do: {:ok, staged_apps, nil}
+
+  defp maybe_treeshake(staged_apps, options, out_dir) do
+    preserved_apps = Keyword.fetch!(options, :preserved_apps)
+
+    with :ok <- validate_preserved_apps(staged_apps, options),
+         preserved_modules = preserved_modules(staged_apps, preserved_apps),
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
+         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+      report = %{
+        preserved_apps: preserved_apps,
+        modules_removed: Enum.map(stats.modules_removed, &to_string/1),
+        modules_shaken:
+          stats.modules_shaked |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
+      }
+
+      {:ok, staged_apps, report}
+    end
+  end
+
+  defp preserved_modules(staged_apps, preserved_apps) do
+    Enum.flat_map(preserved_apps, fn app ->
+      staged_apps
+      |> Map.fetch!(app)
+      |> Map.fetch!(:props)
+      |> Keyword.fetch!(:modules)
+    end)
+  end
+
+  defp run_treeshake(staged_apps, preserved_modules, out_dir) do
+    files =
+      Enum.flat_map(staged_apps, fn {_app, info} ->
+        info.ebin_dir |> Path.join("*") |> Path.wildcard()
+      end)
+
+    output_dir = Path.join(out_dir, "treeshaken")
+
+    report =
+      Treeshake.run(
+        ebin_files: files,
+        output_dir: output_dir,
+        keep: preserved_modules,
+        leave: preserved_modules
+      )
+
+    {:ok, report}
+  rescue
+    error -> err(:treeshake_failed, Exception.message(error))
+  end
+
+  defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
+    preserved = MapSet.new(preserved_apps)
+
+    staged_apps
+    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+    |> replace_beams(output_dir)
+    |> rewrite_app_contents()
+
+    :ok
+  end
+
+  defp replace_beams(staged_apps, output_dir) do
+    Map.new(staged_apps, fn {app, info} ->
+      original_beams = info.ebin_dir |> Path.join("*.beam") |> Path.wildcard()
+      Enum.each(original_beams, &File.rm!/1)
+
+      surviving =
+        Enum.flat_map(original_beams, fn original ->
+          source = Path.join(output_dir, Path.basename(original))
+
+          if File.exists?(source) do
+            target = Path.join(info.ebin_dir, Path.basename(source))
+            File.cp!(source, target)
+            [source |> Path.basename(".beam") |> String.to_atom()]
+          else
+            []
+          end
+        end)
+
+      {app, {info, Enum.sort(surviving)}}
+    end)
+  end
+
+  defp rewrite_app_contents(replaced) do
+    Enum.each(replaced, fn {app, {info, modules}} ->
+      app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
+
+      term =
+        {:application, String.to_existing_atom(app), Keyword.put(info.props, :modules, modules)}
+
+      File.write!(app_path, :io_lib.format(~c"~tp.~n", [term]))
+    end)
+  end
+
   defp root_apps(all_apps_info, extra_apps, entrypoint) do
     with {:ok, roots} <- entrypoint_roots(all_apps_info, entrypoint),
          {:ok, extra} <- extra_roots(all_apps_info, extra_apps) do
@@ -414,7 +528,7 @@ defmodule Popcorn.BeamTools.Packager do
     tar
   end
 
-  defp loaded_dynamic_nifs(app, ebin_dir) do
+  defp loaded_dynamic_nifs(_app, ebin_dir) do
     Path.join(ebin_dir, "*.beam")
     |> Path.wildcard()
     |> Enum.filter(&imports_load_nif?/1)
@@ -526,6 +640,14 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:dynamic_nifs_loading, {app, beams}) do
     {:error, %{code: "dynamic_nifs_loading", app: app, beams: beams}}
+  end
+
+  defp err(:unknown_preserved_apps, apps) do
+    {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:treeshake_failed, message) do
+    {:error, %{code: "treeshake_failed", message: message}}
   end
 
   defp encode_json(term) do
