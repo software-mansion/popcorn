@@ -15,7 +15,18 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
         const wasmSrcPath = wasmSrcPathDefault ?? join(dir, "dist", "wasm");
         const wasmDestPath = wasmDir(config);
 
-        await run("mix", ["build"], { dir });
+        await run(
+          "mise",
+          [
+            "exec",
+            "erlang@26.0.2",
+            "elixir@1.17.3-otp-26",
+            "--",
+            "mix",
+            "build",
+          ],
+          { dir },
+        );
 
         const srcFiles = await readdir(wasmSrcPath);
         const [avm] = srcFiles.filter((path) => path.endsWith(".avm"));
@@ -25,6 +36,57 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
         await cp(src, dst);
 
         logger.info("Bundle copied");
+      },
+    },
+  };
+}
+
+/**
+ * @param {{ dir: string, assetsName: string }} options
+ */
+export function buildOtpAssets({ dir, assetsName }) {
+  return {
+    name: "build-otp-assets",
+    hooks: {
+      "astro:config:setup": async ({ logger, config }) => {
+        logger.info(`Building OTP assets in '${dir}'...`);
+        await run(
+          "mise",
+          [
+            "exec",
+            "erlang@28.3.1",
+            "elixir@1.19.5-otp-28",
+            "--",
+            "mix",
+            "deps.get",
+          ],
+          { dir },
+        );
+        await run(
+          "mise",
+          [
+            "exec",
+            "erlang@28.3.1",
+            "elixir@1.19.5-otp-28",
+            "--",
+            "mix",
+            "compile",
+          ],
+          { dir },
+        );
+        await run("pnpm", ["run", "build"], { dir: join(dir, "assets") });
+
+        const src = join(dir, "dist", "assets", "otp");
+        const dst = join(
+          fileURLToPath(config.publicDir),
+          "assets",
+          assetsName,
+        );
+        await rm(dst, { force: true, recursive: true });
+        await mkdir(dst, { recursive: true });
+        await cp(src, dst, { recursive: true });
+
+        logger.info("OTP assets copied");
       },
     },
   };

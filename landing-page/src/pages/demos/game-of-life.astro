@@ -138,12 +138,18 @@ import Section from "../../components/Section.astro";
 
   async function init() {
     try {
-      await Popcorn.init({
-        bundlePaths: ["/wasm/gol.avm"],
-        debug: false,
+      const result = await Popcorn.init({
+        beam: { otpAssetsRoot: "/assets/game-of-life/" },
         onStdout: (text: string) => console.log(text),
         onStderr: (text: string) => console.error(text),
       });
+      if (!result.ok) throw result.error;
+
+      const mounted = await result.data.genserver.call(
+        "game_of_life_ui",
+        "mount",
+      );
+      if (!mounted.ok) throw mounted.error;
     } catch (error) {
       const container = document.getElementById("root");
       if (container) {

@@ -132,12 +132,13 @@ end"
 
   async function setup() {
     try {
-      popcorn = await Popcorn.init({
-        bundlePaths: ["/wasm/eval.avm"],
-        debug: true,
+      const result = await Popcorn.init({
+        beam: { otpAssetsRoot: "/assets/eval/" },
         onStdout: (text) => displayLog(text, { isError: false }),
         onStderr: (text) => displayLog(text, { isError: true }),
       });
+      if (!result.ok) throw result.error;
+      popcorn = result.data;
 
       Elements.exampleButtons.forEach((button) => {
         button.onclick = () => {
@@ -193,12 +194,16 @@ end"
     }
 
     try {
-      const { data, durationMs } = await popcorn.call([EVAL_ELIXIR, code], {
+      const start = performance.now();
+      const result = await popcorn.genserver.call("main", [EVAL_ELIXIR, code], {
         timeoutMs: 10_000,
       });
+      const durationMs = performance.now() - start;
+      if (!result.ok) throw result.error;
+      if (result.data.error) throw new Error(result.data.error);
       Elements.stateDisplay.textContent = StateIcons.success;
       Elements.timeDisplay.textContent = `${durationMs.toFixed(1)} ms`;
-      Elements.resultDisplay.textContent = data;
+      Elements.resultDisplay.textContent = result.data.value;
     } catch (error) {
       console.error("Evaluation error:", error);
       Elements.stateDisplay.textContent = StateIcons.error;
