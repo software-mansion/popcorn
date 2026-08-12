@@ -1117,7 +1117,7 @@ class LLVEngine {
     setupMirrorSocket() {
         const Socket = this.socketClass();
         const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
-        const llvSocket = new Socket("/llv_socket", {
+        const llvSocket = new Socket(this.config.llvSocketURI ?? "/llv_socket", {
             params: { _csrf_token: csrfToken },
         });
         llvSocket.connect();

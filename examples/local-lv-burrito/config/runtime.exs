@@ -18,7 +18,9 @@ if config_env() == :prod do
   config :burrito, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :burrito, BurritoWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    # URL_PATH lets the app be served under a path prefix (e.g. /burrito
+    # behind a reverse proxy that strips the prefix).
+    url: [host: host, port: 443, scheme: "https", path: System.get_env("URL_PATH", "/")],
     http: [
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port

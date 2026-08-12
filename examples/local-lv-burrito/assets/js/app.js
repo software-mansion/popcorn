@@ -330,11 +330,16 @@ window.toggleLatency = function () {
 
 // ─── LiveSocket Setup ─────────────────────────────────────────────────────────
 
+// When deployed under a path prefix (URL_PATH, e.g. /burrito behind a
+// prefix-stripping proxy) the socket and bundle URLs need that prefix too;
+// derive it from this bundle's own URL so dev (no prefix) works unchanged.
+const basePath = new URL(import.meta.url).pathname.replace(/\/assets\/.*$/, "");
+
 const csrfToken = document
   .querySelector("meta[name='csrf-token']")
   .getAttribute("content");
 
-const liveSocket = new LiveSocket("/live", Socket, {
+const liveSocket = new LiveSocket(`${basePath}/live`, Socket, {
   longPollFallbackMs: 2500,
   params: { _csrf_token: csrfToken },
   hooks: { ScrollSync, InfoModal, LLVLoader },
@@ -351,7 +356,8 @@ liveSocket.connect();
 window.liveSocket = liveSocket;
 
 window.llvEngine = await LLVEngine.create(liveSocket, {
-  bundlePaths: ["/assets/js/wasm/bundle.avm"],
+  bundlePaths: [`${basePath}/assets/js/wasm/bundle.avm`],
+  llvSocketURI: `${basePath}/llv_socket`,
 });
 window.dispatchEvent(new CustomEvent("llv:ready"));
 

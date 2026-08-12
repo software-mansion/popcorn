@@ -6,6 +6,11 @@ import type { LiveSocketInstanceInterface } from "phoenix_live_view";
 export interface LLVConfig {
   /** Paths to compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]` */
   bundlePaths?: string[];
+  /**
+   * The string websocket URI where `LocalLiveView.Socket` is mounted in the
+   * host endpoint. Defaults to `"/llv_socket"`.
+   */
+  llvSocketURI?: string;
   /** Enable Popcorn debug logging */
   debug?: boolean;
   /** Callback for raw Popcorn messages */
