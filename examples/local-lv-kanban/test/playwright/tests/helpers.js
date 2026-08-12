@@ -21,12 +21,11 @@ async function waitForBoard(page) {
   await expect(columns(page).first()).toBeVisible({ timeout: 60_000 });
 }
 
-/** Create a board from the index and land on its page. Returns the board URL. */
-async function createBoard(page, name) {
+/** Create a fresh board from the index and land on its page. Returns the board URL. */
+async function createBoard(page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Kanban boards" })).toBeVisible();
-  await page.fill("input[name=name]", name);
-  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Create new board" }).click();
   await page.waitForURL(/\/boards\/[0-9a-f-]+$/);
   await waitForBoard(page);
   return page.url();

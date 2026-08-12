@@ -93,6 +93,27 @@ defmodule LocalLvKanbanWeb.BoardLive do
         ← All boards
       </.link>
       <.local_live_view view="Local.Kanban" name={@board_name} board={@board} rev={@rev} />
+      <span id="recent-tracker" phx-hook=".TrackRecent" data-board-id={@board_id} hidden></span>
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".TrackRecent">
+        // Record this board in the browser's "recent boards" (rendered by
+        // BoardsLive): an array of board ids, newest first, capped. Just ids —
+        // names come from the DB when the list is rendered.
+        export default {
+          mounted() {
+            const KEY = "llv-kanban:recent-boards";
+            const { boardId } = this.el.dataset;
+            let stored = null;
+            try {
+              stored = JSON.parse(localStorage.getItem(KEY));
+            } catch {}
+            if (!Array.isArray(stored)) stored = [];
+            stored = [boardId, ...stored.filter((id) => id !== boardId)].slice(0, 10);
+            try {
+              localStorage.setItem(KEY, JSON.stringify(stored));
+            } catch {}
+          },
+        };
+      </script>
     </div>
     """
   end
