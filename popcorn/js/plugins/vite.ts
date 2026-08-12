@@ -9,6 +9,7 @@ const CORS_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
+const WORKER_BEAM_IMPORT = 'from \'./assets/beam.mjs\'';
 
 // Plugin is at dist/plugins/vite.mjs, dist/ is one level up.
 const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -154,6 +155,22 @@ export function popcorn(options: Options): Plugin {
     configurePreviewServer(server) {
       server.middlewares.use(serve);
       server.httpServer?.once("close", cleanup);
+    },
+
+    generateBundle(_options, bundle) {
+      for (const output of Object.values(bundle)) {
+        if (output.type !== "asset") continue;
+        const source =
+          typeof output.source === "string"
+            ? output.source
+            : new TextDecoder().decode(output.source);
+        if (source.includes(WORKER_BEAM_IMPORT)) {
+          output.source = source.replace(
+            WORKER_BEAM_IMPORT,
+            "from '../assets/beam.mjs'",
+          );
+        }
+      }
     },
 
     async closeBundle() {
