@@ -290,8 +290,9 @@ defmodule LocalLiveView do
   @doc """
   Invoked once when the view is initialized, before the first `c:render/1`.
 
-  Use it to set up the initial assigns. Assigns passed down from the host
-  LiveView are not available here — they arrive through `c:update/2`.
+  Use it to set up the initial assigns. Assigns coming from the host LiveView
+  are not delivered here — `c:update/2` runs with them right after this
+  callback, before the first render.
 
   ```
   def mount(_params, _session, socket) do
@@ -306,12 +307,52 @@ defmodule LocalLiveView do
             ) ::
               {:ok, Socket.t()} | {:ok, Socket.t(), keyword()}
 
+  @doc """
+  Invoked with the query params of the page the view is rendered on.
+
+  Called after `c:mount/3` and again after every `push_patch/2`. `params` holds
+  the query string decoded into a map with string keys and `uri` is the full
+  URL. A local view is not mounted at the router, so this is the only callback
+  that sees the address bar.
+
+  ```
+  def handle_params(%{"tab" => tab}, _uri, socket) do
+    {:noreply, assign(socket, :tab, tab)}
+  end
+  ```
+  """
   @callback handle_params(
               params :: unsigned_params(),
               uri :: String.t(),
               socket :: Socket.t()
             ) :: {:noreply, Socket.t()}
 
+  @doc ~S'''
+  Receives the assigns the host LiveView passes down.
+
+  Every attribute other than `view` given to `local_live_view/1` is forwarded
+  here, the same way `Phoenix.LiveComponent` receives its assigns:
+
+  ```
+  <.local_live_view view="Cart" items={@items} currency="EUR" />
+  ```
+
+  It runs right after `c:mount/3` with the initial values, and then on every
+  re-render of the host LiveView. The host always sends the full set of
+  forwarded assigns, not a diff, so a view that needs to react only to actual
+  changes has to compare against its own assigns.
+
+  ```
+  def update(%{items: items}, socket) do
+    {:ok, assign(socket, :items, items)}
+  end
+  ```
+
+  The default implementation assigns everything it receives. These assigns are
+  also the authoritative server state that `c:handle_push_error/4` falls back
+  to, so overriding this callback with a guard on unchanged data means the
+  rollback needs handling explicitly — see `c:handle_push_error/4`.
+  '''
   @callback update(assigns :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
 
   @doc """
@@ -333,6 +374,28 @@ defmodule LocalLiveView do
   @callback handle_event(event :: binary, unsigned_params(), socket :: Socket.t()) ::
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
 
+  @doc """
+  Handles a message sent to the view's process.
+
+  A local live view runs as its own Elixir process inside the browser, so
+  anything that can reach that process arrives here — most often a timer set
+  with `Process.send_after/3`:
+
+  ```
+  def mount(_params, _session, socket) do
+    Process.send_after(self(), :tick, 1000)
+    {:ok, assign(socket, :time, Time.utc_now())}
+  end
+
+  def handle_info(:tick, socket) do
+    Process.send_after(self(), :tick, 1000)
+    {:noreply, assign(socket, :time, Time.utc_now())}
+  end
+  ```
+
+  The resulting render is pushed to the DOM as a diff, exactly as after
+  `c:handle_event/3`. The default implementation ignores the message.
+  """
   @callback handle_info(message :: term, socket :: Socket.t()) :: {:noreply, Socket.t()}
 
   @doc """

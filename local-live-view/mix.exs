@@ -32,7 +32,7 @@ defmodule LocalLiveView.MixProject do
   defp deps do
     [
       {:popcorn, "~> 0.3.2", targets: [:wasm, :docs]},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:ex_doc, "~> 0.34", only: [:docs, :dev, :test], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
       {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
       # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
@@ -45,7 +45,7 @@ defmodule LocalLiveView.MixProject do
       {:plug, "~> 1.14", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: :host}
+      {:file_system, "~> 1.0", targets: [:host, :docs]}
     ]
   end
 
@@ -96,7 +96,7 @@ defmodule LocalLiveView.MixProject do
         "deps.unlock --check-unused",
         "deps.compile",
         "compile --force --warnings-as-errors",
-        "docs --warnings-as-errors"
+        "cmd MIX_TARGET=docs mix docs --warnings-as-errors"
       ],
       build: [
         "deps.get",

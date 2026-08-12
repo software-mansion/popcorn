@@ -20,8 +20,16 @@ defmodule LocalLiveView.Channel do
 
   These are the assigns last returned by the view's
   `c:LocalLiveView.Mirror.handle_sync/3`. Returns an empty map when no local
-  live view has joined under that id — for example before the WASM runtime has
-  started, or after the browser disconnected.
+  live view is currently joined under that id, for example before the WASM
+  runtime has started.
+
+  The browser is the source of truth here — mirror assigns are the server's view
+  of the state that LocalLiveView last synced, kept in the channel process. A
+  temporary disconnect does not lose it: the channel rejoins under the same
+  `mirror_id`, because the id is derived from the host LiveView's `socket.id`,
+  which survives reconnects. The mirror is then brought up to date by the next
+  `LocalLiveView.mirror_sync/2`. Reloading the page starts a new `mirror_id`,
+  since the LocalLiveView starts from scratch too.
 
   ```
   def handle_info({:synced, mirror_id}, socket) do
@@ -37,16 +45,12 @@ defmodule LocalLiveView.Channel do
     end
   end
 
-  @doc """
-  Pushes `assigns` down to the local live view identified by `mirror_id`.
-
-  The assigns are delivered to the view's `c:LocalLiveView.update/2` callback,
-  which makes this the server-to-browser counterpart of
-  `LocalLiveView.mirror_sync/2`. Values must be serializable.
-
-  Returns `:ok`, or `{:error, :not_found}` when no local live view has joined
-  under that id.
-  """
+  # Meant as the server-to-browser counterpart of `LocalLiveView.mirror_sync/2`,
+  # but not wired end to end: this pushes a "set_assigns" frame on the mirror
+  # channel and nothing in the JS bundle subscribes to it, so the frame is
+  # dropped. Hidden from the docs until the browser side handles it and feeds
+  # the assigns into the view's update/2.
+  @doc false
   def set_mirror_assigns(mirror_id, assigns) do
     case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
       [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
