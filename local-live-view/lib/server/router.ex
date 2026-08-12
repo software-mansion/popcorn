@@ -15,6 +15,21 @@ defmodule LocalLiveView.Router do
       end
   """
 
+  @doc """
+  Mounts a local live view at `path`, on a plain page with no host LiveView.
+
+  Use it when the view needs no assigns from the server — the route renders
+  nothing but the mount point, as if the page contained a single
+  `LocalLiveView.Component.local_live_view/1` call. A view that receives
+  assigns from the server, pushes events to it with
+  `LocalLiveView.push_server_event/3` or handles
+  `c:LocalLiveView.handle_push_error/4` needs a host LiveView instead, so
+  declare it with `live/4` and render the component in its template.
+
+  `view_module` is taken by its last alias segment, so `HelloLocal` and
+  `MyApp.HelloLocal` both resolve to the `"HelloLocal"` view in the `local/`
+  project. A string or atom works too.
+  """
   defmacro live_local(path, view_module) do
     view_string =
       case view_module do

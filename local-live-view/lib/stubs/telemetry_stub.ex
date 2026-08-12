@@ -12,6 +12,7 @@ end
 :code.purge(module)
 
 defmodule module do
+  @moduledoc false
   def execute(_event, _measurements, _metadata \\ %{}), do: :ok
 
   def span(_event, _metadata, fun) do

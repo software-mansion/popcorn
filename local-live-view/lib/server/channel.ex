@@ -1,6 +1,35 @@
 defmodule LocalLiveView.Channel do
+  @moduledoc """
+  The channel backing LocalLiveView mirror synchronization.
+
+  Each LocalLiveView that syncs its assigns joins this channel on its own
+  topic, identified by the `mirror_id` obtained from
+  `LocalLiveView.Component.mirror_id/2`. The channel keeps the mirror assigns
+  returned by `c:LocalLiveView.Mirror.handle_sync/3` and makes them readable
+  from the server with `get_mirror_assigns/1`.
+
+  The channel is mounted by `LocalLiveView.Socket`, so there is nothing to wire
+  up by hand — `mix llv.install` adds the socket to your endpoint and the
+  `LocalLiveView.ChannelRegistry` to your supervision tree.
+  """
+
   use Phoenix.Channel
 
+  @doc """
+  Returns the mirror assigns currently held for `mirror_id`.
+
+  These are the assigns last returned by the view's
+  `c:LocalLiveView.Mirror.handle_sync/3`. Returns an empty map when no local
+  live view has joined under that id — for example before the WASM runtime has
+  started, or after the browser disconnected.
+
+  ```
+  def handle_info({:synced, mirror_id}, socket) do
+    users = LocalLiveView.Channel.get_mirror_assigns(mirror_id) |> Map.get("users", [])
+    {:noreply, assign(socket, :users, users)}
+  end
+  ```
+  """
   def get_mirror_assigns(mirror_id) do
     case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
       [{pid, _}] -> GenServer.call(pid, :get_mirror_assigns)
@@ -8,6 +37,16 @@ defmodule LocalLiveView.Channel do
     end
   end
 
+  @doc """
+  Pushes `assigns` down to the local live view identified by `mirror_id`.
+
+  The assigns are delivered to the view's `c:LocalLiveView.update/2` callback,
+  which makes this the server-to-browser counterpart of
+  `LocalLiveView.mirror_sync/2`. Values must be serializable.
+
+  Returns `:ok`, or `{:error, :not_found}` when no local live view has joined
+  under that id.
+  """
   def set_mirror_assigns(mirror_id, assigns) do
     case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
       [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
@@ -15,6 +54,7 @@ defmodule LocalLiveView.Channel do
     end
   end
 
+  @impl true
   def join("llv:" <> mirror_id, %{"view" => view_string, "token" => token}, socket) do
     case LocalLiveView.MirrorToken.verify(socket.endpoint, token, max_age: :infinity) do
       {:ok, %{id: ^mirror_id, view: ^view_string}} ->
@@ -33,6 +73,7 @@ defmodule LocalLiveView.Channel do
     {:error, %{reason: "unauthorized"}}
   end
 
+  @impl true
   def handle_call(:get_mirror_assigns, _from, socket) do
     {:reply, socket.assigns.mirror_assigns, socket}
   end
@@ -42,6 +83,7 @@ defmodule LocalLiveView.Channel do
     {:reply, :ok, socket}
   end
 
+  @impl true
   def handle_in("sync", local_assigns, socket) do
     session = %{mirror_id: socket.assigns.mirror_id}
 

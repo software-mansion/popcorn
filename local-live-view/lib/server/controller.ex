@@ -1,14 +1,12 @@
 defmodule LocalLiveView.Controller do
-  @moduledoc """
-  Controller for rendering LocalLiveView mounts via router macros.
-
-  This controller is used internally by the `live_local/2` router macro.
-  It intercepts the action name (which is the view module name as an atom)
-  and passes it to the template renderer.
-  """
+  # Renders a LocalLiveView mount point for a route declared with
+  # `LocalLiveView.Router.live_local/2`. The view module name is carried in
+  # `conn.private.llv_view` and handed to the template renderer.
+  @moduledoc false
 
   use Phoenix.Controller, formats: [html: "ControllerHTML"]
 
+  @doc false
   def index(conn, _params) do
     render(conn, :index, view: conn.private.llv_view)
   end
