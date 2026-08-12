@@ -18,7 +18,8 @@ on:
       - "docker/base.Dockerfile"
       - "docker/landing.Dockerfile"
       - "docker/langtour.Dockerfile"
-      - "docker/burrito/Dockerfile"
+      - "docker/demos/**"
+      - "examples/local-lv-kanban/**"
       - "examples/local-lv-burrito/**"
       - ".github/workflows/demo_staging_build_and_deploy.yml"
       - "pnpm-workspace.yaml"
@@ -33,7 +34,7 @@ env:
 jobs:
   build_docker_images:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -97,12 +98,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build burrito Docker image
-        id: build-and-push-burrito
+      # The demos image (kanban + burrito + nginx + Postgres) is pushed under
+      # the burrito name so the existing server-side popcorn-burrito.yml
+      # deploys it unchanged.
+      - name: Build demos Docker image (deployed as burrito)
+        id: build-and-push-demos
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./docker/burrito/Dockerfile
+          file: ./docker/demos/Dockerfile
           build-args: |
             POPCORN_BASE_TAG=staging
           pull: true
