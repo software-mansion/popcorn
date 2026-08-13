@@ -25,6 +25,38 @@ test.describe("board index + lifecycle", () => {
     expect(await h.columnNames(page)).toEqual(SEEDED);
   });
 
+  test("rename the board; it persists and recents pick the new name up", async ({ page }) => {
+    const url = await h.createBoard(page);
+
+    await page.getByTitle("Rename board").click();
+    const input = page.locator("form[phx-submit='rename_board'] input[name=name]");
+    await input.fill("Renamed board");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // Server-persisted.
+    await page.reload();
+    await h.waitForBoard(page);
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // Recents store only ids, so the index shows the fresh DB name.
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // An invalid name (too long for the server) rolls back to the current one.
+    await page.goto(url);
+    await h.waitForBoard(page);
+    await page.getByTitle("Rename board").click();
+    await input.fill("x".repeat(300));
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    // The form closes as soon as the submit is applied optimistically...
+    await expect(input).toHaveCount(0);
+    // ...and the server's rejection then restores the persisted name.
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
   test("generate a sample board pre-filled with tasks", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "Generate sample board" }).click();

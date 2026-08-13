@@ -160,6 +160,21 @@ defmodule LocalLvKanban.Boards do
   ## broadcast or roll back). Removes/moves are idempotent (already-gone => :ok)
   ## so a doubly-applied edit never errors.
 
+  # Missing board (removed concurrently) => idempotent :ok; an invalid name
+  # (empty / too long) => :error, so the origin client rolls back.
+  def rename_board(board_id, %{"name" => name}) do
+    case Repo.get(Board, board_id) do
+      nil ->
+        :ok
+
+      board ->
+        board
+        |> Board.changeset(%{name: name})
+        |> Repo.update()
+        |> to_status()
+    end
+  end
+
   def add_column(board_id, %{"id" => id, "name" => name, "position" => position}) do
     # The client generated the id and position; persist them verbatim so the
     # optimistic column and this authoritative one converge.

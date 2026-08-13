@@ -1,7 +1,7 @@
 defmodule Local.Kanban do
   use LocalLiveView
 
-  alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
+  alias Local.{AddColumnComponent, BoardNameComponent, ColumnComponent, Rank, TaskModalComponent}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -213,6 +213,18 @@ defmodule Local.Kanban do
     end
   end
 
+  @impl true
+  def handle_info({:rename_board, name}, socket) do
+    # Optimistic: show the new name immediately; the host persists it and
+    # re-pushes the authoritative name (rolling back if it was rejected).
+    {:noreply,
+     socket
+     |> assign(:name, name)
+     |> push_server_event("rename_board", %{"name" => name})}
+  end
+
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   # --- Drag helpers ----------------------------------------------------------
 
   # Where to insert when hovering `tid`: before the task when the cursor is in its
@@ -294,7 +306,7 @@ defmodule Local.Kanban do
 
     ~H"""
     <div style={"font-family:sans-serif;color:#e5e7eb;padding:0.5em 0#{if @dragging, do: ";user-select:none"}"}>
-      <h1 style="margin:0 0 0.75em;font-size:1.6em;font-weight:600;color:#f9fafb">{@name}</h1>
+      <.live_component module={BoardNameComponent} id="board-name" name={@name} />
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
