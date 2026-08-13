@@ -90,6 +90,27 @@ defmodule LocalLvKanban.BoardsTest do
     end
   end
 
+  describe "rename_board" do
+    test "persists the new name" do
+      {board, _todo, _ip, _done} = setup_board()
+
+      assert :ok = Boards.rename_board(board.id, %{"name" => "Renamed"})
+      assert Boards.get_board!(board.id).name == "Renamed"
+    end
+
+    test "rejects an invalid name without touching the stored one" do
+      {board, _todo, _ip, _done} = setup_board()
+
+      assert :error = Boards.rename_board(board.id, %{"name" => String.duplicate("x", 300)})
+      assert :error = Boards.rename_board(board.id, %{"name" => ""})
+      assert Boards.get_board!(board.id).name == "Test"
+    end
+
+    test "is a noop for a board that no longer exists" do
+      assert :ok = Boards.rename_board(Ecto.UUID.generate(), %{"name" => "Ghost"})
+    end
+  end
+
   describe "create_sample_board" do
     test "creates a board pre-filled with columns and tasks" do
       {:ok, board} = Boards.create_sample_board()
