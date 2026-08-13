@@ -1,22 +1,21 @@
 defmodule LocalLiveView.Socket do
-  @moduledoc false
+  @moduledoc """
+  The `Phoenix.Socket` local live views connect to.
 
-  # The `Phoenix.Socket` local live views connect to.
+  Mount it in your endpoint:
 
-  # It carries `LocalLiveView.Channel`, which backs
-  # `LocalLiveView.mirror_sync/2`. Mount it in your endpoint:
+  ```
+  socket "/llv_socket", LocalLiveView.Socket,
+    websocket: [connect_info: [session: @session_options]]
+  ```
 
-  # ```
-  # socket "/llv_socket", LocalLiveView.Socket,
-  #   websocket: [connect_info: [session: @session_options]]
-  # ```
+  The socket is only needed by views that sync assigns to a mirror; a purely
+  local view never connects. `mix llv.install` adds the entry above
+  automatically.
 
-  # The socket is only needed by views that sync assigns to a mirror; a purely
-  # local view never connects. `mix llv.install` adds the entry above
-  # automatically.
-
-  # Connections are rejected unless the client sends a CSRF token matching the
-  # one in the session, so `connect_info` must carry the session.
+  Connections are rejected unless the client sends a CSRF token matching the
+  one in the session, so `connect_info` must carry the session.
+  """
 
   use Phoenix.Socket
 

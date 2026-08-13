@@ -37,7 +37,7 @@ The installer configures your project automatically:
 
 | What | Where |
 |---|---|
-| Adds LocalLiveView.Socket | `lib/*_web/endpoint.ex` |
+| Adds `LocalLiveView.Socket` | `lib/*_web/endpoint.ex` |
 | Adds COOP/COEP security headers (required for WASM) | `lib/*_web/endpoint.ex` |
 | Registers `LocalLiveView.ChannelRegistry` | `lib/<app>/application.ex` |
 | Imports `LocalLiveView.Component` | `lib/*_web.ex` (html_helpers) |
