@@ -9,6 +9,7 @@ defmodule LocalLiveView.MixProject do
       elixirc_paths: elixirc_paths(Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
+      preferred_cli_target: [docs: :docs],
       deps: deps(),
 
       # docs
@@ -31,8 +32,9 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, "~> 0.3.2", targets: :wasm},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false, warn_if_outdated: true},
+      {:popcorn, "~> 0.3.2", targets: [:wasm, :docs]},
+      {:ex_doc, "~> 0.34",
+       only: [:dev, :test], targets: [:docs], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
       {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
       # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
@@ -45,7 +47,7 @@ defmodule LocalLiveView.MixProject do
       {:plug, "~> 1.14", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: :host}
+      {:file_system, "~> 1.0", targets: [:host, :docs]}
     ]
   end
 
@@ -64,6 +66,14 @@ defmodule LocalLiveView.MixProject do
       groups_for_extras: [
         Introduction: ~r"/introduction/",
         Guides: ~r"/guides/"
+      ],
+      groups_for_modules: [
+        "Browser / WASM (Popcorn)": [
+          ~r/^LocalLiveView$/
+        ],
+        "Server Side": [
+          ~r/^LocalLiveView\..*/
+        ]
       ]
     ]
   end
@@ -77,6 +87,7 @@ defmodule LocalLiveView.MixProject do
 
   defp before_closing_body_tag(_), do: ""
 
+  defp elixirc_paths(:docs), do: ["lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
 
@@ -87,7 +98,7 @@ defmodule LocalLiveView.MixProject do
         "deps.unlock --check-unused",
         "deps.compile",
         "compile --force --warnings-as-errors",
-        "docs --warnings-as-errors"
+        "cmd MIX_TARGET=docs mix docs --warnings-as-errors"
       ],
       build: [
         "deps.get",

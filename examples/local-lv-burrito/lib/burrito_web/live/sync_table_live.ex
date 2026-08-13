@@ -23,7 +23,7 @@ defmodule BurritoWeb.Live.SyncTableLive do
           LocalLiveView.Component.mirror_id(llv_rendering_socket_id, "llv-BurritoLive")
 
         Phoenix.PubSub.subscribe(Burrito.PubSub, "llv_mirror:BurritoLive:#{mirror_id}")
-        LocalLiveView.Channel.get_mirror_assigns(mirror_id)
+        LocalLiveView.Mirror.get_mirror_assigns(mirror_id)
       else
         %{}
       end

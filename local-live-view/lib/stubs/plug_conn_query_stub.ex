@@ -12,6 +12,7 @@ end
 :code.purge(module)
 
 defmodule module do
+  @moduledoc false
   def decode(
         query,
         initial \\ [],
