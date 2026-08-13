@@ -1,7 +1,7 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Plugin } from "rollup";
-import { popcorn as prepare, type Options } from "./shared";
+import { copyRuntime, popcorn as prepare, type Options } from "./shared";
 
 export function popcorn(options: Options): Plugin {
   let outputDir: string | undefined;
@@ -31,7 +31,12 @@ export function popcorn(options: Options): Plugin {
 
       try {
         await mkdir(outDir, { recursive: true });
-        await cp(prepared.dir, outDir, { recursive: true });
+        await Promise.all([
+          copyRuntime(outDir),
+          cp(resolve(prepared.dir, "otp"), resolve(outDir, "otp"), {
+            recursive: true,
+          }),
+        ]);
       } finally {
         await rm(prepared.dir, { recursive: true, force: true });
       }
