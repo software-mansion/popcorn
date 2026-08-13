@@ -678,8 +678,7 @@ defmodule LocalLiveView.Server do
       # The mount rendered, held until the channel join ack consumes it.
       initial_rendered: nil,
       # Last (normalized) assigns received from the host, for handle_push_error.
-      # Updated only on mount and "update_assigns"; if the mirror channel's
-      # "set_assigns" push ever gets a JS consumer, it must update this too.
+      # Updated only on mount and "update_assigns".
       server_assigns: server_assigns
     }
   end

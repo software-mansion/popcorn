@@ -21,7 +21,7 @@ defmodule FormDemoWeb.FormDemoLive do
     if connected?(socket) do
       mirror_id = LocalLiveView.Component.mirror_id(socket, "llv-FormDemoLocal")
       Phoenix.PubSub.subscribe(FormDemo.PubSub, "llv_mirror:FormDemoLocal:#{mirror_id}")
-      users = LocalLiveView.Channel.get_mirror_assigns(mirror_id) |> Map.get("users", [])
+      users = LocalLiveView.Mirror.get_mirror_assigns(mirror_id) |> Map.get("users", [])
       {:ok, assign(socket, users: users)}
     else
       {:ok, assign(socket, users: [])}

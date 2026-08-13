@@ -5,7 +5,7 @@ defmodule LocalLiveView.Watcher do
   To use with Phoenix, add to watchers in `config.exs`:
 
   ```
-  confing :my_app, MyEndpoint, watchers: [
+  config :my_app, MyEndpoint, watchers: [
       local_live_view: {#{inspect(__MODULE__)}, :start_link, []},
       # other watchers
     ]
@@ -24,6 +24,18 @@ defmodule LocalLiveView.Watcher do
 
   @type option :: {:dirs, [Path.t()]}
 
+  @doc """
+  Builds the local project once, then starts the watcher.
+
+  This is the entry point used from the endpoint's `:watchers` config, so the
+  bundle is up to date before the first request even if the local project
+  changed while the server was down.
+
+  ## Options
+
+    * `:dirs` — directories to watch, defaults to `["local"]` relative to the
+      project root
+  """
   @spec run([option]) :: :ok
   def run(opts \\ []) do
     cook()
@@ -31,6 +43,12 @@ defmodule LocalLiveView.Watcher do
     :ok
   end
 
+  @doc """
+  Starts the watcher without the initial build.
+
+  Takes the same options as `run/1`. Use it when the local project is already
+  built and you only want to react to later changes.
+  """
   @spec start_link([option]) :: GenServer.on_start()
   def start_link(opts \\ []) do
     opts = Keyword.validate!(opts, dirs: [Path.absname("local")])

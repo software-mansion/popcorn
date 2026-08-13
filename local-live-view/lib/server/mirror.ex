@@ -45,6 +45,36 @@ defmodule LocalLiveView.Mirror do
     end
   end
 
+  @doc """
+  Returns the mirror assigns currently held for `mirror_id`.
+
+  These are the assigns last returned by the view's
+  `c:LocalLiveView.Mirror.handle_sync/3`. Returns an empty map when no local
+  live view is currently joined under that id, for example before the WASM
+  runtime has started.
+
+  The browser is the source of truth here — mirror assigns are the server's view
+  of the state that LocalLiveView last synced, kept in the channel process. A
+  temporary disconnect does not lose it: the channel rejoins under the same
+  `mirror_id`, because the id is derived from the host LiveView's `socket.id`,
+  which survives reconnects. The mirror is then brought up to date by the next
+  `LocalLiveView.mirror_sync/2`. Reloading the page starts a new `mirror_id`,
+  since the LocalLiveView starts from scratch too.
+
+  ```
+  def handle_info({:synced, mirror_id}, socket) do
+    users = LocalLiveView.Mirror.get_mirror_assigns(mirror_id) |> Map.get("users", [])
+    {:noreply, assign(socket, :users, users)}
+  end
+  ```
+  """
+  def get_mirror_assigns(mirror_id) do
+    case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
+      [{pid, _}] -> GenServer.call(pid, :get_mirror_assigns)
+      [] -> %{}
+    end
+  end
+
   defmacro __using__(_opts) do
     quote do
       @behaviour LocalLiveView.Mirror

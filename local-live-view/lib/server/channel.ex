@@ -1,20 +1,20 @@
 defmodule LocalLiveView.Channel do
+  @moduledoc false
+  # The channel backing LocalLiveView mirror synchronization.
+
+  # Each LocalLiveView that syncs its assigns joins this channel on its own
+  # topic, identified by the `mirror_id` obtained from
+  # `LocalLiveView.Component.mirror_id/2`. The channel keeps the mirror assigns
+  # returned by `c:LocalLiveView.Mirror.handle_sync/3` and makes them readable
+  # from the server with `get_mirror_assigns/1`.
+
+  # The channel is mounted by `LocalLiveView.Socket`, so there is nothing to wire
+  # up by hand — `mix llv.install` adds the socket to your endpoint and the
+  # `LocalLiveView.ChannelRegistry` to your supervision tree.
+
   use Phoenix.Channel
 
-  def get_mirror_assigns(mirror_id) do
-    case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
-      [{pid, _}] -> GenServer.call(pid, :get_mirror_assigns)
-      [] -> %{}
-    end
-  end
-
-  def set_mirror_assigns(mirror_id, assigns) do
-    case Registry.lookup(LocalLiveView.ChannelRegistry, mirror_id) do
-      [{pid, _}] -> GenServer.call(pid, {:set_mirror_assigns, assigns})
-      [] -> {:error, :not_found}
-    end
-  end
-
+  @impl true
   def join("llv:" <> mirror_id, %{"view" => view_string, "token" => token}, socket) do
     case LocalLiveView.MirrorToken.verify(socket.endpoint, token, max_age: :infinity) do
       {:ok, %{id: ^mirror_id, view: ^view_string}} ->
@@ -33,15 +33,12 @@ defmodule LocalLiveView.Channel do
     {:error, %{reason: "unauthorized"}}
   end
 
+  @impl true
   def handle_call(:get_mirror_assigns, _from, socket) do
     {:reply, socket.assigns.mirror_assigns, socket}
   end
 
-  def handle_call({:set_mirror_assigns, assigns}, _from, socket) do
-    push(socket, "set_assigns", assigns)
-    {:reply, :ok, socket}
-  end
-
+  @impl true
   def handle_in("sync", local_assigns, socket) do
     session = %{mirror_id: socket.assigns.mirror_id}
 
