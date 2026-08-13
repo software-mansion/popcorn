@@ -50,6 +50,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
   const useBrotli = opts.brotli ?? false;
   const strip = opts.strip ?? true;
   const assetVariants: CopyOptions["variants"] = [
+    "uncompressed",
     "gzip",
     useBrotli && "brotli",
   ];
