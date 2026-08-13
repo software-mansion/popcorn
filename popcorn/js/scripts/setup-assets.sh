@@ -6,7 +6,7 @@ JS_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${JS_ROOT}/../.." && pwd)"
 OUT_DIR="${PROJECT_ROOT}/popcorn/out"
 ASSETS_DIR="${JS_ROOT}/assets"
-DIST_ASSETS_DIR="${JS_ROOT}/dist/assets"
+DIST_DIR="${JS_ROOT}/dist"
 MODE="${1:-setup}"
 
 have_runtime_artifacts() {
@@ -70,13 +70,17 @@ EOF
 }
 
 copy_dist_assets() {
-  rm -rf "${DIST_ASSETS_DIR}"
-  mkdir -p "${DIST_ASSETS_DIR}"
+  rm -rf "${DIST_DIR}/assets" "${DIST_DIR}/runtime" "${DIST_DIR}/otp"
+  mkdir -p "${DIST_DIR}/otp"
+  rm -f \
+    "${DIST_DIR}/beam.mjs" \
+    "${DIST_DIR}/beam.emu.mjs" \
+    "${DIST_DIR}/beam.wasm"
 
-  cp "${ASSETS_DIR}/beam.mjs" "${DIST_ASSETS_DIR}/beam.mjs"
-  cp "${ASSETS_DIR}/beam.emu.mjs" "${DIST_ASSETS_DIR}/beam.emu.mjs"
-  cp "${ASSETS_DIR}/beam.wasm" "${DIST_ASSETS_DIR}/beam.wasm"
-  cp "${ASSETS_DIR}/manifest.json" "${DIST_ASSETS_DIR}/manifest.json"
+  cp "${ASSETS_DIR}/beam.mjs" "${DIST_DIR}/beam.mjs"
+  cp "${ASSETS_DIR}/beam.emu.mjs" "${DIST_DIR}/beam.emu.mjs"
+  cp "${ASSETS_DIR}/beam.wasm" "${DIST_DIR}/beam.wasm"
+  cp "${ASSETS_DIR}/manifest.json" "${DIST_DIR}/otp/manifest.json"
 }
 
 case "${MODE}" in
