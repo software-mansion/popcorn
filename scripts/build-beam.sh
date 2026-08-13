@@ -376,7 +376,7 @@ emulator_link_settings() {
     local flags="-sUSE_PTHREADS=1"
     flags+=" -sPTHREAD_POOL_SIZE=8"
     flags+=" -sPROXY_TO_PTHREAD=1"
-    flags+=" -sENVIRONMENT=web,worker,node"
+    flags+=" -sENVIRONMENT=worker"
     flags+=" -sEXPORT_ES6=1"
     flags+=" -sINITIAL_MEMORY=64MB"
     flags+=" -sALLOW_MEMORY_GROWTH=1"
