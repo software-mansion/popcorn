@@ -32,7 +32,7 @@ defmodule LocalLiveView.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:popcorn, path: "../popcorn-2/elixir", targets: [:wasm, :docs]},
+      {:popcorn, "~> 0.3.3", targets: [:wasm, :docs]},
       {:ex_doc, "~> 0.34",
        only: [:dev, :test], targets: [:docs], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
