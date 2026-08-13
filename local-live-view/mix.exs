@@ -92,7 +92,7 @@ defmodule LocalLiveView.MixProject do
     if System.get_env("LLV_RELEASE") do
       {:popcorn, "~> #{@popcorn_version}", targets: [:wasm, :docs]}
     else
-      {:popcorn, path: "../popcorn/elixir", targets: [:wasm, :docs]}
+      {:popcorn, path: "../popcorn-2/elixir", targets: [:wasm, :docs]}
     end
   end
 
