@@ -14,7 +14,10 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       check(instance === null);
 
       instance = start({
-        otpAssetsRoot: data.payload.otpAssetsRoot,
+        otpAssetsRoot:
+          data.payload.otpAssetsRoot ??
+          // The plugin generates this directory after Vite analyzes the worker.
+          new URL(/* @vite-ignore */ "./otp/", import.meta.url).href,
         emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,

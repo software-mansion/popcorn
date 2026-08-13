@@ -59,7 +59,7 @@ export default [
       file: "dist/worker.mjs",
       format: "esm",
       paths: (id) =>
-        id.endsWith("/assets/beam.mjs") ? "./assets/beam.mjs" : id,
+        id.endsWith("/assets/beam.mjs") ? "./beam.mjs" : id,
     },
     external: (id) => id.endsWith("/assets/beam.mjs"),
     cache: false,
