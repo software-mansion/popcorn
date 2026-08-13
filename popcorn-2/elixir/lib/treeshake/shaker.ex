@@ -47,6 +47,7 @@ defmodule Treeshake.Shaker do
         unless opts.dry_run, do: File.write!(path, shaked)
         {beam_module(path), modules_shaked}
       end)
+      |> Map.new()
 
     handle_to_remove(to_remove, opts)
 
@@ -76,21 +77,21 @@ defmodule Treeshake.Shaker do
     stub_removed_modules = Map.get(opts, :stub_removed_modules, false)
 
     cond do
-      stub_removed_functions -> stub_remove_functions(to_remove, opts)
-      stub_removed_modules -> stub_remove_modules(to_remove, opts)
+      stub_removed_functions -> stub_removed_functions(to_remove, opts)
+      stub_removed_modules -> stub_removed_modules(to_remove, opts)
       not opts.dry_run -> Enum.each(to_remove, &File.rm!/1)
       true -> :ok
     end
   end
 
-  defp stub_remove_functions(to_remove, opts) do
+  defp stub_removed_functions(to_remove, opts) do
     process_async(to_remove, fn path ->
       {shaked, _modules_shaked} = BeamRewriter.keep_funs(path, [], stub_removed_public: true)
       unless opts.dry_run, do: File.write!(path, shaked)
     end)
   end
 
-  defp stub_remove_modules(to_remove, opts) do
+  defp stub_removed_modules(to_remove, opts) do
     module_stub = File.read!(:code.which(EmptyModuleStub))
 
     for path <- to_remove do
@@ -122,6 +123,6 @@ defmodule Treeshake.Shaker do
   defp process_async(enum, fun) do
     enum
     |> Task.async_stream(fun, ordered: false, timeout: 30_000)
-    |> Map.new(fn {:ok, result} -> result end)
+    |> Enum.map(fn {:ok, result} -> result end)
   end
 end

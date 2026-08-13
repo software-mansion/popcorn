@@ -12,7 +12,9 @@ WORKDIR /build/popcorn/language-tour
 RUN if [ "$SYNC_THIRD_PARTY_ASSETS" = "true" ]; then \
       curl -fsSL "https://cdn.cookie-script.com/s/19b5b47f7a8f2606f861864571339358.js" -o public/cookie-script.js; \
     fi
-RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" pnpm run build
+RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" \
+    mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
+    pnpm run build
 RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
