@@ -60,7 +60,6 @@ test.describe("boot", () => {
 
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn({
-        beam: {},
       });
       const boot = await popcorn.boot();
       popcorn.deinit();
@@ -112,7 +111,6 @@ test.describe("boot", () => {
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
     const timeout = await timedOut.boot({
-      beam: {},
       timeoutsMs: { boot: 0 },
     });
     expect(timeout).toEqual({
@@ -150,7 +148,6 @@ test.describe("boot", () => {
   test("worker exit", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn({
-        beam: {},
         workerUrl: "/fault-worker.mjs",
         timeoutsMs: { boot: 30_000 },
       });
@@ -261,7 +258,6 @@ test.describe("lifecycle", () => {
       const stdout: string[] = [];
       const stderr: string[] = [];
       const text = new window.Popcorn({
-        beam: {},
         workerUrl: "/output-worker.mjs",
         onStdout: (chunk) => stdout.push(chunk),
         onStderr: (chunk) => stderr.push(chunk),
@@ -275,7 +271,6 @@ test.describe("lifecycle", () => {
       const rawStdout: number[][] = [];
       const rawStderr: number[][] = [];
       const init = await window.Popcorn.init({
-        beam: {},
         workerUrl: "/output-worker.mjs",
         tty: {
           size: { columns: 100, rows: 30 },
@@ -292,7 +287,6 @@ test.describe("lifecycle", () => {
       // Reboot discards an incomplete UTF-8 sequence.
       const rebootStdout: string[] = [];
       const reboot = new window.Popcorn({
-        beam: {},
         workerUrl: "/output-worker.mjs",
         onStdout: (chunk) => rebootStdout.push(chunk),
       });
@@ -336,7 +330,6 @@ test.describe("lifecycle", () => {
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const init = await window.Popcorn.init({
-        beam: {},
       });
       if (!init.ok) return { ok: false, error: init.error.serialize() };
       init.data.deinit();

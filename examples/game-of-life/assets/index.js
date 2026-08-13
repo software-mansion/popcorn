@@ -1,7 +1,6 @@
 import { Popcorn } from "@swmansion/popcorn";
 
 const result = await Popcorn.init({
-  beam: {},
   onStdout: console.log,
 });
 
