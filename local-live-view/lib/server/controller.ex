@@ -6,7 +6,6 @@ defmodule LocalLiveView.Controller do
 
   use Phoenix.Controller, formats: [html: "ControllerHTML"]
 
-  @doc false
   def index(conn, _params) do
     render(conn, :index, view: conn.private.llv_view)
   end

@@ -6,7 +6,6 @@ defmodule LocalLiveView.ControllerHTML do
 
   import LocalLiveView.Component
 
-  @doc false
   def index(assigns) do
     ~H"""
     <.local_live_view view={@view} />

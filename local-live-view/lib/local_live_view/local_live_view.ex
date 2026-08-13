@@ -10,8 +10,8 @@ defmodule LocalLiveView do
 
   `LocalLiveView` API similar to `Phoenix.LiveView`:
   - it runs in a separate Elixir process,
-  - it has `c:mount/3` and `c:render/1` callbacks, which behave
-    the same way as in a regular live view,
+  - it has `c:mount/3`, `c:handle_params/3` and `c:render/1` callbacks,
+    which behave the same way as in a regular live view,
   - it can spawn regular `Phoenix.Component`s and `Phoenix.LiveComponent`s,
   - events from these components by default go to their parent
     local live view.
@@ -312,8 +312,7 @@ defmodule LocalLiveView do
 
   Called after `c:mount/3` and again after every `push_patch/2`. `params` holds
   the query string decoded into a map with string keys and `uri` is the full
-  URL. A local view is not mounted at the router, so this is the only callback
-  that sees the address bar.
+  URL.
 
   ```
   def handle_params(%{"tab" => tab}, _uri, socket) do
@@ -329,6 +328,9 @@ defmodule LocalLiveView do
 
   @doc ~S'''
   Receives the assigns the host LiveView passes down.
+
+  The mechanism is the same as in `Phoenix.LiveComponent` and its
+  `c:Phoenix.LiveComponent.update/2` callback.
 
   Every attribute other than `view` given to `local_live_view/1` is forwarded
   here, the same way `Phoenix.LiveComponent` receives its assigns:
@@ -348,10 +350,9 @@ defmodule LocalLiveView do
   end
   ```
 
-  The default implementation assigns everything it receives. These assigns are
-  also the authoritative server state that `c:handle_push_error/4` falls back
-  to, so overriding this callback with a guard on unchanged data means the
-  rollback needs handling explicitly — see `c:handle_push_error/4`.
+  The default implementation assigns everything it receives.
+
+  This callback is also called by the default implementation of `c:handle_push_error/4`.
   '''
   @callback update(assigns :: map(), socket :: Socket.t()) :: {:ok, Socket.t()}
 
@@ -378,7 +379,7 @@ defmodule LocalLiveView do
   Handles a message sent to the view's process.
 
   A local live view runs as its own Elixir process inside the browser, so
-  anything that can reach that process arrives here — most often a timer set
+  anything that can reach that process arrives here — for example, a timer set
   with `Process.send_after/3`:
 
   ```
