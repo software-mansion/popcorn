@@ -34,7 +34,7 @@ type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
   : string;
 
 export type PopcornOpts<Output extends TtyOutput = "text"> = {
-  beam: Pick<
+  beam?: Pick<
     BeamBootOptions,
     "emulatorArgs" | "extraArgs" | "env"
   > & { otpAssetsRoot?: string };
@@ -247,7 +247,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
     check(isValidTtySize(ttySize));
     check(
-      opts.beam.otpAssetsRoot === undefined ||
+      opts.beam?.otpAssetsRoot === undefined ||
         opts.beam.otpAssetsRoot.endsWith("/"),
       "otpAssetsRoot must end with a slash",
     );
@@ -256,7 +256,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       beam: {
         ...opts.beam,
         emulatorArgs:
-          opts.beam.emulatorArgs ??
+          opts.beam?.emulatorArgs ??
           schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
       },
     };
