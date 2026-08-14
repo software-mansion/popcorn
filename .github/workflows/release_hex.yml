@@ -24,25 +24,15 @@ jobs:
 
       - name: Check versions align
         if: github.ref_type == 'tag' || inputs.tag
-        shell: python
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          import json, os, re
-          from pathlib import Path
-
-          tag = os.environ["TAG"].removeprefix("v")
-          js = json.loads(Path("popcorn-2/js/package.json").read_text())["version"]
-          ex = re.search(r'@version\s+"([^"]+)"', Path("popcorn-2/elixir/mix.exs").read_text()).group(1)
-
-          versions = {"tag": tag, "js": js, "elixir": ex}
-          core = {k: re.split(r"[-+]", v, 1)[0] for k, v in versions.items()}
-          print(versions)
-          if len(set(core.values())) != 1:
-              raise SystemExit(f"version mismatch (ignoring pre-release): {versions}")
+        uses: ./.github/actions/check-release-versions
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          prefix: v
+          package-json: popcorn-2/js/package.json
+          mix-exs: popcorn-2/elixir/mix.exs
 
       - name: Build Docker image
-        run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ github.ref_name }} .
+        run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ inputs.tag || github.ref_name }} .
 
       - name: Publish to Hex
         env:
