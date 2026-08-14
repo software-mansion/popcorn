@@ -17,7 +17,10 @@ defmodule LocalLiveView.MixProject do
       elixirc_paths: elixirc_paths(Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      preferred_cli_target: [docs: :docs],
+      preferred_cli_target: [
+        docs: :all,
+        "hex.publish": :all
+      ],
       deps: deps(),
 
       # hex
@@ -68,7 +71,7 @@ defmodule LocalLiveView.MixProject do
     [
       popcorn_dep(),
       {:ex_doc, "~> 0.34",
-       only: [:dev, :test], targets: [:docs], runtime: false, warn_if_outdated: true},
+       only: [:dev, :test], targets: [:all], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
       {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
       # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
@@ -81,7 +84,7 @@ defmodule LocalLiveView.MixProject do
       {:plug, "~> 1.14", runtime: false},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: [:host, :docs]}
+      {:file_system, "~> 1.0", targets: [:host, :all]}
     ]
   end
 
@@ -89,9 +92,9 @@ defmodule LocalLiveView.MixProject do
 
   defp popcorn_dep do
     if File.dir?(@popcorn_source) and System.get_env("LLV_RELEASE") == nil do
-      {:popcorn, path: @popcorn_source, targets: [:wasm, :docs]}
+      {:popcorn, path: @popcorn_source, targets: [:wasm, :all]}
     else
-      {:popcorn, "~> #{@popcorn_version}", targets: [:wasm, :docs]}
+      {:popcorn, "~> #{@popcorn_version}", targets: [:wasm, :all]}
     end
   end
 
@@ -131,7 +134,7 @@ defmodule LocalLiveView.MixProject do
 
   defp before_closing_body_tag(_), do: ""
 
-  defp elixirc_paths(:docs), do: ["lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
+  defp elixirc_paths(:all), do: ["lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
 
@@ -142,7 +145,7 @@ defmodule LocalLiveView.MixProject do
         "deps.unlock --check-unused",
         "deps.compile",
         "compile --force --warnings-as-errors",
-        "cmd MIX_TARGET=docs mix docs --warnings-as-errors"
+        "cmd MIX_TARGET=all mix docs --warnings-as-errors"
       ],
       build: [
         "deps.get",

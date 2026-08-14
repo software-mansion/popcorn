@@ -84,14 +84,7 @@ defmodule LocalLvKanban.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["llv.build", "ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      # llv.assets first: esbuild resolves "local_live_view" to the bundle in
-      # deps/, which for an in-repo path dep is generated rather than committed.
-      "assets.build": [
-        "llv.assets",
-        "compile",
-        "tailwind local_lv_kanban",
-        "esbuild local_lv_kanban"
-      ],
+      "assets.build": ["compile", "tailwind local_lv_kanban", "esbuild local_lv_kanban"],
       "assets.deploy": [
         "tailwind local_lv_kanban --minify",
         "esbuild local_lv_kanban --minify",

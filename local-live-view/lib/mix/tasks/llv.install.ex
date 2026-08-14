@@ -34,12 +34,6 @@ defmodule Mix.Tasks.Llv.Install do
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
   @local_project_dir "local"
 
-  # Evaluated while compiling local_live_view, so this is our own version.
-  @llv_version_requirement (
-                             version = Version.parse!(Mix.Project.config()[:version])
-                             "#{version.major}.#{version.minor}"
-                           )
-
   @impl Igniter.Mix.Task
   def igniter(igniter) do
     igniter
@@ -476,7 +470,7 @@ defmodule Mix.Tasks.Llv.Install do
   defp llv_dep_from_local do
     case host_llv_dep() do
       nil ->
-        ~s|{:local_live_view, "~> #{@llv_version_requirement}"}|
+        ~s|{:local_live_view, ">= 0.0.0"}|
 
       {req, opts} ->
         opts =

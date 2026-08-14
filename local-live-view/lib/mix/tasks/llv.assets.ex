@@ -28,6 +28,9 @@ defmodule Mix.Tasks.Llv.Assets do
 
   @artifacts ~w(local_live_view.js local_live_view.d.ts AtomVM.mjs AtomVM.wasm iframe.mjs)
   @extra_sources ~w(rollup.config.mjs package.json tsconfig.json)
+
+  @popcorn_dist "node_modules/@swmansion/popcorn/dist"
+  @copied_runtime_files ~w(AtomVM.mjs AtomVM.wasm iframe.mjs)
   # Kept outside priv/static so it stays out of the hex package.
   @hash_file "priv/.assets_hash"
 
@@ -117,7 +120,7 @@ defmodule Mix.Tasks.Llv.Assets do
   # whose dist/ is generated as well — so check it here instead of letting
   # rollup fail on a bare ENOENT deep inside the plugin.
   defp check_popcorn_dist!(llv_dir) do
-    dist = Path.join(llv_dir, "node_modules/@swmansion/popcorn/dist")
+    dist = Path.join(llv_dir, @popcorn_dist)
 
     unless File.regular?(Path.join(dist, "AtomVM.wasm")) do
       Mix.raise("""
@@ -154,7 +157,8 @@ defmodule Mix.Tasks.Llv.Assets do
   defp sources_hash(llv_dir) do
     sources =
       Path.wildcard(Path.join(llv_dir, "assets/local_live_view/**/*.ts")) ++
-        Enum.map(@extra_sources, &Path.join(llv_dir, &1))
+        Enum.map(@extra_sources, &Path.join(llv_dir, &1)) ++
+        Enum.map(@copied_runtime_files, &Path.join([llv_dir, @popcorn_dist, &1]))
 
     sources
     |> Enum.sort()
