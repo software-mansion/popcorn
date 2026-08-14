@@ -120,6 +120,9 @@ defmodule LocalLiveView.MixProject do
         ],
         "Server Side": [
           ~r/^LocalLiveView\..*/
+        ],
+        "Mix Tasks": [
+          ~r/^Mix\.Tasks\./
         ]
       ]
     ]

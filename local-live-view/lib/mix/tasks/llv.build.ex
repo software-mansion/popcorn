@@ -8,9 +8,10 @@ defmodule Mix.Tasks.Llv.Build do
 
   ## Steps
 
-    1. Runs `mix llv.assets` to make sure `deps/local_live_view/priv/static/`
-       holds the JS bundle. For a published package this is a no-op — the
-       bundle ships in the tarball.
+    1. Makes sure `deps/local_live_view/priv/static/` holds the JS bundle. With
+       the published package there is nothing to do, since the bundle ships in
+       the tarball; a source checkout is bundled on the spot, which needs
+       Node.js and pnpm.
     2. Copies Popcorn runtime files (`iframe.mjs`, `AtomVM.mjs`, `AtomVM.wasm`)
        from `deps/local_live_view/priv/static/` into `priv/static/assets/js/`.
        These must be served alongside Phoenix's `app.js` so Popcorn's

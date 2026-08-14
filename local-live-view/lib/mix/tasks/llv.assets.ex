@@ -1,31 +1,25 @@
 defmodule Mix.Tasks.Llv.Assets do
   use Mix.Task
 
-  @shortdoc "Ensures LocalLiveView's prebuilt JS assets are available"
-
-  @moduledoc """
-  Makes sure `local_live_view/priv/static/` holds an up-to-date JS bundle.
-
-  This is the single place that knows where the bundle comes from, and it
-  answers differently depending on how `:local_live_view` was fetched:
-
-    * **published package** (Hex tarball, no `assets/` directory) — the bundle
-      was built by the release pipeline and ships inside the tarball, so there
-      is nothing to do. Nothing is ever built on a user's machine.
-
-    * **source checkout** (path dep, git dep, this repo) — `priv/static/` is
-      not committed, so it is built on demand, which is the one case that needs
-      Node.js and `pnpm` on the machine. The hash of the TS sources is cached in
-      `priv/.assets_hash`, so repeated runs are a no-op and only actual source
-      changes trigger a rebuild.
-
-  `mix llv.build` runs this first, and every LocalLiveView app has `llv.build`
-  in its `setup` alias — so this normally never needs to be invoked directly.
-
-  ## Usage
-
-      mix llv.assets
-  """
+  # Makes sure local_live_view/priv/static/ holds an up-to-date JS bundle.
+  #
+  # Internal, hence no docs: `mix llv.build` runs it as its first step and every
+  # LocalLiveView app has `llv.build` in its `setup` alias, so nobody needs to
+  # invoke it directly.
+  #
+  # This is the single place that knows where the bundle comes from, and it
+  # answers differently depending on how :local_live_view was fetched:
+  #
+  #   * published package (Hex tarball, no assets/ directory) — the bundle was
+  #     built by the release pipeline and ships inside the tarball, so there is
+  #     nothing to do. Nothing is ever built on a user's machine.
+  #
+  #   * source checkout (path dep, git dep, this repo) — priv/static/ is not
+  #     committed, so it is built on demand, which is the one case that needs
+  #     Node.js and pnpm on the machine. The hash of the sources is cached in
+  #     priv/.assets_hash, so repeated runs are a no-op and only actual source
+  #     changes trigger a rebuild.
+  @moduledoc false
 
   @artifacts ~w(local_live_view.js local_live_view.d.ts AtomVM.mjs AtomVM.wasm iframe.mjs)
   @extra_sources ~w(rollup.config.mjs package.json tsconfig.json)
