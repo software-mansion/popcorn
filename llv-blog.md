@@ -1,6 +1,6 @@
 # The first release of Local Live View!
 
-Today marks another milestone in the Local Live View development. In April, Franek Kubis announced it at Elixir Conf EU, and we published several demos and POCs since then. Now, it finally has docs, reasonable API (more or less :P) and a Hex release. It's not been run in prod yet, but we're close already. We deployed some demos, too. So, it's the perfect time to start hacking around.
+Today marks another milestone in the Local Live View development. In April, Franek Kubis announced it at ElixirConf EU, and we published several demos and POCs since then. Now, it finally has docs, reasonable API (more or less :P) and a Hex release. It's not been run in prod yet, but we're close already. We deployed some demos, too. So, it's the perfect time to start hacking around.
 
 ## Why Local Live View?
 
@@ -24,8 +24,10 @@ defmodule MyAppWeb.ThermostatComponent do
   @impl true
   def render(assigns) do
     ~H"""
-    Current temperature: {@temperature}°C
-    <button phx-click="inc_temperature" phx-target="@myself">+</button>
+    <div>
+      Current temperature: {@temperature}°C
+      <button phx-click="inc_temperature" phx-target={@myself}>+</button>
+    </div>
     """
   end
 
@@ -39,7 +41,7 @@ end
 rendered from a Live View:
 
 ```elixir
-defmodule MyApp.MyLive do
+defmodule MyAppWeb.MyLive do
   use Phoenix.LiveView
 
   @impl true
@@ -51,7 +53,7 @@ defmodule MyApp.MyLive do
 end
 ```
 
-Now, moving the component to the client requires only a slight change:
+Now, moving the component to the client requires only slight changes. First, we `use LocalLiveView`, and change the module name to reflect that:
 
 ```diff
 - defmodule MyAppWeb.ThermostatComponent do
@@ -60,16 +62,23 @@ Now, moving the component to the client requires only a slight change:
 +   use LocalLiveView
 ```
 
-It can be now rendered with:
+Then, we need to remove `phx-target={@myself}` for the `click` event - Local Live View events always target themselves, not their parents:
+
+```diff
+- <button phx-click="inc_temperature" phx-target={@myself}>+</button>
++ <button phx-click="inc_temperature">+</button>
+```
+
+Thermostat can now be rendered with:
 
 ```diff
 - <.live_component module={MyAppWeb.ThermostatComponent} id="thermostat" temperature={25} />
-+ <.local_live_view view={MyAppWeb.ThermostatLocal} id="thermostat" temperature={25} />
++ <.local_live_view view="MyAppWeb.ThermostatLocal" id="thermostat" temperature={25} />
 ```
 
 The only step left is to move the Thermostat to the right place in your project, and voila! The Thermostat is now fully local.
 
-Notice that we changed the Thermostat from a Live Component to a Local Live View. While the API is similar, they're different under the hood: Local Live View runs on a separate process (and even on a separate VM). All the differences are outlined in the docs, the most important being the communication, which now goes across the network. For that, you can use one of two mechanisms: push_server_event or mirror sync - they're thoroughly explained in the docs as well.
+Notice that we changed the Thermostat from a Live Component to a Local Live View. While the API is similar, they're different under the hood: Local Live View runs in a separate process (and even on a separate VM). All the differences are outlined in the docs, the most important being the communication, which now goes across the network. For that, you can use one of two mechanisms: push_server_event or mirror sync - they're thoroughly explained in the docs as well.
 
 ## See it in action
 
@@ -87,7 +96,7 @@ Even though Local Live View has been pretty stable for us recently, we're going 
 
 Removing any dependencies on Live View private APIs is another important point. Fortunately, we're well on our way to doing that and we're working closely with the Live View team.
 
-Reducing the bundle size is something we constantly keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down to < 1.5 MB.
+Reducing the bundle size is something we constantly keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down to < 1.5 MB compressed.
 
 ## Go use it!
 
