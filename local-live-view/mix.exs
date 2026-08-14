@@ -2,7 +2,7 @@ defmodule LocalLiveView.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @popcorn_version "0.3.2"
+  @popcorn_version "0.3.3"
   @github "https://github.com/software-mansion/popcorn"
 
   # LICENSE lives in the repo root and is copied in before packaging, see copy_meta/1.
