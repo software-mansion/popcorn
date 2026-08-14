@@ -85,14 +85,13 @@ defmodule LocalLiveView.MixProject do
     ]
   end
 
-  # In this repo we develop against the Popcorn source tree, so API changes on
-  # both sides land in one commit. A path dep cannot be published, so the
-  # release pipeline sets LLV_RELEASE=1 to depend on the published Popcorn.
+  @popcorn_source Path.expand("../popcorn-2/elixir", __DIR__)
+
   defp popcorn_dep do
-    if System.get_env("LLV_RELEASE") do
-      {:popcorn, "~> #{@popcorn_version}", targets: [:wasm, :docs]}
+    if File.dir?(@popcorn_source) and System.get_env("LLV_RELEASE") == nil do
+      {:popcorn, path: @popcorn_source, targets: [:wasm, :docs]}
     else
-      {:popcorn, path: "../popcorn-2/elixir", targets: [:wasm, :docs]}
+      {:popcorn, "~> #{@popcorn_version}", targets: [:wasm, :docs]}
     end
   end
 

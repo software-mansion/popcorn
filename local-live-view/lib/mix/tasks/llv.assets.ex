@@ -98,10 +98,8 @@ defmodule Mix.Tasks.Llv.Assets do
       """)
     end
 
-    unless File.dir?(Path.join(llv_dir, "node_modules")) do
-      Mix.shell().info("[llv] Installing JS dependencies...")
-      cmd!("pnpm", ["install"], llv_dir)
-    end
+    Mix.shell().info("[llv] Installing JS dependencies...")
+    cmd!("pnpm", ["install"], llv_dir)
 
     check_popcorn_dist!(llv_dir)
 
