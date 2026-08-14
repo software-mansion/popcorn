@@ -14,9 +14,10 @@ defmodule Mix.Tasks.Llv.Assets do
       is nothing to do. Nothing is ever built on a user's machine.
 
     * **source checkout** (path dep, git dep, this repo) — `priv/static/` is
-      not committed, so it is built with `pnpm` on demand. The hash of the TS
-      sources is cached in `priv/.assets_hash`, so repeated runs are a no-op
-      and only actual source changes trigger a rebuild.
+      not committed, so it is built on demand, which is the one case that needs
+      Node.js and `pnpm` on the machine. The hash of the TS sources is cached in
+      `priv/.assets_hash`, so repeated runs are a no-op and only actual source
+      changes trigger a rebuild.
 
   `mix llv.build` runs this first, and every LocalLiveView app has `llv.build`
   in its `setup` alias — so this normally never needs to be invoked directly.
