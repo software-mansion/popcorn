@@ -15,6 +15,67 @@ defmodule Popcorn do
     defexception [:message]
   end
 
+  # Modules dropped from static-boot bundles on top of the regular drop list:
+  # machinery that only the classic application_controller boot (or a host VM)
+  # can reach. Validated against the kanban e2e suite; if an app under
+  # static_boot genuinely needs one of these, the drop list needs an override.
+  # Dead at runtime under the static boot, but not removable by reachability:
+  # the shaker's conservative analysis (literal module atoms, hardcoded
+  # behaviour impls) still qualifies these as reachable, so they are dropped
+  # explicitly. The rest of the old drop list is now covered by
+  # Treeshake @non_treeshakable_exclusions + plain reachability.
+  @static_boot_drop [
+                      # reachable, but its beam does not survive function-shaking
+                      # (same family as prim_eval)
+                      :prim_tty
+                    ] ++
+                      [
+                        # app-start machinery
+                        :application_controller,
+                        :application_master,
+                        :application_starter,
+                        :epp,
+                        :erl_scan,
+                        # distribution & network name resolution
+                        :dist_ac,
+                        :global_group,
+                        :global_search,
+                        :erpc,
+                        :auth,
+                        :inet_res,
+                        :inet_parse,
+                        :inet_hosts,
+                        :inet_gethost_native,
+                        :inet_udp,
+                        :net_adm,
+                        :erl_distribution,
+                        :erl_boot_server,
+                        :peer,
+                        # shell / tooling
+                        :user_drv,
+                        :group,
+                        :group_history,
+                        :erl_compile,
+                        :erl_compile_server,
+                        :otp_internal,
+                        :kernel_config,
+                        :beam_lib,
+                        # storage backends
+                        :disk_log_server,
+                        :disk_log_sup,
+                        :prim_zip,
+                        # OTP logger machinery (logger_std_h stays: patched default handler)
+                        :logger_server,
+                        :logger_olp,
+                        :logger_proxy,
+                        :logger_sup,
+                        :logger_handler_watcher,
+                        :logger_config,
+                        # misc
+                        :gen_statem,
+                        :timer
+                      ]
+
   @doc """
   Builds a Popcorn `.avm` bundle.
 
@@ -87,9 +148,24 @@ defmodule Popcorn do
 
     ebins = options.extra_beams ++ get_all_ebins(apps, generated_ebin_dir)
 
+    # The tree-shaker roots every .app file's `mod` start/2 as an entry point.
+    # Under the static boot the started closure is known exactly, so drop the
+    # .app files of apps that are never started (their modules stay in the
+    # bundle only if genuinely referenced from kept code).
+    ebins =
+      if options.static_boot do
+        Enum.reject(ebins, fn path ->
+          app_name = path |> Path.basename(".app") |> String.to_atom()
+          Path.extname(path) == ".app" and app_name not in apps
+        end)
+      else
+        ebins
+      end
+
     ebins =
       if options.treeshake,
-        do: treeshake(ebins, boot_module, data_modules, options.static_boot, start_module, tmp_dir),
+        do:
+          treeshake(ebins, boot_module, data_modules, options.static_boot, start_module, tmp_dir),
         else: ebins
 
     beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
@@ -109,8 +185,7 @@ defmodule Popcorn do
         # only the generated data modules (module atoms as data) are ignored.
         # The app-start machinery is never invoked: drop it. Env reads work
         # through the patched application.erl (direct ac_tab lookups).
-        {[boot_module], data_modules, data_modules,
-         [:application_controller, :application_master, :application_starter, :epp, :erl_scan]}
+        {[boot_module], data_modules, data_modules, @static_boot_drop}
       else
         {[],
          [
@@ -118,9 +193,17 @@ defmodule Popcorn do
            # of all apps, making treeshake think they're referenced, while they aren't
            boot_module,
            # TODO application_controller references a lot of code that it doesn't use,
-           # we need to figure out if we can avoid keeping it
+           # we need to figure out if we can avoid keeping it. The master/starter are
+           # only reachable through it, so with the controller ignored they must be
+           # left explicitly (they are shakable via @non_treeshakable_exclusions).
            :application_controller
-         ], [boot_module, :application_controller], []}
+         ],
+         [
+           boot_module,
+           :application_controller,
+           :application_master,
+           :application_starter
+         ], []}
       end
 
     opts = [
@@ -144,47 +227,48 @@ defmodule Popcorn do
         ] ++ keep_extra,
       ignore: ignore_extra,
       leave: leave_extra,
-      drop: [
-        Code.Formatter,
-        :elixir_parser,
-        :elixir_tokenizer,
-        :erl_lint,
-        :erl_parse,
-        :erl_eval,
-        # TODO why logger needs these?
-        # :epp,
-        # :erl_scan,
-        :prim_inet,
-        :qlc,
-        :qlc_pt,
-        :dets_v9,
-        :dets,
-        :sofs,
-        :erl_tar,
-        :file_sorter,
-        :global,
-        :disk_log,
-        :disk_log_1,
-        :net_kernel,
-        :zip,
-        :inet_db,
-        :shell,
-        :edlin,
-        :edlin_expand,
-        :edlin_type_suggestion,
-        :edlin_context,
-        :dets_utils,
-        :gen_tcp_socket,
-        :socket,
-        :prim_socket,
-        :eval_bits,
-        :inet_dns,
-        :net,
-        :rpc,
-        :gen_udp_socket,
-        :dist_util,
-        :win32reg
-      ] ++ drop_extra
+      drop:
+        [
+          Code.Formatter,
+          :elixir_parser,
+          :elixir_tokenizer,
+          :erl_lint,
+          :erl_parse,
+          :erl_eval,
+          # TODO why logger needs these?
+          # :epp,
+          # :erl_scan,
+          :prim_inet,
+          :qlc,
+          :qlc_pt,
+          :dets_v9,
+          :dets,
+          :sofs,
+          :erl_tar,
+          :file_sorter,
+          :global,
+          :disk_log,
+          :disk_log_1,
+          :net_kernel,
+          :zip,
+          :inet_db,
+          :shell,
+          :edlin,
+          :edlin_expand,
+          :edlin_type_suggestion,
+          :edlin_context,
+          :dets_utils,
+          :gen_tcp_socket,
+          :socket,
+          :prim_socket,
+          :eval_bits,
+          :inet_dns,
+          :net,
+          :rpc,
+          :gen_udp_socket,
+          :dist_util,
+          :win32reg
+        ] ++ drop_extra
     ]
 
     Treeshake.run(opts)
