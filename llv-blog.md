@@ -10,7 +10,7 @@ Thus, Local LiveView allows you to run LiveView code in the browser via Popcorn,
 
 ## How do I use it?
 
-Let's say you have a simple live component:
+An example means more than a thousand words, so let's follow one, assuming you have Local LiveView installed in your project (did I say there's an Igniter installer?). Now, let's consider a simple live component:
 
 ```elixir
 defmodule MyAppWeb.ThermostatComponent do
@@ -53,7 +53,7 @@ defmodule MyAppWeb.MyLive do
 end
 ```
 
-Let's make the component run locally! For that, we need a simple Local LiveView that spawns our component:
+Let's make the component run on the client! For that, we need a simple Local LiveView that spawns our component:
 
 ```elixir
 defmodule MyAppWeb.MyLocal do
@@ -83,11 +83,11 @@ defmodule MyAppWeb.MyLive do
 end
 ```
 
-The only step left is to move the Thermostat to the right place in your project. Local LiveView enforces separation of the client and server code, so you don't leak the server stuff to the client accidentally, but can still reuse the client code on the server.
+The only step left is to move the Thermostat to the right place (`local/lib/*`) in your project. Local LiveView enforces separation of the client and server code, so you don't leak the server stuff to the client accidentally, but can still reuse the client code on the server.
 
 And... that's it! The Thermostat itself is unchanged, but it now runs locally! Let's see how it works.
 
-The local view we just created is an entry point to the client-side world. In this example, it doesn't do much: just gets the `temperature` assign from the server and uses it to render the Thermostat component. However, local views can have complex logic, handle events, and render multiple live and regular components. In fact, we could merge the Thermostat component into our local view - it's quite straightforward, so we leave it as an exercise for the reader ;) The docs explain the LocalLiveView API and its relation to LiveView and LiveComponent in detail.
+The local view we just created is an entry point to the client-side world. In this example, it doesn't do much: just gets the `temperature` assign from the server and uses it to render the Thermostat component. However, local views can have complex logic, handle events, and render multiple live and regular components. In fact, we could merge the Thermostat component into our local view - it's quite straightforward, so we leave it as an exercise for the reader ;) The docs explain the Local LiveView API and its relation to LiveView and LiveComponent in detail.
 
 It's worth noting that a server-side live view can render many local views, and a local view can reach back to the server - there are two mechanisms for that:
 - `push_server_event` - sends events to the server, which replies with updated assigns (LiveVue/LiveSvelte style),
@@ -113,6 +113,8 @@ Removing any dependencies on LiveView private APIs is another important point. F
 
 Reducing the bundle size is something we constantly keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down 4x (to < 1.5 MB compressed).
 
+Another thing on our radar is server-side rendering. Given that the SSR for Local LiveView is more or less... LiveView, I think it should go smoothly ;)
+
 ## Go use it!
 
-With the first release, Local LiveView is more than ready for you to try! Here's the docs, the repo, and the getting started guide. Happy hacking!
+We're excited for the Local LiveView's further growth, and with the first release out, we'd love to have you on that journey! Try it out: here's the docs, the repo, and the getting started guide. Happy hacking!
