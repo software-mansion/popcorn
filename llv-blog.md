@@ -1,12 +1,12 @@
-# The first release of Local Live View!
+# The first release of Local LiveView!
 
-Today marks another milestone in the Local Live View development. In April, Franek Kubis announced it at ElixirConf EU, and we published several demos and POCs since then. Now, it finally has docs, reasonable API (more or less :P) and a Hex release. It's not been run in prod yet, but we're close already. We deployed some demos, too. So, it's the perfect time to start hacking around.
+This April, we announced Local LiveView: the library to run LiveView code right in the browser. It was a POC at the time, and since then, we put lots of work into making it usable in the wild. Today, I'm happy to share that the first Hex release of Local LiveView just landed 🎉 It ships with a solid core of features, documentation, guides and even an Igniter-based installer. We deployed some demos, too. So, it's the perfect time to start hacking around.
 
-## Why Local Live View?
+## Why Local LiveView?
 
-Local Live View makes it possible to manage local state the same way as you do with the server state in a regular Live View. While Live View provides JS hooks and JS commands, they're arguably more complex and harder to maintain than regular Elixir code. And you're often forced to write JS.
+LiveView is great for cases where you're fine with keeping pretty much all the state on the server, with all its benefits and tradeoffs. When the client-side state is needed, things get complex. Even though there are JS hooks and JS commands, they're far from idiomatic LiveView code, and therefore harder to reason about and maintain. And you're often forced to write JS.
 
-Thus, Local Live View allows you to run Live Views in the browser via Popcorn, keeping all their assigns locally. You can now freely choose what should stay on the client, and what needs to reach the server. It helps, for example, offload the server from handling simple UI updates, drastically reduce latency on poor networks, and avoid 'WebSocket disconnected' issues.
+Thus, Local LiveView allows you to run LiveView code in the browser via Popcorn, keeping all assigns locally. You can now freely choose what should stay on the client, and what needs to reach the server. It helps, for example, offload the server from handling simple UI updates, drastically reduce latency on poor networks, and avoid 'WebSocket disconnected' issues.
 
 ## How do I use it?
 
@@ -38,7 +38,7 @@ defmodule MyAppWeb.ThermostatComponent do
 end
 ```
 
-rendered from a Live View:
+rendered from a LiveView:
 
 ```elixir
 defmodule MyAppWeb.MyLive do
@@ -53,51 +53,66 @@ defmodule MyAppWeb.MyLive do
 end
 ```
 
-Now, moving the component to the client requires only slight changes. First, we `use LocalLiveView`, and change the module name to reflect that:
+Let's make the component run locally! For that, we need a simple Local LiveView that spawns our component:
 
-```diff
-- defmodule MyAppWeb.ThermostatComponent do
--   use Phoenix.LiveComponent
-+ defmodule MyAppWeb.ThermostatLocal do
-+   use LocalLiveView
+```elixir
+defmodule MyAppWeb.MyLocal do
+  use LocalLiveView
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <.live_component module={MyAppWeb.ThermostatComponent} id="thermostat" temperature={@temperature} />
+    """
+  end
+end
 ```
 
-We should also drop phx-target={@myself} — since it's no longer a LiveComponent, Local Live Views target themselves by default.
+Now, let's change our parent LiveView. Instead of rendering the Thermostat directly, let it render the new local view:
 
-```diff
-- <button phx-click="inc_temperature" phx-target={@myself}>+</button>
-+ <button phx-click="inc_temperature">+</button>
+```elixir
+defmodule MyAppWeb.MyLive do
+  use Phoenix.LiveView
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <.local_live_view view="MyAppWeb.MyLocal" id="my_local_view" temperature={25} />
+    """
+  end
+end
 ```
 
-Thermostat can now be rendered with:
+The only step left is to move the Thermostat to the right place in your project. Local LiveView enforces separation of the client and server code, so you don't leak the server stuff to the client accidentally, but can still reuse the client code on the server.
 
-```diff
-- <.live_component module={MyAppWeb.ThermostatComponent} id="thermostat" temperature={25} />
-+ <.local_live_view view="MyAppWeb.ThermostatLocal" id="thermostat" temperature={25} />
-```
+And... that's it! The Thermostat itself is unchanged, but it now runs locally! Let's see how it works.
 
-The only step left is to move the Thermostat to the right place in your project, and voila! The Thermostat is now fully local.
+The local view we just created is an entry point to the client-side world. In this example, it doesn't do much: just gets the `temperature` assign from the server and uses it to render the Thermostat component. However, local views can have complex logic, handle events, and render multiple live and regular components. In fact, we could merge the Thermostat component into our local view - it's quite straightforward, so we leave it as an exercise for the reader ;) The docs explain the LocalLiveView API and its relation to LiveView and LiveComponent in detail.
 
-Notice that we changed the Thermostat from a Live Component to a Local Live View. While the API is similar, they're different under the hood: Local Live View runs in a separate process (and even on a separate VM). All the differences are outlined in the docs, the most important being the communication, which now goes across the network. For that, you can use one of two mechanisms: push_server_event or mirror sync - they're thoroughly explained in the docs as well.
+It's worth noting that a server-side live view can render many local views, and a local view can reach back to the server - there are two mechanisms for that:
+- `push_server_event` - sends events to the server, which replies with updated assigns (LiveVue/LiveSvelte style),
+- mirror sync - syncs selected assigns with the server.
+
+They're both thoroughly explained in the docs as well.
 
 ## See it in action
 
-This post shows a very simple example, but Local Live View is already capable of running more complex apps. We prepared several demos to explain it:
+This post shows a very simple example, but Local LiveView is already capable of running more complex apps. We prepared several demos you can try yourself:
 
-- Kanban boards - an app that allows you to create and browse kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag&drop, optimistic updates, and all the forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` - reconnect and open two windows side-by-side to see it.
+- Kanban boards - an app that allows you to create and browse kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag&drop, optimistic updates, and all the modals/forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` - reconnect and open two windows side-by-side to see it.
 
 - Pong game - a simple, 100% local, 100% Elixir game - you play pong with a bot.
 
-- Burrito order form - a fairly complex form demo, comparing regular Live View and Local Live View side-by-side. It also demonstrates synchronizing state via mirror sync.
+- Burrito order form - a fairly complex form demo, comparing regular LiveView and Local LiveView side-by-side. It also demonstrates synchronizing state via mirror sync.
 
 ## The future
 
-Even though Local Live View has been pretty stable for us recently, we're going to test it further in different scenarios and see how it behaves. We're going to polish the API along the way, but with no big changes expected.
+Even though Local LiveView has been pretty stable for us recently, we're going to test it further in different scenarios and see how it behaves. We're going to polish the API along the way, but with no big changes expected.
 
-Removing any dependencies on Live View private APIs is another important point. Fortunately, we're well on our way to doing that and we're working closely with the Live View team.
+Removing any dependencies on LiveView private APIs is another important point. Fortunately, we're well on our way to doing that and we're working closely with the LiveView team.
 
-Reducing the bundle size is something we constantly keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down to < 1.5 MB compressed.
+Reducing the bundle size is something we constantly keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down 4x (to < 1.5 MB compressed).
 
 ## Go use it!
 
-With the first release, Local Live View is more than ready for you to try! Here's the docs, the repo, and examples. Happy hacking!
+With the first release, Local LiveView is more than ready for you to try! Here's the docs, the repo, and the getting started guide. Happy hacking!
