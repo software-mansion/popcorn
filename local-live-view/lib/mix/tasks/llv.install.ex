@@ -468,37 +468,31 @@ defmodule Mix.Tasks.Llv.Install do
   @host_only_dep_opts [:runtime, :only, :targets, :override, :app, :optional]
 
   defp llv_dep_from_local do
-    case host_llv_dep() do
-      nil ->
-        ~s|{:local_live_view, ">= 0.0.0"}|
-
-      {req, opts} ->
-        opts =
-          opts
-          |> Keyword.drop(@host_only_dep_opts)
-          |> Keyword.replace_lazy(:path, fn _ -> llv_path_from_local() end)
-
-        args =
-          [
-            req && inspect(req)
-            | Enum.map(opts, fn {key, value} -> "#{key}: #{inspect(value)}" end)
-          ]
-          |> Enum.reject(&is_nil/1)
-
-        "{:local_live_view, #{Enum.join(args, ", ")}}"
-    end
-  end
-
-  defp host_llv_dep do
     Mix.Project.config()[:deps]
     |> List.wrap()
-    |> Enum.find_value(fn
-      {:local_live_view, opts} when is_list(opts) -> {nil, opts}
-      {:local_live_view, req} when is_binary(req) -> {req, []}
-      {:local_live_view, req, opts} when is_binary(req) and is_list(opts) -> {req, opts}
-      _ -> nil
+    |> Enum.find_value(~s|{:local_live_view, ">= 0.0.0"}|, fn
+      {:local_live_view, opts} when is_list(opts) ->
+        opts_to_string(opts) |> llv_dep_string(false)
+
+      {:local_live_view, req, opts} when is_binary(req) and is_list(opts) ->
+        opts_to_string(opts) |> llv_dep_string(true)
+
+      _ ->
+        nil
     end)
   end
+
+  defp opts_to_string(opts) do
+    opts
+    |> Keyword.drop(@host_only_dep_opts)
+    |> Keyword.replace_lazy(:path, fn _ -> llv_path_from_local() end)
+    |> Enum.map(fn {key, value} -> "#{key}: #{inspect(value)}" end)
+    |> Enum.join(", ")
+  end
+
+  defp llv_dep_string("", _with_req), do: ~s|{:local_live_view, ">= 0.0.0"}|
+  defp llv_dep_string(args, true), do: ~s|{:local_live_view, ">= 0.0.0", #{args}}|
+  defp llv_dep_string(args, false), do: ~s|{:local_live_view, #{args}}|
 
   defp llv_path_from_local do
     case Mix.Project.deps_paths()[:local_live_view] do

@@ -1,6 +1,6 @@
 defmodule Mix.Tasks.Llv.Assets do
   use Mix.Task
-
+  @moduledoc false
   # Makes sure local_live_view/priv/static/ holds an up-to-date JS bundle.
   #
   # Internal, hence no docs: `mix llv.build` runs it as its first step and every
@@ -19,7 +19,6 @@ defmodule Mix.Tasks.Llv.Assets do
   #     Node.js and pnpm on the machine. The hash of the sources is cached in
   #     priv/.assets_hash, so repeated runs are a no-op and only actual source
   #     changes trigger a rebuild.
-  @moduledoc false
 
   @artifacts ~w(local_live_view.js local_live_view.d.ts AtomVM.mjs AtomVM.wasm iframe.mjs)
   @extra_sources ~w(rollup.config.mjs package.json tsconfig.json)

@@ -8,15 +8,11 @@ defmodule Mix.Tasks.Llv.Build do
 
   ## Steps
 
-    1. Makes sure `deps/local_live_view/priv/static/` holds the JS bundle. With
-       the published package there is nothing to do, since the bundle ships in
-       the tarball; a source checkout is bundled on the spot, which needs
-       Node.js and pnpm.
-    2. Copies Popcorn runtime files (`iframe.mjs`, `AtomVM.mjs`, `AtomVM.wasm`)
+    1. Copies Popcorn runtime files (`iframe.mjs`, `AtomVM.mjs`, `AtomVM.wasm`)
        from `deps/local_live_view/priv/static/` into `priv/static/assets/js/`.
        These must be served alongside Phoenix's `app.js` so Popcorn's
        `import.meta.url`-based lookups resolve.
-    3. Runs `mix build` inside `local/` to compile the WASM bundle.
+    2. Runs `mix build` inside `local/` to compile the WASM bundle.
 
   ## Usage
 
