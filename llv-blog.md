@@ -62,7 +62,7 @@ Now, moving the component to the client requires only slight changes. First, we 
 +   use LocalLiveView
 ```
 
-Then, we need to remove `phx-target={@myself}` for the `click` event - Local Live View events always target themselves, not their parents:
+We should also drop phx-target={@myself} — since it's no longer a LiveComponent, Local Live Views target themselves by default.
 
 ```diff
 - <button phx-click="inc_temperature" phx-target={@myself}>+</button>
