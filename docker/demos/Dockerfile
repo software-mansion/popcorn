@@ -137,6 +137,7 @@ COPY --from=builder-pong --chown=nobody:root \
     /build/popcorn/examples/local-lv-pong/_build/prod/rel/local_lv_pong ./pong/
 
 COPY docker/demos/nginx.conf /etc/nginx/nginx.conf.template
+COPY docker/demos/index.html /var/www/demos/index.html
 COPY --chmod=755 docker/demos/entrypoint.sh /entrypoint.sh
 
 # Root: the entrypoint starts Postgres and nginx, then drops to nobody for

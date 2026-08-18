@@ -1,6 +1,7 @@
 **
 !docker/demos/entrypoint.sh
 !docker/demos/nginx.conf
+!docker/demos/index.html
 !popcorn/elixir/**
 !local-live-view/**
 !examples/local-lv-kanban/**

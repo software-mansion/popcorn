@@ -191,9 +191,6 @@ defmodule Local.PongLive do
         <div style={"position:absolute;left:570px;top:#{@by}px;width:10px;height:70px;background:#fff"}></div>
         <div style={"position:absolute;left:#{@bx}px;top:#{@by_}px;width:10px;height:10px;background:#fff"}></div>
       </div>
-      <div>
-        Press space to play/pause, W/S or ↑/↓ to move
-      </div>
       <div style="font-size:0.8em;margin-top:1em;color:#888;">
         <div :if={@status == :playing}>
           FPS: {@current_fps}
