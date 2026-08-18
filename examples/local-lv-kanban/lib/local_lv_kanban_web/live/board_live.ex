@@ -17,7 +17,7 @@ defmodule LocalLvKanbanWeb.BoardLive do
 
   alias LocalLvKanban.Boards
 
-  @edits ~w(add_column add_task move_task remove_column remove_task)
+  @edits ~w(add_column add_task move_task remove_column remove_task rename_board)
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -66,12 +66,18 @@ defmodule LocalLvKanbanWeb.BoardLive do
     {:noreply, push_board(socket)}
   end
 
-  # Re-read the board from the DB and re-assign it. Always bump `rev` so the
-  # browser-side view re-renders even when the board value is unchanged (failure
-  # rollback) — `rev` is the client's rebuild trigger.
+  # Re-read the board from the DB and re-assign it (name included, so renames
+  # propagate). Always bump `rev` so the browser-side view re-renders even when
+  # the board value is unchanged (failure rollback) — `rev` is the client's
+  # rebuild trigger.
   defp push_board(socket) do
-    board = Boards.board_to_data(Boards.get_board!(socket.assigns.board_id))
-    assign(socket, board: board, rev: socket.assigns.rev + 1)
+    board = Boards.get_board!(socket.assigns.board_id)
+
+    assign(socket,
+      board_name: board.name,
+      board: Boards.board_to_data(board),
+      rev: socket.assigns.rev + 1
+    )
   end
 
   defp topic(board_id), do: "board:#{board_id}"
@@ -81,6 +87,7 @@ defmodule LocalLvKanbanWeb.BoardLive do
   defp apply_edit(board_id, "move_task", params), do: Boards.move_task(board_id, params)
   defp apply_edit(board_id, "remove_column", params), do: Boards.remove_column(board_id, params)
   defp apply_edit(board_id, "remove_task", params), do: Boards.remove_task(board_id, params)
+  defp apply_edit(board_id, "rename_board", params), do: Boards.rename_board(board_id, params)
 
   @impl true
   def render(assigns) do
@@ -93,6 +100,27 @@ defmodule LocalLvKanbanWeb.BoardLive do
         ← All boards
       </.link>
       <.local_live_view view="Local.Kanban" name={@board_name} board={@board} rev={@rev} />
+      <span id="recent-tracker" phx-hook=".TrackRecent" data-board-id={@board_id} hidden></span>
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".TrackRecent">
+        // Record this board in the browser's "recent boards" (rendered by
+        // BoardsLive): an array of board ids, newest first, capped. Just ids —
+        // names come from the DB when the list is rendered.
+        export default {
+          mounted() {
+            const KEY = "llv-kanban:recent-boards";
+            const { boardId } = this.el.dataset;
+            let stored = null;
+            try {
+              stored = JSON.parse(localStorage.getItem(KEY));
+            } catch {}
+            if (!Array.isArray(stored)) stored = [];
+            stored = [boardId, ...stored.filter((id) => id !== boardId)].slice(0, 10);
+            try {
+              localStorage.setItem(KEY, JSON.stringify(stored));
+            } catch {}
+          },
+        };
+      </script>
     </div>
     """
   end

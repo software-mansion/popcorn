@@ -2,36 +2,74 @@
 const { test, expect } = require("@playwright/test");
 const h = require("./helpers");
 
-let seq = 0;
-const uniqueName = (prefix) => `${prefix} ${Date.now().toString(36)}-${seq++}`;
-
 const SEEDED = ["To Do", "In Progress", "Done"];
 
 test.describe("board index + lifecycle", () => {
-  test("create a board, it appears in the index and opens with seeded columns", async ({ page }) => {
-    const name = uniqueName("Lifecycle");
-    const url = await h.createBoard(page, name);
+  test("create a board, it opens with seeded columns and shows up under recents", async ({ page }) => {
+    const url = await h.createBoard(page);
 
     // The local live view heading shows the board's own name.
-    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Untitled board", exact: true })).toBeVisible();
 
     // Seeded columns render in the WASM local live view.
     expect(await h.columnNames(page)).toEqual(SEEDED);
 
-    // The board is listed on the index and links back to itself.
+    // Opening the board recorded it in localStorage; the index renders it as a
+    // recent board linking back to itself.
     await page.goto("/");
-    const link = page.getByRole("link", { name, exact: true });
+    const link = page.getByRole("link", { name: "Untitled board", exact: true });
     await expect(link).toBeVisible();
     await link.click();
     await page.waitForURL(url);
     await h.waitForBoard(page);
     expect(await h.columnNames(page)).toEqual(SEEDED);
   });
+
+  test("rename the board; it persists and recents pick the new name up", async ({ page }) => {
+    const url = await h.createBoard(page);
+
+    await page.getByTitle("Rename board").click();
+    const input = page.locator("form[phx-submit='rename_board'] input[name=name]");
+    await input.fill("Renamed board");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // Server-persisted.
+    await page.reload();
+    await h.waitForBoard(page);
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // Recents store only ids, so the index shows the fresh DB name.
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "Renamed board", exact: true })).toBeVisible();
+
+    // An invalid name (too long for the server) rolls back to the current one.
+    await page.goto(url);
+    await h.waitForBoard(page);
+    await page.getByTitle("Rename board").click();
+    await input.fill("x".repeat(300));
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    // The form closes as soon as the submit is applied optimistically...
+    await expect(input).toHaveCount(0);
+    // ...and the server's rejection then restores the persisted name.
+    await expect(page.getByRole("heading", { name: "Renamed board", exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
+  test("generate a sample board pre-filled with tasks", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Generate sample board" }).click();
+    await page.waitForURL(/\/boards\/[0-9a-f-]+$/);
+    await h.waitForBoard(page);
+
+    expect(await h.tasks(page).count()).toBeGreaterThan(0);
+  });
 });
 
 test.describe("columns", () => {
   test("add a column (optimistic) and it persists across reload", async ({ page }) => {
-    await h.createBoard(page, uniqueName("AddCol"));
+    await h.createBoard(page);
     await h.addColumn(page, "Backlog");
     expect(await h.columnNames(page)).toEqual([...SEEDED, "Backlog"]);
 
@@ -41,13 +79,13 @@ test.describe("columns", () => {
   });
 
   test("the add-column input clears after a successful add", async ({ page }) => {
-    await h.createBoard(page, uniqueName("ColInput"));
+    await h.createBoard(page);
     await h.addColumn(page, "Backlog");
     await expect(page.locator("form[phx-submit='add_column'] input[name=name]")).toHaveValue("");
   });
 
   test("remove a column (optimistic) and it stays gone after reload", async ({ page }) => {
-    await h.createBoard(page, uniqueName("RmCol"));
+    await h.createBoard(page);
     await h.removeColumn(page, "In Progress");
     expect(await h.columnNames(page)).toEqual(["To Do", "Done"]);
 
@@ -59,7 +97,7 @@ test.describe("columns", () => {
 
 test.describe("tasks", () => {
   test("add a task with a description and it persists", async ({ page }) => {
-    await h.createBoard(page, uniqueName("AddTask"));
+    await h.createBoard(page);
     await h.addTask(page, "To Do", "Write tests", "cover drag&drop");
 
     await expect(h.taskCard(page, "Write tests")).toBeVisible();
@@ -72,7 +110,7 @@ test.describe("tasks", () => {
   });
 
   test("remove a task (optimistic) and it stays gone after reload", async ({ page }) => {
-    await h.createBoard(page, uniqueName("RmTask"));
+    await h.createBoard(page);
     await h.addTask(page, "To Do", "Throwaway");
     await h.removeTask(page, "Throwaway");
     expect(await h.taskTextsIn(page, "To Do")).toEqual([]);
@@ -83,7 +121,7 @@ test.describe("tasks", () => {
   });
 
   test("the modal closes after adding a task", async ({ page }) => {
-    await h.createBoard(page, uniqueName("Modal"));
+    await h.createBoard(page);
     await h.addTask(page, "To Do", "Quick");
     await expect(page.locator("input[name=text]")).toHaveCount(0);
   });
@@ -91,7 +129,7 @@ test.describe("tasks", () => {
 
 test.describe("drag & drop", () => {
   test("reorder tasks within a column", async ({ page }) => {
-    await h.createBoard(page, uniqueName("DragReorder"));
+    await h.createBoard(page);
     await h.addTask(page, "To Do", "Alpha");
     await h.addTask(page, "To Do", "Beta");
     expect(await h.taskTextsIn(page, "To Do")).toEqual(["Alpha", "Beta"]);
@@ -106,7 +144,7 @@ test.describe("drag & drop", () => {
   });
 
   test("move a task across columns", async ({ page }) => {
-    await h.createBoard(page, uniqueName("DragMove"));
+    await h.createBoard(page);
     await h.addTask(page, "To Do", "Mover");
     expect(await h.taskTextsIn(page, "To Do")).toEqual(["Mover"]);
 
@@ -129,7 +167,7 @@ test.describe("realtime collaboration (two clients)", () => {
     const B = await ctxB.newPage();
 
     try {
-      const url = await h.createBoard(A, uniqueName("Realtime"));
+      const url = await h.createBoard(A);
       await h.openBoard(B, url);
 
       // add column on A -> visible on B
@@ -158,7 +196,7 @@ test.describe("realtime collaboration (two clients)", () => {
 
 test.describe("optimistic rollback", () => {
   test("a server-rejected edit rolls back and never persists", async ({ page }) => {
-    await h.createBoard(page, uniqueName("Rollback"));
+    await h.createBoard(page);
     await expect(h.columns(page)).toHaveCount(3);
 
     // The server validates column name length (<= 255). A 300-char name is added
@@ -175,7 +213,7 @@ test.describe("optimistic rollback", () => {
 
 test.describe("push failure (handle_push_error)", () => {
   test("an optimistic add snaps back when the socket is down", async ({ page }) => {
-    await h.createBoard(page, uniqueName("PushErr"));
+    await h.createBoard(page);
     await expect(h.columns(page)).toHaveCount(3);
 
     // Kill the host websocket: push_server_event rejects with "no connection".
@@ -200,7 +238,7 @@ test.describe("push failure (handle_push_error)", () => {
   });
 
   test("an optimistic remove snaps back when the socket is down", async ({ page }) => {
-    await h.createBoard(page, uniqueName("PushErrDom"));
+    await h.createBoard(page);
     await expect(h.columns(page)).toHaveCount(3);
 
     // Kill the host websocket: the remove's push_server_event rejects with

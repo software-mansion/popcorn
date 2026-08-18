@@ -1,7 +1,7 @@
 defmodule Local.Kanban do
   use LocalLiveView
 
-  alias Local.{AddColumnComponent, ColumnComponent, Rank, TaskModalComponent}
+  alias Local.{AddColumnComponent, BoardNameComponent, ColumnComponent, Rank, TaskModalComponent}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -9,6 +9,7 @@ defmodule Local.Kanban do
      assign(socket,
        name: nil,
        board: %{},
+       renaming: false,
        task_modal: nil,
        dragging: nil,
        drag_target: nil,
@@ -145,6 +146,33 @@ defmodule Local.Kanban do
 
   def handle_event("close_task_modal", _params, socket) do
     {:noreply, assign(socket, :task_modal, nil)}
+  end
+
+  # --- Board rename (local toggle; commit notifies the server) ----------------
+
+  def handle_event("start_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, true)}
+  end
+
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, false)}
+  end
+
+  def handle_event("rename_board", %{"name" => name}, socket) do
+    socket = assign(socket, :renaming, false)
+
+    case String.trim(name) do
+      "" ->
+        {:noreply, socket}
+
+      name ->
+        # Optimistic: show the new name immediately; the host persists it and
+        # re-pushes the authoritative name (rolling back if it was rejected).
+        {:noreply,
+         socket
+         |> assign(:name, name)
+         |> push_server_event("rename_board", %{"name" => name})}
+    end
   end
 
   # --- Drag & drop (local until drop; commit notifies the server) ------------
@@ -294,7 +322,7 @@ defmodule Local.Kanban do
 
     ~H"""
     <div style={"font-family:sans-serif;color:#e5e7eb;padding:0.5em 0#{if @dragging, do: ";user-select:none"}"}>
-      <h1 style="margin:0 0 0.75em;font-size:1.6em;font-weight:600;color:#f9fafb">{@name}</h1>
+      <BoardNameComponent.board_name name={@name} renaming={@renaming} />
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
