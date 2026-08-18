@@ -3,7 +3,7 @@ defmodule LocalLiveView.MixProject do
 
   @version "0.1.0-rc0"
   @popcorn_version "0.3.3"
-  @github "https://github.com/software-mansion/popcorn/local-live-view"
+  @github "https://github.com/software-mansion/popcorn"
 
   # LICENSE lives in the repo root and is copied in before packaging, see copy_meta/1.
   @repo_root ".."
@@ -100,7 +100,7 @@ defmodule LocalLiveView.MixProject do
 
   defp docs do
     [
-      source_ref: "llv-#{@version}",
+      source_ref: "llv-v#{@version}/local-live-view",
       main: "welcome",
       filter_modules: ~r/^(?!Elixir.Phoenix\.).*/,
       before_closing_body_tag: &before_closing_body_tag/1,
