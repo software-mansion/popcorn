@@ -1,0 +1,120 @@
+name: Verify LocalLiveView App
+description: Runs mix setup, boots the Phoenix server and checks the LocalLiveView page and its runtime assets are served
+
+inputs:
+  working-directory:
+    description: The host Phoenix app to verify
+    required: true
+  path:
+    description: Page expected to render a LocalLiveView mount point
+    required: false
+    default: "/"
+  port:
+    description: Port the app serves on in dev
+    required: false
+    default: "4000"
+
+runs:
+  using: composite
+  steps:
+    # The same command a user runs: deps.get, llv.build (JS bundle + Popcorn
+    # runtime files + the WASM bundle) and the Phoenix asset pipeline.
+    - name: Set up the app
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: mix setup
+
+    # Catches what `mix test` cannot: that everything llv.build produced is
+    # actually served. priv/static holds no committed artifacts anymore, so a
+    # missing file here means the build did not run, not that a file was lost.
+    - name: Boot the server and check the page
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -uo pipefail
+
+        mix phx.server > /tmp/phx_server.log 2>&1 &
+        server=$!
+        trap 'kill "$server" 2>/dev/null || true' EXIT
+
+        base="http://localhost:${{ inputs.port }}"
+        page=""
+
+        for _ in $(seq 1 60); do
+          if page=$(curl -fsS "$base${{ inputs.path }}" 2>/dev/null); then
+            break
+          fi
+
+          if ! kill -0 "$server" 2>/dev/null; then
+            echo "::error::mix phx.server exited before serving a page"
+            cat /tmp/phx_server.log
+            exit 1
+          fi
+
+          sleep 2
+        done
+
+        if [ -z "$page" ]; then
+          echo "::error::no response from $base${{ inputs.path }} after 120s"
+          cat /tmp/phx_server.log
+          exit 1
+        fi
+
+        failed=0
+
+        # The mount point rendered by <.local_live_view>. Its absence means the
+        # page loaded but the component never made it into the markup.
+        if ! grep -q "data-pop-view" <<< "$page"; then
+          echo "::error::${{ inputs.path }} renders no LocalLiveView mount point (data-pop-view)"
+          failed=1
+        fi
+
+        # Retried, because the dev watcher cooks the local project once more right
+        # after boot: while it rewrites bundle.avm the file is briefly absent and
+        # a single request would report a 404 for a perfectly healthy app.
+        check_asset() {
+          local asset="$1" code=""
+
+          for _ in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$base/$asset")
+
+            if [ "$code" = "200" ]; then
+              return 0
+            fi
+
+            sleep 3
+          done
+
+          echo "::error::/$asset returned HTTP $code"
+          return 1
+        }
+
+        # app.js carries the bundled local_live_view.js; the rest is the Popcorn
+        # runtime copied out of the dependency by mix llv.build.
+        for asset in \
+          assets/js/app.js \
+          assets/js/AtomVM.mjs \
+          assets/js/AtomVM.wasm \
+          assets/js/iframe.mjs \
+          assets/js/wasm/bundle.avm
+        do
+          check_asset "$asset" || failed=1
+        done
+
+        # Without these two the browser refuses SharedArrayBuffer and AtomVM
+        # never starts, which is invisible in the HTML itself.
+        headers=$(curl -sI "$base${{ inputs.path }}")
+
+        for header in "cross-origin-opener-policy: same-origin" "cross-origin-embedder-policy: require-corp"; do
+          if ! grep -qi "$header" <<< "$headers"; then
+            echo "::error::missing response header: $header"
+            failed=1
+          fi
+        done
+
+        if [ "$failed" -ne 0 ]; then
+          cat /tmp/phx_server.log
+          exit 1
+        fi
+
+        echo "App boots, the page renders a LocalLiveView and every runtime asset is served."

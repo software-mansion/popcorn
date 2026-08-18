@@ -89,10 +89,15 @@ jobs:
 
       # The e2e test starts the Phoenix endpoint in-process (MIX_ENV=test) and serves
       # prebuilt assets, but esbuild/tailwind are dev-only deps — so build app.js/app.css
-      # up front in :dev. The WASM bundle + AtomVM.* come from `mix llv.build` (run by the
-      # `mix test` alias), and the test DB is created/migrated by that same alias.
+      # up front in :dev. The test DB is created/migrated by the `mix test` alias.
+      #
+      # llv.build has to come first: app.js imports local_live_view, which esbuild
+      # resolves to the dependency's priv/static/local_live_view.js. That file is
+      # generated and not committed, so without this step esbuild bundles against a
+      # path that does not exist yet.
       - name: Build browser assets
         run: |
+          MIX_ENV=dev mix llv.build
           MIX_ENV=dev mix assets.setup
           MIX_ENV=dev mix assets.build
 
