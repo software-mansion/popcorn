@@ -1,7 +1,7 @@
 #!/bin/bash
-# Boots the embedded Postgres, prepares the kanban DB, starts both Phoenix
-# releases (kanban on :4001, burrito on :4002) and nginx routing
-# /kanban and /burrito on $PORT (default 4000). The DB lives inside the
+# Boots the embedded Postgres, prepares the kanban DB, starts the Phoenix
+# releases (kanban on :4001, burrito on :4002, pong on :4003) and nginx
+# routing /kanban, /burrito and /pong on $PORT (default 4000). The DB lives inside the
 # container (no volume): staging demo data is disposable and the idempotent
 # seeds repopulate it on every (re)deploy.
 set -e
@@ -36,6 +36,7 @@ run_as_nobody env PORT=4001 URL_PATH=/kanban /app/kanban/bin/seed
 
 run_as_nobody env PORT=4001 URL_PATH=/kanban /app/kanban/bin/server &
 run_as_nobody env PORT=4002 URL_PATH=/burrito /app/burrito/bin/burrito start &
+run_as_nobody env PORT=4003 URL_PATH=/pong /app/pong/bin/local_lv_pong start &
 
 sed "s/__PORT__/$NGINX_PORT/" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
 nginx -g 'daemon off;' &

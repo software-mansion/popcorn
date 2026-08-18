@@ -21,6 +21,7 @@ on:
       - "docker/demos/**"
       - "examples/local-lv-kanban/**"
       - "examples/local-lv-burrito/**"
+      - "examples/local-lv-pong/**"
       - ".github/workflows/demo_staging_build_and_deploy.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
