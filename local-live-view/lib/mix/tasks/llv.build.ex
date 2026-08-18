@@ -39,6 +39,8 @@ defmodule Mix.Tasks.Llv.Build do
       Mix.raise("#{local_dir}/ directory not found. Run `mix llv.install` first.")
     end
 
+    Mix.Task.run("llv.assets")
+
     llv_path = Mix.Project.deps_paths()[:local_live_view]
     src_dir = Path.join(llv_path, "priv/static")
     dst_dir = "priv/static/assets/js"

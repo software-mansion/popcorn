@@ -1,0 +1,70 @@
+name: Verify LocalLiveView App
+description: Runs mix setup and checks the app boots, i.e. mix phx.server answers a request
+
+inputs:
+  working-directory:
+    description: The host Phoenix app to verify
+    required: true
+  path:
+    description: Path to request once the server is up
+    required: false
+    default: "/"
+  port:
+    description: Port the app serves on in dev, from its config/dev.exs
+    required: false
+    default: "4000"
+
+runs:
+  using: composite
+  steps:
+    # The same command a user runs: deps.get, llv.build (JS bundle + Popcorn
+    # runtime files + the WASM bundle) and the Phoenix asset pipeline.
+    #
+    # MIX_ENV is pinned to dev because the calling workflows set it to test for
+    # their test jobs, and this check is about the developer flow: config/test.exs
+    # binds another port and sets server: false, so the endpoint would come up
+    # somewhere else than the port checked below.
+    - name: Set up the app
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MIX_ENV: dev
+      run: mix setup
+
+    # Deliberately only asks whether the endpoint answers. What the response
+    # contains, and whether every generated asset is in place, is covered by
+    # local_live_view_build.yml — checking it again per example would make each
+    # run longer and add a race with the dev watcher, which recooks the WASM
+    # bundle right after boot.
+    - name: Boot the server
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MIX_ENV: dev
+      run: |
+        set -uo pipefail
+
+        mix phx.server > /tmp/phx_server.log 2>&1 &
+        server=$!
+        trap 'kill "$server" 2>/dev/null || true' EXIT
+
+        url="http://localhost:${{ inputs.port }}${{ inputs.path }}"
+
+        for _ in $(seq 1 60); do
+          if curl -fsS -o /dev/null "$url"; then
+            echo "mix phx.server answered on $url"
+            exit 0
+          fi
+
+          if ! kill -0 "$server" 2>/dev/null; then
+            echo "::error::mix phx.server exited before serving a request"
+            cat /tmp/phx_server.log
+            exit 1
+          fi
+
+          sleep 2
+        done
+
+        echo "::error::no response from $url after 120s"
+        cat /tmp/phx_server.log
+        exit 1

@@ -107,6 +107,15 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     path = Path.join(app_dir, "lib/test_app_web/router.ex")
     content = File.read!(path)
 
+    # The installer does not add this import — the demo it generates goes through
+    # a host LiveView — so a live_local route needs it here.
+    content =
+      String.replace(
+        content,
+        "use TestAppWeb, :router",
+        "use TestAppWeb, :router\n\n  import LocalLiveView.Router"
+      )
+
     content =
       String.replace(
         content,

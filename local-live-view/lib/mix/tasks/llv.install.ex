@@ -39,7 +39,6 @@ defmodule Mix.Tasks.Llv.Install do
     igniter
     |> inject_endpoint()
     |> inject_web_module()
-    |> inject_router_import()
     |> inject_root_layout()
     |> inject_app_js()
     |> inject_esbuild_format()
@@ -194,55 +193,11 @@ defmodule Mix.Tasks.Llv.Install do
     end
   end
 
-  # --- Router import ---
-
-  defp inject_router_import(igniter) do
-    router = Igniter.Libs.Phoenix.web_module_name(igniter, "Router")
-
-    case Igniter.Project.Module.find_and_update_module(igniter, router, &update_router/1) do
-      {:ok, igniter} ->
-        igniter
-
-      {:error, igniter} ->
-        Igniter.add_warning(
-          igniter,
-          "Could not find module #{inspect(router)}. Add manually: import LocalLiveView.Router"
-        )
-    end
-  end
-
-  defp update_router(zipper) do
-    if module_source_contains?(zipper, "LocalLiveView.Router") do
-      {:ok, zipper}
-    else
-      anchor =
-        find_import_by_suffix(zipper, "Phoenix.LiveView.Router") ||
-          find_use_router(zipper)
-
-      case anchor do
-        {:ok, anchor_zipper} ->
-          {:ok, Igniter.Code.Common.add_code(anchor_zipper, "import LocalLiveView.Router")}
-
-        nil ->
-          {:warning,
-           "Could not find Phoenix.LiveView.Router import in router. Add manually: import LocalLiveView.Router"}
-      end
-    end
-  end
-
-  defp find_use_router(zipper) do
-    result =
-      Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2], fn call ->
-        Igniter.Code.Function.argument_matches_predicate?(call, 1, fn arg ->
-          arg |> Sourceror.Zipper.node() |> Macro.to_string() == ":router"
-        end)
-      end)
-
-    case result do
-      {:ok, z} -> {:ok, z}
-      :error -> nil
-    end
-  end
+  # The router deliberately gets no `import LocalLiveView.Router`: the generated
+  # demo mounts its view through a host LiveView, so the import would sit there
+  # unused and every fresh app would warn on compile (and fail the `precommit`
+  # alias, which compiles with --warnings-as-errors). Apps that want the
+  # `live_local/2` macro add the import themselves, as its docs describe.
 
   # --- Root layout ---
 
@@ -501,16 +456,43 @@ defmodule Mix.Tasks.Llv.Install do
     if Igniter.exists?(igniter, "#{@local_project_dir}/mix.exs") do
       igniter
     else
-      llv_path = llv_path_from_local()
-
       igniter
-      |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_path: llv_path)
+      |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_dep: llv_dep_from_local())
       |> copy_template("#{@local_project_dir}/config/config.exs", "config.exs")
       |> copy_template("#{@local_project_dir}/.formatter.exs", "formatter.exs")
       |> copy_template("#{@local_project_dir}/lib/local/application.ex", "application.ex")
       |> copy_template("#{@local_project_dir}/lib/hello_local.ex", "hello_local.ex")
     end
   end
+
+  @host_only_dep_opts [:runtime, :only, :targets, :override, :app, :optional]
+
+  defp llv_dep_from_local do
+    Mix.Project.config()[:deps]
+    |> List.wrap()
+    |> Enum.find_value(~s|{:local_live_view, ">= 0.0.0"}|, fn
+      {:local_live_view, opts} when is_list(opts) ->
+        opts_to_string(opts) |> llv_dep_string(false)
+
+      {:local_live_view, req, opts} when is_binary(req) and is_list(opts) ->
+        opts_to_string(opts) |> llv_dep_string(true)
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp opts_to_string(opts) do
+    opts
+    |> Keyword.drop(@host_only_dep_opts)
+    |> Keyword.replace_lazy(:path, fn _ -> llv_path_from_local() end)
+    |> Enum.map(fn {key, value} -> "#{key}: #{inspect(value)}" end)
+    |> Enum.join(", ")
+  end
+
+  defp llv_dep_string("", _with_req), do: ~s|{:local_live_view, ">= 0.0.0"}|
+  defp llv_dep_string(args, true), do: ~s|{:local_live_view, ">= 0.0.0", #{args}}|
+  defp llv_dep_string(args, false), do: ~s|{:local_live_view, #{args}}|
 
   defp llv_path_from_local do
     case Mix.Project.deps_paths()[:local_live_view] do

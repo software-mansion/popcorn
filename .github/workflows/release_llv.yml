@@ -1,13 +1,21 @@
-name: Release Hex Package
+name: Release LocalLiveView
+
+# LocalLiveView releases on its own cadence, hence the separate `llv-v*` tag
+# namespace (the popcorn release workflows trigger on `v*`).
+#
+# The JS bundle and the vendored Popcorn runtime files are NOT in git. They are
+# built here: `mix hex.publish` runs `mix llv.assets` (wired into the alias in
+# local-live-view/mix.exs), which bundles priv/static/ before packaging. That is
+# also the guard against publishing a tarball without them.
 
 on:
   push:
     tags:
-      - "v*"
+      - "llv-v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Version to simulate, e.g. v0.3.0-rc1"
+        description: "Version to simulate, e.g. llv-v0.1.0"
         required: true
       dry_run:
         description: "Skip actual publish"
@@ -27,21 +35,26 @@ jobs:
         uses: ./.github/actions/check-release-versions
         with:
           tag: ${{ inputs.tag || github.ref_name }}
-          prefix: v
-          package-json: popcorn-2/js/package.json
-          mix-exs: popcorn-2/elixir/mix.exs
+          prefix: llv-v
+          package-json: local-live-view/package.json
+          mix-exs: local-live-view/mix.exs
 
+      # Same image as the popcorn releases: it installs the JS workspace and
+      # builds AtomVM from FissionVM, so the runtime files vendored into
+      # priv/static/ are the production ones.
       - name: Build Docker image
         run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ inputs.tag || github.ref_name }} .
 
+      # LLV_RELEASE makes mix.exs depend on the published :popcorn instead of
+      # the in-repo path dep, which cannot be packaged.
       - name: Publish to Hex
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
           DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
         run: |
-          docker run --rm -e HEX_API_KEY \
+          docker run --rm -e HEX_API_KEY -e LLV_RELEASE=1 \
             popcorn-builder \
-            sh -c "cd /build/popcorn/popcorn-2/elixir \
+            sh -c "cd /build/popcorn/local-live-view \
               && mix deps.get \
               && mix compile \
               && mix hex.publish package --yes $DRY_RUN_FLAG \

@@ -16,7 +16,7 @@ Add `:local_live_view` to your `mix.exs`:
 defp deps do
   [
     # ...existing deps...
-    {:local_live_view, github: "software-mansion/popcorn", sparse: "local-live-view"}
+    {:local_live_view, "~> 0.1.0"}
   ]
 end
 ```
