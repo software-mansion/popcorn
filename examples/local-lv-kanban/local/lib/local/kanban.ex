@@ -9,6 +9,7 @@ defmodule Local.Kanban do
      assign(socket,
        name: nil,
        board: %{},
+       renaming: false,
        task_modal: nil,
        dragging: nil,
        drag_target: nil,
@@ -147,6 +148,33 @@ defmodule Local.Kanban do
     {:noreply, assign(socket, :task_modal, nil)}
   end
 
+  # --- Board rename (local toggle; commit notifies the server) ----------------
+
+  def handle_event("start_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, true)}
+  end
+
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, false)}
+  end
+
+  def handle_event("rename_board", %{"name" => name}, socket) do
+    socket = assign(socket, :renaming, false)
+
+    case String.trim(name) do
+      "" ->
+        {:noreply, socket}
+
+      name ->
+        # Optimistic: show the new name immediately; the host persists it and
+        # re-pushes the authoritative name (rolling back if it was rejected).
+        {:noreply,
+         socket
+         |> assign(:name, name)
+         |> push_server_event("rename_board", %{"name" => name})}
+    end
+  end
+
   # --- Drag & drop (local until drop; commit notifies the server) ------------
 
   def handle_event("drag_start", %{"column_id" => cid, "task_id" => tid}, socket) do
@@ -212,18 +240,6 @@ defmodule Local.Kanban do
         {:noreply, assign(socket, dragging: nil, drag_target: nil)}
     end
   end
-
-  @impl true
-  def handle_info({:rename_board, name}, socket) do
-    # Optimistic: show the new name immediately; the host persists it and
-    # re-pushes the authoritative name (rolling back if it was rejected).
-    {:noreply,
-     socket
-     |> assign(:name, name)
-     |> push_server_event("rename_board", %{"name" => name})}
-  end
-
-  def handle_info(_msg, socket), do: {:noreply, socket}
 
   # --- Drag helpers ----------------------------------------------------------
 
@@ -306,7 +322,7 @@ defmodule Local.Kanban do
 
     ~H"""
     <div style={"font-family:sans-serif;color:#e5e7eb;padding:0.5em 0#{if @dragging, do: ";user-select:none"}"}>
-      <.live_component module={BoardNameComponent} id="board-name" name={@name} />
+      <BoardNameComponent.board_name name={@name} renaming={@renaming} />
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
