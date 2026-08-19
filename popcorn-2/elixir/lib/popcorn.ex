@@ -87,7 +87,7 @@ defmodule Popcorn do
       ebin_files: ebin_files,
       # verbose: true,
       output_dir: treeshaked_dir,
-      # stub_removed_functions: true,
+      stub_removed_functions: false,
       keep: [
         # Phoenix resolves Jason via `Phoenix.json_library/0`, what makes it
         # invisible for treeshaking. Jason is low overhead and needed for

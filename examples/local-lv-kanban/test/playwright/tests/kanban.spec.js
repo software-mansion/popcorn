@@ -194,6 +194,37 @@ test.describe("realtime collaboration (two clients)", () => {
   });
 });
 
+test.describe("console health", () => {
+  test("no console errors while using a board and live-navigating back to the index", async ({ page }) => {
+    const errors = h.watchConsole(page);
+
+    await h.createBoard(page);
+    // Exercise the WASM side so its processes (pushes, timers, intervals)
+    // actually run before teardown.
+    await h.addColumn(page, "Backlog");
+    await h.addTask(page, "To Do", "Console check");
+
+    // Live navigation (no page reload): the WASM runtime stays alive while the
+    // local view tears down — the path where a broken timer_manager once
+    // crashed the whole VM with the UI still looking healthy.
+    await page.getByRole("link", { name: "All boards" }).click();
+    await expect(page.getByRole("heading", { name: "Kanban boards" })).toBeVisible();
+
+    // Assert BEFORE remounting: if teardown crashed the VM, the remount below
+    // would only time out and bury the actual console errors in the report.
+    await page.waitForTimeout(2000);
+    expect(errors).toEqual([]);
+
+    // Remount a board on the same runtime, then give teardown stragglers a
+    // moment to surface before the final check.
+    await page.getByRole("link", { name: "Untitled board", exact: true }).click();
+    await h.waitForBoard(page);
+    await page.waitForTimeout(2000);
+
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe("optimistic rollback", () => {
   test("a server-rejected edit rolls back and never persists", async ({ page }) => {
     await h.createBoard(page);

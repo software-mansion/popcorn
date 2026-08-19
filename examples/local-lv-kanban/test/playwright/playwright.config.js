@@ -30,7 +30,9 @@ module.exports = defineConfig({
   // timed out or which locator it was waiting on.
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:4901",
+    // BASE_URL override lets the suite run against an already-running server
+    // (e.g. `mix phx.server` on :4000) instead of the ExUnit-owned one.
+    baseURL: process.env.BASE_URL || "http://localhost:4901",
     browserName: "chromium",
     // CI sets PW_CHANNEL=chrome to use the runner's preinstalled Google Chrome
     // (no browser download — Playwright's chromium download hangs on the runner).

@@ -86,6 +86,46 @@ async function columnNames(page) {
   );
 }
 
+// --- console health -----------------------------------------------------------
+// A crashed Erlang process in the WASM runtime (e.g. the mis-treeshaken
+// timer_manager taking down LiveView teardown) can leave the UI looking healthy
+// while the damage shows up ONLY in the browser console. The channels, verified
+// against a build with the real bug:
+//   - console.error: JS-side failures — "Runtime VM crashed, popcorn iframe
+//     reloaded.", "LLV destroy error ..." (any console.error counts);
+//   - console.log:   Elixir Logger error reports from inside the WASM (stdout),
+//     e.g. "[error] ** Generic server ... terminating ... {undef, ...}";
+//   - console.warn:  BEAM stderr (Popcorn's default onStderr handler).
+// log/warn only count when the text is crash-shaped, so ordinary logging noise
+// doesn't trip the check.
+
+const BENIGN_ERRORS = [
+  /favicon/i, // 404 on the missing favicon is not an app error
+];
+
+// Crash-shaped BEAM output: Logger [error] reports, gen_server terminations,
+// undef/function_clause from a broken (e.g. mis-treeshaken) module, badarg/
+// badmatch, EXIT reasons.
+const BEAM_CRASH =
+  /\[error\]|\*\* Generic server|crash|\*\* exception|no function clause|function_clause|undefined function|\bundef\b|badarg|badmatch|\{'?EXIT'?/i;
+
+/**
+ * Start watching `page` for console errors and uncaught exceptions.
+ * Call before the first goto. Returns a live array of formatted messages —
+ * assert `expect(errors).toEqual([])` at the end of the test.
+ */
+function watchConsole(page) {
+  const errors = [];
+  page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
+  page.on("console", (msg) => {
+    const text = msg.text();
+    if (BENIGN_ERRORS.some((re) => re.test(text) || re.test(msg.location().url))) return;
+    if (msg.type() === "error") errors.push(`console.error: ${text}`);
+    else if (BEAM_CRASH.test(text)) errors.push(`console.${msg.type()}: ${text}`);
+  });
+  return errors;
+}
+
 // --- HTML5 drag & drop --------------------------------------------------------
 // The kanban uses native draggable + drag events (wired by the LLV custom-binding
 // JS that listens on window). Playwright's mouse-based dragTo does not fire those,
@@ -176,6 +216,7 @@ module.exports = {
   removeTask,
   taskTextsIn,
   columnNames,
+  watchConsole,
   dragTaskBeforeTask,
   dragTaskToColumn,
 };
