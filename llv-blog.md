@@ -1,12 +1,12 @@
 # The first release of Local LiveView!
 
-Local LiveView is a library to run LiveView code in the browser. We announced it back in April, when it was still a POC. Since then, we've put a lot of work into making it usable in the wild. Today, I'm happy to share that the first Hex release of Local LiveView just landed 🎉 It ships with a solid core of features, documentation, guides, and even an Igniter-based installer. We've deployed some demos, too. So, it's the perfect time to start hacking.
+[Local LiveView](https://github.com/software-mansion/popcorn/tree/main/local-live-view) is a library to run [LiveView](https://github.com/phoenixframework/phoenix_live_view) code in the browser. We announced it back in April, when it was still a POC. Since then, we've put a lot of work into making it usable in the wild. Today, I'm happy to share that the first [Hex release of Local LiveView](https://hex.pm/packages/local_live_view) just landed 🎉 It ships with a solid core of features, [documentation, guides](https://hexdocs.pm/local_live_view), and even an [Igniter-based installer](https://hexdocs.pm/local_live_view/installation.html). We've deployed some demos, too. So, it's the perfect time to start hacking.
 
 ## Why Local LiveView?
 
-LiveView is great for cases where you're fine with keeping pretty much all the state on the server, which has its benefits and tradeoffs. When client-side state is needed, things get complex. Even though there are JS hooks and JS commands, they're far from idiomatic LiveView code, and therefore harder to reason about and maintain. And you're often forced to write JS.
+LiveView is great for cases where you're fine with keeping pretty much all the state on the server, which has its benefits and tradeoffs. When client-side state is needed, things get complex. Even though there are [JS hooks](https://hexdocs.pm/phoenix_live_view/js-interop.html) and [JS commands](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.JS.html), they're far from idiomatic LiveView code, and therefore harder to reason about and maintain. And you're often forced to write JS.
 
-That's why we built Local LiveView: it runs your LiveView code in the browser via Popcorn, keeping all assigns local. You can freely choose what should stay on the client and what needs to reach the server. This lets you, for example, offload simple UI updates from the server, drastically reduce latency on poor networks, and avoid "WebSocket disconnected" issues.
+That's why we built Local LiveView: it runs your LiveView code in the browser via [Popcorn](https://popcorn.swmansion.com/), keeping all assigns local. You can freely choose what should stay on the client and what needs to reach the server. This lets you, for example, offload simple UI updates from the server, drastically reduce latency on poor networks, and avoid "WebSocket disconnected" issues.
 
 ## Moving a live component to the browser, step by step
 
@@ -82,11 +82,11 @@ The only step left is to move the Thermostat to the right place (`local/lib/*`) 
 
 And... that's it! The Thermostat itself is unchanged, but it now runs locally! Let's see how it works.
 
-The local view we just created is an entry point to the client-side world. In this example, it doesn't do much: just gets the `temperature` assign from the server and uses it to render the Thermostat component. However, local views can have complex logic, handle events, and render multiple live and regular components. You could even move the Thermostat's logic into the local view, merging them — it can be a nice exercise to get started ;) The docs explain the Local LiveView API and its relation to LiveView and LiveComponent in detail.
+The local view we just created is an entry point to the client-side world. In this example, it doesn't do much: just gets the `temperature` assign from the server and uses it to render the Thermostat component. However, local views can have complex logic, handle events, and render multiple live and regular components. You could even move the Thermostat's logic into the local view, merging them — it can be a nice exercise to get started ;) [The docs](https://hexdocs.pm/local_live_view/LocalLiveView.html) explain the Local LiveView API and its relation to LiveView and LiveComponent in detail.
 
 It's worth noting that a server-side LiveView can render many local views, and a local view can reach back to the server — there are two mechanisms for that:
-- `push_server_event` — sends events to the server, which replies with updated assigns (LiveVue/LiveSvelte style),
-- mirror sync — syncs selected assigns with the server.
+- [`push_server_event`](https://hexdocs.pm/local_live_view/LocalLiveView.html#push_server_event/3) — sends events to the server, which replies with updated assigns (LiveVue/LiveSvelte style),
+- [mirror sync](https://hexdocs.pm/local_live_view/mirror-sync.html) — syncs selected assigns with the server.
 
 They're both thoroughly explained in the docs as well.
 
@@ -94,11 +94,11 @@ They're both thoroughly explained in the docs as well.
 
 This post shows a very simple example, but Local LiveView is already capable of running more complex apps. We prepared several demos you can try yourself:
 
-- Kanban boards — an app for creating and browsing kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag & drop, optimistic updates, and all the modals/forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` — reconnect and open two windows side by side to see it.
+- [Kanban boards](https://demo-popcorn.swmansion.com/kanban) — an app for creating and browsing kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag & drop, optimistic updates, and all the modals/forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` — reconnect and open two windows side by side to see it.
 
-- Pong game — a simple, 100% local, 100% Elixir game — you play Pong against a bot.
+- [Pong game](https://demo-popcorn.swmansion.com/pong) — a simple, 100% local, 100% Elixir game — you play Pong against a bot.
 
-- Burrito order form — a fairly complex form demo, comparing regular LiveView and Local LiveView side by side. It also demonstrates synchronizing state via mirror sync.
+- [Burrito order form](https://demo-popcorn.swmansion.com/burrito) — a fairly complex form demo, comparing regular LiveView and Local LiveView side by side. It also demonstrates synchronizing state via mirror sync.
 
 ## Coming next: real-world validation, smaller bundles, SSR
 
@@ -106,10 +106,10 @@ Even though Local LiveView feels pretty stable already, we're going to test it f
 
 Removing our dependencies on LiveView's private APIs is another important goal. Fortunately, we're well on our way — we're working closely with the LiveView team.
 
-Reducing the bundle size is something we keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down 4x (to < 1.5 MB compressed).
+Reducing the bundle size is something we keep working on. We recently introduced an experimental Elixir tree-shaking tool that already helps significantly, with the Kanban demo's size down 4x (to ~1.8 MB - all assets, compressed).
 
 Another thing on our radar is server-side rendering. Given that SSR for Local LiveView is more or less... LiveView, it should go smoothly ;)
 
 ## Try it out!
 
-We're excited about Local LiveView's further growth, and with the first release out, we'd love to have you along for the journey! Try it out: here are the docs, the repo, and the getting-started guide. Happy hacking!
+We're excited about Local LiveView's further growth, and with the first release out, we'd love to have you along for the journey! Try it out: here are [the docs](https://hexdocs.pm/local_live_view), [the repo](https://github.com/software-mansion/popcorn), and [the getting-started guide](https://hexdocs.pm/local_live_view/first-view.html). Happy hacking!
