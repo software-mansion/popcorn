@@ -1,6 +1,6 @@
 {
   "name": "local_live_view",
-  "version": "0.1.0-rc0",
+  "version": "0.1.0",
   "description": "JS bundle for LocalLiveView — bundled at release time, resolved via Phoenix esbuild NODE_PATH.",
   "type": "module",
   "exports": {
