@@ -1,14 +1,22 @@
 ARG POPCORN_BASE_IMAGE=ghcr.io/software-mansion/popcorn-base
 ARG POPCORN_BASE_TAG=latest
 
-# ── Kanban builder ────────────────────────────────────────────────────────────
-FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder-kanban
+# ── Shared demo build stage ───────────────────────────────────────────────────
+FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS demos-base
 
 COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
 COPY local-live-view/ /build/popcorn/local-live-view/
 
 WORKDIR /build/popcorn
+
+# Deployed demos run the prod (release-wasm) AtomVM runtime: point
+# local-live-view's @swmansion/popcorn at the package built in the base image
+# instead of the version published to the npm registry.
+RUN node -e 'const fs = require("fs"); const f = "pnpm-workspace.yaml"; fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace(/^overrides:$/m, "overrides:\n  \"@swmansion/popcorn\": link:./popcorn-2/js"))'
 RUN CI=true pnpm install --no-frozen-lockfile --shamefully-hoist
+
+# ── Kanban builder ────────────────────────────────────────────────────────────
+FROM demos-base AS builder-kanban
 
 WORKDIR /build/popcorn/examples/local-lv-kanban
 
@@ -39,13 +47,7 @@ COPY examples/local-lv-kanban/rel/ rel/
 RUN mix release
 
 # ── Burrito builder ───────────────────────────────────────────────────────────
-FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder-burrito
-
-COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
-COPY local-live-view/ /build/popcorn/local-live-view/
-
-WORKDIR /build/popcorn
-RUN CI=true pnpm install --no-frozen-lockfile --shamefully-hoist
+FROM demos-base AS builder-burrito
 
 WORKDIR /build/popcorn/examples/local-lv-burrito
 
@@ -74,13 +76,7 @@ COPY examples/local-lv-burrito/config/runtime.exs config/
 RUN mix release
 
 # ── Pong builder ──────────────────────────────────────────────────────────────
-FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder-pong
-
-COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
-COPY local-live-view/ /build/popcorn/local-live-view/
-
-WORKDIR /build/popcorn
-RUN CI=true pnpm install --no-frozen-lockfile --shamefully-hoist
+FROM demos-base AS builder-pong
 
 WORKDIR /build/popcorn/examples/local-lv-pong
 

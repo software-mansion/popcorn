@@ -1,2 +1,5 @@
-# Exclude everything, Dockerfile clones the repo anyway
+# Exclude everything, Dockerfile clones the repo anyway.
+# scripts/ is whitelisted so base.Dockerfile can build AtomVM
+# before (independently of) the repo clone.
 **
+!scripts/**

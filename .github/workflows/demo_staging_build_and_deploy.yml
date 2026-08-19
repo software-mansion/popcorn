@@ -67,6 +67,12 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
 
+      # Busts the base image's AtomVM layer cache exactly when FissionVM moves,
+      # so AtomVM isn't rebuilt on every popcorn commit.
+      - name: Get FissionVM commit
+        id: fvm
+        run: echo "sha=$(git ls-remote https://github.com/software-mansion-labs/FissionVM.git swm | cut -f1)" >> $GITHUB_OUTPUT
+
       - name: Build base Docker image
         id: build-base
         uses: docker/build-push-action@v6
@@ -75,6 +81,7 @@ jobs:
           file: ./docker/base.Dockerfile
           build-args: |
             COMMIT_REF=${{ github.sha }}
+            FISSIONVM_SHA=${{ steps.fvm.outputs.sha }}
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:staging"

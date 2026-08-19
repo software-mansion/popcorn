@@ -17,7 +17,7 @@ ARG COMMIT_REF
 WORKDIR /build/
 RUN mkdir -p popcorn out
 RUN apt-get -y update && \
-    apt-get -y install git curl cmake gperf libmbedtls-dev zlib1g-dev \
+    apt-get -y install git curl cmake ninja-build gperf libmbedtls-dev zlib1g-dev \
     automake make gcc g++ libssl-dev libncurses-dev \
     default-jre-headless python3 xz-utils gpg wget
 
@@ -47,6 +47,15 @@ RUN mise install erlang@26.0.2 elixir@1.17.3-otp-26 && \
     mise exec erlang@26.0.2 elixir@1.17.3-otp-26 -- mix local.hex --force
 RUN mise use --global emsdk@"${EMSDK_VERSION}" && mise install
 
+# Build the release AtomVM WASM runtime once, before the repo clone, so the
+# layer survives popcorn commits. FISSIONVM_SHA is only a cache key: the deploy
+# workflows pass the current FissionVM swm commit so this layer is rebuilt
+# exactly when FissionVM moves.
+COPY scripts/ /build/popcorn-scripts/
+ARG FISSIONVM_SHA=untracked
+RUN echo "FissionVM swm @ ${FISSIONVM_SHA}" && \
+    /build/popcorn-scripts/build-atomvm.sh --outdir /build/atomvm-release-wasm release-wasm
+
 RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn && \
     mise trust /build/popcorn
 RUN cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
@@ -62,3 +71,11 @@ RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
     scripts/build-beam.sh release
 RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
     pnpm -F ./popcorn/js build
+
+# Build the popcorn-2 JS package against the release AtomVM runtime built
+# above. Images that build the demos (docker/demos) link local-live-view to
+# this package, so AtomVM is compiled once here instead of once per demo app.
+RUN pnpm --dir popcorn-2 install --frozen-lockfile --child-concurrency=1 --network-concurrency=1
+RUN mkdir -p popcorn-2/js/assets && \
+    cp /build/atomvm-release-wasm/AtomVM.mjs /build/atomvm-release-wasm/AtomVM.wasm popcorn-2/js/assets/ && \
+    pnpm --dir popcorn-2/js exec rollup -c
