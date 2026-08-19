@@ -1,7 +1,7 @@
 defmodule LocalLiveView.MixProject do
   use Mix.Project
 
-  @version "0.1.0-rc0"
+  @version "0.1.0"
   @popcorn_version "0.3.3"
   @github "https://github.com/software-mansion/popcorn"
 
