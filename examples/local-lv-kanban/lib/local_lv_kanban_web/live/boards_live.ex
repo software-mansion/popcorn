@@ -58,7 +58,22 @@ defmodule LocalLvKanbanWeb.BoardsLive do
     <div style="min-height:100vh;background:#0b1220;color:#e5e7eb;font-family:sans-serif;padding:2em">
       <.flash kind={:error} flash={@flash} />
       <div style="max-width:640px;margin:0 auto">
-        <h1 style="font-size:1.8em;font-weight:700;color:#f9fafb;margin:0 0 1em">Kanban boards</h1>
+        <h1 style="font-size:1.8em;font-weight:700;color:#f9fafb;margin:0 0 0.5em">Kanban boards</h1>
+
+        <p style="background:#1f2937;border:1px solid #374151;border-radius:8px;padding:0.7em 0.9em;color:#9ca3af;margin:0 0.5em 1.5em;line-height:1.6">
+          Create, browse and edit kanban-style boards.
+          The board view supports drag&nbsp;&amp;&nbsp;drop,
+          optimistic updates, all the modals/forms are handled locally,
+          and it's 100% Elixir.
+          Create a board, then disconnect from the network and see how it behaves.
+          It also demonstrates server synchronization via LLV's push_server_event
+          mechanism - reconnect and open two windows side-by-side to see it in action.
+          The source code is available
+          <a
+            href="https://github.com/software-mansion/popcorn/tree/main/examples/local-lv-kanban"
+            style="color:#60a5fa;font-weight:600;text-decoration:underline"
+          >here</a>.
+        </p>
 
         <div style="display:flex;gap:0.6em;margin-bottom:2em">
           <button

@@ -11,6 +11,9 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
   config :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/<target>", target: target}
   ```
 
+  The build type follows the Mix env: `prod` builds a release runtime,
+  every other env builds a debug one.
+
   Options:
     - `git` - source repo URL (defaults to FissionVM repo)
     - `git-ref` - branch, tag or commit (only works with the `git` option)
@@ -53,8 +56,9 @@ defmodule Mix.Tasks.Popcorn.BuildRuntime do
 
     script_args = ["--outdir", artifacts_dir | script_args]
 
-    # Add build mode (positional) - always use debug for now
-    build_mode = "debug-#{target}"
+    # Add build mode (positional): release runtime in prod, debug in other envs
+    build_type = if Mix.env() == :prod, do: "release", else: "debug"
+    build_mode = "#{build_type}-#{target}"
     script_args = script_args ++ [build_mode]
 
     # Find script path relative to the popcorn package root

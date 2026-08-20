@@ -40,8 +40,9 @@
   },
   "scripts": {
     "setup": "../../scripts/build-atomvm.sh --outdir assets/ debug-wasm",
+    "setup:prod": "../../scripts/build-atomvm.sh --outdir assets/ release-wasm",
     "build": "pnpm run setup && rollup -c",
-    "build:prod": "pnpm run lint && rm -rf assets dist && ATOMVM_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm' pnpm run setup && rollup -c",
+    "build:prod": "pnpm run lint && rm -rf assets dist && ATOMVM_SOURCE='https://github.com/software-mansion-labs/FissionVM.git#swm' pnpm run setup:prod && rollup -c",
     "dev": "pnpm run setup && rollup -c --watch",
     "lint": "tsc --noEmit && eslint && prettier . --check --log-level=warn",
     "test": "vitest",

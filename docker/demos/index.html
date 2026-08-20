@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Popcorn demos</title>
+  <style>
+    :root {
+      --bg: #faf8f5;
+      --fg: #1f1b16;
+      --muted: #6b6257;
+      --card-bg: #ffffff;
+      --card-border: #e8e2d9;
+      --accent: #c2410c;
+      color-scheme: light dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #17130f;
+        --fg: #f0ebe4;
+        --muted: #a89d8f;
+        --card-bg: #211c16;
+        --card-border: #373027;
+        --accent: #fb923c;
+      }
+    }
+
+    * {
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 3rem 1.25rem;
+    }
+
+    main {
+      max-width: 40rem;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2rem;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+    }
+
+    .intro {
+      color: var(--muted);
+      margin-bottom: 2.5rem;
+    }
+
+    .intro a {
+      color: var(--accent);
+    }
+
+    ul {
+      list-style: none;
+      display: grid;
+      gap: 1rem;
+      padding: 0;
+    }
+
+    .card {
+      display: block;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .card h2 {
+      font-size: 1.125rem;
+      margin-bottom: 0.25rem;
+      color: var(--accent);
+    }
+
+    .card p {
+      color: var(--muted);
+      font-size: 0.9375rem;
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+
+    footer a {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Local LiveView demos</h1>
+    <p class="intro">
+      These apps are built with
+      <a href="https://github.com/software-mansion/popcorn/tree/main/local-live-view">Local LiveView</a>
+      — Phoenix LiveView running entirely in your browser thanks to
+      <a href="https://popcorn.swmansion.com">Popcorn</a>. The source code is available
+      <a href="https://github.com/software-mansion/popcorn/tree/main/examples">on GitHub</a>.
+    </p>
+    <ul>
+      <li>
+        <a class="card" href="/kanban/">
+          <h2>Kanban boards</h2>
+          <p>
+            Create, browse and edit kanban-style boards.
+            The most interesting part is the board view: it's 100% Elixir,
+            supports drag&nbsp;&amp;&nbsp;drop, optimistic updates,
+            and all the modals/forms are handled locally.
+            Open the app, create a board, then disconnect from the network
+            and see how it behaves. It also demonstrates server synchronization
+            via LLV's push_server_event mechanism - reconnect and open two windows
+            side-by-side to see it in action.
+          </p>
+        </a>
+      </li>
+      <li>
+        <a class="card" href="/pong/">
+          <h2>Pong game</h2>
+          <p>
+            The classic game, 100% local, 100% Elixir.
+            You play against the bot.
+          </p>
+        </a>
+      </li>
+      <li>
+        <a class="card" href="/burrito/">
+          <h2>Burrito ordering app</h2>
+          <p>
+            Compose your order and put it in the cart. Showcases how Local LiveView handes forms,
+            comparing regular LiveView and Local LiveView side-by-side.
+            It also demonstrates synchronizing state via LLV's mirror sync mechanism.</p>
+        </a>
+      </li>
+    </ul>
+    <footer>
+      Local LiveView and Popcorn are created by <a href="https://swmansion.com">Software Mansion</a>.
+    </footer>
+  </main>
+</body>
+</html>

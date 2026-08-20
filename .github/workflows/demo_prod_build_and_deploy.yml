@@ -9,7 +9,7 @@ env:
 jobs:
   build_docker_images:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -40,6 +40,12 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
 
+      # Busts the base image's AtomVM layer cache exactly when FissionVM moves,
+      # so AtomVM isn't rebuilt on every popcorn commit.
+      - name: Get FissionVM commit
+        id: fvm
+        run: echo "sha=$(git ls-remote https://github.com/software-mansion-labs/FissionVM.git swm | cut -f1)" >> $GITHUB_OUTPUT
+
       - name: Build base Docker image
         id: build-base
         uses: docker/build-push-action@v6
@@ -48,6 +54,7 @@ jobs:
           file: ./docker/base.Dockerfile
           build-args: |
             COMMIT_REF=${{ github.sha }}
+            FISSIONVM_SHA=${{ steps.fvm.outputs.sha }}
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:latest"
@@ -55,29 +62,32 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build landing Docker image
-        id: build-and-push-landing
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/landing.Dockerfile
-          build-args: |
-            POPCORN_BASE_TAG=latest
-            SYNC_THIRD_PARTY_ASSETS=true
-          pull: true
-          push: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build landing Docker image
+      #   id: build-and-push-landing
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: ./docker/landing.Dockerfile
+      #     build-args: |
+      #       POPCORN_BASE_TAG=latest
+      #       SYNC_THIRD_PARTY_ASSETS=true
+      #     pull: true
+      #     push: true
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:latest"
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
-      - name: Build burrito Docker image
-        id: build-and-push-burrito
+      # The demos image (kanban + burrito + pong + nginx + Postgres) is pushed
+      # under the burrito name so the existing server-side popcorn-burrito.yml
+      # deploys it unchanged.
+      - name: Build demos Docker image (deployed as burrito)
+        id: build-and-push-demos
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./docker/burrito/Dockerfile
+          file: ./docker/demos/Dockerfile
           build-args: |
             POPCORN_BASE_TAG=latest
           pull: true
@@ -88,26 +98,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build language tour Docker image
-        id: build-and-push-langtour
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/langtour.Dockerfile
-          # Sentry DSN is embedded in built JS, not really a secret
-          build-args: |
-            POPCORN_BASE_TAG=latest
-            SYNC_THIRD_PARTY_ASSETS=true
-            SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
-            SENTRY_MODE=production
-            APP_VERSION=${{ github.sha }}
-          pull: true
-          push: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build language tour Docker image
+      #   id: build-and-push-langtour
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: ./docker/langtour.Dockerfile
+      #     # Sentry DSN is embedded in built JS, not really a secret
+      #     build-args: |
+      #       POPCORN_BASE_TAG=latest
+      #       SYNC_THIRD_PARTY_ASSETS=true
+      #       SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
+      #       SENTRY_MODE=production
+      #       APP_VERSION=${{ github.sha }}
+      #     pull: true
+      #     push: true
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:latest"
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
   deploy_production:
     runs-on: ubuntu-latest

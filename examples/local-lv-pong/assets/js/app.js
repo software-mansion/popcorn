@@ -25,8 +25,13 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/local_lv_pong"
 import topbar from "../vendor/topbar"
 
+// When deployed under a path prefix (URL_PATH, e.g. /pong behind a
+// prefix-stripping proxy) the socket and bundle URLs need that prefix too;
+// derive it from this bundle's own URL so dev (no prefix) works unchanged.
+const basePath = new URL(import.meta.url).pathname.replace(/\/assets\/.*$/, "")
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
-const liveSocket = new LiveSocket("/live", Socket, {
+const liveSocket = new LiveSocket(`${basePath}/live`, Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
   hooks: {...colocatedHooks},
@@ -38,7 +43,10 @@ window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
 import { LLVEngine } from "local_live_view";
-await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+await LLVEngine.create(liveSocket, {
+  bundlePaths: [`${basePath}/assets/js/wasm/bundle.avm`],
+  llvSocketURI: `${basePath}/llv_socket`,
+});
 
 // connect if there are any LiveViews on the page
 liveSocket.connect();

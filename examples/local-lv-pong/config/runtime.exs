@@ -41,7 +41,9 @@ if config_env() == :prod do
   config :local_lv_pong, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :local_lv_pong, LocalLvPongWeb.Endpoint,
-    url: [host: host, port: 443, scheme: "https"],
+    # URL_PATH lets the app be served under a path prefix (e.g. /pong
+    # behind a reverse proxy that strips the prefix).
+    url: [host: host, port: 443, scheme: "https", path: System.get_env("URL_PATH", "/")],
     http: [
       # Enable IPv6 and bind on all interfaces.
       # Set it to  {0, 0, 0, 0, 0, 0, 0, 1} for local network only access.

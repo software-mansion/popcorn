@@ -1,0 +1,15 @@
+**
+!docker/demos/entrypoint.sh
+!docker/demos/nginx.conf
+!docker/demos/index.html
+!popcorn/elixir/**
+!local-live-view/**
+!examples/local-lv-kanban/**
+examples/local-lv-kanban/test
+!examples/local-lv-burrito/**
+!examples/local-lv-pong/**
+examples/local-lv-pong/test
+**/_build
+**/deps
+**/node_modules
+**/erl_crash.dump
