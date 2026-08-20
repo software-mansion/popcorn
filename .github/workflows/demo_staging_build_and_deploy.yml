@@ -89,22 +89,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build landing Docker image
-        id: build-and-push-landing
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/landing.Dockerfile
-          build-args: |
-            POPCORN_BASE_TAG=staging
-            SYNC_THIRD_PARTY_ASSETS=true
-          pull: true
-          push: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build landing Docker image
+      #   id: build-and-push-landing
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: ./docker/landing.Dockerfile
+      #     build-args: |
+      #       POPCORN_BASE_TAG=staging
+      #       SYNC_THIRD_PARTY_ASSETS=true
+      #     pull: true
+      #     push: true
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
       # The demos image (kanban + burrito + nginx + Postgres) is pushed under
       # the burrito name so the existing server-side popcorn-burrito.yml
@@ -125,26 +125,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build language tour Docker image
-        id: build-and-push-langtour
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./docker/langtour.Dockerfile
-          # Sentry DSN is embedded in built JS, not really a secret
-          build-args: |
-            POPCORN_BASE_TAG=staging
-            SYNC_THIRD_PARTY_ASSETS=true
-            SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
-            SENTRY_MODE=staging
-            APP_VERSION=${{ github.sha }}
-          pull: true
-          push: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:staging"
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # - name: Build language tour Docker image
+      #   id: build-and-push-langtour
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     file: ./docker/langtour.Dockerfile
+      #     # Sentry DSN is embedded in built JS, not really a secret
+      #     build-args: |
+      #       POPCORN_BASE_TAG=staging
+      #       SYNC_THIRD_PARTY_ASSETS=true
+      #       SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
+      #       SENTRY_MODE=staging
+      #       APP_VERSION=${{ github.sha }}
+      #     pull: true
+      #     push: true
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:staging"
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
 
   deploy_staging:
     runs-on: ubuntu-latest
