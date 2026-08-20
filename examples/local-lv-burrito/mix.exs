@@ -9,7 +9,6 @@ defmodule Burrito.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      releases: releases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader]
@@ -50,17 +49,8 @@ defmodule Burrito.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:local_live_view,
-       path: System.get_env("LOCAL_LIVE_VIEW_PATH", "../../local-live-view"), runtime: false},
+      {:local_live_view, path: System.get_env("LOCAL_LIVE_VIEW_PATH", "../../local-live-view")},
       {:local, path: "local"}
-    ]
-  end
-
-  defp releases do
-    [
-      burrito: [
-        applications: [local_live_view: :load]
-      ]
     ]
   end
 
