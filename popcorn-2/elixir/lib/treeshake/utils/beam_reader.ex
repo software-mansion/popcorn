@@ -1,6 +1,6 @@
 defmodule Treeshake.Utils.BeamReader do
   @moduledoc false
-  # Reads core erlang from a beam file
+  # Reads core erlang and function metadata from a beam file
 
   @spec read_core!(String.t()) :: {module(), core_ast :: term()}
   def read_core!(beam_path) do
@@ -24,6 +24,22 @@ defmodule Treeshake.Utils.BeamReader do
 
       _other ->
         :error
+    end
+  end
+
+  # This uses debug_info chunk, which is not present in the patched modules,
+  # so it's best-effort
+  @spec read_elixir_definitions(String.t()) :: [
+          {{name :: atom(), arity :: non_neg_integer()}, kind :: atom(), meta :: keyword(),
+           clauses :: [term()]}
+        ]
+  def read_elixir_definitions(beam_path) do
+    case :beam_lib.chunks(~c"#{beam_path}", [:debug_info]) do
+      {:ok, {_module, [debug_info: {:debug_info_v1, :elixir_erl, {:elixir_v1, map, _specs}}]}} ->
+        map.definitions
+
+      _other ->
+        []
     end
   end
 
