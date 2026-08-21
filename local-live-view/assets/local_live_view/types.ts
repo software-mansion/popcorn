@@ -89,7 +89,6 @@ interface PhxLiveSocketInternals {
   isConnected(): boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: Record<string, any>;
-  owner(childEl: Element, callback?: (view: LLVView) => unknown): unknown;
   withinOwners(childEl: Element, callback: (view: LLVView) => void): void;
   debounce(el: Element, event: Event, eventType: string, callback: () => void): unknown;
   pushHistoryPatch(
