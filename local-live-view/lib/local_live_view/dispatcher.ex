@@ -159,5 +159,6 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
+  defp parse_assigns(nil), do: %{}
   defp parse_assigns(assigns), do: :erlang.binary_to_term(Base.decode64!(assigns))
 end
