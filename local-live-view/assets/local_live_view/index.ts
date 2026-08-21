@@ -28,7 +28,7 @@ interface CreateArgs {
   view: string | null;
   url: string;
   urlParams: Record<string, string>;
-  assigns: string;
+  assigns: string | null;
   mirrorId: string | undefined;
 }
 
@@ -192,7 +192,7 @@ export class LLVEngine {
       view: pop_view_el.getAttribute("data-pop-view"),
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
-      assigns: pop_view_el.getAttribute("data-pop-assigns")!,
+      assigns: pop_view_el.getAttribute("data-pop-assigns"),
       mirrorId: mirrorId,
     });
     // A rejected call resolves with ok: false (it does not throw). Bail on
