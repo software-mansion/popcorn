@@ -1,20 +1,37 @@
 defmodule Local.BoardNameComponent do
-  use Phoenix.Component
+  use Phoenix.LiveComponent
 
-  # Board title with inline rename. The `renaming` toggle is driven by the
-  # parent Kanban's state (start_rename/cancel_rename). The form has no
-  # phx-target — Kanban applies the rename optimistically and pushes it to
-  # the host LiveView itself.
+  @impl true
+  def mount(socket) do
+    {:ok, assign(socket, :renaming, false)}
+  end
 
-  attr :name, :string, required: true
-  attr :renaming, :boolean, default: false
+  @impl true
+  def handle_event("start_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, true)}
+  end
 
-  def board_name(assigns) do
+  def handle_event("cancel_rename", _params, socket) do
+    {:noreply, assign(socket, :renaming, false)}
+  end
+
+  def handle_event("rename_board", %{"name" => name}, socket) do
+    case String.trim(name) do
+      "" -> :ok
+      name -> send(self(), {:rename_board, name})
+    end
+
+    {:noreply, assign(socket, :renaming, false)}
+  end
+
+  @impl true
+  def render(assigns) do
     ~H"""
     <div style="display:flex;align-items:center;gap:0.6em;margin:0 0 0.75em">
       <form
         :if={@renaming}
         phx-submit="rename_board"
+        phx-target={@myself}
         style="display:flex;gap:0.5em;align-items:center"
         autocomplete="off"
       >
@@ -35,6 +52,7 @@ defmodule Local.BoardNameComponent do
         <button
           type="button"
           phx-click="cancel_rename"
+          phx-target={@myself}
           style="background:#1f2937;color:#9ca3af;border:1px solid #374151;border-radius:6px;padding:0.45em 0.9em;font-size:0.95em;cursor:pointer"
         >
           Cancel
@@ -46,6 +64,7 @@ defmodule Local.BoardNameComponent do
       <button
         :if={!@renaming}
         phx-click="start_rename"
+        phx-target={@myself}
         title="Rename board"
         style="background:none;color:#6b7280;border:none;font-size:1.1em;cursor:pointer;padding:0.2em"
       >
