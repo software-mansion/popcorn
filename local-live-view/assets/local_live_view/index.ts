@@ -25,10 +25,12 @@ type CallResult = Awaited<ReturnType<Popcorn["call"]>>;
 
 interface CreateArgs {
   id: string;
-  view: string | null;
+  view: string;
   url: string;
   urlParams: Record<string, string>;
-  assigns: string;
+  // Can be null when mounting LLVs manually via <div data-pop-view="...">
+  // and not setting `data-pop-assigns`.
+  assigns: string | null;
   mirrorId: string | undefined;
 }
 
@@ -189,10 +191,11 @@ export class LLVEngine {
     if (this.views.has(llvId)) return;
     const result = await this.pop.create({
       id: llvId,
-      view: pop_view_el.getAttribute("data-pop-view"),
+      // always present since its used to find LLVs.
+      view: pop_view_el.getAttribute("data-pop-view")!,
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
-      assigns: pop_view_el.getAttribute("data-pop-assigns")!,
+      assigns: pop_view_el.getAttribute("data-pop-assigns"),
       mirrorId: mirrorId,
     });
     // A rejected call resolves with ok: false (it does not throw). Bail on
