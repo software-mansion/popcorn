@@ -19,7 +19,8 @@ defmodule Treeshake.Utils.PrivatesResolver do
           private_functions: %{name_arity() => [name_arity()]},
           abstraction: {:behaviour | :protocol, [name_arity()]} | nil,
           behaviour_impls: [module()],
-          protocol_impl: {module(), module()} | nil
+          protocol_impl: {module(), module()} | nil,
+          macro_generated: [name_arity()]
         }
 
   @spec resolve(BeamAnalyzer.module_info()) :: module_info()
@@ -70,7 +71,9 @@ defmodule Treeshake.Utils.PrivatesResolver do
       public_functions: expanded_pub,
       private_functions: expanded_priv
     }
-    |> Map.merge(Map.take(module_info, [:abstraction, :behaviour_impls, :protocol_impl]))
+    |> Map.merge(
+      Map.take(module_info, [:abstraction, :behaviour_impls, :protocol_impl, :macro_generated])
+    )
   end
 
   defp resolve_local({nil, name, arity}, module), do: {module, name, arity}
