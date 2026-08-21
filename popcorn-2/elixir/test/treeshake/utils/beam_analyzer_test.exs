@@ -13,7 +13,8 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
 
   defp analyze(beam_path) do
     {module, core} = Treeshake.Utils.BeamReader.read_core!(beam_path)
-    BeamAnalyzer.analyze(module, core)
+    definitions = Treeshake.Utils.BeamReader.read_elixir_definitions(beam_path)
+    BeamAnalyzer.analyze(module, core, definitions)
   end
 
   defp find_fun(functions, name, arity) do
@@ -267,5 +268,40 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
              {Task, :start_link, _args} -> true
              _other -> false
            end)
+  end
+
+  describe "macro_generated" do
+    test "detects functions injected by `use GenServer`" do
+      info = analyze(HelloPopcorn)
+
+      assert {:child_spec, 1} in info.macro_generated
+      assert {:handle_call, 3} in info.macro_generated
+      assert {:handle_info, 2} in info.macro_generated
+
+      # written by hand in the fixture
+      refute {:init, 1} in info.macro_generated
+      refute {:start_link, 1} in info.macro_generated
+    end
+
+    test "detects `__struct__` injected by defstruct" do
+      info = analyze(DemoApp.Widget)
+
+      assert {:__struct__, 0} in info.macro_generated
+      assert {:__struct__, 1} in info.macro_generated
+    end
+
+    test "detects `__impl__` injected by defimpl" do
+      info = analyze(DemoApp.Formatter.Integer)
+
+      assert {:__impl__, 1} in info.macro_generated
+      refute {:format, 1} in info.macro_generated
+    end
+
+    test "is [] when no definitions are given" do
+      {module, core} =
+        Treeshake.Utils.BeamReader.read_core!(Path.join(@ebin, "Elixir.HelloPopcorn.beam"))
+
+      assert BeamAnalyzer.analyze(module, core, []).macro_generated == []
+    end
   end
 end

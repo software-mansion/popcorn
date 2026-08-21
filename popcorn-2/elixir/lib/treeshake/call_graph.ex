@@ -115,9 +115,10 @@ defmodule Treeshake.CallGraph do
 
     behaviour_calls = find_behaviour_calls(referenced_modules_info, module_index)
     child_spec_calls = find_child_spec_calls(referenced_modules_info)
+    generated_funs = find_generated_funs(referenced_modules_info)
 
     all_calls =
-      (function_info.calls ++ behaviour_calls ++ child_spec_calls)
+      (function_info.calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
       |> Enum.reject(&(&1 == mfa))
 
     {protocol_entries, acc_protocol_calls} =
@@ -161,6 +162,18 @@ defmodule Treeshake.CallGraph do
           raise "Module #{module} implements #{behaviour} as if it was a behaviour, but it's not"
       end
       |> Enum.map(fn {f, a} -> {module, f, a} end)
+    end)
+  end
+
+  defp find_generated_funs(referenced_modules_info) do
+    referenced_modules_info
+    |> Enum.filter(fn info -> info.behaviour_impls != [] end)
+    |> Enum.flat_map(fn info ->
+      info
+      |> Map.get(:macro_generated, [])
+      |> Enum.filter(&Map.has_key?(info.public_functions, &1))
+      |> Enum.reject(fn {f, _a} -> f == :__struct__ end)
+      |> Enum.map(fn {f, a} -> {info.module, f, a} end)
     end)
   end
 
