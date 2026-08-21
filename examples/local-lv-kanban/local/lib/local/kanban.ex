@@ -9,8 +9,6 @@ defmodule Local.Kanban do
      assign(socket,
        name: nil,
        board: %{},
-       renaming: false,
-       task_modal: nil,
        dragging: nil,
        drag_target: nil,
        add_seq: 0
@@ -76,44 +74,6 @@ defmodule Local.Kanban do
     end
   end
 
-  def handle_event("add_task", %{"column_id" => cid, "text" => text} = params, socket) do
-    case {String.trim(text), socket.assigns.board[cid]} do
-      {"", _} ->
-        {:noreply, assign(socket, :task_modal, nil)}
-
-      {_text, nil} ->
-        {:noreply, assign(socket, :task_modal, nil)}
-
-      {text, column} ->
-        # The client owns the position: generate the id up front and an append
-        # rank, then tell the host to persist it verbatim (and reuse the same id,
-        # so optimistic and authoritative rows converge).
-        id = uuid()
-        position = Rank.key_before(Map.values(column.tasks), nil, id)
-
-        task = %{
-          id: id,
-          text: text,
-          description: params |> Map.get("description", "") |> String.trim(),
-          position: position
-        }
-
-        socket =
-          socket
-          |> assign(:board, put_in(socket.assigns.board, [cid, :tasks, id], task))
-          |> assign(:task_modal, nil)
-          |> push_server_event("add_task", %{
-            "column_id" => cid,
-            "text" => task.text,
-            "description" => task.description,
-            "id" => id,
-            "position" => position
-          })
-
-        {:noreply, socket}
-    end
-  end
-
   def handle_event("remove_column", %{"id" => id} = payload, socket) do
     {_column, board} = pop_in(socket.assigns.board, [id])
 
@@ -130,49 +90,6 @@ defmodule Local.Kanban do
      socket
      |> assign(:board, board)
      |> push_server_event("remove_task", payload)}
-  end
-
-  # --- Task modal (local-only UI state) --------------------------------------
-
-  def handle_event("open_task_modal", %{"column_id" => cid}, socket) do
-    case socket.assigns.board[cid] do
-      nil ->
-        {:noreply, socket}
-
-      column ->
-        {:noreply, assign(socket, :task_modal, %{column_id: cid, column_name: column.name})}
-    end
-  end
-
-  def handle_event("close_task_modal", _params, socket) do
-    {:noreply, assign(socket, :task_modal, nil)}
-  end
-
-  # --- Board rename (local toggle; commit notifies the server) ----------------
-
-  def handle_event("start_rename", _params, socket) do
-    {:noreply, assign(socket, :renaming, true)}
-  end
-
-  def handle_event("cancel_rename", _params, socket) do
-    {:noreply, assign(socket, :renaming, false)}
-  end
-
-  def handle_event("rename_board", %{"name" => name}, socket) do
-    socket = assign(socket, :renaming, false)
-
-    case String.trim(name) do
-      "" ->
-        {:noreply, socket}
-
-      name ->
-        # Optimistic: show the new name immediately; the host persists it and
-        # re-pushes the authoritative name (rolling back if it was rejected).
-        {:noreply,
-         socket
-         |> assign(:name, name)
-         |> push_server_event("rename_board", %{"name" => name})}
-    end
   end
 
   # --- Drag & drop (local until drop; commit notifies the server) ------------
@@ -238,6 +155,46 @@ defmodule Local.Kanban do
 
       _ ->
         {:noreply, assign(socket, dragging: nil, drag_target: nil)}
+    end
+  end
+
+  # --- Messages from live components -----------------------------------------
+
+  @impl true
+  def handle_info({:rename_board, name}, socket) do
+    # Optimistic: show the new name immediately; the host persists it and
+    # re-pushes the authoritative name (rolling back if it was rejected).
+    {:noreply,
+     socket
+     |> assign(:name, name)
+     |> push_server_event("rename_board", %{"name" => name})}
+  end
+
+  def handle_info({:add_task, %{column_id: cid, text: text, description: description}}, socket) do
+    case socket.assigns.board[cid] do
+      nil ->
+        {:noreply, socket}
+
+      column ->
+        # The client owns the position: generate the id up front and an append
+        # rank, then tell the host to persist it verbatim (and reuse the same id,
+        # so optimistic and authoritative rows converge).
+        id = uuid()
+        position = Rank.key_before(Map.values(column.tasks), nil, id)
+        task = %{id: id, text: text, description: description, position: position}
+
+        socket =
+          socket
+          |> assign(:board, put_in(socket.assigns.board, [cid, :tasks, id], task))
+          |> push_server_event("add_task", %{
+            "column_id" => cid,
+            "text" => text,
+            "description" => description,
+            "id" => id,
+            "position" => position
+          })
+
+        {:noreply, socket}
     end
   end
 
@@ -322,7 +279,7 @@ defmodule Local.Kanban do
 
     ~H"""
     <div style={"font-family:sans-serif;color:#e5e7eb;padding:0.5em 0#{if @dragging, do: ";user-select:none"}"}>
-      <BoardNameComponent.board_name name={@name} renaming={@renaming} />
+      <.live_component module={BoardNameComponent} id="board-name" name={@name} />
 
       <div style="display:flex;gap:1em;overflow-x:auto;padding-bottom:1em;align-items:flex-start">
         <ColumnComponent.column
@@ -330,12 +287,13 @@ defmodule Local.Kanban do
           col={col}
           dragging={@dragging}
           drag_target={@drag_target}
+          task_modal="#task-modal"
         />
 
         <AddColumnComponent.add_column seq={@add_seq} />
       </div>
 
-      <TaskModalComponent.modal params={@task_modal} />
+      <.live_component module={TaskModalComponent} id="task-modal" />
     </div>
     """
   end

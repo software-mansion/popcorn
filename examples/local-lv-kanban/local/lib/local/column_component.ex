@@ -10,6 +10,7 @@ defmodule Local.ColumnComponent do
   attr :col, :map, required: true
   attr :dragging, :map, default: nil
   attr :drag_target, :map, default: nil
+  attr :task_modal, :string, required: true
 
   def column(assigns) do
     assigns =
@@ -57,6 +58,8 @@ defmodule Local.ColumnComponent do
         type="button"
         phx-click="open_task_modal"
         phx-value-column_id={@col.id}
+        phx-value-column_name={@col.name}
+        phx-target={@task_modal}
         style="background:#2563eb;color:#fff;border:none;border-radius:5px;padding:0.5em 0.7em;font-size:0.85em;cursor:pointer;margin-top:0.2em"
       >+ Add task</button>
     </div>
