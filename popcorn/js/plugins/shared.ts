@@ -16,7 +16,6 @@ import { brotliCompress, constants, gzip } from "node:zlib";
 const execFileAsync = promisify(execFile);
 const brotliCompressAsync = promisify(brotliCompress);
 const gzipAsync = promisify(gzip);
-const OTP_DIR = "assets/otp";
 
 export type Options = {
   rootDir: string;
@@ -58,23 +57,11 @@ export async function popcorn(opts: Options): Promise<Prepared> {
   const preparedDir = await mkdtemp(p`${tmpdir()}/popcorn-otp-`);
 
   try {
-    await Promise.all([
-      copy(p`${distDir}/worker.mjs`, p`${preparedDir}/worker.mjs`),
-      copy(p`${distDir}/assets/beam.mjs`, p`${preparedDir}/assets/beam.mjs`),
-      copy(
-        p`${distDir}/assets/beam.emu.mjs`,
-        p`${preparedDir}/assets/beam.emu.mjs`,
-      ),
-      copy(p`${distDir}/assets/beam.wasm`, p`${preparedDir}/assets/beam.wasm`, {
-        variants: assetVariants,
-      }),
-    ]);
-
     const report = await withTmp(async (packedDir) => {
       const report = await packTarballs({
         rootDir: resolve(opts.rootDir),
         outDir: packedDir,
-        manifestPath: p`${distDir}/assets/manifest.json`,
+        manifestPath: p`${distDir}/otp/manifest.json`,
         app: opts.app,
         extraApps: opts.extraApps ?? [],
         strip,
@@ -85,9 +72,9 @@ export async function popcorn(opts: Options): Promise<Prepared> {
       }
 
       await Promise.all([
-        copy(report.manifestPath, p`${preparedDir}/${OTP_DIR}/manifest.json`),
-        copy(report.bootPath, p`${preparedDir}/${OTP_DIR}/bin/vm.boot`),
-        copy(report.tarPaths, p`${preparedDir}/${OTP_DIR}/lib`, {
+        copy(report.manifestPath, p`${preparedDir}/otp/manifest.json`),
+        copy(report.bootPath, p`${preparedDir}/otp/bin/vm.boot`),
+        copy(report.tarPaths, p`${preparedDir}/otp/lib`, {
           variants: assetVariants,
         }),
       ]);
@@ -102,6 +89,15 @@ export async function popcorn(opts: Options): Promise<Prepared> {
     await rm(preparedDir, { recursive: true, force: true });
     throw error;
   }
+}
+
+export async function copyRuntime(targetDir: string): Promise<void> {
+  const distDir = p`${dirname(fileURLToPath(import.meta.url))}/..`;
+  await Promise.all(
+    ["worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"].map((file) =>
+      copy(p`${distDir}/${file}`, p`${targetDir}/${file}`),
+    ),
+  );
 }
 
 type PackTarballsParams = {
