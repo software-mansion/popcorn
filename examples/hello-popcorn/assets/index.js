@@ -1,9 +1,7 @@
 import { Popcorn } from "@swmansion/popcorn";
 
 const result = await Popcorn.init({
-  beam: {
-    otpAssetsRoot: "/assets/otp/",
-  },
+  beam: {},
   onStdout: console.log,
 });
 

@@ -5,7 +5,7 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 
 const result = await Popcorn.init({
-  beam: { otpAssetsRoot: "/assets/otp/" },
+  beam: {},
   onStdout: console.log,
   onStderr: console.warn,
 });
