@@ -45,7 +45,7 @@ const Elements = {
 
 async function setup() {
   const result = await Popcorn.init({
-    beam: { otpAssetsRoot: "/assets/otp/" },
+    beam: {},
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
