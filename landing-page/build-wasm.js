@@ -33,7 +33,21 @@ export function buildBundle({ dir, wasmSrcPathDefault, newBundleName }) {
         const src = join(wasmSrcPath, avm);
         const dst = join(wasmDestPath, newBundleName);
 
-        await cp(src, dst);
+        const runtimeSrcPath = join(dir, "priv", "static", "assets", "js");
+        const runtimeDestPath = join(fileURLToPath(config.publicDir), "_astro");
+        await mkdir(runtimeDestPath, { recursive: true });
+
+        await Promise.all([
+          cp(src, dst),
+          cp(
+            join(runtimeSrcPath, "AtomVM.mjs"),
+            join(runtimeDestPath, "AtomVM.mjs"),
+          ),
+          cp(
+            join(runtimeSrcPath, "AtomVM.wasm"),
+            join(runtimeDestPath, "AtomVM.wasm"),
+          ),
+        ]);
 
         logger.info("Bundle copied");
       },
@@ -76,12 +90,8 @@ export function buildOtpAssets({ dir, assetsName }) {
         );
         await run("pnpm", ["run", "build"], { dir: join(dir, "assets") });
 
-        const src = join(dir, "dist", "assets", "otp");
-        const dst = join(
-          fileURLToPath(config.publicDir),
-          "assets",
-          assetsName,
-        );
+        const src = join(dir, "dist", "otp");
+        const dst = join(fileURLToPath(config.publicDir), "assets", assetsName);
         await rm(dst, { force: true, recursive: true });
         await mkdir(dst, { recursive: true });
         await cp(src, dst, { recursive: true });
