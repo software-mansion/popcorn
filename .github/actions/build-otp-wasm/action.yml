@@ -1,5 +1,5 @@
-name: Build OTP WASM
-description: Install the build toolchain, restore caches, and build OTP/BEAM for WASM
+name: Build OTP Wasm
+description: Install the build toolchain, restore caches, and build OTP/BEAM for Wasm
 
 inputs:
   build-mode:
@@ -7,7 +7,7 @@ inputs:
     required: false
     default: debug
   otp-tag:
-    description: OTP git tag to build for WASM
+    description: OTP git tag to build for Wasm
     required: false
     default: OTP-28.3.1
   host-otp-version:
@@ -66,7 +66,7 @@ runs:
     - name: Reuse cached OTP/BEAM build
       if: steps.otp-build-cache.outputs.cache-hit == 'true'
       shell: bash
-      run: echo "Using cached OTP WASM build from popcorn/out"
+      run: echo "Using cached OTP Wasm build from popcorn/out"
 
     # scripts/build-beam.sh needs emconfigure and an erlc to compile the
     # preloaded modules the native bootstrap emulator embeds.
@@ -128,7 +128,7 @@ runs:
         env | awk -F'=' '{print length($0), $1}' | sort -rn | head -15
         printf "ulimit -s: %s  ARG_MAX: %s\n" "$(ulimit -s)" "$(getconf ARG_MAX)"
 
-    - name: Build OTP/BEAM for WASM
+    - name: Build OTP/BEAM for Wasm
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |

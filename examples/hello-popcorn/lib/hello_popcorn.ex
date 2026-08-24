@@ -14,7 +14,7 @@ defmodule HelloPopcorn do
     {:ok, _} =
       Popcorn.Wasm.run_js("""
       () => {
-        document.body.innerHTML = "Hello from WASM!";
+        document.body.innerHTML = "Hello from Wasm!";
       }
       """)
 

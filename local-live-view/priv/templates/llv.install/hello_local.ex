@@ -5,7 +5,7 @@ defmodule HelloLocal do
   def render(assigns) do
     ~H"""
     <div>
-      <p>Hello from WASM!</p>
+      <p>Hello from Wasm!</p>
     </div>
     """
   end

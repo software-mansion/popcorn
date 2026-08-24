@@ -24,7 +24,7 @@
 
 Popcorn provides seamless APIs for communication between your Elixir and JavaScript code, handling serialization and ensuring browser responsiveness while your Elixir processes work in the background.
 
-## How Popcorn uses WASM
+## How Popcorn uses Wasm
 
 Popcorn takes a unique approach to Wasm in the Elixir ecosystem. Unlike [Wasmex](https://github.com/tessi/wasmex), which allows you to execute existing Wasm modules within Elixir on the _server_, Popcorn is run entirely in the _browser_.
 

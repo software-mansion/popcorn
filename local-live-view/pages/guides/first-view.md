@@ -50,7 +50,7 @@ Use the `<.local_live_view>` component in any Phoenix template:
 <.local_live_view view="CounterLocal" />
 ```
 
-The `view` attribute is the module name as a string. The component renders a `<div>` that becomes the mount point for the WASM view.
+The `view` attribute is the module name as a string. The component renders a `<div>` that becomes the mount point for the Wasm view.
 
 The counter is now fully local — clicks are handled in the browser with no server round-trips.
 
@@ -87,7 +87,7 @@ end
 
 ## Multiple views on one page
 
-Each `<.local_live_view>` on the page runs as an independent process in the WASM runtime. You can mount as many as you need:
+Each `<.local_live_view>` on the page runs as an independent process in the Wasm runtime. You can mount as many as you need:
 
 ```heex
 <.local_live_view view="CounterLocal" />

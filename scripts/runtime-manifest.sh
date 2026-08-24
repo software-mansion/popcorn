@@ -1,5 +1,5 @@
 #!/bin/bash
-# Write the WASM runtime manifest describing the built emulator.
+# Write the Wasm runtime manifest describing the built emulator.
 #
 # BEAM applications are packaged from the user's own Erlang/Elixir
 # installation at build time, so the manifest only records what the emulator
@@ -23,7 +23,7 @@ usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Write the WASM runtime manifest describing the built emulator.
+Write the Wasm runtime manifest describing the built emulator.
 
 Options:
   --beam-dir <path>       OTP build directory (default: popcorn/sources/otp)

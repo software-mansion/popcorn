@@ -1,4 +1,4 @@
-# Eval in WASM
+# Eval in Wasm
 
 A textarea-based code runner using Popcorn. Type Elixir or Erlang code and run it fully in the browser via WebAssembly.
 
@@ -26,4 +26,4 @@ Cross-Origin-Opener-Policy: "same-origin"
 Cross-Origin-Embedder-Policy: "require-corp"
 ```
 
-for the WASM runtime to work.
+for the Wasm runtime to work.

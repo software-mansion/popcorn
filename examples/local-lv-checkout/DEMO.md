@@ -39,7 +39,7 @@ CheckoutLive (Parent - Phoenix LiveView)
 CheckoutFormComponent (LiveComponent)
   └─ renders CheckoutLive local live view
 
-CheckoutLive (Local - LocalLiveView in WASM)
+CheckoutLive (Local - LocalLiveView in Wasm)
   └─ renders step form
   └─ handles field updates
   └─ handles navigation
@@ -117,7 +117,7 @@ Visit http://localhost:4000
 
 ### Current Limitation ⚠️
 - **Parent step indicator doesn't update in real-time** after navigation
-  - Reason: Parent is normal LiveView (server-side WebSocket), Local is WASM (client-side)
+  - Reason: Parent is normal LiveView (server-side WebSocket), Local is Wasm (client-side)
   - URL changes but parent doesn't get notified
   - This is the key problem that `handle_params` implementation would solve
 

@@ -4,7 +4,7 @@ import type { PopcornClient } from "./index";
 
 const llvIdFromTopic = (topic: string) => topic.slice("lv:".length);
 
-// Frames the WASM view must answer. Each entry needs a matching
+// Frames the Wasm view must answer. Each entry needs a matching
 // Message clause in LocalLiveView.Server.
 // Anything else — heartbeats, phx_leave — is acked in place
 // as Popcorn may be not booted yet.

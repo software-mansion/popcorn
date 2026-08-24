@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 
 const READY_TIMEOUT = 30_000;
 
-test("says hello from WASM", async ({ page }) => {
+test("says hello from Wasm", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.locator("body")).toHaveText("Hello from WASM!", {
+  await expect(page.locator("body")).toHaveText("Hello from Wasm!", {
     timeout: READY_TIMEOUT,
   });
 });

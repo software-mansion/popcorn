@@ -46,12 +46,12 @@ The patching is currently not exposed to users.
 sequenceDiagram
     participant MW as Main Window
     participant IF as iframe
-    participant WM as WASM Module
+    participant WM as Wasm Module
     participant AVM as AtomVM
     participant EA as Elixir App
 
     MW->>IF: Create iframe, load scripts
-    IF->>WM: Initialize WASM module
+    IF->>WM: Initialize Wasm module
     WM->>AVM: Start AtomVM runtime
     AVM->>EA: Load and start application
     EA->>AVM: Wasm.send_elixir_ready()

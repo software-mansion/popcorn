@@ -59,7 +59,7 @@ defmodule MyApp.Worker do
   @impl true
   def init(_init_arg) do
     Popcorn.Wasm.ready(@process_name)
-    IO.puts("Hello from WASM!")
+    IO.puts("Hello from Wasm!")
     {:ok, %{}}
   end
 end
@@ -123,7 +123,7 @@ The JavaScript build step bundles your JavaScript, copies the WebAssembly runtim
 
 ### Serving the artifacts
 
-Run `mix popcorn.server` to start a local server. Then, at <http://localhost:4000>, you should see `Hello from WASM` printed in the browser console.
+Run `mix popcorn.server` to start a local server. Then, at <http://localhost:4000>, you should see `Hello from Wasm` printed in the browser console.
 
 The webpage can also be hosted with any HTTP static file server, but **it must add the following HTTP headers**:
 
@@ -132,7 +132,7 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Otherwise, browsers refuse to run WASM.
+Otherwise, browsers refuse to run Wasm.
 
 ## Popcorn project files structure
 

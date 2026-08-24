@@ -5,7 +5,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
   Spins up a fresh Phoenix project via `mix phx.new` in a temp dir,
   injects local_live_view as a path dep, runs `mix llv.install` + `mix setup`,
   starts `mix phx.server`, and uses Playwright to assert that the bundled
-  HelloLocal component renders "Hello from WASM!" in the browser.
+  HelloLocal component renders "Hello from Wasm!" in the browser.
 
   Slow (~1-2 min) — covers what unit tests can't: real `mix llv.build`,
   real esbuild + popcorn.cook + AtomVM bootstrap, real DOM render.
@@ -60,7 +60,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     wait_for(
       fn ->
         text = Playwright.Page.text_content(page, "body")
-        assert text =~ "Hello from WASM!"
+        assert text =~ "Hello from Wasm!"
       end,
       @assertion_timeout
     )

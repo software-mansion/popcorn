@@ -4,7 +4,7 @@ import type { LiveSocketInstanceInterface } from "phoenix_live_view";
 // --- Public API ---
 
 export interface LLVConfig {
-  /** Paths to compiled WASM bundle files. Defaults to `["wasm/bundle.avm"]` */
+  /** Paths to compiled Wasm bundle files. Defaults to `["wasm/bundle.avm"]` */
   bundlePaths?: string[];
   /** Enable Popcorn debug logging */
   debug?: boolean;
@@ -20,7 +20,7 @@ export interface LLVConfig {
 
 // --- Internal Phoenix types ---
 
-/** Opaque rendered diff payload delivered from WASM via structuredClone */
+/** Opaque rendered diff payload delivered from Wasm via structuredClone */
 export type RenderedDiff = Record<string, unknown>;
 
 /** A raw Phoenix channel frame as it crosses the (fake) transport. */

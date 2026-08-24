@@ -128,7 +128,7 @@ defmodule LocalLvKanban.E2ETest do
 
   # The dev server used to build app.js/app.css on boot; in test env esbuild/tailwind
   # are `runtime: false`, so build them up front (in :dev) when missing. `mix llv.build`
-  # in the `test` alias already produced the WASM bundle + AtomVM.*; this fills the gap.
+  # in the `test` alias already produced the Wasm bundle + AtomVM.*; this fills the gap.
   defp ensure_assets! do
     unless File.regular?(Path.join(@app_root, "priv/static/assets/js/app.js")) do
       {_out, 0} =

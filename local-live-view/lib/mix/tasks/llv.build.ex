@@ -1,10 +1,10 @@
 defmodule Mix.Tasks.Llv.Build do
   use Mix.Task
 
-  @shortdoc "Copies LLV runtime assets and builds the WASM bundle"
+  @shortdoc "Copies LLV runtime assets and builds the Wasm bundle"
 
   @moduledoc """
-  Copies LocalLiveView runtime files into the host project and builds the WASM bundle.
+  Copies LocalLiveView runtime files into the host project and builds the Wasm bundle.
 
   ## Steps
 
@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Llv.Build do
        from `deps/local_live_view/priv/static/` into `priv/static/assets/js/`.
        These must be served alongside Phoenix's `app.js` so Popcorn's
        `import.meta.url`-based lookups resolve.
-    2. Runs `mix build` inside `local/` to compile the WASM bundle.
+    2. Runs `mix build` inside `local/` to compile the Wasm bundle.
 
   ## Usage
 
@@ -29,7 +29,7 @@ defmodule Mix.Tasks.Llv.Build do
 
   @impl Mix.Task
   def run(args) do
-    # `--local` points at the local (WASM) project. Defaults to "local" (a
+    # `--local` points at the local (Wasm) project. Defaults to "local" (a
     # subdirectory of the host app); in an umbrella it's a sibling, e.g.
     # `mix llv.build --local ../local`.
     {opts, _} = OptionParser.parse!(args, strict: [local: :string])
@@ -53,7 +53,7 @@ defmodule Mix.Tasks.Llv.Build do
       File.cp!(Path.join(src_dir, file), Path.join(dst_dir, file))
     end
 
-    Mix.shell().info("[llv] Building WASM bundle...")
+    Mix.shell().info("[llv] Building Wasm bundle...")
     0 = Mix.shell().cmd("mix build", cd: local_dir)
   end
 end

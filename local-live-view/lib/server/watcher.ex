@@ -81,7 +81,7 @@ defmodule LocalLiveView.Watcher do
 
   @impl true
   def handle_info(:cooked, state) do
-    # Phoenix doesn't watch for WASM files by default
+    # Phoenix doesn't watch for Wasm files by default
     # so we touch a stub JS file.
     File.touch!("priv/static/assets/js/wasm/_reload.js")
 

@@ -65,7 +65,7 @@ non_builtin_local_func(F,As,Bs, FT) ->
 %%    end.
 
 %% Patch reason: even if the module is loaded in AtomVM it does not mean that 
-%% the path to the file is correct as we operate in WASM in Browser.
+%% the path to the file is correct as we operate in Wasm in Browser.
 %% Also - user_default module is never loaded in AtomVM.
 initiate_records(Bs, RT) ->
     RNs1 = popcorn_module:init_rec(shell_default, Bs, RT),

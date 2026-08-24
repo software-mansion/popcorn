@@ -15,7 +15,7 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 ```
            Server                                      Browser                 
 ┌───────────────────────────────┐              ┌──────────────────────────────┐
-│ Phoenix LiveView (host)       │              │ Popcorn (AtomVM WASM)        │
+│ Phoenix LiveView (host)       │              │ Popcorn (AtomVM Wasm)        │
 │                               │              │                              │
 │ render/1                      │              │ MyLocal                      │
 │   <.local_live_view           │              │   mount/3                    │
@@ -30,16 +30,16 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 └───────────────────────────────┘              └──────────────────────────────┘
 ```
 
-1. Your `local/` project is compiled to a `.avm` WASM bundle at build time.
+1. Your `local/` project is compiled to a `.avm` Wasm bundle at build time.
 2. A server-side LiveView renders the mount point with `<.local_live_view view="MyLocal" />`. Every attribute other than `view` is passed down as assigns and delivered to the local view's `update/2` callback — so the host stays in control of the data, exactly as with `live_component/1`.
-3. When the page loads, Popcorn starts the WASM runtime and mounts your LocalLiveViews.
+3. When the page loads, Popcorn starts the Wasm runtime and mounts your LocalLiveViews.
 4. User interactions are handled in the browser — no round-trip to the server.
 5. A local view can push events back to its host with `push_server_event/3`, which arrives at the host LiveView's `handle_event/3`. Handling the event locally first and pushing afterwards gives you optimistic updates, with the server's authoritative state arriving as the next `update/2`.
 6. Optionally, you can sync selected assigns to a server-side mirror module via `mirror_sync/2`, letting other users' LiveViews react to local state changes.
 
 ## Key concepts
 
-**LocalLiveView module** — An Elixir module that uses `use LocalLiveView` and implements `mount/3`, `render/1`, and optionally `handle_event/3`. Lives in the `local/` project (compiled to WASM).
+**LocalLiveView module** — An Elixir module that uses `use LocalLiveView` and implements `mount/3`, `render/1`, and optionally `handle_event/3`. Lives in the `local/` project (compiled to Wasm).
 
 **`local/` project** — A separate Mix project inside your Phoenix app, built via `mix llv.build`. The `local/` project depends on `:local_live_view` and contains all your client-side Elixir code.
 

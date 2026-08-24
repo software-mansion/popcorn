@@ -1,9 +1,9 @@
 # Navigation
 
 LocalLiveView supports patch navigation: updating the URL and re-running
-`handle_params/3` without a full page reload. The state update runs in the WASM
+`handle_params/3` without a full page reload. The state update runs in the Wasm
 VM, so it needs no network call; the URL change is coordinated between the Elixir
-code running in WASM, the Phoenix LiveView JavaScript runtime, and the browser.
+code running in Wasm, the Phoenix LiveView JavaScript runtime, and the browser.
 
 ## Two modes
 
@@ -49,8 +49,8 @@ def handle_event("select_tab", %{"tab" => tab}, socket) do
 end
 ```
 
-The state update happens client-side: `handle_params/3` runs in the WASM VM and
-its diff is applied to the DOM with no network call. The WASM side then emits an
+The state update happens client-side: `handle_params/3` runs in the Wasm VM and
+its diff is applied to the DOM with no network call. The Wasm side then emits an
 `llv:navigate` event, and how the history entry is written depends on the mode:
 
 * **Standalone** - the JS layer writes the browser history entry directly. No
@@ -76,8 +76,8 @@ so `handle_params/3` is not run twice for the same navigation.
 
 ```mermaid
 flowchart TD
-    PP["push_patch/2 (LLV)"] --> WASM["handle_params/3 runs in WASM, diff to DOM"]
-    WASM --> EMIT["local_live_view server emits llv:navigate event"]
+    PP["push_patch/2 (LLV)"] --> Wasm["handle_params/3 runs in Wasm, diff to DOM"]
+    Wasm --> EMIT["local_live_view server emits llv:navigate event"]
     EMIT --> H{Hosted?}
     H -- yes --> PHX["route through Phoenix, phx:navigate echo de-duplicated"]
     H -- no --> HIST["write browser history directly"]

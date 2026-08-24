@@ -56,11 +56,11 @@ export function registerNavigationHandlers(
     llvHandleParams(window.location.href);
   });
 
-  // llv:navigate: LLV push_patch fires this event after the WASM-side
+  // llv:navigate: LLV push_patch fires this event after the Wasm-side
   // handle_params has run. We write the history entry per mode:
   //  - hosted: hand to Phoenix via pushHistoryPatch (Phoenix-owned patch entry + host
   //    handle_params); the phx:navigate echo is skipped via lastLLVNavigatedHref.
-  //  - standalone: just write the URL bar — the WASM side already ran handle_params.
+  //  - standalone: just write the URL bar — the Wasm side already ran handle_params.
   window.addEventListener("llv:navigate", (e: Event) => {
     const { href, replace } = (e as CustomEvent<{ href: string; replace: boolean }>).detail;
     lastLLVNavigatedHref = absHref(href);
@@ -87,7 +87,7 @@ export function registerNavigationHandlers(
   // phx:navigate: forward Phoenix LiveView patch navigations to all LLV views (hosted
   // mode only — never dispatched in dead mode). Fires for <.link patch> clicks and
   // browser back/forward. Skip navigations LLV itself triggered via push_patch, since
-  // LLV already ran handle_params on the WASM side for those.
+  // LLV already ran handle_params on the Wasm side for those.
   window.addEventListener("phx:navigate", (e: Event) => {
     const detail = (e as CustomEvent<{ href?: string; patch?: boolean }>).detail;
     if (!detail?.patch) return;

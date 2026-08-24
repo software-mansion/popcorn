@@ -2,7 +2,7 @@ defmodule LocalLiveView.Utils do
   @moduledoc false
 
   @doc """
-  Recursively turns a term into something JSON-serializable to cross the WASM
+  Recursively turns a term into something JSON-serializable to cross the Wasm
   boundary: structs become maps, map keys become strings, lists are mapped
   through. Used when sending assigns/payloads from the runtime to JS.
   """

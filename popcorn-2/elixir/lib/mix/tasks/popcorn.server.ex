@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.Popcorn.Server do
-  @shortdoc "Starts a static file server with COOP/COEP headers for running WASM."
+  @shortdoc "Starts a static file server with COOP/COEP headers for running Wasm."
   @moduledoc """
   #{@shortdoc}
 

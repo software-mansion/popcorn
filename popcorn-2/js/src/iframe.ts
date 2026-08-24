@@ -16,7 +16,7 @@ type EmscriptenFS = {
   writeFile: (path: string, data: Int8Array) => void;
 };
 
-/** AtomVM Module interface - the WASM module with Elixir runtime */
+/** AtomVM Module interface - the Wasm module with Elixir runtime */
 type AtomVMModule = {
   serialize: (data: AnySerializable) => string;
   deserialize: (

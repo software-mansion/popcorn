@@ -90,7 +90,7 @@ export function buildError(error: ErrorData): PopcornInternalError {
         "Iframe already mounted",
       );
     case "unmounted":
-      return new PopcornInternalError("unmounted", "WASM iframe not mounted");
+      return new PopcornInternalError("unmounted", "Wasm iframe not mounted");
     case "bad_target":
       return new PopcornInternalError(
         "bad_target",

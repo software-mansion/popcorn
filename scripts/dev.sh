@@ -48,7 +48,7 @@ require_cmd() {
 ensure_wasm_assets() {
     local js_dir="$1"
     if [[ ! -f "${js_dir}/assets/AtomVM.wasm" ]]; then
-        log "WASM assets not found, building..."
+        log "Wasm assets not found, building..."
         cd "${js_dir}"
         pnpm run setup
     fi

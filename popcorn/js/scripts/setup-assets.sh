@@ -23,11 +23,11 @@ have_runtime_artifacts() {
 
 ensure_runtime_artifacts() {
   if have_runtime_artifacts; then
-    echo "popcorn/js: using existing OTP WASM artifacts from ${OUT_DIR}"
+    echo "popcorn/js: using existing OTP Wasm artifacts from ${OUT_DIR}"
     return
   fi
 
-  echo "popcorn/js: building OTP WASM artifacts..."
+  echo "popcorn/js: building OTP Wasm artifacts..."
   "${PROJECT_ROOT}/scripts/build-beam.sh" debug
 }
 

@@ -80,5 +80,5 @@ jobs:
       - name: Run tests
         run: mix test
 
-      - name: Run WASM tests
+      - name: Run Wasm tests
         run: TARGET=wasm mix test
