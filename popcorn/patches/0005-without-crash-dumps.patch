@@ -1,7 +1,10 @@
 diff --git a/erts/emulator/beam/break.c b/erts/emulator/beam/break.c
+index cb62e55d1bb241eb50db5552967b5a25aa746186..68ee60186dc83f4d8ea5ce354520990106581554 100644
 --- a/erts/emulator/beam/break.c
 +++ b/erts/emulator/beam/break.c
-@@ -797,4 +797,15 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+@@ -795,6 +795,17 @@ crash_dump_limited_writer(void* vfdp, char* buf, size_t len)
+ void
+ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
  {
 +#ifdef __EMSCRIPTEN__
 +    erts_fprintf(stderr, "\nBEAM fatal error");
@@ -17,7 +20,8 @@ diff --git a/erts/emulator/beam/break.c b/erts/emulator/beam/break.c
      ErtsThrPrgrData tpd_buf; /* in case we aren't a managed thread... */
      int fd;
      size_t envsz;
-@@ -1048,5 +1059,6 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+@@ -1047,6 +1058,7 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+     }
  
      erts_fprintf(stderr,"done\n");
 +#endif

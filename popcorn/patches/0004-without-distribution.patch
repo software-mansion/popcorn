@@ -1,156 +1,5 @@
-diff --git a/lib/kernel/src/Makefile b/lib/kernel/src/Makefile
---- a/lib/kernel/src/Makefile
-+++ b/lib/kernel/src/Makefile
-@@ -66,14 +66,11 @@ MODULES = \
- 	disk_log_server \
- 	disk_log_sup \
- 	dist_ac \
--	dist_util \
- 	erl_boot_server \
- 	erl_compile_server \
- 	erl_ddll \
- 	erl_debugger \
--	erl_distribution \
- 	erl_erts_errors \
--	erl_epmd \
- 	erl_kernel_errors \
- 	erl_reply \
- 	erl_signal_handler \
-@@ -97,21 +94,17 @@ MODULES = \
- 	heart \
- 	inet \
- 	inet6_tcp \
--	inet6_tcp_dist \
- 	inet6_udp \
- 	inet6_sctp \
- 	inet_config \
- 	inet_db \
- 	inet_dns \
- 	inet_dns_tsig \
--	inet_epmd_dist \
--	inet_epmd_socket \
- 	inet_gethost_native \
- 	inet_hosts \
- 	inet_parse \
- 	inet_res \
- 	inet_tcp \
--	inet_tcp_dist \
- 	inet_udp \
- 	inet_sctp \
- 	kernel \
-diff --git a/lib/kernel/src/kernel.app.src b/lib/kernel/src/kernel.app.src
---- a/lib/kernel/src/kernel.app.src
-+++ b/lib/kernel/src/kernel.app.src
-@@ -32,11 +32,9 @@
- 	     auth,
- 	     code,
- 	     code_server,
--	     dist_util,
- 	     erl_boot_server,
- 	     erl_compile_server,
- 	     erl_debugger,
--	     erl_distribution,
-              erl_erts_errors,
- 	     erl_reply,
-              erl_kernel_errors,
-@@ -54,15 +52,11 @@
- 	     group_history,
- 	     heart,
- 	     inet6_tcp,
--	     inet6_tcp_dist,
- 	     inet6_udp,
- 	     inet6_sctp,
- 	     inet_config,
--             inet_epmd_dist,
--             inet_epmd_socket,
- 	     inet_hosts,
- 	     inet_gethost_native,
--	     inet_tcp_dist,
- 	     kernel,
- 	     kernel_config,
- 	     kernel_refc,
-@@ -99,7 +93,6 @@
-              disk_log_sup,
-              dist_ac,
-              erl_ddll,
--             erl_epmd,
- 	     erts_debug,
-              gen_tcp,
- 	     gen_tcp_socket,
-diff --git a/lib/kernel/src/kernel.erl b/lib/kernel/src/kernel.erl
---- a/lib/kernel/src/kernel.erl
-+++ b/lib/kernel/src/kernel.erl
-@@ -260,13 +260,6 @@ start_distribution() ->
- 
-     DistAC = start_dist_ac(),
- 
--    NetSup = #{id => net_sup,
--               start => {erl_distribution, start_link, []},
--               restart => permanent,
--               shutdown => infinity,
--               type => supervisor,
--               modules => [erl_distribution]},
--
-     GlGroup = #{id => global_group,
-                 start => {global_group,start_link,[]},
-                 restart => permanent,
-@@ -274,7 +267,7 @@ start_distribution() ->
-                 type => worker,
-                 modules => [global_group]},
- 
--    [Rpc, Global | DistAC] ++ [NetSup, GlGroup].
-+    [Rpc, Global | DistAC] ++ [GlGroup].
- 
- start_dist_ac() ->
-     Spec = [#{id => dist_ac,
-diff --git a/lib/kernel/src/net_kernel.erl b/lib/kernel/src/net_kernel.erl
---- a/lib/kernel/src/net_kernel.erl
-+++ b/lib/kernel/src/net_kernel.erl
-@@ -345,10 +345,9 @@ Only possible when the net kernel was started using `start/2`, otherwise
- `{error, not_allowed}` is returned. Returns `{error, not_found}` if the local
- node is not alive.
- """.
---spec stop() -> ok | {error, Reason} when
--      Reason :: not_allowed | not_found.
-+-spec stop() -> {error, enotsup}.
- stop() ->
--    erl_distribution:stop().
-+    {error, enotsup}.
- 
- -type node_info() ::
-     {address, #net_address{}} |
-@@ -834,28 +833,8 @@ Currently supported options:
-       Reason :: {already_started, pid()} | term().
- 
- start(Name, Options) when is_atom(Name), is_map(Options) ->
--    try
--        maps:foreach(fun (name_domain, Val) when Val == shortnames;
--                                                 Val == longnames ->
--                             ok;
--                         (net_ticktime, Val) when is_integer(Val),
--                                                  Val > 0 ->
--                             ok;
--                         (net_tickintensity, Val) when is_integer(Val),
--                                                       4 =< Val,
--                                                       Val =< 1000 ->
--                             ok;
--                         (dist_listen, Val) when is_boolean(Val) ->
--                             ok;
--                         (hidden, Val) when is_boolean(Val) ->
--                             ok;
--                         (Opt, Val) ->
--                             error({invalid_option, Opt, Val})
--                     end, Options)
--    catch error:Reason ->
--            error(Reason, [Name, Options])
--    end,
--    erl_distribution:start(Options#{name => Name});
-+    _ = {Name, Options},
-+    {error, enotsup};
- start(Name, Options) when is_map(Options) ->
-     error(invalid_name, [Name, Options]);
- start(Name, Options) ->
 diff --git a/erts/emulator/beam/dist.c b/erts/emulator/beam/dist.c
+index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd016652138e93 100644
 --- a/erts/emulator/beam/dist.c
 +++ b/erts/emulator/beam/dist.c
 @@ -2020,6 +2020,8 @@ int erts_net_message(Port *prt,
@@ -234,7 +83,7 @@ diff --git a/erts/emulator/beam/dist.c b/erts/emulator/beam/dist.c
      DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
      const Sint initial_reds = ERTS_BIF_REDS_LEFT(BIF_P);
      Sint reds = initial_reds, ix, vlen;
-@@ -4977,6 +4995,8 @@ int distribution_info(fmtfn_t to, void *arg)
+@@ -4977,6 +4995,8 @@ int distribution_info(fmtfn_t to, void *arg)	/* Called by break handler */
  
  BIF_RETTYPE setnode_2(BIF_ALIST_2)
  {
@@ -279,3 +128,159 @@ diff --git a/erts/emulator/beam/dist.c b/erts/emulator/beam/dist.c
      erts_de_rwlock(dep);
      if (dep->state != ERTS_DE_STATE_IDLE) {
          erts_de_rwunlock(dep);
+diff --git a/lib/kernel/src/Makefile b/lib/kernel/src/Makefile
+index 63cae1e45f4769779c008d58eb71f7891b4158bb..079353cb5f2afff1e3fec361330c56a6ae41dd96 100644
+--- a/lib/kernel/src/Makefile
++++ b/lib/kernel/src/Makefile
+@@ -66,14 +66,11 @@ MODULES = \
+ 	disk_log_server \
+ 	disk_log_sup \
+ 	dist_ac \
+-	dist_util \
+ 	erl_boot_server \
+ 	erl_compile_server \
+ 	erl_ddll \
+ 	erl_debugger \
+-	erl_distribution \
+ 	erl_erts_errors \
+-	erl_epmd \
+ 	erl_kernel_errors \
+ 	erl_reply \
+ 	erl_signal_handler \
+@@ -97,21 +94,17 @@ MODULES = \
+ 	heart \
+ 	inet \
+ 	inet6_tcp \
+-	inet6_tcp_dist \
+ 	inet6_udp \
+ 	inet6_sctp \
+ 	inet_config \
+ 	inet_db \
+ 	inet_dns \
+ 	inet_dns_tsig \
+-	inet_epmd_dist \
+-	inet_epmd_socket \
+ 	inet_gethost_native \
+ 	inet_hosts \
+ 	inet_parse \
+ 	inet_res \
+ 	inet_tcp \
+-	inet_tcp_dist \
+ 	inet_udp \
+ 	inet_sctp \
+ 	kernel \
+diff --git a/lib/kernel/src/kernel.app.src b/lib/kernel/src/kernel.app.src
+index 831cf1948be806db14f11665a933d65520568c89..b0f870e2a65b2f1fa6dd41cb8205d996023565d1 100644
+--- a/lib/kernel/src/kernel.app.src
++++ b/lib/kernel/src/kernel.app.src
+@@ -32,11 +32,9 @@
+ 	     auth,
+ 	     code,
+ 	     code_server,
+-	     dist_util,
+ 	     erl_boot_server,
+ 	     erl_compile_server,
+ 	     erl_debugger,
+-	     erl_distribution,
+              erl_erts_errors,
+ 	     erl_reply,
+              erl_kernel_errors,
+@@ -54,15 +52,11 @@
+ 	     group_history,
+ 	     heart,
+ 	     inet6_tcp,
+-	     inet6_tcp_dist,
+ 	     inet6_udp,
+ 	     inet6_sctp,
+ 	     inet_config,
+-             inet_epmd_dist,
+-             inet_epmd_socket,
+ 	     inet_hosts,
+ 	     inet_gethost_native,
+-	     inet_tcp_dist,
+ 	     kernel,
+ 	     kernel_config,
+ 	     kernel_refc,
+@@ -99,7 +93,6 @@
+              disk_log_sup,
+              dist_ac,
+              erl_ddll,
+-             erl_epmd,
+ 	     erts_debug,
+              gen_tcp,
+ 	     gen_tcp_socket,
+diff --git a/lib/kernel/src/kernel.erl b/lib/kernel/src/kernel.erl
+index 09281afbf76067aaa18646baa4c17877e678ebb3..95abd9e1ed8bb5f343c2bc62a8b6d70849ce0bde 100644
+--- a/lib/kernel/src/kernel.erl
++++ b/lib/kernel/src/kernel.erl
+@@ -260,13 +260,6 @@ start_distribution() ->
+ 
+     DistAC = start_dist_ac(),
+ 
+-    NetSup = #{id => net_sup,
+-               start => {erl_distribution, start_link, []},
+-               restart => permanent,
+-               shutdown => infinity,
+-               type => supervisor,
+-               modules => [erl_distribution]},
+-
+     GlGroup = #{id => global_group,
+                 start => {global_group,start_link,[]},
+                 restart => permanent,
+@@ -274,7 +267,7 @@ start_distribution() ->
+                 type => worker,
+                 modules => [global_group]},
+ 
+-    [Rpc, Global | DistAC] ++ [NetSup, GlGroup].
++    [Rpc, Global | DistAC] ++ [GlGroup].
+ 
+ start_dist_ac() ->
+     Spec = [#{id => dist_ac,
+diff --git a/lib/kernel/src/net_kernel.erl b/lib/kernel/src/net_kernel.erl
+index b798949dfc59c8770412be4ceb208dd2ce47cde8..903616391b3cbc77acb214ccb571aca3b66d41f0 100644
+--- a/lib/kernel/src/net_kernel.erl
++++ b/lib/kernel/src/net_kernel.erl
+@@ -345,10 +345,9 @@ Only possible when the net kernel was started using `start/2`, otherwise
+ `{error, not_allowed}` is returned. Returns `{error, not_found}` if the local
+ node is not alive.
+ """.
+--spec stop() -> ok | {error, Reason} when
+-      Reason :: not_allowed | not_found.
++-spec stop() -> {error, enotsup}.
+ stop() ->
+-    erl_distribution:stop().
++    {error, enotsup}.
+ 
+ -type node_info() ::
+     {address, #net_address{}} |
+@@ -834,28 +833,8 @@ Currently supported options:
+       Reason :: {already_started, pid()} | term().
+ 
+ start(Name, Options) when is_atom(Name), is_map(Options) ->
+-    try
+-        maps:foreach(fun (name_domain, Val) when Val == shortnames;
+-                                                 Val == longnames ->
+-                             ok;
+-                         (net_ticktime, Val) when is_integer(Val),
+-                                                  Val > 0 ->
+-                             ok;
+-                         (net_tickintensity, Val) when is_integer(Val),
+-                                                       4 =< Val,
+-                                                       Val =< 1000 ->
+-                             ok;
+-                         (dist_listen, Val) when is_boolean(Val) ->
+-                             ok;
+-                         (hidden, Val) when is_boolean(Val) ->
+-                             ok;
+-                         (Opt, Val) ->
+-                             error({invalid_option, Opt, Val})
+-                     end, Options)
+-    catch error:Reason ->
+-            error(Reason, [Name, Options])
+-    end,
+-    erl_distribution:start(Options#{name => Name});
++    _ = {Name, Options},
++    {error, enotsup};
+ start(Name, Options) when is_map(Options) ->
+     error(invalid_name, [Name, Options]);
+ start(Name, Options) ->

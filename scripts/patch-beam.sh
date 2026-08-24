@@ -36,6 +36,15 @@ Examples:
   $0
   $0 --regen HEAD:javascript-bridge
   $0 --regen --create-new-patches HEAD:new-runtime-hook
+
+Regeneration workflow:
+  1. Commit each focused OTP modification above the applied patch stack.
+  2. Assign every modification commit to exactly one simplified patch name.
+  3. Use --create-new-patches only when an assignment introduces a new name.
+
+Split a modification that belongs to several features into separate commits
+before regeneration. Updating an early patch may refresh later patch files when
+their diff context changes.
 EOF
     exit 0
 }

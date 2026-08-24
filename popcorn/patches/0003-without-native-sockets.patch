@@ -1,14 +1,16 @@
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index a3c737bd9c9863566362cd70dd167d45a42806ae..e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -1178,6 +1178,5 @@ ifeq ($(TARGET),win32)
+@@ -1162,7 +1162,6 @@ NIF_OBJS = \
+ ifeq ($(TARGET),win32)
  DRV_OBJS = \
  	$(OBJDIR)/registry_drv.o \
 -	$(OBJDIR)/inet_drv.o \
  	$(OBJDIR)/ram_file_drv.o
  OS_OBJS = \
  	$(OBJDIR)/dll_sys.o \
-@@ -1205,6 +1204,5 @@ OS_OBJS = \
+@@ -1189,7 +1188,6 @@ OS_OBJS = \
  	$(OBJDIR)/unix_socket_syncio.o
  
  DRV_OBJS = \
@@ -17,9 +19,13 @@ diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
  endif
  
 diff --git a/erts/preloaded/src/prim_inet.erl b/erts/preloaded/src/prim_inet.erl
+index 78c415e7c5240c8582aec89046d254e135c8eab8..fb15d8f5cc6caad25c636b742afa0da0f7815ebc 100644
 --- a/erts/preloaded/src/prim_inet.erl
 +++ b/erts/preloaded/src/prim_inet.erl
-@@ -97,26 +97,3 @@ fdopen(Protocol, Family, Type, Fd, Bound)
+@@ -94,44 +94,8 @@ fdopen(Protocol, Family, Type, Fd, Bound)
+     open(Protocol, Family, Type, [], ?INET_REQ_FDOPEN,
+          [?int32(Fd), enc_value_2(bool, Bound)]).
+ 
 -open(Protocol, Family, Type, Opts, Req, Data) ->
 -    Drv = protocol2drv(Protocol),
 -    AF = enc_family(Family),
@@ -45,10 +51,7 @@ diff --git a/erts/preloaded/src/prim_inet.erl b/erts/preloaded/src/prim_inet.erl
 -	%% system_limit if out of port slots
 -	error:system_limit -> {error, system_limit}
 -    end.
-+open(_Protocol, _Family, _Type, _Opts, _Req, _Data) ->
-+    {error, eprotonosupport}.
- 
-@@ -123,14 +100,1 @@ open(Protocol, Family, Type, Opts, Req, Data) ->
+-
 -enc_family(inet)  -> ?INET_AF_INET;
 -enc_family(inet6) -> ?INET_AF_INET6;
 -enc_family(local) -> ?INET_AF_LOCAL.
@@ -61,5 +64,8 @@ diff --git a/erts/preloaded/src/prim_inet.erl b/erts/preloaded/src/prim_inet.erl
 -protocol2drv(udp)   -> "udp_inet";
 -protocol2drv(sctp)  -> "sctp_inet";
 -protocol2drv(mptcp) -> "tcp_inet".
--
++open(_Protocol, _Family, _Type, _Opts, _Req, _Data) ->
++    {error, eprotonosupport}.
+ 
  drv2protocol("tcp_inet")  -> tcp;
+ drv2protocol("udp_inet")  -> udp;
