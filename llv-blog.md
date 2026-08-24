@@ -94,11 +94,11 @@ They're both thoroughly explained in the docs as well.
 
 This post shows a very simple example, but Local LiveView is already capable of running more complex apps. We prepared several demos you can try yourself:
 
-- [Kanban boards](https://demo-popcorn.swmansion.com/kanban) — an app for creating and browsing kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag & drop, optimistic updates, and all the modals/forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` — reconnect and open two windows side by side to see it.
+- [Kanban boards](https://popcorn-demo.swmansion.com/kanban) — an app for creating and browsing kanban-style boards. The most interesting part is the board view: it's 100% Elixir, supports drag & drop, optimistic updates, and all the modals/forms are handled locally. Open the app, create a board, then disconnect from the network and see how it behaves. It also demonstrates server synchronization via `push_server_event` — reconnect and open two windows side by side to see it.
 
-- [Pong game](https://demo-popcorn.swmansion.com/pong) — a simple, 100% local, 100% Elixir game — you play Pong against a bot.
+- [Pong game](https://popcorn-demo.swmansion.com/pong) — a simple, 100% local, 100% Elixir game — you play Pong against a bot.
 
-- [Burrito order form](https://demo-popcorn.swmansion.com/burrito) — a fairly complex form demo, comparing regular LiveView and Local LiveView side by side. It also demonstrates synchronizing state via mirror sync.
+- [Burrito order form](https://popcorn-demo.swmansion.com/burrito) — a fairly complex form demo, comparing regular LiveView and Local LiveView side by side. It also demonstrates synchronizing state via mirror sync.
 
 ## Coming next: real-world validation, smaller bundles, SSR
 
