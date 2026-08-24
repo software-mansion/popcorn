@@ -94,7 +94,7 @@ const INIT_TOKEN = Symbol();
 const IFRAME_URL = new URL("./iframe.mjs", import.meta.url).href;
 
 /**
- * Manages Elixir by setting up iframe, WASM module, and event listeners. Used to sent messages to Elixir processes.
+ * Manages Elixir by setting up iframe, Wasm module, and event listeners. Used to sent messages to Elixir processes.
  */
 export class Popcorn {
   public heartbeatTimeoutMs: number | null = null;

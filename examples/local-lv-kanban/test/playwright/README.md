@@ -25,7 +25,7 @@ mix test --exclude e2e # fast: unit tests only (skip this suite)
 mix test --only e2e    # just this suite
 ```
 
-`mix test` prepends `mix llv.build`, so the WASM bundle the browser boots from is
+`mix test` prepends `mix llv.build`, so the Wasm bundle the browser boots from is
 current (adds ~30–60s; use `--exclude e2e` while iterating on unit tests). On a clean
 checkout the e2e test also builds `app.js`/`app.css` once via `mix assets.build`.
 

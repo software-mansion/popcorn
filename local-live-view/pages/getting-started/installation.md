@@ -38,14 +38,14 @@ The installer configures your project automatically:
 | What | Where |
 |---|---|
 | Adds `LocalLiveView.Socket` | `lib/*_web/endpoint.ex` |
-| Adds COOP/COEP security headers (required for WASM) | `lib/*_web/endpoint.ex` |
+| Adds COOP/COEP security headers (required for Wasm) | `lib/*_web/endpoint.ex` |
 | Registers `LocalLiveView.ChannelRegistry` | `lib/<app>/application.ex` |
 | Imports `LocalLiveView.Component` | `lib/*_web.ex` (html_helpers) |
 | Changes app.js script tag to `type="module"` | `lib/*_web/components/layouts/root.html.heex` |
 | Adds `LLVEngine.create` call for the JS bridge | `assets/js/app.js` |
 | Adds `local_live_view` JS package | `assets/package.json` |
 | Replaces esbuild watcher with `build.mjs` | `mix.exs`, `config/dev.exs` |
-| Generates the `local/` WASM project | `local/` |
+| Generates the `local/` Wasm project | `local/` |
 
 > **Manual fallback:** If the installer can't find a file (e.g. your project has a non-standard structure), it prints the exact snippet to add manually.
 
@@ -57,7 +57,7 @@ mix setup
 
 The installer already added `llv.build` to the `setup` alias in `mix.exs`. `llv.build` creates popcorn runtime for browser-side elixir.
 
-This compiles your `local/` project to a WASM bundle at `priv/static/assets/js/wasm/bundle.avm`.
+This compiles your `local/` project to a Wasm bundle at `priv/static/assets/js/wasm/bundle.avm`.
 
 
 ## Step 4 — Start the server
@@ -81,7 +81,7 @@ local/
 │   │   └── application.ex  # OTP application
 │   └── hello_local.ex      # Sample LocalLiveView
 ├── .formatter.exs
-└── mix.exs                 # Compiles to WASM via popcorn.cook
+└── mix.exs                 # Compiles to Wasm via popcorn.cook
 ```
 
 Now you can add your LocalLiveView modules to `local/lib/`. When the server is running, the LLV watcher detects changes and automatically rebuilds the local code. To enforce rebuild, run `mix llv.build` and restart the server.

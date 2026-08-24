@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build OTP/BEAM for WASM
+      - name: Build OTP/BEAM for Wasm
         uses: ./.github/actions/build-otp-wasm
         with:
           host-otp-version: &host_otp "28.3.1"
@@ -76,7 +76,7 @@ jobs:
           version: "1.61.1"
 
       # The e2e suite compiles and packages an OTP fixture app, so a host
-      # toolchain matching the WASM runtime is required even on cache hits.
+      # toolchain matching the Wasm runtime is required even on cache hits.
       - name: Setup Elixir and Erlang
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:

@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build OTP/BEAM for WASM
+      - name: Build OTP/BEAM for Wasm
         uses: ./.github/actions/build-otp-wasm
         with:
           host-otp-version: &host_otp "28.3.1"

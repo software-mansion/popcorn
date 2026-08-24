@@ -1,7 +1,7 @@
 # Hello Popcorn 👋
 
 This is a very simple example of using Popcorn with the OTP/BEAM WebAssembly
-runtime: it displays `Hello from WASM!` on the homepage and `Hello console!` in
+runtime: it displays `Hello from Wasm!` on the homepage and `Hello console!` in
 the browser console (see `lib/hello_popcorn.ex`).
 
 Install the JavaScript dependencies and build the OTP package from the

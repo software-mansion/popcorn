@@ -38,8 +38,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Produces popcorn/out with the OTP/BEAM WASM runtime (cached across runs).
-      - name: Build OTP/BEAM for WASM
+      # Produces popcorn/out with the OTP/BEAM Wasm runtime (cached across runs).
+      - name: Build OTP/BEAM for Wasm
         uses: ./.github/actions/build-otp-wasm
         with:
           host-otp-version: &host_otp "28.3.1"
@@ -47,7 +47,7 @@ jobs:
           with-crypto: "false"
 
       # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.19.5
-      # runtime shipped in the WASM VM, so the host toolchain must match it.
+      # runtime shipped in the Wasm VM, so the host toolchain must match it.
       # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
@@ -96,7 +96,7 @@ jobs:
         run: pnpm test
         working-directory: examples/hello-popcorn/assets
 
-      - name: Run IEx WASM e2e tests
+      - name: Run IEx Wasm e2e tests
         run: pnpm test
         working-directory: examples/iex-wasm/assets
 

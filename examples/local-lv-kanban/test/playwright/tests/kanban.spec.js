@@ -11,7 +11,7 @@ test.describe("board index + lifecycle", () => {
     // The local live view heading shows the board's own name.
     await expect(page.getByRole("heading", { name: "Untitled board", exact: true })).toBeVisible();
 
-    // Seeded columns render in the WASM local live view.
+    // Seeded columns render in the Wasm local live view.
     expect(await h.columnNames(page)).toEqual(SEEDED);
 
     // Opening the board recorded it in localStorage; the index renders it as a
@@ -229,7 +229,7 @@ test.describe("push failure (handle_push_error)", () => {
       }).observe(document.body, { childList: true, subtree: true, characterData: true });
     });
 
-    // add_column applies optimistically in WASM, then the failed push triggers
+    // add_column applies optimistically in Wasm, then the failed push triggers
     // handle_push_error, restoring the last authoritative board.
     await h.submitColumn(page, "Ghost");
     await page.waitForFunction(() => window.__llvTestSawGhost, null, { timeout: 15_000 });

@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Llv.Install do
     * Generate a HelloLocalLive LiveView that renders it and route it at `/hello_local`
 
   `mix setup` will then run `mix llv.build` which copies the LLV JS runtime files
-  into your project's `priv/static/assets/js/` and builds the WASM bundle from `local/`.
+  into your project's `priv/static/assets/js/` and builds the Wasm bundle from `local/`.
   """
 
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
@@ -83,7 +83,7 @@ defmodule Mix.Tasks.Llv.Install do
       else
         :error ->
           {:warning,
-           "Could not find use Phoenix.Endpoint. Add LLV socket and WASM security headers manually."}
+           "Could not find use Phoenix.Endpoint. Add LLV socket and Wasm security headers manually."}
       end
     end
   end

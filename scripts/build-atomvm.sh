@@ -17,8 +17,8 @@ Usage: $0 [OPTIONS] <build-mode>
 Build AtomVM from source.
 
 Build modes (positional):
-  debug-wasm      Build debug WASM target
-  release-wasm    Build release WASM target
+  debug-wasm      Build debug Wasm target
+  release-wasm    Build release Wasm target
   debug-unix      Build debug Unix target
   release-unix    Build release Unix target
 
@@ -129,7 +129,7 @@ ensure_ninja() {
 
 ensure_emscripten() {
     if ! command -v emcmake &> /dev/null; then
-        error "emscripten is required for WASM builds but not found. Please install emscripten."
+        error "emscripten is required for Wasm builds but not found. Please install emscripten."
     fi
 }
 
@@ -196,7 +196,7 @@ build_wasm() {
     local jobs="$6"
     local build_dir="${atomvm_dir}/src/platforms/emscripten/build"
 
-    log "Building WASM target (${build_type})"
+    log "Building Wasm target (${build_type})"
 
     ensure_ninja
     ensure_emscripten
@@ -247,7 +247,7 @@ build_wasm() {
         gzip -9 -k -f "${out_dir}/AtomVM.mjs"
     fi
 
-    success "WASM build complete. Artifacts written to: ${out_dir}"
+    success "Wasm build complete. Artifacts written to: ${out_dir}"
 }
 
 main() {

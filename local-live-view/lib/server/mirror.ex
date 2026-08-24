@@ -50,7 +50,7 @@ defmodule LocalLiveView.Mirror do
 
   These are the assigns last returned by the view's
   `c:LocalLiveView.Mirror.handle_sync/3`. Returns an empty map when no local
-  live view is currently joined under that id, for example before the WASM
+  live view is currently joined under that id, for example before the Wasm
   runtime has started.
 
   The browser is the source of truth here — mirror assigns are the server's view

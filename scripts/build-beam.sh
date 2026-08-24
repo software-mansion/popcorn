@@ -225,7 +225,7 @@ build_openssl() {
     local mode="$1"
     local jobs="$2"
 
-    log "Building OpenSSL for WASM..."
+    log "Building OpenSSL for Wasm..."
     local openssl_args=("${mode}")
     if [[ -n "${jobs}" ]]; then
         openssl_args+=("-j" "${jobs}")
@@ -399,7 +399,7 @@ build_beam() {
     local mode="$2"
     local jobs="$3"
 
-    log "Building BEAM for WASM (${mode}, ${jobs} jobs)..."
+    log "Building BEAM for Wasm (${mode}, ${jobs} jobs)..."
 
     local extra_emcc_link_flags
     extra_emcc_link_flags=$(emulator_link_settings "${mode}")

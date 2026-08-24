@@ -18,7 +18,7 @@ runs:
   using: composite
   steps:
     # The same command a user runs: deps.get, llv.build (JS bundle + Popcorn
-    # runtime files + the WASM bundle) and the Phoenix asset pipeline.
+    # runtime files + the Wasm bundle) and the Phoenix asset pipeline.
     #
     # MIX_ENV is pinned to dev because the calling workflows set it to test for
     # their test jobs, and this check is about the developer flow: config/test.exs
@@ -34,7 +34,7 @@ runs:
     # Deliberately only asks whether the endpoint answers. What the response
     # contains, and whether every generated asset is in place, is covered by
     # local_live_view_build.yml — checking it again per example would make each
-    # run longer and add a race with the dev watcher, which recooks the WASM
+    # run longer and add a race with the dev watcher, which recooks the Wasm
     # bundle right after boot.
     - name: Boot the server
       shell: bash

@@ -216,7 +216,7 @@ function errorLines(error: unknown): string[] {
       .map(({ app, capability }) => `${app} (needs ${capability})`)
       .join(", ");
     return [
-      `These applications need native support the WASM runtime wasn't built`,
+      `These applications need native support the Wasm runtime wasn't built`,
       `with: ${apps}.`,
       `Drop them from your dependencies, or use a runtime built with it.`,
     ];

@@ -116,7 +116,7 @@ defmodule LocalLiveView.MixProject do
         Guides: ~r"/guides/"
       ],
       groups_for_modules: [
-        "Browser / WASM (Popcorn)": [
+        "Browser / Wasm (Popcorn)": [
           ~r/^LocalLiveView$/
         ],
         "Server Side": [

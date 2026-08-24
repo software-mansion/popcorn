@@ -119,7 +119,7 @@ jobs:
         run: mix test
 
       # The host app is only exercised here, after AtomVM exists: `mix setup`
-      # builds the JS bundle and the WASM bundle, neither of which is committed.
+      # builds the JS bundle and the Wasm bundle, neither of which is committed.
       - name: Verify setup and phx.server
         uses: ./.github/actions/verify-llv-app
         with:

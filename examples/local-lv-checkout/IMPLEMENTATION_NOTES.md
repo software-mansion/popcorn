@@ -18,7 +18,7 @@ CheckoutLive (Phoenix LiveView)
   ├─ displays step indicator
   └─ renders <.local_live_view id={id} view="CheckoutLive" />
        ↓
-       CheckoutLive (LocalLiveView in WASM)
+       CheckoutLive (LocalLiveView in Wasm)
          ├─ independent state (form_data, current_step)
          ├─ handles mount/handle_params (but currently only on initial mount)
          └─ renders step forms

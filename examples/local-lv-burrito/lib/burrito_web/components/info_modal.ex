@@ -29,7 +29,7 @@ defmodule BurritoWeb.InfoModal do
           <p>
             The same burrito form runs twice. Left as a standard Phoenix LiveView (server-rendered),
             right as <strong class="text-pop-brown">Local LiveView</strong>: Elixir code compiled
-            to WASM and running directly in the browser.
+            to Wasm and running directly in the browser.
           </p>
 
           <ul class="flex flex-col gap-2 list-none">

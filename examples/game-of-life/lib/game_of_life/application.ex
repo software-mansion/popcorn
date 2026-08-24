@@ -15,7 +15,7 @@ defmodule GameOfLife.Application do
     Supervisor.start_link(children, opts)
   end
 
-  # The bridge exists only inside the OTP/WASM runtime; on the host BEAM
+  # The bridge exists only inside the OTP/Wasm runtime; on the host BEAM
   # (e.g. `mix test`) the app runs without the UI.
   defp ui() do
     if Popcorn.Wasm.available?() do

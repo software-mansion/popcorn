@@ -137,7 +137,7 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Runs JS code in the WASM iframe context. Takes a JS function as a string.
+  Runs JS code in the Wasm iframe context. Takes a JS function as a string.
   Returns list of `TrackedObject` (or values directly, see `return`) for each value in an array returned from JS function.
 
   ## Options

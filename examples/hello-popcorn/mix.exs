@@ -16,7 +16,7 @@ defmodule HelloPopcorn.MixProject do
     [
       # Only apps present in the OTP runtime manifest (kernel, stdlib,
       # compiler, elixir, logger) may be listed — they ship as tarballs baked
-      # into the OTP/WASM build. Other apps make the asset packer fail with a
+      # into the OTP/Wasm build. Other apps make the asset packer fail with a
       # missing dependency.
       extra_applications: [:logger],
       mod: {HelloPopcorn.Application, []}

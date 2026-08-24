@@ -14,7 +14,7 @@ const columnByName = (page, name) => columns(page).filter({ hasText: name });
 // A task card located by its text.
 const taskCard = (page, text) => tasks(page).filter({ hasText: text });
 
-/** Wait until the WASM local live view has booted and rendered the board. */
+/** Wait until the Wasm local live view has booted and rendered the board. */
 async function waitForBoard(page) {
   // The heading now shows the board's own name, so the first rendered column is
   // the name-agnostic boot signal.
@@ -91,7 +91,7 @@ async function columnNames(page) {
 // JS that listens on window). Playwright's mouse-based dragTo does not fire those,
 // so we dispatch real DragEvents (with a DataTransfer) and let the bindings run.
 // Sequence: dragstart(src) -> dragover(target) -> dragend(src). The local view
-// processes them in order (waits give the WASM round-trips time to land).
+// processes them in order (waits give the Wasm round-trips time to land).
 
 // Dispatch a drag event on the first element matching `selector` whose text
 // contains `text`. The selector MUST be specific (TASK vs COLUMN): a column is an
