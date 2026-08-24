@@ -28,8 +28,7 @@ interface CreateArgs {
   view: string;
   url: string;
   urlParams: Record<string, string>;
-  // Can be null when mounting LLVs manually via <div data-pop-view="...">
-  // and not setting `data-pop-assigns`.
+  // Null when a manually mounted LLV (`<div data-pop-view="...">`) omits data-pop-assigns.
   assigns: string | null;
   mirrorId: string | undefined;
 }
@@ -107,9 +106,7 @@ class PopcornClient {
     this.fire("server_message", { action: "server_message", id, payload });
   }
 
-  // Report a failed local→server push back to the view's process so its
-  // handle_push_error callback runs. `payload` is the map the view passed
-  // to push_server_event.
+  // Notify the view so handle_push_error runs for a failed server push.
   pushError(id: string, event: string, payload: Record<string, unknown>): void {
     this.fire("push_error report", { action: "push_error", id, payload: { event, payload } });
   }
@@ -138,7 +135,7 @@ export class LLVEngine {
   }
 
   /**
-   * Initializes LLVEngine and connects the LiveSocket.
+   * Initializes the engine and mounts the views currently on the page.
    *
    * @param liveSocket - The phoenix_live_view LiveSocket instance.
    * @param config - Optional LLV configuration.
@@ -149,8 +146,7 @@ export class LLVEngine {
   ): Promise<LLVEngine> {
     const engine = new LLVEngine(liveSocket as LLVSocket, config);
 
-    // Synchronous registration must happen BEFORE any awaits (see
-    // registerServerMessageListener / registerHooks comments).
+    // Register handlers before bootPopcorn() so early LiveView events aren't lost.
     engine.registerServerMessageListener();
     registerNavigationHandlers(engine.socket, engine.views, engine.pop, engine.config);
     engine.registerHooks();
@@ -170,9 +166,7 @@ export class LLVEngine {
     return engine;
   }
 
-  // The app's Phoenix Socket class, recovered from the live instance the
-  // LiveSocket already holds — same class, same version, same module as the
-  // one LiveView runs on, with nothing to configure.
+  // Reuse the Socket constructor already held by LiveSocket.
   private socketClass(): typeof PhoenixSocket {
     return this.socket.getSocket().constructor as typeof PhoenixSocket;
   }
@@ -181,7 +175,6 @@ export class LLVEngine {
     this.popcornLink = createPopcornSocket(this.socketClass(), this.pop);
   }
 
-  // Start a view and wire it up.
   private async mountView(pop_view_el: HTMLElement): Promise<void> {
     const llvId = pop_view_el.id;
     const mirrorId = pop_view_el.dataset.popMirrorId;
@@ -191,16 +184,12 @@ export class LLVEngine {
     if (this.views.has(llvId)) return;
     const result = await this.pop.create({
       id: llvId,
-      // always present since its used to find LLVs.
       view: pop_view_el.getAttribute("data-pop-view")!,
       url: window.location.href,
       urlParams: Object.fromEntries(new URLSearchParams(window.location.search)),
       assigns: pop_view_el.getAttribute("data-pop-assigns"),
       mirrorId: mirrorId,
     });
-    // A rejected call resolves with ok: false (it does not throw). Bail on
-    // failed or duplicate creates — wiring a fake view without a live
-    // process would join a channel nobody answers.
     if (!result.ok) {
       console.error("LLV failed to create view", llvId, result.error);
       return;
@@ -213,8 +202,6 @@ export class LLVEngine {
     }
   }
 
-  // Stop a view's runtime process and drop its fake view. Used by the hook when
-  // the host LiveView removes the mount point.
   private unmountView(pop_view_el: HTMLElement): void {
     const llvId = pop_view_el.id;
     const view = this.views.get(llvId);
@@ -224,10 +211,7 @@ export class LLVEngine {
     this.pop.destroy(llvId);
   }
 
-  // Register the server message listener immediately — BEFORE any awaits.
-  // push_event("llv_server_message") from Phoenix LiveView fires during the initial
-  // LiveView join, which happens before Popcorn finishes initializing. Without this,
-  // the event is dispatched on window before our listener is registered and is lost.
+  // Register before Popcorn boots; the initial LiveView join can emit this event.
   private registerServerMessageListener(): void {
     window.addEventListener("phx:llv_server_message", (e: Event) => {
       const detail = (e as CustomEvent<LLVServerMessageDetail>).detail;
@@ -306,7 +290,6 @@ export class LLVEngine {
     }
   }
 
-  // Mirror channels: only created for views with a server-side Mirror module.
   private setupMirrorSync(): void {
     window.__llvSync = (mirror_id: string, eventName: string, payload: Record<string, unknown>) => {
       const channel = this.channels[mirror_id];
@@ -404,17 +387,13 @@ export class LLVEngine {
     };
   }
 
-  // Startup scan: mount every [data-pop-view] present now that Popcorn is up.
-  // This is the mount path for host-less pages (no hooks fire there) and the
-  // catch-up for hooks that fired before Popcorn was ready.
-  // If a view is mounted twice (here and by the hook), the dispatcher
-  // on the Elixir side rejects the second create.
+  // Catch hostless views and hooks that fired before Popcorn was ready.
+  // Concurrent hook mounting is safe because the dispatcher rejects duplicate creates.
   private async scanAndMount(): Promise<void> {
     const pop_view_els = Array.from(document.querySelectorAll<HTMLElement>("[data-pop-view]"));
     await Promise.all(pop_view_els.map((el) => this.mountView(el)));
   }
 
-  // Flush any server messages that arrived during Popcorn initialization.
   private flushBufferedServerMessages(): void {
     for (const detail of this.bufferedServerMessages) {
       sendServerMessage(this.pop, detail);
@@ -423,7 +402,7 @@ export class LLVEngine {
   }
 
   /**
-   * Pushes an event into a LLVEngine from external JavaScript.
+   * Dispatches an event to handle_info/2.
    *
    * @param viewId - The view name (e.g. `"ThermostatLive"`) or element id.
    * @param event - The event name to dispatch into the view's `handle_info/2`.
