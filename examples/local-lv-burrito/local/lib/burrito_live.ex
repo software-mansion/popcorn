@@ -20,6 +20,13 @@ defmodule BurritoLive do
   }
 
   def mount(_params, _session, socket) do
+    # Tell the browser this view is up — the LLVLoader hook in app.js hides
+    # the boot overlay on this event (once-listener, so the re-fire on a
+    # crash-rejoin remount is harmless).
+    Popcorn.Wasm.run_js("""
+    () => window.dispatchEvent(new CustomEvent("llv:ready"))
+    """)
+
     builder = default_builder()
 
     {:ok,

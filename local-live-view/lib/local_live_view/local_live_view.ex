@@ -8,7 +8,7 @@ defmodule LocalLiveView do
   to the browser on page load. Whenever you render a local
   live view on the page, it is run on the client.
 
-  `LocalLiveView` API similar to `Phoenix.LiveView`:
+  The `LocalLiveView` API is similar to `Phoenix.LiveView`:
   - it runs in a separate Elixir process,
   - it has `c:mount/3`, `c:handle_params/3` and `c:render/1` callbacks,
     which behave the same way as in a regular live view,
@@ -63,7 +63,7 @@ defmodule LocalLiveView do
   end
   ```
 
-  You can reder it the following way:
+  You can render it the following way:
 
   ```
   <.local_live_view view="Cart" items={@items} />
@@ -166,23 +166,21 @@ defmodule LocalLiveView do
     socket
   end
 
-  defmacro __using__(opts) do
-    quote bind_quoted: [opts: opts] do
-      import LocalLiveView, only: [mirror_sync: 2, push_server_event: 2, push_server_event: 3]
+  # A local view module is NOT a LiveView itself: the channel always mounts
+  # LocalLiveView.Proxy, which proxies every callback here at runtime. So
+  # `use LocalLiveView` only declares the behaviour, compiles templates
+  # (Phoenix.Component) and provides overridable defaults.
+  defmacro __using__(_opts) do
+    quote do
+      import LocalLiveView,
+        only: [mirror_sync: 2, push_patch: 2, push_server_event: 2, push_server_event: 3]
+
       @behaviour LocalLiveView
       @before_compile Phoenix.LiveView.Renderer
-      @phoenix_live_opts []
-      Module.register_attribute(__MODULE__, :phoenix_live_mount, accumulate: true)
-      @before_compile LocalLiveView
-      alias LocalLiveView.Message
       use Phoenix.Component, global_prefixes: ~w(pop-)
 
       @impl true
-      def handle_event("llv_server_message", %{"type" => type} = params, socket) do
-        handle_server_event(type, params, socket)
-      end
-
-      def handle_server_event(_, _, socket) do
+      def handle_server_event(_type, _params, socket) do
         {:noreply, socket}
       end
 
@@ -206,51 +204,6 @@ defmodule LocalLiveView do
     end
   end
 
-  @doc false
-  defmacro __before_compile__(env) do
-    opts = Module.get_attribute(env.module, :phoenix_live_opts)
-
-    on_mount =
-      env.module
-      |> Module.get_attribute(:phoenix_live_mount)
-      |> Enum.reverse()
-
-    live = LocalLiveView.__live__([on_mount: on_mount] ++ opts)
-
-    quote do
-      @doc false
-      def __live__ do
-        unquote(Macro.escape(live))
-      end
-    end
-  end
-
-  @doc false
-  def __live__(opts \\ []) do
-    on_mount = opts[:on_mount] || []
-
-    layout =
-      Phoenix.LiveView.Utils.normalize_layout(Keyword.get(opts, :layout, false))
-
-    log =
-      case Keyword.fetch(opts, :log) do
-        {:ok, false} -> false
-        {:ok, log} when is_atom(log) -> log
-        :error -> :debug
-        _ -> raise ArgumentError, ":log expects an atom or false, got: #{inspect(opts[:log])}"
-      end
-
-    container = opts[:container] || {:div, []}
-
-    %{
-      container: container,
-      kind: :view,
-      layout: layout,
-      lifecycle: Phoenix.LiveView.Lifecycle.build(on_mount),
-      log: log
-    }
-  end
-
   @doc """
   Navigates to the given path with a browser history push, then calls `handle_params/3`
   with the new URL query params. No server round-trip.
@@ -265,7 +218,14 @@ defmodule LocalLiveView do
   def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
     to = Keyword.fetch!(opts, :to)
     kind = if opts[:replace], do: :replace, else: :push
-    %{socket | redirected: {:live, :patch, %{to: to, kind: kind}}}
+
+    # Setting socket.redirected would send Phoenix.LiveView.Channel down its
+    # router-backed live-patch path, which router-less local views can't take.
+    # Instead LocalLiveView.Proxy picks the {:llv, :patch} message up right
+    # after the current callback: it updates the browser URL and runs
+    # handle_params.
+    send(self(), {:llv, :patch, to, kind})
+    socket
   end
 
   @type unsigned_params :: map
@@ -376,6 +336,16 @@ defmodule LocalLiveView do
               {:noreply, Socket.t()} | {:reply, map, Socket.t()}
 
   @doc """
+  Handles an `llv_server_message` event pushed by the host LiveView.
+
+  The host pushes such messages with the `LocalLiveViewEventBus` hook;
+  they arrive here instead of `c:handle_event/3`, with the message `type`
+  extracted from the payload. The default implementation ignores the message.
+  """
+  @callback handle_server_event(type :: binary, params :: unsigned_params(), socket :: Socket.t()) ::
+              {:noreply, Socket.t()} | {:reply, map, Socket.t()}
+
+  @doc """
   Handles a message sent to the view's process.
 
   A local live view runs as its own Elixir process inside the browser, so
@@ -428,5 +398,6 @@ defmodule LocalLiveView do
                       handle_event: 3,
                       handle_info: 2,
                       handle_params: 3,
-                      handle_push_error: 4
+                      handle_push_error: 4,
+                      handle_server_event: 3
 end

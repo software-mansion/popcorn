@@ -21,8 +21,9 @@ defmodule LocalLiveView.Component do
 
   Like `Phoenix.Component.live_component/1`, any attribute other than `view` is
   forwarded to the view as the assigns of its `c:LocalLiveView.update/2`
-  callback. `id` is forwarded too, and additionally used as the mount point's DOM
-  id.
+  callback. `id` is forwarded too, and additionally used as the view's DOM id
+  (the id of the root div inside the mount point, which becomes the LiveView
+  container at runtime).
 
   ## Attributes
 
@@ -136,18 +137,37 @@ defmodule LocalLiveView.Component do
     validate_assigns!(assigns)
 
     ~H"""
-    <div>
+    <%!-- The mount point: one host-owned element carrying the LocalLiveView
+    hook (which drives the view's lifecycle from the host LiveView), the
+    view identity (data-pop-view, data-pop-id) and the host→view data
+    attributes (assigns, mirror config). phx-update="ignore" keeps host
+    patches away from the subtree below — documented LiveView semantics —
+    while the ignored element itself still gets its data-* attributes
+    merged and its hook's updated() fired on every patch, so assign
+    updates keep flowing. The hook nested in the ignored subtree (the
+    event bus) mounts from the initial HTML and never needs patching. --%>
     <div
-      data-pop-view={@view}
-      id={@id}
+      id={"#{@id}-llv-hook"}
       phx-hook="LocalLiveView"
+      phx-update="ignore"
+      data-pop-view={@view}
+      data-pop-id={@id}
+      data-pop-assigns={encode_assigns(@comp_assigns)}
       data-pop-mirror-token={@mirror_token}
       data-pop-mirror-id={@mirror_id}
-      data-pop-assigns={encode_assigns(@comp_assigns)}
-      phx-update="ignore"
     >
-    </div>
-    <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
+    <%!-- The LLV root placeholder. On "create" the WASM runtime renders the
+    view's real LiveView container — a sticky root whose data-phx-session
+    token is signed by LiveView's own machinery — and the LLVEngine
+    replaces this div with it, then joins it (through the patched
+    newRootView, which puts its channel on the popcorn socket). The
+    canonical view id (@id) belongs to the container (it is the LiveView's
+    id, its topic, and the id every LLV API is keyed on); the mount point
+    carries it in data-pop-id. --%>
+    <div id={@id} data-pop-root></div>
+    <%!-- Stub for sending events from client to server. See LLVEngine class.
+    Deliberately its own empty element: pushing through a hook freezes the
+    hook's element and all descendants until LiveView acks. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>
     </div>

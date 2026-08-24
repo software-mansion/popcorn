@@ -96,6 +96,15 @@ defmodule Popcorn do
         # LiveView/LLV modules are resolved via Heex templates, which are just strings,
         # what makes them invisible for treeshaking. For now we keep all LLV impls.
         %{behaviour_impls: LocalLiveView},
+        # The fake LLV endpoint is only ever called dynamically —
+        # `endpoint.config(:live_view)` in LiveView/Plug.Crypto token
+        # verification — which static analysis cannot see. A @behaviour
+        # doesn't help either: Phoenix.Endpoint declares config/2, while the
+        # dynamic call sites use the config/1 default-argument wrapper.
+        # Without this every LLV channel join crashes.
+        # (LocalLiveView.Serializer has the same dynamic-call problem but is
+        # covered by its @behaviour Phoenix.Socket.Serializer declaration.)
+        LocalLiveView.Endpoint,
         # Popcorn.Init is called by the boot module, which is ignored (see `:ignore`)
         Popcorn.Init
         | start_fun

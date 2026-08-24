@@ -344,16 +344,24 @@ topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
 window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));
 window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 
-// Setup Local LiveViews (intercepts LLV data-pop-view elements and runs them via Wasm)
+// Setup Local LiveViews (intercepts LLV data-pop-view elements and runs them via Wasm).
+// LLVEngine.create must run before liveSocket.connect() (the hooks it
+// registers must exist when the host view joins); llvEngine.connect() boots
+// the Wasm runtime and mounts the views.
 import { LLVEngine } from "local_live_view";
+
+const llvEngine = LLVEngine.create(liveSocket, {
+  bundlePaths: ["/assets/js/wasm/bundle.avm"],
+});
 
 liveSocket.connect();
 window.liveSocket = liveSocket;
 
-window.llvEngine = await LLVEngine.create(liveSocket, {
-  bundlePaths: ["/assets/js/wasm/bundle.avm"],
-});
-window.dispatchEvent(new CustomEvent("llv:ready"));
+// BurritoLive dispatches "llv:ready" from its own mount (via run_js);
+// LLVLoader listens for it. llvEngine is usable as an object right away —
+// its only pre-boot caller (triggerLLVReconnect) is optional-chained.
+llvEngine.connect();
+window.llvEngine = llvEngine;
 
 if (process.env.NODE_ENV === "development") {
   window.addEventListener(
