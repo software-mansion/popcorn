@@ -1,5 +1,5 @@
 diff --git a/erts/configure.ac b/erts/configure.ac
-index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e417d1095a4 100644
+index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..e5b8ff73657a3c1b9d2b95d2a65b4e4917f1f4bd 100644
 --- a/erts/configure.ac
 +++ b/erts/configure.ac
 @@ -522,8 +522,38 @@ dnl Special stuff regarding CFLAGS and details in the environment...
@@ -15,7 +15,7 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e41
 +    wasm32-*-emscripten*|wasm64-*-emscripten*)
 +        EMSCRIPTEN=yes
 +        AC_DEFINE(ERTS_EMSCRIPTEN, 1, [Define if targeting Emscripten/WebAssembly])
-+        dnl Force disable features not supported on WASM
++        dnl Force disable features not supported on Wasm
 +        enable_jit=no
 +        enable_sctp=no
 +        if test "x$enable_kernel_poll" = "xunknown"; then
@@ -30,8 +30,8 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e41
 +        ac_cv_func_vsyslog=no
 +        ac_cv_func_ppoll=no
 +        AC_MSG_NOTICE([Configuring for Emscripten/WebAssembly])
-+        AC_MSG_NOTICE([  JIT disabled (not supported on WASM)])
-+        AC_MSG_NOTICE([  SCTP disabled (not supported on WASM)])
++        AC_MSG_NOTICE([  JIT disabled (not supported on Wasm)])
++        AC_MSG_NOTICE([  SCTP disabled (not supported on Wasm)])
 +        ;;
 +esac
 +AC_SUBST(EMSCRIPTEN)
@@ -47,7 +47,7 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..924973cf2a2fed76f0a45e06a0d17e41
  	CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600 -DWINVER=0x0600"
  	;;
 +    emscripten*)
-+	# Emscripten/WASM target
++	# Emscripten/Wasm target
 +	CPPFLAGS="$CPPFLAGS -DERTS_EMSCRIPTEN"
 +	;;
      *)
@@ -112,7 +112,7 @@ index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8
      AC_MSG_RESULT($ARCH)
 diff --git a/xcomp/erl-xcomp-wasm32-emscripten.conf b/xcomp/erl-xcomp-wasm32-emscripten.conf
 new file mode 100644
-index 0000000000000000000000000000000000000000..19d1d671a34657150eba9e5006c4775b6037c83c
+index 0000000000000000000000000000000000000000..e257796fd372fe0d6bc8e24c729eda31c24b3b28
 --- /dev/null
 +++ b/xcomp/erl-xcomp-wasm32-emscripten.conf
 @@ -0,0 +1,112 @@
@@ -201,18 +201,18 @@ index 0000000000000000000000000000000000000000..19d1d671a34657150eba9e5006c4775b
 +## -- Optional Feature, and Bug Tests ------------------------------------------
 +
 +## These are values that cannot be determined by configure when cross-compiling.
-+## We set them explicitly for WASM/Emscripten.
++## We set them explicitly for Wasm/Emscripten.
 +
-+## Endianness: WASM is little-endian
++## Endianness: Wasm is little-endian
 +erl_xcomp_bigendian=no
 +
-+## No clock_gettime for CPU time on WASM
++## No clock_gettime for CPU time on Wasm
 +erl_xcomp_clock_gettime_cpu_time=no
 +
 +## getaddrinfo works in Emscripten (via proxy)
 +erl_xcomp_getaddrinfo=no
 +
-+## No kqueue on WASM
++## No kqueue on Wasm
 +erl_xcomp_kqueue=no
 +
 +## No poll() - use select() instead

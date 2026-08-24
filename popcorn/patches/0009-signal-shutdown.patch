@@ -1,5 +1,5 @@
 diff --git a/erts/emulator/sys/unix/sys.c b/erts/emulator/sys/unix/sys.c
-index 4663b680c0a24684c6bcd171129420df24e753c5..efd4ce6c49cc2d1a0276af562618308b81a43059 100644
+index 4663b680c0a24684c6bcd171129420df24e753c5..43cc4d0153cac2a3c0a2f872d9dfd6bd24912a8a 100644
 --- a/erts/emulator/sys/unix/sys.c
 +++ b/erts/emulator/sys/unix/sys.c
 @@ -82,6 +82,9 @@
@@ -66,7 +66,7 @@ index 4663b680c0a24684c6bcd171129420df24e753c5..efd4ce6c49cc2d1a0276af562618308b
  smp_sig_notify(int signum)
  {
 +#ifdef ERTS_EMSCRIPTEN
-+    (void)signum; // No signal handling in Emscripten/WASM
++    (void)signum; // No signal handling in Emscripten/Wasm
 +#else
      int res;
      do {
