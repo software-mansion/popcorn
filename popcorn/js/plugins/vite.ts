@@ -20,6 +20,7 @@ export function popcorn(options: Options): Plugin {
   let repacking: Promise<Prepared> | undefined;
   let dirty = false;
   let outDir: string | undefined;
+  let assetsDir = "assets";
 
   // Dev/preview: pack once at first request, re-pack lazily after the app's
   // compiled beams change. A single in-flight promise dedupes concurrent
@@ -64,10 +65,11 @@ export function popcorn(options: Options): Plugin {
     const requestPath = decodeURIComponent(
       new URL(url, "http://localhost").pathname,
     );
-    const isOtpAsset = requestPath.startsWith("/assets/otp/");
-    const isBuiltWasm = requestPath === "/assets/beam.wasm";
-    const isSourceWasm = requestPath === `/@fs${distDir}/assets/beam.wasm`;
-    if (!isOtpAsset && !isBuiltWasm && !isSourceWasm) {
+    const requestRoot = [
+      `/${assetsDir}/otp/`,
+      `/@fs${distDir}/otp/`,
+    ].find((root) => requestPath.startsWith(root));
+    if (requestRoot === undefined) {
       next();
       return;
     }
@@ -80,11 +82,8 @@ export function popcorn(options: Options): Plugin {
       return;
     }
 
-    const assetsRoot = join(dir, "assets");
-    const rel = isSourceWasm
-      ? "beam.wasm"
-      : requestPath.slice("/assets/".length);
-    const filePath = resolve(assetsRoot, rel);
+    const assetsRoot = join(dir, "otp");
+    const filePath = resolve(assetsRoot, requestPath.slice(requestRoot.length));
     if (!isUnder(assetsRoot, filePath)) {
       res.statusCode = 403;
       setHeaders(res);
@@ -129,6 +128,7 @@ export function popcorn(options: Options): Plugin {
       return {
         // Exclude from prebundling so import.meta.url resolves correctly.
         optimizeDeps: { exclude: ["@swmansion/popcorn"] },
+        worker: { format: "es" },
         // COOP/COEP must be on every response (SharedArrayBuffer/pthreads),
         // including the worker/beam files Vite serves from the package itself.
         server: { headers: CORS_HEADERS },
@@ -139,6 +139,7 @@ export function popcorn(options: Options): Plugin {
     configResolved(config: ResolvedConfig) {
       config.server.fs.allow.push(distDir);
       outDir = resolve(config.root, config.build.outDir);
+      assetsDir = config.build.assetsDir;
     },
 
     configureServer(server) {
@@ -160,8 +161,9 @@ export function popcorn(options: Options): Plugin {
       assert(outDir !== undefined, "outDir was not resolved");
       const built = await prepare(options);
       try {
-        await mkdir(outDir, { recursive: true });
-        await cp(built.dir, outDir, { recursive: true });
+        const targetDir = join(outDir, assetsDir, "otp");
+        await mkdir(dirname(targetDir), { recursive: true });
+        await cp(join(built.dir, "otp"), targetDir, { recursive: true });
       } finally {
         await rm(built.dir, { recursive: true, force: true });
       }

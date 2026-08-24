@@ -34,10 +34,10 @@ type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
   : string;
 
 export type PopcornOpts<Output extends TtyOutput = "text"> = {
-  beam: Pick<
+  beam?: Pick<
     BeamBootOptions,
-    "otpAssetsRoot" | "emulatorArgs" | "extraArgs" | "env"
-  >;
+    "emulatorArgs" | "extraArgs" | "env"
+  > & { otpAssetsRoot?: string };
   tty?: {
     size?: TtySize;
     output?: Output;
@@ -247,7 +247,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
     check(isValidTtySize(ttySize));
     check(
-      opts.beam.otpAssetsRoot.endsWith("/"),
+      opts.beam?.otpAssetsRoot === undefined ||
+        opts.beam.otpAssetsRoot.endsWith("/"),
       "otpAssetsRoot must end with a slash",
     );
     this.opts = {
@@ -255,7 +256,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       beam: {
         ...opts.beam,
         emulatorArgs:
-          opts.beam.emulatorArgs ??
+          opts.beam?.emulatorArgs ??
           schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
       },
     };
@@ -265,9 +266,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   private spawnWorker(): void {
-    const defaultWorkerUrl = new URL("./worker.mjs", import.meta.url);
-    const workerUrl = this.opts.workerUrl ?? defaultWorkerUrl;
-    this.vmWorker = new Worker(workerUrl, { type: "module" });
+    this.vmWorker = this.opts.workerUrl
+      ? new Worker(this.opts.workerUrl, { type: "module" })
+      : // Keep this as one expression so Vite recognizes and bundles the worker.
+        new Worker(new URL("./worker.mjs", import.meta.url), {
+          type: "module",
+        });
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
   }
 
