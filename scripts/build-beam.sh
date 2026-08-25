@@ -196,7 +196,7 @@ compile_preloaded_modules() {
     local modules=(wasm erl_init)
 
     if [[ "${compile_prim_inet}" == "true" ]]; then
-        modules+=(prim_inet)
+        modules+=(prim_inet inet gen_tcp gen_udp wasm_socket wasm_tcp wasm_udp wasm_virtual_network)
     fi
 
     if [[ ! -x "${erlc}" ]]; then
@@ -209,6 +209,11 @@ compile_preloaded_modules() {
     mkdir -p "${ebin}"
     for module in "${modules[@]}"; do
         local src="${beam_dir}/erts/preloaded/src/${module}.erl"
+        case "${module}" in
+            inet|gen_tcp|gen_udp|wasm_socket|wasm_tcp|wasm_udp|wasm_virtual_network)
+                src="${beam_dir}/lib/kernel/src/${module}.erl"
+                ;;
+        esac
         local beam="${ebin}/${module}.beam"
 
         if [[ ! -f "${src}" ]]; then
@@ -235,7 +240,7 @@ compile_preloaded_modules() {
 commit_preloaded_modules() {
     local beam_dir="$1"
     local ebin="erts/preloaded/ebin"
-    local modules=(wasm erl_init prim_inet)
+    local modules=(wasm erl_init prim_inet inet gen_tcp gen_udp wasm_socket wasm_tcp wasm_udp wasm_virtual_network)
     local files=()
     local module
 

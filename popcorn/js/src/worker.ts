@@ -70,6 +70,11 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       instance.resizeTty(data.payload.columns, data.payload.rows);
       break;
     }
+    case "popcorn:network-event": {
+      check(instance !== null);
+      instance.deliverNetworkEvent(data.payload.metadata, data.payload.bytes);
+      break;
+    }
     default:
       unreachable();
   }

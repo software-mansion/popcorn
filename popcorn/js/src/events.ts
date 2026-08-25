@@ -27,6 +27,11 @@ type TtyResizeEvent = {
   payload: { columns: number; rows: number };
 };
 
+type NetworkEvent = {
+  type: "popcorn:network-event";
+  payload: { metadata: string; bytes: Uint8Array<ArrayBuffer> };
+};
+
 type SendEvent = {
   type: "popcorn:send";
   payload: SendRequestPayload;
@@ -69,7 +74,8 @@ export type MainToVmEvent =
   | SendEvent
   | RunJsReplyEvent
   | StdinEvent
-  | TtyResizeEvent;
+  | TtyResizeEvent
+  | NetworkEvent;
 
 export type PopcornEvent = AnyValue;
 
@@ -104,6 +110,7 @@ export function readMainEvent(value: unknown): MainToVmEvent {
     case "popcorn:tty-resize":
     case "popcorn:send":
     case "popcorn:run-js-reply":
+    case "popcorn:network-event":
       return data as MainToVmEvent;
     default:
       unreachable();
@@ -121,6 +128,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent {
     case "otp:message":
     case "otp:run_js":
     case "otp:tracked-value-delete":
+    case "otp:network-command":
     case "popcorn:boot-vm-ready":
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
@@ -208,9 +216,12 @@ export function toMain(event: VmToMainEvent): void {
 
 function getTransferables(event: VmToMainEvent): Transferable[] {
   const isTtyEvent = event.type === "otp:stdout" || event.type === "otp:stderr";
-  if (!isTtyEvent) return [];
-  check(event.payload.buffer instanceof ArrayBuffer);
-  return [event.payload.buffer];
+  if (isTtyEvent) {
+    check(event.payload.buffer instanceof ArrayBuffer);
+    return [event.payload.buffer];
+  }
+  if (event.type === "otp:network-command") return [event.payload.bytes.buffer];
+  return [];
 }
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {

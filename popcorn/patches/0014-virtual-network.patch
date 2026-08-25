@@ -1,0 +1,946 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 6424077b835bf62cff12b671d8200d764a67890e..c4cdd20297971d98b22ff343ca19387cc6417a23 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -773,6 +773,13 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/atomics.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/counters.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/inet.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/gen_tcp.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/gen_udp.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm_socket.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm_tcp.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm_udp.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm_virtual_network.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/wasm.beam
+ 
+ ifeq ($(TARGET),win32)
+diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
+index 3a03cf66dc36e38eeeb7142bb0817c4b6d6e8a7f..bf6751e6724c86a7eba422627b0a0ff4a0a220c0 100644
+--- a/erts/emulator/js_bridge/beam-bridge.pre.js
++++ b/erts/emulator/js_bridge/beam-bridge.pre.js
+@@ -23,6 +23,17 @@ Module['onStdinConsumed'] = function(size) {
+   }
+ };
+ 
++var __beamBridgeOnVirtualNetworkCommand =
++  typeof Module['onVirtualNetworkCommand'] === 'function'
++    ? Module['onVirtualNetworkCommand']
++    : null;
++
++Module['onVirtualNetworkCommand'] = function(metadata, bytes) {
++  if (typeof __beamBridgeOnVirtualNetworkCommand === 'function') {
++    __beamBridgeOnVirtualNetworkCommand(metadata, bytes);
++  }
++};
++
+ // TTY interception lives here rather than in the caller because it patches
+ // runtime internals (TTY.stream_ops) whose names Closure rewrites; inside
+ // this compilation unit the renaming stays consistent.
+diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
+index 80870eaa00f0d8e57f8987457378adc08c15a0cb..1f87bee42e59bbf8efadc0ca71aeba5c3131259f 100644
+--- a/erts/emulator/js_bridge/js_bridge.js
++++ b/erts/emulator/js_bridge/js_bridge.js
+@@ -39,4 +39,22 @@ mergeInto(LibraryManager.library, {
+       Module['onStdinConsumed'](size);
+     }
+   },
++
++  js_bridge_on_virtual_network_async__proxy: 'async',
++  js_bridge_on_virtual_network_async__sig: 'viiii',
++  js_bridge_on_virtual_network_async: function(metadata, metadataLen, bytes, bytesLen) {
++    var metadataText;
++    var payload;
++    try {
++      metadataText = UTF8ToString(metadata, metadataLen);
++      payload = new Uint8Array(bytesLen);
++      payload.set(HEAPU8.subarray(bytes, bytes + bytesLen));
++    } finally {
++      _free(metadata);
++      _free(bytes);
++    }
++    if (typeof Module['onVirtualNetworkCommand'] === 'function') {
++      Module['onVirtualNetworkCommand'](metadataText, payload);
++    }
++  },
+ });
+diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
+index 086797fa6f81d81cdebb74f86bb58b85e90f4111..96b6c8b30e3ee039aa240c8ed841aa76a802db37 100644
+--- a/erts/emulator/nifs/common/wasm_nif.c
++++ b/erts/emulator/nifs/common/wasm_nif.c
+@@ -61,6 +61,8 @@ typedef struct wasm_listener_s {
+ struct wasm_state_s {
+   unsigned int owner_count;
+   wasm_listener_t *listeners;
++  ErlNifPid network_pid;
++  bool has_network_pid;
+ };
+ 
+ typedef struct wasm_tracked_value_s {
+@@ -78,6 +80,10 @@ static ERL_NIF_TERM materialize_ref_nif(ErlNifEnv *env, int argc,
+                                         const ERL_NIF_TERM argv[]);
+ static ERL_NIF_TERM ref_key_nif(ErlNifEnv *env, int argc,
+                                 const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM network_register_nif(ErlNifEnv *env, int argc,
++                                         const ERL_NIF_TERM argv[]);
++static ERL_NIF_TERM network_send_nif(ErlNifEnv *env, int argc,
++                                     const ERL_NIF_TERM argv[]);
+ 
+ static void wasm_listener_dtor(ErlNifEnv *env, void *obj);
+ static void wasm_listener_down(ErlNifEnv *env, void *obj, ErlNifPid *pid,
+@@ -88,6 +94,8 @@ static ErlNifFunc nif_funcs[] = {
+     {"send_raw", 1, send_raw_nif},
+     {"materialize_ref", 1, materialize_ref_nif},
+     {"ref_key", 1, ref_key_nif},
++    {"network_register", 0, network_register_nif},
++    {"network_send", 2, network_send_nif},
+ };
+ 
+ ERL_NIF_INIT(wasm, nif_funcs, load, NULL, upgrade, unload)
+@@ -112,6 +120,8 @@ static wasm_state_t *erts_wasm_state = NULL;
+ #ifdef ERTS_EMSCRIPTEN
+ int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
+                   const unsigned char *etf, int etf_len);
++int wasmNetworkEvent(const unsigned char *metadata, int metadata_len,
++                     const unsigned char *bytes, int bytes_len);
+ static void schedule_js_message(const unsigned char *data, size_t size);
+ static const unsigned char vm_ready_message[] =
+     "{\"type\":\"vm_message\",\"data\":{\"_popcorn\":{\"t\":\"vm_ready\"}}}";
+@@ -163,6 +173,7 @@ static wasm_state_t *create_wasm_state(void) {
+ 
+   state->owner_count = 1;
+   state->listeners = NULL;
++  state->has_network_pid = false;
+ 
+   return state;
+ }
+@@ -462,6 +473,9 @@ static void unload(ErlNifEnv *env, void *priv_data) {
+ #ifdef ERTS_EMSCRIPTEN
+ extern void js_bridge_on_from_beam_async(char *data, int len);
+ extern void js_bridge_on_tracked_value_delete(int key);
++extern void js_bridge_on_virtual_network_async(char *metadata, int metadata_len,
++                                               unsigned char *bytes,
++                                               int bytes_len);
+ 
+ static void schedule_js_message(const unsigned char *data, size_t size) {
+   char *copy;
+@@ -501,6 +515,55 @@ static ERL_NIF_TERM send_raw_nif(ErlNifEnv *env, int argc,
+ #endif
+ }
+ 
++static ERL_NIF_TERM network_register_nif(ErlNifEnv *env, int argc,
++                                         const ERL_NIF_TERM argv[]) {
++  wasm_state_t *state = enif_priv_data(env);
++
++  (void)argv;
++  if (argc != 0 || state == NULL) return enif_make_badarg(env);
++  enif_mutex_lock(erts_wasm_state_lock);
++  if (!enif_self(env, &state->network_pid)) {
++    enif_mutex_unlock(erts_wasm_state_lock);
++    return enif_make_badarg(env);
++  }
++  state->has_network_pid = true;
++  enif_mutex_unlock(erts_wasm_state_lock);
++  return am_ok;
++}
++
++static ERL_NIF_TERM network_send_nif(ErlNifEnv *env, int argc,
++                                     const ERL_NIF_TERM argv[]) {
++  ErlNifBinary metadata;
++  ErlNifBinary bytes;
++#ifdef ERTS_EMSCRIPTEN
++  char *metadata_copy;
++  unsigned char *bytes_copy;
++#endif
++
++  if (argc != 2 || !enif_inspect_iolist_as_binary(env, argv[0], &metadata) ||
++      !enif_inspect_iolist_as_binary(env, argv[1], &bytes) ||
++      metadata.size > INT_MAX || bytes.size > INT_MAX) {
++    return enif_make_badarg(env);
++  }
++#ifdef ERTS_EMSCRIPTEN
++  metadata_copy = malloc(metadata.size + 1);
++  bytes_copy = malloc(bytes.size == 0 ? 1 : bytes.size);
++  if (metadata_copy == NULL || bytes_copy == NULL) {
++    free(metadata_copy);
++    free(bytes_copy);
++    return make_error(env, am_out_of_memory);
++  }
++  memcpy(metadata_copy, metadata.data, metadata.size);
++  metadata_copy[metadata.size] = '\0';
++  if (bytes.size > 0) memcpy(bytes_copy, bytes.data, bytes.size);
++  js_bridge_on_virtual_network_async(metadata_copy, (int)metadata.size,
++                                     bytes_copy, (int)bytes.size);
++  return am_ok;
++#else
++  return make_error(env, am_unsupported);
++#endif
++}
++
+ static void wasm_tracked_value_dtor(ErlNifEnv *env, void *obj) {
+   wasm_tracked_value_t *tracked = obj;
+ 
+@@ -638,6 +701,42 @@ int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
+   enif_free_env(env);
+   return 0;
+ }
++
++EMSCRIPTEN_KEEPALIVE
++int wasmNetworkEvent(const unsigned char *metadata, int metadata_len,
++                     const unsigned char *bytes, int bytes_len) {
++  wasm_state_t *state;
++  ErlNifEnv *env;
++  ErlNifPid pid;
++  ERL_NIF_TERM metadata_term;
++  ERL_NIF_TERM bytes_term;
++  unsigned char *metadata_data;
++  unsigned char *bytes_data;
++  bool found;
++
++  ASSERT(metadata != NULL && metadata_len > 0 && bytes != NULL && bytes_len >= 0);
++  enif_mutex_lock(erts_wasm_state_lock);
++  state = erts_wasm_state;
++  found = state != NULL && state->has_network_pid;
++  if (found) pid = state->network_pid;
++  enif_mutex_unlock(erts_wasm_state_lock);
++  if (!found) return 1;
++
++  env = enif_alloc_env();
++  if (env == NULL) abort();
++  metadata_data = enif_make_new_binary(env, (size_t)metadata_len, &metadata_term);
++  bytes_data = enif_make_new_binary(env, (size_t)bytes_len, &bytes_term);
++  memcpy(metadata_data, metadata, (size_t)metadata_len);
++  if (bytes_len > 0) memcpy(bytes_data, bytes, (size_t)bytes_len);
++  if (!enif_send(NULL, &pid, env,
++                 enif_make_tuple3(env, enif_make_atom(env, "wasm_network"),
++                                  metadata_term, bytes_term))) {
++    enif_free_env(env);
++    return 1;
++  }
++  enif_free_env(env);
++  return 0;
++}
+ #else
+ int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
+                   const unsigned char *etf, int etf_len) {
+diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
+index 3679b690583605c17f185b5f2f4008a8bb3d9a9e..bbd07392a7d420327a4f6094d602c3345e65a387 100644
+--- a/erts/preloaded/src/wasm.erl
++++ b/erts/preloaded/src/wasm.erl
+@@ -24,9 +24,11 @@
+ 
+ %% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
+ %% -on_load attribute (a preloaded module with one aborts the VM at boot).
+--export([on_load/0, send/1, run_js/2, run_js/3, keep_alive/1]).
++-export([on_load/0, send/1, run_js/2, run_js/3, keep_alive/1,
++         network_register/0, network_send/2]).
+ 
+--nifs([send_raw/1, materialize_ref/1, ref_key/1]).
++-nifs([send_raw/1, materialize_ref/1, ref_key/1,
++       network_register/0, network_send/2]).
+ 
+ -define(RUN_JS_TIMEOUT, 5000).
+ 
+@@ -126,3 +128,9 @@ materialize_ref(_Key) ->
+ 
+ ref_key(_Resource) ->
+     erlang:nif_error(undef).
++
++network_register() ->
++    erlang:nif_error(undef).
++
++network_send(_Metadata, _Bytes) ->
++    erlang:nif_error(undef).
+diff --git a/lib/kernel/src/Makefile b/lib/kernel/src/Makefile
+index 079353cb5f2afff1e3fec361330c56a6ae41dd96..bee818e2ac81c5bc9d63154fd18b8bcd36d79ae7 100644
+--- a/lib/kernel/src/Makefile
++++ b/lib/kernel/src/Makefile
+@@ -141,6 +141,10 @@ MODULES = \
+ 	trace \
+ 	user_drv \
+ 	user_sup \
++	wasm_socket \
++	wasm_tcp \
++	wasm_udp \
++	wasm_virtual_network \
+ 	prim_tty \
+ 	prim_tty_sighandler \
+ 	raw_file_io \
+diff --git a/lib/kernel/src/inet.erl b/lib/kernel/src/inet.erl
+index 073e16633c88b90d79793248a65d2bb1677fc5e0..917d584c6d93aa38175f000c3e1799fdc0a47dbe 100644
+--- a/lib/kernel/src/inet.erl
++++ b/lib/kernel/src/inet.erl
+@@ -325,7 +325,7 @@ Function `parse_address/1` can be useful:
+ %% imports
+ -import(lists, [append/1, duplicate/2, filter/2, foldl/3]).
+ 
+--define(DEFAULT_KERNEL_INET_BACKEND, inet). % inet_backend()
++-define(DEFAULT_KERNEL_INET_BACKEND, virtual). % inet_backend()
+ 
+ %% Record Signature
+ -define(RS(Record),
+@@ -3311,7 +3311,9 @@ gen_tcp_module(Opts) ->
+ gen_tcp_module(Opts, inet) ->
+     {gen_tcp, Opts};
+ gen_tcp_module(Opts, socket) ->
+-    {gen_tcp_socket, Opts}.
++    {gen_tcp_socket, Opts};
++gen_tcp_module(Opts, virtual) ->
++    {wasm_tcp, Opts}.
+ 
+ 
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@@ -3432,7 +3434,9 @@ gen_udp_module(Opts) ->
+ gen_udp_module(Opts, inet) ->
+     {gen_udp, Opts};
+ gen_udp_module(Opts, socket) ->
+-    {gen_udp_socket, Opts}.
++    {gen_udp_socket, Opts};
++gen_udp_module(Opts, virtual) ->
++    {wasm_udp, Opts}.
+ 
+ 
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+diff --git a/lib/kernel/src/kernel.app.src b/lib/kernel/src/kernel.app.src
+index b0f870e2a65b2f1fa6dd41cb8205d996023565d1..41db10e6ad3e2e371c38af1bb8d711e69c073627 100644
+--- a/lib/kernel/src/kernel.app.src
++++ b/lib/kernel/src/kernel.app.src
+@@ -108,6 +108,10 @@
+              inet_tcp,
+              inet_udp,
+ 	     inet_sctp,
++             wasm_socket,
++             wasm_tcp,
++             wasm_udp,
++             wasm_virtual_network,
+              pg,
+              pg2,
+              raw_file_io,
+diff --git a/lib/kernel/src/wasm_socket.erl b/lib/kernel/src/wasm_socket.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0dd33dddd
+--- /dev/null
++++ b/lib/kernel/src/wasm_socket.erl
+@@ -0,0 +1,422 @@
++-module(wasm_socket).
++-moduledoc false.
++
++-export([tcp_listen/2, tcp_connect/4, udp_open/2, accept/2,
++         call/2, call/3, cast/2]).
++
++-define(QUEUE_LIMIT_BYTES, 1024 * 1024).
++
++tcp_listen(Port, Opts) ->
++    start({tcp_listener, Port, Opts}, self()).
++
++tcp_connect(Address, Port, Opts, Timeout) ->
++    start({tcp, Address, Port, Opts, Timeout}, self()).
++
++udp_open(Port, Opts) ->
++    start({udp, Port, Opts}, self()).
++
++accept(Socket, Timeout) ->
++    call(Socket, {accept, Timeout}, infinity).
++
++call({'$inet', _Module, Pid}, Request) ->
++    call(Pid, Request, infinity).
++
++call({'$inet', _Module, Pid}, Request, Timeout) ->
++    call(Pid, Request, Timeout);
++call(Pid, Request, Timeout) when is_pid(Pid) ->
++    Ref = make_ref(),
++    Pid ! {socket_call, self(), Ref, Request},
++    receive
++        {socket_reply, Ref, Reply} -> Reply
++    after Timeout ->
++        {error, timeout}
++    end.
++
++cast({'$inet', _Module, Pid}, Request) ->
++    Pid ! {socket_cast, self(), Request},
++    ok.
++
++start(Spec, Owner) ->
++    Parent = self(),
++    Ref = make_ref(),
++    Pid = spawn(fun() -> init(Parent, Ref, Owner, Spec) end),
++    receive
++        {socket_started, Ref, {ok, Module}} -> {ok, {'$inet', Module, Pid}};
++        {socket_started, Ref, Error} -> Error
++    end.
++
++init(Parent, Ref, Owner, Spec) ->
++    {ok, Id} = wasm_virtual_network:open_socket(self()),
++    case open(Id, Owner, Spec) of
++        {ok, State} ->
++            Parent ! {socket_started, Ref, {ok, module(State)}},
++            loop(State);
++        {error, _} = Error ->
++            ok = wasm_virtual_network:close_socket(Id),
++            Parent ! {socket_started, Ref, Error}
++    end.
++
++open(Id, Owner, {tcp_listener, Port, Opts}) ->
++    case options(Opts, tcp_listener) of
++        {ok, Options, Address, Backlog} ->
++            Operation = #{operation => listen_tcp, address => address(Address),
++                          port => Port, backlog => Backlog},
++            case wasm_virtual_network:request(Id, Operation, <<>>, infinity) of
++                {ok, Event} ->
++                    {ok, state(tcp_listener, Id, Owner, Options,
++                               endpoint(Event), undefined)};
++                Error -> Error
++            end;
++        Error -> Error
++    end;
++open(Id, Owner, {tcp, Address, Port, Opts, Timeout}) ->
++    case options(Opts, tcp) of
++        {ok, Options, LocalAddress, _Backlog} ->
++            Operation = #{operation => connect_tcp, address => address(Address),
++                          port => Port},
++            case wasm_virtual_network:request(Id, Operation, <<>>, Timeout) of
++                {ok, Event} ->
++                    Local = local_endpoint(Event, LocalAddress),
++                    {ok, state(tcp, Id, Owner, Options, Local, endpoint(Event))};
++                Error -> Error
++            end;
++        Error -> Error
++    end;
++open(Id, Owner, {udp, Port, Opts}) ->
++    case options(Opts, udp) of
++        {ok, Options, Address, _Backlog} ->
++            Operation = #{operation => bind_udp, address => address(Address), port => Port},
++            case wasm_virtual_network:request(Id, Operation, <<>>, infinity) of
++                {ok, Event} ->
++                    {ok, state(udp, Id, Owner, Options, endpoint(Event), undefined)};
++                Error -> Error
++            end;
++        Error -> Error
++    end.
++
++state(Kind, Id, Owner, Options, Local, Peer) ->
++    #{kind => Kind, id => Id, owner => Owner, owner_mon => monitor(process, Owner),
++      options => Options, local => Local, peer => Peer, buffer => <<>>,
++      datagrams => queue:new(), recv => undefined, closed => false}.
++
++module(#{kind := udp}) -> wasm_udp;
++module(_) -> wasm_tcp.
++
++loop(State) ->
++    receive
++        {socket_call, From, Ref, Request} ->
++            case handle_call(From, Ref, Request, State) of
++                {reply, Reply, Next} -> From ! {socket_reply, Ref, Reply}, loop(deliver(Next));
++                {noreply, Next} -> loop(Next);
++                stop -> ok
++            end;
++        {socket_cast, From, close} ->
++            close(State), From ! {socket_closed, self()};
++        {network_event, Event, Bytes} ->
++            loop(deliver(handle_event(Event, Bytes, State)));
++        {recv_timeout, Ref} ->
++            loop(timeout_recv(Ref, State));
++        {'DOWN', Mon, process, _Pid, _Reason} when Mon =:= map_get(owner_mon, State) ->
++            close(State);
++        _ -> loop(State)
++    end.
++
++handle_call(_From, _Ref, close, State) ->
++    close(State), stop;
++handle_call(From, _Ref, {accept, Timeout}, #{kind := tcp_listener} = State) ->
++    case start_pending(From, maps:get(options, State), maps:get(local, State)) of
++        {ok, Pid, Id, Socket} ->
++            Operation = #{operation => accept_tcp, acceptedSocketId => Id},
++            case wasm_virtual_network:request(maps:get(id, State), Operation, <<>>, Timeout) of
++                {ok, Event} ->
++                    Pid ! {accepted, endpoint(Event)},
++                    {reply, {ok, Socket}, State};
++                Error ->
++                    Pid ! abort,
++                    {reply, Error, State}
++            end;
++        Error -> {reply, Error, State}
++    end;
++handle_call(_From, _Ref, {accept, _Timeout}, State) ->
++    {reply, {error, einval}, State};
++handle_call(_From, _Ref, {send, Data}, #{kind := tcp, closed := false} = State) ->
++    case encode_packet(Data, maps:get(packet, maps:get(options, State))) of
++        {ok, Bytes} ->
++            ok = wasm_virtual_network:send(maps:get(id, State),
++                                            #{operation => tcp_data}, Bytes),
++            {reply, ok, State};
++        Error -> {reply, Error, State}
++    end;
++handle_call(_From, _Ref, {send, _Data}, State) ->
++    {reply, {error, closed}, State};
++handle_call(From, Ref, {recv, Length, Timeout}, State) ->
++    recv(From, Ref, Length, Timeout, State);
++handle_call(_From, _Ref, {udp_send, Address, Port, Data}, #{kind := udp} = State) ->
++    Bytes = iolist_to_binary(Data),
++    case byte_size(Bytes) =< ?QUEUE_LIMIT_BYTES of
++        true ->
++            ok = wasm_virtual_network:send(maps:get(id, State),
++                                            #{operation => udp_data,
++                                              address => address(Address),
++                                              port => Port}, Bytes),
++            {reply, ok, State};
++        false -> {reply, {error, enobufs}, State}
++    end;
++handle_call(_From, _Ref, {udp_connect, Address, Port}, #{kind := udp} = State) ->
++    {reply, ok, State#{peer := {parse_address(Address), Port}}};
++handle_call(From, Ref, {udp_recv, Length, Timeout}, #{kind := udp} = State) ->
++    recv(From, Ref, Length, Timeout, State);
++handle_call(From, _Ref, {controlling_process, NewOwner}, State) ->
++    case From =:= maps:get(owner, State) andalso is_process_alive(NewOwner) of
++        true ->
++            demonitor(maps:get(owner_mon, State), [flush]),
++            {reply, ok, State#{owner := NewOwner,
++                               owner_mon := monitor(process, NewOwner)}};
++        false when From =/= map_get(owner, State) -> {reply, {error, not_owner}, State};
++        false -> {reply, {error, badarg}, State}
++    end;
++handle_call(_From, _Ref, {setopts, Opts}, State) ->
++    case update_options(Opts, maps:get(options, State)) of
++        {ok, Options} -> {reply, ok, State#{options := Options}};
++        Error -> {reply, Error, State}
++    end;
++handle_call(_From, _Ref, {getopts, Names}, State) ->
++    Options = maps:get(options, State),
++    {reply, get_options(Names, Options), State};
++handle_call(_From, _Ref, sockname, State) ->
++    {reply, {ok, maps:get(local, State)}, State};
++handle_call(_From, _Ref, peername, #{peer := undefined} = State) ->
++    {reply, {error, enotconn}, State};
++handle_call(_From, _Ref, peername, State) ->
++    {reply, {ok, maps:get(peer, State)}, State};
++handle_call(_From, _Ref, _Request, State) ->
++    {reply, {error, enotsup}, State}.
++
++start_pending(Owner, Options, Local) ->
++    Parent = self(),
++    Ref = make_ref(),
++    Pid = spawn(fun() -> pending(Parent, Ref, Owner, Options, Local) end),
++    receive
++        {pending_started, Ref, Id} -> {ok, Pid, Id, {'$inet', wasm_tcp, Pid}}
++    end.
++
++pending(Parent, Ref, Owner, Options, Local) ->
++    {ok, Id} = wasm_virtual_network:open_socket(self()),
++    Parent ! {pending_started, Ref, Id},
++    receive
++        {accepted, Peer} -> loop(state(tcp, Id, Owner, Options, Local, Peer));
++        abort ->
++            wasm_virtual_network:send(Id, #{operation => close,
++                                            direction => read_write}, <<>>),
++            wasm_virtual_network:close_socket(Id)
++    end.
++
++recv(_From, _Ref, _Length, _Timeout, #{options := #{active := Active}} = State)
++  when Active =/= false ->
++    {reply, {error, einval}, State};
++recv(_From, _Ref, _Length, _Timeout, #{recv := Recv} = State)
++  when Recv =/= undefined ->
++    {reply, {error, ealready}, State};
++recv(From, Ref, Length, Timeout, State) ->
++    case take_passive(Length, State) of
++        {ok, Value, Next} -> {reply, {ok, Value}, Next};
++        closed -> {reply, {error, closed}, State};
++        wait ->
++            Timer = case Timeout of infinity -> undefined;
++                       _ -> erlang:send_after(Timeout, self(), {recv_timeout, Ref})
++                    end,
++            {noreply, State#{recv := {From, Ref, Length, Timer}}}
++    end.
++
++timeout_recv(Ref, #{recv := {From, Ref, _Length, _Timer}} = State) ->
++    From ! {socket_reply, Ref, {error, timeout}},
++    State#{recv := undefined};
++timeout_recv(_Ref, State) -> State.
++
++handle_event(#{<<"operation">> := <<"tcp_data">>}, Bytes, State) ->
++    State#{buffer := <<(maps:get(buffer, State))/binary, Bytes/binary>>};
++handle_event(#{<<"operation">> := <<"udp_data">>,
++               <<"address">> := Address, <<"port">> := Port}, Bytes, State) ->
++    Datagram = {parse_ip(Address), Port, Bytes},
++    State#{datagrams := queue:in(Datagram, maps:get(datagrams, State))};
++handle_event(#{<<"operation">> := <<"tcp_closed">>} = Event, _Bytes, State) ->
++    Reason = case maps:find(<<"reason">>, Event) of
++                 {ok, Binary} -> network_reason(Binary);
++                 error -> closed
++             end,
++    State#{closed := Reason};
++handle_event(_Event, _Bytes, State) -> State.
++
++deliver(#{recv := {From, Ref, Length, Timer}} = State) ->
++    case take_passive(Length, State#{recv := undefined}) of
++        {ok, Value, Next} ->
++            cancel_timer(Timer), From ! {socket_reply, Ref, {ok, Value}}, Next;
++        closed ->
++            cancel_timer(Timer), From ! {socket_reply, Ref, {error, closed}},
++            State#{recv := undefined};
++        wait -> deliver_active(State)
++    end;
++deliver(State) -> deliver_active(State).
++
++deliver_active(#{options := #{active := false}} = State) -> State;
++deliver_active(#{kind := udp} = State) -> deliver_active_udp(State);
++deliver_active(State) -> deliver_active_tcp(State).
++
++deliver_active_tcp(State) ->
++    case take_tcp(0, State) of
++        {ok, Value, Next} ->
++            Owner = maps:get(owner, State), Handle = {'$inet', wasm_tcp, self()},
++            Owner ! {tcp, Handle, Value},
++            continue_active(Next);
++        closed ->
++            maps:get(owner, State) ! {tcp_closed, {'$inet', wasm_tcp, self()}}, State;
++        wait -> State
++    end.
++
++deliver_active_udp(State) ->
++    case take_udp(0, State) of
++        {ok, {Address, Port, Value}, Next} ->
++            maps:get(owner, State) ! {udp, {'$inet', wasm_udp, self()}, Address, Port, Value},
++            continue_active(Next);
++        wait -> State
++    end.
++
++continue_active(#{options := #{active := once} = Options} = State) ->
++    State#{options := Options#{active := false}};
++continue_active(State) -> deliver_active(State).
++
++take_passive(Length, #{kind := udp} = State) -> take_udp(Length, State);
++take_passive(Length, State) -> take_tcp(Length, State).
++
++take_udp(Length, State) ->
++    case queue:out(maps:get(datagrams, State)) of
++        {{value, {Address, Port, Bytes}}, Rest} ->
++            Data = mode(truncate(Bytes, Length), State),
++            {ok, {Address, Port, Data}, State#{datagrams := Rest}};
++        {empty, _} -> wait
++    end.
++
++take_tcp(Length, State) ->
++    Packet = maps:get(packet, maps:get(options, State)),
++    case extract_packet(maps:get(buffer, State), Packet, Length,
++                        maps:get(closed, State)) of
++        {ok, Bytes, Rest} -> {ok, mode(Bytes, State), State#{buffer := Rest}};
++        closed -> closed;
++        wait -> wait
++    end.
++
++extract_packet(Buffer, raw, 0, _Closed) when byte_size(Buffer) > 0 ->
++    {ok, Buffer, <<>>};
++extract_packet(Buffer, raw, Length, _Closed) when byte_size(Buffer) >= Length,
++                                                   Length > 0 ->
++    <<Value:Length/binary, Rest/binary>> = Buffer, {ok, Value, Rest};
++extract_packet(Buffer, raw, _Length, Closed) when Closed =/= false,
++                                                  byte_size(Buffer) > 0 ->
++    {ok, Buffer, <<>>};
++extract_packet(<<>>, _Packet, _Length, Closed) when Closed =/= false -> closed;
++extract_packet(Buffer, Packet, _Length, _Closed) when is_integer(Packet) ->
++    case Buffer of
++        <<Size:Packet/unit:8, Rest/binary>> when byte_size(Rest) >= Size ->
++            <<Value:Size/binary, Tail/binary>> = Rest, {ok, Value, Tail};
++        _ -> wait
++    end;
++extract_packet(_Buffer, _Packet, _Length, _Closed) -> wait.
++
++encode_packet(Data, raw) -> {ok, iolist_to_binary(Data)};
++encode_packet(Data, Packet) when is_integer(Packet) ->
++    Bytes = iolist_to_binary(Data), Size = byte_size(Bytes),
++    case Size < (1 bsl (Packet * 8)) of
++        true -> {ok, <<Size:Packet/unit:8, Bytes/binary>>};
++        false -> {error, emsgsize}
++    end.
++
++mode(Bytes, #{options := #{mode := binary}}) -> Bytes;
++mode(Bytes, _State) -> binary_to_list(Bytes).
++
++options(Opts, Kind) when is_list(Opts) ->
++    Defaults = #{active => true, mode => list, packet => raw},
++    parse_options(Opts, Defaults, any, 5, Kind).
++
++parse_options([], Options, Address, Backlog, _Kind) ->
++    {ok, Options, Address, Backlog};
++parse_options([binary | Rest], Options, Address, Backlog, Kind) ->
++    parse_options(Rest, Options#{mode := binary}, Address, Backlog, Kind);
++parse_options([list | Rest], Options, Address, Backlog, Kind) ->
++    parse_options(Rest, Options#{mode := list}, Address, Backlog, Kind);
++parse_options([{active, Active} | Rest], Options, Address, Backlog, Kind)
++  when Active =:= true; Active =:= false; Active =:= once ->
++    parse_options(Rest, Options#{active := Active}, Address, Backlog, Kind);
++parse_options([{packet, Packet} | Rest], Options, Address, Backlog, Kind)
++  when Packet =:= raw; Packet =:= 0; Packet =:= 1; Packet =:= 2; Packet =:= 4 ->
++    Value = case Packet of 0 -> raw; _ -> Packet end,
++    parse_options(Rest, Options#{packet := Value}, Address, Backlog, Kind);
++parse_options([{ip, Address} | Rest], Options, _Old, Backlog, Kind) ->
++    parse_options(Rest, Options, Address, Backlog, Kind);
++parse_options([{ifaddr, Address} | Rest], Options, _Old, Backlog, Kind) ->
++    parse_options(Rest, Options, Address, Backlog, Kind);
++parse_options([{backlog, Backlog} | Rest], Options, Address, _Old, tcp_listener)
++  when is_integer(Backlog), Backlog >= 0 ->
++    parse_options(Rest, Options, Address, Backlog, tcp_listener);
++parse_options([inet | Rest], Options, Address, Backlog, Kind) ->
++    parse_options(Rest, Options, Address, Backlog, Kind);
++parse_options([_Unsupported | _], _Options, _Address, _Backlog, _Kind) ->
++    {error, enotsup}.
++
++update_options(Opts, Options) ->
++    case parse_options(Opts, Options, any, 5, update) of
++        {ok, New, _Address, _Backlog} -> {ok, New};
++        Error -> Error
++    end.
++
++get_options(Names, Options) ->
++    try {ok, [{Name, maps:get(option_name(Name), Options)} || Name <- Names]}
++    catch error:{badkey, _} -> {error, enotsup}
++    end.
++
++option_name(active) -> active;
++option_name(mode) -> mode;
++option_name(packet) -> packet.
++
++close(State) ->
++    Id = maps:get(id, State),
++    wasm_virtual_network:send(Id, #{operation => close, direction => read_write}, <<>>),
++    wasm_virtual_network:close_socket(Id),
++    ok.
++
++cancel_timer(undefined) -> ok;
++cancel_timer(Timer) -> erlang:cancel_timer(Timer), ok.
++
++endpoint(#{<<"address">> := Address, <<"port">> := Port}) ->
++    {parse_ip(Address), Port}.
++
++local_endpoint(#{<<"localAddress">> := Address, <<"localPort">> := Port}, _Default) ->
++    {parse_ip(Address), Port};
++local_endpoint(_Event, Default) ->
++    {normalize_ip(Default), 0}.
++
++address(any) -> <<"0.0.0.0">>;
++address(loopback) -> <<"127.0.0.1">>;
++address(Address) when is_binary(Address) -> Address;
++address(Address) when is_atom(Address) -> atom_to_binary(Address);
++address(Address) when is_list(Address) -> list_to_binary(Address);
++address({A, B, C, D}) ->
++    iolist_to_binary(io_lib:format("~B.~B.~B.~B", [A, B, C, D])).
++
++normalize_ip(any) -> {0, 0, 0, 0};
++normalize_ip(loopback) -> {127, 0, 0, 1};
++normalize_ip({_, _, _, _} = Address) -> Address.
++
++parse_ip(Address) ->
++    {ok, IP} = inet_parse:ipv4_address(binary_to_list(Address)), IP.
++
++parse_address({_, _, _, _} = Address) -> Address;
++parse_address(loopback) -> {127, 0, 0, 1};
++parse_address(Address) ->
++    parse_ip(address(Address)).
++
++truncate(Bytes, 0) -> Bytes;
++truncate(Bytes, Length) when byte_size(Bytes) =< Length -> Bytes;
++truncate(Bytes, Length) -> binary:part(Bytes, 0, Length).
++
++network_reason(<<"econnreset">>) -> econnreset;
++network_reason(<<"enobufs">>) -> enobufs.
+diff --git a/lib/kernel/src/wasm_tcp.erl b/lib/kernel/src/wasm_tcp.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1564f92c87e0a673fb3130f7e56abd7b1b4939c
+--- /dev/null
++++ b/lib/kernel/src/wasm_tcp.erl
+@@ -0,0 +1,31 @@
++-module(wasm_tcp).
++-moduledoc false.
++
++-export([connect/3, connect/4, listen/2, accept/2, send/2, recv/3,
++         close/1, shutdown/2, controlling_process/2, setopts/2, getopts/2,
++         sockname/1, peername/1, unrecv/2, fdopen/2]).
++
++connect(#{addr := Address, port := Port}, Opts, Timeout) ->
++    connect(Address, Port, Opts, Timeout).
++
++connect(Address, Port, Opts, Timeout) ->
++    wasm_socket:tcp_connect(Address, Port, Opts, Timeout).
++
++listen(Port, Opts) -> wasm_socket:tcp_listen(Port, Opts).
++accept(Socket, Timeout) -> wasm_socket:accept(Socket, Timeout).
++send(Socket, Data) -> wasm_socket:call(Socket, {send, Data}).
++recv(Socket, Length, Timeout) -> wasm_socket:call(Socket, {recv, Length, Timeout}).
++
++close({'$inet', ?MODULE, Pid} = Socket) ->
++    wasm_socket:cast(Socket, close),
++    receive {socket_closed, Pid} -> ok end.
++
++shutdown(_Socket, _How) -> {error, enotsup}.
++controlling_process(Socket, Owner) ->
++    wasm_socket:call(Socket, {controlling_process, Owner}).
++setopts(Socket, Opts) -> wasm_socket:call(Socket, {setopts, Opts}).
++getopts(Socket, Names) -> wasm_socket:call(Socket, {getopts, Names}).
++sockname(Socket) -> wasm_socket:call(Socket, sockname).
++peername(Socket) -> wasm_socket:call(Socket, peername).
++unrecv(_Socket, _Data) -> {error, enotsup}.
++fdopen(_Fd, _Opts) -> {error, enotsup}.
+diff --git a/lib/kernel/src/wasm_udp.erl b/lib/kernel/src/wasm_udp.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..c25ae7386487dbcb537e7fee0eb69a0461321eda
+--- /dev/null
++++ b/lib/kernel/src/wasm_udp.erl
+@@ -0,0 +1,43 @@
++-module(wasm_udp).
++-moduledoc false.
++
++-export([open/2, close/1, send/2, send/3, send/4, send/5,
++         recv/2, recv/3, connect/3, controlling_process/2,
++         setopts/2, getopts/2, sockname/1, peername/1]).
++
++open(Port, Opts) -> wasm_socket:udp_open(Port, Opts).
++
++close({'$inet', ?MODULE, Pid} = Socket) ->
++    wasm_socket:cast(Socket, close),
++    receive {socket_closed, Pid} -> ok end.
++
++send(Socket, Data) ->
++    case peername(Socket) of
++        {ok, {Address, Port}} -> send(Socket, Address, Port, Data);
++        Error -> Error
++    end.
++
++send(Socket, {Address, Port}, Data) -> send(Socket, Address, Port, Data);
++send(_Socket, _Destination, _Data) -> {error, enotsup}.
++
++send(Socket, {Address, Port}, [], Data) -> send(Socket, Address, Port, Data);
++send(Socket, Address, Port, Data) when is_integer(Port) ->
++    wasm_socket:call(Socket, {udp_send, Address, Port, Data});
++send(_Socket, _Destination, _Ancillary, _Data) -> {error, enotsup}.
++
++send(Socket, Address, Port, [], Data) -> send(Socket, Address, Port, Data);
++send(_Socket, _Address, _Port, _Ancillary, _Data) -> {error, enotsup}.
++
++recv(Socket, Length) -> recv(Socket, Length, infinity).
++recv(Socket, Length, Timeout) ->
++    wasm_socket:call(Socket, {udp_recv, Length, Timeout}).
++
++connect(Socket, Address, Port) ->
++    wasm_socket:call(Socket, {udp_connect, Address, Port}).
++
++controlling_process(Socket, Owner) ->
++    wasm_socket:call(Socket, {controlling_process, Owner}).
++setopts(Socket, Opts) -> wasm_socket:call(Socket, {setopts, Opts}).
++getopts(Socket, Names) -> wasm_socket:call(Socket, {getopts, Names}).
++sockname(Socket) -> wasm_socket:call(Socket, sockname).
++peername(Socket) -> wasm_socket:call(Socket, peername).
+diff --git a/lib/kernel/src/wasm_virtual_network.erl b/lib/kernel/src/wasm_virtual_network.erl
+new file mode 100644
+index 0000000000000000000000000000000000000000..3aa7af0a9ce56c6d25581bc9c0b76d9c394e30b6
+--- /dev/null
++++ b/lib/kernel/src/wasm_virtual_network.erl
+@@ -0,0 +1,107 @@
++-module(wasm_virtual_network).
++-moduledoc false.
++
++-export([open_socket/1, close_socket/1, request/4, send/3]).
++
++-define(SERVER, wasm_virtual_network).
++
++open_socket(Pid) when is_pid(Pid) ->
++    call({open_socket, Pid}).
++
++close_socket(SocketId) when is_integer(SocketId) ->
++    call({close_socket, SocketId}).
++
++request(SocketId, Operation, Bytes, Timeout)
++  when is_integer(SocketId), is_map(Operation), is_binary(Bytes) ->
++    Ref = make_ref(),
++    server() ! {request, self(), Ref, SocketId, Operation, Bytes},
++    receive
++        {network_reply, Ref, Reply} -> Reply
++    after Timeout ->
++        {error, timeout}
++    end.
++
++send(SocketId, Operation, Bytes)
++  when is_integer(SocketId), is_map(Operation), is_binary(Bytes) ->
++    server() ! {send, SocketId, Operation, Bytes},
++    ok.
++
++call(Request) ->
++    Ref = make_ref(),
++    server() ! {call, self(), Ref, Request},
++    receive
++        {network_reply, Ref, Reply} -> Reply
++    end.
++
++server() ->
++    case whereis(?SERVER) of
++        undefined ->
++            Pid = spawn(fun init/0),
++            try register(?SERVER, Pid) of
++                true -> Pid
++            catch
++                error:badarg -> exit(Pid, kill), whereis(?SERVER)
++            end;
++        Pid -> Pid
++    end.
++
++init() ->
++    ok = wasm:network_register(),
++    loop(#{next_socket => 1, next_request => 1,
++           sockets => #{}, pending => #{}}).
++
++loop(State) ->
++    receive
++        {call, From, Ref, {open_socket, Pid}} ->
++            Id = maps:get(next_socket, State),
++            From ! {network_reply, Ref, {ok, Id}},
++            loop(State#{next_socket := Id + 1,
++                        sockets := maps:put(Id, Pid, maps:get(sockets, State))});
++        {call, From, Ref, {close_socket, Id}} ->
++            From ! {network_reply, Ref, ok},
++            loop(State#{sockets := maps:remove(Id, maps:get(sockets, State))});
++        {request, From, Ref, SocketId, Operation, Bytes} ->
++            RequestId = maps:get(next_request, State),
++            Command = envelope(SocketId, Operation#{requestId => RequestId}),
++            ok = wasm:network_send(json(Command), Bytes),
++            Pending = maps:put(RequestId, {From, Ref}, maps:get(pending, State)),
++            loop(State#{next_request := RequestId + 1, pending := Pending});
++        {send, SocketId, Operation, Bytes} ->
++            ok = wasm:network_send(json(envelope(SocketId, Operation)), Bytes),
++            loop(State);
++        {wasm_network, Metadata, Bytes} ->
++            Event = json:decode(Metadata),
++            loop(route(Event, Bytes, State))
++    end.
++
++route(#{<<"requestId">> := RequestId} = Event, _Bytes, State) ->
++    Pending = maps:get(pending, State),
++    case maps:take(RequestId, Pending) of
++        {{From, Ref}, Rest} ->
++            From ! {network_reply, Ref, reply(Event)},
++            State#{pending := Rest};
++        error -> State
++    end;
++route(#{<<"socketId">> := SocketId} = Event, Bytes, State) ->
++    case maps:find(SocketId, maps:get(sockets, State)) of
++        {ok, Pid} -> Pid ! {network_event, Event, Bytes};
++        error -> ok
++    end,
++    State.
++
++reply(#{<<"operation">> := <<"error">>, <<"reason">> := Reason}) ->
++    {error, reason(Reason)};
++reply(Event) ->
++    {ok, Event}.
++
++reason(<<"eaddrinuse">>) -> eaddrinuse;
++reason(<<"econnrefused">>) -> econnrefused;
++reason(<<"econnreset">>) -> econnreset;
++reason(<<"enobufs">>) -> enobufs;
++reason(<<"enoent">>) -> enoent.
++
++envelope(SocketId, Operation) ->
++    Operation#{version => 1, vmId => <<>>, socketId => SocketId}.
++
++json(Term) ->
++    iolist_to_binary(json:encode(Term)).

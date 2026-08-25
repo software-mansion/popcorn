@@ -63,6 +63,7 @@ export type Beam = {
   send: (message: BeamSendPayload) => Result<null>;
   writeStdin: (chunk: Uint8Array) => void;
   resizeTty: (columns: number, rows: number) => void;
+  deliverNetworkEvent: (metadata: string, bytes: Uint8Array) => void;
 };
 
 export function start(options: BeamBootOptions): Beam {
@@ -74,6 +75,8 @@ export function start(options: BeamBootOptions): Beam {
     send: (message) => send(state.isVmReady ? state.module : null, message),
     writeStdin: (chunk) => writeStdin(state.module, chunk),
     resizeTty: (columns, rows) => resizeTty(state.module, columns, rows),
+    deliverNetworkEvent: (metadata, bytes) =>
+      deliverNetworkEvent(state.module, metadata, bytes),
   };
 }
 
@@ -138,6 +141,8 @@ async function boot(
         type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
         payload: chunk,
       }),
+    onVirtualNetworkCommand: (metadata, bytes) =>
+      emit({ type: "otp:network-command", payload: { metadata, bytes } }),
     arguments: buildArgs({
       appNames: fsData.appNames,
       entrypoint: fsData.entrypoint,
@@ -164,6 +169,21 @@ async function boot(
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
   }
+}
+
+function deliverNetworkEvent(
+  module: EmscriptenModule | null,
+  metadata: string,
+  bytes: Uint8Array,
+): void {
+  check(module !== null);
+  const metadataBytes = UTF8.encode(metadata);
+  module.ccall(
+    "wasmNetworkEvent",
+    "number",
+    ["array", "number", "array", "number"],
+    [metadataBytes, metadataBytes.byteLength, bytes, bytes.byteLength],
+  );
 }
 
 type BeamMessage = NonNullable<ReturnType<typeof deserializeBridgeMessage>>;

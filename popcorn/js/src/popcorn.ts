@@ -18,6 +18,11 @@ import type {
   TtySize,
 } from "./types";
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
+import {
+  VirtualNetworkBroker,
+  type VirtualNetworkCommand,
+  type VirtualNetworkEvent,
+} from "./virtual-network";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
@@ -27,6 +32,9 @@ const PID_REF_KEY = "popcorn_pid";
 const UTF8 = new TextEncoder();
 const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
 const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
+const virtualNetwork = new VirtualNetworkBroker();
+const virtualWorkers = new Map<string, Worker>();
+let virtualVmSequence = 0;
 
 type TtyOutput = "text" | "bytes";
 type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
@@ -189,6 +197,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private trackedKeySeq = 0;
   private io = createIoState();
   private vmReady = false;
+  private virtualVmId = "";
 
   public readonly genserver: GenServer = {
     call: (target, request, opts) => this.call(target, request, opts),
@@ -220,6 +229,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         return;
       case "otp:tracked-value-delete":
         this.deleteTrackedValue(data.payload);
+        return;
+      case "otp:network-command":
+        this.handleNetworkCommand(data.payload.metadata, data.payload.bytes);
         return;
       case "otp:stdout":
         this.handleStdout(data.payload);
@@ -273,6 +285,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           type: "module",
         });
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
+    virtualVmSequence += 1;
+    this.virtualVmId = `popcorn-${virtualVmSequence}`;
+    virtualWorkers.set(this.virtualVmId, this.vmWorker);
+    virtualNetwork.registerVm(this.virtualVmId);
   }
 
   public static async init<Output extends TtyOutput = "text">(
@@ -527,9 +543,41 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
     this.pendingCalls.clear();
     this.clearTrackedValues();
+    virtualWorkers.delete(this.virtualVmId);
+    this.deliverNetwork(virtualNetwork.unregisterVm(this.virtualVmId));
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.vmWorker.terminate();
     // we keep onEvent() callbacks across reboots
+  }
+
+  private handleNetworkCommand(metadata: string, bytes: Uint8Array<ArrayBuffer>): void {
+    const parsed = JSON.parse(metadata) as VirtualNetworkCommand;
+    check(parsed.version === 1);
+    check(parsed.vmId === "");
+    const command = { ...parsed, vmId: this.virtualVmId } as VirtualNetworkCommand;
+    if (command.operation === "tcp_data" || command.operation === "udp_data") command.bytes = bytes;
+    else check(bytes.byteLength === 0);
+    this.deliverNetwork(virtualNetwork.command(command));
+  }
+
+  private deliverNetwork(
+    deliveries: Array<{ vmId: string; event: VirtualNetworkEvent }>,
+  ): void {
+    for (const delivery of deliveries) {
+      const worker = virtualWorkers.get(delivery.vmId);
+      if (worker === undefined) continue;
+      const event = delivery.event;
+      const bytes =
+        "bytes" in event ? event.bytes : new Uint8Array(new ArrayBuffer(0));
+      const metadata = JSON.stringify(
+        "bytes" in event ? { ...event, bytes: undefined } : event,
+      );
+      toVm(
+        worker,
+        { type: "popcorn:network-event", payload: { metadata, bytes } },
+        bytes.byteLength === 0 ? [] : [bytes.buffer],
+      );
+    }
   }
 
   private clearTrackedValues(): void {

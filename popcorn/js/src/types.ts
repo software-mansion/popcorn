@@ -30,7 +30,13 @@ export type BeamEvent =
   | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue }
   | { type: "otp:run_js"; payload: RunJsRequest }
-  | { type: "otp:tracked-value-delete"; payload: number };
+  | { type: "otp:tracked-value-delete"; payload: number }
+  | { type: "otp:network-command"; payload: VirtualNetworkWireMessage };
+
+export type VirtualNetworkWireMessage = {
+  metadata: string;
+  bytes: Uint8Array<ArrayBuffer>;
+};
 
 export type RunJsRequest = {
   code: string;
@@ -81,6 +87,10 @@ export type EmscriptenModule = {
   onStdinConsumed?: (size: number) => void;
   onTrackedValueDelete?: (key: number) => void;
   onTtyChunk?: (fd: number, chunk: Uint8Array) => void;
+  onVirtualNetworkCommand?: (
+    metadata: string,
+    bytes: Uint8Array<ArrayBuffer>,
+  ) => void;
   addRunDependency: (id: string) => void;
   removeRunDependency: (id: string) => void;
 };
