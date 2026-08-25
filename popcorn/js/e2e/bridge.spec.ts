@@ -83,6 +83,36 @@ test.describe("ETF", () => {
 });
 
 test.describe("events", () => {
+  test("local fun ETF round trip", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+          Fun = fun(Value) -> Value + 1 end,
+          Encoded = term_to_binary(Fun),
+          Decoded = binary_to_term(Encoded),
+          {xxh3_128, Checksum} = lists:module_info(checksum),
+          {ok, {lists, {xxh3_128, Checksum}}} =
+            beam_lib:checksum(code:which(lists)),
+          undefined = lists:module_info(md5),
+          Info = lists:module_info(),
+          {checksum, {xxh3_128, Checksum}} =
+            lists:keyfind(checksum, 1, Info),
+          {md5, undefined} = lists:keyfind(md5, 1, Info),
+          ok = wasm:send(#{
+            local_fun_round_trip => Decoded(1) =:= 2,
+            new_fun_ext => binary:at(Encoded, 1) =:= 112,
+            module_checksum => byte_size(Checksum)
+          }).
+        `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("local_fun_round_trip")).toEqual({
+      local_fun_round_trip: true,
+      new_fun_ext: true,
+      module_checksum: 16,
+    });
+  });
+
   test("atoms and tuples", async ({ otp, page }) => {
     function inJs<Result>(fn: () => Result) {
       return page.evaluateHandle(fn);
