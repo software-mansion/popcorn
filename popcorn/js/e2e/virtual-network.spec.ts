@@ -1,6 +1,44 @@
 import { assert, evalOpts, expect, test } from "./helpers";
 
 test.describe("virtual network", () => {
+  test("Cowboy through JavaScript TCP and fetch", async ({ createOtp, page }) => {
+    const server = await createOtp();
+    const serverBoot = await server.boot(
+      evalOpts(`
+        {ok, _} = ranch_sup:start_link(),
+        Dispatch = cowboy_router:compile([{'_', [{"/hello", test_cowboy_handler, #{}}]}]),
+        {ok, _} = cowboy:start_clear(test_http, [{port, 0}, {num_acceptors, 2}],
+                                     #{env => #{dispatch => Dispatch}}),
+        Port = ranch:get_port(test_http),
+        ok = wasm:send(#{cowboy_port => Port}).
+      `),
+    );
+    assert(serverBoot.ok, JSON.stringify(serverBoot));
+    const event = (await server.waitForEvent("cowboy_port")) as { cowboy_port: number };
+
+    const result = await page.evaluate(async (port) => {
+      const socket = await window.Popcorn.connect("vm-1", port);
+      await socket.write(new TextEncoder().encode(`GET /hello HTTP/1.1\r\nhost: vm-1:${port}\r\nconnection: close\r\n\r\n`));
+      const rawReader = socket.readable.getReader();
+      let raw = "";
+      while (!raw.includes("hello from Cowboy")) {
+        const { done, value } = await rawReader.read();
+        if (done) break;
+        raw += new TextDecoder().decode(value);
+      }
+      socket.close();
+
+      const responses = await Promise.all(Array.from({ length: 8 }, () => window.Popcorn.fetch(`http://vm-1:${port}/hello`)));
+      return {
+        raw: raw.includes("HTTP/1.1 200 OK") && raw.includes("hello from Cowboy"),
+        bodies: await Promise.all(responses.map((response) => response.text())),
+      };
+    }, event.cowboy_port);
+
+    expect(result.raw).toBe(true);
+    expect(result.bodies).toEqual(Array(8).fill("hello from Cowboy"));
+  });
+
   test("virtual fetch", async ({ createOtp, page }) => {
     const server = await createOtp();
     const serverBoot = await server.boot(

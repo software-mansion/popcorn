@@ -42,6 +42,11 @@ Virtual requests return standard streaming `Response` objects, follow redirects
 unless configured otherwise, and support buffered request bodies. Connections
 currently send `Connection: close` and are not reused. HTTPS is unsupported.
 
+The TCP compatibility surface supports Ranch and cleartext Cowboy listeners,
+including concurrent acceptors, integer active mode, `tcp_passive`, standard
+Ranch listener options, ownership transfer, and graceful write shutdown. Cowboy
+TLS listeners remain unsupported.
+
 ## Example
 
 One VM can listen with ordinary OTP calls:

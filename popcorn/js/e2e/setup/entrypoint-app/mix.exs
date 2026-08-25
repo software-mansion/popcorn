@@ -19,7 +19,7 @@ defmodule TestEntrypoint.MixProject do
   end
 
   defp deps do
-    deps = [{:popcorn, path: "../../../../elixir"}]
+    deps = [{:cowboy, "~> 2.13"}, {:popcorn, path: "../../../../elixir"}]
 
     if System.get_env("POPCORN_E2E_REQ") == "1" do
       [{:req, ">= 0.5.0"} | deps]

@@ -322,7 +322,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0dd33dddd
 --- /dev/null
 +++ b/lib/kernel/src/wasm_socket.erl
-@@ -0,0 +1,422 @@
+@@ -0,0 +1,441 @@
 +-module(wasm_socket).
 +-moduledoc false.
 +
@@ -514,6 +514,11 @@ index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0
 +    {reply, {error, enotconn}, State};
 +handle_call(_From, _Ref, peername, State) ->
 +    {reply, {ok, maps:get(peer, State)}, State};
++handle_call(_From, _Ref, {shutdown, How}, #{kind := tcp} = State)
++  when How =:= read; How =:= write; How =:= read_write ->
++    ok = wasm_virtual_network:send(maps:get(id, State),
++                                   #{operation => close, direction => How}, <<>>),
++    {reply, ok, State};
 +handle_call(_From, _Ref, _Request, State) ->
 +    {reply, {error, enotsup}, State}.
 +
@@ -608,6 +613,13 @@ index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0
 +
 +continue_active(#{options := #{active := once} = Options} = State) ->
 +    State#{options := Options#{active := false}};
++continue_active(#{options := #{active := 1} = Options} = State) ->
++    Owner = maps:get(owner, State),
++    Owner ! {tcp_passive, {'$inet', wasm_tcp, self()}},
++    State#{options := Options#{active := false}};
++continue_active(#{options := #{active := Active} = Options} = State)
++  when is_integer(Active) ->
++    deliver_active(State#{options := Options#{active := Active - 1}});
 +continue_active(State) -> deliver_active(State).
 +
 +take_passive(Length, #{kind := udp} = State) -> take_udp(Length, State);
@@ -671,6 +683,9 @@ index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0
 +parse_options([{active, Active} | Rest], Options, Address, Backlog, Kind)
 +  when Active =:= true; Active =:= false; Active =:= once ->
 +    parse_options(Rest, Options#{active := Active}, Address, Backlog, Kind);
++parse_options([{active, Active} | Rest], Options, Address, Backlog, Kind)
++  when is_integer(Active), Active > 0 ->
++    parse_options(Rest, Options#{active := Active}, Address, Backlog, Kind);
 +parse_options([{packet, Packet} | Rest], Options, Address, Backlog, Kind)
 +  when Packet =:= raw; Packet =:= 0; Packet =:= 1; Packet =:= 2; Packet =:= 4 ->
 +    Value = case Packet of 0 -> raw; _ -> Packet end,
@@ -683,6 +698,10 @@ index 0000000000000000000000000000000000000000..5f3532fa166f715d305bfbb1cbf3d2e0
 +  when is_integer(Backlog), Backlog >= 0 ->
 +    parse_options(Rest, Options, Address, Backlog, tcp_listener);
 +parse_options([inet | Rest], Options, Address, Backlog, Kind) ->
++    parse_options(Rest, Options, Address, Backlog, Kind);
++parse_options([{Name, _Value} | Rest], Options, Address, Backlog, Kind)
++  when Name =:= reuseaddr; Name =:= nodelay; Name =:= send_timeout;
++       Name =:= send_timeout_close; Name =:= buffer ->
 +    parse_options(Rest, Options, Address, Backlog, Kind);
 +parse_options([_Unsupported | _], _Options, _Address, _Backlog, _Kind) ->
 +    {error, enotsup}.
@@ -773,7 +792,7 @@ index 0000000000000000000000000000000000000000..d1564f92c87e0a673fb3130f7e56abd7
 +    wasm_socket:cast(Socket, close),
 +    receive {socket_closed, Pid} -> ok end.
 +
-+shutdown(_Socket, _How) -> {error, enotsup}.
++shutdown(Socket, How) -> wasm_socket:call(Socket, {shutdown, How}).
 +controlling_process(Socket, Owner) ->
 +    wasm_socket:call(Socket, {controlling_process, Owner}).
 +setopts(Socket, Opts) -> wasm_socket:call(Socket, {setopts, Opts}).

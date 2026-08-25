@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from "child_process";
-import { readFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -38,6 +38,7 @@ async function globalSetup() {
   }
 
   await buildEntrypointFixture(env);
+  if (!manifest.vm.capabilities.crypto) await removeUnusedCowboyTlsApps();
 
   console.log("e2e: starting Vite dev server...");
 
@@ -80,6 +81,19 @@ async function globalSetup() {
   });
 
   console.log("e2e: vite dev server started on http://127.0.0.1:5173");
+}
+
+async function removeUnusedCowboyTlsApps(): Promise<void> {
+  const applications = {
+    cowboy: "kernel,stdlib,cowlib,ranch",
+    cowlib: "kernel,stdlib",
+    ranch: "kernel,stdlib",
+  };
+  for (const [app, value] of Object.entries(applications)) {
+    const path = resolve(__dirname, `entrypoint-app/_build/dev/lib/${app}/ebin/${app}.app`);
+    const source = await readFile(path, "utf8");
+    await writeFile(path, source.replace(/\{applications, \[[^\]]+\]\}/, `{applications, [${value}]}`));
+  }
 }
 
 export default globalSetup;
