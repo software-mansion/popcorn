@@ -12,14 +12,15 @@ index e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287..68947940b681616b85497f30a6c42de3
  
  ifeq ($(TARGET),win32)
  # On windows the preloaded objects are in a resource object.
-@@ -1168,5 +1169,6 @@ NIF_OBJS = \
- 	$(OBJDIR)/prim_tty_nif.o \
+@@ -1156,6 +1157,7 @@ NIF_OBJS = \
  	$(OBJDIR)/erl_tracer_nif.o \
  	$(OBJDIR)/prim_buffer_nif.o \
  	$(OBJDIR)/prim_file_nif.o \
 +	$(OBJDIR)/wasm_nif.o \
  	$(OBJDIR)/zlib_nif.o \
-@@ -1291,7 +1293,7 @@ EMU_LD=$(CC)
+ 	$(ESOCK_NIF_OBJS)
+ 
+@@ -1275,7 +1277,7 @@ EMU_LD=$(CC)
  endif
  $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
  	$(ld_verbose) $(EMU_LD) -o $@ \
