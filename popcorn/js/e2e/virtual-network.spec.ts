@@ -1,6 +1,44 @@
 import { assert, evalOpts, expect, test } from "./helpers";
 
 test.describe("virtual network", () => {
+  test("JavaScript TCP", async ({ createOtp, page }) => {
+    const server = await createOtp();
+    const serverBoot = await server.boot(
+      evalOpts(`
+        spawn(fun() ->
+          {ok, Listener} = gen_tcp:listen(0, [binary, {active, false}, {packet, raw}]),
+          {ok, Port} = inet:port(Listener),
+          ok = wasm:send(#{js_tcp_port => Port}),
+          {ok, Socket} = gen_tcp:accept(Listener, 5000),
+          {ok, <<"abcdef">>} = gen_tcp:recv(Socket, 6, 5000),
+          ok = gen_tcp:send(Socket, <<"one">>),
+          ok = gen_tcp:send(Socket, <<"two">>),
+          {error, closed} = gen_tcp:recv(Socket, 0, 5000),
+          ok = wasm:send(#{js_tcp_done => true})
+        end).
+      `),
+    );
+    assert(serverBoot.ok);
+    const event = (await server.waitForEvent("js_tcp_port")) as { js_tcp_port: number };
+
+    const result = await page.evaluate(async (port) => {
+      const socket = await window.Popcorn.connect("vm-1", port);
+      await socket.write(new TextEncoder().encode("ab"));
+      await socket.write(new TextEncoder().encode("cdef"));
+      const reader = socket.readable.getReader();
+      let reply = "";
+      while (reply.length < 6) {
+        const { value } = await reader.read();
+        reply += new TextDecoder().decode(value);
+      }
+      socket.closeWrite();
+      return { reply, localAddress: socket.localAddress };
+    }, event.js_tcp_port);
+
+    expect(result).toEqual({ reply: "onetwo", localAddress: "10.255.0.1" });
+    expect(await server.waitForEvent("js_tcp_done")).toEqual({ js_tcp_done: true });
+  });
+
   test("TCP and UDP between VMs", async ({ createOtp }) => {
     const server = await createOtp();
     const serverBoot = await server.boot(

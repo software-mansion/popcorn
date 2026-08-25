@@ -23,6 +23,7 @@ import {
   type VirtualNetworkCommand,
   type VirtualNetworkEvent,
 } from "./virtual-network";
+import { VirtualTcpClient, type VirtualTcpSocket } from "./virtual-tcp";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
@@ -35,6 +36,7 @@ const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 const virtualNetwork = new VirtualNetworkBroker();
 const virtualWorkers = new Map<string, Worker>();
 let virtualVmSequence = 0;
+const virtualTcp = new VirtualTcpClient(virtualNetwork, deliverVirtualNetwork, 1);
 
 type TtyOutput = "text" | "bytes";
 type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
@@ -308,6 +310,14 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return { ok: true, data: popcorn };
   }
 
+  public static connect(
+    host: string,
+    port: number,
+    options?: { signal?: AbortSignal },
+  ): Promise<VirtualTcpSocket> {
+    return virtualTcp.connect(host, port, options);
+  }
+
   /**
    * Starts the VM and resolves after its bridge is ready and the entrypoint
    * application has started. `timeoutsMs.boot` bounds the wait for the VM
@@ -544,7 +554,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.pendingCalls.clear();
     this.clearTrackedValues();
     virtualWorkers.delete(this.virtualVmId);
-    this.deliverNetwork(virtualNetwork.unregisterVm(this.virtualVmId));
+    deliverVirtualNetwork(virtualNetwork.unregisterVm(this.virtualVmId));
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.vmWorker.terminate();
     // we keep onEvent() callbacks across reboots
@@ -557,27 +567,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     const command = { ...parsed, vmId: this.virtualVmId } as VirtualNetworkCommand;
     if (command.operation === "tcp_data" || command.operation === "udp_data") command.bytes = bytes;
     else check(bytes.byteLength === 0);
-    this.deliverNetwork(virtualNetwork.command(command));
-  }
-
-  private deliverNetwork(
-    deliveries: Array<{ vmId: string; event: VirtualNetworkEvent }>,
-  ): void {
-    for (const delivery of deliveries) {
-      const worker = virtualWorkers.get(delivery.vmId);
-      if (worker === undefined) continue;
-      const event = delivery.event;
-      const bytes =
-        "bytes" in event ? event.bytes : new Uint8Array(new ArrayBuffer(0));
-      const metadata = JSON.stringify(
-        "bytes" in event ? { ...event, bytes: undefined } : event,
-      );
-      toVm(
-        worker,
-        { type: "popcorn:network-event", payload: { metadata, bytes } },
-        bytes.byteLength === 0 ? [] : [bytes.buffer],
-      );
-    }
+    deliverVirtualNetwork(virtualNetwork.command(command));
   }
 
   private clearTrackedValues(): void {
@@ -902,6 +892,20 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
 
     this.deinit(exitReason(payload));
+  }
+}
+
+function deliverVirtualNetwork(
+  deliveries: Array<{ vmId: string; event: VirtualNetworkEvent }>,
+): void {
+  for (const delivery of deliveries) {
+    if (virtualTcp.receive(delivery)) continue;
+    const worker = virtualWorkers.get(delivery.vmId);
+    if (worker === undefined) continue;
+    const event = delivery.event;
+    const bytes = "bytes" in event ? event.bytes : new Uint8Array(new ArrayBuffer(0));
+    const metadata = JSON.stringify("bytes" in event ? { ...event, bytes: undefined } : event);
+    toVm(worker, { type: "popcorn:network-event", payload: { metadata, bytes } }, bytes.byteLength === 0 ? [] : [bytes.buffer]);
   }
 }
 

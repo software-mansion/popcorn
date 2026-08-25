@@ -26,7 +26,7 @@ export type VirtualNetworkError =
   | "enoent";
 
 type Endpoint = { vmId: string; socketId: number };
-type Delivery = { vmId: string; event: VirtualNetworkEvent };
+export type VirtualNetworkDelivery = { vmId: string; event: VirtualNetworkEvent };
 type Vm = { address: VirtualAddress; hostname: string };
 type Listener = {
   endpoint: Endpoint;
@@ -53,6 +53,7 @@ export class VirtualNetworkBroker {
   private readonly listeners = new Map<string, Listener>();
   private readonly udpBindings = new Map<string, Endpoint>();
   private readonly peers = new Map<string, Endpoint>();
+  private readonly closedWrites = new Set<string>();
   private readonly pendingClients = new Map<string, PendingConnection>();
   private nextAddress = 1;
   private nextPort = EPHEMERAL_START;
@@ -71,8 +72,14 @@ export class VirtualNetworkBroker {
     return value;
   }
 
-  public unregisterVm(vmId: string): Delivery[] {
-    const deliveries: Delivery[] = [];
+  public registerJs(vmId: string, id: number): Vm {
+    const value = { address: `10.255.0.${id}`, hostname: `javascript-${id}` };
+    this.vms.set(vmId, value);
+    return value;
+  }
+
+  public unregisterVm(vmId: string): VirtualNetworkDelivery[] {
+    const deliveries: VirtualNetworkDelivery[] = [];
     for (const listener of Array.from(this.listeners.values())) {
       if (listener.endpoint.vmId === vmId) {
         this.listeners.delete(bindingKey(listener.address, listener.port));
@@ -93,6 +100,8 @@ export class VirtualNetworkBroker {
       if (endpoint.vmId !== vmId && peer.vmId !== vmId) continue;
       this.peers.delete(key);
       this.peers.delete(endpointKey(peer));
+      this.closedWrites.delete(key);
+      this.closedWrites.delete(endpointKey(peer));
       const survivor = endpoint.vmId === vmId ? peer : endpoint;
       if (survivor.vmId !== vmId) deliveries.push(closed(survivor, "read_write", "econnreset"));
     }
@@ -103,7 +112,7 @@ export class VirtualNetworkBroker {
     return deliveries;
   }
 
-  public command(command: VirtualNetworkCommand): Delivery[] {
+  public command(command: VirtualNetworkCommand): VirtualNetworkDelivery[] {
     const vm = this.vms.get(command.vmId);
     if (vm === undefined) return requestError(command, "enoent");
     switch (command.operation) {
@@ -117,7 +126,7 @@ export class VirtualNetworkBroker {
     }
   }
 
-  private bindUdp(command: Extract<VirtualNetworkCommand, { operation: "bind_udp" }>, vm: Vm): Delivery[] {
+  private bindUdp(command: Extract<VirtualNetworkCommand, { operation: "bind_udp" }>, vm: Vm): VirtualNetworkDelivery[] {
     const address = bindAddress(command.address, vm.address);
     const port = command.port === 0 ? this.allocatePort(address) : command.port;
     const key = bindingKey(address, port);
@@ -126,7 +135,7 @@ export class VirtualNetworkBroker {
     return [reply(command.vmId, { version: 1, operation: "ok", requestId: command.requestId, address, port })];
   }
 
-  private listenTcp(command: Extract<VirtualNetworkCommand, { operation: "listen_tcp" }>, vm: Vm): Delivery[] {
+  private listenTcp(command: Extract<VirtualNetworkCommand, { operation: "listen_tcp" }>, vm: Vm): VirtualNetworkDelivery[] {
     const address = bindAddress(command.address, vm.address);
     const port = command.port === 0 ? this.allocatePort(address) : command.port;
     const key = bindingKey(address, port);
@@ -135,7 +144,7 @@ export class VirtualNetworkBroker {
     return [reply(command.vmId, { version: 1, operation: "ok", requestId: command.requestId, address, port })];
   }
 
-  private connectTcp(command: Extract<VirtualNetworkCommand, { operation: "connect_tcp" }>, vm: Vm): Delivery[] {
+  private connectTcp(command: Extract<VirtualNetworkCommand, { operation: "connect_tcp" }>, vm: Vm): VirtualNetworkDelivery[] {
     const address = resolveAddress(resolveHost(command.address, vm.address), this.vms);
     const listener = this.listeners.get(bindingKey(address, command.port));
     if (listener === undefined) return requestError(command, "econnrefused");
@@ -149,7 +158,7 @@ export class VirtualNetworkBroker {
     return deliveries;
   }
 
-  private acceptTcp(command: Extract<VirtualNetworkCommand, { operation: "accept_tcp" }>): Delivery[] {
+  private acceptTcp(command: Extract<VirtualNetworkCommand, { operation: "accept_tcp" }>): VirtualNetworkDelivery[] {
     const listener = Array.from(this.listeners.values()).find((value) => sameEndpoint(value.endpoint, command));
     if (listener === undefined) return requestError(command, "enoent");
     const accept = { socketId: command.acceptedSocketId, requestId: command.requestId };
@@ -161,7 +170,7 @@ export class VirtualNetworkBroker {
     return this.finishAccept(listener, pending, accept);
   }
 
-  private finishAccept(listener: Listener, pending: PendingConnection, accept: { socketId: number; requestId: number }): Delivery[] {
+  private finishAccept(listener: Listener, pending: PendingConnection, accept: { socketId: number; requestId: number }): VirtualNetworkDelivery[] {
     const server = { vmId: listener.endpoint.vmId, socketId: accept.socketId };
     this.pendingClients.delete(endpointKey(pending.client));
     this.peers.set(endpointKey(pending.client), server);
@@ -171,7 +180,8 @@ export class VirtualNetworkBroker {
     return deliveries;
   }
 
-  private tcpData(command: Extract<VirtualNetworkCommand, { operation: "tcp_data" }>): Delivery[] {
+  private tcpData(command: Extract<VirtualNetworkCommand, { operation: "tcp_data" }>): VirtualNetworkDelivery[] {
+    if (this.closedWrites.has(endpointKey(command))) return [closed(command, "write", "econnreset")];
     if (command.bytes.byteLength > this.queueLimitBytes) {
       return [closed(command, "read_write", "enobufs"),
               ...this.closeEndpoint(command, "enobufs")];
@@ -186,7 +196,7 @@ export class VirtualNetworkBroker {
     return [];
   }
 
-  private udpData(command: Extract<VirtualNetworkCommand, { operation: "udp_data" }>, vm: Vm): Delivery[] {
+  private udpData(command: Extract<VirtualNetworkCommand, { operation: "udp_data" }>, vm: Vm): VirtualNetworkDelivery[] {
     if (command.bytes.byteLength > this.queueLimitBytes) return [];
     const address = resolveAddress(command.address, this.vms);
     const target = this.udpBindings.get(bindingKey(address, command.port));
@@ -197,22 +207,30 @@ export class VirtualNetworkBroker {
     return [reply(target.vmId, { version: 1, operation: "udp_data", socketId: target.socketId, address: vm.address, port: Number(sourcePortText), bytes: command.bytes })];
   }
 
-  private close(command: Extract<VirtualNetworkCommand, { operation: "close" }>): Delivery[] {
+  private close(command: Extract<VirtualNetworkCommand, { operation: "close" }>): VirtualNetworkDelivery[] {
     for (const [key, listener] of this.listeners) {
       if (sameEndpoint(listener.endpoint, command)) this.listeners.delete(key);
       else listener.accepts = listener.accepts.filter((accept) =>
         !(listener.endpoint.vmId === command.vmId && accept.socketId === command.socketId));
     }
     for (const [key, endpoint] of this.udpBindings) if (sameEndpoint(endpoint, command)) this.udpBindings.delete(key);
+    if (command.direction === "write") {
+      const peer = this.peers.get(endpointKey(command));
+      if (peer === undefined) return [];
+      this.closedWrites.add(endpointKey(command));
+      return [closed(peer, "read")];
+    }
     return this.closeEndpoint(command);
   }
 
-  private closeEndpoint(endpoint: Endpoint, reason?: VirtualNetworkError): Delivery[] {
+  private closeEndpoint(endpoint: Endpoint, reason?: VirtualNetworkError): VirtualNetworkDelivery[] {
     const peer = this.peers.get(endpointKey(endpoint));
     this.peers.delete(endpointKey(endpoint));
+    this.closedWrites.delete(endpointKey(endpoint));
     this.pendingClients.delete(endpointKey(endpoint));
     if (peer === undefined) return [];
     this.peers.delete(endpointKey(peer));
+    this.closedWrites.delete(endpointKey(peer));
     return [closed(peer, "read_write", reason)];
   }
 
@@ -237,6 +255,6 @@ function bindingKey(address: string, port: number): string { return `${address}:
 function endpointKey(endpoint: Endpoint): string { return `${endpoint.vmId}\0${endpoint.socketId}`; }
 function parseEndpointKey(key: string): Endpoint { const [vmId, socketId] = key.split("\0"); return { vmId, socketId: Number(socketId) }; }
 function sameEndpoint(left: Endpoint, right: Endpoint): boolean { return left.vmId === right.vmId && left.socketId === right.socketId; }
-function reply(vmId: string, event: VirtualNetworkEvent): Delivery { return { vmId, event }; }
-function closed(endpoint: Endpoint, direction: "read" | "write" | "read_write", reason?: VirtualNetworkError): Delivery { return reply(endpoint.vmId, { version: 1, operation: "tcp_closed", socketId: endpoint.socketId, direction, reason }); }
-function requestError(command: { vmId: string; requestId?: number }, reason: VirtualNetworkError): Delivery[] { return command.requestId === undefined ? [] : [reply(command.vmId, { version: 1, operation: "error", requestId: command.requestId, reason })]; }
+function reply(vmId: string, event: VirtualNetworkEvent): VirtualNetworkDelivery { return { vmId, event }; }
+function closed(endpoint: Endpoint, direction: "read" | "write" | "read_write", reason?: VirtualNetworkError): VirtualNetworkDelivery { return reply(endpoint.vmId, { version: 1, operation: "tcp_closed", socketId: endpoint.socketId, direction, reason }); }
+function requestError(command: { vmId: string; requestId?: number }, reason: VirtualNetworkError): VirtualNetworkDelivery[] { return command.requestId === undefined ? [] : [reply(command.vmId, { version: 1, operation: "error", requestId: command.requestId, reason })]; }
