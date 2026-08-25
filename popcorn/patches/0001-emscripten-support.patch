@@ -46,7 +46,7 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..e5b8ff73657a3c1b9d2b95d2a65b4e49
  	# -D_WIN32_WINNT=* from CPPFLAGS is saved in ETHR_DEFS.
  	CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600 -DWINVER=0x0600"
  	;;
-+    emscripten*)
++    *emscripten*)
 +	# Emscripten/Wasm target
 +	CPPFLAGS="$CPPFLAGS -DERTS_EMSCRIPTEN"
 +	;;

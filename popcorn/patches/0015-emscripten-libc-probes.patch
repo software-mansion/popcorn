@@ -1,0 +1,53 @@
+diff --git a/erts/emulator/beam/sys.h b/erts/emulator/beam/sys.h
+--- a/erts/emulator/beam/sys.h
++++ b/erts/emulator/beam/sys.h
+@@ -1167,7 +1167,7 @@ ERTS_GLB_INLINE void *sys_memchr(const void *s, int c, size_t n)
+ ERTS_GLB_INLINE void *sys_memrchr(const void *s, int c, size_t n)
+ {
+     ASSERT(s != NULL);
+-#ifdef HAVE_MEMRCHR
++#if defined(HAVE_MEMRCHR) && !defined(__EMSCRIPTEN__)
+     return (void*)memrchr(s, c, n);
+ #else
+     {
+diff --git a/erts/emulator/beam/utils.c b/erts/emulator/beam/utils.c
+--- a/erts/emulator/beam/utils.c
++++ b/erts/emulator/beam/utils.c
+@@ -125,7 +125,10 @@ void *ycf_debug_get_stack_start(void) {
+ #include <malloc.h>
+ #endif
+ 
+-#if !defined(HAVE_MALLOPT)
++#if defined(__EMSCRIPTEN__)
++#undef HAVE_MALLOPT
++#define HAVE_MALLOPT 0
++#elif !defined(HAVE_MALLOPT)
+ #undef  HAVE_MALLOPT
+ #define HAVE_MALLOPT 0
+ #endif
+diff --git a/erts/emulator/sys/common/erl_mmap.c b/erts/emulator/sys/common/erl_mmap.c
+--- a/erts/emulator/sys/common/erl_mmap.c
++++ b/erts/emulator/sys/common/erl_mmap.c
+@@ -28,6 +28,10 @@
+ #include "erl_process.h"
+ #include "atom.h"
+ #include "erl_mmap.h"
++
++#ifdef __EMSCRIPTEN__
++#undef ERTS_HAVE_OS_MREMAP
++#endif
+ #include <stddef.h>
+ 
+ #ifdef HAVE_SYS_MMAN_H
+diff --git a/erts/etc/unix/run_erl.c b/erts/etc/unix/run_erl.c
+--- a/erts/etc/unix/run_erl.c
++++ b/erts/etc/unix/run_erl.c
+@@ -1222,7 +1222,7 @@ static void error_logf(int priority, int line, const char *format, ...)
+ 
+ #ifdef HAVE_SYSLOG_H
+     if (run_daemon) {
+-#ifdef HAVE_VSYSLOG
++#if defined(HAVE_VSYSLOG) && !defined(__EMSCRIPTEN__)
+ 	vsyslog(priority,format,args);
+ #else
+ 	/* Some OSes like AIX lack vsyslog. */
