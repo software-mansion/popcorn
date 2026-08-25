@@ -133,7 +133,7 @@ setup_otp_source() {
 
 patch_otp() {
     log "Patching OTP sources..."
-    run "${PROJECT_ROOT}/scripts/patch-beam.sh" "$@"
+    run "${PROJECT_ROOT}/scripts/patch-beam.sh"
 }
 
 
@@ -151,8 +151,20 @@ run_autoconf() {
         return
     fi
 
+    if ! git -C "${beam_dir}" diff --quiet || ! git -C "${beam_dir}" diff --cached --quiet; then
+        error "OTP has uncommitted source changes before autoconf regeneration."
+    fi
+
     log "Regenerating autoconf scripts..."
-    (cd "${beam_dir}" && run ./otp_build update_configure)
+    (cd "${beam_dir}" && run ./otp_build update_configure --no-commit)
+
+    if ! git -C "${beam_dir}" diff --quiet; then
+        git -C "${beam_dir}" add -u
+        git -C "${beam_dir}" \
+            -c user.name=Popcorn -c user.email=popcorn@localhost \
+            commit --quiet -m "Update configure scripts" \
+            -m "Popcorn-Build-Artifact: configure"
+    fi
 
     echo "${current_hash}" > "${stamp}"
     success "Autoconf done."
@@ -217,6 +229,27 @@ compile_preloaded_modules() {
             -o "${ebin}" "${src}"
     done
     success "Preloaded modules compiled."
+}
+
+
+commit_preloaded_modules() {
+    local beam_dir="$1"
+    local ebin="erts/preloaded/ebin"
+    local modules=(wasm erl_init prim_inet)
+    local files=()
+    local module
+
+    for module in "${modules[@]}"; do
+        [[ -f "${beam_dir}/${ebin}/${module}.beam" ]] && files+=("${ebin}/${module}.beam")
+    done
+    git -C "${beam_dir}" add "${files[@]}"
+    if git -C "${beam_dir}" diff --cached --quiet; then
+        return
+    fi
+    git -C "${beam_dir}" \
+        -c user.name=Popcorn -c user.email=popcorn@localhost \
+        commit --quiet -m "Update preloaded modules" \
+        -m "Popcorn-Build-Artifact: preloaded"
 }
 
 
@@ -548,12 +581,7 @@ main() {
 
     setup_otp_source "${source}" "${otp_tag}"
 
-    patch_otp \
-        --without-zstd \
-        --without-native-sockets \
-        --without-distribution \
-        --without-crash-dumps \
-        --without-dynamic-loading
+    patch_otp
 
     run_autoconf "${beam_dir}"
 
@@ -564,6 +592,7 @@ main() {
     build_bootstrap "${beam_dir}" "${jobs}"
 
     compile_preloaded_modules "${beam_dir}" true true
+    commit_preloaded_modules "${beam_dir}"
 
     local openssl_prefix=""
     if [[ "${with_crypto}" == "true" ]]; then

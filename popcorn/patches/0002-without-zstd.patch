@@ -1,4 +1,5 @@
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 5d6c12c8a54493e3550082370288a7d0cc79aded..a3c737bd9c9863566362cd70dd167d45a42806ae 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
 @@ -397,17 +397,6 @@ else
@@ -46,11 +47,16 @@ diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
  COMMON_INCLUDES += -I../include -I../include/$(TARGET)
  COMMON_INCLUDES += -I../include/internal -I../include/internal/$(TARGET)
  
-@@ -1172,3 +1159,2 @@ NIF_OBJS = \
+@@ -1170,7 +1157,6 @@ NIF_OBJS = \
+ 	$(OBJDIR)/prim_buffer_nif.o \
+ 	$(OBJDIR)/prim_file_nif.o \
  	$(OBJDIR)/zlib_nif.o \
 -	$(OBJDIR)/zstd_nif.o \
  	$(ESOCK_NIF_OBJS)
-@@ -1427,6 +1413,6 @@ $(TARGET)/gen_git_version.mk:
+ 
+ ifeq ($(TARGET),win32)
+@@ -1424,7 +1410,7 @@ $(TARGET)/gen_git_version.mk:
+ # rebuild.
  	$(V_at)if utils/gen_git_version $@; then touch beam/erl_bif_info.c; fi
  
 -DEPEND_DEPS=jit src drv nif sys target zlib ryu zstd
@@ -58,7 +64,7 @@ diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
  
  $(TTF_DIR)/src.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
  	$(gen_verbose)
-@@ -1458,10 +1444,6 @@ $(TTF_DIR)/ryu.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
+@@ -1456,10 +1442,6 @@ $(TTF_DIR)/ryu.depend.mk: $(TTF_DIR)/GENERATED $(PRELOAD_SRC)
  	$(gen_verbose)
  	$(V_at)$(DEP_CC) $(DEP_FLAGS) $(RYU_SRC) > $@.tmp
  	$(V_at)$(SED_DEPEND_ZLIB) $@.tmp  > $@
@@ -70,9 +76,10 @@ diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
  	$(gen_verbose)
  	@touch $@
 diff --git a/lib/stdlib/src/Makefile b/lib/stdlib/src/Makefile
+index ddecd632450c741768c5463d52b1a83c56b6b971..e29d6ab2280ebf11f4c8813c0a6899b8e6cae2ef 100644
 --- a/lib/stdlib/src/Makefile
 +++ b/lib/stdlib/src/Makefile
-@@ -138,8 +138,7 @@ MODULES= \
+@@ -137,8 +137,7 @@ MODULES= \
  	unicode_util \
  	uri_string \
  	win32reg \
@@ -83,9 +90,11 @@ diff --git a/lib/stdlib/src/Makefile b/lib/stdlib/src/Makefile
  HRL_FILES= \
  	../include/assert.hrl \
 diff --git a/lib/stdlib/src/stdlib.app.src b/lib/stdlib/src/stdlib.app.src
+index 7f42f8573765db26e571864972016e29c7ed5e01..afe3eba701bdfdb7fbf9e08a032c40f842fae093 100644
 --- a/lib/stdlib/src/stdlib.app.src
 +++ b/lib/stdlib/src/stdlib.app.src
-@@ -118,6 +118,5 @@
+@@ -117,8 +117,7 @@
+              unicode_util,
  	     uri_string,
  	     win32reg,
 -	     zip,
@@ -93,3 +102,4 @@ diff --git a/lib/stdlib/src/stdlib.app.src b/lib/stdlib/src/stdlib.app.src
 +	     zip]},
    {registered,[timer_server,rsh_starter,take_over_monitor,pool_master,
                 dets]},
+   {applications, [kernel]},

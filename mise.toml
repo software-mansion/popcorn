@@ -45,7 +45,7 @@ description = "Build OTP/BEAM for Wasm with crypto/asn1 NIFs"
 
 [tasks.regenerate-otp-patches]
 run = "scripts/patch-beam.sh --regen"
-description = "Regenerate OTP patches from current popcorn/sources/otp state"
+description = "Fold committed OTP modifications into named feature patches"
 
 [tasks.clean]
 run = "scripts/clean.sh"
