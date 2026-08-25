@@ -24,6 +24,7 @@ import {
   type VirtualNetworkEvent,
 } from "./virtual-network";
 import { VirtualTcpClient, type VirtualTcpSocket } from "./virtual-tcp";
+import { virtualFetch } from "./virtual-fetch";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
@@ -316,6 +317,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     options?: { signal?: AbortSignal },
   ): Promise<VirtualTcpSocket> {
     return virtualTcp.connect(host, port, options);
+  }
+
+  public static fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    return virtualFetch(input, init, (host, port, options) => virtualTcp.connect(host, port, options), globalThis.fetch.bind(globalThis));
   }
 
   /**

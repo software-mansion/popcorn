@@ -1,6 +1,41 @@
 import { assert, evalOpts, expect, test } from "./helpers";
 
 test.describe("virtual network", () => {
+  test("virtual fetch", async ({ createOtp, page }) => {
+    const server = await createOtp();
+    const serverBoot = await server.boot(
+      evalOpts(`
+        spawn(fun() ->
+          {ok, Listener} = gen_tcp:listen(0, [binary, {active, false}, {packet, raw}]),
+          {ok, Port} = inet:port(Listener),
+          ok = wasm:send(#{http_port => Port}),
+          {ok, Socket} = gen_tcp:accept(Listener, 5000),
+          {ok, Request} = gen_tcp:recv(Socket, 0, 5000),
+          true = binary:match(Request, <<"GET /hello?name=popcorn HTTP/1.1\r\n">>) =/= nomatch,
+          ok = gen_tcp:send(Socket, <<"HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\ncontent-length: 11\r\n\r\nhello ">>),
+          ok = gen_tcp:send(Socket, <<"world">>),
+          ok = gen_tcp:close(Socket)
+        end).
+      `),
+    );
+    assert(serverBoot.ok);
+    const event = (await server.waitForEvent("http_port")) as { http_port: number };
+
+    const result = await page.evaluate(async (port) => {
+      const response = await window.Popcorn.fetch(`http://vm-1:${port}/hello?name=popcorn`);
+      const native = await window.Popcorn.fetch("data:text/plain,native");
+      return {
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        body: await response.text(),
+        native: await native.text(),
+        standard: response instanceof Response,
+      };
+    }, event.http_port);
+
+    expect(result).toEqual({ status: 200, contentType: "text/plain", body: "hello world", native: "native", standard: true });
+  });
+
   test("JavaScript TCP", async ({ createOtp, page }) => {
     const server = await createOtp();
     const serverBoot = await server.boot(

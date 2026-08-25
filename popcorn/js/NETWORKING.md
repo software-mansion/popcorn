@@ -31,6 +31,17 @@ TLS, IPv6, DNS, multicast, broadcast, SCTP, or operating-system file
 descriptors. It is also not a security boundary: any script that can access the
 page can create a VM or interact with the page-local broker.
 
+JavaScript can open a stream socket with `Popcorn.connect(host, port, options)`.
+The returned socket exposes a byte `ReadableStream`, `write`, `closeWrite`, and
+`close`. Passing an `AbortSignal` cancels a pending connection. Reads preserve
+byte order but not write boundaries, and the same 1 MiB broker limit applies.
+
+`Popcorn.fetch(input, init)` routes `http://vm-N/...` and virtual `10.x.x.x`
+addresses through virtual TCP. Other URLs use the browser's native `fetch`.
+Virtual requests return standard streaming `Response` objects, follow redirects
+unless configured otherwise, and support buffered request bodies. Connections
+currently send `Connection: close` and are not reused. HTTPS is unsupported.
+
 ## Example
 
 One VM can listen with ordinary OTP calls:
