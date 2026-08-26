@@ -25,13 +25,15 @@
 
 -export([start/0, start_timer/3, cancel_timer/1, get_timer_refs/0, send_after/3, send_interval/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
--export([run_timer/5, run_interval/5, send_after_timer/3]).
+-export([send_after_timer/3]).
 
 -record(state, {
     timers = [] :: [{reference(), pid()}]
 }).
 
 -define(SERVER_NAME, ?MODULE).
+
+-behaviour(gen_server).
 
 -spec start() -> {ok, Pid :: pid()} | {error, Reason :: term()}.
 start() ->
@@ -57,11 +59,11 @@ maybe_start() ->
     TimerRef :: reference().
 start_timer(Time, Dest, Msg) ->
     maybe_start(),
-    gen_server:call(?SERVER_NAME, {run, run_timer, Time, Dest, Msg}).
+    gen_server:call(?SERVER_NAME, {run_job, timer, Time, Dest, Msg}).
 
 send_interval(Time, Dest, Msg) ->
     maybe_start(),
-    TimerRef = gen_server:call(?SERVER_NAME, {run, run_interval, Time, Dest, Msg}),
+    TimerRef = gen_server:call(?SERVER_NAME, {run_job, interval, Time, Dest, Msg}),
     {ok, TimerRef}.
 
 %%-----------------------------------------------------------------------------
@@ -121,8 +123,8 @@ handle_call({cancel, TimerRef}, From, #state{timers = Timers} = State) ->
             NewTimers = lists:keyreplace(Pid, 2, Timers, {{canceled, From}, Pid}),
             {noreply, State#state{timers = NewTimers}}
     end;
-handle_call({run, Action, Time, Dest, Msg}, _From, #state{timers = Timers} = State) ->
-    {TimerRef, Pid} = do_start_timer(Action, Time, Dest, Msg),
+handle_call({run_job, Action, Time, Dest, Msg}, _From, #state{timers = Timers} = State) ->
+    {TimerRef, Pid} = start_job(Action, Time, Dest, Msg),
     {reply, TimerRef, State#state{timers = [{TimerRef, Pid} | Timers]}}.
 
 %% @hidden
@@ -163,13 +165,14 @@ terminate(_Reason, _State) ->
 %% internal functions
 
 %% @private
-do_start_timer(Action, Time, Dest, Msg) ->
+start_job(Action, Time, Dest, Msg) ->
     TimerRef = erlang:make_ref(),
-    Pid = spawn(?MODULE, Action, [self(), Time, TimerRef, Dest, Msg]),
+    MgrPid = self(),
+    Pid = spawn(fun() -> run_job(Action, MgrPid, Time, TimerRef, Dest, Msg) end),
     {TimerRef, Pid}.
 
 %% @private
-run_timer(MgrPid, Time, TimerRef, Dest, Msg) ->
+run_job(timer, MgrPid, Time, TimerRef, Dest, Msg) ->
     Start = erlang:system_time(millisecond),
     receive
         {cancel, From} ->
@@ -178,10 +181,10 @@ run_timer(MgrPid, Time, TimerRef, Dest, Msg) ->
     after Time ->
         MgrPid ! {fired, self()},
         Dest ! {timeout, TimerRef, Msg}
-    end.
+    end;
 
 %% @private
-run_interval(MgrPid, Time, _TimerRef, Dest, Msg) ->
+run_job(interval, MgrPid, Time, _TimerRef, Dest, Msg) ->
     erlang:monitor(process, Dest),
     Start = erlang:system_time(millisecond),
     do_run_interval(MgrPid, Start, Time, 0, Dest, Msg).
