@@ -12,6 +12,40 @@ import {
   TOP_BAR_BANNER,
 } from "../components/TopBarBanner";
 
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Popcorn: Elixir & Wasm",
+  description = "Compile Elixir to Wasm and run it in the browser with no extra setup.",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://swmansion.com/#organization",
+      name: "Software Mansion",
+      url: "https://swmansion.com",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://popcorn.swmansion.com/#software",
+      name: "Popcorn",
+      url: "https://popcorn.swmansion.com",
+      description: "Compile Elixir to Wasm and run it in the browser with no extra setup.",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web",
+      publisher: { "@id": "https://swmansion.com/#organization" },
+    },
+  ],
+};
+
 const firstZone = TOP_BAR_BANNER!.zones[0];
 const reservationScript = topBarBannerReservationScript(
   firstZone.zoneId,
@@ -31,26 +65,23 @@ const bannerHidden = isBannerHidden(
     <meta name="viewport" content="width=device-width" />
     {import.meta.env.PROD && <script is:inline src="/cookie-script.js" />}
     <script is:inline set:html={reservationScript} />
-    <title>Popcorn: Elixir & Wasm</title>
-    <meta
-      name="description"
-      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <script
+      is:inline
+      type="application/ld+json"
+      set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")}
     />
 
-    <meta property="og:title" content="Popcorn: Elixir & Wasm" />
-    <meta
-      property="og:description"
-      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
-    />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Popcorn" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Popcorn: Elixir & Wasm" />
-    <meta
-      name="twitter:description"
-      content="Compile Elixir to Wasm and run it in the browser with no extra setup."
-    />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="49x80" />
     <link
