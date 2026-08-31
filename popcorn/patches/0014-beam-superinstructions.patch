@@ -1,0 +1,65 @@
+diff --git a/erts/emulator/beam/beam_debug.c b/erts/emulator/beam/beam_debug.c
+index 9a3dcd29cef282dce3b36e851ca1ae765bf6e565..9900c09cf4a9244143bb65de1a09617245e3ac71 100644
+--- a/erts/emulator/beam/beam_debug.c
++++ b/erts/emulator/beam/beam_debug.c
+@@ -958,6 +958,8 @@ print_op(fmtfn_t to, void *to_arg, int op, int size, BeamInstr* addr)
+        break;
+     case op_put_tuple2_xI:
+     case op_put_tuple2_yI:
++    case op_i_test_heap_put_tuple2_ItxI:
++    case op_i_test_heap_put_tuple2_ItyI:
+     case op_new_map_dtI:
+     case op_update_map_assoc_xdtI:
+     case op_update_map_assoc_ydtI:
+diff --git a/erts/emulator/beam/emu/instrs.tab b/erts/emulator/beam/emu/instrs.tab
+index 590dce31b281b9df347526505822b36792009243..bf4b48b8a1828dbd677c019624a5a5aab91b0da8 100644
+--- a/erts/emulator/beam/emu/instrs.tab
++++ b/erts/emulator/beam/emu/instrs.tab
+@@ -867,6 +867,11 @@ test_heap(Nh, Live) {
+     $GC_TEST(0, $Nh, $Live);
+ }
+ 
++i_test_heap_put_tuple2(Nh, Live, Dst, Arity) {
++    $test_heap($Nh, $Live);
++    $put_tuple2($Dst, $Arity);
++}
++
+ test_heap_1_put_list(Nh, Reg) {
+     $test_heap($Nh, 1);
+     $put_list($Reg, x(0), x(0));
+diff --git a/erts/emulator/beam/emu/ops.tab b/erts/emulator/beam/emu/ops.tab
+index 68eebde0f24ceb280f69b3c3c2b85d3b755674d9..f6386084366baa415ad52507975a5880ef871067 100644
+--- a/erts/emulator/beam/emu/ops.tab
++++ b/erts/emulator/beam/emu/ops.tab
+@@ -131,13 +131,18 @@ i_init y
+ # there is a stack frame.
+ deallocate Q
+ 
++move Src=y Dst=y | trim N _Remaining | y_survives_trim(Dst, N) =>
++    move_trim Src Dst N
+ move Src=y Dst=x | trim N _Remaining => move_trim Src Dst N
+ trim N _Remaining => i_trim N
+ 
+-move_trim y x t
++move_trim y xy t
+ i_trim t
+ 
++test_heap Need Live | put_tuple2 Dst=xy Arity Rest=* =>
++    i_test_heap_put_tuple2 Need Live Dst Arity Rest
+ test_heap I t?
++i_test_heap_put_tuple2 I t? xy I *
+ 
+ allocate_heap S u==0 R => allocate S R
+ i_allocate_heap_zero S u==0 R => i_allocate_zero S R
+diff --git a/erts/emulator/beam/predicates.tab b/erts/emulator/beam/predicates.tab
+index bc7c8d1f489a82826f06b0564897120809e69e41..bcf7f0182c4cd1695e05d3e7cf4b843824413969 100644
+--- a/erts/emulator/beam/predicates.tab
++++ b/erts/emulator/beam/predicates.tab
+@@ -229,3 +229,7 @@ pred.equal(Val1, Val2) {
+         return Val1.val == Val2.val;
+     }
+ }
++
++pred.y_survives_trim(Dst, N) {
++    return Dst.type == TAG_y && (Dst.val & REG_MASK) >= N.val;
++}
