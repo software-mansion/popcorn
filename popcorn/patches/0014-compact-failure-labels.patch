@@ -1,0 +1,212 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 6424077b835bf62cff12b671d8200d764a67890e..2174829a6caae0ab6ad1300362e3684af03c95d0 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -613,6 +613,7 @@ $(TTF_DIR)/OPCODES-GENERATED: $(OPCODE_TABLES) utils/beam_makeops
+ 		-code-model @CODE_MODEL@ \
+ 		-outdir $(TTF_DIR) \
+ 		-jit $(if $(filter jit,$(FLAVOR)),yes,no) \
++		-DWASM32=$(if $(filter wasm32-unknown-emscripten,$(TARGET)),1,0) \
+ 		-DUSE_VM_PROBES=$(if $(USE_VM_PROBES),1,0) \
+ 		-emulator $(OPCODE_TABLES) && echo $? >$(TTF_DIR)/OPCODES-GENERATED
+ GENERATE += $(TTF_DIR)/OPCODES-GENERATED
+diff --git a/erts/emulator/beam/beam_debug.c b/erts/emulator/beam/beam_debug.c
+index 9a3dcd29cef282dce3b36e851ca1ae765bf6e565..a0e7bc0d1b1ef29440a995495f80c0d9aefc7cc7 100644
+--- a/erts/emulator/beam/beam_debug.c
++++ b/erts/emulator/beam/beam_debug.c
+@@ -647,6 +647,15 @@ print_op(fmtfn_t to, void *to_arg, int op, int size, BeamInstr* addr)
+ 		*ap++ = packed & BEAM_LOOSE_MASK;
+ 		packed >>= BEAM_LOOSE_SHIFT;
+ 		break;
++#ifdef BEAM_COMPACT_LABEL_MASK
++            case '5':
++                *ap++ = (BeamInstr)((Sint32)packed >>
++                                    BEAM_COMPACT_LABEL_SHIFT);
++                break;
++            case '6':
++                *ap++ = (packed & BEAM_TIGHTEST_MASK) << 2;
++                break;
++#endif
+ #ifdef ARCH_64
+ 	    case '4':		/* Shift 32 steps */
+ 		*ap++ = packed & BEAM_WIDE_MASK;
+diff --git a/erts/emulator/beam/emu/beam_emu.c b/erts/emulator/beam/emu/beam_emu.c
+index a473b89fbd3bc313a7d235b9925bbd7993217207..7b1b3e7b0051fb17b13bb05d66536445d9d36eb2 100644
+--- a/erts/emulator/beam/emu/beam_emu.c
++++ b/erts/emulator/beam/emu/beam_emu.c
+@@ -162,6 +162,7 @@ void** beam_ops;
+ 
+ #define db(N) (N)
+ #define fb(N) ((Sint)(Sint32)(N))
++#define fcb(N) ((Sint)((Sint32)((Uint32)(N) << 10) >> 10))
+ #define jb(N) ((Sint)(Sint32)(N))
+ #define tb(N) (N)
+ #define xb(N) (*ADD_BYTE_OFFSET(reg, N))
+diff --git a/erts/emulator/beam/emu/emu_load.c b/erts/emulator/beam/emu/emu_load.c
+index e5eb108ed0331273823cefd93074704d507eccd6..7f11c01db95b8b5a69afeadd86f498a72e8ecb52 100644
+--- a/erts/emulator/beam/emu/emu_load.c
++++ b/erts/emulator/beam/emu/emu_load.c
+@@ -535,6 +535,17 @@ int beam_load_finish_emit(LoaderState *stp) {
+                     codev[pos] = ((Uint)rel << BEAM_WIDE_SHIFT) |
+                         (codev[pos] & BEAM_WIDE_MASK);
+                     break;
++#endif
++#ifdef BEAM_COMPACT_LABEL_MASK
++                case 3:
++                    ASSERT(rel >= -(1 << 21) && rel < (1 << 21));
++                    codev[pos] =
++                        (codev[pos] &
++                         ~((BeamInstr)BEAM_COMPACT_LABEL_MASK <<
++                           BEAM_COMPACT_LABEL_SHIFT)) |
++                        (((BeamInstr)rel & BEAM_COMPACT_LABEL_MASK) <<
++                         BEAM_COMPACT_LABEL_SHIFT);
++                    break;
+ #endif
+                 default:
+                     ASSERT(0);
+@@ -1182,6 +1193,34 @@ int beam_load_emit_op(LoaderState *stp, BeamOp *tmp_op) {
+                     packed_label->packed++;
+                 }
+                 break;
++#ifdef BEAM_COMPACT_LABEL_MASK
++            case '5':
++                {
++                    Uint w = code[--ci];
++                    LabelPatch* lp;
++                    int patch;
++
++                    if (w != 0) {
++                        lp = stp->labels[w].patches;
++                        for (patch = stp->labels[w].num_patches - 1;
++                             patch >= 0;
++                             patch--) {
++                            if (lp[patch].pos == ci) {
++                                lp[patch].packed = 3;
++                                packed_label = &lp[patch];
++                                break;
++                            }
++                        }
++                        ASSERT(packed_label);
++                    }
++                }
++                break;
++            case '6':
++                ci--;
++                ASSERT((code[ci] & 3) == 0);
++                packed = code[ci] >> 2;
++                break;
++#endif
+ #ifdef ARCH_64
+             case '4':        /* Wide shift (32 bits) */
+                 {
+diff --git a/erts/emulator/beam/emu/load.h b/erts/emulator/beam/emu/load.h
+index 5906abaf8e7a1f33ef695f670135b66427c34280..cde51aa1bb9afcf3ee4ee5bee2f6094a7809e276 100644
+--- a/erts/emulator/beam/emu/load.h
++++ b/erts/emulator/beam/emu/load.h
+@@ -31,7 +31,7 @@
+ typedef struct {
+     Uint pos;                   /* Position of label reference to patch. */
+     Uint offset;                /* Offset from patch location.  */
+-    int packed;                 /* 0 (not packed), 1 (lsw), 2 (msw) */
++    int packed;                 /* 0 (not packed), 1/2 (wide), 3 (compact) */
+ } LabelPatch;
+ 
+ /*
+diff --git a/erts/emulator/utils/beam_makeops b/erts/emulator/utils/beam_makeops
+index a1c45a887820d949f2a1fd0811894024cb4f5c4c..240cd13619a31738f4d08ed116cd9d82134a4e8e 100755
+--- a/erts/emulator/utils/beam_makeops
++++ b/erts/emulator/utils/beam_makeops
+@@ -37,6 +37,8 @@ use constant PACK_CMD_TIGHTEST => '1';
+ use constant PACK_CMD_TIGHT => '2';
+ use constant PACK_CMD_LOOSE => '3';
+ use constant PACK_CMD_WIDE => '4';
++use constant PACK_CMD_COMPACT_LABEL => '5';
++use constant PACK_CMD_COMPACT_REG => '6';
+ 
+ $BEAM_FORMAT_NUMBER = undef;
+ $GC_REGEXP = undef;
+@@ -379,6 +381,8 @@ while (@ARGV && $ARGV[0] =~ /^-(.*)/) {
+ if ($wordsize == 32) {
+     $defs{'ARCH_32'} = 1;
+     $defs{'ARCH_64'} = 0;
++    @basic_pack_options = (0,PACK_JUMP) if $defs{'WASM32'};
++    @extended_pack_options = @basic_pack_options;
+ } elsif ($wordsize == 64) {
+     $defs{'ARCH_32'} = 0;
+     $defs{'ARCH_64'} = 1;
+@@ -1032,6 +1036,11 @@ sub emulator_output {
+ 	print "#define BEAM_TIGHT_MASK 0xFFC\n";
+ 	print "#define BEAM_LOOSE_SHIFT 16\n";
+ 	print "#define BEAM_TIGHT_SHIFT 10\n";
++        if ($defs{'WASM32'}) {
++            print "#define BEAM_TIGHTEST_MASK 0x3FF\n";
++            print "#define BEAM_COMPACT_LABEL_MASK 0x3FFFFF\n";
++            print "#define BEAM_COMPACT_LABEL_SHIFT 10\n";
++        }
+     } elsif ($wordsize == 64) {
+ 	print "#if !defined(ARCH_64)\n";
+ 	print qq[  #error "64-bit architecture assumed, but ARCH_64 not defined"\n];
+@@ -2064,6 +2073,11 @@ sub do_pack_one {
+     my @bits_needed;            # Bits needed for each argument.
+     my $pack_in_iw = $options & PACK_IN_INSTR_WORD;
+ 
++    if ($defs{'WASM32'} && ($options & PACK_JUMP) &&
++        !(@args >= 2 && $args[0] eq 'f' && $args[1] =~ /^[xy]$/)) {
++        return (0, []);
++    }
++
+     #
+     # Define the minimum number of bits needed for the packable argument types.
+     #
+@@ -2080,6 +2094,8 @@ sub do_pack_one {
+             $bits_needed{'f'} = 32;
+             $bits_needed{'j'} = 32;
+         }
++    } elsif ($defs{'WASM32'} && ($options & PACK_JUMP)) {
++        $bits_needed{'f'} = 22;
+     }
+ 
+     #
+@@ -2270,9 +2286,12 @@ sub do_pack_one {
+         my $args_per_word = $args_per_word[$word];
+         my $pack_word_size = ($pack_in_iw && $word == 0) ? 32 : $wordsize;
+ 
++        my $compact_label = $defs{'WASM32'} && ($options & PACK_JUMP) &&
++            $args_per_word == 2 &&
++            $args[$arg_num] eq 'f' && $args[$arg_num+1] =~ /^[xy]$/;
+         my($shref,$mref,$iref,$unpack_suffix)  =
+             get_pack_parameters($name, $args_per_word, $pack_word_size,
+-                                $need_wide_mask[$word]);
++                                $need_wide_mask[$word], $compact_label);
+         my @shift = @$shref;
+         my @mask = @$mref;
+         my @instr = @$iref;
+@@ -2306,7 +2325,8 @@ sub do_pack_one {
+ 
+                 $down = "$instr[$ap]$down";
+                 my $unpack = make_unpack($packed_var, $shift[$ap], $mask[$ap]);
+-                my $macro = "$reg$unpack_suffix";
++                my $macro = $compact_label && $reg eq 'f' ? 'fcb' :
++                    "$reg$unpack_suffix";
+                 $args[$arg_num] = "packed:$reg:$this_size:$macro($unpack)";
+ 
+                 $ap++;
+@@ -2335,11 +2355,16 @@ sub do_pack_one {
+ }
+ 
+ sub get_pack_parameters {
+-    my($name,$args_per_word,$pack_word_size,$wide_mask) = @_;
++    my($name,$args_per_word,$pack_word_size,$wide_mask,$compact_label) = @_;
+     my(@shift,@mask,@instr);
+     my $unpack_suffix = 'b';
+ 
+-    if ($wide_mask and $args_per_word > 1) {
++    if ($compact_label) {
++        @shift = ('BEAM_COMPACT_LABEL_SHIFT', '0');
++        @mask = ($WHOLE_WORD, 'BEAM_TIGHTEST_MASK');
++        @instr = (PACK_CMD_COMPACT_LABEL, PACK_CMD_COMPACT_REG);
++        $unpack_suffix = '';
++    } elsif ($wide_mask and $args_per_word > 1) {
+         @shift = ('0', 'BEAM_WIDE_SHIFT');
+         @mask = ('BEAM_WIDE_MASK', $WHOLE_WORD);
+         @instr = (PACK_CMD_WIDE) x 2;
