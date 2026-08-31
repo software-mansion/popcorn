@@ -1,0 +1,15 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index 6424077b835bf62cff12b671d8200d764a67890e..1e466044c4972489a6611573561d30378e61d967 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -207,6 +207,10 @@ endif
+ endif
+ endif
+ 
++ifeq ($(TARGET),wasm32-unknown-emscripten)
++TYPE_FLAGS += -DNO_JUMP_TABLE
++endif
++
+ LIBS += $(TYPE_LIBS)
+ 
+ ORIG_LIBS:= $(LIBS)
