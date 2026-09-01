@@ -109,11 +109,14 @@ defmodule LocalLiveView.MixProject do
         "pages/getting-started/installation.md",
         "pages/guides/first-view.md",
         "pages/guides/mirror-sync.md",
-        "pages/guides/navigation.md"
+        "pages/guides/navigation.md",
+        "pages/reference/js-api.md"
       ],
       groups_for_extras: [
         Introduction: ~r"/introduction/",
-        Guides: ~r"/guides/"
+        "Getting started": ~r"/getting-started/",
+        Guides: ~r"/guides/",
+        Reference: ~r"/reference/"
       ],
       groups_for_modules: [
         "Browser / WASM (Popcorn)": [

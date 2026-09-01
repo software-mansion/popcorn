@@ -138,7 +138,9 @@ export class LLVEngine {
   }
 
   /**
-   * Initializes LLVEngine and connects the LiveSocket.
+   * Boots LLVEngine: registers the LLV hooks and bindings on the LiveSocket,
+   * starts the Popcorn runtime and mounts every [data-pop-view] on the page.
+   * Does not connect the LiveSocket — the caller still owns that.
    *
    * @param liveSocket - The phoenix_live_view LiveSocket instance.
    * @param config - Optional LLV configuration.
@@ -426,8 +428,11 @@ export class LLVEngine {
    * Pushes an event into a LLVEngine from external JavaScript.
    *
    * @param viewId - The view name (e.g. `"ThermostatLive"`) or element id.
-   * @param event - The event name to dispatch into the view's `handle_info/2`.
+   * @param event - The event name. Arrives as `{:js_push, event, payload}` in
+   *   the view's `handle_info/2`.
    * @param payload - Optional payload map passed alongside the event.
+   * @returns Resolves once the runtime accepted the event. Never rejects —
+   *   failures are logged to console.error.
    */
   async pushEvent(
     viewId: string,
