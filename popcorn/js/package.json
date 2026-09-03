@@ -43,7 +43,9 @@
     "build": "rollup -c",
     "lint": "tsc --noEmit && tsc -p plugins/tsconfig.json --noEmit",
     "lint:e2e": "tsc -p e2e/tsconfig.json",
-    "e2e": "env -u FORCE_COLOR -u NO_COLOR playwright test --config e2e/playwright.config.ts"
+    "e2e": "env -u FORCE_COLOR -u NO_COLOR playwright test --config e2e/playwright.config.ts",
+    "prepack": "node scripts/prepack.mjs",
+    "postpack": "node scripts/postpack.mjs"
   },
   "peerDependencies": {
     "esbuild": ">=0.17.0",

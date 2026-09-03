@@ -14,6 +14,7 @@ defmodule Popcorn.MixProject do
       deps: deps(),
       description: "Elixir API for Popcorn's OTP/BEAM WebAssembly runtime",
       package: package(),
+      aliases: aliases(),
       name: "Popcorn",
       docs: &docs/0,
       source_url: @github,
@@ -32,12 +33,52 @@ defmodule Popcorn.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      files: ["lib", "mix.exs", "README.md", "LICENSE"],
+      files: ["lib", "priv/static", "mix.exs", "README.md", "LICENSE"],
       links: %{
         "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"
       }
     ]
+  end
+
+  defp aliases do
+    [
+      "hex.build": &package_with_static("hex.build", &1),
+      "hex.publish": &package_with_static("hex.publish", &1)
+    ]
+  end
+
+  defp package_with_static(task, args) do
+    case Enum.any?(args, &(&1 in ["docs", "--revert"])) do
+      true -> Mix.Task.run(task, args)
+      false -> with_static(fn -> Mix.Task.run(task, args) end)
+    end
+  end
+
+  defp with_static(fun) do
+    out = Path.expand("../out/js", __DIR__)
+    static = Path.join(__DIR__, "priv/static")
+    stage = Path.join(__DIR__, "_build/hex-static")
+
+    File.rm_rf!(stage)
+
+    try do
+      File.mkdir_p!(Path.dirname(stage))
+      File.cp_r!(out, stage, dereference_symlinks: true)
+
+      File.mkdir_p!(Path.dirname(static))
+      File.rm_rf!(static)
+      File.rename!(stage, static)
+
+      try do
+        fun.()
+      after
+        File.rm_rf!(static)
+        File.ln_s!("../../out/js", static)
+      end
+    after
+      File.rm_rf!(stage)
+    end
   end
 
   defp docs do
