@@ -43,13 +43,17 @@ export default [
     output: {
       file: "dist/worker.mjs",
       format: "esm",
-      paths: (id) =>
-        id.endsWith("/assets/beam.mjs") ? "./beam.mjs" : id,
     },
-    external: (id) => id.endsWith("/assets/beam.mjs"),
+    external: ["./beam.mjs"],
     cache: false,
     plugins: [
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
+      copyFiles([
+        { src: "../out/beam.mjs", dest: "dist/beam.mjs" },
+        { src: "../out/beam.emu.mjs", dest: "dist/beam.emu.mjs" },
+        { src: "../out/beam.wasm", dest: "dist/beam.wasm" },
+        { src: "../out/manifest.json", dest: "dist/otp/manifest.json" },
+      ]),
     ],
   },
   {

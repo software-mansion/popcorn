@@ -474,23 +474,15 @@ copy_artifacts() {
 
     local wasm_bin_dir="${beam_dir}/bin/wasm32-unknown-emscripten"
 
-    if [[ -f "${wasm_bin_dir}/beam.wasm" ]]; then
-        cp "${wasm_bin_dir}/beam.wasm" "${outdir}/"
-        local wasm_size
-        wasm_size=$(du -h "${outdir}/beam.wasm" | cut -f1)
-        log "beam.wasm: ${wasm_size}"
-    fi
+    cp "${wasm_bin_dir}/beam.wasm" "${outdir}/"
+    local wasm_size
+    wasm_size=$(du -h "${outdir}/beam.wasm" | cut -f1)
+    log "beam.wasm: ${wasm_size}"
 
-    if [[ -f "${wasm_bin_dir}/beam.smp" ]]; then
-        cp "${wasm_bin_dir}/beam.smp" "${outdir}/"
-    fi
-
-    # Copy JS glue if present
-    for ext in mjs js emu; do
-        if [[ -f "${wasm_bin_dir}/beam.${ext}" ]]; then
-            cp "${wasm_bin_dir}/beam.${ext}" "${outdir}/"
-        fi
-    done
+    sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
+        "${wasm_bin_dir}/beam.smp" > "${outdir}/beam.mjs"
+    sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
+        "${wasm_bin_dir}/beam.emu" > "${outdir}/beam.emu.mjs"
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"
