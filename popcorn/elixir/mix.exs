@@ -42,7 +42,8 @@ defmodule Popcorn.MixProject do
 
   defp docs do
     [
-      main: "Popcorn.Wasm",
+      main: "readme",
+      extras: ["README.md"],
       formatters: ["html"],
       source_ref: "v#{@version}"
     ]
