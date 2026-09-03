@@ -30,12 +30,23 @@ class TupleTerm {
   public constructor(public readonly entries: unknown[]) {}
 }
 
+/**
+ * Creates a BEAM atom value.
+ *
+ * The atom must already exist in the receiving VM. Plain strings encode as binaries.
+ */
 export function atom(name: string): AtomTerm {
   return new AtomTerm(name);
 }
 
+/** Alias for {@link atom}. */
 export const a = atom;
 
+/**
+ * Creates a BEAM tuple.
+ *
+ * Plain arrays encode as lists.
+ */
 export function tuple(
   first: unknown,
   second: unknown,
@@ -45,6 +56,7 @@ export function tuple(
   return new TupleTerm([first, second, ...rest]);
 }
 
+/** Alias for {@link tuple}. */
 export const t = tuple;
 
 /** Pre-encoded ETF sub-term bytes (no version prefix), spliced verbatim. */

@@ -3,6 +3,14 @@ import { dirname, resolve } from "node:path";
 import type { Plugin } from "esbuild";
 import { copyRuntime, popcorn as prepare, type Options } from "./shared";
 
+/**
+ * Copies the worker, VM runtime, and `otp/` assets into the output directory after a successful esbuild build.
+ *
+ * Requires `format: "esm"` and either `outdir` or `outfile`.
+ * If the application bundle is elsewhere, set `PopcornOpts.workerUrl` to the copied `worker.mjs`.
+ *
+ * @see {@link Options} for application packaging and server requirements.
+ */
 export function popcorn(options: Options): Plugin {
   let outputDir: string | undefined;
 
@@ -13,10 +21,17 @@ export function popcorn(options: Options): Plugin {
       build.onStart(() => {
         const opts = build.initialOptions;
         const outdir =
-          opts.outdir ?? (opts.outfile === undefined ? undefined : dirname(opts.outfile));
+          opts.outdir ??
+          (opts.outfile === undefined ? undefined : dirname(opts.outfile));
 
-        assert(opts.format === "esm", "Popcorn OTP works only with esm builds.");
-        assert(outdir !== undefined, "outdir is not specified, cannot copy files");
+        assert(
+          opts.format === "esm",
+          "Popcorn OTP works only with esm builds.",
+        );
+        assert(
+          outdir !== undefined,
+          "outdir is not specified, cannot copy files",
+        );
 
         outputDir = resolve(outdir);
       });

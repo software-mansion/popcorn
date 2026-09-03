@@ -65,12 +65,13 @@ type BootEndEvent =
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
 export type MainToVmEvent =
-  | BootEvent
-  | SendEvent
-  | RunJsReplyEvent
-  | StdinEvent
-  | TtyResizeEvent;
+  BootEvent | SendEvent | RunJsReplyEvent | StdinEvent | TtyResizeEvent;
 
+/**
+ * A decoded BEAM message payload.
+ *
+ * Includes restored PID handles and tracked JavaScript values.
+ */
 export type PopcornEvent = AnyValue;
 
 type RuntimeEvent = BeamEvent | SendEndEvent;

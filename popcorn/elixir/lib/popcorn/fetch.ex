@@ -1,34 +1,34 @@
 defmodule Popcorn.Fetch do
   @moduledoc """
-  A Req adapter that runs HTTP requests through the browser's `fetch()`.
+  Sends HTTP requests through the browser's `fetch()` API.
 
-  Req's default `Req.Finch` adapter uses TCP sockets, which are not available in WebAssembly.
-  Popcorn installs this module as the default adapter instead.
+  ## Using Req
 
-  Use
+  Req is optional. If your application includes Req, Popcorn installs this adapter when it starts inside the Popcorn runtime.
+  Popcorn preserves any adapter in Req's `:default_options` configuration.
+
+  You can also select the adapter per request:
+
   ```elixir
-  # config/config.exs
-  config :req, default_options: [adapter: CustomAdapter]
+  Req.get!("https://api.example.com/status", adapter: Popcorn.Fetch)
   ```
 
-  to set a custom adapter.
+  The adapter supports Req's `:into` functions, collectables, and `:self` streams.
+
+  It buffers request bodies before upload.
+  The `:receive_timeout` option limits the wait for each response message and defaults to `30_000` ms.
+  Adapter failures return `Req.TransportError` exceptions through Req's normal error handling.
 
   ## Using it without Req
 
-  `request/2` is the fetch primitive the adapter sits on:
+  Use `request/2` for a response map with a binary body. It does not require Req or decode JSON responses.
 
-  ```elixir
-  args = %{method: "GET", url: "https://api.example.com/thing"}
-  {:ok, %{status: 200, body: body}} = Popcorn.Fetch.request(args)
-  ```
+  ## Browser limits
 
-  ## Notes
-
-  `fetch()` has some limitations:
-  - Popcorn requires CORS headers to work. This may affect requests sent to external domains.
-  - Browsers automatically follow redirects. `:max_redirects` and `:redirect_log_level` request options have no effect.
-  - Browsers deal with compression. `decompress_body` step can't be hooked into. `raw` request option has no effect.
-  - Some headers are dropped. This includes `Host`, `Referer`, `Cookie`, and others.
+  - Cross-origin requests need permission from the target server's CORS policy.
+  - The browser follows redirects. Req's `:max_redirects` and `:redirect_log_level` options do not control those redirects.
+  - The browser decompresses responses. Req's `:raw` option cannot preserve compressed response bytes.
+  - The browser controls restricted headers, such as `Host` and `Cookie`.
   """
 
   # Req is an optional dependency
@@ -39,6 +39,9 @@ defmodule Popcorn.Fetch do
 
   @default_timeout 30_000
 
+  @typedoc """
+  A request with a method and URL. Headers are string pairs, and the optional body is a binary.
+  """
   @type request :: %{
           required(:method) => String.t(),
           required(:url) => String.t(),
@@ -46,6 +49,9 @@ defmodule Popcorn.Fetch do
           optional(:body) => binary() | nil
         }
 
+  @typedoc """
+  An HTTP status, browser-visible headers, and a binary response body.
+  """
   @type response :: %{
           status: non_neg_integer(),
           headers: [{String.t(), String.t()}],
@@ -53,9 +59,11 @@ defmodule Popcorn.Fetch do
         }
 
   @typedoc """
-  - `:timeout` - no reply within `:timeout`. The browser request is aborted.
-  - `{:fetch, message}` - the browser rejected the request.
-  - `{:bridge, reason}` - the call into JavaScript itself failed. See `Popcorn.Wasm.run_js/3`.
+  A request failure.
+
+  - `:timeout` - the response exceeded the timeout. The adapter aborts the browser request.
+  - `{:fetch, message}` - the browser reported a network or fetch failure.
+  - `{:bridge, reason}` - JavaScript execution failed. See `Popcorn.Wasm.run_js/3`.
   """
   @type error :: :timeout | {:fetch, String.t()} | {:bridge, term()}
 
@@ -130,20 +138,21 @@ defmodule Popcorn.Fetch do
   @abort_js "({ controller }) => { controller.abort(); }"
 
   @doc """
-  Performs an HTTP request and returns the whole response.
+  Sends an HTTP request and returns the complete response.
+
+  HTTP error statuses, such as 404, still return `{:ok, response}`.
+  Transport failures return `{:error, reason}`. See `t:error/0`.
 
   ## Options
 
-  - `:timeout` - how long to wait for the response to complete, in milliseconds.
-                 Defaults to `#{@default_timeout}`. Request is aborted on timeout.
+  - `:timeout` - the total response timeout in milliseconds, or `:infinity`. Defaults to `#{@default_timeout}`. The adapter aborts the request on timeout.
 
-  ## Examples
+  ## Example
 
   ```elixir
-  Fetch.request(%{method: "GET", url: "/api/status"})
-  #=> {:ok, %{status: 200, headers: [{"content-type", "application/json"}], body: "{}"}}
-
-  Fetch.request(%{method: "POST", url: "/api/blobs", body: <<255, 0, 65>>})
+  {:ok, response} = Popcorn.Fetch.request(%{method: "GET", url: "/api/status"})
+  response.body
+  #=> ~s({"status":"ready"})
   ```
   """
   @spec request(request(), [{:timeout, timeout()}]) :: {:ok, response()} | {:error, error()}

@@ -17,11 +17,45 @@ const execFileAsync = promisify(execFile);
 const brotliCompressAsync = promisify(brotliCompress);
 const gzipAsync = promisify(gzip);
 
+/**
+ * Shared options for the Vite, Rollup, and esbuild plugins.
+ *
+ * Compile the project before the plugin runs.
+ * The plugins use the local `mix` executable to package applications and dependencies.
+ *
+ * On the production server, set `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`.
+ * Serve compressed variants with the matching `Content-Encoding` header.
+ */
 export type Options = {
+  /**
+   * Mix project directory.
+   *
+   * Reads compiled apps from `_build/$MIX_ENV/lib`, with `MIX_ENV` defaulting to `dev`.
+   */
   rootDir: string;
+  /**
+   * OTP application to start after VM boot.
+   *
+   * Use `null` to boot without an entrypoint application.
+   */
   app: string | null;
+  /**
+   * Additional applications to package with their dependencies.
+   *
+   * Does not start them automatically. Defaults to `[]`.
+   */
   extraApps?: string[];
+  /**
+   * Adds Brotli tarball variants beside the gzip and uncompressed files.
+   *
+   * Defaults to `false`.
+   */
   brotli?: boolean;
+  /**
+   * Removes nonessential BEAM chunks.
+   *
+   * Experimental. Defaults to `true`.
+   */
   strip?: boolean;
 };
 

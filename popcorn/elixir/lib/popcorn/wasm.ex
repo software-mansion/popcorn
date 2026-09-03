@@ -1,21 +1,8 @@
 defmodule Popcorn.Wasm.Error do
   @moduledoc """
-  Raised by `Popcorn.Wasm.run_js!/3` when JS fails.
+  Raised by `Popcorn.Wasm.run_js!/3` when JavaScript fails or the reply times out.
 
-  `reason` holds the same value `Popcorn.Wasm.run_js/3` would have returned in
-  an `{:error, reason}` tuple, so you can match on it after rescuing:
-
-  ```elixir
-  try do
-    Popcorn.Wasm.run_js!("() => document.title", %{})
-  rescue
-    e in Popcorn.Wasm.Error ->
-      case e.reason do
-        :timeout -> retry()
-        {:js, _reason} -> give_up()
-      end
-  end
-  ```
+  The `:reason` field contains the reason from the `{:error, reason}` result of `Popcorn.Wasm.run_js/3`.
   """
 
   @type t :: %__MODULE__{reason: :timeout | {:js, term()}}
@@ -33,32 +20,30 @@ end
 
 defmodule Popcorn.Wasm do
   @moduledoc """
-  Allows for communication from Elixir back to JS.
-
-  Elixir code running through Popcorn runs in OTP/BEAM runtime (in Wasm).
-  It will receive events put to the process' mailbox from JS and can use functions
-  from this module to talk back.
+  Connects Elixir processes to JavaScript in the browser page.
 
   ## Receiving messages
 
-  Messages from JS have `{:wasm, payload}` shape. `payload` is fully controlled by user.
+  JavaScript calls to `popcorn.send(target, payload)` deliver `{:wasm, payload}` to the target process.
+  Use `is_message/1` in guards to match for it.
+  Use `Popcorn.Proxy` for GenServer calls and casts.
 
-  You can use `is_message/1` guard for filtering this type of messages.
+  ## Values
 
-  ## Running JavaScript
+  From JS side:
+  - strings become binaries.
+  - arrays become lists.
+  - plain objects become maps with string keys.
+  - `atom()` and `tuple()` helpers send atoms and tuples. Atoms must already exist in the VM.
 
-  `run_js/3` takes a JavaScript function written as a string and a map of
-  arguments for it:
-  ```elixir
-  Popcorn.Wasm.run_js("(args) => args.n + 1", %{n: 1})
-  #=> {:ok, 2}
-  ```
+  From VM side:
+  - Tuples become arrays.
+  - Most atoms become strings, with exception of `true`, `false` and `nil` (mapped to `null`).
+  - PID handles refer to processes in the VM.
 
   ## Outside the browser
 
-  Functions in this module call `:wasm` which is our patched-in module for OTP/BEAM.
-  You can use `available?/0` to conditionally disable parts of your code when you
-  run it on non-Popcorn OTP/BEAM (for example in testing).
+  Use `available?/0` to check if your code is running natively or in the browser.
   """
 
   # The runtime provides `:wasm`, so the compiler never sees it. Silencing the
@@ -66,21 +51,21 @@ defmodule Popcorn.Wasm do
   @compile {:no_warn_undefined, :wasm}
 
   @typedoc """
-  A handle to a JavaScript value that the runtime keeps alive.
+  An opaque handle that keeps a JavaScript value alive.
 
-  The JavaScript value is released once this term is garbage collected.
-  The exact timing isn't guaranteed.
+  Return `new TrackedValue(value, cleanup)` from JavaScript function to create a handle.
+  Pass the handle in `run_js/3` arguments to access the original value.
 
-  If you need exact timing, use `TrackedValue` constructor with idempotent
-  cleanup function you can call yourself.
+  The runtime calls `cleanup` function after BEAM garbage collection releases the handle, or when the VM stops.
+
+  Note:
+  Garbage collection does not guarantee prompt cleanup.
+  For time-sensitive resources, call an idempotent cleanup function explicitly. This ensures you can call it yourself or it can be called by Popcorn.
   """
   @opaque tracked_value :: {:wasm_tracked_value, reference()}
 
   @typedoc """
-  A message sent from JavaScript to a process.
-
-  The payload is already decoded into Elixir terms. Only value serializable to JSON are supported.
-  TrackedValues and PID handles are special-cased in communication.
+  A JavaScript message with a payload decoded into Elixir terms.
   """
   @type message :: {:wasm, payload :: term()}
 
@@ -93,19 +78,7 @@ defmodule Popcorn.Wasm do
            when is_tuple(message) and tuple_size(message) == 2 and elem(message, 0) == :wasm
 
   @doc """
-  Returns true when running inside the Popcorn OTP runtime.
-
-  ## Example
-
-  ```elixir
-  # in application.ex
-  children =
-    if Popcorn.Wasm.available?() do
-      [MyApp.UI | core_children]
-    else
-      core_children
-    end
-  ```
+  Returns `true` if running in the browser.
   """
   @spec available?() :: boolean()
   def available? do
@@ -113,35 +86,41 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Runs JavaScript synchrounously on the page and returns a handle to JS result.
+  Runs a JavaScript function on the page and waits for its result.
 
-  `code` is a JavaScript function written as a string, called as `(args, {send, call, cast}) => { ... }`.
+  `code` defines a function with the signature `(args, {send, call, cast}) => result`.
+  The bridge converts the `args` map to JavaScript values and awaits any returned promise.
+  It returns `{:ok, value}` with the result converted to Elixir terms or `{:error, {:js, reason}}`.
+  A timeout returns `{:error, :timeout}` and does not cancel JavaScript execution.
 
-  - `args` are arguments passed from elixir in a map (types from Elixir are converted to JS ones).
-  - `send` is used to send events from JS running in `run_js/3`, same as `popcorn.send()` JS API.
-  - `call` and `cast` talk to GenServers through `Popcorn.Proxy`, same as `popcorn.genserver` JS API.
-    Both are async and resolve to a result object.
+  The page's Content Security Policy must permit JavaScript evaluation with `unsafe-eval`.
 
-  `run_js/3` can run during application startup. Its JavaScript executes before
-  `Popcorn.boot()` resolves, so it must not depend on state initialized after
-  boot. Slow JavaScript also delays application startup.
+  ## JS
 
-    Awaiting a `call` on the process that runs `run_js/3` deadlocks until the call times out.
+  The `send` helper sends a message to a BEAM process.
+  The `call` and `cast` helpers use `Popcorn.Proxy` to contact GenServers.
+  These helpers return promises with the same result objects as their [JavaScript API](JS.Popcorn.html) counterparts.
 
-  `run_js/3` returns result converted to Elixir types. You can use `new TrackedValue(value, cleanup_fn)` (`t:tracked_value/0`) to return a handle.
-  Underlying TrackedValue is kept on JS side until OTP/BEAM drops all references to a handle.
-  If that happens, `cleanup_fn` is called in JS and value is removed from JS.
-  <!-- TODO: show explicit serialization errors -->
+  Notes:
+  - Calls during application startup run before `popcorn.boot()` resolves.
+  - Do not await a `call` to the process that executes `run_js/3`. It will cause deadlocks.
 
   ## Options
 
-  - `:timeout` - how long to wait for a reply, in milliseconds. Defaults to `5_000`.
+  - `:timeout` - the reply timeout, or `:infinity`. Defaults to `5_000` ms.
 
   ## Examples
 
   ```elixir
-  Popcorn.Wasm.run_js("(args) => args.n + 1", %{n: 1})
+  Popcorn.Wasm.run_js("({n}) => n + 1", %{n: 1})
   #=> {:ok, 2}
+  ```
+
+  Use a `t:tracked_value/0` for values such as DOM elements:
+
+  ```elixir
+  {:ok, element} = Popcorn.Wasm.run_js("() => new TrackedValue(document.body)")
+  Popcorn.Wasm.run_js!("({element}) => { element.textContent = 'Ready'; }", %{element: element})
   ```
   """
   @spec run_js(String.t(), map(), run_js_opts()) ::
@@ -155,7 +134,7 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  See `run_js/3`. May raise `Popcorn.Wasm.Error`.
+  See run_js/3.
   """
   @spec run_js!(String.t(), map(), run_js_opts()) :: term()
   def run_js!(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
@@ -166,7 +145,7 @@ defmodule Popcorn.Wasm do
   end
 
   @doc """
-  Sends a message to JavaScript. Semantics follow OTP/BEAM ones: no receive confirmation, returns immediately.
+  Sends a message to the JavaScript callbacks registered with `popcorn.onEvent()`.
   """
   @spec send(term()) :: :ok
   def send(message) do

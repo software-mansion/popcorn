@@ -1,3 +1,7 @@
+/**
+ * An operation result. Check `ok` before accessing `data` or `error`.
+ * Expected failures use the error branch. Invalid usage can still throw.
+ */
 export type Result<T, E extends Tag = Tag> =
   | { ok: true; data: T }
   | {
@@ -6,6 +10,7 @@ export type Result<T, E extends Tag = Tag> =
     };
 
 type Tag = keyof PopcornErrors;
+/** Error tags and their structured details. Match tags instead of message text. */
 export type PopcornErrors = {
   "timeout:init": { timeoutMs: number };
   "timeout:send": { timeoutMs: number };
@@ -28,6 +33,7 @@ export type PopcornErrors = {
   "runtime:eval-unavailable": EmptyData;
 };
 
+/** Error tag and details without the Error instance or stack. */
 export type SerializedError<T extends Tag = Tag> = {
   [K in T]: { t: K; data: PopcornErrors[K] };
 }[T];
@@ -68,6 +74,7 @@ export function isErr<T extends Tag = Tag>(
   return false;
 }
 
+/** @hidden */
 export class PopcornError<T extends Tag = Tag> extends Error {
   override readonly cause: SerializedError<T>;
   private readonly serialized: SerializedError<T>;
@@ -88,6 +95,7 @@ export class PopcornError<T extends Tag = Tag> extends Error {
     return this.serialized.data;
   }
 
+  /** Returns the tag and a shallow copy of its details. */
   public serialize(): SerializedError<T> {
     return {
       t: this.serialized.t,
@@ -95,6 +103,7 @@ export class PopcornError<T extends Tag = Tag> extends Error {
     };
   }
 
+  /** Restores a serialized error. Throws if validation fails. */
   public static deserialize(value: unknown): PopcornError {
     return new PopcornError(parse(value));
   }

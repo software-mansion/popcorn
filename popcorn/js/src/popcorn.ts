@@ -1,5 +1,5 @@
 import { PopcornError, err, type Result } from "./errors";
-import { RawTerm, type Mapper } from "./etf";
+import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
   readWorkerEvent,
   serializeSendPayload,
@@ -28,28 +28,74 @@ const UTF8 = new TextEncoder();
 const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
 const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 
+/** Output type for a terminal. */
 type TtyOutput = "text" | "bytes";
 type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
   ? Uint8Array
   : string;
 
+/** Browser VM configuration. */
 export type PopcornOpts<Output extends TtyOutput = "text"> = {
-  beam?: Pick<
-    BeamBootOptions,
-    "emulatorArgs" | "extraArgs" | "env"
-  > & { otpAssetsRoot?: string };
+  beam?: Pick<BeamBootOptions, "emulatorArgs" | "extraArgs" | "env"> & {
+    /**
+     * Asset directory URL.
+     *
+     * Must end with `/`. Defaults to `otp/` next to the worker.
+     */
+    otpAssetsRoot?: string;
+  };
   tty?: {
+    /** Initial terminal size. Defaults to 80 columns and 24 rows. */
     size?: TtySize;
+    /** Output callback format. Defaults to `text` with streamed UTF-8 decoding. Use `bytes` for raw chunks. */
     output?: Output;
   };
   timeoutsMs?: {
+    /**
+     * Maximum wait for the VM bridge.
+     *
+     * Defaults to 10 000 ms.
+     */
     boot?: number;
+    /**
+     * Maximum wait for entrypoint startup after bridge readiness.
+     *
+     * Defaults to 60 000 ms.
+     */
     appStartup?: number;
+    /**
+     * Maximum wait for a send resolving its process target.
+     *
+     * Defaults to 5 000 ms.
+     */
     send?: number;
   };
+
+  /**
+   * Receives stdout.
+   *
+   * Defaults to `console.log`.
+   * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
+   */
   onStdout?: (chunk: OutputChunk<Output>) => void;
+  /**
+   * Receives stderr.
+   *
+   * Defaults to `console.error`.
+   * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
+   */
   onStderr?: (chunk: OutputChunk<Output>) => void;
+  /**
+   * Receives VM errors and exits before shutdown.
+   *
+   * Defaults to console output.
+   */
   onError?: (event: OtpErrorPayload) => void;
+  /**
+   * Module worker URL.
+   *
+   * Defaults to the worker included with the package.
+   */
   workerUrl?: string | URL;
 };
 
@@ -106,27 +152,15 @@ type ProxyReply =
     };
 export type GenServer = {
   /**
-   * Sends a `call` to the `target` GenServer (through the `proxy`), waiting for a response.
+   * Calls a GenServer by registered name or {@link Pid} and waits for its reply.
    *
-   * ## Parameters
+   * Requires a running `Popcorn.Proxy`, registered as `popcorn_proxy` by default.
    *
-   * - `target` — the GenServer to call, either a registered name or a `Pid`.
-   * - `request` — the request payload.
-   * - `opts` — call options.
+   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy.
+   * @returns A {@link Result} with the reply or a bridge, VM, timeout, or GenServer error.
    *
-   * ### Options
-   *
-   * - `timeoutMs` — the maximum time to wait for a response, in milliseconds.
-   * - `proxy` — the name of the `Popcorn.Proxy` process to use for the call.
-   *
-   * ## Returns
-   *
-   * A `Promise` that resolves with the server's reply, or rejects with an error.
-   *
-   * ## Errors
-   *
-   * TODO: gather errors
-   *
+   * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
+   * A call timeout does not cancel server work.
    */
   call(
     target: string | Pid,
@@ -135,26 +169,11 @@ export type GenServer = {
   ): Promise<Result<AnyValue>>;
 
   /**
-   * Sends a `cast` to the `target` GenServer (through the `proxy`), in fire-and-forget manner.
+   * Sends a cast through the proxy.
    *
-   * ## Parameters
-   *
-   * - `target` — the GenServer to cast to, either a registered name or a `Pid`.
-   * - `request` — the request payload.
-   * - `opts` — cast options.
-   *
-   * ### Options
-   *
-   * - `proxy` — the registered name or `Pid` of the `Popcorn.Proxy` process to use for the cast.
-   *
-   * ## Returns
-   *
-   * A `Promise` that resolves once the message is delivered to the proxy.
-   *
-   * ## Errors
-   *
-   * TODO: gather errors
-   *
+   * Success confirms delivery to the proxy
+   * @see {@link call}
+   * @param opts - `proxy` allows to select another registered proxy.
    */
   cast(
     target: string | Pid,
@@ -173,6 +192,11 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
   check(typeof value === "function");
 }
 
+/**
+ * A BEAM VM in a browser worker.
+ *
+ * Use {@link Popcorn.init} to create and start an instance.
+ **/
 export class Popcorn<Output extends TtyOutput = "text"> {
   private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
@@ -243,6 +267,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
   };
 
+  /**
+   * Creates the worker.
+   *
+   * Call {@link boot} to start the VM.
+   **/
   public constructor(opts: PopcornOpts<Output>) {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
     check(isValidTtySize(ttySize));
@@ -275,6 +304,13 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
   }
 
+  /**
+   * Creates an instance and waits for {@link boot}.
+   *
+   * For startup messages, use the constructor and register {@link onEvent} before boot.
+   *
+   * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
+   */
   public static async init<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output>,
   ): Promise<Result<Popcorn<Output>>> {
@@ -293,13 +329,21 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Starts the VM and resolves after its bridge is ready and the entrypoint
-   * application has started. `timeoutsMs.boot` bounds the wait for the VM
-   * bridge; `timeoutsMs.appStartup` bounds the entrypoint startup that
-   * follows. Register event handlers before calling this
-   * method when the application sends messages during startup. Processes
-   * registered later by handle_continue or spawned work can still return
-   * genserver:noproc immediately after boot.
+   * Starts the VM and waits for its bridge and entrypoint application.
+   *
+   * Without an entrypoint, waits only for the bridge.
+   *
+   * After shutdown, starts a fresh VM with the original options.
+   *
+   * @returns Ok tuple with `this` if boot completes or error tuple.
+   *
+   * @example
+   * ```ts
+   * const popcorn = new Popcorn({});
+   * popcorn.onEvent((message) => console.log(message));
+   * const result = await popcorn.boot();
+   * if (!result.ok) throw result.error;
+   * ```
    */
   public async boot(): Promise<Result<Popcorn<Output>>> {
     if (this.state.status === "booted") {
@@ -385,6 +429,14 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     });
   }
 
+  /**
+   * Queues terminal input.
+   *
+   * Encodes strings as UTF-8 and copies byte arrays. Does not append a newline.
+   *
+   * Returns `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
+   * An overflow leaves the queue unchanged.
+   */
   public writeStdin(chunk: string | Uint8Array): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
@@ -410,6 +462,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return { ok: true, data: null };
   }
 
+  /**
+   * Sends new terminal dimensions to a booted VM.
+   *
+   * Each dimension must be between 1 and 65,535.
+   */
   public resizeTty(columns: number, rows: number): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
@@ -425,7 +482,25 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Resolves after VM sent message to registered process.
+   * Sends a payload to a registered process name or a {@link Pid} from this VM boot.
+   *
+   * The process receives `{wasm, Payload}`.
+   * A send timeout does not cancel delivery.
+   * Uses the value conversions in {@link AnyValue}. An omitted, `null`, or `undefined` payload becomes an empty map.
+   *
+   * @returns Ok tuple or `bridge:not-started` before boot and `vm:exited` after shutdown.
+   *
+   * @example
+   * Send an Erlang `{ok, <<"value">>}` tuple to a registered `receiver` process.
+   *
+   * ```ts
+   * const result = await popcorn.send("receiver", tuple(atom("ok"), "value"));
+   * if (!result.ok) throw result.error;
+   * ```
+   *
+   * @see {@link AnyValue}
+   * @see {@link atom}
+   * @see {@link tuple}
    */
   public async send(
     rawTarget: string | Pid,
@@ -494,9 +569,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Receives BEAM messages delivered while this handler is registered.
-   * Messages with no handlers are dropped. A handler registered before boot
-   * can run before the boot promise resolves.
+   * Registers a handler for BEAM message payloads.
+   *
+   * Messages with no handlers are lost. Startup messages can arrive before {@link boot} resolves.
+   * VM errors and terminal output use the callbacks in {@link PopcornOpts}.
+   *
+   * @returns a function that removes the handler.
    */
   public onEvent(handler: (event: PopcornEvent) => void): () => void {
     this.eventHandlers.add(handler);
@@ -505,6 +583,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     };
   }
 
+  /**
+   * Stops the worker and completes pending sends and calls with `vm:exited`.
+   *
+   * Releases tracked values and runs their cleanup callbacks.
+   * Keeps event handlers for the next boot. Repeated calls have no effect.
+   */
   public deinit(reason: VmExitReason = { reason: "deinit" }): void {
     if (this.state.status === "closed") {
       return;
@@ -552,7 +636,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
 
     if (this.eventHandlers.size === 0) {
-      console.warn(`${LOG_PREFIX} Dropped message with no event handlers`, event);
+      console.warn(
+        `${LOG_PREFIX} Dropped message with no event handlers`,
+        event,
+      );
     }
     for (const handler of this.eventHandlers) {
       handler(event);
@@ -857,12 +944,25 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 }
 
+/**
+ * Thread counts for {@link schedulers}.
+ *
+ * Each count must be positive.
+ */
 export type SchedulerOptions = {
+  /** Regular schedulers. */
   base: number;
+  /** Dirty CPU schedulers. */
   dirtyCpu: number;
+  /** Dirty I/O schedulers. */
   dirtyIo: number;
 };
 
+/**
+ * Builds `beam.emulatorArgs` for scheduler counts.
+ *
+ * Defaults to one scheduler of each type.
+ */
 export function schedulers(opts: SchedulerOptions): string[] {
   const { base, dirtyCpu, dirtyIo } = opts;
   check(base > 0);
