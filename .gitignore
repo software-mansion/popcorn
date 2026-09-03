@@ -23,6 +23,7 @@ node_modules/
 popcorn/sources/
 popcorn/out/
 popcorn/js/dist
+popcorn/js/.dist-*/
 popcorn/js/assets/
 popcorn/js/e2e/setup/dist/
 popcorn/js/playwright-report/
