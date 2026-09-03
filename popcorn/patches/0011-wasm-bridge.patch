@@ -1143,10 +1143,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..3679b690583605c17f185b5f2f4008a8bb3d9a9e
+index 0000000000000000000000000000000000000000..90bd457be65aa7cc28cfbd33d5686fdb6e8e1567
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,130 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1242,6 +1242,8 @@ index 0000000000000000000000000000000000000000..3679b690583605c17f185b5f2f4008a8
 +unserializable_reason(<<"non-finite-float">>) -> non_finite_float;
 +unserializable_reason(<<"unsupported">>) -> unsupported.
 +
++encode_arg(nil, Encoder) ->
++    json:encode_value(null, Encoder);
 +encode_arg({wasm_tracked_value, Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
 +encode_arg(Pid, Encoder) when is_pid(Pid) ->
