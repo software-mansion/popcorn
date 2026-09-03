@@ -1,59 +1,42 @@
-import { cp, mkdir, rm } from "node:fs/promises";
-import { dirname } from "node:path";
+import { cp, mkdir, rm, symlink } from "node:fs/promises";
+import { basename } from "node:path";
 import typescript from "@rollup/plugin-typescript";
-
-function copyFiles(targets) {
-  return {
-    name: "copy-files",
-    async buildEnd() {
-      await Promise.all(
-        targets.map(async ({ src, dest }) => {
-          await mkdir(dirname(dest), { recursive: true });
-          await cp(src, dest, { recursive: true });
-        }),
-      );
-    },
-  };
-}
-
-function cleanDir(dir) {
-  return {
-    name: "clean-dir",
-    async buildStart() {
-      await rm(dir, { recursive: true, force: true });
-    },
-  };
-}
 
 export default [
   {
     input: "src/index.ts",
     output: {
-      file: "dist/index.mjs",
+      file: "../out/js/index.mjs",
       format: "esm",
     },
     cache: false,
     plugins: [
-      cleanDir("dist"),
+      {
+        name: "shared-output",
+        async buildStart() {
+          await rm("../out/js", { recursive: true, force: true });
+          await mkdir("../out/js", { recursive: true });
+          await symlink("../runtimes", "../out/js/runtimes", "dir");
+          await rm("dist", { recursive: true, force: true });
+          await symlink("../out/js", "dist", "dir");
+          await mkdir("../elixir/priv", { recursive: true });
+          await rm("../elixir/priv/static", { recursive: true, force: true });
+          await symlink("../../out/js", "../elixir/priv/static", "dir");
+        },
+      },
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
     ],
   },
   {
     input: "src/worker.ts",
     output: {
-      file: "dist/worker.mjs",
+      file: "../out/js/worker.mjs",
       format: "esm",
     },
     external: ["./beam.mjs"],
     cache: false,
     plugins: [
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
-      copyFiles([
-        { src: "../out/beam.mjs", dest: "dist/beam.mjs" },
-        { src: "../out/beam.emu.mjs", dest: "dist/beam.emu.mjs" },
-        { src: "../out/beam.wasm", dest: "dist/beam.wasm" },
-        { src: "../out/manifest.json", dest: "dist/otp/manifest.json" },
-      ]),
     ],
   },
   {
@@ -63,7 +46,7 @@ export default [
       esbuild: "plugins/esbuild.ts",
     },
     output: {
-      dir: "dist/plugins",
+      dir: "../out/js/plugins",
       format: "esm",
       entryFileNames: "[name].mjs",
       chunkFileNames: "[name].mjs",
@@ -76,24 +59,15 @@ export default [
         tsconfig: "./plugins/tsconfig.json",
         outputToFilesystem: true,
       }),
-      copyFiles([
-        {
-          src: "../out/runtimes",
-          dest: "dist/runtimes",
+      {
+        name: "beam-tools",
+        async buildEnd() {
+          await cp("plugins/beam_tools", "../out/js/plugins/beam_tools", {
+            recursive: true,
+            filter: (source) => !["_build", "deps"].includes(basename(source)),
+          });
         },
-        {
-          src: "plugins/beam_tools/mix.exs",
-          dest: "dist/plugins/beam_tools/mix.exs",
-        },
-        {
-          src: "plugins/beam_tools/lib",
-          dest: "dist/plugins/beam_tools/lib",
-        },
-        {
-          src: "plugins/beam_tools/patches",
-          dest: "dist/plugins/beam_tools/patches",
-        },
-      ]),
+      },
     ],
   },
 ];

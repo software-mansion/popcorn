@@ -12,7 +12,7 @@
 #   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
 #   --otp-tag <TAG>       OTP git tag to clone (default: OTP-29.0.6)
 #   --source <path>       Use local OTP source instead of cloning
-#   --outdir <dir>        Output directory (default: ./out)
+#   --outdir <dir>        Output directory (default: popcorn/out)
 #   --clean               Clean before building (removes popcorn/sources/otp)
 #   -j <N>                Parallel jobs
 #   -v, --verbose         Show output of underlying build commands
@@ -58,7 +58,7 @@ Options:
   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
   --otp-tag <TAG>       OTP git tag to clone (default: ${DEFAULT_OTP_TAG})
   --source <path>       Use local OTP source instead of cloning
-  --outdir <dir>        Output directory (default: ./out)
+  --outdir <dir>        Output directory (default: popcorn/out)
   --clean               Clean before building (removes popcorn/sources/otp)
   -j <N>                Parallel jobs
   -v, --verbose         Show output of underlying build commands
@@ -486,9 +486,8 @@ copy_artifacts() {
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"
-    cp "${outdir}/beam.wasm" "${outdir}/manifest.json" "${runtime_dir}/"
-    sed 's/"beam.emu"/"beam.emu.mjs"/g' "${outdir}/beam.smp" > "${runtime_dir}/beam.mjs"
-    sed 's/"beam.emu"/"beam.emu.mjs"/g' "${outdir}/beam.emu" > "${runtime_dir}/beam.emu.mjs"
+    cp "${outdir}/beam.wasm" "${outdir}/beam.mjs" "${outdir}/beam.emu.mjs" \
+        "${outdir}/otp/manifest.json" "${runtime_dir}/"
 
     for boot in start.boot start_clean.boot no_dot_erlang.boot vm.boot; do
         rm -f "${outdir}/bin/${boot}"
@@ -607,7 +606,7 @@ main() {
 
     run "${PROJECT_ROOT}/scripts/runtime-manifest.sh" \
         --beam-dir "${beam_dir}" \
-        --outdir "${final_outdir}" \
+        --outdir "${final_outdir}/otp" \
         --with-crypto "${with_crypto}"
 
     copy_artifacts "${beam_dir}" "${final_outdir}" "${with_crypto}"
