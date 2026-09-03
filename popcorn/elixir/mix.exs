@@ -15,7 +15,7 @@ defmodule Popcorn.MixProject do
       description: "Elixir API for Popcorn's OTP/BEAM WebAssembly runtime",
       package: package(),
       name: "Popcorn OTP",
-      docs: docs(),
+      docs: &docs/0,
       source_url: @github,
       homepage_url: "https://popcorn.swmansion.com"
     ]
@@ -46,12 +46,18 @@ defmodule Popcorn.MixProject do
       formatters: ["html"],
       source_ref: "v#{@version}"
     ]
+    |> ExDocJs.configure(
+      entry_points: ["../js/src/index.ts"],
+      tsconfig: "../js/tsconfig.json",
+      root_module: "JS"
+    )
   end
 
   defp deps do
     [
       {:req, ">= 0.5.0", optional: true},
-      {:ex_doc, "~> 0.34", only: [:dev, :test], runtime: false}
+      {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
+      {:ex_doc_js, github: "software-mansion-labs/ex_doc_js", only: [:dev, :test], runtime: false}
     ]
   end
 end
