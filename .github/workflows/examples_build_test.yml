@@ -46,13 +46,13 @@ jobs:
           build-mode: debug
           with-crypto: "false"
 
-      # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.19.5
+      # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.20.4
       # runtime shipped in the Wasm VM, so the host toolchain must match it.
       # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.5"
+          elixir-version: "1.20.4"
           otp-version: *host_otp
 
       - name: Setup pnpm

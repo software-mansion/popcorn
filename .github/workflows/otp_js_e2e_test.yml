@@ -80,7 +80,7 @@ jobs:
       - name: Setup Elixir and Erlang
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.5"
+          elixir-version: "1.20.4"
           otp-version: *host_otp
 
       - name: Run e2e tests

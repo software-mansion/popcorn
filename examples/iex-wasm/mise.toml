@@ -1,10 +1,10 @@
 # The example has no Elixir code, but the packer shells out to `mix` and the
 # dev server to `elixir`, both inheriting this toolchain. It has to match the
-# OTP 28 / Elixir 1.19.5 the OTP/Wasm runtime ships. The repo-root mise.toml
+# OTP 28 / Elixir 1.20.4 the OTP/Wasm runtime ships. The repo-root mise.toml
 # still pins the older AtomVM toolchain (1.17 / OTP 26); once AtomVM support is
 # dropped, this nested config can be removed.
 [tools]
-elixir = "1.19.5-otp-28"
+elixir = "1.20.4-otp-28"
 erlang = "28.3.1"
 node = "24.15.0"
 pnpm = "11"
