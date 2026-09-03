@@ -2,6 +2,9 @@ defmodule Popcorn.BeamTools.Packager do
   alias Popcorn.BeamTools.BeamPatcher
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
+
+  # :beam_lib.significant_chunks/0 is undocumented.
+  @retained_chunks :beam_lib.significant_chunks() -- [~c"Type"]
   # Applications that only work when the emulator was built with the matching
   # native support. The runtime manifest declares what the build provides.
   @app_capabilities %{
@@ -52,13 +55,26 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp beam?(path), do: Path.extname(path) == ".beam"
 
+  # Reimplementation of :beam_lib.strip_files/2.
+  # Original also gzip compresses modules.
   defp strip_beam({name, content}) do
-    with {:is_beam, true} <- {:is_beam, beam?(to_string(name))},
-         {:ok, {_module, stripped_and_compressed}} <- :beam_lib.strip(content) do
-      stripped = :zlib.gunzip(stripped_and_compressed)
+    if beam?(to_string(name)) do
+      {:ok, _module, chunks} = :beam_lib.all_chunks(content)
+      chunks_by_name = Map.new(chunks)
+
+      chunks =
+        Enum.flat_map(@retained_chunks, fn name ->
+          case Map.fetch(chunks_by_name, name) do
+            {:ok, data} -> [{name, data}]
+            :error -> []
+          end
+        end)
+
+      {:ok, stripped} = :beam_lib.build_module(chunks)
+
       {name, stripped}
     else
-      {:is_beam, false} -> {name, content}
+      {name, content}
     end
   end
 
