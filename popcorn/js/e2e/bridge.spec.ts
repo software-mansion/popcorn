@@ -5,6 +5,7 @@ const OVERFLOWED = Number.MAX_SAFE_INTEGER + 1;
 const PAYLOAD = {
   text: "żółw",
   nullValue: null,
+  nilString: "nil",
   boolTrue: true,
   boolFalse: false,
   numbers: [
@@ -22,7 +23,7 @@ const PAYLOAD = {
   ],
   emptyList: [],
   emptyMap: {},
-  nested: [{ value: "ok" }],
+  nested: [{ value: "ok", missing: null }, null],
 };
 
 test.describe("ETF", () => {
@@ -170,6 +171,7 @@ test.describe("events", () => {
             ExpectedPayload = #{
               <<"text">> => <<"żółw"/utf8>>,
               <<"nullValue">> => nil,
+              <<"nilString">> => <<"nil">>,
               <<"boolTrue">> => true,
               <<"boolFalse">> => false,
               <<"numbers">> => [
@@ -179,7 +181,7 @@ test.describe("events", () => {
               ],
               <<"emptyList">> => [],
               <<"emptyMap">> => #{},
-              <<"nested">> => [#{<<"value">> => <<"ok">>}]
+              <<"nested">> => [#{<<"value">> => <<"ok">>, <<"missing">> => nil}, nil]
             },
             ExpectedEtf = base64:encode(term_to_binary(ExpectedPayload)),
             ok = wasm:send(#{etf_expected => ExpectedEtf}),
@@ -203,7 +205,7 @@ test.describe("events", () => {
     await otp.waitForEvent("bridge_ready");
     assert((await otp.send("żółw", structuredClone(PAYLOAD))).ok);
     expect(await otp.waitForEvent("reply")).toEqual({
-      reply: { ...PAYLOAD, nullValue: "nil" },
+      reply: PAYLOAD,
       decoded: true,
     });
   });
@@ -219,8 +221,8 @@ test.describe("run_js", () => {
             #{a => 2, b => 5}
           ),
           Nested = wasm:run_js(
-            <<"() => ({a: 1, nested: {b: [2, 3]}, flag: true})">>,
-            #{},
+            <<"({missing}) => ({a: 1, nested: {b: [2, 3]}, flag: missing === null, missing})">>,
+            #{missing => nil},
             [{return, value}]
           ),
           ok = wasm:send(#{sync => Sync, async => Async, nested => Nested}).
@@ -231,7 +233,7 @@ test.describe("run_js", () => {
     expect(await otp.waitForEvent("sync")).toEqual({
       sync: 3,
       async: 7,
-      nested: { a: 1, nested: { b: [2, 3] }, flag: true },
+      nested: { a: 1, nested: { b: [2, 3] }, flag: true, missing: null },
     });
   });
 
