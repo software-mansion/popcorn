@@ -68,6 +68,7 @@ export function isErr<T extends Tag = Tag>(
   return false;
 }
 
+/** @hidden */
 export class PopcornError<T extends Tag = Tag> extends Error {
   override readonly cause: SerializedError<T>;
   private readonly serialized: SerializedError<T>;
