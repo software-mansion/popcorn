@@ -10,7 +10,7 @@
 #
 # Options:
 #   --with-crypto         Include static OpenSSL + crypto/asn1 NIFs
-#   --otp-tag <TAG>       OTP git tag to clone (default: OTP-28.3.1)
+#   --otp-tag <TAG>       OTP git tag to clone (default: OTP-29.0.6)
 #   --source <path>       Use local OTP source instead of cloning
 #   --outdir <dir>        Output directory (default: ./out)
 #   --clean               Clean before building (removes popcorn/sources/otp)
@@ -23,7 +23,7 @@ LOG_PREFIX="BUILD BEAM"
 # shellcheck source=_common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-DEFAULT_OTP_TAG="OTP-28.3.1"
+DEFAULT_OTP_TAG="OTP-29.0.6"
 SOURCES_DIR="${PROJECT_ROOT}/popcorn/sources"
 VERBOSE=false
 
@@ -72,7 +72,7 @@ Source selection (from higher to lower priority):
 Examples:
   $0 debug
   $0 --with-crypto release
-  $0 --source /local/otp --otp-tag OTP-28.3.1 debug
+  $0 --source /local/otp --otp-tag OTP-29.0.6 debug
 EOF
     exit 0
 }

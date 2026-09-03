@@ -1,8 +1,8 @@
 diff --git a/erts/emulator/beam/dist.c b/erts/emulator/beam/dist.c
-index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd016652138e93 100644
+index 53cd31e9a0f3430202f91b1fad9c24471dddd493..29807377bad60349b0c0c6e2c8575d5332c507da 100644
 --- a/erts/emulator/beam/dist.c
 +++ b/erts/emulator/beam/dist.c
-@@ -2020,6 +2020,8 @@ int erts_net_message(Port *prt,
+@@ -2023,6 +2023,8 @@ int erts_net_message(Port *prt,
  		     const byte *buf,
  		     ErlDrvSizeT len)
  {
@@ -11,7 +11,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      ErtsDistExternal ede, *edep = &ede;
      ErtsDistExternalData ede_data;
      ErlHeapFragment *ede_hfrag = NULL;
-@@ -3220,6 +3222,8 @@ erts_dsig_prepare(ErtsDSigSendContext *ctx,
+@@ -3222,6 +3224,8 @@ erts_dsig_prepare(ErtsDSigSendContext *ctx,
                    int no_trap,
  		  int connect)
  {
@@ -20,7 +20,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      /*
       * No process imply that we should force data through. That
       * is, ignore busy state of dist entry and allow enqueue
-@@ -4271,6 +4275,8 @@ erts_dist_command(Port *prt, int initial_reds)
+@@ -4272,6 +4276,8 @@ erts_dist_command(Port *prt, int initial_reds)
  BIF_RETTYPE
  dist_ctrl_get_data_notification_1(BIF_ALIST_1)
  {
@@ -29,7 +29,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
      erts_aint32_t notify;
      erts_aint_t qsize;
-@@ -4331,6 +4337,8 @@ dist_ctrl_get_data_notification_1(BIF_ALIST_1)
+@@ -4332,6 +4338,8 @@ dist_ctrl_get_data_notification_1(BIF_ALIST_1)
  BIF_RETTYPE
  dist_ctrl_put_data_2(BIF_ALIST_2)
  {
@@ -38,7 +38,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      DistEntry *dep;
      Eterm input_handler;
      Uint32 conn_id;
-@@ -4407,6 +4415,8 @@ dist_ctrl_put_data_2(BIF_ALIST_2)
+@@ -4408,6 +4416,8 @@ dist_ctrl_put_data_2(BIF_ALIST_2)
  BIF_RETTYPE
  dist_ctrl_set_opt_3(BIF_ALIST_3)
  {
@@ -47,7 +47,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
      Uint32 conn_id;
      BIF_RETTYPE ret;
-@@ -4450,6 +4460,8 @@ dist_ctrl_set_opt_3(BIF_ALIST_3)
+@@ -4451,6 +4461,8 @@ dist_ctrl_set_opt_3(BIF_ALIST_3)
  BIF_RETTYPE
  dist_ctrl_get_opt_2(BIF_ALIST_2)
  {
@@ -56,7 +56,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      DistEntry *dep = ERTS_PROC_GET_DIST_ENTRY(BIF_P);
      Uint32 conn_id;
      BIF_RETTYPE ret;
-@@ -4487,6 +4499,8 @@ dist_ctrl_get_opt_2(BIF_ALIST_2)
+@@ -4488,6 +4500,8 @@ dist_ctrl_get_opt_2(BIF_ALIST_2)
  BIF_RETTYPE
  dist_get_stat_1(BIF_ALIST_1)
  {
@@ -65,7 +65,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      Sint64 read, write, pend;
      Eterm res, *hp, **hpp;
      Uint sz, *szp;
-@@ -4531,6 +4545,8 @@ dist_get_stat_1(BIF_ALIST_1)
+@@ -4532,6 +4546,8 @@ dist_get_stat_1(BIF_ALIST_1)
  BIF_RETTYPE
  dist_ctrl_input_handler_2(BIF_ALIST_2)
  {
@@ -74,7 +74,7 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      Uint32 conn_id;
      DistEntry *dep = erts_dhandle_to_dist_entry(BIF_ARG_1, &conn_id);
  
-@@ -4557,6 +4573,8 @@ dist_ctrl_input_handler_2(BIF_ALIST_2)
+@@ -4558,6 +4574,8 @@ dist_ctrl_input_handler_2(BIF_ALIST_2)
  BIF_RETTYPE
  dist_ctrl_get_data_1(BIF_ALIST_1)
  {
@@ -129,10 +129,10 @@ index e6d277ef86ab33976da7485badebd9295aaf7b69..50f9ba3cfc44bcce9bcd2ae279fd0166
      if (dep->state != ERTS_DE_STATE_IDLE) {
          erts_de_rwunlock(dep);
 diff --git a/lib/kernel/src/Makefile b/lib/kernel/src/Makefile
-index 63cae1e45f4769779c008d58eb71f7891b4158bb..079353cb5f2afff1e3fec361330c56a6ae41dd96 100644
+index bc94e3de3a3bc9364edd5442291df0bfb99b1ba7..3710569e6b51065c5f04b79343d898c8ed28c4fe 100644
 --- a/lib/kernel/src/Makefile
 +++ b/lib/kernel/src/Makefile
-@@ -66,14 +66,11 @@ MODULES = \
+@@ -67,14 +67,11 @@ MODULES = \
  	disk_log_server \
  	disk_log_sup \
  	dist_ac \
@@ -147,7 +147,7 @@ index 63cae1e45f4769779c008d58eb71f7891b4158bb..079353cb5f2afff1e3fec361330c56a6
  	erl_kernel_errors \
  	erl_reply \
  	erl_signal_handler \
-@@ -97,21 +94,17 @@ MODULES = \
+@@ -98,21 +95,17 @@ MODULES = \
  	heart \
  	inet \
  	inet6_tcp \
@@ -170,13 +170,13 @@ index 63cae1e45f4769779c008d58eb71f7891b4158bb..079353cb5f2afff1e3fec361330c56a6
  	inet_sctp \
  	kernel \
 diff --git a/lib/kernel/src/kernel.app.src b/lib/kernel/src/kernel.app.src
-index 831cf1948be806db14f11665a933d65520568c89..b0f870e2a65b2f1fa6dd41cb8205d996023565d1 100644
+index 54d288387fbc6377c12749dffe308f74bdcfd408..a4aa4c7d77ce78698564cec7b43ce1549cd58999 100644
 --- a/lib/kernel/src/kernel.app.src
 +++ b/lib/kernel/src/kernel.app.src
-@@ -32,11 +32,9 @@
- 	     auth,
+@@ -33,11 +33,9 @@
  	     code,
  	     code_server,
+              data_publisher,
 -	     dist_util,
  	     erl_boot_server,
  	     erl_compile_server,
@@ -185,7 +185,7 @@ index 831cf1948be806db14f11665a933d65520568c89..b0f870e2a65b2f1fa6dd41cb8205d996
               erl_erts_errors,
  	     erl_reply,
               erl_kernel_errors,
-@@ -54,15 +52,11 @@
+@@ -55,15 +53,11 @@
  	     group_history,
  	     heart,
  	     inet6_tcp,
@@ -201,7 +201,7 @@ index 831cf1948be806db14f11665a933d65520568c89..b0f870e2a65b2f1fa6dd41cb8205d996
  	     kernel,
  	     kernel_config,
  	     kernel_refc,
-@@ -99,7 +93,6 @@
+@@ -100,7 +94,6 @@
               disk_log_sup,
               dist_ac,
               erl_ddll,
@@ -237,10 +237,10 @@ index 09281afbf76067aaa18646baa4c17877e678ebb3..95abd9e1ed8bb5f343c2bc62a8b6d708
  start_dist_ac() ->
      Spec = [#{id => dist_ac,
 diff --git a/lib/kernel/src/net_kernel.erl b/lib/kernel/src/net_kernel.erl
-index b798949dfc59c8770412be4ceb208dd2ce47cde8..903616391b3cbc77acb214ccb571aca3b66d41f0 100644
+index 3bd8f516f784740350307aa5b3e3ed2b4abfcb7b..1d0f4f89c1b3d6500cf9bc44fc131fef21824c41 100644
 --- a/lib/kernel/src/net_kernel.erl
 +++ b/lib/kernel/src/net_kernel.erl
-@@ -345,10 +345,9 @@ Only possible when the net kernel was started using `start/2`, otherwise
+@@ -346,10 +346,9 @@ Only possible when the net kernel was started using `start/2`, otherwise
  `{error, not_allowed}` is returned. Returns `{error, not_found}` if the local
  node is not alive.
  """.
@@ -253,7 +253,7 @@ index b798949dfc59c8770412be4ceb208dd2ce47cde8..903616391b3cbc77acb214ccb571aca3
  
  -type node_info() ::
      {address, #net_address{}} |
-@@ -834,28 +833,8 @@ Currently supported options:
+@@ -835,28 +834,8 @@ Currently supported options:
        Reason :: {already_started, pid()} | term().
  
  start(Name, Options) when is_atom(Name), is_map(Options) ->

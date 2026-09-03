@@ -1,5 +1,5 @@
 diff --git a/Makefile.in b/Makefile.in
-index dc20f9858337f345b7010d912264d46a093499c6..739cf1ef4c5dd21eafc4977fc6f529c3ecee9f97 100644
+index e0981b1d9a841da18c5aecf2d1fdb2b1c038944f..5a29bc887188d8db693763604fb67a548895568d 100644
 --- a/Makefile.in
 +++ b/Makefile.in
 @@ -639,16 +639,19 @@ SECONDARY_BOOTSTRAP=$(TINY_SECONDARY_BOOTSTRAP) asn1

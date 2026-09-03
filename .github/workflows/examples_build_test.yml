@@ -42,11 +42,11 @@ jobs:
       - name: Build OTP/BEAM for Wasm
         uses: ./.github/actions/build-otp-wasm
         with:
-          host-otp-version: &host_otp "28.3.1"
+          host-otp-version: &host_otp "29.0.6"
           build-mode: debug
           with-crypto: "false"
 
-      # The example is compiled to BEAM that runs on the OTP 28 / Elixir 1.20.4
+      # The example is compiled to BEAM that runs on the OTP 29 / Elixir 1.20.4
       # runtime shipped in the Wasm VM, so the host toolchain must match it.
       # (Note: repo-wide mise.toml pins the older AtomVM toolchain, 1.17/OTP 26.)
       - name: Set up Elixir

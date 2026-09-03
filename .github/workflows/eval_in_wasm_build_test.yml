@@ -43,7 +43,7 @@ jobs:
       - name: Build OTP/BEAM for Wasm
         uses: ./.github/actions/build-otp-wasm
         with:
-          host-otp-version: &host_otp "28.3.1"
+          host-otp-version: &host_otp "29.0.6"
           build-mode: debug
           with-crypto: "false"
 

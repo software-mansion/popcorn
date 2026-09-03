@@ -24,10 +24,10 @@ index 018dec7ebd42994666f10c5b6cffa9254e680ff9..e6b31e3066a1473704c3433b9b3fce76
  
  /*
 diff --git a/erts/emulator/beam/erl_nif.c b/erts/emulator/beam/erl_nif.c
-index f7acec81521f69789b0d9d64206f0e631e4419d0..e18830d929f9cf93f137ee068d4fd537b8bc9051 100644
+index ae5e6b72dae8425abc2ca3aa2acda86aa567017e..27c1d16378d65f2eee4c9f6901fe7a16eff53a10 100644
 --- a/erts/emulator/beam/erl_nif.c
 +++ b/erts/emulator/beam/erl_nif.c
-@@ -3276,6 +3276,13 @@ int enif_dynamic_resource_call(ErlNifEnv* caller_env,
+@@ -3303,6 +3303,13 @@ int enif_dynamic_resource_call(ErlNifEnv* caller_env,
  void* enif_dlopen(const char* lib,
  		  void (*err_handler)(void*,const char*), void* err_arg)
  {
@@ -41,7 +41,7 @@ index f7acec81521f69789b0d9d64206f0e631e4419d0..e18830d929f9cf93f137ee068d4fd537
      ErtsSysDdllError errdesc = ERTS_SYS_DDLL_ERROR_INIT;
      void* handle;
      void* init_func;
-@@ -3292,11 +3299,20 @@ void* enif_dlopen(const char* lib,
+@@ -3319,11 +3326,20 @@ void* enif_dlopen(const char* lib,
      }
      erts_sys_ddll_free_error(&errdesc);
      return handle;
@@ -62,7 +62,7 @@ index f7acec81521f69789b0d9d64206f0e631e4419d0..e18830d929f9cf93f137ee068d4fd537
      ErtsSysDdllError errdesc = ERTS_SYS_DDLL_ERROR_INIT;
      void* ret;
      if (erts_sys_ddll_sym2(handle, symbol, &ret, &errdesc) != ERL_DE_NO_ERROR) {
-@@ -3307,6 +3323,7 @@ void* enif_dlsym(void* handle, const char* symbol,
+@@ -3334,6 +3350,7 @@ void* enif_dlsym(void* handle, const char* symbol,
  	return NULL;
      }
      return ret;
@@ -70,7 +70,7 @@ index f7acec81521f69789b0d9d64206f0e631e4419d0..e18830d929f9cf93f137ee068d4fd537
  }
  
  int enif_consume_timeslice(ErlNifEnv* env, int percent)
-@@ -4726,6 +4743,13 @@ Eterm erts_load_nif(Process *c_p, ErtsCodePtr I, Eterm filename, Eterm args)
+@@ -4753,6 +4770,13 @@ Eterm erts_load_nif(Process *c_p, ErtsCodePtr I, Eterm filename, Eterm args)
              is_static = 1;
          }
      }

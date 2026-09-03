@@ -1,8 +1,8 @@
-diff --git a/erts/emulator/beam/break.c b/erts/emulator/beam/break.c
-index cb62e55d1bb241eb50db5552967b5a25aa746186..68ee60186dc83f4d8ea5ce354520990106581554 100644
---- a/erts/emulator/beam/break.c
-+++ b/erts/emulator/beam/break.c
-@@ -795,6 +795,17 @@ crash_dump_limited_writer(void* vfdp, char* buf, size_t len)
+diff --git a/erts/emulator/beam/erl_crash_dump.c b/erts/emulator/beam/erl_crash_dump.c
+index 8b45bbd88430c1d621799e1cb8d8a6a804b85b03..d1e757c651595b8ce1a493c3e3b4324d5cceab33 100644
+--- a/erts/emulator/beam/erl_crash_dump.c
++++ b/erts/emulator/beam/erl_crash_dump.c
+@@ -391,6 +391,17 @@ static int write_layered(void *to_arg, char *buf, size_t len) {
  void
  erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
  {
@@ -17,14 +17,12 @@ index cb62e55d1bb241eb50db5552967b5a25aa746186..68ee60186dc83f4d8ea5ce3545209901
 +    erts_fprintf(stderr, "\n");
 +    return;
 +#else
+     const size_t WRITE_BUFFER_SIZE = 64 << 10;
+ 
      ErtsThrPrgrData tpd_buf; /* in case we aren't a managed thread... */
-     int fd;
-     size_t envsz;
-@@ -1047,6 +1058,7 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
-     }
+@@ -695,4 +706,5 @@ erl_crash_dump_v(char *file, int line, const char* fmt, va_list args)
+     outer->close(outer->to_arg);
  
      erts_fprintf(stderr,"done\n");
 +#endif
  }
- 
- void

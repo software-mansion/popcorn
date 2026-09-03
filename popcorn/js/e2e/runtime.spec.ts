@@ -11,13 +11,19 @@ test.describe("boot", () => {
         {ok, _} = application:ensure_all_started(logger),
         3 = element(1, 'Elixir.Code':eval_string(<<"1 + 2">>)),
         _ = 'Elixir.Logger':level(),
-        ok = wasm:send(#{runtime_ready => true}).
+        ok = wasm:send(#{
+          runtime_ready => true,
+          otp_release => list_to_binary(erlang:system_info(otp_release)),
+          elixir_version => 'Elixir.System':version()
+        }).
       `),
     );
     assert(boot.ok);
 
     expect(await otp.waitForEvent("runtime_ready")).toEqual({
       runtime_ready: true,
+      otp_release: "29",
+      elixir_version: "1.20.4",
     });
   });
 
