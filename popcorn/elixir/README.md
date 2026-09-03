@@ -27,8 +27,18 @@ Add the Elixir package to your Mix dependencies:
 
 ```elixir
 defp deps do
-  [{:popcorn, "~> 0.1"}]
+  [{:popcorn, "0.4.0-next.0"}]
 end
 ```
 
-Use `@swmansion/popcorn` for the JavaScript API and bundler plugins.
+Install the matching JavaScript package with `npm install @swmansion/popcorn@next`.
+The npm package includes both `core` and `crypto` runtime variants.
+The bundler plugin selects one from your application's dependencies.
+Use `runtimeVariant` to override the selection. Both variants use this Hex package.
+
+Compile your application with `mix deps.get` and `mix compile` before building its JavaScript assets.
+The bundler plugin invokes Mix to package your application and its standard-library dependencies.
+Use the toolchain in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/mise.toml) for this release.
+
+See the [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/js/README.md) for bundler configuration and production headers.
+See the [versioned API documentation](https://popcorn.hexdocs.pm/0.4.0-next.0/) for the Elixir API.

@@ -26,11 +26,6 @@ description = "Build OpenSSL for Wasm"
 run = "scripts/build-beam.sh"
 description = "Build OTP/BEAM for Wasm"
 
-[tasks.build-otp-js]
-depends = ["build-otp debug"]
-run = "pnpm -F ./popcorn/js build"
-description = "Build JS part of OTP/BEAM interop"
-
 [tasks.build-llv-js]
 run = "pnpm -F ./local-live-view build"
 description = "Build JS bundle for LocalLiveView"

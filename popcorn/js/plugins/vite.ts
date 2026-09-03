@@ -3,7 +3,12 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ResolvedConfig } from "vite";
-import { popcorn as prepare, type Options, type Prepared } from "./shared";
+import {
+  popcorn as prepare,
+  runtimeDirectory,
+  type Options,
+  type Prepared,
+} from "./shared";
 
 const CORS_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -31,6 +36,17 @@ type Res = ServerResponse<IncomingMessage>;
  * @see {@link Options} for production server requirements.
  */
 export function popcorn(options: Options): Plugin {
+  const resolveRuntime: Plugin["resolveId"] = async (source, importer) => {
+    if (
+      importer !== undefined &&
+      resolve(dirname(importer.split("?")[0]), source) ===
+        join(distDir, "beam.mjs")
+    ) {
+      const { runtimeVariant } = await ensurePrepared();
+      const runtimeDir = runtimeDirectory(runtimeVariant);
+      return join(runtimeDir, "beam.mjs");
+    }
+  };
   let prepared: Prepared | undefined;
   let repacking: Promise<Prepared> | undefined;
   let dirty = false;
@@ -137,12 +153,23 @@ export function popcorn(options: Options): Plugin {
 
   return {
     name: "popcorn-otp",
+    enforce: "pre",
+    resolveId: resolveRuntime,
 
     config() {
       return {
         // Exclude from prebundling so import.meta.url resolves correctly.
         optimizeDeps: { exclude: ["@swmansion/popcorn"] },
-        worker: { format: "es" },
+        worker: {
+          format: "es",
+          plugins: () => [
+            {
+              name: "popcorn-runtime",
+              enforce: "pre",
+              resolveId: resolveRuntime,
+            },
+          ],
+        },
         // COOP/COEP must be on every response (SharedArrayBuffer/pthreads),
         // including the worker/beam files Vite serves from the package itself.
         server: { headers: CORS_HEADERS },
@@ -173,13 +200,14 @@ export function popcorn(options: Options): Plugin {
 
     async closeBundle() {
       assert(outDir !== undefined, "outDir was not resolved");
-      const built = await prepare(options);
+      const built = await ensurePrepared();
       try {
         const targetDir = join(outDir, assetsDir, "otp");
         await mkdir(dirname(targetDir), { recursive: true });
         await cp(join(built.dir, "otp"), targetDir, { recursive: true });
       } finally {
         await rm(built.dir, { recursive: true, force: true });
+        prepared = undefined;
       }
     },
   };

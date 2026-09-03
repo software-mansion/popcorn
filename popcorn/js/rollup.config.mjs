@@ -1,5 +1,5 @@
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { cp, mkdir, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import typescript from "@rollup/plugin-typescript";
 
 function copyFiles(targets) {
@@ -25,21 +25,6 @@ function cleanDir(dir) {
   };
 }
 
-function cleanModules(dir) {
-  return {
-    name: "clean-modules",
-    async buildStart() {
-      await mkdir(dir, { recursive: true });
-      const entries = await readdir(dir, { withFileTypes: true });
-      await Promise.all(
-        entries
-          .filter((entry) => entry.isFile() && entry.name.endsWith(".mjs"))
-          .map((entry) => rm(join(dir, entry.name))),
-      );
-    },
-  };
-}
-
 export default [
   {
     input: "src/index.ts",
@@ -49,7 +34,7 @@ export default [
     },
     cache: false,
     plugins: [
-      cleanModules("dist"),
+      cleanDir("dist"),
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
     ],
   },
@@ -83,12 +68,15 @@ export default [
       id.startsWith("node:") || ["esbuild", "rollup", "vite"].includes(id),
     cache: false,
     plugins: [
-      cleanDir("dist/plugins"),
       typescript({
         tsconfig: "./plugins/tsconfig.json",
         outputToFilesystem: true,
       }),
       copyFiles([
+        {
+          src: "../out/runtimes",
+          dest: "dist/runtimes",
+        },
         {
           src: "plugins/beam_tools/mix.exs",
           dest: "dist/plugins/beam_tools/mix.exs",

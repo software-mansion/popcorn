@@ -35,7 +35,8 @@ defmodule Popcorn.BeamTools.Packager do
           entrypoint_app: String.t() | nil,
           extra_apps: [String.t()],
           out_dir: Path.t(),
-          manifest_path: Path.t(),
+          runtimes_dir: Path.t(),
+          runtime_variant: String.t() | nil,
           strip: boolean()
         }
 
@@ -85,15 +86,19 @@ defmodule Popcorn.BeamTools.Packager do
       entrypoint_app: entrypoint_app,
       extra_apps: extra_apps,
       out_dir: out_dir,
-      manifest_path: manifest_path,
+      runtimes_dir: runtimes_dir,
+      runtime_variant: runtime_variant,
       strip: strip
     } = args
 
-    with {:ok, manifest} <- read_manifest(manifest_path),
-         {:ok, toolchain} <- fetch_toolchain_info(manifest.version),
-         {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
+    toolchain = fetch_toolchain_info()
+
+    with {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
+         variant = runtime_variant || required_runtime(apps_info),
+         {:ok, manifest} <- read_manifest(Path.join([runtimes_dir, variant, "manifest.json"])),
+         :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
@@ -148,6 +153,7 @@ defmodule Popcorn.BeamTools.Packager do
 
       result = %{
         ok: true,
+        runtimeVariant: variant,
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
         bootPath: Path.expand(boot_path),
@@ -320,6 +326,11 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
+  defp required_runtime(apps_info) do
+    needs_crypto = Enum.any?(apps_info, fn {app, _info} -> @app_capabilities[app] == "crypto" end)
+    if needs_crypto, do: "crypto", else: "core"
+  end
+
   defp check_capabilities(apps_info, capabilities) do
     unsupported =
       apps_info
@@ -418,10 +429,18 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  defp fetch_toolchain_info(runtime_version) do
+  defp fetch_toolchain_info() do
+    %{
+      otp: host_otp_version(),
+      elixir: System.version(),
+      otp_root: Path.join(to_string(:code.root_dir()), "lib"),
+      elixir_root: :elixir |> :code.lib_dir() |> to_string() |> Path.dirname()
+    }
+  end
+
+  defp check_otp_version(host_version, runtime_version) do
     # host: computer this runs on
     # runtime: vm compiled to wasm
-    host_version = host_otp_version()
     host = otp_version(host_version)
     runtime = otp_version(runtime_version)
 
@@ -431,17 +450,7 @@ defmodule Popcorn.BeamTools.Packager do
     compatible = runtime_major - 2 <= host_major and version_lte?(host, runtime)
 
     if compatible do
-      otp_root = Path.join(to_string(:code.root_dir()), "lib")
-      elixir_root = :elixir |> :code.lib_dir() |> to_string() |> Path.dirname()
-
-      info = %{
-        otp: host_version,
-        elixir: System.version(),
-        otp_root: otp_root,
-        elixir_root: elixir_root
-      }
-
-      {:ok, info}
+      :ok
     else
       err(:unsupported_otp, {host_version, runtime_version})
     end

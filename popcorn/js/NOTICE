@@ -1,0 +1,12 @@
+Popcorn includes Erlang/OTP compiled to WebAssembly with Emscripten.
+
+Erlang/OTP
+Copyright Ericsson AB and other contributors.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/erlang/otp
+Popcorn's runtime includes modifications for WebAssembly and JavaScript interoperability.
+
+Emscripten
+Copyright the Emscripten authors.
+Available under the MIT license and the University of Illinois/NCSA Open Source License.
+Source: https://github.com/emscripten-core/emscripten
