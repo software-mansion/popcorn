@@ -9,7 +9,7 @@ inputs:
   otp-tag:
     description: OTP git tag to build for Wasm
     required: false
-    default: OTP-28.3.1
+    default: OTP-29.0.6
   host-otp-version:
     description: OTP release installed on the runner to bootstrap the build.
     required: true

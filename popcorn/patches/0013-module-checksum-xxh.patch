@@ -1,8 +1,8 @@
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index 68947940b681616b85497f30a6c42de37275f79e..6424077b835bf62cff12b671d8200d764a67890e 100644
+index ae77630dba5020c6fb2e7329e4050312e4867947..34504831d7dc05beeb1d7b8c3b2de8281476a4a7 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -907,6 +907,11 @@ endif
+@@ -948,6 +948,11 @@ endif
  $(OBJDIR)/%.o: beam/%.c
  	$(V_CC) $(subst $(space)-O2$(space), $(GEN_OPT_FLGS) , $(CFLAGS)) $(INCLUDES) -c $< -o $@
  
@@ -14,7 +14,7 @@ index 68947940b681616b85497f30a6c42de37275f79e..6424077b835bf62cff12b671d8200d76
  $(OBJDIR)/%.o: beam/emu/%.c
  	$(V_CC) $(subst $(space)-O2$(space), $(GEN_OPT_FLGS) , $(CFLAGS)) $(INCLUDES) -c $< -o $@
  
-@@ -1143,6 +1148,7 @@ RUN_OBJS += \
+@@ -1199,6 +1204,7 @@ RUN_OBJS += \
  	$(ESOCK_RUN_OBJS)		$(OBJDIR)/erl_flxctr.o \
  	$(OBJDIR)/erl_nfunc_sched.o \
  	$(OBJDIR)/erl_global_literals.o \
@@ -23,10 +23,10 @@ index 68947940b681616b85497f30a6c42de37275f79e..6424077b835bf62cff12b671d8200d76
  	$(OBJDIR)/beam_types.o \
  	$(OBJDIR)/erl_term_hashing.o \
 diff --git a/erts/emulator/beam/atom.names b/erts/emulator/beam/atom.names
-index d3296846b1f725eb869e089d7e1bdb2e3e48f5f5..36ee59451f3fb859aa78f580441822d3e3b59623 100644
+index 2f943195f1105e9bf451e4ab99896c68e33afa1b..6573d6fc4fbb9742acf84353b32f14c220c19056 100644
 --- a/erts/emulator/beam/atom.names
 +++ b/erts/emulator/beam/atom.names
-@@ -182,6 +182,7 @@ atom CHANGE='CHANGE'
+@@ -183,6 +183,7 @@ atom CHANGE='CHANGE'
  atom characters_to_binary_int
  atom characters_to_list_int
  atom check_gc
@@ -34,7 +34,7 @@ index d3296846b1f725eb869e089d7e1bdb2e3e48f5f5..36ee59451f3fb859aa78f580441822d3
  atom clear
  atom clock_service
  atom close
-@@ -786,6 +787,7 @@ atom write_concurrency
+@@ -792,6 +793,7 @@ atom write_concurrency
  atom x
  atom xor
  atom x86
@@ -43,10 +43,10 @@ index d3296846b1f725eb869e089d7e1bdb2e3e48f5f5..36ee59451f3fb859aa78f580441822d3
  atom yes
  atom yield
 diff --git a/erts/emulator/beam/beam_bif_load.c b/erts/emulator/beam/beam_bif_load.c
-index 4a8a1420dbb02642be5ab01a924e095f480308b6..adf0ace74ea7c66a9b1e516fe78c7ab7573946ea 100644
+index 440a7134040e1e765918d6a60c86a7dbd6dc98f0..d70ea0d32483a3a1a3f425c40c027821f8cab67e 100644
 --- a/erts/emulator/beam/beam_bif_load.c
 +++ b/erts/emulator/beam/beam_bif_load.c
-@@ -198,22 +198,21 @@ erts_internal_beamfile_chunk_2(BIF_ALIST_2)
+@@ -200,22 +200,21 @@ erts_internal_beamfile_chunk_2(BIF_ALIST_2)
      return res;
  }
  
@@ -74,7 +74,7 @@ index 4a8a1420dbb02642be5ab01a924e095f480308b6..adf0ace74ea7c66a9b1e516fe78c7ab7
                                          sizeof(beam.checksum),
                                          beam.checksum);
          beamfile_free(&beam);
-@@ -226,6 +225,28 @@ erts_internal_beamfile_module_md5_1(BIF_ALIST_1)
+@@ -228,6 +227,28 @@ erts_internal_beamfile_module_md5_1(BIF_ALIST_1)
      return res;
  }
  
@@ -104,13 +104,13 @@ index 4a8a1420dbb02642be5ab01a924e095f480308b6..adf0ace74ea7c66a9b1e516fe78c7ab7
  erts_internal_prepare_loading_2(BIF_ALIST_2)
  {
 diff --git a/erts/emulator/beam/beam_file.c b/erts/emulator/beam/beam_file.c
-index af807d97d06f206b1f84f3cb880bea561ca23ef2..4b683d72abb5d955e2d581dc7af1cebf61e65ee0 100644
+index 1938c5e6ab154aac9ea0da5974992c59a648aecd..ca7361cefe62446dca1ccfce50d90bf7b01c1d50 100644
 --- a/erts/emulator/beam/beam_file.c
 +++ b/erts/emulator/beam/beam_file.c
-@@ -24,6 +24,10 @@
- #include "config.h"
+@@ -25,6 +25,10 @@
  #endif
  
+ #include <stddef.h>
 +#define ERTS_ENABLE_XXH3
 +#define XXH_NAMESPACE ERTS_
 +#define XXH_STATIC_LINKING_ONLY
@@ -118,13 +118,15 @@ index af807d97d06f206b1f84f3cb880bea561ca23ef2..4b683d72abb5d955e2d581dc7af1cebf
  #include "beam_file.h"
  #include "beam_load.h"
  #include "erl_zlib.h"
-@@ -1262,23 +1266,38 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+@@ -1750,23 +1754,38 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
  
      /* Compute module checksum. Please keep all parsing above this section */
      {
--        MD5_CTX md5;
+-        erts_md5_state md5;
 -
--        MD5Init(&md5);
+-        erts_md5_init(&md5);
+-
+-        erts_md5_update(&md5,
 +        XXH3_state_t xxh3;
 +        XXH128_hash_t hash;
 +        XXH128_canonical_t canonical;
@@ -143,67 +145,80 @@ index af807d97d06f206b1f84f3cb880bea561ca23ef2..4b683d72abb5d955e2d581dc7af1cebf
 +            (void)result;
 +            ASSERT(result == XXH_OK);
 +        }
- 
--        MD5Update(&md5,
++
 +        XXH3_UPDATE(
                    (byte*)chunks[UTF8_ATOM_CHUNK].data,
                    chunks[UTF8_ATOM_CHUNK].size);
--        MD5Update(&md5,
+-        erts_md5_update(&md5,
 +        XXH3_UPDATE(
                    (byte*)chunks[CODE_CHUNK].data,
                    chunks[CODE_CHUNK].size);
--        MD5Update(&md5,
+-        erts_md5_update(&md5,
 +        XXH3_UPDATE(
                    (byte*)chunks[STR_CHUNK].data,
                    chunks[STR_CHUNK].size);
--        MD5Update(&md5,
+-        erts_md5_update(&md5,
 +        XXH3_UPDATE(
                    (byte*)chunks[IMP_CHUNK].data,
                    chunks[IMP_CHUNK].size);
--        MD5Update(&md5,
+-        erts_md5_update(&md5,
 +        XXH3_UPDATE(
                    (byte*)chunks[EXP_CHUNK].data,
                    chunks[EXP_CHUNK].size);
  
-@@ -1290,7 +1309,7 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+@@ -1778,7 +1797,7 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
              * checksum hash, as it's derived using a (broken and superseded)
              * endian-dependent hash function. */
              if (left >= 4) {
--                MD5Update(&md5, (byte*)start, 4);
-+                XXH3_UPDATE((byte*)start, 4);
+-                erts_md5_update(&md5, (byte*)start, 4);
++                XXH3_UPDATE( (byte*)start, 4);
  
                  start += 4;
                  left -= 4;
-@@ -1299,9 +1318,9 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+@@ -1787,9 +1806,9 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
                      static byte zero[4] = {0, 0, 0, 0};
  
                      /* Include: Function Arity Index NumFree */
--                    MD5Update(&md5, (byte*)start, 20);
-+                    XXH3_UPDATE((byte*)start, 20);
+-                    erts_md5_update(&md5, (byte*)start, 20);
++                    XXH3_UPDATE( (byte*)start, 20);
                      /* Set to zero: OldUniq */
--                    MD5Update(&md5, (byte*)zero, 4);
-+                    XXH3_UPDATE((byte*)zero, 4);
+-                    erts_md5_update(&md5, (byte*)zero, 4);
++                    XXH3_UPDATE( (byte*)zero, 4);
  
                      start += 24;
                      left -= 24;
-@@ -1315,18 +1334,22 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
+@@ -1803,30 +1822,34 @@ beamfile_read(const byte *data, size_t size, BeamFile *beam) {
          }
  
          if (chunks[LITERAL_CHUNK].size > 0) {
--            MD5Update(&md5,
+-            erts_md5_update(&md5,
 +            XXH3_UPDATE(
                        (byte*)chunks[LITERAL_CHUNK].data,
                        chunks[LITERAL_CHUNK].size);
          }
  
          if (chunks[META_CHUNK].size > 0) {
--            MD5Update(&md5,
+-            erts_md5_update(&md5,
 +            XXH3_UPDATE(
                        (byte*)chunks[META_CHUNK].data,
                        chunks[META_CHUNK].size);
          }
  
--        MD5Final(beam->checksum, &md5);
+         if (chunks[RECORD_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[RECORD_CHUNK].data,
+                       chunks[RECORD_CHUNK].size);
+         }
+ 
+         if (chunks[DEBUG_CHUNK].size > 0) {
+-            erts_md5_update(&md5,
++            XXH3_UPDATE(
+                       (byte*)chunks[DEBUG_CHUNK].data,
+                       chunks[DEBUG_CHUNK].size);
+         }
+ 
+-        erts_md5_finish(beam->checksum, &md5);
 +        hash = XXH3_128bits_digest(&xxh3);
 +        XXH128_canonicalFromHash(&canonical, hash);
 +        sys_memcpy(beam->checksum, canonical.digest, sizeof(canonical.digest));
@@ -213,7 +228,7 @@ index af807d97d06f206b1f84f3cb880bea561ca23ef2..4b683d72abb5d955e2d581dc7af1cebf
  
      return BEAMFILE_READ_SUCCESS;
 diff --git a/erts/emulator/beam/bif.tab b/erts/emulator/beam/bif.tab
-index 95fcb0589f114efac831c5776aebee2759499651..2d74913c0e8a416900473a1c169223d9fdc55d74 100644
+index a4b1aa58ed6661741e84ad6dd9902ac42ece57e1..f366be789067fc00a45134450988846fbb8bd92e 100644
 --- a/erts/emulator/beam/bif.tab
 +++ b/erts/emulator/beam/bif.tab
 @@ -768,6 +768,7 @@ bif erts_internal:get_creation/0
@@ -225,10 +240,10 @@ index 95fcb0589f114efac831c5776aebee2759499651..2d74913c0e8a416900473a1c169223d9
  bif erlang:alias/1
  bif erlang:unalias/1
 diff --git a/erts/emulator/beam/erl_bif_info.c b/erts/emulator/beam/erl_bif_info.c
-index 41b5391423ba9cfedee322192f0d5462cbdc90b3..241184c959fa4aecc2c8fa56bda6513ab6baa5ab 100644
+index 0b6eb12c462d8ff2a88c9a2accfb40b40eb51d3f..b3ed0d22a540c78d19f62884d36154439c26e80a 100644
 --- a/erts/emulator/beam/erl_bif_info.c
 +++ b/erts/emulator/beam/erl_bif_info.c
-@@ -5823,11 +5823,14 @@ compilation_info_for_module(Process* p, const BeamCodeHeader* code_hdr)
+@@ -5904,11 +5904,14 @@ compilation_info_for_module(Process* p, const BeamCodeHeader* code_hdr)
      return result;
  }
  
@@ -246,7 +261,7 @@ index 41b5391423ba9cfedee322192f0d5462cbdc90b3..241184c959fa4aecc2c8fa56bda6513a
  }
  
  static Eterm
-@@ -5837,8 +5840,10 @@ get_module_info(Process* p, ErtsCodeIndex code_ix,
+@@ -5918,8 +5921,10 @@ get_module_info(Process* p, ErtsCodeIndex code_ix,
  {
      if (what == am_module) {
          return module;
@@ -258,7 +273,7 @@ index 41b5391423ba9cfedee322192f0d5462cbdc90b3..241184c959fa4aecc2c8fa56bda6513a
      } else if (what == am_exports) {
          return exported_from_module(p, code_ix, module);
      } else if (what == am_functions) {
-@@ -5889,6 +5894,7 @@ module_info_0(Process* p, Eterm module)
+@@ -5970,6 +5975,7 @@ module_info_0(Process* p, Eterm module)
      hp += 3; \
      list = CONS(hp, tup, list)
  
@@ -267,7 +282,7 @@ index 41b5391423ba9cfedee322192f0d5462cbdc90b3..241184c959fa4aecc2c8fa56bda6513a
      BUILD_INFO(am_compile);
      BUILD_INFO(am_attributes);
 diff --git a/erts/emulator/beam/erl_fun.h b/erts/emulator/beam/erl_fun.h
-index 0f8fdeba319de236fabed4ccb62908dfa1c59718..b1228c859c0391d0b7a7f5b3f01cffef570f65f2 100644
+index c26c59ab11c9744838fcbd1ce80439f0acb83d05..6a101676536895d4d54199325e46ee4dbb4b8a08 100644
 --- a/erts/emulator/beam/erl_fun.h
 +++ b/erts/emulator/beam/erl_fun.h
 @@ -39,7 +39,7 @@ typedef struct erl_fun_entry {
@@ -280,10 +295,10 @@ index 0f8fdeba319de236fabed4ccb62908dfa1c59718..b1228c859c0391d0b7a7f5b3f01cffef
      int index;                      /* New style index. */
  
 diff --git a/erts/emulator/beam/external.c b/erts/emulator/beam/external.c
-index ea04f5afc597498961eeced5b394bc4650620575..1a10a05c8a7510dd473f0705792f4bbdad27d37c 100644
+index b45bd379bec7bad1a8eaaf4a009260332dac644c..484c15cb5de1b703cbc2e2d62482ecf22d946aaf 100644
 --- a/erts/emulator/beam/external.c
 +++ b/erts/emulator/beam/external.c
-@@ -3970,6 +3970,9 @@ enc_term_int(TTBEncodeContext* ctx, ErtsAtomCacheMap *acmp, Eterm obj, byte* ep,
+@@ -3977,6 +3977,9 @@ enc_term_int(TTBEncodeContext* ctx, ErtsAtomCacheMap *acmp, Eterm obj, byte* ep,
                      ep += 4;
                      *ep = fun_arity(funp);
                      ep += 1;
@@ -307,10 +322,10 @@ index b6af402fdf4c9a39207974448a0525e20631c115..0c6ababb85477ec24fdeba56b2423d20
  #endif
  
 diff --git a/erts/preloaded/src/erlang.erl b/erts/preloaded/src/erlang.erl
-index cfb724920adece4b1c9d1f2ffcb0a9f41d19651f..092978948bd0e8f79aec8dbf2384e2705bb3331b 100644
+index 8e38a056819e114b89dbd90d6734c163573b0fdb..8db34aabd928e3a7d7999c0782f609a160b375a4 100644
 --- a/erts/preloaded/src/erlang.erl
 +++ b/erts/preloaded/src/erlang.erl
-@@ -6889,7 +6889,7 @@ element(_N, _Tuple) ->
+@@ -6997,7 +6997,7 @@ element(_N, _Tuple) ->
      erlang:nif_error(undefined).
  
  %% Not documented
@@ -345,10 +360,10 @@ index fcf68868566fd8c83af7a6dbac97e33c067ddb23..ee4188e9db4059a0e8d71682178402a8
  
  no_aux_work_threads() ->
 diff --git a/lib/stdlib/src/beam_lib.erl b/lib/stdlib/src/beam_lib.erl
-index 884ece0b48bafb5e0cdcb6e432447cc6b4ec66b5..ca7aaa32ad1b057806ee3c1378137d3868adfe57 100644
+index 28a84ab1284541e649535650c03f0a7eaff7e1be..2e38f3b08df2d1106c40827966ec387f14f7253f 100644
 --- a/lib/stdlib/src/beam_lib.erl
 +++ b/lib/stdlib/src/beam_lib.erl
-@@ -171,6 +171,7 @@ providing one key for module `t` and another key for all other modules:
+@@ -174,6 +174,7 @@ providing one key for module `t` and another key for all other modules:
  	 significant_chunks/0,
  	 build_module/1,
  	 version/1,
@@ -356,7 +371,7 @@ index 884ece0b48bafb5e0cdcb6e432447cc6b4ec66b5..ca7aaa32ad1b057806ee3c1378137d38
  	 md5/1,
  	 format_error/1]).
  
-@@ -551,6 +552,33 @@ version(File) ->
+@@ -554,6 +555,33 @@ version(File) ->
  	    Error
      end.
  
@@ -390,7 +405,7 @@ index 884ece0b48bafb5e0cdcb6e432447cc6b4ec66b5..ca7aaa32ad1b057806ee3c1378137d38
  -doc """
  Calculates an MD5 redundancy check for the code of the module (compilation date
  and other attributes are not included).
-@@ -1287,6 +1315,9 @@ extract_literals(Chunk0) ->
+@@ -1290,6 +1318,9 @@ extract_literals(Chunk0) ->
  	     bin :: binary(),
  	     source :: binary() | string()}).
  
@@ -401,7 +416,7 @@ index 884ece0b48bafb5e0cdcb6e432447cc6b4ec66b5..ca7aaa32ad1b057806ee3c1378137d38
      Binary = maybe_uncompress(Binary0),
      #bb{bin = Binary, source = Binary};
 diff --git a/lib/stdlib/test/beam_lib_SUITE.erl b/lib/stdlib/test/beam_lib_SUITE.erl
-index 738e5cf3cd48ef2567313174e6c08bfe2e52f620..ed8ce913efbc3aa3e148ac1f93e5bf8d97244580 100644
+index 2425df74586ba6bd6fefea18cd8523cfdeb66fed..22a13b91249c9abdc62c5298ecc24d324a2bb8af 100644
 --- a/lib/stdlib/test/beam_lib_SUITE.erl
 +++ b/lib/stdlib/test/beam_lib_SUITE.erl
 @@ -37,7 +37,7 @@
@@ -422,7 +437,7 @@ index 738e5cf3cd48ef2567313174e6c08bfe2e52f620..ed8ce913efbc3aa3e148ac1f93e5bf8d
       missing_debug_info_backend, test_makedep_abstract_code,
       literals
      ].
-@@ -606,6 +606,15 @@ building(Conf) when is_list(Conf) ->
+@@ -622,6 +622,15 @@ building(Conf) when is_list(Conf) ->
      ok.
  
  %% Compare beam_lib:md5/1 and code:module_md5/1.

@@ -1,5 +1,5 @@
 diff --git a/erts/emulator/sys/unix/sys_drivers.c b/erts/emulator/sys/unix/sys_drivers.c
-index c06d6b66036a316dd6d5179dfcf8ee684ce161b6..658b15a3c87c303e3d2332ed3450bfdedc0eeb44 100644
+index bdd6528412393d3bb85b2d4ac64a27a226a1a1d3..1cb2c1283e28dae02a933ec62f474472dafa488c 100644
 --- a/erts/emulator/sys/unix/sys_drivers.c
 +++ b/erts/emulator/sys/unix/sys_drivers.c
 @@ -169,6 +169,7 @@ typedef struct driver_data {

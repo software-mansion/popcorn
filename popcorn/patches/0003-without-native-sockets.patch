@@ -1,8 +1,8 @@
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index a3c737bd9c9863566362cd70dd167d45a42806ae..e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287 100644
+index d89bb8aa69b2419fe8177fca209a1cedc516f3f9..d77f46fc7cf16dd1644ed1777137762870ca7880 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -1162,7 +1162,6 @@ NIF_OBJS = \
+@@ -1222,7 +1222,6 @@ NIF_OBJS = \
  ifeq ($(TARGET),win32)
  DRV_OBJS = \
  	$(OBJDIR)/registry_drv.o \
@@ -10,7 +10,7 @@ index a3c737bd9c9863566362cd70dd167d45a42806ae..e91c4c644b8a4a9c87f3e545054ed9cd
  	$(OBJDIR)/ram_file_drv.o
  OS_OBJS = \
  	$(OBJDIR)/dll_sys.o \
-@@ -1189,7 +1188,6 @@ OS_OBJS = \
+@@ -1249,7 +1248,6 @@ OS_OBJS = \
  	$(OBJDIR)/unix_socket_syncio.o
  
  DRV_OBJS = \
@@ -19,10 +19,10 @@ index a3c737bd9c9863566362cd70dd167d45a42806ae..e91c4c644b8a4a9c87f3e545054ed9cd
  endif
  
 diff --git a/erts/preloaded/src/prim_inet.erl b/erts/preloaded/src/prim_inet.erl
-index 78c415e7c5240c8582aec89046d254e135c8eab8..fb15d8f5cc6caad25c636b742afa0da0f7815ebc 100644
+index 5f7bf55979c42ad5bda8985a070b465cc264af88..63307394221749f2ed52ab1acf420f989a0a9769 100644
 --- a/erts/preloaded/src/prim_inet.erl
 +++ b/erts/preloaded/src/prim_inet.erl
-@@ -94,44 +94,8 @@ fdopen(Protocol, Family, Type, Fd, Bound)
+@@ -96,44 +96,8 @@ fdopen(Protocol, Family, Type, Fd, Bound)
      open(Protocol, Family, Type, [], ?INET_REQ_FDOPEN,
           [?int32(Fd), enc_value_2(bool, Bound)]).
  

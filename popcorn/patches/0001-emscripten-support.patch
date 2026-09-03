@@ -1,8 +1,8 @@
 diff --git a/erts/configure.ac b/erts/configure.ac
-index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..e5b8ff73657a3c1b9d2b95d2a65b4e4917f1f4bd 100644
+index c5113a5953128d331ebff40e66feb6b2ced9f7b6..202d963ae91066795eac72f88f1f36b7a825d59c 100644
 --- a/erts/configure.ac
 +++ b/erts/configure.ac
-@@ -522,8 +522,38 @@ dnl Special stuff regarding CFLAGS and details in the environment...
+@@ -539,8 +539,38 @@ dnl Special stuff regarding CFLAGS and details in the environment...
  dnl ---------------------------------------------------------------------
  
  dnl NOTE: CPPFLAGS will be included in CFLAGS at the end
@@ -42,7 +42,7 @@ index 9ed8c5e398624b4ee4e752c0e32b2e87d22ea02d..e5b8ff73657a3c1b9d2b95d2a65b4e49
      aix*|os400*)
          # * _ALL_SOURCE: Required to get the winsize structure for TIOCSWINSZ.
          # * _LINUX_SOURCE_COMPAT: Not required, but makes some libc functions
-@@ -535,6 +565,10 @@ case $host_os in
+@@ -552,6 +582,10 @@ case $host_os in
  	# -D_WIN32_WINNT=* from CPPFLAGS is saved in ETHR_DEFS.
  	CPPFLAGS="$CPPFLAGS -D_WIN32_WINNT=0x0600 -DWINVER=0x0600"
  	;;
@@ -83,7 +83,7 @@ index 72a9397bc1a5863dc88c1458e143ebbca708d891..14160385f06a8229d3b0611ab33e2ed5
    int err;
  
 diff --git a/lib/odbc/configure.ac b/lib/odbc/configure.ac
-index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3a503af02 100644
+index d8adc3810a535731b174a652ec45d723975dbf98..380de694dcd6ebabe78cff1862e022d5d1b5d6bc 100644
 --- a/lib/odbc/configure.ac
 +++ b/lib/odbc/configure.ac
 @@ -70,9 +70,7 @@ _search_path=
@@ -98,10 +98,10 @@ index 1f9e23e9976d9345a424002476acaeb8f767732b..bed8fa83f7f16c0d9beeb6c1fa0f8fc3
   [
    dnl "$with_odbc" != "no"
 diff --git a/make/autoconf/otp.m4 b/make/autoconf/otp.m4
-index 2ca07d8d0e79eb5f1c6cdf2b303757b697697b92..839240d5dee15d710bd2d9f527b87ad8bafa90e1 100644
+index f449c53196e81abf2d2941ae5b992fdc38371e44..6fd8e3b613b0baac1d288e166962e99d929f5a5f 100644
 --- a/make/autoconf/otp.m4
 +++ b/make/autoconf/otp.m4
-@@ -3083,6 +3083,8 @@ AC_DEFUN([LM_HARDWARE_ARCH], [
+@@ -3087,6 +3087,8 @@ AC_DEFUN([LM_HARDWARE_ARCH], [
      aarch*)	ARCH=arm;;
      tile)	ARCH=tile;;
      e2k)        ARCH=e2k;;

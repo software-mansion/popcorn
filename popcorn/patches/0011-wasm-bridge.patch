@@ -1,8 +1,8 @@
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287..68947940b681616b85497f30a6c42de37275f79e 100644
+index d77f46fc7cf16dd1644ed1777137762870ca7880..ae77630dba5020c6fb2e7329e4050312e4867947 100644
 --- a/erts/emulator/Makefile.in
 +++ b/erts/emulator/Makefile.in
-@@ -772,7 +772,8 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
+@@ -806,7 +806,8 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
  		$(ERL_TOP)/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam \
  		$(ERL_TOP)/erts/preloaded/ebin/atomics.beam \
  		$(ERL_TOP)/erts/preloaded/ebin/counters.beam \
@@ -12,7 +12,7 @@ index e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287..68947940b681616b85497f30a6c42de3
  
  ifeq ($(TARGET),win32)
  # On windows the preloaded objects are in a resource object.
-@@ -1156,6 +1157,7 @@ NIF_OBJS = \
+@@ -1216,6 +1217,7 @@ NIF_OBJS = \
  	$(OBJDIR)/erl_tracer_nif.o \
  	$(OBJDIR)/prim_buffer_nif.o \
  	$(OBJDIR)/prim_file_nif.o \
@@ -20,7 +20,7 @@ index e91c4c644b8a4a9c87f3e545054ed9cd6bf9d287..68947940b681616b85497f30a6c42de3
  	$(OBJDIR)/zlib_nif.o \
  	$(ESOCK_NIF_OBJS)
  
-@@ -1275,7 +1277,7 @@ EMU_LD=$(CC)
+@@ -1338,7 +1340,7 @@ EMU_LD=$(CC)
  endif
  $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
  	$(ld_verbose) $(EMU_LD) -o $@ \
@@ -133,7 +133,7 @@ index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc0
 +  },
 +});
 diff --git a/erts/emulator/nifs/common/prim_tty_nif.c b/erts/emulator/nifs/common/prim_tty_nif.c
-index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f76136108fa1c18 100644
+index 1538b23d107f1718c87e389d9bb42da913eca002..aeec8a3cc4f163ceeaca2bddb1ba642e7fd0b5e2 100644
 --- a/erts/emulator/nifs/common/prim_tty_nif.c
 +++ b/erts/emulator/nifs/common/prim_tty_nif.c
 @@ -38,6 +38,7 @@
@@ -144,7 +144,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  #include <string.h>
  #include <ctype.h>
  #include <wchar.h>
-@@ -66,6 +67,9 @@
+@@ -67,6 +68,9 @@
  #ifdef HAVE_POLL_H
  #include <poll.h>
  #endif
@@ -154,7 +154,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  
  #if defined IOV_MAX
  #define MAXIOV IOV_MAX
-@@ -109,6 +113,11 @@ typedef struct {
+@@ -110,6 +114,11 @@ typedef struct {
  #endif
      ErlNifPid self;
      ErlNifPid reader;
@@ -166,7 +166,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
      enum TTYState tty;       /* if the tty is initialized */
  #ifdef HAVE_TERMCAP
      struct termios tty_smode;
-@@ -116,6 +125,93 @@ typedef struct {
+@@ -117,6 +126,93 @@ typedef struct {
  #endif
  } TTYResource;
  
@@ -260,7 +260,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  // #define HARD_DEBUG
  #ifdef HARD_DEBUG
  static FILE *logFile = NULL;
-@@ -641,6 +737,30 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -642,6 +738,30 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
              return make_errno_error(env, errorFunction);
          }
      }
@@ -291,7 +291,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  #else
      enif_alloc_binary(n, &bin);
      res = read(tty->ifd, bin.data, bin.size);
-@@ -654,9 +774,12 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -655,9 +775,12 @@ static ERL_NIF_TERM tty_read_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
          enif_release_binary(&bin);
          return make_error(env, enif_make_atom(env, "closed"));
      }
@@ -304,7 +304,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
      if (res == bin.size) {
  	res_term = enif_make_binary(env, &bin);
      } else if (res < bin.size / 2) {
-@@ -949,6 +1072,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+@@ -1067,6 +1190,18 @@ static ERL_NIF_TERM tty_create_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
  
      enif_set_pid_undefined(&tty->self);
      enif_set_pid_undefined(&tty->reader);
@@ -323,7 +323,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  
      return enif_make_tuple2(env, atom_ok, tty_term);
  }
-@@ -976,6 +1111,13 @@ static ERL_NIF_TERM tty_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
+@@ -1094,6 +1229,13 @@ static ERL_NIF_TERM tty_init_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM ar
          return atom_ok;
      }
  
@@ -337,7 +337,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
  #if defined(HAVE_TERMCAP) || defined(__WIN32__)
  
      tty->tty = enif_is_identical(input, atom_raw) ? enabled : disabled;
-@@ -1056,7 +1198,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
+@@ -1174,7 +1316,12 @@ static ERL_NIF_TERM tty_window_size_nif(ErlNifEnv* env, int argc, const ERL_NIF_
      if (!enif_get_resource(env, argv[0], tty_rt, (void **)&tty))
          return enif_make_badarg(env);
      {
@@ -351,7 +351,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
          struct winsize ws;
          if (ioctl(tty->ifd,TIOCGWINSZ,&ws) == 0) {
              if (ws.ws_col > 0)
-@@ -1106,9 +1253,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
+@@ -1224,9 +1371,20 @@ static ERL_NIF_TERM tty_select_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM
      using_oldshell = 0;
  #endif
      debug("Select on %d\r\n", tty->ifd);
@@ -372,7 +372,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
      enif_monitor_process(env, tty, &tty->reader, NULL);
  
      return atom_ok;
-@@ -1122,7 +1280,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
+@@ -1240,7 +1398,14 @@ static void tty_monitor_down(ErlNifEnv* caller_env, void* obj, ErlNifPid* pid, E
      }
  #endif
      if (enif_compare_pids(pid, &tty->reader) == 0) {
@@ -387,7 +387,7 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
      }
  }
  
-@@ -1134,9 +1299,25 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
+@@ -1252,15 +1417,44 @@ static void tty_select_stop(ErlNifEnv* caller_env, void* obj, ErlNifEvent event,
  #endif
  }
  
@@ -407,44 +407,45 @@ index 6615c41065d22e8d9275efcd043b85594f36e4b0..96dab652d0d3329ff1d8291e8f761361
 +#endif
 +}
 +
- static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
+ static void init(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
      ErlNifResourceTypeInit rt = {
 -        NULL /* dtor */,
 +        tty_dtor,
          tty_select_stop,
          tty_monitor_down};
  
-@@ -1150,13 +1331,29 @@ static void load_resources(ErlNifEnv* env, ErlNifResourceFlags rt_flags) {
- static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
- {
-     *priv_data = NULL;
-+#ifdef __EMSCRIPTEN__
-+    const char *columns;
-+    const char *rows;
-+
-+    memset(&popcorn_stdin, 0, sizeof(popcorn_stdin));
-+    popcorn_stdin.lock = enif_mutex_create("popcorn_stdin");
-+    ASSERT(popcorn_stdin.lock != NULL);
-+    columns = getenv("COLUMNS");
-+    rows = getenv("LINES");
-+    ASSERT(columns != NULL && rows != NULL);
-+    popcorn_stdin.columns = atoi(columns);
-+    popcorn_stdin.rows = atoi(rows);
-+#endif
-     load_resources(env, ERL_NIF_RT_CREATE);
-     return 0;
- }
+     tty_rt = enif_open_resource_type_x(env, "tty", &rt, rt_flags, NULL);
  
+     if (library_refc == 0) {
++#ifdef __EMSCRIPTEN__
++        const char *columns;
++        const char *rows;
++
++        memset(&popcorn_stdin, 0, sizeof(popcorn_stdin));
++        popcorn_stdin.lock = enif_mutex_create("popcorn_stdin");
++        ASSERT(popcorn_stdin.lock != NULL);
++        columns = getenv("COLUMNS");
++        rows = getenv("LINES");
++        ASSERT(columns != NULL && rows != NULL);
++        popcorn_stdin.columns = atoi(columns);
++        popcorn_stdin.rows = atoi(rows);
++#endif
+ #ifdef HAVE_TERMCAP
+         tputs_mutex = enif_mutex_create("tputs_muex");
+ #endif
+@@ -1281,6 +1475,12 @@ static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
  static void unload(ErlNifEnv* env, void* priv_data)
  {
--
+     --library_refc;
 +#ifdef __EMSCRIPTEN__
-+    enif_mutex_destroy(popcorn_stdin.lock);
-+    popcorn_stdin.lock = NULL;
++    if (library_refc == 0) {
++        enif_mutex_destroy(popcorn_stdin.lock);
++        popcorn_stdin.lock = NULL;
++    }
 +#endif
- }
- 
- static int upgrade(ErlNifEnv* env, void** priv_data, void** old_priv_data,
+ #ifdef HAVE_TERMCAP
+     if (library_refc == 0) {
+         enif_mutex_destroy(tputs_mutex);
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
 index 0000000000000000000000000000000000000000..086797fa6f81d81cdebb74f86bb58b85e90f4111
@@ -1103,7 +1104,7 @@ index 0000000000000000000000000000000000000000..086797fa6f81d81cdebb74f86bb58b85
 +}
 +#endif
 diff --git a/erts/preloaded/src/Makefile b/erts/preloaded/src/Makefile
-index e76af6ce766adb16ce964733c7eba6f3554b8f6e..be1005e2490384368dde68305207c50a477e86c3 100644
+index abd5122bf24ac9c7b61e6c0838c1564bf064c623..855142f26e63778658d2cca672d3d2978e1adab8 100644
 --- a/erts/preloaded/src/Makefile
 +++ b/erts/preloaded/src/Makefile
 @@ -58,7 +58,8 @@ PRE_LOADED_ERL_MODULES = \
