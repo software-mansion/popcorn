@@ -45,7 +45,9 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
     otpAssetsRoot?: string;
   };
   tty?: {
+    /** Initial terminal size. Defaults to 80 columns and 24 rows. */
     size?: TtySize;
+    /** Output callback format. Defaults to `text` with streamed UTF-8 decoding. Use `bytes` for raw chunks. */
     output?: Output;
   };
   timeoutsMs?: {
@@ -68,15 +70,18 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
      */
     send?: number;
   };
+
   /**
    * Receives stdout.
    *
+   * Defaults to `console.log`.
    * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
    */
   onStdout?: (chunk: OutputChunk<Output>) => void;
   /**
    * Receives stderr.
    *
+   * Defaults to `console.error`.
    * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
    */
   onStderr?: (chunk: OutputChunk<Output>) => void;
@@ -424,6 +429,14 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     });
   }
 
+  /**
+   * Queues terminal input.
+   *
+   * Encodes strings as UTF-8 and copies byte arrays. Does not append a newline.
+   *
+   * Returns `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
+   * An overflow leaves the queue unchanged.
+   */
   public writeStdin(chunk: string | Uint8Array): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
@@ -449,6 +462,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return { ok: true, data: null };
   }
 
+  /**
+   * Sends new terminal dimensions to a booted VM.
+   *
+   * Each dimension must be between 1 and 65,535.
+   */
   public resizeTty(columns: number, rows: number): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };

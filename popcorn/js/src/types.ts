@@ -74,6 +74,7 @@ export type OtpErrorPayload =
   | { kind: "error"; data: string }
   | { kind: "exit"; data: number };
 
+/** Terminal dimensions in character cells, from 1 to 65,535 per dimension. */
 export type TtySize = {
   columns: number;
   rows: number;
