@@ -15,8 +15,16 @@ export type BeamSendPayload = {
 
 export type BeamBootOptions = {
   otpAssetsRoot: string;
+  /**
+   * Emulator flags before `--`.
+   *
+   * Overrides the default scheduler flags.
+   * Use `schedulers()` to set thread counts.
+   */
   emulatorArgs?: string[];
+  /** Erlang arguments after the boot arguments, such as `-eval` expressions. */
   extraArgs?: string[];
+  /** VM environment variables. */
   env?: Record<string, string>;
   ttySize: TtySize;
   createModule: CreateModuleFn<EmscriptenModule>;
@@ -39,6 +47,11 @@ export type RunJsRequest = {
   return: "value" | "ref";
 };
 
+/**
+ * VM shutdown notification.
+ *
+ * An `exit` carries a status code, including zero for a normal exit.
+ */
 export type OtpErrorPayload =
   | { kind: "abort"; data: string }
   | { kind: "error"; data: string }
