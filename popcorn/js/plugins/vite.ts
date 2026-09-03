@@ -15,6 +15,21 @@ const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 type Res = ServerResponse<IncomingMessage>;
 
+/**
+ * Serves application assets during developmens.
+ *
+ * @example
+ * ```ts
+ * import { defineConfig } from "vite";
+ * import { popcorn } from "@swmansion/popcorn/vite";
+ *
+ * export default defineConfig({
+ *   plugins: [popcorn({ rootDir: "../my_app", app: "my_app" })],
+ * });
+ * ```
+ *
+ * @see {@link Options} for production server requirements.
+ */
 export function popcorn(options: Options): Plugin {
   let prepared: Prepared | undefined;
   let repacking: Promise<Prepared> | undefined;
@@ -65,10 +80,9 @@ export function popcorn(options: Options): Plugin {
     const requestPath = decodeURIComponent(
       new URL(url, "http://localhost").pathname,
     );
-    const requestRoot = [
-      `/${assetsDir}/otp/`,
-      `/@fs${distDir}/otp/`,
-    ].find((root) => requestPath.startsWith(root));
+    const requestRoot = [`/${assetsDir}/otp/`, `/@fs${distDir}/otp/`].find(
+      (root) => requestPath.startsWith(root),
+    );
     if (requestRoot === undefined) {
       next();
       return;

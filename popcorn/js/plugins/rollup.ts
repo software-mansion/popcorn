@@ -3,6 +3,14 @@ import { dirname, resolve } from "node:path";
 import type { Plugin } from "rollup";
 import { copyRuntime, popcorn as prepare, type Options } from "./shared";
 
+/**
+ * Copies the worker, VM runtime, and `otp/` assets into the output directory after Rollup writes the bundle.
+ *
+ * Requires `output.format: "es"` and either `output.dir` or `output.file`.
+ * If the application bundle is elsewhere, set `PopcornOpts.workerUrl` to the copied `worker.mjs`.
+ *
+ * @see {@link Options} for application packaging and server requirements.
+ */
 export function popcorn(options: Options): Plugin {
   let outputDir: string | undefined;
 
@@ -19,7 +27,10 @@ export function popcorn(options: Options): Plugin {
       if (dir === undefined && outputOptions.file !== undefined) {
         dir = dirname(outputOptions.file);
       }
-      assert(dir !== undefined, "output dir is not specified, cannot copy files");
+      assert(
+        dir !== undefined,
+        "output dir is not specified, cannot copy files",
+      );
 
       outputDir = resolve(dir);
     },
