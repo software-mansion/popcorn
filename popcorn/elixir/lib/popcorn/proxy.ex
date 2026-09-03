@@ -3,43 +3,69 @@ defmodule Popcorn.Proxy do
   @default_timeout_ms 5_000
 
   @moduledoc """
-  Dispatches calls and casts to GenServers running in the VM.
+  Connects JavaScript calls and casts to GenServers in the VM.
 
-  JS can't build a `GenServer.call/3` itself and needs a proxy to send requests.
-  Proxies are multiplexing requests to the GenServers, tracking responses and timeouts.
+  To receive them, add `Popcorn.Proxy` to your supervision tree.
 
-  By default, it is registered as `#{inspect(@default_name)}`. You can use multiple proxies in your application.
+  Notes:
+  - One proxy handles concurrent requests to multiple GenServers.
+  - Targets can be registered names or PID handles from the same VM.
+
+  See `Popcorn.Wasm` for value conversions.
 
   ## Example
-  <!-- TODO: check if correct -->
-  ```elixir
-  # app/supervisor.ex
-  children = [
-    MyApp.Counter,
-    Popcorn.Proxy
-  ]
-  ```
+
+  Define a GenServer that accepts JavaScript requests:
 
   ```elixir
-  # gen_server.ex
   defmodule MyApp.Counter do
-    def handle_call(["add", n], _from, state) do
-      {:reply, state + n, state + n}
+    use GenServer
+
+    def start_link(_opts), do: GenServer.start_link(__MODULE__, 0, name: :counter)
+
+    @impl true
+    def init(count), do: {:ok, count}
+
+    @impl true
+    def handle_call(["add", n], _from, count) do
+      {:reply, count + n, count + n}
     end
 
-    def handle_cast("reset", state) do
-      {:noreply, 0}
-    end
+    @impl true
+    def handle_cast("reset", _count), do: {:noreply, 0}
   end
   ```
 
-  Then, from JavaScript:
+  Add both processes to your application supervisor:
+
+  ```elixir
+  children = [MyApp.Counter, Popcorn.Proxy]
+  Supervisor.start_link(children, strategy: :one_for_one)
+  ```
+
+  After the VM boots, call the counter from JavaScript:
+
   ```js
-  // `call()` settles when the response from the GenServer is received.
-  const [status, value] = await popcorn.genserver.call("counter", ["add", n: 1]);
-  // `cast()` settles when the message is sent to the proxy.
+  const result = await popcorn.genserver.call("counter", ["add", 1]);
+  if (!result.ok) throw result.error;
+  console.log(result.data); // 1
+
   await popcorn.genserver.cast("counter", "reset");
   ```
+
+  ## Calls and casts
+
+  Calls wait for a reply, including deferred replies from `GenServer.reply/2`.
+  Calls report missing processes, server exits, replies that cannot be serialized, and timeouts.
+  The `timeoutMs` JavaScript option defaults to `#{@default_timeout_ms}`. A timeout does not cancel the GenServer's work.
+
+  Casts are fire-and-forget.
+
+  ## Custom proxy names
+
+  Use `{Popcorn.Proxy, name: :ui_proxy}` in the supervision tree.
+  Select it in JavaScript with the option `{proxy: "ui_proxy"}`.
+  For multiple proxies under one supervisor, assign distinct child IDs with `Supervisor.child_spec/2`.
   """
 
   use GenServer
@@ -47,11 +73,11 @@ defmodule Popcorn.Proxy do
   alias Popcorn.Wasm
 
   @doc """
-  Starts the proxy.
+  Starts a proxy linked to the current process.
 
   ## Options
 
-  - `:name` - the registered name JS addresses in `proxy` option. Defaults to `#{inspect(@default_name)}`.
+  - `:name` - the registered name. Defaults to `#{inspect(@default_name)}`. JavaScript selects this name with its `proxy` option.
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
