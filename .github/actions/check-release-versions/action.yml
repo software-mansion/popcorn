@@ -31,12 +31,15 @@ runs:
         import json, os, re
         from pathlib import Path
 
-        tag = os.environ["TAG"].removeprefix(os.environ["PREFIX"])
+        raw_tag = os.environ["TAG"]
+        prefix = os.environ["PREFIX"]
+        if not raw_tag.startswith(prefix):
+            raise SystemExit(f"tag must start with {prefix}: {raw_tag}")
+        tag = raw_tag.removeprefix(prefix)
         js = json.loads(Path(os.environ["PACKAGE_JSON"]).read_text())["version"]
         ex = re.search(r'@version\s+"([^"]+)"', Path(os.environ["MIX_EXS"]).read_text()).group(1)
 
         versions = {"tag": tag, "js": js, "elixir": ex}
-        core = {k: re.split(r"[-+]", v, 1)[0] for k, v in versions.items()}
         print(versions)
-        if len(set(core.values())) != 1:
-            raise SystemExit(f"version mismatch (ignoring pre-release): {versions}")
+        if len(set(versions.values())) != 1:
+            raise SystemExit(f"version mismatch: {versions}")
