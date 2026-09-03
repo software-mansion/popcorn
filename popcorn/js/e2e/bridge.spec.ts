@@ -26,6 +26,16 @@ const PAYLOAD = {
 };
 
 test.describe("ETF", () => {
+  test("nil", () => {
+    assert.equal(hex(null), hex(atom("nil")));
+    assert.equal(hex(undefined), hex(null));
+    assert.equal(
+      hex({ value: undefined, nested: [undefined, tuple(undefined, null)] }),
+      hex({ value: null, nested: [null, tuple(null, null)] }),
+    );
+    assert.equal(hex(new Array(1)), hex([null]));
+  });
+
   test("atoms and tuples", () => {
     const tupleJs = tuple as (...entries: unknown[]) => unknown;
 
@@ -57,7 +67,6 @@ test.describe("ETF", () => {
     const fn = () => null;
     const symbol = Symbol("value");
     const date = new Date();
-    const sparse = new Array(1);
 
     for (const [value, part, reason] of [
       [OVERFLOWED, OVERFLOWED, "lossy-int"],
@@ -65,13 +74,10 @@ test.describe("ETF", () => {
       [-Infinity, -Infinity, "non-finite-float"],
       [NaN, NaN, "non-finite-float"],
       [cyclic, cyclic, "cyclic-object"],
-      [undefined, undefined, "unsupported"],
       [fn, fn, "unsupported"],
       [symbol, symbol, "unsupported"],
       [date, date, "non-plain-object"],
-      [{ value: undefined }, undefined, "unsupported"],
       [[fn], fn, "unsupported"],
-      [sparse, undefined, "unsupported"],
     ] as const) {
       const result = encode(value);
       assert(!result.ok);

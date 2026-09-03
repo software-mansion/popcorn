@@ -100,7 +100,7 @@ class Encoder {
   }
 
   private value(value: unknown): void {
-    if (value === null) {
+    if (value === null || value === undefined) {
       this.atom("nil");
       return;
     }
