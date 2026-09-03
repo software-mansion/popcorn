@@ -1,8 +1,25 @@
 type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
 
+/**
+ * A message value. JavaScript sends use these BEAM conversions:
+ *
+ * - Strings become UTF-8 binaries. Booleans become `true` and `false` atoms.
+ * - Integers become integers. Other finite numbers become floats.
+ * - Arrays become lists.
+ * - Plain objects become maps with binary string keys.
+ * - `null` and `undefined` become the `nil` atom.
+ * - `atom()` and `tuple()` create atoms and tuples. PIDs retain their BEAM identity.
+ *
+ * Cycles, class instances, functions, symbols, bigints, unsafe integers, and non-finite numbers cause `bridge:unserializable`.
+ */
 export type AnyValue = unknown;
 
 declare const pidBrand: unique symbol;
+/**
+ * An opaque BEAM process identifier received from the VM.
+ *
+ * Valid only with the Popcorn instance and boot that produced it.
+ */
 export type Pid = { readonly [pidBrand]: true };
 
 /** Internal wire target. The public `send` accepts `string | Pid` instead. */

@@ -1,5 +1,5 @@
 import { PopcornError, err, type Result } from "./errors";
-import { RawTerm, type Mapper } from "./etf";
+import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
   readWorkerEvent,
   serializeSendPayload,
@@ -147,27 +147,15 @@ type ProxyReply =
     };
 export type GenServer = {
   /**
-   * Sends a `call` to the `target` GenServer (through the `proxy`), waiting for a response.
+   * Calls a GenServer by registered name or {@link Pid} and waits for its reply.
    *
-   * ## Parameters
+   * Requires a running `Popcorn.Proxy`, registered as `popcorn_proxy` by default.
    *
-   * - `target` — the GenServer to call, either a registered name or a `Pid`.
-   * - `request` — the request payload.
-   * - `opts` — call options.
+   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy.
+   * @returns A {@link Result} with the reply or a bridge, VM, timeout, or GenServer error.
    *
-   * ### Options
-   *
-   * - `timeoutMs` — the maximum time to wait for a response, in milliseconds.
-   * - `proxy` — the name of the `Popcorn.Proxy` process to use for the call.
-   *
-   * ## Returns
-   *
-   * A `Promise` that resolves with the server's reply, or rejects with an error.
-   *
-   * ## Errors
-   *
-   * TODO: gather errors
-   *
+   * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
+   * A call timeout does not cancel server work.
    */
   call(
     target: string | Pid,
@@ -176,26 +164,11 @@ export type GenServer = {
   ): Promise<Result<AnyValue>>;
 
   /**
-   * Sends a `cast` to the `target` GenServer (through the `proxy`), in fire-and-forget manner.
+   * Sends a cast through the proxy.
    *
-   * ## Parameters
-   *
-   * - `target` — the GenServer to cast to, either a registered name or a `Pid`.
-   * - `request` — the request payload.
-   * - `opts` — cast options.
-   *
-   * ### Options
-   *
-   * - `proxy` — the registered name or `Pid` of the `Popcorn.Proxy` process to use for the cast.
-   *
-   * ## Returns
-   *
-   * A `Promise` that resolves once the message is delivered to the proxy.
-   *
-   * ## Errors
-   *
-   * TODO: gather errors
-   *
+   * Success confirms delivery to the proxy
+   * @see {@link call}
+   * @param opts - `proxy` allows to select another registered proxy.
    */
   cast(
     target: string | Pid,
@@ -491,7 +464,25 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Resolves after VM sent message to registered process.
+   * Sends a payload to a registered process name or a {@link Pid} from this VM boot.
+   *
+   * The process receives `{wasm, Payload}`.
+   * A send timeout does not cancel delivery.
+   * Uses the value conversions in {@link AnyValue}. An omitted, `null`, or `undefined` payload becomes an empty map.
+   *
+   * @returns Ok tuple or `bridge:not-started` before boot and `vm:exited` after shutdown.
+   *
+   * @example
+   * Send an Erlang `{ok, <<"value">>}` tuple to a registered `receiver` process.
+   *
+   * ```ts
+   * const result = await popcorn.send("receiver", tuple(atom("ok"), "value"));
+   * if (!result.ok) throw result.error;
+   * ```
+   *
+   * @see {@link AnyValue}
+   * @see {@link atom}
+   * @see {@link tuple}
    */
   public async send(
     rawTarget: string | Pid,
@@ -560,9 +551,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Receives BEAM messages delivered while this handler is registered.
-   * Messages with no handlers are dropped. A handler registered before boot
-   * can run before the boot promise resolves.
+   * Registers a handler for BEAM message payloads.
+   *
+   * Messages with no handlers are lost. Startup messages can arrive before {@link boot} resolves.
+   * VM errors and terminal output use the callbacks in {@link PopcornOpts}.
+   *
+   * @returns a function that removes the handler.
    */
   public onEvent(handler: (event: PopcornEvent) => void): () => void {
     this.eventHandlers.add(handler);
