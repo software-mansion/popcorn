@@ -465,6 +465,10 @@ build_beam() {
 copy_artifacts() {
     local beam_dir="$1"
     local outdir="$2"
+    local variant=core
+    if [[ "$3" == "true" ]]; then
+        variant=crypto
+    fi
 
     mkdir -p "${outdir}" "${outdir}/bin"
 
@@ -487,6 +491,12 @@ copy_artifacts() {
             cp "${wasm_bin_dir}/beam.${ext}" "${outdir}/"
         fi
     done
+
+    local runtime_dir="${outdir}/runtimes/${variant}"
+    mkdir -p "${runtime_dir}"
+    cp "${outdir}/beam.wasm" "${outdir}/manifest.json" "${runtime_dir}/"
+    sed 's/"beam.emu"/"beam.emu.mjs"/g' "${outdir}/beam.smp" > "${runtime_dir}/beam.mjs"
+    sed 's/"beam.emu"/"beam.emu.mjs"/g' "${outdir}/beam.emu" > "${runtime_dir}/beam.emu.mjs"
 
     for boot in start.boot start_clean.boot no_dot_erlang.boot vm.boot; do
         rm -f "${outdir}/bin/${boot}"
@@ -608,7 +618,7 @@ main() {
         --outdir "${final_outdir}" \
         --with-crypto "${with_crypto}"
 
-    copy_artifacts "${beam_dir}" "${final_outdir}"
+    copy_artifacts "${beam_dir}" "${final_outdir}" "${with_crypto}"
 
     success "Build completed successfully!"
 }

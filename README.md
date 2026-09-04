@@ -16,6 +16,13 @@ Popcorn is early stages and may break. Please report an issue if it does. Contri
 
 Under the hood, Popcorn runs [AtomVM](https://github.com/atomvm/AtomVM), a tiny Erlang VM.
 
+### OTP prerelease
+
+The upcoming `0.4.0-next.0` release uses OTP/BEAM instead of AtomVM.
+It ships both `core` and `crypto` runtime variants, selected with the bundler plugin's `runtimeVariant` option.
+See the [OTP setup guide](popcorn/js/README.md) for installation and configuration.
+The stable npm channel remains on AtomVM.
+
 ## Documentation
 
 The API documentation and guides are available at <https://hexdocs.pm/popcorn>

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Version to simulate, e.g. v0.3.0-rc1"
+        description: "Release tag, e.g. v0.4.0-next.0"
         required: true
       dry_run:
         description: "Skip actual publish"
@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   release:
+    if: ${{ !contains(inputs.tag || github.ref_name, '-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -60,3 +61,103 @@ jobs:
         run: |
           npm publish "$(ls swmansion-popcorn-*.tgz)" $PROVENANCE_FLAG --access public --tag latest $DRY_RUN_FLAG
         working-directory: ./popcorn-2/js/output
+
+  otp-runtime:
+    if: ${{ contains(inputs.tag || github.ref_name, '-next.') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: core
+            crypto: "false"
+          - variant: crypto
+            crypto: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
+      - uses: ./.github/actions/check-release-versions
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          prefix: v
+          package-json: popcorn/js/package.json
+          mix-exs: popcorn/elixir/mix.exs
+      - id: toolchain
+        uses: ./.github/actions/read-otp-toolchain
+      - uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: ${{ steps.toolchain.outputs.otp }}
+          otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
+          build-mode: release
+          with-crypto: ${{ matrix.crypto }}
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93
+        with:
+          otp-version: ${{ steps.toolchain.outputs.otp }}
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-playwright
+        with:
+          version: "1.61.1"
+      - run: pnpm -F ./popcorn/js e2e
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.variant }}
+          path: popcorn/out/runtimes/${{ matrix.variant }}
+          if-no-files-found: error
+
+  otp-release:
+    needs: otp-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
+      - uses: ./.github/actions/check-release-versions
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          prefix: v
+          package-json: popcorn/js/package.json
+          mix-exs: popcorn/elixir/mix.exs
+      - id: toolchain
+        uses: ./.github/actions/read-otp-toolchain
+      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93
+        with:
+          otp-version: ${{ steps.toolchain.outputs.otp }}
+          elixir-version: ${{ steps.toolchain.outputs.elixir }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          registry-url: "https://registry.npmjs.org"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-core
+          path: popcorn/out/runtimes/core
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-crypto
+          path: popcorn/out/runtimes/crypto
+      - name: Build package
+        working-directory: popcorn/js
+        run: |
+          pnpm build
+          pnpm lint
+          pnpm pack --pack-destination output
+      - name: Publish OTP to next
+        working-directory: popcorn/js/output
+        env:
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          flags=(--provenance)
+          if [[ "$DRY_RUN" == "true" ]]; then flags=(--dry-run); fi
+          npm publish ./swmansion-popcorn-*.tgz --access public --tag next "${flags[@]}"

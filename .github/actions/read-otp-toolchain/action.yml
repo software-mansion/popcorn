@@ -1,0 +1,26 @@
+name: Read OTP toolchain
+description: Read release tool versions from the OTP package configuration
+outputs:
+  otp:
+    value: ${{ steps.versions.outputs.otp }}
+    description: Host OTP version
+  elixir:
+    value: ${{ steps.versions.outputs.elixir }}
+    description: Host Elixir version
+  otp-tag:
+    value: ${{ steps.versions.outputs.otp-tag }}
+    description: Wasm OTP source tag
+runs:
+  using: composite
+  steps:
+    - id: versions
+      shell: python
+      run: |
+        import os, tomllib
+        from pathlib import Path
+
+        tools = tomllib.loads(Path("popcorn/mise.toml").read_text())["tools"]
+        otp = tools["erlang"]
+        elixir = tools["elixir"].split("-otp-", 1)[0]
+        with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+            print(f"otp={otp}\nelixir={elixir}\notp-tag=OTP-{otp}", file=output)

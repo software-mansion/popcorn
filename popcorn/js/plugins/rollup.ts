@@ -43,7 +43,7 @@ export function popcorn(options: Options): Plugin {
       try {
         await mkdir(outDir, { recursive: true });
         await Promise.all([
-          copyRuntime(outDir),
+          copyRuntime(outDir, prepared.runtimeVariant),
           cp(resolve(prepared.dir, "otp"), resolve(outDir, "otp"), {
             recursive: true,
           }),

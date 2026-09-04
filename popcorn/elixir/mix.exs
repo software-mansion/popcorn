@@ -1,7 +1,7 @@
 defmodule Popcorn.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.4.0-next.0"
   @github "https://github.com/software-mansion/popcorn"
 
   def project do
@@ -32,7 +32,7 @@ defmodule Popcorn.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      files: ["lib", "mix.exs", "README.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE"],
       links: %{
         "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"
@@ -45,6 +45,7 @@ defmodule Popcorn.MixProject do
       main: "readme",
       extras: ["README.md"],
       formatters: ["html"],
+      source_url_pattern: "#{@github}/blob/v#{@version}/popcorn/elixir/%{path}#L%{line}",
       source_ref: "v#{@version}"
     ]
     |> ExDocJs.configure(

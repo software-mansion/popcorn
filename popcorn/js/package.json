@@ -1,11 +1,21 @@
 {
   "name": "@swmansion/popcorn",
-  "version": "0.1.0",
+  "version": "0.4.0-next.0",
   "description": "JS bindings for BEAM/OTP in WebAssembly",
   "type": "module",
   "license": "Apache-2.0",
+  "homepage": "https://popcorn.swmansion.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/software-mansion/popcorn.git",
+    "directory": "popcorn/js"
+  },
+  "bugs": {
+    "url": "https://github.com/software-mansion/popcorn/issues"
+  },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
@@ -30,8 +40,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "setup": "./scripts/setup-assets.sh",
-    "build": "pnpm run setup && rollup -c && ./scripts/setup-assets.sh dist",
+    "build": "rollup -c",
     "lint": "tsc --noEmit && tsc -p plugins/tsconfig.json --noEmit",
     "lint:e2e": "tsc -p e2e/tsconfig.json",
     "e2e": "env -u FORCE_COLOR -u NO_COLOR playwright test --config e2e/playwright.config.ts"

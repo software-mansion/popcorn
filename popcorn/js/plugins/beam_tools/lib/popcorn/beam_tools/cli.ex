@@ -6,11 +6,12 @@ defmodule Popcorn.BeamTools.CLI do
     entrypoint_app: :string,
     extra_app: [:string, :keep],
     out_dir: :string,
-    manifest_path: :string,
+    runtimes_dir: :string,
+    runtime_variant: :string,
     strip: :boolean
   ]
 
-  @required_options [:root_dir, :out_dir, :manifest_path]
+  @required_options [:root_dir, :out_dir, :runtimes_dir]
 
   def main(argv) do
     if String.to_integer(System.otp_release()) < 27 do
@@ -43,6 +44,7 @@ defmodule Popcorn.BeamTools.CLI do
           |> Map.new()
           |> Map.put(:extra_apps, Keyword.get_values(opts, :extra_app))
           |> Map.put_new(:entrypoint_app, nil)
+          |> Map.put_new(:runtime_variant, nil)
           |> Map.put_new(:strip, false)
 
         {:ok, options}

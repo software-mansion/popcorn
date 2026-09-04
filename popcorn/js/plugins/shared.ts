@@ -26,7 +26,15 @@ const gzipAsync = promisify(gzip);
  * On the production server, set `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`.
  * Serve compressed variants with the matching `Content-Encoding` header.
  */
+type RuntimeVariant = "core" | "crypto";
+
 export type Options = {
+  /**
+   * Runtime variant override.
+   *
+   * By default, the plugin selects `crypto` when an application requires it and `core` otherwise.
+   */
+  runtimeVariant?: RuntimeVariant;
   /**
    * Mix project directory.
    *
@@ -61,12 +69,14 @@ export type Options = {
 
 export type Prepared = {
   dir: string;
+  runtimeVariant: RuntimeVariant;
   notes: unknown[];
 };
 
 type Report =
   | {
       ok: true;
+      runtimeVariant: RuntimeVariant;
       manifestPath: string;
       bootPath: string;
       tarPaths: string[];
@@ -87,7 +97,6 @@ export async function popcorn(opts: Options): Promise<Prepared> {
     "gzip",
     useBrotli && "brotli",
   ];
-  const distDir = p`${dirname(fileURLToPath(import.meta.url))}/..`;
   const preparedDir = await mkdtemp(p`${tmpdir()}/popcorn-otp-`);
 
   try {
@@ -95,7 +104,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
       const report = await packTarballs({
         rootDir: resolve(opts.rootDir),
         outDir: packedDir,
-        manifestPath: p`${distDir}/otp/manifest.json`,
+        runtimeVariant: opts.runtimeVariant,
         app: opts.app,
         extraApps: opts.extraApps ?? [],
         strip,
@@ -117,6 +126,7 @@ export async function popcorn(opts: Options): Promise<Prepared> {
 
     return {
       dir: preparedDir,
+      runtimeVariant: report.runtimeVariant,
       notes: report.notes ?? [],
     };
   } catch (error) {
@@ -125,11 +135,25 @@ export async function popcorn(opts: Options): Promise<Prepared> {
   }
 }
 
-export async function copyRuntime(targetDir: string): Promise<void> {
+export function runtimeDirectory(variant: RuntimeVariant): string {
+  if (variant !== "core" && variant !== "crypto") {
+    throw new Error(`[popcorn-otp] Unknown runtime variant: ${variant}`);
+  }
+  return p`${dirname(fileURLToPath(import.meta.url))}/../runtimes/${variant}`;
+}
+
+export async function copyRuntime(
+  targetDir: string,
+  variant: RuntimeVariant,
+): Promise<void> {
   const distDir = p`${dirname(fileURLToPath(import.meta.url))}/..`;
+  const runtimeDir = runtimeDirectory(variant);
   await Promise.all(
     ["worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"].map((file) =>
-      copy(p`${distDir}/${file}`, p`${targetDir}/${file}`),
+      copy(
+        p`${file === "worker.mjs" ? distDir : runtimeDir}/${file}`,
+        p`${targetDir}/${file}`,
+      ),
     ),
   );
 }
@@ -137,13 +161,13 @@ export async function copyRuntime(targetDir: string): Promise<void> {
 type PackTarballsParams = {
   rootDir: string;
   outDir: string;
-  manifestPath: string;
+  runtimeVariant: Options["runtimeVariant"];
   app: string | null;
   extraApps: string[];
   strip: boolean;
 };
 async function packTarballs(opts: PackTarballsParams): Promise<Report> {
-  const { rootDir, outDir, manifestPath, app, extraApps, strip } = opts;
+  const { rootDir, outDir, runtimeVariant, app, extraApps, strip } = opts;
   const toolDir = p`${dirname(fileURLToPath(import.meta.url))}/beam_tools`;
 
   const packerArgs = [
@@ -156,9 +180,13 @@ async function packTarballs(opts: PackTarballsParams): Promise<Report> {
     rootDir,
     "--out-dir",
     outDir,
-    "--manifest-path",
-    manifestPath,
+    "--runtimes-dir",
+    p`${toolDir}/../../runtimes`,
   ];
+
+  if (runtimeVariant !== undefined) {
+    packerArgs.push("--runtime-variant", runtimeVariant);
+  }
 
   if (app !== null) {
     packerArgs.push("--entrypoint-app", app);

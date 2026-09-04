@@ -199,7 +199,7 @@ function withNodeOnPath(nodeExecutable: string): NodeJS.ProcessEnv {
 }
 
 async function readManifest() {
-  const path = resolve(jsRootDir, "assets/manifest.json");
+  const path = resolve(jsRootDir, "../out/manifest.json");
   const content = await readFile(path, "utf8");
   return JSON.parse(content) as Manifest;
 }
