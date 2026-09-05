@@ -68,8 +68,8 @@ export function buildOtpAssets({ dir, assetsName }) {
           "mise",
           [
             "exec",
-            "erlang@28.3.1",
-            "elixir@1.19.5-otp-28",
+            "erlang@29.0.6",
+            "elixir@1.20.4-otp-29",
             "--",
             "mix",
             "deps.get",
@@ -80,8 +80,8 @@ export function buildOtpAssets({ dir, assetsName }) {
           "mise",
           [
             "exec",
-            "erlang@28.3.1",
-            "elixir@1.19.5-otp-28",
+            "erlang@29.0.6",
+            "elixir@1.20.4-otp-29",
             "--",
             "mix",
             "compile",
