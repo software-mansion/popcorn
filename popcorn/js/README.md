@@ -54,7 +54,7 @@ Use ESM output with those bundlers.
 ```ts
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.init({});
+const result = await Popcorn.init();
 if (!result.ok) throw result.error;
 
 const vm = result.data;
