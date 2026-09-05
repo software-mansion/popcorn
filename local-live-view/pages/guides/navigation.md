@@ -89,10 +89,10 @@ flowchart TD
 
 ## Customizing navigation
 
-`LLVEngine.create/2` accepts an `onNavigate` callback in its config. It overrides
-LLV's default handling of an Elixir-initiated `push_patch/2`, letting you take
-full control of the browser history (for example, to integrate with a custom
-router).
+`LLVEngine.create()` accepts an `onNavigate` callback in its config (see the
+[JavaScript API](js-api.md#llvconfig)). It overrides LLV's default handling of an
+Elixir-initiated `push_patch/2`, letting you take full control of the browser
+history (for example, to integrate with a custom router).
 
   * arguments: `(href, replace)` - the target URL and whether the entry should
     replace the current one instead of being pushed
