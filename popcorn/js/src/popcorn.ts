@@ -272,7 +272,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Call {@link boot} to start the VM.
    **/
-  public constructor(opts: PopcornOpts<Output>) {
+  public constructor(opts: PopcornOpts<Output> = {}) {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
     check(isValidTtySize(ttySize));
     check(
@@ -312,7 +312,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
    */
   public static async init<Output extends TtyOutput = "text">(
-    opts: PopcornOpts<Output>,
+    opts: PopcornOpts<Output> = {},
   ): Promise<Result<Popcorn<Output>>> {
     if (!canEval()) {
       return { ok: false, error: err("runtime:eval-unavailable", {}) };

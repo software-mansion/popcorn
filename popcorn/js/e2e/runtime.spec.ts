@@ -57,7 +57,7 @@ test.describe("boot", () => {
     });
   });
 
-  test("no entrypoint", async ({ page }) => {
+  test("no options", async ({ page }) => {
     await page.route("/assets/otp/manifest.json", async (route) => {
       const response = await route.fetch();
       const manifest = (await response.json()) as Record<string, unknown>;
@@ -65,11 +65,16 @@ test.describe("boot", () => {
     });
 
     const result = await page.evaluate(async () => {
-      const popcorn = new window.Popcorn({
-      });
+      const popcorn = new window.Popcorn();
       const boot = await popcorn.boot();
       popcorn.deinit();
-      return boot.ok;
+      if (!boot.ok) return false;
+
+      const init = await window.Popcorn.init();
+      if (!init.ok) return false;
+
+      init.data.deinit();
+      return true;
     });
 
     expect(result).toBe(true);
