@@ -51,7 +51,7 @@ jobs:
   otp-release:
     if: ${{ contains(inputs.tag || github.ref_name, '-next.') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,6 +64,11 @@ jobs:
           mix-exs: popcorn/elixir/mix.exs
       - id: toolchain
         uses: ./.github/actions/read-otp-toolchain
+      - uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: ${{ steps.toolchain.outputs.otp }}
+          otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
+          build-mode: release
       - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93
         with:
           otp-version: ${{ steps.toolchain.outputs.otp }}
@@ -73,6 +78,7 @@ jobs:
         with:
           node-version: "24.15.0"
       - run: pnpm install --frozen-lockfile
+      - run: pnpm -F ./popcorn/js build
       - name: Test and build Hex package
         working-directory: popcorn/elixir
         run: |
