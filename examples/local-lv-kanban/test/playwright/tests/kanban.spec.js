@@ -265,3 +265,113 @@ test.describe("push failure (handle_push_error)", () => {
     await expect(h.columns(page)).toHaveCount(3);
   });
 });
+
+test.describe("channel crash recovery", () => {
+  test("a crashed local view remounts and stays usable", async ({ page }) => {
+    await h.createBoard(page);
+    expect(await h.columnNames(page)).toEqual(SEEDED);
+
+    // Push an event no handle_event clause matches: the WASM channel process
+    // crashes, the dispatcher forwards phx_error, and the stock phoenix.js
+    // channel schedules a rejoin — a fresh mount from the stored config.
+    const pushed = await page.evaluate(() => {
+      const roots = Object.values(window.liveSocket.roots ?? {});
+      const view = roots.find((v) => v.el.hasAttribute("data-pop-root"));
+      if (!view) return false;
+      view.channel.push("event", { type: "hook", event: "__crash_for_test__", value: {} });
+      return true;
+    });
+    expect(pushed).toBe(true);
+
+    // The forwarded phx_error puts the view in error state (phx-error class),
+    // and the rejoin — phoenix.js' first backoff, ~1s — clears it on remount.
+    // Interacting inside the error window would race the dying channel, so
+    // gate on the full cycle before acting.
+    const container = page.locator("[data-pop-root]");
+    await expect(container).toHaveClass(/phx-error/, { timeout: 15_000 });
+    await expect(container).not.toHaveClass(/phx-error/, { timeout: 15_000 });
+
+    // The remounted view renders the board again and keeps working end to end.
+    expect(await h.columnNames(page)).toEqual(SEEDED);
+    await h.addColumn(page, "After crash");
+    await expect(h.columnByName(page, "After crash")).toBeVisible();
+  });
+});
+
+test.describe("live navigation away (replaceMain)", () => {
+  test("navigating to the index tears the local view down; coming back remounts", async ({
+    page,
+  }) => {
+    const browserLog = [];
+    page.on("console", (m) => browserLog.push(`${m.type()}: ${m.text()}`));
+    page.on("pageerror", (e) => browserLog.push(`pageerror: ${e.message}`));
+
+    await h.createBoard(page);
+    expect(await h.columnNames(page)).toEqual(SEEDED);
+
+    // A full page load would tear everything down trivially — plant a flag a
+    // reload would wipe to prove the navigation below is live (replaceMain).
+    await page.evaluate(() => {
+      window.__llvLiveNavProbe = true;
+    });
+    await page.getByRole("link", { name: "All boards" }).click();
+    try {
+      await expect(page.getByRole("heading", { name: "Kanban boards" })).toBeVisible({
+        timeout: 15_000,
+      });
+    } catch (err) {
+      console.log("URL at failure:", page.url());
+      const state = await page.evaluate(() => {
+        const main = document.querySelector("[data-phx-main]");
+        const ls = window.liveSocket;
+        return {
+          socketConnected: ls.isConnected(),
+          domMain: main && { id: main.id, children: main.children.length },
+          lsMain: ls.main && {
+            id: ls.main.id,
+            elId: ls.main.el?.id,
+            attached: ls.main.el?.isConnected,
+            destroyed: ls.main.destroyed,
+          },
+          roots: Object.keys(ls.roots ?? {}),
+          popRoots: Array.from(document.querySelectorAll("[data-pop-root]")).map((e) => ({
+            id: e.id,
+            inMain: !!e.closest("[data-phx-main]"),
+          })),
+          headingAnywhere: !!Array.from(document.querySelectorAll("h1")).find((h) =>
+            h.textContent.includes("Kanban boards"),
+          ),
+        };
+      });
+      console.log("state at failure:", JSON.stringify(state, null, 2));
+      console.log("browser log:\n" + browserLog.join("\n"));
+      throw err;
+    }
+    expect(await page.evaluate(() => window.__llvLiveNavProbe)).toBe(true);
+
+    // replaceMain MOVES data-phx-sticky elements into the new page instead
+    // of discarding them; the new main's join patch then discards the moved
+    // husk, which is what destroys the client View and sends the channel
+    // leave (stock teardown — Views.unmount deliberately doesn't destroy
+    // the View, see its comment). Both must converge: no live-view zombie
+    // in the socket's roots, no stray [data-pop-root] husk in the DOM.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => ({
+          zombies: Object.values(window.liveSocket.roots ?? {})
+            .filter((v) => v.el?.hasAttribute?.("data-pop-root"))
+            .map((v) => v.id),
+          husks: Array.from(document.querySelectorAll("[data-pop-root]")).map((e) => e.id),
+        })),
+      )
+      .toEqual({ zombies: [], husks: [] });
+
+    // Going back remounts a fresh incarnation of the same view id on the
+    // same runtime, and it works end to end.
+    await page.goBack();
+    await h.waitForBoard(page);
+    expect(await h.columnNames(page)).toEqual(SEEDED);
+    await h.addColumn(page, "After live nav");
+    await expect(h.columnByName(page, "After live nav")).toBeVisible();
+  });
+});

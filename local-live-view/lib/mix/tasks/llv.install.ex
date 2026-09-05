@@ -231,9 +231,16 @@ defmodule Mix.Tasks.Llv.Install do
 
   # --- app.js ---
 
+  # LLVEngine.create must run before liveSocket.connect() (the hooks it
+  # registers must exist when the host view joins); llvEngine.connect() boots
+  # the WASM runtime and mounts the views.
   @llv_js """
   import { LLVEngine } from "local_live_view";
-  await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  """
+
+  @llv_js_after_connect """
+  llvEngine.connect();
   """
 
   defp inject_app_js(igniter) do
@@ -252,15 +259,17 @@ defmodule Mix.Tasks.Llv.Install do
             Regex.replace(
               ~r/liveSocket\.connect\(\);?\n/,
               content,
-              "liveSocket.connect();\n\n" <> @llv_js
+              @llv_js <> "\nliveSocket.connect();\n\n" <> @llv_js_after_connect
             )
           )
         end
       end)
     else
       Igniter.add_warning(igniter, """
-      Could not find #{path}. Add after liveSocket.connect():
+      Could not find #{path}. Add before liveSocket.connect():
       #{@llv_js}
+      and after it:
+      #{@llv_js_after_connect}
       """)
     end
   end

@@ -1,7 +1,7 @@
 defmodule CheckoutLive do
   use LocalLiveView
 
-  def mount(params, _session, socket) do
+  def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
        current_step: 1,
@@ -20,7 +20,7 @@ defmodule CheckoutLive do
     {:noreply, assign(socket, current_step: step, errors: [])}
   end
 
-  def handle_params(params, _uri, socket) do
+  def handle_params(_params, _uri, socket) do
     {:noreply, assign(socket, current_step: 1)}
   end
 

@@ -46,7 +46,9 @@ defmodule LocalLvKanban.E2ETest do
 
     # Shared mode lets the browser-driven Bandit/LiveView processes (which aren't
     # descendants of the test) use this connection; the whole run rolls back after.
-    owner = Sandbox.start_owner!(LocalLvKanban.Repo, shared: true)
+    # The owner holds this connection for the entire Playwright run, which
+    # can exceed the default 120s ownership timeout as the suite grows.
+    owner = Sandbox.start_owner!(LocalLvKanban.Repo, shared: true, ownership_timeout: :infinity)
     on_exit(fn -> Sandbox.stop_owner(owner) end)
 
     start_server!()

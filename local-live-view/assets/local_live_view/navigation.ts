@@ -1,4 +1,4 @@
-import type { LLVConfig, LLVSocket, ViewRegistry } from "./types";
+import type { LLVConfig, LLVSocket } from "./types";
 import type { PopcornClient } from "./index";
 
 // LLV navigation runs in one of two modes:
@@ -14,7 +14,6 @@ import type { PopcornClient } from "./index";
 //    history entry, and handle popstate.
 export function registerNavigationHandlers(
   socket: LLVSocket,
-  views: ViewRegistry,
   pop: PopcornClient,
   config: LLVConfig,
 ) {
@@ -23,11 +22,7 @@ export function registerNavigationHandlers(
   const phoenixOwnsNav = () => socket.isConnected();
 
   const llvHandleParams = (href: string) => {
-    const url = absHref(href);
-    const params = Object.fromEntries(new URL(url).searchParams.entries());
-    for (const llvId of views.keys()) {
-      pop.handleParams(llvId, params, url);
-    }
+    void pop.call({ action: "navigated", url: absHref(href) });
   };
 
   let lastLLVNavigatedHref: string | null = null;
@@ -64,6 +59,7 @@ export function registerNavigationHandlers(
   window.addEventListener("llv:navigate", (e: Event) => {
     const { href, replace } = (e as CustomEvent<{ href: string; replace: boolean }>).detail;
     lastLLVNavigatedHref = absHref(href);
+    pop.call({ action: "url_changed", url: lastLLVNavigatedHref });
 
     if (config.onNavigate) {
       config.onNavigate(href, replace);

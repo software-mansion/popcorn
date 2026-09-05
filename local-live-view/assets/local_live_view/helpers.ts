@@ -1,20 +1,17 @@
-import type { LLVServerMessageDetail } from "./types";
-import type { PopcornClient } from "./index";
+// The canonical view id of a mount point. The Component writes it in
+// data-pop-id: the id itself belongs to the root div inside the mount
+// point (it is the LiveView's id, its channel topic, and the key of every
+// LLV registry). The el.id fallback covers markup predating data-pop-id.
+export function llvIdOf(el: HTMLElement): string {
+  return el.dataset.popId ?? el.id;
+}
 
-// Resolve an LLV's element id from a view name or id: prefer the element whose
-// data-pop-view matches, else fall back to treating the argument as an id.
+// Resolve an LLV's canonical id from a view name or id: prefer the mount
+// point whose data-pop-view matches, else fall back to treating the
+// argument as an id.
 export function resolveLlvId(viewOrId: string): string {
   const el = Array.from(document.querySelectorAll<HTMLElement>("[data-pop-view]")).find(
     (e) => e.getAttribute("data-pop-view") === viewOrId,
   );
-  return el ? el.id : viewOrId;
-}
-
-// handles messages sent by the server via LocalLiveView.push_server_message
-export function sendServerMessage(pop: PopcornClient, detail: LLVServerMessageDetail) {
-  pop.serverMessage(resolveLlvId(detail.view), {
-    event: "llv_server_message",
-    value: detail.payload,
-    type: "llv_server_message",
-  });
+  return el ? llvIdOf(el) : viewOrId;
 }

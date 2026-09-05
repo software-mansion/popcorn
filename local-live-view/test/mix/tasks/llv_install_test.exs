@@ -67,13 +67,16 @@ defmodule Mix.Tasks.Llv.InstallTest do
   end
 
   describe "inject_app_js" do
-    test "adds LLVEngine.create() import + call after liveSocket.connect()" do
+    test "runs LLVEngine.create() before liveSocket.connect() and llvEngine.connect() after" do
       installed()
       |> assert_has_patch(@app_js_path, """
       + |import { LLVEngine } from "local_live_view";
       """)
       |> assert_has_patch(@app_js_path, """
-      + |await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+      + |const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+      """)
+      |> assert_has_patch(@app_js_path, """
+      + |llvEngine.connect();
       """)
     end
   end

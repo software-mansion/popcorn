@@ -37,11 +37,16 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// LLVEngine.create must run before liveSocket.connect() (the hooks it
+// registers must exist when the host view joins); llvEngine.connect() boots
+// the WASM runtime and mounts the views.
+import { LLVEngine } from "local_live_view";
+const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
-import { LLVEngine } from "local_live_view";
-await LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+llvEngine.connect();
 
 // expose liveSocket on window for web console debug logs and latency simulation:
 // >> liveSocket.enableDebug()

@@ -58,17 +58,13 @@ export function registerCustomEventBindings(socket: LLVSocket) {
       if (el) {
         const phxEvent = el.getAttribute(elementBinding)!;
         socket.debounce(el, e, eventType, () => {
-          socket.withinOwners(el, (view) => {
-            view.pushEvent(eventType, el, null, phxEvent, buildPointerData(e, el), {});
-          });
+          socket.js().push(el as HTMLElement, phxEvent, { value: buildPointerData(e, el) });
         });
       } else {
-        document.querySelectorAll<Element>(`[${windowBinding}]`).forEach((wel) => {
+        document.querySelectorAll<HTMLElement>(`[${windowBinding}]`).forEach((wel) => {
           const phxEvent = wel.getAttribute(windowBinding)!;
           socket.debounce(wel, e, eventType, () => {
-            socket.withinOwners(wel, (view) => {
-              view.pushEvent(eventType, wel, null, phxEvent, buildPointerData(e, wel), {});
-            });
+            socket.js().push(wel, phxEvent, { value: buildPointerData(e, wel) });
           });
         });
       }
@@ -118,9 +114,7 @@ export function registerCustomEventBindings(socket: LLVSocket) {
 
       const phxEvent = el.getAttribute(elementBinding)!;
       socket.debounce(el, e, eventType, () => {
-        socket.withinOwners(el, (view) => {
-          view.pushEvent(eventType, el, null, phxEvent, buildPointerData(e, el), {});
-        });
+        socket.js().push(el as HTMLElement, phxEvent, { value: buildPointerData(e, el) });
       });
     });
   }
