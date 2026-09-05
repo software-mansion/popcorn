@@ -10,22 +10,27 @@
 [![Ad](https://swm-delivery.com/www/images/zone-gh-popcorn-2?n=1)](https://swm-delivery.com/www/delivery/ck-slug.php?zoneid=zone-gh-popcorn-2&n=1)
 [![Ad](https://swm-delivery.com/www/images/zone-gh-popcorn-3?n=1)](https://swm-delivery.com/www/delivery/ck-slug.php?zoneid=zone-gh-popcorn-3&n=1)
 
-**Popcorn is a library that allows you to run client-side Elixir in browsers, with JavaScript interoperability**
+**Popcorn runs Elixir and Erlang applications in the browser on a BEAM virtual machine compiled to WebAssembly.**
 
-Popcorn is early stages and may break. Please report an issue if it does. Contributions are very welcome, but please open an issue before committing too much effort.
+Please report issues and discuss large contributions before you start work.
 
-Under the hood, Popcorn runs [AtomVM](https://github.com/atomvm/AtomVM), a tiny Erlang VM.
+### Release channels
 
-### OTP prerelease
+The stable 0.3 release uses [AtomVM](https://github.com/atomvm/AtomVM).
 
-The upcoming `0.4.0-next.0` release uses OTP/BEAM instead of AtomVM.
-It ships both `core` and `crypto` runtime variants, selected with the bundler plugin's `runtimeVariant` option.
-See the [OTP setup guide](popcorn/js/README.md) for installation and configuration.
-The stable npm channel remains on AtomVM.
+The 0.4 prerelease uses the BEAM virtual machine from Erlang/OTP, compiled to
+WebAssembly. It runs compiled BEAM code in a Web Worker and supports standard
+OTP processes, message passing, and supervision.
+
+Use the [Popcorn 0.4 setup guide](popcorn/js/README.md) for the prerelease. The
+stable npm channel remains on Popcorn 0.3 until the 0.4 release.
 
 ## Documentation
 
-The API documentation and guides are available at <https://hexdocs.pm/popcorn>
+The stable documentation is available at <https://hexdocs.pm/popcorn>.
+
+The versioned 0.4 prerelease documentation is available at
+<https://popcorn.hexdocs.pm/0.4.0-next.0/>.
 
 ## Examples
 
@@ -38,9 +43,8 @@ See also third-party examples:
 
 ## Repository Structure
 
-- **`popcorn-2/elixir/`** - Elixir library used to patch OTP and Elixir stdlib, create .avm bundles and containing JS interop API.
-- **`popcorn-2/js/`** - JavaScript library loads the VM in Wasm, manages its isolation, and bridges JS and Elixir.
-- **`popcorn/`** - integration with BEAM/OTP.
+- **`popcorn-2/`** - Popcorn 0.3 implementation based on AtomVM.
+- **`popcorn/`** - Popcorn 0.4 implementation based on Erlang/OTP.
 - **`examples/`** - Example projects showcasing Popcorn features, hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples). Examples use development version of Popcorn.
 - **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
 - **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.
@@ -77,7 +81,8 @@ mise run test --wasm     # Elixir wasm tests
 mise run test --js       # JS tests
 ```
 
-AtomVM is built automatically if artifacts are missing. Make sure you have [AtomVM dependencies](https://github.com/atomvm/atomvm?tab=readme-ov-file#dependencies) installed.
+The required runtime build depends on the package that you change. See the
+package documentation for its toolchain and native build requirements.
 
 ### Other tasks
 
