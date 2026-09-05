@@ -40,5 +40,9 @@ Compile your application with `mix deps.get` and `mix compile` before building i
 The bundler plugin invokes Mix to package your application and its standard-library dependencies.
 Use the toolchain in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/mise.toml) for this release.
 
-See the [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/js/README.md) for bundler configuration and production headers.
-See the [versioned API documentation](https://popcorn.hexdocs.pm/0.4.0-next.0/) for the Elixir API.
+Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.0/introduction.html).
+Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.0/first-application.html).
+
+The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/js/README.md)
+contains a short package reference. The versioned documentation contains the
+complete Elixir and JavaScript API reference.
