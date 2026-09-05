@@ -14,7 +14,7 @@ defmodule Popcorn.MixProject do
       deps: deps(),
       description: "Elixir API for Popcorn's OTP/BEAM WebAssembly runtime",
       package: package(),
-      name: "Popcorn OTP",
+      name: "Popcorn",
       docs: &docs/0,
       source_url: @github,
       homepage_url: "https://popcorn.swmansion.com"
