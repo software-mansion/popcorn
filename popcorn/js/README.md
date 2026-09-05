@@ -3,6 +3,10 @@
 Run Elixir in a browser with OTP/BEAM compiled to WebAssembly.
 This prerelease replaces the AtomVM runtime used by Popcorn 0.3.x.
 
+Start with the
+[versioned Popcorn guide](https://popcorn.hexdocs.pm/0.4.0-next.0/introduction.html).
+It includes a complete Mix and Vite tutorial.
+
 ## Install
 
 ```sh
@@ -61,6 +65,10 @@ const vm = result.data;
 // Stop the runtime when the application no longer needs it.
 vm.deinit();
 ```
+
+`Popcorn.init()` waits for the OTP application tree to start. Use
+`popcorn.genserver.call()` to call a supervised GenServer from JavaScript.
+Use `popcorn.onEvent()` to receive events from BEAM processes.
 
 ## Serve in production
 
