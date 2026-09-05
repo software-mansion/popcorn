@@ -4,10 +4,6 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import icon from "astro-icon";
-// used for build-time generation of diagrams
-// import rehypeMermaid from "rehype-mermaid";
-import mermaid from "astro-mermaid";
-import devtoolsJson from "vite-plugin-devtools-json";
 import { popcorn } from "@swmansion/popcorn/vite";
 import {
   buildBundle,
@@ -29,9 +25,11 @@ export default defineConfig({
       "Cross-Origin-Resource-Policy": "cross-origin",
     },
   },
+  experimental: {
+    chromeDevtoolsWorkspace: true,
+  },
   vite: {
     plugins: [
-      devtoolsJson(),
       tailwindcss(),
       popcorn({
         rootDir: "../examples/iex-wasm",
@@ -43,14 +41,6 @@ export default defineConfig({
   integrations: [
     react(),
     icon(),
-    mermaid({
-      autoTheme: true,
-      mermaidConfig: {
-        sequence: {
-          mirrorActors: false,
-        },
-      },
-    }),
     cleanWasmDir(),
     buildOtpAssets({
       dir: "../examples/game-of-life",
@@ -73,24 +63,4 @@ export default defineConfig({
       newBundleName: "local_forms.avm",
     }),
   ],
-  markdown: {
-    // used for build-time generation of diagrams
-    // rehypePlugins: [
-    //   [
-    //     rehypeMermaid,
-    //     {
-    //       strategy: "img-svg",
-    //       dark: true,
-    //       mermaidConfig: {
-    //         sequence: {
-    //           mirrorActors: false,
-    //         },
-    //       },
-    //     },
-    //   ],
-    // ],
-    // syntaxHighlight: {
-    //   excludeLangs: ["mermaid", "math"],
-    // },
-  },
 });
