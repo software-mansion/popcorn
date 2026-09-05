@@ -42,8 +42,33 @@ defmodule Popcorn.MixProject do
 
   defp docs do
     [
-      main: "readme",
-      extras: ["README.md"],
+      main: "introduction",
+      extras: [
+        "pages/getting-started/introduction.md",
+        "pages/getting-started/installation.md",
+        "pages/getting-started/first-application.md",
+        "pages/concepts/runtime-model.md",
+        "pages/concepts/values.md",
+        "pages/guides/messaging.md",
+        "pages/guides/javascript-interop.md",
+        "pages/guides/http.md",
+        "pages/guides/terminal.md",
+        "pages/guides/packaging.md",
+        "pages/guides/deployment.md",
+        "pages/reference/compatibility.md",
+        "pages/reference/troubleshooting.md",
+        "pages/migration/from-0-3.md",
+        "pages/comparisons/frameworks.md",
+        "pages/contributing/runtime.md"
+      ],
+      groups_for_extras: [
+        "Getting started": ~r"/getting-started/",
+        "Understand Popcorn": ~r"/concepts/",
+        Guides: ~r"/guides/",
+        Reference: ~r"/reference/",
+        "Migration and comparisons": ~r"/(?:migration|comparisons)/",
+        Contributing: ~r"/contributing/"
+      ],
       formatters: ["html"],
       source_url_pattern: "#{@github}/blob/v#{@version}/popcorn/elixir/%{path}#L%{line}",
       source_ref: "v#{@version}"
