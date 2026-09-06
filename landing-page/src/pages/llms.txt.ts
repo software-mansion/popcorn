@@ -9,27 +9,7 @@ const PAGES = [
   {
     path: "/",
     title: "Popcorn",
-    description: "What Popcorn does and how to start",
-  },
-  {
-    path: "/demos/eval",
-    title: "Demo: eval",
-    description: "Evaluate Elixir expressions in the browser",
-  },
-  {
-    path: "/demos/game-of-life",
-    title: "Demo: game of life",
-    description: "Conway's game of life running on Elixir in Wasm",
-  },
-  {
-    path: "/demos/local-forms",
-    title: "Demo: local forms",
-    description: "Form handling driven entirely client-side",
-  },
-  {
-    path: "/demos/local-thermostat",
-    title: "Demo: local thermostat",
-    description: "Stateful UI backed by an Elixir process in the browser",
+    description: "Popcorn landing page",
   },
 ];
 

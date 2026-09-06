@@ -1,13 +1,7 @@
 import type { APIRoute } from "astro";
 
 const SITE = "https://popcorn.swmansion.com";
-const ROUTES = [
-  "/",
-  "/demos/eval",
-  "/demos/game-of-life",
-  "/demos/local-forms",
-  "/demos/local-thermostat",
-];
+const ROUTES = ["/"];
 
 export const GET: APIRoute = () => {
   const urls = ROUTES.map(

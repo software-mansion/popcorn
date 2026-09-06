@@ -5,41 +5,17 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "test": "vitest run",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/react": "^6.0.2",
-    "@fontsource-variable/handjet": "^5.2.6",
-    "@fontsource-variable/inter": "^5.2.6",
-    "@iconify-json/material-symbols-light": "^1.2.30",
-    "@swmansion/popcorn": "link:../popcorn/js",
     "@tailwindcss/vite": "^4.1.11",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
     "astro": "^7.0.0",
-    "astro-icon": "^1.1.5",
-    "chokidar": "^4.0.3",
-    "ghostty-web": "^0.4.0",
-    "highlight.js": "^11.11.1",
-    "local_live_view": "workspace:*",
-    "phoenix": "^1.8.0",
-    "phoenix_live_view": "^1.1.0",
-    "playwright": "^1.60.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.11",
-    "three": "^0.178.0"
+    "tailwindcss": "^4.1.11"
   },
   "devDependencies": {
-    "@types/phoenix": "^1.6.7",
-    "@types/three": "^0.178.1",
     "prettier": "^3.6.2",
     "prettier-plugin-astro": "^0.14.1",
-    "prettier-plugin-tailwindcss": "^0.6.14",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.5"
+    "prettier-plugin-tailwindcss": "^0.6.14"
   }
 }
