@@ -1,4 +1,5 @@
 ---
+import Heading from "../components/Heading.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
@@ -17,10 +18,9 @@ import Layout from "../layouts/Layout.astro";
         <div
           class="flex w-full flex-col items-center gap-4 md:gap-6 lg:max-w-175 lg:gap-10"
         >
-          <SectionPlaceholder
-            label="Hero copy placeholder"
-            class="h-46 w-full md:h-57 lg:h-46"
-          />
+          <Heading level={1} punctuation="." class="text-ink self-stretch">
+            Elixir in your browser
+          </Heading>
           <SectionPlaceholder
             label="Install placeholder"
             class="h-14 w-full max-w-125"
@@ -42,8 +42,10 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <section
-    class="bg-ink h-242 px-5 pt-34 md:h-177 md:px-8 md:pt-42 lg:h-205 lg:px-16 lg:pt-58"
+    class="bg-ink flex h-242 flex-col items-center gap-8 px-5 pt-16 md:h-177 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
   >
+    <Heading punctuation="?" class="text-cream">Features</Heading>
+
     <div
       class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-rows-2 lg:gap-16"
     >
@@ -61,8 +63,10 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <section
-    class="bg-ink h-186 px-5 pt-38 md:h-104 md:px-8 md:pt-22 lg:h-150 lg:px-16 lg:pt-58"
+    class="bg-ink flex h-186 flex-col items-center gap-8 px-5 pt-20 pb-22 md:h-104 md:gap-10 md:px-8 md:pt-0 md:pb-24 lg:h-150 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-34"
   >
+    <Heading punctuation="." class="text-cream">Use cases</Heading>
+
     <div
       class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-16"
     >
@@ -75,9 +79,13 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <section
-    class="bg-cream relative h-205 overflow-hidden pt-33 md:h-250 md:pt-41 lg:h-289 lg:px-16 lg:pt-58"
+    class="bg-cream relative flex h-205 flex-col items-center gap-7 overflow-hidden pt-16 pb-18 md:h-250 md:gap-9 md:pt-20 md:pb-22 lg:h-289 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-28"
   >
     <StripedBackground />
+
+    <Heading punctuation="!" class="text-ink relative z-10 w-full px-5">
+      Demos
+    </Heading>
 
     <div
       class="relative z-10 mx-auto flex w-full max-w-352 flex-col gap-7 md:gap-9 lg:flex-row lg:gap-6"

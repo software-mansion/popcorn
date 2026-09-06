@@ -1,3 +1,4 @@
+@import "@fontsource-variable/fraunces";
 @import "tailwindcss";
 
 @theme {
@@ -5,6 +6,8 @@
   --color-cream-soft: #fbf4e5;
   --color-ink: #301b05;
   --color-brown-70: #5f4122;
+  --color-orange: #ef7c00;
+  --font-display: "Fraunces Variable", system-ui, sans-serif;
   --font-sans: Inter, system-ui, sans-serif;
 }
 

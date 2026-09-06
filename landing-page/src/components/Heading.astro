@@ -1,0 +1,26 @@
+---
+interface Props {
+  level?: 1 | 2;
+  punctuation: "." | "?" | "!";
+  class?: string;
+}
+
+const { level = 2, punctuation, class: className } = Astro.props;
+let Element: "h1" | "h2" = "h2";
+let sizeClasses = "text-4xl leading-10 md:text-5xl md:leading-12 lg:leading-14";
+
+if (level === 1) {
+  Element = "h1";
+  sizeClasses = "text-5xl leading-12 md:text-6xl md:leading-16";
+}
+---
+
+<Element
+  class:list={[
+    "font-display text-center font-semibold",
+    sizeClasses,
+    className,
+  ]}
+>
+  <span><slot /><span class="text-orange">&#8288;{punctuation}</span></span>
+</Element>
