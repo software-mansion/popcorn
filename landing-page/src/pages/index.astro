@@ -1,5 +1,106 @@
 ---
+import SectionPlaceholder from "../components/SectionPlaceholder.astro";
+import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout />
+<Layout>
+  <section class="bg-ink relative h-240 overflow-hidden md:h-283 lg:h-355">
+    <StripedBackground scalloped />
+
+    <div
+      class="relative z-10 flex h-full flex-col items-center px-5 pt-20 pb-16 md:px-8 md:pt-24 md:pb-20 lg:px-16 lg:pt-44 lg:pb-44"
+    >
+      <div
+        class="flex w-full max-w-258 flex-1 flex-col items-center gap-6 md:gap-10 lg:gap-28"
+      >
+        <div
+          class="flex w-full flex-col items-center gap-4 md:gap-6 lg:max-w-175 lg:gap-10"
+        >
+          <SectionPlaceholder
+            label="Hero copy placeholder"
+            class="h-46 w-full md:h-57 lg:h-46"
+          />
+          <SectionPlaceholder
+            label="Install placeholder"
+            class="h-14 w-full max-w-125"
+          />
+          <div
+            class="grid h-26 w-full max-w-125 grid-cols-1 gap-3 md:h-12 md:grid-cols-2 md:gap-3 lg:h-10 lg:max-w-93 lg:gap-4"
+          >
+            <SectionPlaceholder label="Primary action" />
+            <SectionPlaceholder label="Secondary action" />
+          </div>
+        </div>
+
+        <SectionPlaceholder
+          label="Hero media placeholder"
+          class="h-52 w-full max-w-258 md:h-110 lg:h-149"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section
+    class="bg-ink h-242 px-5 pt-34 md:h-177 md:px-8 md:pt-42 lg:h-205 lg:px-16 lg:pt-58"
+  >
+    <div
+      class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-rows-2 lg:gap-16"
+    >
+      <SectionPlaceholder
+        label="Feature placeholder"
+        class="h-46 md:h-58 lg:h-65"
+      />
+      <SectionPlaceholder label="Feature placeholder" class="h-58 lg:h-65" />
+      <SectionPlaceholder label="Feature placeholder" class="h-52 lg:h-65" />
+      <SectionPlaceholder
+        label="Feature placeholder"
+        class="h-40 md:h-52 lg:h-65"
+      />
+    </div>
+  </section>
+
+  <section
+    class="bg-ink h-186 px-5 pt-38 md:h-104 md:px-8 md:pt-22 lg:h-150 lg:px-16 lg:pt-58"
+  >
+    <div
+      class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-16"
+    >
+      <SectionPlaceholder
+        label="Use case placeholder"
+        class="h-64 md:h-58 lg:h-51"
+      />
+      <SectionPlaceholder label="Use case placeholder" class="h-58" />
+    </div>
+  </section>
+
+  <section
+    class="bg-cream relative h-205 overflow-hidden pt-33 md:h-250 md:pt-41 lg:h-289 lg:px-16 lg:pt-58"
+  >
+    <StripedBackground />
+
+    <div
+      class="relative z-10 mx-auto flex w-full max-w-352 flex-col gap-7 md:gap-9 lg:flex-row lg:gap-6"
+    >
+      <SectionPlaceholder
+        label="Movie strip placeholder"
+        class="h-62 w-full rounded-none lg:h-203 lg:w-115 lg:flex-none lg:rounded-2xl"
+      />
+      <div class="px-3 md:px-6 lg:flex-1 lg:px-0">
+        <SectionPlaceholder
+          label="Demo placeholder"
+          class="h-85 w-full md:h-116 lg:h-203"
+        />
+      </div>
+    </div>
+  </section>
+
+  <footer
+    class="bg-ink flex h-195 justify-center px-6 pt-16 md:h-159 md:px-8 lg:h-200 lg:px-16 lg:pt-35"
+  >
+    <SectionPlaceholder
+      label="Footer content placeholder"
+      class="h-73 w-full max-w-175 md:h-49 md:max-w-150 lg:h-74 lg:max-w-175"
+    />
+  </footer>
+</Layout>
