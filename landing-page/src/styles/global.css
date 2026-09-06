@@ -1,14 +1,17 @@
+@import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/fraunces";
 @import "tailwindcss";
 
 @theme {
   --color-cream: #fffdf5;
   --color-cream-soft: #fbf4e5;
+  --color-cream-button: #f7ebd480;
   --color-ink: #301b05;
   --color-brown-70: #5f4122;
   --color-orange: #ef7c00;
+  --color-orange-20: #ffe6cc;
   --font-display: "Fraunces Variable", system-ui, sans-serif;
-  --font-sans: Inter, system-ui, sans-serif;
+  --font-sans: "DM Sans Variable", system-ui, sans-serif;
 }
 
 :root {

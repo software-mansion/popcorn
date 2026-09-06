@@ -1,45 +1,13 @@
 ---
 import Heading from "../components/Heading.astro";
+import Hero from "../components/Hero.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout>
-  <section class="bg-ink relative h-240 overflow-hidden md:h-283 lg:h-355">
-    <StripedBackground scalloped />
-
-    <div
-      class="relative z-10 flex h-full flex-col items-center px-5 pt-20 pb-16 md:px-8 md:pt-24 md:pb-20 lg:px-16 lg:pt-44 lg:pb-44"
-    >
-      <div
-        class="flex w-full max-w-258 flex-1 flex-col items-center gap-6 md:gap-10 lg:gap-28"
-      >
-        <div
-          class="flex w-full flex-col items-center gap-4 md:gap-6 lg:max-w-175 lg:gap-10"
-        >
-          <Heading level={1} punctuation="." class="text-ink self-stretch">
-            Elixir in your browser
-          </Heading>
-          <SectionPlaceholder
-            label="Install placeholder"
-            class="h-14 w-full max-w-125"
-          />
-          <div
-            class="grid h-26 w-full max-w-125 grid-cols-1 gap-3 md:h-12 md:grid-cols-2 md:gap-3 lg:h-10 lg:max-w-93 lg:gap-4"
-          >
-            <SectionPlaceholder label="Primary action" />
-            <SectionPlaceholder label="Secondary action" />
-          </div>
-        </div>
-
-        <SectionPlaceholder
-          label="Hero media placeholder"
-          class="h-52 w-full max-w-258 md:h-110 lg:h-149"
-        />
-      </div>
-    </div>
-  </section>
+  <Hero />
 
   <section
     class="bg-ink flex h-242 flex-col items-center gap-8 px-5 pt-16 md:h-177 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
@@ -63,6 +31,7 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <section
+    id="use-cases"
     class="bg-ink flex h-186 flex-col items-center gap-8 px-5 pt-20 pb-22 md:h-104 md:gap-10 md:px-8 md:pt-0 md:pb-24 lg:h-150 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-34"
   >
     <Heading punctuation="." class="text-cream">Use cases</Heading>
@@ -79,6 +48,7 @@ import Layout from "../layouts/Layout.astro";
   </section>
 
   <section
+    id="demos"
     class="bg-cream relative flex h-205 flex-col items-center gap-7 overflow-hidden pt-16 pb-18 md:h-250 md:gap-9 md:pt-20 md:pb-22 lg:h-289 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-28"
   >
     <StripedBackground />
