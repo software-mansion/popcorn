@@ -1,0 +1,57 @@
+---
+import Barcode from "./Barcode.astro";
+
+interface Props {
+  label: string;
+  variant: "a" | "b";
+}
+
+const { label, variant } = Astro.props;
+---
+
+<div class="flex h-9 shrink-0 items-center overflow-hidden">
+  <span class="ticket-edge ticket-edge-left bg-ink h-9 w-1.25 shrink-0"></span>
+  <span class="bg-ink flex h-9 items-center">
+    <span
+      class="font-label text-cream pr-4 pl-3.5 text-xs leading-4 font-semibold tracking-[0.14em] whitespace-nowrap uppercase"
+    >
+      {label}
+    </span>
+    <span
+      class="border-cream flex h-9 items-center border-l border-dashed pr-2.5 pl-3"
+    >
+      <Barcode {variant} />
+    </span>
+  </span>
+  <span class="ticket-edge ticket-edge-right bg-ink h-9 w-1.25 shrink-0"></span>
+</div>
+
+<style>
+  .ticket-edge-left {
+    clip-path: polygon(
+      100% 0,
+      0 12.5%,
+      100% 25%,
+      0 37.5%,
+      100% 50%,
+      0 62.5%,
+      100% 75%,
+      0 87.5%,
+      100% 100%
+    );
+  }
+
+  .ticket-edge-right {
+    clip-path: polygon(
+      0 0,
+      100% 12.5%,
+      0 25%,
+      100% 37.5%,
+      0 50%,
+      100% 62.5%,
+      0 75%,
+      100% 87.5%,
+      0 100%
+    );
+  }
+</style>

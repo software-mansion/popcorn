@@ -2,6 +2,8 @@
 import "../styles/global.css";
 import dmSansUrl from "@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2?url";
 import frauncesUrl from "@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2?url";
+import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
+import ibmPlexMonoUrl from "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2?url";
 
 interface Props {
   title?: string;
@@ -54,6 +56,20 @@ const structuredData = {
     <link
       rel="preload"
       href={frauncesUrl}
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      href={interUrl}
+      as="font"
+      type="font/woff2"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="preload"
+      href={ibmPlexMonoUrl}
       as="font"
       type="font/woff2"
       crossorigin="anonymous"

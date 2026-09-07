@@ -1,0 +1,51 @@
+---
+interface Props {
+  variant: "a" | "b";
+}
+
+const { variant } = Astro.props;
+
+const bars = {
+  a: [
+    [0, 2],
+    [3, 1],
+    [5, 2],
+    [8, 1],
+    [10, 1],
+    [12, 2],
+    [15, 1],
+    [17, 2],
+    [20, 1],
+    [22, 1],
+    [24, 2],
+    [27, 1],
+  ],
+  b: [
+    [0, 1],
+    [2, 2],
+    [5, 1],
+    [7, 2],
+    [10, 2],
+    [13, 1],
+    [15, 2],
+    [18, 1],
+    [20, 1],
+    [22, 2],
+    [25, 1],
+    [27, 1],
+  ],
+} as const;
+---
+
+<svg
+  aria-hidden="true"
+  class="text-cream h-4 w-7"
+  viewBox="0 0 28 16"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  {
+    bars[variant].map(([x, width]) => (
+      <rect x={x} y="0" width={width} height="16" fill="currentColor" />
+    ))
+  }
+</svg>

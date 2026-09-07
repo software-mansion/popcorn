@@ -1,0 +1,28 @@
+---
+import TicketBadge from "./TicketBadge.astro";
+
+interface Props {
+  label: string;
+  variant: "a" | "b";
+  title: string;
+  description: string;
+}
+
+const { label, variant, title, description } = Astro.props;
+---
+
+<article
+  class="bg-cream flex min-w-0 flex-col items-start gap-3.5 overflow-hidden rounded-2xl p-5 lg:gap-4 lg:p-6"
+>
+  <TicketBadge {label} {variant} />
+  <h3
+    class="font-display text-ink text-[21px] leading-7 font-semibold tracking-[-0.01em] lg:text-[28px] lg:leading-9"
+  >
+    {title}
+  </h3>
+  <p
+    class="font-copy text-brown-60 lg:text-brown-70 text-[15px] leading-6 lg:text-base lg:leading-[26px]"
+  >
+    {description}
+  </p>
+</article>

@@ -2,6 +2,7 @@
 import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
 import FeatureCard from "../components/FeatureCard.astro";
+import UseCaseCard from "../components/UseCaseCard.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
@@ -38,6 +39,23 @@ const features = [
     ],
   },
 ];
+
+const useCases = [
+  {
+    label: "Local LiveView",
+    variant: "a" as const,
+    title: "Use LiveView in the frontend",
+    description:
+      "You can use familiar Phoenix LiveViews to create local UI. Makes your app work even when the internet connection is spotty.",
+  },
+  {
+    label: "Elixir Language Tour",
+    variant: "b" as const,
+    title: "Learn Elixir",
+    description:
+      "We created Elixir Language Tour for Elixir newcomers. It's a great start to learn functional programming. It covers base types, pattern matching, functions, processes, and OTP patterns. Uses Popcorn under the hood.",
+  },
+];
 ---
 
 <Layout>
@@ -58,18 +76,14 @@ const features = [
 
   <section
     id="use-cases"
-    class="bg-ink flex h-186 flex-col items-center gap-8 px-5 pt-20 pb-22 md:h-104 md:gap-10 md:px-8 md:pt-0 md:pb-24 lg:h-150 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-34"
+    class="bg-ink flex flex-col items-center gap-8 px-5 pt-20 pb-22 md:gap-10 md:px-8 md:pt-0 md:pb-24 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-35"
   >
     <Heading punctuation="." class="text-cream">Use cases</Heading>
 
     <div
-      class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-16"
+      class="mx-auto grid w-full max-w-352 auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-16"
     >
-      <SectionPlaceholder
-        label="Use case placeholder"
-        class="h-64 md:h-58 lg:h-51"
-      />
-      <SectionPlaceholder label="Use case placeholder" class="h-58" />
+      {useCases.map((useCase) => <UseCaseCard {...useCase} />)}
     </div>
   </section>
 
