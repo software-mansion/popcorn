@@ -2,6 +2,7 @@
 import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
 import FeatureCard from "../components/FeatureCard.astro";
+import Footer from "../components/Footer.astro";
 import UseCaseCard from "../components/UseCaseCard.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
@@ -113,12 +114,5 @@ const useCases = [
     </div>
   </section>
 
-  <footer
-    class="bg-ink flex h-195 justify-center px-6 pt-16 md:h-159 md:px-8 lg:h-200 lg:px-16 lg:pt-35"
-  >
-    <SectionPlaceholder
-      label="Footer content placeholder"
-      class="h-73 w-full max-w-175 md:h-49 md:max-w-150 lg:h-74 lg:max-w-175"
-    />
-  </footer>
+  <Footer />
 </Layout>
