@@ -1,0 +1,20 @@
+<div
+  class="popcorn-layer pointer-events-none absolute inset-0 z-1"
+  aria-hidden="true"
+>
+  <div
+    class="popcorn-view pointer-events-auto absolute top-20 -left-36 h-64 w-64 cursor-grab touch-pan-y contain-strict active:cursor-grabbing md:top-137 md:-left-60 md:h-99 md:w-105 lg:top-88.5 lg:-left-51 lg:h-153 lg:w-161.5"
+  >
+  </div>
+  <div
+    class="popcorn-view pointer-events-auto absolute top-149 -right-44 h-75.5 w-80 cursor-grab touch-pan-y contain-strict active:cursor-grabbing md:top-197 md:-right-66.5 md:h-118 md:w-125 lg:top-163.5 lg:-right-36.5 lg:h-153 lg:w-161.5"
+  >
+  </div>
+</div>
+
+<script>
+  import { mountHeroPopcorn } from "../scripts/heroPopcorn";
+
+  const container = document.querySelector<HTMLElement>(".popcorn-layer")!;
+  mountHeroPopcorn(container);
+</script>
