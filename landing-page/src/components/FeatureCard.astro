@@ -1,0 +1,53 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  linkText?: string;
+  note?: string;
+  code?: string[];
+}
+
+const { title, description, position, linkText, note, code } = Astro.props;
+const isRight = position.endsWith("right");
+const isTop = position.startsWith("top");
+---
+
+<article
+  class:list={[
+    "border-cream flex flex-col gap-2.5 rounded-2xl border p-6",
+    "lg:border-brown-80 lg:min-h-66 lg:gap-3 lg:rounded-none lg:border-0 lg:px-0 lg:pt-9 lg:pb-10",
+    isRight ? "lg:border-l lg:pl-14" : "lg:pr-14",
+    isTop && "lg:border-b",
+  ]}
+>
+  <h3
+    class="font-display text-cream text-lg leading-7 font-semibold tracking-tight lg:text-2xl lg:leading-8"
+  >
+    {title}
+  </h3>
+  <p class="text-cream-muted text-sm leading-6 lg:text-base lg:leading-7">
+    {description}
+  </p>
+  {
+    linkText && (
+      <span class="text-orange mt-2 hidden text-sm leading-4 font-medium lg:block">
+        {linkText} →
+      </span>
+    )
+  }
+  {
+    note && (
+      <p class="text-cream-muted hidden text-sm leading-6 lg:block lg:text-base lg:leading-7">
+        {note}
+      </p>
+    )
+  }
+  {
+    code && (
+      <pre class="bg-brown-90 text-cream-muted font-label hidden overflow-hidden rounded-md px-4 py-3 text-sm leading-5 lg:block">
+        {code.join("\n")}
+      </pre>
+    )
+  }
+</article>
