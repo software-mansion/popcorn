@@ -1,0 +1,46 @@
+---
+interface Props {
+  title: string;
+  demo: string;
+  active?: boolean;
+}
+
+const { title, demo, active = false } = Astro.props;
+---
+
+<button
+  class="thumbnail group bg-ink @min-demos/demos:min-h-0 @min-demos/demos:w-91 @min-demos/demos:flex-1 flex w-61 flex-none cursor-pointer flex-col overflow-hidden rounded-md border-0 p-0 text-left md:w-65.5"
+  type="button"
+  data-demo={demo}
+  aria-pressed={active}
+>
+  <span
+    class="@min-demos/demos:h-11.5 @min-demos/demos:px-4 after:bg-brown-70 relative flex h-9.5 flex-none items-center justify-between gap-2 px-3 after:absolute after:inset-x-4 after:bottom-0 after:h-px"
+  >
+    <span
+      class="text-cream @min-demos/demos:text-thumbnail @min-demos/demos:font-medium font-sans text-sm leading-4.5 font-normal"
+      role="heading"
+      aria-level="3">{title}</span
+    >
+    <span
+      class="bg-orange font-label text-label-small tracking-label text-cream @min-demos/demos:px-2.25 @min-demos/demos:py-1 @min-demos/demos:text-label hidden flex-none rounded-full px-2 py-0.75 font-semibold uppercase group-aria-pressed:inline-block"
+      >Now playing</span
+    >
+  </span>
+  <span class="flex min-h-0 flex-1 overflow-hidden"><slot /></span>
+</button>
+
+<style>
+  .thumbnail {
+    box-shadow: inset 0 0 0 1px var(--color-brown-70);
+  }
+
+  .thumbnail[aria-pressed="true"] {
+    box-shadow: inset 0 0 0 2px var(--color-orange);
+  }
+
+  .thumbnail:focus-visible {
+    outline: 2px solid var(--color-cream);
+    outline-offset: -5px;
+  }
+</style>

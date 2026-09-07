@@ -1,0 +1,116 @@
+---
+import MovieThumbnail from "./MovieThumbnail.astro";
+---
+
+<MovieThumbnail title="Elixir REPL" demo="iex" active>
+  <span class="repl-preview" aria-hidden="true">
+    <span class="repl-row"
+      ><span class="prompt"></span><span class="line long"></span></span
+    >
+    <span class="line orange short"></span>
+    <span class="repl-row"
+      ><span class="prompt"></span><span class="line medium"></span></span
+    >
+    <span class="line orange longest"></span>
+    <span class="repl-row"
+      ><span class="prompt"></span><span class="cursor"></span></span
+    >
+  </span>
+</MovieThumbnail>
+
+<style>
+  .repl-preview {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 14px;
+  }
+
+  .repl-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .prompt,
+  .line,
+  .cursor {
+    display: block;
+  }
+
+  .prompt,
+  .line {
+    height: 5px;
+    border-radius: 3px;
+  }
+
+  .prompt {
+    width: 22px;
+    background: var(--color-brown-muted);
+  }
+
+  .line {
+    background: var(--color-cream);
+  }
+
+  .line.orange,
+  .cursor {
+    background: var(--color-orange);
+  }
+
+  .line.long {
+    width: 128px;
+  }
+  .line.short {
+    width: 88px;
+  }
+  .line.medium {
+    width: 110px;
+  }
+  .line.longest {
+    width: 150px;
+  }
+
+  .cursor {
+    width: 6px;
+    height: 11px;
+  }
+
+  @container demos (min-width: 1318px) {
+    .repl-preview {
+      gap: 14px;
+      padding: 22px 20px;
+    }
+
+    .repl-row {
+      gap: 10px;
+    }
+
+    .prompt,
+    .line {
+      height: 8px;
+      border-radius: 2px;
+    }
+
+    .prompt {
+      width: 26px;
+    }
+    .line.long {
+      width: 158px;
+    }
+    .line.medium {
+      width: 132px;
+    }
+    .line.longest {
+      width: 196px;
+    }
+
+    .cursor {
+      width: 9px;
+      height: 16px;
+    }
+  }
+</style>

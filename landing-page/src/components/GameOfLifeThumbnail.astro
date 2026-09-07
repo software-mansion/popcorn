@@ -1,0 +1,74 @@
+---
+import MovieThumbnail from "./MovieThumbnail.astro";
+
+const cells = [
+  [2, 4, false],
+  [9, 4, false],
+  [9, 18, true],
+  [2, 32, false],
+  [16, 32, false],
+  [23, 18, false],
+  [34, 44, true],
+  [41, 36, false],
+  [37, 56, false],
+  [49, 26, false],
+  [46, 50, true],
+  [59, 12, false],
+  [64, 30, false],
+  [64, 44, false],
+  [71, 44, true],
+  [79, 56, false],
+  [76, 74, false],
+  [83, 74, false],
+  [83, 88, true],
+  [26, 76, false],
+  [31, 90, false],
+  [18, 90, true],
+  [96, 82, false],
+];
+---
+
+<MovieThumbnail title="Game of life" demo="game-of-life">
+  <span class="life-preview" aria-hidden="true">
+    {
+      cells.map(([left, top, orange]) => (
+        <span class:list={{ orange }} style={`--left:${left}%;--top:${top}%`} />
+      ))
+    }
+  </span>
+</MovieThumbnail>
+
+<style>
+  .life-preview {
+    position: relative;
+    width: 100%;
+    height: 104px;
+    margin: auto 14px;
+    overflow: hidden;
+  }
+
+  .life-preview > span {
+    position: absolute;
+    top: var(--top);
+    left: var(--left);
+    width: 8px;
+    height: 8px;
+    background: var(--color-cream);
+  }
+
+  .life-preview > span.orange {
+    background: var(--color-orange);
+  }
+
+  @container demos (min-width: 1318px) {
+    .life-preview {
+      height: 156px;
+      margin: auto 20px;
+    }
+
+    .life-preview > span {
+      width: 12px;
+      height: 12px;
+    }
+  }
+</style>

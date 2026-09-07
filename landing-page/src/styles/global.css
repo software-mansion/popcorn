@@ -17,10 +17,18 @@
   --color-brown-muted: #9c8b79;
   --color-orange: #ef7c00;
   --color-orange-20: #ffe6cc;
+  --container-demos: 82.375rem;
   --font-display: "Fraunces Variable", system-ui, sans-serif;
   --font-sans: "DM Sans Variable", system-ui, sans-serif;
   --font-copy: "Inter Variable", system-ui, sans-serif;
   --font-label: "IBM Plex Mono", ui-monospace, monospace;
+  --text-label-small: 0.5625rem;
+  --text-label-small--line-height: 0.75rem;
+  --text-label: 0.625rem;
+  --text-label--line-height: 0.875rem;
+  --text-thumbnail: 1.0625rem;
+  --text-thumbnail--line-height: 1.5rem;
+  --tracking-label: 0.08em;
 }
 
 :root {
