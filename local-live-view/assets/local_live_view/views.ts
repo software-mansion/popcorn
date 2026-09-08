@@ -1,20 +1,40 @@
-import type { Socket as PhoenixSocket } from "phoenix";
 import type { LLVSocket } from "./types";
 import type { PopcornClient } from "./index";
 import { llvIdOf } from "./helpers";
+import type { PopcornTransports } from "./transport";
 
 interface ViewData {
   lastAssigns?: string | null;
+  // The view's own LiveSocket, created once its container is installed.
+  socket?: LLVSocket;
 }
 
 export class Views {
-  private socket: LLVSocket;
+  private hostSocket: LLVSocket;
   private pop: PopcornClient;
+  private transports: PopcornTransports;
   private data = new Map<string, ViewData>();
 
-  constructor(socket: LLVSocket, pop: PopcornClient) {
-    this.socket = socket;
+  constructor(hostSocket: LLVSocket, pop: PopcornClient, transports: PopcornTransports) {
+    this.hostSocket = hostSocket;
     this.pop = pop;
+    this.transports = transports;
+  }
+
+  // The LiveSocket owning the element: the view's own socket for elements
+  // inside a mounted container, the host's otherwise.
+  socketFor(el: Element): LLVSocket {
+    const rootEl = el.closest("[data-pop-root]");
+    const socket = rootEl && this.data.get(rootEl.id)?.socket;
+    return socket || this.hostSocket;
+  }
+
+  socketById(llvId: string): LLVSocket | undefined {
+    return this.data.get(llvId)?.socket;
+  }
+
+  mountedIds(): string[] {
+    return Array.from(this.data.keys());
   }
 
   async mount(pop_view_el: HTMLElement): Promise<void> {
@@ -50,37 +70,31 @@ export class Views {
       return;
     }
     const { html } = result.data as { html: string };
-    const root = pop_view_el.querySelector<HTMLElement>("[data-pop-root]");
-    if (!root) {
-      console.error("LLV: mount point has no [data-pop-root] element", llvId);
+    const slot = pop_view_el.querySelector<HTMLElement>("[data-pop-slot]");
+    if (!slot) {
+      console.error("LLV: mount point has no [data-pop-slot] element", llvId);
       return;
     }
-    this.socket.newRootView(this.installContainer(root, html)).join();
+    // The view's own LiveSocket, embedded in the slot: it places the locally
+    // rendered container there and joins it through the fully stock path.
+    data.socket = this.transports.newSocket(llvId);
+    data.socket.embed(slot, () => html);
   }
 
   unmount(pop_view_el: HTMLElement): void {
     const llvId = llvIdOf(pop_view_el);
-    if (this.data.delete(llvId)) this.pop.call({ action: "destroy", id: llvId });
-  }
-
-  // Replace the view's channel with the PopcornSocket channel
-  // for the local views.
-  // This relies on LV's private API and the fact that LV
-  // opens the channel before it calls newRootView and joins it
-  // afterwards.
-  patchAdoption(popcornSocket: PhoenixSocket): void {
-    const origNewRootView = this.socket.newRootView.bind(this.socket);
-
-    this.socket.newRootView = (...args) => {
-      const [el] = args;
-      const view = origNewRootView(...args);
-      if (el.matches?.("[data-pop-root]")) {
-        const params = (view.channel as unknown as { params: () => Record<string, unknown> })
-          .params;
-        view.channel = popcornSocket.channel(`lv:${el.id}`, params);
-      }
-      return view;
-    };
+    const data = this.data.get(llvId);
+    if (!data) return;
+    this.data.delete(llvId);
+    // Stock goodbye: the view's socket leaves its channel (phx_leave makes
+    // the channel process exit itself with {:shutdown, :left} — no
+    // server-side kill needed), runs the hooks' destroyed callbacks,
+    // disconnects and releases its window listeners. The destroy action
+    // then only cleans the dispatcher's registry/ETS (and its epoch guard
+    // reaps a join still in flight — the one case where no client exists
+    // to leave).
+    data.socket?.destroy();
+    this.pop.call({ action: "destroy", id: llvId });
   }
 
   syncAssigns(pop_view_el: HTMLElement): void {
@@ -91,15 +105,5 @@ export class Views {
     if (assigns === null || assigns === data.lastAssigns) return;
     data.lastAssigns = assigns;
     this.pop.call({ action: "update_assigns", id: llvId, assigns });
-  }
-
-  // Replaces the host-rendered placeholder with the locally
-  // rendered container
-  private installContainer(root: HTMLElement, html: string): HTMLElement {
-    const template = document.createElement("template");
-    template.innerHTML = html;
-    const rendered = template.content.firstElementChild as HTMLElement;
-    root.replaceWith(rendered);
-    return rendered;
   }
 }

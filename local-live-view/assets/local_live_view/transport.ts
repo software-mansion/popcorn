@@ -1,5 +1,6 @@
-import type { Socket as PhoenixSocket, SocketConnectOption } from "phoenix";
-import type { TransportFrame } from "./types";
+import { Socket } from "phoenix";
+import { LiveSocket, type Hook } from "phoenix_live_view";
+import type { LLVSocket, TransportFrame } from "./types";
 import type { PopcornClient } from "./index";
 
 const LV_TOPIC_PREFIX = "lv:";
@@ -10,103 +11,124 @@ const llvIdFromTopic = (topic: string) =>
 // thus we keep the timeout 'big enough'
 const JOIN_TIMEOUT_MS = 120_000;
 
-export interface PopcornLink {
-  /** The never-networked Phoenix socket the LLV views' channels live on. */
-  socket: PhoenixSocket;
-  /** Deliver an inbound frame (out-of-band diffs) to the channel layer. */
+interface FrameSink {
   inject(frame: TransportFrame): void;
 }
 
-// A fake socket that connects LLV views to Popcorn.
-// Phoenix channels can be normally constructed on top of this socket.
-export function createPopcornSocket(
-  SocketClass: typeof PhoenixSocket,
+export interface PopcornTransports {
+  /** Deliver an inbound frame (diff, reply) to the transport serving its topic. */
+  route(frame: TransportFrame): void;
+  /**
+   * A LiveSocket dedicated to one view, riding its own fake transport: same
+   * LiveSocket/Socket classes the host runs on, to be embedded in the view's
+   * slot (which also opts it out of dead-view, main and history duties).
+   */
+  newSocket(llvId: string): LLVSocket;
+}
+
+// The engine-owned registry of per-view transports. Each view's LiveSocket
+// gets its own transport class (Phoenix constructs it with `new
+// transport(url)`; the url is a dead label), so its socket, channel and
+// transport form an isolated, fully stock stack; inbound frames are routed
+// to the right one by topic.
+export function createPopcornTransports(
   pop: PopcornClient,
-): PopcornLink {
-  let transport: PopcornTransport | null = null;
+  hooks: Record<string, Hook>,
+): PopcornTransports {
+  const sinks = new Map<string, FrameSink>();
 
-  class PopcornTransport {
-    readyState = 0; // CONNECTING
-    onopen: () => void = () => {};
-    onerror: (error: unknown) => void = () => {};
-    onmessage: (event: { data: TransportFrame }) => void = () => {};
-    onclose: (event: { code: number; wasClean: boolean }) => void = () => {};
+  const transportClassFor = (llvId: string) => {
+    const topic = `lv:${llvId}`;
 
-    // The WebSocket-shaped signature the Socket constructs us with; the URL
-    // is a dead label.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    constructor(_endpointURL: string, _protocols?: unknown) {
-      // eslint-disable-next-line @typescript-eslint/no-this-alias
-      transport = this;
-      // The Socket assigns onopen/onmessage/onclose after `new`, so the
-      // "connection" must open asynchronously.
-      queueMicrotask(() => {
-        this.readyState = 1; // OPEN
-        this.onopen();
-      });
-    }
+    return class PopcornTransport {
+      readyState = 0; // CONNECTING
+      onopen: () => void = () => {};
+      onerror: (error: unknown) => void = () => {};
+      onmessage: (event: { data: TransportFrame }) => void = () => {};
+      onclose: (event: { code: number; wasClean: boolean }) => void = () => {};
 
-    // Deliver an inbound frame. Async so an ack never re-enters Socket code
-    // in the middle of an outbound send.
-    inject(frame: TransportFrame): void {
-      queueMicrotask(() => {
-        if (this.readyState === 1) this.onmessage({ data: frame });
-      });
-    }
-
-    send(frame: TransportFrame): void {
-      // Ack heartbeats right away, as Wasm could
-      // theoretically be late to ack and that would
-      // kill all LLVs.
-      if (frame.event == "heartbeat") {
-        this.ack(frame, "ok", {});
-        return;
-      }
-
-      const id = llvIdFromTopic(frame.topic);
-      if (id === null) {
-        this.ack(frame, "error", { reason: `unsupported channel ${frame.topic}` });
-        return;
-      }
-
-      pop
-        .call({ action: "transport_frame", id, frame }, { suppressErrorLog: true })
-        .then((result) => {
-          if (!result.ok) this.ack(frame, "error", result.error);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      constructor(_endpointURL: string, _protocols?: unknown) {
+        sinks.set(topic, this);
+        // The Socket assigns onopen/onmessage/onclose after `new`, so the
+        // "connection" must open asynchronously.
+        queueMicrotask(() => {
+          this.readyState = 1; // OPEN
+          this.onopen();
         });
-    }
+      }
 
-    // Ack an outbound frame in place (heartbeats, rejected frames).
-    ack(frame: TransportFrame, status: string, response: unknown): void {
-      this.inject({
-        topic: frame.topic,
-        event: "phx_reply",
-        payload: { status, response },
-        ref: frame.ref,
-        join_ref: frame.join_ref,
-      });
-    }
+      // Deliver an inbound frame. Async so an ack never re-enters Socket code
+      // in the middle of an outbound send.
+      inject(frame: TransportFrame): void {
+        queueMicrotask(() => {
+          if (this.readyState === 1) this.onmessage({ data: frame });
+        });
+      }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    close(_code?: number, _reason?: string): void {
-      this.readyState = 3; // CLOSED
-      queueMicrotask(() => this.onclose({ code: 1000, wasClean: true }));
-    }
-  }
+      // Ack an outbound frame in place (heartbeats, rejected frames).
+      ack(frame: TransportFrame, status: string, response: unknown): void {
+        this.inject({
+          topic: frame.topic,
+          event: "phx_reply",
+          payload: { status, response },
+          ref: frame.ref,
+          join_ref: frame.join_ref,
+        });
+      }
 
-  // The endpoint URL is only a label — the transport never dereferences it.
-  const socket = new SocketClass("/llv-popcorn", {
-    transport: PopcornTransport,
-    timeout: JOIN_TIMEOUT_MS,
-    encode: (payload: unknown, callback: (encoded: unknown) => void) => callback(payload),
-    decode: (rawPayload: unknown, callback: (decoded: unknown) => void) => callback(rawPayload),
-  } as unknown as Partial<SocketConnectOption>);
-  socket.connect();
+      send(frame: TransportFrame): void {
+        // Ack heartbeats right away, as Wasm could
+        // theoretically be late to ack and that would
+        // kill all LLVs.
+        if (frame.event == "heartbeat") {
+          this.ack(frame, "ok", {});
+          return;
+        }
+
+        const id = llvIdFromTopic(frame.topic);
+        if (id === null) {
+          this.ack(frame, "error", { reason: `unsupported channel ${frame.topic}` });
+          return;
+        }
+
+        // The call only acknowledges transport-level acceptance; the
+        // channel's reply comes back through the push pipe as a phx_reply
+        // frame, matched to this frame by ref. Rejected frames are acked
+        // with an error so their Push fails fast instead of timing out.
+        pop
+          .call({ action: "transport_frame", id, frame }, { suppressErrorLog: true })
+          .then((result) => {
+            if (!result.ok) this.ack(frame, "error", result.error);
+          });
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      close(_code?: number, _reason?: string): void {
+        this.readyState = 3; // CLOSED
+        if (sinks.get(topic) === this) sinks.delete(topic);
+        queueMicrotask(() => this.onclose({ code: 1000, wasClean: true }));
+      }
+    };
+  };
 
   return {
-    socket,
-    inject(frame: TransportFrame): void {
-      transport?.inject(frame);
+    route(frame: TransportFrame): void {
+      sinks.get(frame.topic)?.inject(frame);
+    },
+
+    newSocket(llvId: string): LLVSocket {
+      // Socket-level options (transport, encode/decode, timeout) are
+      // forwarded by LiveSocket but absent from its published options type
+      // — pass through a variable to skip the excess-property check.
+      const opts = {
+        transport: transportClassFor(llvId),
+        timeout: JOIN_TIMEOUT_MS,
+        encode: (payload: unknown, callback: (encoded: unknown) => void) => callback(payload),
+        decode: (rawPayload: unknown, callback: (decoded: unknown) => void) => callback(rawPayload),
+        hooks,
+      };
+      return new LiveSocket("/llv-popcorn", Socket, opts) as unknown as LLVSocket;
     },
   };
 }

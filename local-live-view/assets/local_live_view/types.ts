@@ -1,5 +1,4 @@
-import type { Channel } from "phoenix";
-import type { LiveSocketInstanceInterface } from "phoenix_live_view";
+import type { Hook, LiveSocketInstanceInterface } from "phoenix_live_view";
 
 // --- Public API ---
 
@@ -16,6 +15,12 @@ export interface LLVConfig {
    * Pass a custom function to take full control of navigation.
    */
   onNavigate?: (href: string, replace: boolean) => void;
+  /**
+   * Hooks available to local views (`phx-hook` in their templates).
+   * Independent of the host LiveSocket's hooks — pass the same object to
+   * both if hooks are shared.
+   */
+  hooks?: Record<string, Hook>;
 }
 
 // --- Internal Phoenix types ---
@@ -52,14 +57,6 @@ export interface LLVServerEventDetail {
   payload: unknown;
 }
 
-export interface LLVView {
-  el: HTMLElement;
-  channel: Channel;
-  join(): void;
-  addHook: (el: Element) => unknown;
-  destroy?: (callback?: () => void) => void;
-}
-
 /**
  * A mounted LocalLiveViewEventBus hook instance: the host-side channel used
  * by __llvPushServer.
@@ -71,12 +68,26 @@ export interface EventBusHook {
 
 /**
  * LiveSocket members missing from LV's published LiveSocketInstanceInterface,
- * which LLV accesses via type-cast. All are private API except isConnected —
- * a public runtime method their TS types simply don't declare.
+ * which LLV accesses via type-cast. All are private API except isConnected,
+ * embed and destroy — public runtime methods their TS types don't declare
+ * (embed and destroy come with the multi-socket LV fork).
  */
 interface PhxLiveSocketInternals {
-  newRootView(el: HTMLElement, ...rest: unknown[]): LLVView;
   isConnected(): boolean;
+  /**
+   * Embeds the LiveSocket in the container: places the root LiveViews the
+   * source yields in it and joins them, then invokes the callback.
+   */
+  embed(
+    container: HTMLElement,
+    source: () => string | Node | Promise<string | Node>,
+    callback?: () => void,
+  ): void;
+  /**
+   * Leaves every joined view (running the hooks' destroyed callbacks),
+   * disconnects and releases the window listeners the LiveSocket installed.
+   */
+  destroy(callback?: () => void): Promise<void>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: Record<string, any>;
   debounce(el: Element, event: Event, eventType: string, callback: () => void): unknown;
@@ -86,7 +97,6 @@ interface PhxLiveSocketInternals {
     linkState: string,
     targetEl: Element | null,
   ): void;
-  bindForms(): void;
 }
 
 /** Public LiveSocket interface extended with Phoenix internals accessed by LLV. */

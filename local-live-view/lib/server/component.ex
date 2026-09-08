@@ -145,8 +145,8 @@ defmodule LocalLiveView.Component do
       data-pop-mirror-token={@mirror_token}
       data-pop-mirror-id={@mirror_id}
     >
-    <%!-- Placeholder, replaced with LLV on the client --%>
-    <div id={@id} data-pop-root></div>
+    <%!-- Slot the view's LiveSocket embeds the locally rendered LLV in --%>
+    <div data-pop-slot></div>
     <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>

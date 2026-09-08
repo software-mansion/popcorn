@@ -42,13 +42,19 @@ defmodule LocalLvKanban.MixProject do
     [
       {:local_live_view, path: "../../local-live-view"},
       {:local, path: "local"},
-      {:phoenix, "~> 1.8.5"},
+      # Temporary local override: phoenix main with the JS `Socket.destroy()`
+      # that `LiveSocket.destroy()` uses to release the socket's window
+      # listeners. Host only — the WASM `local` project stays on hex phoenix.
+      {:phoenix, path: "#{System.user_home!()}/dev/phoenix/phoenix", override: true},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},
       {:postgrex, ">= 0.0.0"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
+      # Temporary local override: the multi-socket branch of LV (viewSelector
+      # + foreign-root opacity) that LLV's socket-per-view design needs.
+      {:phoenix_live_view,
+       path: "#{System.user_home!()}/dev/phoenix/phoenix_live_view", override: true},
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},

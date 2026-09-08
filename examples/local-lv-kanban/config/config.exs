@@ -36,7 +36,7 @@ config :esbuild,
   version: "0.25.4",
   local_lv_kanban: [
     args:
-      ~w(js/app.js --bundle --format=esm --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=. --alias:local_live_view=#{Mix.Project.deps_paths()[:local_live_view]}/priv/static/local_live_view.js),
+      ~w(js/app.js --bundle --format=esm --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=. --alias:local_live_view=#{Mix.Project.deps_paths()[:local_live_view]}/priv/static/local_live_view.js --alias:phoenix_live_view=#{Mix.Project.deps_paths()[:phoenix_live_view]}/priv/static/phoenix_live_view.esm.js --alias:phoenix=#{Mix.Project.deps_paths()[:phoenix]}/priv/static/phoenix.mjs),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]

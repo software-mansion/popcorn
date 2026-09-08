@@ -10,6 +10,9 @@ export default [
       file: "priv/static/local_live_view.js",
       format: "esm",
     },
+    // Resolved by the consuming app's bundler to the same copies its own
+    // app.js uses — never bundled in, or the page would run two LiveViews.
+    external: ["phoenix", "phoenix_live_view"],
     plugins: [
       resolve(),
       typescript({ tsconfig: "./tsconfig.json" }),

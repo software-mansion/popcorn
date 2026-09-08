@@ -1,14 +1,8 @@
 import { Popcorn } from "@swmansion/popcorn";
 import type { Socket as PhoenixSocket } from "phoenix";
 import type { Hook, LiveSocketInstanceInterface } from "phoenix_live_view";
-import type {
-  EventBusHook,
-  LLVConfig,
-  LLVSocket,
-  LLVServerEventDetail,
-  TransportFrame,
-} from "./types";
-import { createPopcornSocket, type PopcornLink } from "./transport";
+import type { EventBusHook, LLVConfig, LLVSocket, LLVServerEventDetail } from "./types";
+import { createPopcornTransports, type PopcornTransports } from "./transport";
 import { registerNavigationHandlers } from "./navigation";
 import { registerCustomEventBindings } from "./events";
 import { llvIdOf, resolveLlvId } from "./helpers";
@@ -65,17 +59,18 @@ export class LLVEngine {
   private socket: LLVSocket;
   private config: LLVConfig;
   private pop = new PopcornClient();
+  private transports: PopcornTransports;
   private views: Views;
   private mirrors: Mirrors;
   private bufferedServerEvents: LLVServerEventDetail[] = [];
   private eventBusHooks = new Map<string, EventBusHook>();
-  private popcornLink!: PopcornLink;
   private connectPromise: Promise<void> | null = null;
 
   private constructor(socket: LLVSocket, config: LLVConfig) {
     this.socket = socket;
     this.config = config;
-    this.views = new Views(this.socket, this.pop);
+    this.transports = createPopcornTransports(this.pop, config.hooks ?? {});
+    this.views = new Views(this.socket, this.pop, this.transports);
     this.mirrors = new Mirrors(() => this.socketClass(), this.pop);
   }
 
@@ -89,9 +84,6 @@ export class LLVEngine {
     engine.registerServerEventListener();
     registerNavigationHandlers(engine.socket, engine.pop, engine.config);
     engine.registerHooks();
-    engine.bindFormsIfHostless();
-    engine.connectPopcornSocket();
-    engine.views.patchAdoption(engine.popcornLink.socket);
     return engine;
   }
 
@@ -110,7 +102,7 @@ export class LLVEngine {
 
       this.mirrors.installSync();
       this.exposeGlobals();
-      registerCustomEventBindings(this.socket);
+      registerCustomEventBindings((el) => this.views.socketFor(el));
 
       this.scanAndMount();
       this.flushBufferedServerEvents();
@@ -124,10 +116,6 @@ export class LLVEngine {
   // one LiveView runs on, with nothing to configure.
   private socketClass(): typeof PhoenixSocket {
     return this.socket.getSocket().constructor as typeof PhoenixSocket;
-  }
-
-  private connectPopcornSocket(): void {
-    this.popcornLink = createPopcornSocket(this.socketClass(), this.pop);
   }
 
   private async mountView(pop_view_el: HTMLElement): Promise<void> {
@@ -200,15 +188,6 @@ export class LLVEngine {
     } satisfies Hook;
   }
 
-  // Pages with only LocalLiveViews (no server-side LiveView) connect in "dead"
-  // mode, which skips bindForms() — making phx-submit / phx-change no-ops on
-  // any LLV. Wire them up manually when no real LiveView is on the page.
-  private bindFormsIfHostless(): void {
-    if (!document.querySelector("[data-phx-session]:not([data-pop-root])")) {
-      this.socket.bindForms();
-    }
-  }
-
   private async bootPopcorn(): Promise<void> {
     const popcorn = await Popcorn.init({
       debug: this.config.debug ?? false,
@@ -222,9 +201,7 @@ export class LLVEngine {
   }
 
   private exposeGlobals(): void {
-    window.__llvPopcornTransportPush = (frame: TransportFrame) => {
-      this.popcornLink.inject(frame);
-    };
+    window.__llvPopcornTransportPush = (frame) => this.transports.route(frame);
 
     window.__llvPushServer = (llvId: string, event: string, payload: Record<string, unknown>) => {
       const pushError = () =>
@@ -262,6 +239,21 @@ export class LLVEngine {
       this.sendServerEvent(detail);
     }
     this.bufferedServerEvents = [];
+  }
+
+  /**
+   * The LiveSocket owning a mounted local view, or undefined while the view
+   * is not mounted. Useful for debugging (e.g. `enableDebug()`) and tests.
+   *
+   * @param viewId - The view name (e.g. `"ThermostatLive"`) or element id.
+   */
+  liveSocketFor(viewId: string): LiveSocketInstanceInterface | undefined {
+    return this.views.socketById(resolveLlvId(viewId));
+  }
+
+  /** Ids of the currently mounted local views. */
+  mountedViewIds(): string[] {
+    return this.views.mountedIds();
   }
 
   /**

@@ -50,6 +50,7 @@ llvEngine.connect();
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
+window.llvEngine = llvEngine
 
 // The lines below enable quality of life phoenix_live_reload
 // development features:

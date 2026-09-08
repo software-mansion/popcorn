@@ -5,7 +5,7 @@ import type { LLVSocket, PointerData } from "./types";
 // Wire them up here, walking up from e.target to find the closest ancestor with
 // the binding (same as how phx-click works) so element-level bindings on
 // container elements also catch events from their descendants.
-export function registerCustomEventBindings(socket: LLVSocket) {
+export function registerCustomEventBindings(socketFor: (el: Element) => LLVSocket) {
   // The binding element's bounding rect is included so handlers can
   // position-aware-route the event (e.g. clientY - rect.top for the offset
   // within the element, rect.height for its size).
@@ -57,12 +57,14 @@ export function registerCustomEventBindings(socket: LLVSocket) {
       const el = closestWithBinding(e.target, elementBinding);
       if (el) {
         const phxEvent = el.getAttribute(elementBinding)!;
+        const socket = socketFor(el);
         socket.debounce(el, e, eventType, () => {
           socket.js().push(el as HTMLElement, phxEvent, { value: buildPointerData(e, el) });
         });
       } else {
         document.querySelectorAll<HTMLElement>(`[${windowBinding}]`).forEach((wel) => {
           const phxEvent = wel.getAttribute(windowBinding)!;
+          const socket = socketFor(wel);
           socket.debounce(wel, e, eventType, () => {
             socket.js().push(wel, phxEvent, { value: buildPointerData(e, wel) });
           });
@@ -113,6 +115,7 @@ export function registerCustomEventBindings(socket: LLVSocket) {
       }
 
       const phxEvent = el.getAttribute(elementBinding)!;
+      const socket = socketFor(el);
       socket.debounce(el, e, eventType, () => {
         socket.js().push(el as HTMLElement, phxEvent, { value: buildPointerData(e, el) });
       });

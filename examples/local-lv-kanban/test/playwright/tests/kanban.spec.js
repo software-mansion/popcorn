@@ -275,7 +275,9 @@ test.describe("channel crash recovery", () => {
     // crashes, the dispatcher forwards phx_error, and the stock phoenix.js
     // channel schedules a rejoin — a fresh mount from the stored config.
     const pushed = await page.evaluate(() => {
-      const roots = Object.values(window.liveSocket.roots ?? {});
+      const rootEl = document.querySelector("[data-pop-root]");
+      const socket = rootEl && window.llvEngine.liveSocketFor(rootEl.id);
+      const roots = Object.values(socket?.roots ?? {});
       const view = roots.find((v) => v.el.hasAttribute("data-pop-root"));
       if (!view) return false;
       view.channel.push("event", { type: "hook", event: "__crash_for_test__", value: {} });
@@ -351,16 +353,14 @@ test.describe("live navigation away (replaceMain)", () => {
 
     // replaceMain MOVES data-phx-sticky elements into the new page instead
     // of discarding them; the new main's join patch then discards the moved
-    // husk, which is what destroys the client View and sends the channel
-    // leave (stock teardown — Views.unmount deliberately doesn't destroy
-    // the View, see its comment). Both must converge: no live-view zombie
-    // in the socket's roots, no stray [data-pop-root] husk in the DOM.
+    // husk. The mount-point hook's destroyed() disconnects the view's own
+    // LiveSocket and drops it from the engine registry. Both must converge:
+    // no mounted view left in the engine, no stray [data-pop-root] husk in
+    // the DOM.
     await expect
       .poll(async () =>
         page.evaluate(() => ({
-          zombies: Object.values(window.liveSocket.roots ?? {})
-            .filter((v) => v.el?.hasAttribute?.("data-pop-root"))
-            .map((v) => v.id),
+          zombies: window.llvEngine.mountedViewIds(),
           husks: Array.from(document.querySelectorAll("[data-pop-root]")).map((e) => e.id),
         })),
       )

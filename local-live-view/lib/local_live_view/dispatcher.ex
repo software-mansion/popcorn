@@ -139,6 +139,11 @@ defmodule LocalLiveView.Dispatcher do
     # a single LLV at the same time. Thus, we add a reference
     # to make sure the LLV process registered with register/2
     # is the newest one.
+    # Perhaps a cleaner solution would be to spawn a separate
+    # transport process for each view, so that any 'orphan channel'
+    # would be terminated when we terminate the transport process,
+    # the same way as in LV. Worth considering if current approach
+    # causes problems.
     epoch = make_ref()
 
     # The LLV needs the assigns at mount, and we get to know
@@ -170,16 +175,6 @@ defmodule LocalLiveView.Dispatcher do
         push_to_browser(message, state)
         {:resolve, :ok, state}
     end
-  end
-
-  # When phx_leave comes, we may have removed the view from the state already
-  defp handle_wasm_call(
-         %{"action" => "transport_frame", "frame" => %{"event" => "phx_leave"} = frame},
-         _promise,
-         state
-       ) do
-    {_result, state} = socket_in(state, frame)
-    {:resolve, :ok, state}
   end
 
   defp handle_wasm_call(%{"action" => "transport_frame"}, _promise, state) do
@@ -218,17 +213,7 @@ defmodule LocalLiveView.Dispatcher do
 
   defp handle_wasm_call(%{"action" => "destroy", "id" => id}, _promise, state) do
     :ets.delete(@table, {:assigns, id})
-    {view, views} = Map.pop(state.views, id)
-
-    if pid = get_in(view.channel_pid) do
-      # We need to stop the view manually because it's sticky.
-      # Thus, after a navigation, LiveView may not destroy the view
-      # even if its DOM element is destroyed (that's what triggers
-      # this action).
-      Process.exit(pid, {:shutdown, :destroyed})
-    end
-
-    {:resolve, :ok, %{state | views: views}}
+    {:resolve, :ok, %{state | views: Map.delete(state.views, id)}}
   end
 
   # Keep the current url in the ETS table, so that LLVs can read it
