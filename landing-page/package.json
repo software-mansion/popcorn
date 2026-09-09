@@ -13,8 +13,10 @@
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@swmansion/popcorn": "link:../popcorn/js",
     "@tailwindcss/vite": "^4.1.11",
     "astro": "^7.0.0",
+    "ghostty-web": "^0.4.0",
     "tailwindcss": "^4.1.11",
     "three": "^0.178.0"
   },

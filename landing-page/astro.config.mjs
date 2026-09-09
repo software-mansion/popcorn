@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { fileURLToPath } from "node:url";
 
+import { popcorn } from "@swmansion/popcorn/vite";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
@@ -13,6 +15,13 @@ export default defineConfig({
     chromeDevtoolsWorkspace: true,
   },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      popcorn({
+        rootDir: fileURLToPath(new URL("../examples/iex-wasm", import.meta.url)),
+        app: "iex",
+        extraApps: ["logger"],
+      }),
+      tailwindcss(),
+    ],
   },
 });
