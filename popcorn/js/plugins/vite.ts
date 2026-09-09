@@ -10,7 +10,8 @@ import {
   type Prepared,
 } from "./shared";
 
-const CORS_HEADERS = {
+/** Headers required by the threaded WebAssembly runtime. */
+export const crossOriginIsolationHeaders = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
@@ -116,7 +117,6 @@ export function popcorn(options: Options): Plugin {
     const filePath = resolve(assetsRoot, requestPath.slice(requestRoot.length));
     if (!isUnder(assetsRoot, filePath)) {
       res.statusCode = 403;
-      setHeaders(res);
       res.end("Forbidden");
       return;
     }
@@ -131,13 +131,11 @@ export function popcorn(options: Options): Plugin {
         : ({ name: null, suffix: "" } as const);
       if (compressible && encoding.name === null) {
         res.statusCode = 406;
-        setHeaders(res);
         res.setHeader("Vary", "Accept-Encoding");
         res.end("No supported content encoding");
         return;
       }
       const content = await readFile(`${filePath}${encoding.suffix}`);
-      setHeaders(res);
       setContentType(res, filePath);
       res.setHeader("Vary", "Accept-Encoding");
       if (encoding.name !== null) {
@@ -146,7 +144,6 @@ export function popcorn(options: Options): Plugin {
       res.end(content);
     } catch {
       res.statusCode = 404;
-      setHeaders(res);
       res.end("Not found");
     }
   };
@@ -170,10 +167,6 @@ export function popcorn(options: Options): Plugin {
             },
           ],
         },
-        // COOP/COEP must be on every response (SharedArrayBuffer/pthreads),
-        // including the worker/beam files Vite serves from the package itself.
-        server: { headers: CORS_HEADERS },
-        preview: { headers: CORS_HEADERS },
       };
     },
 
@@ -185,6 +178,7 @@ export function popcorn(options: Options): Plugin {
 
     configureServer(server) {
       const rootDir = resolve(options.rootDir);
+      server.httpServer?.prependListener("request", setIsolationHeaders);
       server.watcher.add(rootDir);
       server.watcher.on("all", (_event, file) => {
         if (isUnder(rootDir, file)) dirty = true;
@@ -194,6 +188,7 @@ export function popcorn(options: Options): Plugin {
     },
 
     configurePreviewServer(server) {
+      server.httpServer?.prependListener("request", setIsolationHeaders);
       server.middlewares.use(serve);
       server.httpServer?.once("close", cleanup);
     },
@@ -236,8 +231,8 @@ function isUnder(dir: string, file: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
 }
 
-function setHeaders(res: Res): void {
-  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+function setIsolationHeaders(_req: IncomingMessage, res: Res): void {
+  for (const [key, value] of Object.entries(crossOriginIsolationHeaders)) {
     res.setHeader(key, value);
   }
 }
