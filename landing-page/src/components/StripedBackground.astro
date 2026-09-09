@@ -1,9 +1,20 @@
 ---
 interface Props {
   scalloped?: boolean;
+  edgeOnly?: boolean;
 }
 
-const { scalloped = false } = Astro.props;
+const { scalloped = false, edgeOnly = false } = Astro.props;
+
+let background = "bg-ink";
+let placement = "absolute inset-0 flex overflow-hidden";
+let stripeLayout = "flex h-full min-w-0 flex-1 flex-col";
+
+if (edgeOnly) {
+  background = "bg-transparent";
+  placement = "absolute inset-x-0 top-0 flex overflow-hidden";
+  stripeLayout = "min-w-0 flex-1";
+}
 
 const stripes = Array.from({ length: 64 }, (_, index) => {
   let color = "bg-cream";
@@ -17,7 +28,7 @@ const stripes = Array.from({ length: 64 }, (_, index) => {
 ---
 
 <div
-  class="bg-ink absolute inset-0 flex overflow-hidden"
+  class:list={[background, placement]}
   data-stripe-background
   aria-hidden="true"
 >
@@ -25,13 +36,15 @@ const stripes = Array.from({ length: 64 }, (_, index) => {
   ></span>
   {
     stripes.map(({ color, index }) => (
-      <span
-        class="flex h-full min-w-0 flex-1 flex-col"
-        data-stripe
-        hidden={index >= 13}
-      >
-        <span class:list={["min-h-0 flex-1", color]} />
-        {scalloped && (
+      <span class={stripeLayout} data-stripe hidden={index >= 13}>
+        {edgeOnly ? (
+          <span
+            class:list={["block aspect-2/1 w-full rounded-b-full", color]}
+          />
+        ) : (
+          <span class:list={["min-h-0 flex-1", color]} />
+        )}
+        {scalloped && !edgeOnly && (
           <span
             class:list={["aspect-2/1 w-full flex-none rounded-b-full", color]}
           />
@@ -49,12 +62,14 @@ const stripes = Array.from({ length: 64 }, (_, index) => {
     const stripes = background.querySelectorAll("[data-stripe]");
 
     function updateStripeCount() {
+      if (!probe.offsetWidth) return;
+
       const count = Math.floor(window.innerWidth / probe.offsetWidth);
 
       console.assert(count <= stripes.length);
-      stripes.forEach(function setStripeVisibility(stripe, index) {
-        stripe.hidden = index >= count;
-      });
+      for (let index = 0; index < stripes.length; index += 1) {
+        stripes[index].hidden = index >= count;
+      }
     }
 
     updateStripeCount();
