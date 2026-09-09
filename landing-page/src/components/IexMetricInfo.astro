@@ -1,0 +1,80 @@
+---
+interface Props {
+  id: string;
+  label: string;
+}
+
+const { id, label } = Astro.props;
+---
+
+<span class="flex-none" data-iex-info>
+  <button
+    class="text-brown-60 flex cursor-help border-0 bg-transparent p-0"
+    type="button"
+    aria-label="More information"
+    aria-describedby={id}
+    data-iex-info-trigger
+  >
+    <svg class="size-3.5" viewBox="0 0 14 14" aria-hidden="true">
+      <circle
+        cx="7"
+        cy="7"
+        r="5.25"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.25"></circle>
+      <path
+        d="M7 6.25v3.25M7 4.25h.01"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.25"
+        stroke-linecap="round"></path>
+    </svg>
+  </button>
+  <span
+    class="bg-ink text-cream font-copy fixed inset-auto z-50 m-0 w-52 -translate-x-1/2 -translate-y-full rounded-sm border-0 px-3 py-2 text-xs leading-4.5 shadow-sm"
+    id={id}
+    role="tooltip"
+    popover="auto"
+    data-iex-info-popover
+  >
+    {label}
+  </span>
+</span>
+
+<script>
+  for (const info of document.querySelectorAll<HTMLElement>(
+    "[data-iex-info]",
+  )) {
+    const trigger = info.querySelector<HTMLButtonElement>(
+      "[data-iex-info-trigger]",
+    );
+    const popover = info.querySelector<HTMLElement>("[data-iex-info-popover]");
+    console.assert(trigger instanceof HTMLButtonElement);
+    console.assert(popover instanceof HTMLElement);
+    if (
+      !(trigger instanceof HTMLButtonElement) ||
+      !(popover instanceof HTMLElement)
+    ) {
+      continue;
+    }
+
+    const show = () => {
+      const bounds = trigger.getBoundingClientRect();
+      popover.style.left = `${bounds.left + bounds.width / 2}px`;
+      popover.style.top = `${bounds.top - 8}px`;
+      if (popover.matches(":popover-open") === false) popover.showPopover();
+    };
+    const hide = () => {
+      if (popover.matches(":popover-open")) popover.hidePopover();
+    };
+
+    trigger.addEventListener("mouseenter", show);
+    trigger.addEventListener("mouseleave", () => {
+      if (document.activeElement !== trigger) hide();
+    });
+    trigger.addEventListener("focus", show);
+    trigger.addEventListener("blur", hide);
+    trigger.addEventListener("click", show);
+  }
+</script>

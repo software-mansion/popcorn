@@ -1,0 +1,884 @@
+---
+import IexMetricInfo from "./IexMetricInfo.astro";
+
+const memory = [
+  { color: "bg-memory-processes", key: "processes", name: "processes" },
+  { color: "bg-memory-binary", key: "binary", name: "binary" },
+  { color: "bg-memory-code", key: "code", name: "code" },
+  { color: "bg-memory-ets", key: "ets", name: "ets" },
+  { color: "bg-memory-other", key: "other", name: "atom + other" },
+];
+
+const loadMetrics = [
+  { info: null, key: "runQueue", name: "run queue" },
+  {
+    info: "Reductions count the work performed by the BEAM VM each second.",
+    key: "reductionsFull",
+    name: "reductions / s",
+  },
+  { info: null, key: "processCountLimit", name: "processes / max" },
+  {
+    info: "Garbage collection runs reclaim memory from BEAM processes.",
+    key: "gcRuns",
+    name: "gc runs",
+  },
+  { info: null, key: "uptime", name: "uptime" },
+];
+
+const figures = [
+  { key: "memory", label: "Memory", value: "—" },
+  { key: "processCount", label: "Processes", value: "—" },
+  { key: "reductions", label: "Reductions/s", value: "—" },
+];
+---
+
+<section
+  class="bg-cream border-demo relative flex h-full w-full min-w-0 flex-col overflow-hidden rounded-md border antialiased"
+  aria-label="Interactive Elixir demo"
+  data-iex-demo
+>
+  <nav
+    class="border-demo-soft flex h-14 flex-none border-b md:h-18"
+    aria-label="IEx examples"
+  >
+    <div
+      class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto px-3 md:gap-2.5 md:px-5.5"
+    >
+      <button
+        class="border-demo font-copy text-ink md:font-label flex-none cursor-pointer rounded-full border px-3 py-2 text-xs leading-4 font-medium disabled:cursor-default disabled:opacity-40 md:rounded-sm md:px-4 md:py-2 md:text-sm md:leading-4.5"
+        type="button"
+        disabled
+        data-iex-example="greet">Greet a process</button
+      >
+      <button
+        class="border-demo font-copy text-ink md:font-label flex-none cursor-pointer rounded-full border px-3 py-2 text-xs leading-4 font-medium disabled:cursor-default disabled:opacity-40 md:rounded-sm md:px-4 md:py-2 md:text-sm md:leading-4.5"
+        type="button"
+        disabled
+        data-iex-example="sort">Enum.sort/1</button
+      >
+      <button
+        class="border-demo font-copy text-ink md:font-label flex-none cursor-pointer rounded-full border px-3 py-2 text-xs leading-4 font-medium disabled:cursor-default disabled:opacity-40 md:rounded-sm md:px-4 md:py-2 md:text-sm md:leading-4.5"
+        type="button"
+        disabled
+        data-iex-example="supervise">Supervise a crash</button
+      >
+    </div>
+
+    <button
+      class="border-demo-soft text-ink font-copy flex w-11.5 flex-none cursor-pointer items-center justify-center gap-2 border-l text-sm disabled:cursor-default disabled:opacity-35 md:w-auto md:border-0 md:px-5.5"
+      type="button"
+      aria-label="Restart IEx"
+      disabled
+      data-iex-restart
+    >
+      <svg class="size-3.5 flex-none" viewBox="0 0 14 14" aria-hidden="true">
+        <path
+          d="M12 7a5 5 0 1 1-1.6-3.7M12.2 1.4v2.9H9.3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"></path>
+      </svg>
+      <span class="hidden md:inline">Restart</span>
+    </button>
+  </nav>
+
+  <div class="@min-demos/demos:flex-row flex min-h-0 flex-1 flex-col">
+    <div
+      class="bg-cream-terminal @min-demos/demos:h-auto @min-demos/demos:flex-1 relative h-53 min-h-0 flex-none overflow-hidden md:h-75"
+    >
+      <div class="absolute inset-1" data-iex-terminal></div>
+      <div
+        class="bg-cream-terminal absolute inset-0 z-10 flex flex-col px-4 pt-5 pb-4 md:px-7 md:pt-6.5 md:pb-4.5"
+        data-iex-loading
+      >
+        <div class="flex flex-1 flex-col gap-3.5" aria-hidden="true">
+          <span class="bg-demo-soft h-2 w-1/2 rounded-sm"></span>
+        </div>
+        <span
+          class="font-label text-brown-60 text-xs leading-5.5 md:text-sm"
+          data-iex-loading-message>Loading runtime…</span
+        >
+      </div>
+    </div>
+
+    <aside
+      class="bg-cream @min-demos/demos:flex hidden w-95 flex-none flex-col gap-6 p-6.5"
+      aria-label="Runtime details"
+    >
+      <div class="flex flex-col gap-3">
+        <span
+          class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase"
+          >Memory</span
+        >
+        <strong
+          class="font-label text-cream-muted text-2xl leading-8 font-medium"
+          data-iex-stat="memory">— MB</strong
+        >
+        <div
+          class="bg-demo-soft flex h-2.5 gap-0.5 overflow-hidden rounded-sm"
+          aria-hidden="true"
+        >
+          {
+            memory.map(({ color, key }) => (
+              <span
+                class:list={["h-full min-w-0", color]}
+                data-iex-memory-segment={key}
+              />
+            ))
+          }
+        </div>
+        <dl
+          class="font-label text-sm leading-5.5 opacity-55"
+          data-iex-memory-list
+        >
+          {
+            memory.map(({ color, key, name }) => (
+              <div class="flex items-center gap-3 py-0.75">
+                <span
+                  class:list={["size-2 flex-none rounded-sm", color]}
+                  aria-hidden="true"
+                />
+                <dt class="text-brown-70 min-w-0 flex-1">{name}</dt>
+                <dd
+                  class="text-ink w-19 flex-none text-right"
+                  data-iex-stat={`memory-${key}`}
+                >
+                  —
+                </dd>
+              </div>
+            ))
+          }
+        </dl>
+      </div>
+
+      <div class="border-demo-soft flex flex-col gap-2 border-t pt-5">
+        <span
+          class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase"
+          >Load</span
+        >
+        {
+          loadMetrics.map(({ info, key, name }) => (
+            <dl class="font-label flex min-w-0 items-center gap-3 text-sm leading-5.5">
+              <dt class="text-brown-70 flex min-w-0 flex-1 items-center gap-1.5">
+                {name}
+                {info !== null && (
+                  <IexMetricInfo id={`iex-${key}-info`} label={info} />
+                )}
+              </dt>
+              <dd
+                class="text-ink w-27.5 flex-none text-right whitespace-nowrap"
+                data-iex-stat={key}
+              >
+                —
+              </dd>
+            </dl>
+          ))
+        }
+      </div>
+
+      <div class="border-demo-soft flex min-h-0 flex-col gap-2 border-t pt-5">
+        <span
+          class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase"
+          >Top processes</span
+        >
+        <dl
+          class="font-label mt-1.5 flex min-w-0 flex-col text-sm leading-5.5"
+          data-iex-processes
+        >
+          <div
+            class="text-cream-muted flex min-w-0 items-baseline gap-3.5 py-0.75"
+          >
+            <dt class="sr-only">Processes</dt>
+            <dd class="min-w-0 flex-1 truncate">no processes yet</dd>
+          </div>
+        </dl>
+      </div>
+    </aside>
+  </div>
+
+  <footer
+    class="border-demo-soft bg-cream @min-demos/demos:hidden relative flex-none border-t px-4 py-3.5 md:px-5.5 md:py-4.5"
+  >
+    <div class="grid min-w-0 grid-cols-3 gap-3">
+      {
+        figures.map(({ key, label, value }) => (
+          <details class="group min-w-0" name="iex-statistics">
+            <summary class="focus-visible:outline-orange flex cursor-pointer list-none flex-col gap-0.75 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 md:gap-1 [&::-webkit-details-marker]:hidden">
+              <span class="font-label text-brown-60 md:tracking-label flex min-w-0 items-center gap-1 text-xs leading-4 font-medium tracking-normal uppercase md:gap-1.5 md:leading-4.5">
+                <span class="truncate">{label}</span>
+                <svg
+                  class="size-2 flex-none transition-transform group-open:rotate-180 md:size-3"
+                  viewBox="0 0 12 8"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M1 6.5 6 1.5l5 5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <span
+                class="font-label text-ink truncate text-sm leading-5.5 md:text-2xl md:leading-8"
+                data-iex-stat={key}
+              >
+                {value}
+              </span>
+            </summary>
+
+            {key === "memory" && (
+              <div class="border-demo-soft bg-cream absolute inset-x-0 bottom-full z-10 flex max-h-53 flex-col gap-3 overflow-y-auto border-t p-4 md:max-h-75 md:p-5.5">
+                <div class="flex items-end justify-between gap-4">
+                  <span class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase">
+                    Total memory
+                  </span>
+                  <strong
+                    class="font-label text-cream-muted text-lg leading-5.5 font-normal"
+                    data-iex-stat="memory"
+                  >
+                    —
+                  </strong>
+                </div>
+                <div
+                  class="bg-demo-soft flex h-2.5 flex-none gap-0.5 overflow-hidden rounded-sm"
+                  aria-hidden="true"
+                >
+                  {memory.map(({ color, key: memoryKey }) => (
+                    <span
+                      class:list={["h-full min-w-0", color]}
+                      data-iex-memory-segment={memoryKey}
+                    />
+                  ))}
+                </div>
+                <dl
+                  class="font-label text-sm leading-5.5 opacity-55"
+                  data-iex-memory-list
+                >
+                  {memory.map(({ color, key: memoryKey, name }) => (
+                    <div class="flex items-center gap-3 py-0.5">
+                      <span
+                        class:list={["size-2 flex-none rounded-sm", color]}
+                        aria-hidden="true"
+                      />
+                      <dt class="text-brown-70 min-w-0 flex-1">{name}</dt>
+                      <dd
+                        class="text-ink w-19 flex-none text-right"
+                        data-iex-stat={`memory-${memoryKey}`}
+                      >
+                        —
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
+            {key === "reductions" && (
+              <div class="border-demo-soft bg-cream absolute inset-x-0 bottom-full z-10 flex max-h-53 flex-col gap-2 overflow-y-auto border-t p-4 md:max-h-75 md:p-5.5">
+                <span class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase">
+                  Load
+                </span>
+                {loadMetrics.map(({ info, key: metricKey, name }) => (
+                  <dl class="font-label flex min-w-0 items-center gap-3 text-sm leading-5.5">
+                    <dt class="text-brown-70 flex min-w-0 flex-1 items-center gap-1.5">
+                      {name}
+                      {info !== null && (
+                        <IexMetricInfo
+                          id={`iex-compact-${metricKey}-info`}
+                          label={info}
+                        />
+                      )}
+                    </dt>
+                    <dd
+                      class="text-ink w-27.5 flex-none text-right whitespace-nowrap"
+                      data-iex-stat={metricKey}
+                    >
+                      —
+                    </dd>
+                  </dl>
+                ))}
+              </div>
+            )}
+
+            {key === "processCount" && (
+              <div class="border-demo-soft bg-cream absolute inset-x-0 bottom-full z-10 flex max-h-53 flex-col gap-2 overflow-y-auto border-t p-4 md:max-h-75 md:p-5.5">
+                <span class="font-label text-brown-60 tracking-label text-xs leading-4.5 font-medium uppercase">
+                  Top processes
+                </span>
+                <dl
+                  class="font-label flex min-w-0 flex-col text-sm leading-5.5"
+                  data-iex-processes
+                >
+                  <div class="text-cream-muted flex min-w-0 items-baseline gap-3.5 py-0.75">
+                    <dt class="sr-only">Processes</dt>
+                    <dd class="min-w-0 flex-1 truncate">no processes yet</dd>
+                  </div>
+                </dl>
+              </div>
+            )}
+          </details>
+        ))
+      }
+    </div>
+  </footer>
+
+  <div
+    class="bg-demo-soft absolute inset-x-0 bottom-0 z-20 h-0.75"
+    data-iex-progress
+  >
+    <div class="bg-orange h-full w-3/5 animate-pulse"></div>
+  </div>
+
+  <p class="sr-only" aria-live="polite" data-iex-status>
+    Starting the Elixir runtime
+  </p>
+</section>
+
+<script>
+  import type { Popcorn as PopcornInstance } from "@swmansion/popcorn";
+  import type {
+    FitAddon as FitAddonInstance,
+    Terminal as TerminalInstance,
+  } from "ghostty-web";
+
+  const TERMINAL_FONT =
+    'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
+
+  const STATS_EVAL = `
+    {InitialReductions, _} = erlang:statistics(reductions),
+    spawn(fun() ->
+      Loop = fun Next(PreviousReductions) ->
+        timer:sleep(1000),
+        Total = erlang:memory(total),
+        ProcessesMemory = erlang:memory(processes),
+        Binary = erlang:memory(binary),
+        Code = erlang:memory(code),
+        Ets = erlang:memory(ets),
+        Atom = erlang:memory(atom),
+        Other = erlang:max(0, Total - ProcessesMemory - Binary - Code - Ets - Atom),
+        {CurrentReductions, _} = erlang:statistics(reductions),
+        {GcRuns, _, _} = erlang:statistics(garbage_collection),
+        {Uptime, _} = erlang:statistics(wall_clock),
+        ProcessRows = lists:sublist([
+          Row || {_, Row} <- lists:reverse(lists:keysort(1, [
+            {ProcessMemory, #{
+              pid => list_to_binary(["#PID", pid_to_list(Pid)]),
+              name => list_to_binary(case RegisteredName of
+                [] -> io_lib:format("~p.~p", [Module, Function]);
+                _ -> atom_to_list(RegisteredName)
+              end)
+            }} ||
+              Pid <- processes(),
+              [{memory, ProcessMemory}, {registered_name, RegisteredName},
+               {current_function, {Module, Function, _}}] <-
+                [process_info(Pid, [memory, registered_name, current_function])]
+          ]))
+        ], 3),
+        wasm:send(#{popcorn_demo_stats => #{
+          memory => #{
+            total => Total,
+            processes => ProcessesMemory,
+            binary => Binary,
+            code => Code,
+            ets => Ets,
+            other => Atom + Other
+          },
+          run_queue => erlang:statistics(run_queue),
+          reductions => CurrentReductions - PreviousReductions,
+          process_count => erlang:system_info(process_count),
+          process_limit => erlang:system_info(process_limit),
+          gc_runs => GcRuns,
+          uptime => Uptime,
+          processes => ProcessRows
+        }}),
+        Next(CurrentReductions)
+      end,
+      Loop(InitialReductions)
+    end),
+    ok.
+  `;
+
+  const SHELL_ARGS = [
+    "-eval",
+    STATS_EVAL,
+    "-elixir_root",
+    "/lib",
+    "-user",
+    "elixir",
+    "-extra",
+    "--no-halt",
+    "+iex",
+    "--dot-iex",
+    "",
+  ];
+
+  const EXAMPLES = {
+    greet: [
+      'pid = spawn(fn -> receive do {:greet, name} -> IO.puts("Hello, #{name}") end end)',
+      'send(pid, {:greet, "Popcorn"})',
+    ],
+    sort: ["Enum.sort([:popcorn, :beam, :elixir])"],
+    supervise: [
+      "{:ok, supervisor} = Supervisor.start_link([{Agent, fn -> 0 end}], strategy: :one_for_one)",
+      "[{_, pid, _, _}] = Supervisor.which_children(supervisor)",
+      "Process.exit(pid, :kill)",
+      "Supervisor.which_children(supervisor)",
+    ],
+  };
+
+  type RuntimeStats = {
+    memory: {
+      total: number;
+      processes: number;
+      binary: number;
+      code: number;
+      ets: number;
+      other: number;
+    };
+    run_queue: number;
+    reductions: number;
+    process_count: number;
+    process_limit: number;
+    gc_runs: number;
+    uptime: number;
+    processes: Array<{ pid: string; name: string }>;
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting !== true) continue;
+      observer.unobserve(entry.target);
+      setupDemo(entry.target as HTMLElement);
+    }
+  });
+
+  for (const demo of document.querySelectorAll<HTMLElement>(
+    "[data-iex-demo]",
+  )) {
+    observer.observe(demo);
+  }
+
+  async function setupDemo(demo: HTMLElement) {
+    const terminalElement = demo.querySelector<HTMLElement>(
+      "[data-iex-terminal]",
+    );
+    const loadingElement =
+      demo.querySelector<HTMLElement>("[data-iex-loading]");
+    const loadingMessage = demo.querySelector<HTMLElement>(
+      "[data-iex-loading-message]",
+    );
+    const progress = demo.querySelector<HTMLElement>("[data-iex-progress]");
+    const status = demo.querySelector<HTMLElement>("[data-iex-status]");
+    const restart = demo.querySelector<HTMLButtonElement>("[data-iex-restart]");
+    const exampleButtons =
+      demo.querySelectorAll<HTMLButtonElement>("[data-iex-example]");
+
+    console.assert(terminalElement instanceof HTMLElement);
+    console.assert(loadingElement instanceof HTMLElement);
+    console.assert(loadingMessage instanceof HTMLElement);
+    console.assert(progress instanceof HTMLElement);
+    console.assert(status instanceof HTMLElement);
+    console.assert(restart instanceof HTMLButtonElement);
+    if (
+      !(terminalElement instanceof HTMLElement) ||
+      !(loadingElement instanceof HTMLElement) ||
+      !(loadingMessage instanceof HTMLElement) ||
+      !(progress instanceof HTMLElement) ||
+      !(status instanceof HTMLElement) ||
+      !(restart instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    let popcorn: PopcornInstance | null = null;
+    let terminal: TerminalInstance | null = null;
+    let stopStatistics: (() => void) | null = null;
+
+    terminalElement.addEventListener(
+      "wheel",
+      (event) => {
+        if (terminal === null) return;
+        if (shouldChainTerminalWheel(terminal, event) === false) return;
+        event.stopImmediatePropagation();
+      },
+      { capture: true },
+    );
+
+    for (const button of exampleButtons) {
+      button.addEventListener("click", () => {
+        if (popcorn === null) return;
+
+        const name = button.dataset.iexExample;
+        console.assert(
+          name === "greet" || name === "sort" || name === "supervise",
+        );
+        if (name !== "greet" && name !== "sort" && name !== "supervise") return;
+
+        runExample(popcorn, EXAMPLES[name]);
+      });
+    }
+
+    restart.addEventListener("click", async () => {
+      if (stopStatistics !== null) stopStatistics();
+      if (popcorn !== null) popcorn.deinit();
+      if (terminal !== null) terminal.dispose();
+      popcorn = null;
+      terminal = null;
+      stopStatistics = null;
+      terminalElement.replaceChildren();
+      ({ popcorn, terminal, stopStatistics } = await startTerminal(
+        demo,
+        terminalElement,
+        loadingElement,
+        loadingMessage,
+        progress,
+        status,
+        exampleButtons,
+        restart,
+      ));
+    });
+
+    ({ popcorn, terminal, stopStatistics } = await startTerminal(
+      demo,
+      terminalElement,
+      loadingElement,
+      loadingMessage,
+      progress,
+      status,
+      exampleButtons,
+      restart,
+    ));
+  }
+
+  async function startTerminal(
+    demo: HTMLElement,
+    terminalElement: HTMLElement,
+    loadingElement: HTMLElement,
+    loadingMessage: HTMLElement,
+    progress: HTMLElement,
+    status: HTMLElement,
+    exampleButtons: NodeListOf<HTMLButtonElement>,
+    restart: HTMLButtonElement,
+  ) {
+    resetStatistics(demo);
+    setLoading(exampleButtons, restart, loadingElement, progress, true);
+    loadingMessage.textContent = "Loading runtime…";
+    status.textContent = "Starting the Elixir runtime";
+    terminalElement.dataset.ready = "false";
+    await nextFrame();
+
+    if (self.crossOriginIsolated !== true) {
+      const message = "Cross-origin isolation is required to start IEx";
+      loadingMessage.textContent = message;
+      progress.classList.add("hidden");
+      status.textContent = message;
+      return { popcorn: null, terminal: null, stopStatistics: null };
+    }
+
+    const [{ Popcorn }, { FitAddon, init, Terminal }] = await Promise.all([
+      import("@swmansion/popcorn"),
+      import("ghostty-web"),
+    ]);
+    await init();
+
+    const styles = getComputedStyle(document.documentElement);
+    const terminal = new Terminal({
+      cursorBlink: true,
+      cursorStyle: "bar",
+      fontFamily: TERMINAL_FONT,
+      fontSize: window.matchMedia("(max-width: 47.999rem)").matches ? 12 : 14,
+      scrollback: 1_000,
+      theme: {
+        background: styles.getPropertyValue("--color-cream-terminal").trim(),
+        foreground: styles.getPropertyValue("--color-ink").trim(),
+        cursor: styles.getPropertyValue("--color-orange").trim(),
+        cursorAccent: styles.getPropertyValue("--color-cream-terminal").trim(),
+        black: styles.getPropertyValue("--color-ink").trim(),
+        red: styles.getPropertyValue("--color-orange-text").trim(),
+        green: styles.getPropertyValue("--color-brown-70").trim(),
+        yellow: styles.getPropertyValue("--color-orange").trim(),
+        blue: styles.getPropertyValue("--color-brown-60").trim(),
+        magenta: styles.getPropertyValue("--color-orange").trim(),
+        cyan: styles.getPropertyValue("--color-brown-70").trim(),
+        white: styles.getPropertyValue("--color-cream").trim(),
+        brightBlack: styles.getPropertyValue("--color-brown-60").trim(),
+        brightRed: styles.getPropertyValue("--color-orange").trim(),
+        brightGreen: styles.getPropertyValue("--color-brown-70").trim(),
+        brightYellow: styles.getPropertyValue("--color-orange").trim(),
+        brightBlue: styles.getPropertyValue("--color-brown-60").trim(),
+        brightMagenta: styles.getPropertyValue("--color-orange").trim(),
+        brightCyan: styles.getPropertyValue("--color-brown-70").trim(),
+        brightWhite: styles.getPropertyValue("--color-cream").trim(),
+        selectionBackground: styles
+          .getPropertyValue("--color-orange-20")
+          .trim(),
+      },
+    });
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+
+    const nativeFocus = terminalElement.focus.bind(terminalElement);
+    terminalElement.focus = () => nativeFocus({ preventScroll: true });
+    terminal.open(terminalElement);
+    const dimensions = fitTerminal(terminal, fitAddon);
+
+    const result = await Popcorn.init({
+      beam: {
+        otpAssetsRoot: "/_astro/otp/",
+        env: { TERM: "xterm-256color" },
+        extraArgs: SHELL_ARGS,
+      },
+      tty: { size: dimensions },
+      timeoutsMs: { boot: 30_000 },
+      onStdout: (chunk) => terminal.write(chunk),
+      onStderr: (chunk) => terminal.write(chunk),
+      onError: (error) => {
+        status.textContent = `Runtime ${error.kind}: ${error.data}`;
+      },
+    });
+
+    if (result.ok === false) {
+      loadingElement.classList.remove("hidden");
+      loadingMessage.textContent = result.error.message;
+      progress.classList.add("hidden");
+      status.textContent = result.error.message;
+      terminal.dispose();
+      terminalElement.replaceChildren();
+      return { popcorn: null, terminal: null, stopStatistics: null };
+    }
+
+    const popcorn = result.data;
+    terminal.onData((data) => {
+      const input = popcorn.writeStdin(data);
+      if (input.ok === false) status.textContent = input.error.message;
+    });
+    terminal.onResize(({ cols, rows }) => {
+      const resize = popcorn.resizeTty(cols, rows);
+      if (resize.ok === false) status.textContent = resize.error.message;
+    });
+
+    fitAddon.observeResize();
+    const fitted = fitTerminal(terminal, fitAddon);
+    const resize = popcorn.resizeTty(fitted.columns, fitted.rows);
+    console.assert(resize.ok);
+    terminalElement.dataset.ready = "true";
+    status.textContent = "IEx is ready";
+    setLoading(exampleButtons, restart, loadingElement, progress, false);
+    await nextFrame();
+    terminal.options.fontFamily = TERMINAL_FONT;
+    const redrawn = fitTerminal(terminal, fitAddon);
+    const redrawResize = popcorn.resizeTty(redrawn.columns, redrawn.rows);
+    console.assert(redrawResize.ok);
+    const stopStatistics = popcorn.onEvent((event) => {
+      const statistics = getRuntimeStatistics(event);
+      if (statistics !== null) updateStatistics(demo, statistics);
+    });
+
+    return { popcorn, terminal, stopStatistics };
+  }
+
+  function runExample(popcorn: PopcornInstance, commands: string[]) {
+    for (const command of commands) {
+      const input = popcorn.writeStdin(`${command}\r`);
+      console.assert(input.ok);
+    }
+  }
+
+  function shouldChainTerminalWheel(
+    terminal: TerminalInstance,
+    event: WheelEvent,
+  ) {
+    if (terminal.buffer.active.type !== "normal") return false;
+    if (event.deltaY === 0) return false;
+
+    const scrollbackLength = terminal.getScrollbackLength();
+    if (scrollbackLength === 0) return true;
+
+    const viewportY = terminal.getViewportY();
+    if (event.deltaY > 0) return viewportY <= 0;
+    return viewportY >= scrollbackLength;
+  }
+
+  function setLoading(
+    exampleButtons: NodeListOf<HTMLButtonElement>,
+    restart: HTMLButtonElement,
+    loadingElement: HTMLElement,
+    progress: HTMLElement,
+    loading: boolean,
+  ) {
+    restart.disabled = loading;
+    for (const button of exampleButtons) button.disabled = loading;
+    loadingElement.classList.toggle("hidden", loading === false);
+    progress.classList.toggle("hidden", loading === false);
+  }
+
+  function getRuntimeStatistics(event: unknown): RuntimeStats | null {
+    if (
+      typeof event !== "object" ||
+      event === null ||
+      !("popcorn_demo_stats" in event)
+    ) {
+      return null;
+    }
+
+    return event.popcorn_demo_stats as RuntimeStats;
+  }
+
+  function updateStatistics(demo: HTMLElement, statistics: RuntimeStats) {
+    const { memory } = statistics;
+    setStatistic(demo, "memory", formatBytes(memory.total));
+    setStatistic(demo, "memory-processes", formatBytes(memory.processes));
+    setStatistic(demo, "memory-binary", formatBytes(memory.binary));
+    setStatistic(demo, "memory-code", formatBytes(memory.code));
+    setStatistic(demo, "memory-ets", formatBytes(memory.ets));
+    setStatistic(demo, "memory-other", formatBytes(memory.other));
+    setStatistic(demo, "runQueue", String(statistics.run_queue));
+    setStatistic(demo, "reductions", formatCompact(statistics.reductions));
+    setStatistic(demo, "reductionsFull", formatInteger(statistics.reductions));
+    setStatistic(demo, "processCount", String(statistics.process_count));
+    setStatistic(
+      demo,
+      "processCountLimit",
+      `${statistics.process_count} / ${statistics.process_limit}`,
+    );
+    setStatistic(demo, "gcRuns", formatInteger(statistics.gc_runs));
+    setStatistic(demo, "uptime", formatDuration(statistics.uptime));
+    renderProcesses(demo, statistics.processes);
+
+    for (const segment of demo.querySelectorAll<HTMLElement>(
+      "[data-iex-memory-segment]",
+    )) {
+      const key = segment.dataset.iexMemorySegment as keyof typeof memory;
+      segment.style.width = `${(memory[key] / memory.total) * 100}%`;
+    }
+
+    for (const list of demo.querySelectorAll("[data-iex-memory-list]")) {
+      list.classList.remove("opacity-55");
+    }
+    for (const total of demo.querySelectorAll('[data-iex-stat="memory"]')) {
+      total.classList.remove("text-cream-muted");
+    }
+  }
+
+  function resetStatistics(demo: HTMLElement) {
+    for (const statistic of demo.querySelectorAll<HTMLElement>(
+      "[data-iex-stat]",
+    )) {
+      statistic.textContent = "—";
+    }
+    for (const segment of demo.querySelectorAll<HTMLElement>(
+      "[data-iex-memory-segment]",
+    )) {
+      segment.style.width = "0";
+    }
+    for (const list of demo.querySelectorAll("[data-iex-memory-list]")) {
+      list.classList.add("opacity-55");
+    }
+    for (const total of demo.querySelectorAll('[data-iex-stat="memory"]')) {
+      total.classList.add("text-cream-muted");
+    }
+    for (const processes of demo.querySelectorAll("[data-iex-processes]")) {
+      processes.innerHTML = `
+        <div class="text-cream-muted flex min-w-0 items-baseline gap-3.5 py-0.75">
+          <dt class="sr-only">Processes</dt>
+          <dd class="min-w-0 flex-1 truncate">no processes yet</dd>
+        </div>
+      `;
+    }
+  }
+
+  function renderProcesses(
+    demo: HTMLElement,
+    processRows: RuntimeStats["processes"],
+  ) {
+    for (const list of demo.querySelectorAll("[data-iex-processes]")) {
+      list.replaceChildren(
+        ...processRows.map(({ pid, name }) => {
+          const row = document.createElement("div");
+          row.className =
+            "flex min-w-0 items-baseline gap-3.5 overflow-hidden py-0.75";
+
+          const processId = document.createElement("dt");
+          processId.className = "text-ink w-29.5 flex-none";
+          processId.textContent = pid;
+
+          const processName = document.createElement("dd");
+          processName.className = "text-brown-60 min-w-0 flex-1 truncate";
+          processName.textContent = name;
+
+          row.append(processId, processName);
+          return row;
+        }),
+      );
+    }
+  }
+
+  function setStatistic(demo: HTMLElement, name: string, value: string) {
+    for (const statistic of demo.querySelectorAll<HTMLElement>(
+      `[data-iex-stat="${name}"]`,
+    )) {
+      statistic.textContent = value;
+    }
+  }
+
+  function formatBytes(bytes: number) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function formatCompact(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)} K`;
+    return value.toFixed(1);
+  }
+
+  function formatInteger(value: number) {
+    return Math.round(value).toLocaleString("en-US").replaceAll(",", " ");
+  }
+
+  function formatDuration(milliseconds: number) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return [hours, minutes, seconds % 60]
+      .map((part) => String(part).padStart(2, "0"))
+      .join(":");
+  }
+
+  function fitTerminal(terminal: TerminalInstance, fitAddon: FitAddonInstance) {
+    terminal.renderer?.remeasureFont();
+    const dimensions = fitAddon.proposeDimensions();
+    if (dimensions === undefined) {
+      throw new Error("Terminal dimensions are unavailable");
+    }
+
+    terminal.resize(dimensions.cols, dimensions.rows);
+    return { columns: dimensions.cols, rows: dimensions.rows };
+  }
+
+  function nextFrame() {
+    return new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  }
+</script>
+
+<style is:global>
+  [data-iex-terminal],
+  [data-iex-terminal] textarea {
+    caret-color: var(--color-transparent);
+  }
+
+  [data-iex-terminal] textarea {
+    color: var(--color-transparent);
+    background: var(--color-transparent);
+  }
+
+  [data-iex-terminal] canvas {
+    max-width: none;
+  }
+</style>
