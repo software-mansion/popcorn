@@ -118,11 +118,13 @@ const perforations = Array.from({ length: 48 });
 </style>
 
 <script>
-  document.querySelectorAll("[data-movie-strip]").forEach((strip) => {
+  for (const strip of document.querySelectorAll<HTMLElement>(
+    "[data-movie-strip]",
+  )) {
     const track = strip.querySelector("[data-thumbnail-track]");
 
     console.assert(track instanceof HTMLElement);
-    if (!(track instanceof HTMLElement)) return;
+    if (!(track instanceof HTMLElement)) continue;
 
     track.addEventListener(
       "wheel",
@@ -153,12 +155,36 @@ const perforations = Array.from({ length: 48 });
       { root: track, threshold: [0.65] },
     ).observe(lastThumbnail!);
 
-    thumbnails.forEach((thumbnail) => {
+    for (const thumbnail of thumbnails) {
       thumbnail.addEventListener("click", () => {
-        thumbnails.forEach((candidate) => {
+        const stage = strip
+          .closest("#demos")
+          ?.querySelector("[data-demo-stage]");
+        const demo = thumbnail.dataset.demo;
+        if (!(stage instanceof HTMLElement)) return;
+        const panel = stage?.querySelector<HTMLElement>(
+          `[data-demo-panel="${demo}"]`,
+        );
+        if (!(panel instanceof HTMLElement)) return;
+
+        for (const candidate of thumbnails) {
           const active = candidate === thumbnail;
           candidate.setAttribute("aria-pressed", String(active));
-        });
+        }
+        for (const candidate of stage.querySelectorAll<HTMLElement>(
+          "[data-demo-panel]",
+        )) {
+          const active = candidate === panel;
+          const persistent = candidate.dataset.demoPanel === "iex";
+          candidate.hidden = !active && !persistent;
+          candidate.classList.toggle("absolute", !active && persistent);
+          candidate.classList.toggle("inset-x-0", !active && persistent);
+          candidate.classList.toggle("top-0", !active && persistent);
+          candidate.classList.toggle("invisible", !active && persistent);
+          candidate.classList.toggle("pointer-events-none", !active);
+          candidate.toggleAttribute("inert", !active);
+          candidate.setAttribute("aria-hidden", String(!active));
+        }
 
         const horizontal = getComputedStyle(strip).flexDirection === "column";
 
@@ -175,8 +201,10 @@ const perforations = Array.from({ length: 48 });
           });
         }
 
-        console.log(`Selected demo: ${thumbnail.dataset.demo}`);
+        strip
+          .closest("#demos")
+          ?.dispatchEvent(new CustomEvent("demo:select", { detail: { demo } }));
       });
-    });
-  });
+    }
+  }
 </script>

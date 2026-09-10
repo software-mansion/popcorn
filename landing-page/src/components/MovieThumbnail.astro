@@ -3,9 +3,10 @@ interface Props {
   title: string;
   demo: string;
   active?: boolean;
+  disabled?: boolean;
 }
 
-const { title, demo, active = false } = Astro.props;
+const { title, demo, active = false, disabled = false } = Astro.props;
 ---
 
 <button
@@ -13,6 +14,7 @@ const { title, demo, active = false } = Astro.props;
   type="button"
   data-demo={demo}
   aria-pressed={active}
+  disabled={disabled}
 >
   <span
     class="@min-demos/demos:h-11.5 @min-demos/demos:px-4 after:bg-brown-70 relative flex h-9.5 flex-none items-center justify-between gap-2 px-3 after:absolute after:inset-x-4 after:bottom-0 after:h-px"
@@ -42,5 +44,10 @@ const { title, demo, active = false } = Astro.props;
   .thumbnail:focus-visible {
     outline: 2px solid var(--color-cream);
     outline-offset: -5px;
+  }
+
+  .thumbnail:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 </style>

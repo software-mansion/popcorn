@@ -9,7 +9,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 const run = promisify(execFile);
 const gameOfLifeRoot = fileURLToPath(
-  new URL("../examples/game-of-life", import.meta.url),
+  new URL("./game-of-life", import.meta.url),
 );
 
 function compileGameOfLife() {

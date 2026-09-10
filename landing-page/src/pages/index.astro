@@ -1,6 +1,7 @@
 ---
 import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
+import GameOfLifeDemo from "../components/GameOfLifeDemo.astro";
 import IexDemo from "../components/IexDemo.astro";
 import FeatureCard from "../components/FeatureCard.astro";
 import Footer from "../components/Footer.astro";
@@ -102,16 +103,28 @@ const useCases = [
     </Heading>
 
     <div
-      class="@container/demos relative z-10 mx-auto w-full max-w-352 2xl:max-w-480"
+      class="@container/demos relative z-10 mx-auto w-full max-w-352 px-3 md:px-6 2xl:max-w-480 2xl:px-0"
     >
       <div
         class="@min-demos/demos:max-w-none @min-demos/demos:flex-row @min-demos/demos:gap-6 mx-auto flex max-w-208 flex-col gap-7 md:gap-9"
       >
         <MovieStrip />
-        <div
-          class="@min-demos/demos:h-203 @min-demos/demos:flex-1 @min-demos/demos:p-0 h-85 min-w-0 px-3 md:h-116 md:px-6"
-        >
-          <IexDemo />
+        <div class="@min-demos/demos:flex-1 relative min-w-0" data-demo-stage>
+          <div
+            class="@min-demos/demos:h-203 h-85 md:h-116"
+            data-demo-panel="iex"
+          >
+            <IexDemo />
+          </div>
+          <div
+            class="@min-demos/demos:h-203 md:h-208"
+            data-demo-panel="game-of-life"
+            aria-hidden="true"
+            inert
+            hidden
+          >
+            <GameOfLifeDemo />
+          </div>
         </div>
       </div>
     </div>
