@@ -110,7 +110,13 @@ defmodule Popcorn do
       ],
       leave: [
         boot_module,
-        :application_controller
+        :application_controller,
+        # Works around an OTP 26 compiler bug (beam_ssa_alias crashes on the
+        # crypto module's NIF stubs). It only surfaces once treeshaking removes
+        # the original `on_load/0`, whose `erlang:load_nif` call otherwise makes
+        # the compiler skip module-level SSA optimizations. Fixed in OTP 27,
+        # remove once OTP 26 is no longer supported.
+        :crypto
       ],
       drop: [
         Code.Formatter,

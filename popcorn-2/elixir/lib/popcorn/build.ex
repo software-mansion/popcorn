@@ -30,6 +30,7 @@ defmodule Popcorn.Build do
     :erts,
     :kernel,
     :stdlib,
+    :crypto,
     # Elixir
     :elixir,
     :logger

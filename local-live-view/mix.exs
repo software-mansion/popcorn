@@ -82,6 +82,8 @@ defmodule LocalLiveView.MixProject do
       {:phoenix_ecto, "~> 4.6", runtime: false},
       {:ecto, "~> 3.12", runtime: false},
       {:plug, "~> 1.14", runtime: false},
+      # plug_crypto is needed in runtime for signing LV tokens
+      {:plug_crypto, "~> 2.0"},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
       {:file_system, "~> 1.0", targets: [:host, :all]}
