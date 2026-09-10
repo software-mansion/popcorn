@@ -32,11 +32,15 @@ defmodule Treeshake.ModuleIndex do
     {info.module, info}
   end
 
+  # Hardcoded calls can be keyed by a module (added to all its functions)
+  # or by an MFA (added to that function only).
   defp add_hardcoded_calls(functions, module, hardcoded) do
-    case Map.fetch(hardcoded.calls, module) do
-      {:ok, calls} -> Enum.map(functions, &%{&1 | calls: calls ++ &1.calls})
-      :error -> functions
-    end
+    module_calls = Map.get(hardcoded.calls, module, [])
+
+    Enum.map(functions, fn fun_info ->
+      fun_calls = Map.get(hardcoded.calls, {module, fun_info.name, fun_info.arity}, [])
+      %{fun_info | calls: module_calls ++ fun_calls ++ fun_info.calls}
+    end)
   end
 
   defp add_hardcoded_behaviour_impls(behaviour_impls, module, hardcoded) do

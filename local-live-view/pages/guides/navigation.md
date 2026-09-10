@@ -9,13 +9,13 @@ code running in Wasm, the Phoenix LiveView JavaScript runtime, and the browser.
 
 Navigation behaves differently depending on how an LLV view is rendered.
 
-* **Hosted** - the LLV view is rendered as a child of a connected Phoenix
+- **Hosted** - the LLV view is rendered as a child of a connected Phoenix
   LiveView. Phoenix already owns the browser history, the `popstate` handler and
   the click handler for patch links. LLV routes its navigation through Phoenix
   and listens for the resulting `phx:navigate` event to re-run `handle_params/3`
   in its own views.
 
-* **Standalone** - the LLV view is rendered directly in a HEEx or HTML template,
+- **Standalone** - the LLV view is rendered directly in a HEEx or HTML template,
   with no host LiveView on the page. There is nothing from Phoenix to lean on, so
   LLV owns navigation itself: it intercepts patch-link clicks, writes the browser
   history entry, and handles `popstate`.
@@ -53,9 +53,9 @@ The state update happens client-side: `handle_params/3` runs in the Wasm VM and
 its diff is applied to the DOM with no network call. The Wasm side then emits an
 `llv:navigate` event, and how the history entry is written depends on the mode:
 
-* **Standalone** - the JS layer writes the browser history entry directly. No
+- **Standalone** - the JS layer writes the browser history entry directly. No
   server is involved.
-* **Hosted** - the `llv:navigate` event hands the navigation to Phoenix, which
+- **Hosted** - the `llv:navigate` event hands the navigation to Phoenix, which
   does a server round-trip to update the history it keeps on the LiveView side.
   This round-trip is triggered after LLV emits `llv:navigate`, not as part of the
   `push_patch/2` state update itself.
@@ -63,6 +63,25 @@ its diff is applied to the DOM with no network call. The Wasm side then emits an
 As in a normal Phoenix LiveView, clicking a `<.link patch={...}>` also invokes
 `handle_params/3` with the new params. The behaviour is identical to LiveView, so
 the same link works without any LLV-specific markup.
+
+## `redirect/2`
+
+`LocalLiveView.redirect/2` mirrors `Phoenix.LiveView.redirect/2`: it performs a
+full-page redirect to a path or an external URL:
+
+```elixir
+def handle_event("checkout", _params, socket) do
+  {:noreply, redirect(socket, to: "/checkout")}
+end
+```
+
+The difference from server-side redirect is that Flash isn't carried over
+to the next page. If that's required, use `LocalLiveView.push_server_event/3`
+and trigger the redirect on the server.
+
+`push_navigate/2` is not supported. A live redirect mounts another LiveView
+over the existing socket through the router, and local views are not mounted
+at a router. Calling it logs an error and is ignored.
 
 ## `phx:navigate`
 
@@ -94,7 +113,7 @@ LLV's default handling of an Elixir-initiated `push_patch/2`, letting you take
 full control of the browser history (for example, to integrate with a custom
 router).
 
-  * arguments: `(href, replace)` - the target URL and whether the entry should
-    replace the current one instead of being pushed
-  * scope: only the `push_patch/2` path. Patch-link clicks and back/forward
-    navigation are unaffected.
+- arguments: `(href, replace)` - the target URL and whether the entry should
+  replace the current one instead of being pushed
+- scope: only the `push_patch/2` path. Patch-link clicks and back/forward
+  navigation are unaffected.

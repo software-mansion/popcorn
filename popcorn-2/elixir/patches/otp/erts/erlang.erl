@@ -105,6 +105,7 @@
     garbage_collect/1,
     binary_to_term/1,
     term_to_binary/1,
+    term_to_binary/2,
     timestamp/0,
     universaltime/0,
     localtime/0,
@@ -3131,6 +3132,13 @@ binary_to_term(_Binary) ->
 -spec term_to_binary(Term :: any()) -> binary().
 term_to_binary(_Term) ->
     erlang:nif_error(undefined).
+
+%% Patch reason: term_to_binary/2 is not supported in AtomVM
+%% Since the options only tune the encoding, delegating to
+%% term_to_binary/1 still produces a valid result.
+-spec term_to_binary(Term :: any(), Options :: [any()]) -> binary().
+term_to_binary(Term, Options) when is_list(Options) ->
+    erlang:term_to_binary(Term).
 
 %%-----------------------------------------------------------------------------
 %% @returns A tuple representing the current timestamp.

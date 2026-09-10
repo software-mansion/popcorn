@@ -54,8 +54,19 @@ defmodule TreeshakeTest do
       end)
       |> Enum.sort()
 
-    assert ~w|Application.beam Behaviour.beam BehaviourImpl.beam BehaviourImplDep.beam Formatter.DemoApp.Widget.beam Formatter.Integer.beam Formatter.beam ProtocolUser.beam Worker.beam| =
+    assert ~w|Application.beam Behaviour.beam BehaviourImpl.beam BehaviourImplDep.beam Formatter.DemoApp.Widget.beam Formatter.Integer.beam Formatter.beam OnLoadDep.beam ProtocolUser.beam Worker.beam| =
              surviving
+  end
+
+  @tag :on_load
+  async_test "on_load function and its callees are kept in a surviving module", ctx do
+    stats = get_stats(ctx)
+    refute :demo_app_on_load in stats.modules_removed
+    shaked = Map.get(stats.modules_shaked, :demo_app_on_load, [])
+    refute {:init, 0} in shaked
+    refute {:prepare, 0} in shaked
+    # Only reachable through the on_load function
+    refute DemoApp.OnLoadDep in stats.modules_removed
   end
 
   describe "function-level removal" do

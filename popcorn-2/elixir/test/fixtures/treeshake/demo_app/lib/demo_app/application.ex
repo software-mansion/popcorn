@@ -10,6 +10,7 @@ defmodule DemoApp.Application do
       IO.puts("Worker result: #{result}")
       DemoApp.Behaviour.call_hello(DemoApp.BehaviourImpl)
       DemoApp.ProtocolUser.run()
+      :pong = :demo_app_on_load.ping()
       {:ok, sup}
     rescue
       e ->

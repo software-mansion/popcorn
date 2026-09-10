@@ -8,6 +8,11 @@ defmodule Base do
     :base64.encode(data, %{mode: :standard, padding: pad?})
   end
 
+  def url_encode64(data, opts \\ []) when is_binary(data) do
+    pad? = Keyword.get(opts, :padding, true)
+    :base64.encode(data, %{mode: :urlsafe, padding: pad?})
+  end
+
   def decode64(string, opts \\ []) when is_binary(string) do
     {:ok, decode64!(string, opts)}
   rescue
@@ -18,32 +23,43 @@ defmodule Base do
     # :base64 accepts only booleans, while the original accepts any
     # truthy/falsy value here
     pad? = !!Keyword.get(opts, :padding, true)
-    decode64base!(string, opts[:ignore], pad?)
+    decode64base!(string, opts[:ignore], pad?, :standard)
+  end
+
+  def url_decode64(string, opts \\ []) when is_binary(string) do
+    {:ok, url_decode64!(string, opts)}
+  rescue
+    ArgumentError -> :error
+  end
+
+  def url_decode64!(string, opts \\ []) when is_binary(string) do
+    pad? = !!Keyword.get(opts, :padding, true)
+    decode64base!(string, opts[:ignore], pad?, :urlsafe)
   end
 
   # :base64.decode/2 whitespace handling differs from the original (OTP skips
   # whitespace unconditionally, AtomVM's implementation rejects it), so it's
   # handled upfront: rejected without `ignore: :whitespace`, stripped with it
-  defp decode64base!(string, nil, pad?) do
+  defp decode64base!(string, nil, pad?, mode) do
     reject_whitespace!(string)
-    erl_decode64!(string, pad?)
+    erl_decode64!(string, pad?, mode)
   end
 
-  defp decode64base!(string, :whitespace, pad?) do
-    string |> remove_whitespace() |> erl_decode64!(pad?)
+  defp decode64base!(string, :whitespace, pad?, mode) do
+    string |> remove_whitespace() |> erl_decode64!(pad?, mode)
   end
 
-  defp erl_decode64!(string, pad?) do
+  defp erl_decode64!(string, pad?, mode) do
     # with padding: false, :base64 accepts incomplete padding (e.g. a lone
     # trailing "="), while the original requires padding to be either complete
     # or absent, so anything containing "=" is decoded with padding: true
     erl_pad? = pad? or contains_eq?(string)
-    :base64.decode(string, %{mode: :standard, padding: erl_pad?})
+    :base64.decode(string, %{mode: mode, padding: erl_pad?})
   rescue
     _e in [ArgumentError, ArithmeticError, CaseClauseError, ErlangError, FunctionClauseError] ->
       # :base64 errors don't say what was wrong with the input, so scan it
       # to raise an ArgumentError matching the original implementation
-      raise_decode64_error!(string)
+      raise_decode64_error!(string, mode)
   end
 
   defp remove_whitespace(string) do
@@ -61,13 +77,18 @@ defmodule Base do
   defp reject_whitespace!(<<_char, rest::binary>>), do: reject_whitespace!(rest)
   defp reject_whitespace!(<<>>), do: :ok
 
-  defp raise_decode64_error!(<<char, rest::binary>>)
+  defp raise_decode64_error!(<<char, rest::binary>>, :standard = mode)
        when char in ?A..?Z or char in ?a..?z or char in ?0..?9 or char in ~c"+/=" do
-    raise_decode64_error!(rest)
+    raise_decode64_error!(rest, mode)
   end
 
-  defp raise_decode64_error!(<<char, _rest::binary>>), do: bad_character!(char)
-  defp raise_decode64_error!(<<>>), do: raise(ArgumentError, "incorrect padding")
+  defp raise_decode64_error!(<<char, rest::binary>>, :urlsafe = mode)
+       when char in ?A..?Z or char in ?a..?z or char in ?0..?9 or char in ~c"-_=" do
+    raise_decode64_error!(rest, mode)
+  end
+
+  defp raise_decode64_error!(<<char, _rest::binary>>, _mode), do: bad_character!(char)
+  defp raise_decode64_error!(<<>>, _mode), do: raise(ArgumentError, "incorrect padding")
 
   defp bad_character!(byte) do
     raise ArgumentError,

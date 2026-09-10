@@ -72,7 +72,13 @@ defmodule Treeshake.Utils.PrivatesResolver do
       private_functions: expanded_priv
     }
     |> Map.merge(
-      Map.take(module_info, [:abstraction, :behaviour_impls, :protocol_impl, :macro_generated])
+      Map.take(module_info, [
+        :abstraction,
+        :behaviour_impls,
+        :protocol_impl,
+        :macro_generated,
+        :on_load
+      ])
     )
   end
 

@@ -21,8 +21,7 @@ defmodule LocalLiveView.Component do
 
   Like `Phoenix.Component.live_component/1`, any attribute other than `view` is
   forwarded to the view as the assigns of its `c:LocalLiveView.update/2`
-  callback. `id` is forwarded too, and additionally used as the mount point's DOM
-  id.
+  callback. `id` is forwarded too, and additionally used as the view's DOM id.
 
   ## Attributes
 
@@ -136,17 +135,18 @@ defmodule LocalLiveView.Component do
     validate_assigns!(assigns)
 
     ~H"""
-    <div>
     <div
-      data-pop-view={@view}
-      id={@id}
+      id={"#{@id}-llv-hook"}
       phx-hook="LocalLiveView"
+      phx-update="ignore"
+      data-pop-view={@view}
+      data-pop-id={@id}
+      data-pop-assigns={encode_assigns(@comp_assigns)}
       data-pop-mirror-token={@mirror_token}
       data-pop-mirror-id={@mirror_id}
-      data-pop-assigns={encode_assigns(@comp_assigns)}
-      phx-update="ignore"
     >
-    </div>
+    <%!-- Placeholder, replaced with LLV on the client --%>
+    <div id={@id} data-pop-root></div>
     <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>

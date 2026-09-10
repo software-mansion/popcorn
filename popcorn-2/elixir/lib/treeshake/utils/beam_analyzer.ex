@@ -18,12 +18,16 @@ defmodule Treeshake.Utils.BeamAnalyzer do
             {:behaviour | :protocol, [{callback :: atom(), arity :: non_neg_integer()}]} | nil,
           behaviour_impls: [module()],
           protocol_impl: {protocol :: module(), type :: module()} | nil,
-          macro_generated: [{atom(), non_neg_integer()}]
+          macro_generated: [{atom(), non_neg_integer()}],
+          on_load: {atom(), non_neg_integer()} | nil
         }
 
   @spec analyze(module(), core_ast :: term(), elixir_definitions :: [tuple()]) :: module_info()
   def analyze(module, core, elixir_definitions) do
-    exports = collect_exports(core)
+    on_load = collect_on_load(core)
+    # The on_load function is usually private, but it's an entry point
+    # called by the VM, so it's treated as public to be a call graph node.
+    exports = collect_exports(core) |> MapSet.union(MapSet.new(List.wrap(on_load)))
     callbacks = collect_callbacks(core)
     protocol_impl = collect_protocol_impl(core)
     behaviours = collect_behaviours(core)
@@ -52,8 +56,16 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       abstraction: abstraction,
       behaviour_impls: behaviours,
       protocol_impl: protocol_impl,
-      macro_generated: macro_generated_functions(module, elixir_definitions)
+      macro_generated: macro_generated_functions(module, elixir_definitions),
+      on_load: on_load
     }
+  end
+
+  defp collect_on_load({:c_module, _, _, _, attrs, _}) do
+    Enum.find_value(attrs, fn
+      {{:c_literal, _, :on_load}, {:c_literal, _, [{name, arity}]}} -> {name, arity}
+      _ -> nil
+    end)
   end
 
   # Functions injected into the module by macros defined in other modules.

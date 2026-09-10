@@ -76,12 +76,14 @@ defmodule LocalLiveView.MixProject do
       {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
       # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
       {:cowlib, "~> 2.13", override: true, runtime: false, only: :test},
-      {:phoenix, "~> 1.8", runtime: false},
+      {:phoenix, "~> 1.8.4", runtime: false},
       {:phoenix_live_view, "~> 1.1", runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},
       {:phoenix_ecto, "~> 4.6", runtime: false},
       {:ecto, "~> 3.12", runtime: false},
       {:plug, "~> 1.14", runtime: false},
+      # plug_crypto is needed in runtime for signing LV tokens
+      {:plug_crypto, "~> 2.0"},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
       {:file_system, "~> 1.0", targets: [:host, :all]}

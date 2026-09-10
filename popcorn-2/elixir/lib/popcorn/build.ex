@@ -9,6 +9,9 @@ defmodule Popcorn.Build do
   alias Popcorn.BuildLogFormatter
   alias Popcorn.ArtifactsCache
 
+  # Make sure this module is recompiled when CoreErlangUtils change
+  _ = Popcorn.CoreErlangUtils.module_info(:md5)
+
   @after_compile __MODULE__
   def __after_compile__(_env, _bytecode) do
     # When this module is recompiled, we need to
@@ -30,6 +33,7 @@ defmodule Popcorn.Build do
     :erts,
     :kernel,
     :stdlib,
+    :crypto,
     # Elixir
     :elixir,
     :logger

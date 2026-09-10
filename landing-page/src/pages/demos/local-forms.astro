@@ -117,7 +117,7 @@ defmodule FormDemoLocal do
   end
 
   def handle_event(
-        &quot;llv_server_message&quot;,
+        &quot;llv_server_event&quot;,
         %{&quot;type&quot; =&gt; &quot;synchronize&quot;, &quot;users&quot; =&gt; server_users},
         socket
       ) do

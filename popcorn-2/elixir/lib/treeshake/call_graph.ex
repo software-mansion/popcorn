@@ -87,7 +87,7 @@ defmodule Treeshake.CallGraph do
     end
   end
 
-  defp do_visit({_m, f, a} = mfa, function_info, acc, module_index, protocols_impls) do
+  defp do_visit({m, f, a} = mfa, function_info, acc, module_index, protocols_impls) do
     %{
       graph: graph,
       protocol_calls: acc_protocol_calls,
@@ -116,9 +116,11 @@ defmodule Treeshake.CallGraph do
     behaviour_calls = find_behaviour_calls(referenced_modules_info, module_index)
     child_spec_calls = find_child_spec_calls(referenced_modules_info)
     generated_funs = find_generated_funs(referenced_modules_info)
+    on_load_calls = find_on_load_calls(m, module_index)
 
     all_calls =
-      (function_info.calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
+      (function_info.calls ++
+         behaviour_calls ++ child_spec_calls ++ generated_funs ++ on_load_calls)
       |> Enum.reject(&(&1 == mfa))
 
     {protocol_entries, acc_protocol_calls} =
@@ -175,6 +177,15 @@ defmodule Treeshake.CallGraph do
       |> Enum.reject(fn {f, _a} -> f == :__struct__ end)
       |> Enum.map(fn {f, a} -> {info.module, f, a} end)
     end)
+  end
+
+  # The VM calls the on_load function whenever the module is loaded, so as long
+  # as any function of the module is reachable, its on_load function is too.
+  defp find_on_load_calls(module, module_index) do
+    case get_in(module_index[module].on_load) do
+      {f, a} -> [{module, f, a}]
+      nil -> []
+    end
   end
 
   # When a module atom appears as a literal (e.g. passed to Supervisor.start_link),

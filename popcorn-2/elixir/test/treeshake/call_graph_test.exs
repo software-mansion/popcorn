@@ -33,6 +33,12 @@ defmodule Treeshake.CallGraphTest do
       # Worker.unused/1 is public but never called from any reachable path
       refute Map.has_key?(graph, {DemoApp.Worker, :unused, 1})
     end
+
+    test "on_load function of a reachable module is a key, called by its functions",
+         %{graph: graph} do
+      assert {:demo_app_on_load, :init, 0} in graph[{:demo_app_on_load, :ping, 0}]
+      assert {DemoApp.OnLoadDep, :touch, 0} in graph[{:demo_app_on_load, :init, 0}]
+    end
   end
 
   # ---- call values and external references ----

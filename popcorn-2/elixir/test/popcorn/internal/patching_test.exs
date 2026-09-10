@@ -70,6 +70,114 @@ defmodule Popcorn.Internal.PatchingTest do
     refute function_exported?(module, :priv_baz2, 0)
   end
 
+  describe "on_load" do
+    # The on_load functions below record their runs in :persistent_term;
+    # patch_and_load/3 clears the record before loading the merged module.
+    test "original's private on_load is kept", %{tmp_dir: tmp_dir} do
+      module =
+        patch_and_load(
+          quote do
+            @on_load :orig_init
+            defp orig_init(), do: unquote(record(:orig))
+            def hello(), do: :hello
+          end,
+          quote do
+            def hello(), do: :patch_hello
+          end,
+          tmp_dir
+        )
+
+      assert [:orig] = on_load_runs(module)
+      assert :patch_hello = module.hello()
+    end
+
+    test "patch's on_load is kept", %{tmp_dir: tmp_dir} do
+      module =
+        patch_and_load(
+          quote do
+            def hello(), do: :hello
+          end,
+          quote do
+            @on_load :patch_init
+            defp patch_init(), do: unquote(record(:patch))
+          end,
+          tmp_dir
+        )
+
+      assert [:patch] = on_load_runs(module)
+    end
+
+    test "patch's function with the same name becomes the on_load", %{tmp_dir: tmp_dir} do
+      module =
+        patch_and_load(
+          quote do
+            @on_load :init
+            defp init(), do: unquote(record(:orig))
+          end,
+          quote do
+            @compile {:no_warn_undefined, :popcorn_module}
+            defp init(), do: unquote(record(:patch))
+            def call_init(), do: init()
+            def call_orig_init(), do: :popcorn_module.init()
+          end,
+          tmp_dir
+        )
+
+      assert [:patch] = on_load_runs(module)
+      assert :ok = module.call_init()
+      # The original's function is still there under the renamed name
+      assert :ok = module.call_orig_init()
+      assert [:patch, :patch, :orig] = on_load_runs(module)
+    end
+
+    test "patch's override of the on_load function becomes the on_load", %{tmp_dir: tmp_dir} do
+      module =
+        patch_and_load(
+          quote do
+            @on_load :init
+            defp init(), do: unquote(record(:orig))
+          end,
+          quote do
+            @compile {:popcorn_patch_private, init: 0}
+            def init(), do: unquote(record(:patch))
+          end,
+          tmp_dir
+        )
+
+      assert [:patch] = on_load_runs(module)
+      refute function_exported?(module, :init, 0)
+    end
+
+    test "patch can call the original's on_load function", %{tmp_dir: tmp_dir} do
+      module =
+        patch_and_load(
+          quote do
+            @on_load :init
+            defp init(), do: unquote(record(:orig))
+          end,
+          quote do
+            @compile {:no_warn_undefined, :popcorn_module}
+            def call_orig_init(), do: :popcorn_module.init()
+          end,
+          tmp_dir
+        )
+
+      assert [:orig] = on_load_runs(module)
+      assert :ok = module.call_orig_init()
+      assert [:orig, :orig] = on_load_runs(module)
+    end
+  end
+
+  defp record(who) do
+    quote do
+      key = {:on_load_runs, __MODULE__}
+      :persistent_term.put(key, :persistent_term.get(key, []) ++ [unquote(who)])
+      :ok
+    end
+  end
+
+  defp on_load_runs(module), do: :persistent_term.get({:on_load_runs, module}, [])
+
   defp patch_and_load(orig, patch, tmp_dir) do
     module = String.to_atom("#{__MODULE__.Foo}#{:erlang.unique_integer([:positive])}")
 
@@ -96,6 +204,8 @@ defmodule Popcorn.Internal.PatchingTest do
       )
       |> CoreErlangUtils.serialize()
 
+    # Compiling above already ran the on_load functions of both modules
+    :persistent_term.erase({:on_load_runs, module})
     assert {:module, ^module} = :code.load_binary(module, ~c"#{inspect(module)}.ex", beam)
     module
   end

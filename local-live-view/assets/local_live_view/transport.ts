@@ -2,22 +2,22 @@ import type { Socket as PhoenixSocket, SocketConnectOption } from "phoenix";
 import type { TransportFrame } from "./types";
 import type { PopcornClient } from "./index";
 
-const llvIdFromTopic = (topic: string) => topic.slice("lv:".length);
+const LV_TOPIC_PREFIX = "lv:";
+const llvIdFromTopic = (topic: string) =>
+  topic.startsWith(LV_TOPIC_PREFIX) ? topic.slice(LV_TOPIC_PREFIX.length) : null;
 
-// Frames the Wasm view must answer. Each entry needs a matching
-// Message clause in LocalLiveView.Server.
-// Anything else — heartbeats, phx_leave — is acked in place
-// as Popcorn may be not booted yet.
-const ANSWERED_EVENTS = ["phx_join", "event", "cids_will_destroy", "cids_destroyed"];
+// LiveView retries a join after this timeout, we don't want that
+// thus we keep the timeout 'big enough'
+const JOIN_TIMEOUT_MS = 120_000;
 
 export interface PopcornLink {
-  /** The never-networked Phoenix socket the fake views' channels live on. */
+  /** The never-networked Phoenix socket the LLV views' channels live on. */
   socket: PhoenixSocket;
   /** Deliver an inbound frame (out-of-band diffs) to the channel layer. */
   inject(frame: TransportFrame): void;
 }
 
-// A fake socket that connects LLV vievs to Popcorn.
+// A fake socket that connects LLV views to Popcorn.
 // Phoenix channels can be normally constructed on top of this socket.
 export function createPopcornSocket(
   SocketClass: typeof PhoenixSocket,
@@ -54,7 +54,29 @@ export function createPopcornSocket(
       });
     }
 
-    // Ack an outbound frame in place (joins, leaves, heartbeats, no-ops).
+    send(frame: TransportFrame): void {
+      // Ack heartbeats right away, as Wasm could
+      // theoretically be late to ack and that would
+      // kill all LLVs.
+      if (frame.event == "heartbeat") {
+        this.ack(frame, "ok", {});
+        return;
+      }
+
+      const id = llvIdFromTopic(frame.topic);
+      if (id === null) {
+        this.ack(frame, "error", { reason: `unsupported channel ${frame.topic}` });
+        return;
+      }
+
+      pop
+        .call({ action: "transport_frame", id, frame }, { suppressErrorLog: true })
+        .then((result) => {
+          if (!result.ok) this.ack(frame, "error", result.error);
+        });
+    }
+
+    // Ack an outbound frame in place (heartbeats, rejected frames).
     ack(frame: TransportFrame, status: string, response: unknown): void {
       this.inject({
         topic: frame.topic,
@@ -63,30 +85,6 @@ export function createPopcornSocket(
         ref: frame.ref,
         join_ref: frame.join_ref,
       });
-    }
-
-    send(frame: TransportFrame): void {
-      const { topic, event, payload } = frame;
-
-      if (!ANSWERED_EVENTS.includes(event)) {
-        this.ack(frame, "ok", {});
-        return;
-      }
-
-      pop.handleTransportFrame(llvIdFromTopic(topic), event, payload).then(
-        (result) => {
-          if (result.ok) {
-            const { status, payload: response } = result.data as {
-              status: string;
-              payload: unknown;
-            };
-            this.ack(frame, status, response);
-          } else {
-            this.ack(frame, "error", result.error);
-          }
-        },
-        (err) => this.ack(frame, "error", String(err)),
-      );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -99,6 +97,7 @@ export function createPopcornSocket(
   // The endpoint URL is only a label — the transport never dereferences it.
   const socket = new SocketClass("/llv-popcorn", {
     transport: PopcornTransport,
+    timeout: JOIN_TIMEOUT_MS,
     encode: (payload: unknown, callback: (encoded: unknown) => void) => callback(payload),
     decode: (rawPayload: unknown, callback: (decoded: unknown) => void) => callback(rawPayload),
   } as unknown as Partial<SocketConnectOption>);

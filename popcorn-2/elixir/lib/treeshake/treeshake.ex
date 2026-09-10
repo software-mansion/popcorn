@@ -41,7 +41,9 @@ defmodule Treeshake do
 
   @hardcoded %{
     calls: %{
-      Supervisor => [{Supervisor.Default, :init, 1}]
+      Supervisor => [{Supervisor.Default, :init, 1}],
+      # The tokenizer module is fetched from config and called dynamically
+      {:elixir_config, :identifier_tokenizer, 0} => [{String.Tokenizer, :tokenize, 1}]
     },
     behaviour_impls: %{
       :application_controller => [:gen_server]

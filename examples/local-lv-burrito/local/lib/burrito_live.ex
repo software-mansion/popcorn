@@ -20,6 +20,10 @@ defmodule BurritoLive do
   }
 
   def mount(_params, _session, socket) do
+    Popcorn.Wasm.run_js("""
+    () => window.dispatchEvent(new CustomEvent("llv:ready"))
+    """)
+
     builder = default_builder()
 
     {:ok,
