@@ -80,9 +80,36 @@ defmodule Popcorn.CoreErlangUtils do
 
     exports_ast = exports |> Enum.sort() |> Enum.map(&{:c_var, [], &1})
 
-    specs = orig_specs ++ patch_specs
+    specs = rewrite_on_load(orig_specs ++ patch_specs, module, defined_funs(body))
 
     {:c_module, [], module_spec, exports_ast, specs, body}
+  end
+
+  defp defined_funs(body) do
+    for {{:c_var, _meta, {fun, arity}}, {:c_fun, _fun_meta, _vars, _body}} <- body,
+        do: {fun, arity},
+        into: MapSet.new()
+  end
+
+  # Points the on_load attribute at the function as it exists in the merged body:
+  # the patched one if exists, the original otherwise.
+  defp rewrite_on_load(specs, module, defined) do
+    Enum.map(specs, fn
+      {{:c_literal, _meta1, :on_load} = key, {:c_literal, meta2, [{fun, arity}]}} ->
+        resolved =
+          [fun, :"avmp_#{fun}", :"avmo_#{fun}"]
+          |> Enum.map(&{&1, arity})
+          |> Enum.find(&(&1 in defined))
+
+        if resolved == nil do
+          raise "on_load function #{fun}/#{arity} not found in the merged #{inspect(module)}"
+        end
+
+        {key, {:c_literal, meta2, [resolved]}}
+
+      spec ->
+        spec
+    end)
   end
 
   @doc """
