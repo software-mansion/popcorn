@@ -37,10 +37,14 @@ const features = [
     title: "Call Elixir from JavaScript (and vice versa)",
     description:
       "Communicate with Elixir processes, exchange data, run JS from Elixir code.",
-    code: [
-      'const result = await popcorn.genserver.call("counter", ["add", 1]);',
-      "if (result.ok) console.log(result.data);",
-    ],
+    code: `const result =
+  await popcorn.genserver.call(
+    "counter",
+    ["add", 1],
+  );
+if (result.ok) {
+  console.log(result.data);
+}`,
   },
 ];
 
@@ -67,14 +71,12 @@ const useCases = [
 
   <section
     id="features"
-    class="bg-ink flex flex-col items-center gap-8 px-5 pt-16 md:h-177 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
+    class="bg-ink flex flex-col items-center gap-8 px-5 pt-16 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
     data-background="dark"
   >
     <Heading punctuation="?" class="text-cream">Features</Heading>
 
-    <div
-      class="grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-0"
-    >
+    <div class="grid w-full max-w-352 grid-cols-1 md:grid-cols-2">
       {features.map((feature) => <FeatureCard {...feature} />)}
     </div>
   </section>

@@ -1,24 +1,49 @@
 ---
+import { Code } from "astro:components";
+
 interface Props {
   title: string;
   description: string;
   position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
   linkText?: string;
   note?: string;
-  code?: string[];
+  code?: string;
 }
 
 const { title, description, position, linkText, note, code } = Astro.props;
 const isRight = position.endsWith("right");
 const isTop = position.startsWith("top");
+const isLast = position === "bottom-right";
+const popcornTheme = {
+  name: "popcorn",
+  type: "dark",
+  colors: {
+    "editor.background": "var(--color-brown-90)",
+    "editor.foreground": "var(--color-cream-muted)",
+  },
+  tokenColors: [
+    {
+      scope: ["keyword", "storage.type"],
+      settings: { foreground: "var(--color-orange)" },
+    },
+    {
+      scope: ["string", "constant.numeric"],
+      settings: { foreground: "var(--color-cream)" },
+    },
+    {
+      scope: "entity.name.function",
+      settings: { foreground: "var(--color-orange-20)" },
+    },
+  ],
+} as const;
 ---
 
 <article
   class:list={[
-    "border-cream flex flex-col gap-2.5 rounded-2xl border p-6",
-    "lg:border-brown-80 lg:min-h-66 lg:gap-3 lg:rounded-none lg:border-0 lg:px-0 lg:pt-9 lg:pb-10",
-    isRight ? "lg:border-l lg:pl-14" : "lg:pr-14",
-    isTop && "lg:border-b",
+    "border-brown-80 flex flex-col gap-2.5 border-b py-6 md:min-h-66 md:gap-3 md:py-8 lg:pt-9 lg:pb-10",
+    isLast && "border-b-0",
+    !isTop && "md:border-b-0",
+    isRight ? "md:border-l md:pl-8 lg:pl-14" : "md:pr-8 lg:pr-14",
   ]}
 >
   <h3
@@ -45,9 +70,12 @@ const isTop = position.startsWith("top");
   }
   {
     code && (
-      <pre class="bg-brown-90 text-cream-muted font-label hidden overflow-hidden rounded-md px-4 py-3 text-sm leading-5 lg:block">
-        {code.join("\n")}
-      </pre>
+      <Code
+        code={code}
+        lang="javascript"
+        theme={popcornTheme}
+        class="font-label block overflow-x-auto rounded-md px-4 py-3 text-xs leading-4 lg:text-sm lg:leading-5"
+      />
     )
   }
 </article>
