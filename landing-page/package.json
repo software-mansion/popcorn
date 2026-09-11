@@ -17,6 +17,9 @@
     "@tailwindcss/vite": "^4.1.11",
     "astro": "^7.0.0",
     "ghostty-web": "^0.4.0",
+    "local_live_view": "link:../local-live-view",
+    "phoenix": "^1.7.21",
+    "phoenix_live_view": "^1.1.30",
     "tailwindcss": "^4.1.11",
     "three": "^0.178.0"
   },
