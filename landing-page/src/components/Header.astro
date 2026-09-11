@@ -3,7 +3,12 @@ import StripedBackground from "./StripedBackground.astro";
 
 const navLinks = [
   { number: "01", label: "Demos", href: "/#demos" },
-  { number: "02", label: "Docs", href: "/docs" },
+  {
+    number: "02",
+    label: "Docs",
+    href: "https://popcorn.hexdocs.pm/introduction.html",
+    external: true,
+  },
   {
     number: "03",
     label: "Github",
@@ -34,7 +39,7 @@ const navLinks = [
       {
         navLinks.map(({ label, href, external }) => (
           <a
-            class="hover:text-orange focus-visible:text-orange text-sm leading-6 transition-colors"
+            class="hover:text-orange focus-visible:text-orange group text-sm leading-6 transition-colors"
             href={href}
             target={external ? "_blank" : undefined}
             rel={external ? "noreferrer" : undefined}
@@ -42,7 +47,7 @@ const navLinks = [
             {label}
             {external && (
               <span
-                class="text-orange ml-1 transition-colors"
+                class="text-orange group-hover:text-orange group-focus-visible:text-orange ml-1 transition-colors"
                 aria-hidden="true"
                 data-navbar-arrow
               >
@@ -136,7 +141,7 @@ const navLinks = [
     const header = button.closest("header")!;
     const navbar = header.querySelector<HTMLElement>("[data-navbar-content]")!;
     const logo = header.querySelector<HTMLImageElement>("[data-navbar-logo]")!;
-    const arrow = header.querySelector<HTMLElement>("[data-navbar-arrow]")!;
+    const arrows = header.querySelectorAll<HTMLElement>("[data-navbar-arrow]");
     const main = document.querySelector("main")!;
     const menu = document.querySelector<HTMLElement>("[data-mobile-menu]")!;
     const openIcon = button.querySelector<HTMLElement>(
@@ -156,8 +161,10 @@ const navLinks = [
       navbar.classList.toggle("text-cream", lightText);
       navbar.classList.toggle("text-ink", !lightText);
       logo.classList.toggle("invert", lightText);
-      arrow.classList.toggle("text-white", lightText);
-      arrow.classList.toggle("text-orange", !lightText);
+      for (const arrow of arrows) {
+        arrow.classList.toggle("text-white", lightText);
+        arrow.classList.toggle("text-orange", !lightText);
+      }
     }
 
     function observeBackground() {
