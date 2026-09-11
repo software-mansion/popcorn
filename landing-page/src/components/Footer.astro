@@ -1,0 +1,131 @@
+---
+import SocialIcon from "./SocialIcon.astro";
+
+const legalLinks = [
+  {
+    label: "Apache 2.0 License",
+    href: "https://github.com/software-mansion/popcorn/blob/main/LICENSE",
+  },
+  {
+    label: "Privacy Policy",
+    href: "https://swmansion.com/privacy/policy/",
+  },
+];
+
+const socialLinks = [
+  { type: "twitter" as const, href: "https://twitter.com/swmansion" },
+  {
+    type: "facebook" as const,
+    href: "https://www.facebook.com/SoftwareMansion/",
+  },
+  {
+    type: "github" as const,
+    href: "https://github.com/software-mansion",
+  },
+  {
+    type: "instagram" as const,
+    href: "https://www.instagram.com/swmansion/",
+  },
+  {
+    type: "youtube" as const,
+    href: "https://www.youtube.com/c/SoftwareMansion",
+  },
+  {
+    type: "linkedin" as const,
+    href: "https://www.linkedin.com/company/software-mansion/d",
+  },
+  {
+    type: "dribbble" as const,
+    href: "https://dribbble.com/softwaremansion",
+  },
+];
+---
+
+<footer class="bg-ink text-cream flex flex-col">
+  <section
+    class="flex flex-col items-center gap-10 px-6 pt-16 pb-12 md:px-8 md:pt-22 md:pb-14 lg:gap-8 lg:pt-35 lg:pb-28"
+  >
+    <div
+      class="flex w-full max-w-150 flex-col items-center gap-5 text-center lg:max-w-175 lg:gap-6"
+    >
+      <h2
+        class="font-copy text-[28px] leading-9 font-semibold tracking-tight whitespace-nowrap lg:font-sans lg:text-5xl lg:leading-14 lg:font-medium"
+      >
+        We are Software Mansion
+      </h2>
+
+      <div
+        class="text-cream-muted font-copy flex flex-col gap-5 text-sm leading-6 lg:gap-6 lg:font-sans lg:text-base"
+      >
+        <p>
+          You might know us from Elixir Stream Week, Global Elixir Meetups, or
+          from projects like Live Debugger and Membrane. But that’s not all we
+          do.
+        </p>
+        <p>
+          We help teams build exceptional software - from developer tools to
+          production-ready applications. Let’s talk about how we can support
+          your next project.
+        </p>
+      </div>
+    </div>
+
+    <a
+      href="https://swmansion.com/contact/"
+      class="text-ink bg-cream rounded-full px-6 py-2.5 text-sm leading-5.5 font-medium transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current lg:px-5"
+    >
+      Contact us
+    </a>
+  </section>
+
+  <div class="border-brown-70 border-t px-6 md:px-8 lg:px-16">
+    <div
+      class="mx-auto flex w-full max-w-352 flex-col items-center justify-between gap-5 pt-7 pb-8 md:flex-row md:gap-6 md:pb-9 lg:py-8"
+    >
+      <div class="flex flex-col items-center gap-5 md:flex-row md:gap-10">
+        <a href="https://swmansion.com/" aria-label="Software Mansion">
+          <img
+            src="/swmansion-full-mono-m-left-top-on-light.svg"
+            alt=""
+            width="79"
+            height="40"
+            class="h-10 w-20 brightness-0 invert"
+          />
+        </a>
+
+        <ul
+          class="font-copy text-cream-muted flex flex-wrap justify-center gap-6 text-xs leading-5 lg:gap-4 lg:font-sans lg:text-base lg:leading-6"
+        >
+          {
+            legalLinks.map((link) => (
+              <li>
+                <a
+                  href={link.href}
+                  class="transition-colors hover:text-current focus-visible:text-current"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <ul class="flex items-end gap-4">
+        {
+          socialLinks.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                aria-label={link.type}
+                class="flex transition-opacity hover:opacity-70 focus-visible:opacity-70"
+              >
+                <SocialIcon type={link.type} />
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</footer>
