@@ -1,5 +1,7 @@
 @import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/inter";
+@import "@fontsource/ibm-plex-mono/600.css";
 @import "tailwindcss";
 
 @theme {
@@ -17,6 +19,8 @@
   --color-orange-20: #ffe6cc;
   --font-display: "Fraunces Variable", system-ui, sans-serif;
   --font-sans: "DM Sans Variable", system-ui, sans-serif;
+  --font-copy: "Inter Variable", system-ui, sans-serif;
+  --font-label: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 :root {
