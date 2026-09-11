@@ -1,0 +1,205 @@
+<section
+  class="bg-cream @min-demos/demos:h-185 relative h-98 w-full overflow-hidden rounded-md md:h-155"
+  aria-label="Pong running in LocalLiveView"
+  tabindex="-1"
+  data-pong-demo
+>
+  <div id="landing-pong" class="h-full" data-pop-view="Local.PongLive"></div>
+
+  <p class="sr-only" aria-live="polite" data-pong-status>Pong is loading.</p>
+</section>
+
+<script>
+  const demo = document.querySelector<HTMLElement>("[data-pong-demo]");
+  console.assert(demo instanceof HTMLElement);
+
+  if (demo instanceof HTMLElement) {
+    const status = demo.querySelector<HTMLElement>("[data-pong-status]");
+    console.assert(status instanceof HTMLElement);
+
+    if (status instanceof HTMLElement) {
+      let starting: Promise<void> | null = null;
+      let dragPointer: number | null = null;
+      let dragStartY = 0;
+      let dragging = false;
+      let dragTop: string | null = null;
+      let lastMoveAt = 0;
+      let settleTimer: number | null = null;
+
+      function focusCourt() {
+        demo
+          .querySelector<HTMLElement>(".pong-court")
+          ?.focus({ preventScroll: true });
+      }
+
+      function movePaddle(event: PointerEvent, force = false) {
+        const court = demo.querySelector<HTMLElement>(".pong-court");
+        const paddle = demo.querySelector<HTMLElement>("[data-player-paddle]");
+        const move = demo.querySelector<HTMLButtonElement>("[data-pong-move]");
+        if (
+          !(court instanceof HTMLElement) ||
+          !(paddle instanceof HTMLElement) ||
+          !(move instanceof HTMLButtonElement)
+        ) {
+          dragPointer = null;
+          dragging = false;
+          dragTop = null;
+          return;
+        }
+
+        const bounds = court.getBoundingClientRect();
+        const center = Math.min(
+          1,
+          Math.max(0, (event.clientY - bounds.top) / bounds.height),
+        );
+        const paddleHeight = (paddle.offsetHeight / bounds.height) * 100;
+        const top = Math.min(
+          100 - paddleHeight,
+          Math.max(0, center * 100 - paddleHeight / 2),
+        );
+        dragTop = `${top}%`;
+        paddle.style.top = dragTop;
+        move.setAttribute(
+          "phx-value-position",
+          String(Math.round(center * 1000)),
+        );
+
+        const now = performance.now();
+        if (!force && now - lastMoveAt < 75) return;
+        lastMoveAt = now;
+        move.click();
+      }
+
+      function waitForCourt() {
+        const court = demo.querySelector<HTMLElement>(".pong-court");
+        if (court instanceof HTMLElement) return Promise.resolve();
+
+        return new Promise<void>((resolve) => {
+          const observer = new MutationObserver(() => {
+            const court = demo.querySelector<HTMLElement>(".pong-court");
+            if (!(court instanceof HTMLElement)) return;
+            observer.disconnect();
+            resolve();
+          });
+          observer.observe(demo, { childList: true, subtree: true });
+        });
+      }
+
+      async function start() {
+        status.textContent = "Booting AtomVM and LocalLiveView";
+        const [{ Socket }, { LiveSocket }, { LLVEngine }] = await Promise.all([
+          import("phoenix"),
+          import("phoenix_live_view"),
+          import("local_live_view"),
+        ]);
+        const liveSocket = new LiveSocket("/live", Socket, { params: {} });
+        await LLVEngine.create(liveSocket, {
+          bundlePaths: ["/wasm/local_pong.avm"],
+        });
+        liveSocket.connect();
+        await waitForCourt();
+        status.textContent = "Pong is ready";
+      }
+
+      function ensureStarted() {
+        starting ??= start().catch((error: unknown) => {
+          console.error("Failed to start Pong", error);
+          status.textContent = "Pong could not start. Refresh and try again.";
+          throw error;
+        });
+        return starting;
+      }
+
+      void ensureStarted();
+
+      document
+        .querySelector("#demos")
+        ?.addEventListener("demo:select", (event) => {
+          if ((event as CustomEvent).detail.demo !== "pong") return;
+          demo.focus({ preventScroll: true });
+          void ensureStarted().then(() => requestAnimationFrame(focusCourt));
+        });
+
+      new MutationObserver(() => {
+        if (!dragging || dragTop === null) return;
+        const paddle = demo.querySelector<HTMLElement>("[data-player-paddle]");
+        if (paddle instanceof HTMLElement && paddle.style.top !== dragTop) {
+          paddle.style.top = dragTop;
+        }
+      }).observe(demo, {
+        attributes: true,
+        attributeFilter: ["style"],
+        childList: true,
+        subtree: true,
+      });
+
+      demo.addEventListener("pointerdown", (event) => {
+        const court = demo.querySelector<HTMLElement>(".pong-court");
+        if (!(court instanceof HTMLElement)) return;
+        court.focus({ preventScroll: true });
+
+        const control = (event.target as HTMLElement).closest<HTMLElement>(
+          "[data-pong-control]",
+        );
+        if (!(control instanceof HTMLElement)) {
+          if (event.pointerType === "mouse") event.preventDefault();
+          return;
+        }
+        event.preventDefault();
+        if (settleTimer !== null) window.clearTimeout(settleTimer);
+        dragPointer = event.pointerId;
+        dragStartY = event.clientY;
+        dragging = false;
+        dragTop = null;
+        control.setPointerCapture(event.pointerId);
+      });
+
+      demo.addEventListener("pointermove", (event) => {
+        if (event.pointerId !== dragPointer) return;
+        event.preventDefault();
+        if (Math.abs(event.clientY - dragStartY) < 4) return;
+        dragging = true;
+        movePaddle(event);
+      });
+
+      for (const eventName of ["pointerup", "pointercancel"]) {
+        demo.addEventListener(eventName, (event) => {
+          const pointerEvent = event as PointerEvent;
+          if (pointerEvent.pointerId !== dragPointer) return;
+          event.preventDefault();
+          if (dragging) {
+            movePaddle(pointerEvent, true);
+          } else if (eventName === "pointerup") {
+            const court = demo.querySelector<HTMLElement>(".pong-court");
+            const direction =
+              court instanceof HTMLElement &&
+              pointerEvent.clientY <
+                court.getBoundingClientRect().top + court.offsetHeight / 2
+                ? "up"
+                : "down";
+            demo
+              .querySelector<HTMLButtonElement>(
+                `[data-pong-nudge="${direction}"]`,
+              )
+              ?.click();
+          }
+          dragPointer = null;
+          settleTimer = window.setTimeout(() => {
+            dragging = false;
+            dragTop = null;
+            settleTimer = null;
+          }, 250);
+        });
+      }
+
+      demo.addEventListener("keydown", (event) => {
+        if (!(event.target as HTMLElement).closest(".pong-court")) return;
+        if (
+          !["ArrowUp", "ArrowDown", " ", "w", "W", "s", "S"].includes(event.key)
+        )
+          return;
+        event.preventDefault();
+      });
+    }
+  }
+</script>

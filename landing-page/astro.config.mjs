@@ -13,7 +13,7 @@ const gameOfLifeRoot = fileURLToPath(
   new URL("./game-of-life", import.meta.url),
 );
 const pongRoot = fileURLToPath(
-  new URL("../examples/local-lv-pong", import.meta.url),
+  new URL("./pong", import.meta.url),
 );
 const publicRoot = fileURLToPath(new URL("./public", import.meta.url));
 

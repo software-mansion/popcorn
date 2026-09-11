@@ -4,6 +4,7 @@
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "tailwindcss";
+@source "../../pong/local/lib/local/pong_live.ex";
 
 @theme {
   --color-cream: #fffdf5;
@@ -29,7 +30,6 @@
   --color-memory-ets: #5e9a48;
   --color-memory-other: #7a7068;
   --color-orange: #ef7c00;
-  --color-orange-text: #a84f00;
   --color-orange-20: #ffe6cc;
   --container-demos: 82.375rem;
   --font-display: "Fraunces Variable", system-ui, sans-serif;
