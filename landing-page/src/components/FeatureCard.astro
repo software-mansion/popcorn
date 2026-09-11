@@ -1,81 +1,18 @@
 ---
-import { Code } from "astro:components";
-
 interface Props {
   title: string;
-  description: string;
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-  linkText?: string;
-  note?: string;
-  code?: string;
 }
 
-const { title, description, position, linkText, note, code } = Astro.props;
-const isRight = position.endsWith("right");
-const isTop = position.startsWith("top");
-const isLast = position === "bottom-right";
-const popcornTheme = {
-  name: "popcorn",
-  type: "dark",
-  colors: {
-    "editor.background": "var(--color-brown-90)",
-    "editor.foreground": "var(--color-cream-muted)",
-  },
-  tokenColors: [
-    {
-      scope: ["keyword", "storage.type"],
-      settings: { foreground: "var(--color-orange)" },
-    },
-    {
-      scope: ["string", "constant.numeric"],
-      settings: { foreground: "var(--color-cream)" },
-    },
-    {
-      scope: "entity.name.function",
-      settings: { foreground: "var(--color-orange-20)" },
-    },
-  ],
-} as const;
+const { title } = Astro.props;
 ---
 
 <article
-  class:list={[
-    "border-brown-80 flex flex-col gap-2.5 border-b py-6 md:min-h-66 md:gap-3 md:py-8 lg:pt-9 lg:pb-10",
-    isLast && "border-b-0",
-    !isTop && "md:border-b-0",
-    isRight ? "md:border-l md:pl-8 lg:pl-14" : "md:pr-8 lg:pr-14",
-  ]}
+  class="border-brown-80 text-cream-muted flex flex-col gap-2.5 border-b py-6 text-sm leading-6 last:border-b-0 md:min-h-66 md:gap-3 md:py-8 md:odd:pr-8 md:even:border-l md:even:pl-8 md:nth-[n+3]:border-b-0 lg:pt-9 lg:pb-10 lg:text-base lg:leading-7 lg:odd:pr-14 lg:even:pl-14"
 >
   <h3
     class="font-display text-cream text-lg leading-7 font-semibold tracking-tight lg:text-2xl lg:leading-8"
   >
     {title}
   </h3>
-  <p class="text-cream-muted text-sm leading-6 lg:text-base lg:leading-7">
-    {description}
-  </p>
-  {
-    linkText && (
-      <span class="text-orange mt-2 hidden text-sm leading-4 font-medium lg:block">
-        {linkText} →
-      </span>
-    )
-  }
-  {
-    note && (
-      <p class="text-cream-muted hidden text-sm leading-6 lg:block lg:text-base lg:leading-7">
-        {note}
-      </p>
-    )
-  }
-  {
-    code && (
-      <Code
-        code={code}
-        lang="javascript"
-        theme={popcornTheme}
-        class="font-label block overflow-x-auto rounded-md px-4 py-3 text-xs leading-4 lg:text-sm lg:leading-5"
-      />
-    )
-  }
+  <slot />
 </article>
