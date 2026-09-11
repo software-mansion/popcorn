@@ -1,1 +1,31 @@
+@import "@fontsource-variable/fraunces";
 @import "tailwindcss";
+
+@theme {
+  --color-cream: #fffdf5;
+  --color-cream-soft: #fbf4e5;
+  --color-ink: #301b05;
+  --color-brown-70: #5f4122;
+  --color-orange: #ef7c00;
+  --font-display: "Fraunces Variable", system-ui, sans-serif;
+  --font-sans: Inter, system-ui, sans-serif;
+}
+
+:root {
+  color: var(--color-ink);
+  background: var(--color-cream);
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+main {
+  width: 100%;
+}

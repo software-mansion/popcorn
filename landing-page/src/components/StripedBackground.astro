@@ -1,0 +1,65 @@
+---
+interface Props {
+  scalloped?: boolean;
+}
+
+const { scalloped = false } = Astro.props;
+
+const stripes = Array.from({ length: 64 }, (_, index) => {
+  let color = "bg-cream";
+
+  if (index % 2 === 0) {
+    color = "bg-cream-soft";
+  }
+
+  return { color, index };
+});
+---
+
+<div
+  class="bg-ink absolute inset-0 flex overflow-hidden"
+  data-stripe-background
+  aria-hidden="true"
+>
+  <span class="invisible absolute w-19 md:w-23 lg:w-28" data-stripe-probe
+  ></span>
+  {
+    stripes.map(({ color, index }) => (
+      <span
+        class="flex h-full min-w-0 flex-1 flex-col"
+        data-stripe
+        hidden={index >= 13}
+      >
+        <span class:list={["min-h-0 flex-1", color]} />
+        {scalloped && (
+          <span
+            class:list={["aspect-2/1 w-full flex-none rounded-b-full", color]}
+          />
+        )}
+      </span>
+    ))
+  }
+</div>
+
+<script>
+  const backgrounds = document.querySelectorAll<HTMLElement>(
+    "[data-stripe-background]",
+  );
+
+  function updateStripeCount(background: HTMLElement) {
+    const probe = background.querySelector<HTMLElement>("[data-stripe-probe]")!;
+    const stripes = background.querySelectorAll<HTMLElement>("[data-stripe]");
+
+    const count = Math.floor(window.innerWidth / probe.offsetWidth);
+
+    console.assert(count <= stripes.length);
+    stripes.forEach((stripe, index) => {
+      stripe.hidden = index >= count;
+    });
+  }
+
+  for (const background of backgrounds) {
+    updateStripeCount(background);
+    new ResizeObserver(() => updateStripeCount(background)).observe(background);
+  }
+</script>
