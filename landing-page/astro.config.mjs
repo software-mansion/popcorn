@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import { execFile } from "node:child_process";
+import { copyFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -11,6 +12,10 @@ const run = promisify(execFile);
 const gameOfLifeRoot = fileURLToPath(
   new URL("./game-of-life", import.meta.url),
 );
+const pongRoot = fileURLToPath(
+  new URL("./pong", import.meta.url),
+);
+const publicRoot = fileURLToPath(new URL("./public", import.meta.url));
 
 function compileGameOfLife() {
   return {
@@ -18,6 +23,44 @@ function compileGameOfLife() {
     hooks: {
       "astro:config:setup": async () => {
         await run("mix", ["compile"], { cwd: gameOfLifeRoot });
+      },
+    },
+  };
+}
+
+function compilePong() {
+  return {
+    name: "compile-pong",
+    hooks: {
+      "astro:config:setup": async () => {
+        await run("mise", ["exec", "--", "mix", "deps.get"], {
+          cwd: pongRoot,
+        });
+        await run("mise", ["exec", "--", "mix", "llv.build"], {
+          cwd: pongRoot,
+        });
+
+        const runtimeRoot = `${pongRoot}/priv/static/assets/js`;
+        await mkdir(`${publicRoot}/_astro`, { recursive: true });
+        await mkdir(`${publicRoot}/wasm`, { recursive: true });
+        await Promise.all([
+          copyFile(
+            `${runtimeRoot}/AtomVM.mjs`,
+            `${publicRoot}/_astro/AtomVM.mjs`,
+          ),
+          copyFile(
+            `${runtimeRoot}/AtomVM.wasm`,
+            `${publicRoot}/_astro/AtomVM.wasm`,
+          ),
+          copyFile(
+            `${runtimeRoot}/iframe.mjs`,
+            `${publicRoot}/_astro/iframe.mjs`,
+          ),
+          copyFile(
+            `${runtimeRoot}/wasm/bundle.avm`,
+            `${publicRoot}/wasm/local_pong.avm`,
+          ),
+        ]);
       },
     },
   };
@@ -43,5 +86,5 @@ export default defineConfig({
       tailwindcss(),
     ],
   },
-  integrations: [compileGameOfLife()],
+  integrations: [compileGameOfLife(), compilePong()],
 });

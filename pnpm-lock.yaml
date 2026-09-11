@@ -197,6 +197,15 @@ importers:
       ghostty-web:
         specifier: ^0.4.0
         version: 0.4.0
+      local_live_view:
+        specifier: link:../local-live-view
+        version: link:../local-live-view
+      phoenix:
+        specifier: ^1.7.21
+        version: 1.8.13
+      phoenix_live_view:
+        specifier: ^1.1.30
+        version: 1.1.30
       tailwindcss:
         specifier: ^4.1.11
         version: 4.2.4
@@ -3488,6 +3497,9 @@ packages:
   path-type@4.0.0:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
     engines: {node: '>=8'}
+
+  phoenix@1.8.13:
+    resolution: {integrity: sha512-5UByH7ejdsPLd6eihwzV3L3i6YX4mHUtFjLaE8S1YuA+3aBj37rzH6KDjxBuPlB04o9ZHVz+PKRiUg3aYYvzmQ==}
 
   phoenix_live_view@1.1.30:
     resolution: {integrity: sha512-M5fQmoJj9H4mQ98sqdKKc7E2PxLWMJJU7TzZfSC+tcNHTgDDhZKi33NpOKosLmNbkIdlnA6DZ1J6TfgndKV+6w==}
@@ -7389,6 +7401,8 @@ snapshots:
   path-parse@1.0.7: {}
 
   path-type@4.0.0: {}
+
+  phoenix@1.8.13: {}
 
   phoenix_live_view@1.1.30:
     dependencies:

@@ -166,13 +166,14 @@ const navLinks = [
       updateNavbarColor();
 
       const center = Math.round(navbar.offsetHeight / 2);
+      const bottom = Math.max(0, window.innerHeight - center - 1);
       observer = new IntersectionObserver(
         (entries) => {
           darkBackground = entries.some((entry) => entry.isIntersecting);
           updateNavbarColor();
         },
         {
-          rootMargin: `-${center}px 0px -${window.innerHeight - center - 1}px`,
+          rootMargin: `-${center}px 0px -${bottom}px`,
         },
       );
       for (const section of darkSections) {
