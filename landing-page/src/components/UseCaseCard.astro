@@ -11,7 +11,7 @@ const { label, variant, title } = Astro.props;
 ---
 
 <article
-  class="bg-cream flex min-w-0 flex-col items-start gap-3.5 overflow-hidden rounded-2xl p-5 lg:gap-4 lg:p-6"
+  class="bg-cream font-copy text-brown-60 lg:text-brown-70 flex min-w-0 flex-col items-start gap-3.5 overflow-hidden rounded-2xl p-5 text-[15px] leading-6 lg:gap-4 lg:p-6 lg:text-base lg:leading-[26px]"
 >
   <TicketBadge {label} {variant} />
   <h3
@@ -19,9 +19,5 @@ const { label, variant, title } = Astro.props;
   >
     {title}
   </h3>
-  <p
-    class="font-copy text-brown-60 lg:text-brown-70 text-[15px] leading-6 lg:text-base lg:leading-[26px]"
-  >
-    <slot />
-  </p>
+  <slot />
 </article>
