@@ -3,6 +3,7 @@ import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
 import FeatureCard from "../components/FeatureCard.astro";
 import Footer from "../components/Footer.astro";
+import MovieStrip from "../components/MovieStrip.astro";
 import UseCaseCard from "../components/UseCaseCard.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
@@ -90,7 +91,7 @@ const useCases = [
 
   <section
     id="demos"
-    class="bg-cream relative flex h-205 flex-col items-center gap-7 overflow-hidden pt-16 pb-18 md:h-250 md:gap-9 md:pt-20 md:pb-22 lg:h-289 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-28"
+    class="bg-cream relative flex flex-col items-center gap-7 overflow-hidden pt-16 pb-18 md:gap-9 md:pt-20 md:pb-22 lg:gap-16 lg:pt-28 lg:pb-28"
   >
     <StripedBackground />
 
@@ -98,18 +99,16 @@ const useCases = [
       Demos
     </Heading>
 
-    <div
-      class="relative z-10 mx-auto flex w-full max-w-352 flex-col gap-7 md:gap-9 lg:flex-row lg:gap-6"
-    >
-      <SectionPlaceholder
-        label="Movie strip placeholder"
-        class="h-62 w-full rounded-none lg:h-203 lg:w-115 lg:flex-none lg:rounded-2xl"
-      />
-      <div class="px-3 md:px-6 lg:flex-1 lg:px-0">
-        <SectionPlaceholder
-          label="Demo placeholder"
-          class="h-85 w-full md:h-116 lg:h-203"
-        />
+    <div class="@container/demos relative z-10 mx-auto w-full max-w-352">
+      <div
+        class="@min-demos/demos:flex-row @min-demos/demos:gap-6 flex flex-col gap-7 md:gap-9"
+      >
+        <MovieStrip />
+        <div
+          class="@min-demos/demos:h-203 @min-demos/demos:flex-1 @min-demos/demos:p-0 h-85 px-3 md:h-116 md:px-6"
+        >
+          <SectionPlaceholder label="Demo placeholder" class="h-full w-full" />
+        </div>
       </div>
     </div>
   </section>

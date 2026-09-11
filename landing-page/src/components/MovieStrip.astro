@@ -1,0 +1,182 @@
+---
+import GameOfLifeThumbnail from "./GameOfLifeThumbnail.astro";
+import PongThumbnail from "./PongThumbnail.astro";
+import ReplThumbnail from "./ReplThumbnail.astro";
+
+const perforations = Array.from({ length: 48 });
+---
+
+<div
+  class="movie-strip bg-ink @min-demos/demos:h-203 @min-demos/demos:w-115 @min-demos/demos:flex-none @min-demos/demos:flex-row @min-demos/demos:gap-4 @min-demos/demos:rounded-lg @min-demos/demos:px-2 @min-demos/demos:py-3 relative flex h-61.5 w-full flex-col gap-2.5 overflow-hidden py-2.5"
+  data-movie-strip
+>
+  <div
+    class="perforations @min-demos/demos:h-auto @min-demos/demos:w-6 grid h-5 flex-none overflow-hidden"
+    aria-hidden="true"
+  >
+    {perforations.map(() => <span />)}
+  </div>
+
+  <div
+    class="thumbnail-track @min-demos/demos:flex-col @min-demos/demos:gap-4 @min-demos/demos:overflow-hidden @min-demos/demos:p-0 flex min-h-0 flex-1 touch-pan-x touch-pan-y gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain px-3"
+    data-thumbnail-track
+    role="region"
+    aria-label="Demo previews"
+    tabindex="0"
+  >
+    <ReplThumbnail />
+    <GameOfLifeThumbnail />
+    <PongThumbnail />
+  </div>
+
+  <span
+    class="scroll-hint text-cream @min-demos/demos:hidden pointer-events-none absolute top-1/2 right-2 z-1 grid size-7 -translate-y-1/2 place-items-center rounded-full opacity-0 transition-opacity duration-150"
+    aria-hidden="true"
+  >
+    <svg viewBox="0 0 20 20" width="20" height="20">
+      <path d="M16 10H5m4-4-4 4 4 4"></path>
+    </svg>
+  </span>
+
+  <div
+    class="perforations @min-demos/demos:h-auto @min-demos/demos:w-6 grid h-5 flex-none overflow-hidden"
+    aria-hidden="true"
+  >
+    {perforations.map(() => <span />)}
+  </div>
+</div>
+
+<style>
+  .perforations {
+    grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
+    grid-auto-rows: 20px;
+  }
+
+  .perforations span {
+    width: 14px;
+    height: 20px;
+    justify-self: center;
+    border-radius: 4px;
+    background: var(--color-cream-soft);
+  }
+
+  .thumbnail-track {
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .thumbnail-track:focus-visible {
+    outline: 2px solid var(--color-orange);
+    outline-offset: -2px;
+  }
+
+  .thumbnail-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-hint {
+    background: color-mix(in srgb, var(--color-cream) 12%, transparent);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--color-ink) 22%, transparent);
+    backdrop-filter: blur(10px) saturate(1.15);
+    -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  }
+
+  .scroll-hint path {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.75;
+  }
+
+  .movie-strip.has-hidden-demos .scroll-hint {
+    opacity: 1;
+  }
+
+  @media (min-width: 48rem) {
+    .perforations {
+      grid-template-columns: repeat(auto-fit, minmax(29px, 1fr));
+    }
+  }
+
+  @container demos (min-width: 1318px) {
+    .perforations {
+      grid-template-rows: repeat(18, 16px);
+      grid-template-columns: 24px;
+      align-content: space-between;
+    }
+
+    .perforations span {
+      width: 24px;
+      height: 16px;
+    }
+
+    .perforations span:nth-child(n + 19) {
+      display: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll("[data-movie-strip]").forEach((strip) => {
+    const track = strip.querySelector("[data-thumbnail-track]");
+
+    console.assert(track instanceof HTMLElement);
+    if (!(track instanceof HTMLElement)) return;
+
+    track.addEventListener(
+      "wheel",
+      (event) => {
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+        const horizontal = getComputedStyle(strip).flexDirection === "column";
+        if (!horizontal || track.scrollWidth <= track.clientWidth) return;
+
+        event.preventDefault();
+        track.scrollLeft += event.deltaY;
+      },
+      { passive: false },
+    );
+
+    const thumbnails = track.querySelectorAll<HTMLButtonElement>("[data-demo]");
+    const lastThumbnail = thumbnails.item(thumbnails.length - 1);
+
+    console.assert(lastThumbnail);
+
+    new IntersectionObserver(
+      ([entry]) => {
+        strip.classList.toggle(
+          "has-hidden-demos",
+          entry.intersectionRatio < 0.65,
+        );
+      },
+      { root: track, threshold: [0.65] },
+    ).observe(lastThumbnail!);
+
+    thumbnails.forEach((thumbnail) => {
+      thumbnail.addEventListener("click", () => {
+        thumbnails.forEach((candidate) => {
+          const active = candidate === thumbnail;
+          candidate.setAttribute("aria-pressed", String(active));
+        });
+
+        const horizontal = getComputedStyle(strip).flexDirection === "column";
+
+        if (horizontal) {
+          const trackBounds = track.getBoundingClientRect();
+          const thumbnailBounds = thumbnail.getBoundingClientRect();
+
+          track.scrollBy({
+            left:
+              thumbnailBounds.left -
+              trackBounds.left +
+              (thumbnailBounds.width - trackBounds.width) / 2,
+            behavior: "smooth",
+          });
+        }
+
+        console.log(`Selected demo: ${thumbnail.dataset.demo}`);
+      });
+    });
+  });
+</script>
