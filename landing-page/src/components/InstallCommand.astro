@@ -1,0 +1,67 @@
+---
+import CheckIcon from "./CheckIcon.astro";
+import CopyIcon from "./CopyIcon.astro";
+---
+
+<div
+  class="outline-ink bg-cream flex w-full items-center justify-between rounded-xl py-1 pr-1 pl-4 outline-1 -outline-offset-1 outline-dashed"
+>
+  <code class="flex items-center gap-3 font-mono text-sm leading-6">
+    <span class="text-orange text-2xl font-light" aria-hidden="true">›</span>
+    <span data-install-command>mix install popcorn</span>
+  </code>
+
+  <button
+    type="button"
+    class="bg-cream-button text-orange hover:bg-orange-20 focus-visible:outline-orange flex cursor-pointer items-center justify-center rounded-lg p-3 focus-visible:outline-2 focus-visible:outline-offset-2"
+    aria-label="Copy install command"
+    data-copy-command
+  >
+    <CopyIcon />
+    <CheckIcon />
+  </button>
+  <span class="sr-only" aria-live="polite" data-copy-status></span>
+</div>
+
+<script>
+  const copyButton = document.querySelector<HTMLButtonElement>(
+    "[data-copy-command]",
+  )!;
+  const command = document.querySelector<HTMLElement>(
+    "[data-install-command]",
+  )!;
+  const copyIcon = copyButton.querySelector<SVGElement>("[data-copy-icon]")!;
+  const checkIcon = copyButton.querySelector<SVGElement>("[data-check-icon]")!;
+  const status = document.querySelector<HTMLElement>("[data-copy-status]")!;
+
+  function resetCopyButton() {
+    copyButton.setAttribute("aria-label", "Copy install command");
+    copyIcon.classList.remove("hidden");
+    checkIcon.classList.add("hidden");
+    status.textContent = "";
+  }
+
+  function copyWithSelection() {
+    const selection = document.getSelection()!;
+    const range = document.createRange();
+    range.selectNodeContents(command);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const copied = document.execCommand("copy");
+    selection.removeAllRanges();
+    console.assert(copied);
+  }
+
+  copyButton.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(command.textContent!.trim());
+    } catch {
+      copyWithSelection();
+    }
+    copyButton.setAttribute("aria-label", "Install command copied");
+    copyIcon.classList.add("hidden");
+    checkIcon.classList.remove("hidden");
+    status.textContent = "Install command copied";
+    window.setTimeout(resetCopyButton, 1600);
+  });
+</script>

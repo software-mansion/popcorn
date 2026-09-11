@@ -41,25 +41,23 @@ const stripes = Array.from({ length: 64 }, (_, index) => {
   }
 </div>
 
-<script>
-  const backgrounds = document.querySelectorAll<HTMLElement>(
-    "[data-stripe-background]",
-  );
+<script is:inline>
+  {
+    const script = document.currentScript;
+    const background = script.previousElementSibling;
+    const probe = background.querySelector("[data-stripe-probe]");
+    const stripes = background.querySelectorAll("[data-stripe]");
 
-  function updateStripeCount(background: HTMLElement) {
-    const probe = background.querySelector<HTMLElement>("[data-stripe-probe]")!;
-    const stripes = background.querySelectorAll<HTMLElement>("[data-stripe]");
+    function updateStripeCount() {
+      const count = Math.floor(window.innerWidth / probe.offsetWidth);
 
-    const count = Math.floor(window.innerWidth / probe.offsetWidth);
+      console.assert(count <= stripes.length);
+      stripes.forEach(function setStripeVisibility(stripe, index) {
+        stripe.hidden = index >= count;
+      });
+    }
 
-    console.assert(count <= stripes.length);
-    stripes.forEach((stripe, index) => {
-      stripe.hidden = index >= count;
-    });
-  }
-
-  for (const background of backgrounds) {
-    updateStripeCount(background);
-    new ResizeObserver(() => updateStripeCount(background)).observe(background);
+    updateStripeCount();
+    new ResizeObserver(updateStripeCount).observe(background);
   }
 </script>
