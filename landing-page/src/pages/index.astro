@@ -1,32 +1,58 @@
 ---
 import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
+import FeatureCard from "../components/FeatureCard.astro";
 import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
+
+const features = [
+  {
+    position: "top-left" as const,
+    title: "Just plain Elixir",
+    description:
+      "Supervisors, GenServers, and any other OTP components just work. The VM runs off the browser's main thread, so a busy process never freezes the page.",
+  },
+  {
+    position: "top-right" as const,
+    title: "Optimised for the web",
+    description:
+      "Under 1 MB of compressed Wasm, with ~2.9 MB for Elixir and the OTP standard library. It boots in about 200 ms. Getting there meant cutting what the browser has no use for — native sockets, distribution, dynamic module loading, crash dumps.",
+    linkText: "Read optimization blogpost",
+  },
+  {
+    position: "bottom-left" as const,
+    title: "Your dependencies come with you",
+    description:
+      "Req, Jason, Ecto, even Phoenix Live View compile and run unmodified. The bundler packs your whole dependency closure, so there's nothing to list.",
+    note: "Browser requests use fetch() automatically.",
+  },
+  {
+    position: "bottom-right" as const,
+    title: "Call Elixir from JavaScript (and vice versa)",
+    description:
+      "Communicate with Elixir processes, exchange data, run JS from Elixir code.",
+    code: [
+      'const result = await popcorn.genserver.call("counter", ["add", 1]);',
+      "if (result.ok) console.log(result.data);",
+    ],
+  },
+];
 ---
 
 <Layout>
   <Hero />
 
   <section
-    class="bg-ink flex h-242 flex-col items-center gap-8 px-5 pt-16 md:h-177 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
+    id="features"
+    class="bg-ink flex flex-col items-center gap-8 px-5 pt-16 md:h-177 md:gap-10 md:px-8 md:py-20 lg:h-205 lg:gap-16 lg:px-16 lg:pt-28 lg:pb-0"
   >
     <Heading punctuation="?" class="text-cream">Features</Heading>
 
     <div
-      class="mx-auto grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-rows-2 lg:gap-16"
+      class="grid w-full max-w-352 grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:gap-0"
     >
-      <SectionPlaceholder
-        label="Feature placeholder"
-        class="h-46 md:h-58 lg:h-65"
-      />
-      <SectionPlaceholder label="Feature placeholder" class="h-58 lg:h-65" />
-      <SectionPlaceholder label="Feature placeholder" class="h-52 lg:h-65" />
-      <SectionPlaceholder
-        label="Feature placeholder"
-        class="h-40 md:h-52 lg:h-65"
-      />
+      {features.map((feature) => <FeatureCard {...feature} />)}
     </div>
   </section>
 

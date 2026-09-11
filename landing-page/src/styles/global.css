@@ -6,8 +6,13 @@
   --color-cream: #fffdf5;
   --color-cream-soft: #fbf4e5;
   --color-cream-button: #f7ebd480;
+  --color-cream-muted: #c4b7a6;
   --color-ink: #301b05;
+  --color-brown-60: #696057;
   --color-brown-70: #5f4122;
+  --color-brown-80: #4a3520;
+  --color-brown-90: #241505;
+  --color-brown-muted: #9c8b79;
   --color-orange: #ef7c00;
   --color-orange-20: #ffe6cc;
   --font-display: "Fraunces Variable", system-ui, sans-serif;
