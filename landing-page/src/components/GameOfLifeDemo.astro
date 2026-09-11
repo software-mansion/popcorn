@@ -1,0 +1,479 @@
+---
+const patterns = [
+  {
+    id: "rpentomino",
+    label: "R-pentomino",
+    size: 3,
+    iconClass: "size-10",
+    path: "M1 0h1v1H1zM2 0h1v1H2zM0 1h1v1H0zM1 1h1v1H1zM1 2h1v1H1z",
+  },
+  {
+    id: "glider",
+    label: "Glider",
+    size: 3,
+    iconClass: "size-10",
+    path: "M1 0h1v1H1zM2 1h1v1H2zM0 2h1v1H0zM1 2h1v1H1zM2 2h1v1H2z",
+  },
+  {
+    id: "random",
+    label: "Random soup",
+    size: 5,
+    iconClass: "size-16",
+    path: "M0 0h1v1H0zM0 2h1v1H0zM1 3h1v1H1zM2 0h1v1H2zM2 2h1v1H2zM2 4h1v1H2zM3 1h1v1H3zM4 2h1v1H4zM4 3h1v1H4z",
+  },
+  {
+    id: "pulsar",
+    label: "Pulsar",
+    size: 13,
+    iconClass: "size-24",
+    path: "M0 2h1v1H0zM0 3h1v1H0zM0 4h1v1H0zM0 8h1v1H0zM0 9h1v1H0zM0 10h1v1H0zM2 0h1v1H2zM2 5h1v1H2zM2 7h1v1H2zM2 12h1v1H2zM3 0h1v1H3zM3 5h1v1H3zM3 7h1v1H3zM3 12h1v1H3zM4 0h1v1H4zM4 5h1v1H4zM4 7h1v1H4zM4 12h1v1H4zM5 2h1v1H5zM5 3h1v1H5zM5 4h1v1H5zM5 8h1v1H5zM5 9h1v1H5zM5 10h1v1H5zM7 2h1v1H7zM7 3h1v1H7zM7 4h1v1H7zM7 8h1v1H7zM7 9h1v1H7zM7 10h1v1H7zM8 0h1v1H8zM8 5h1v1H8zM8 7h1v1H8zM8 12h1v1H8zM9 0h1v1H9zM9 5h1v1H9zM9 7h1v1H9zM9 12h1v1H9zM10 0h1v1h-1zM10 5h1v1h-1zM10 7h1v1h-1zM10 12h1v1h-1zM12 2h1v1h-1zM12 3h1v1h-1zM12 4h1v1h-1zM12 8h1v1h-1zM12 9h1v1h-1zM12 10h1v1h-1z",
+  },
+] as const;
+
+const controls = [
+  { action: "run", label: "Run", running: false },
+  { action: "pause", label: "Stop", running: true },
+  { action: "step", label: "Step" },
+  { action: "clear", label: "Clear" },
+] as const;
+
+const figures = [
+  { key: "generation", label: "Generation", value: "0" },
+  { key: "alive", label: "Alive", value: "5" },
+  { key: "born", label: "Born this tick", value: "5" },
+] as const;
+---
+
+<section
+  class="border-demo bg-cream relative flex h-auto min-h-0 w-full flex-col overflow-hidden rounded-md border antialiased md:h-full"
+  aria-label="Conway's Game of Life demo"
+  data-game-of-life-demo
+>
+  <nav
+    class="border-demo-soft contents md:flex md:h-18 md:flex-none md:items-center md:gap-6 md:border-b md:px-5"
+    aria-label="Game of Life controls"
+  >
+    <div
+      class="border-demo-soft order-1 flex h-16 items-center gap-2 border-b px-3 md:order-none md:h-auto md:border-0 md:px-0"
+    >
+      <div class="flex items-center gap-2">
+        {
+          controls.map(({ action, label, running }) => (
+            <button
+              class:list={[
+                "border-demo font-copy flex h-9 cursor-pointer items-center gap-2 rounded-sm border px-3 text-xs font-medium disabled:cursor-default disabled:opacity-40 md:h-9.5 md:px-4 md:text-sm",
+                action === "run" || action === "pause"
+                  ? "bg-orange text-cream"
+                  : "bg-cream text-ink",
+              ]}
+              type="button"
+              data-life-event={action}
+              data-life-running={running}
+              hidden={running === true}
+              disabled
+            >
+              {action === "run" && (
+                <svg
+                  class="h-3 w-2.5 fill-current"
+                  viewBox="0 0 10 12"
+                  aria-hidden="true"
+                >
+                  <path d="M0 0v12l10-6z" />
+                </svg>
+              )}
+              {action === "pause" && (
+                <svg
+                  class="h-3 w-2.5 fill-current"
+                  viewBox="0 0 10 12"
+                  aria-hidden="true"
+                >
+                  <path d="M0 0h3v12H0zM7 0h3v12H7z" />
+                </svg>
+              )}
+              {label}
+            </button>
+          ))
+        }
+      </div>
+      <button
+        class="text-ink ml-auto flex flex-none cursor-pointer items-center gap-2 text-xs disabled:cursor-default disabled:opacity-40 md:text-sm"
+        type="button"
+        data-life-event="restart"
+        disabled
+      >
+        <svg class="size-3.5" viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d="M12 7a5 5 0 1 1-1.6-3.7M12.2 1.4v2.9H9.3"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"></path>
+        </svg>
+        Restart
+      </button>
+    </div>
+    <div
+      class="border-demo order-3 mx-3 my-3 flex overflow-hidden rounded-sm border md:order-none md:mx-0 md:my-0 md:ml-auto md:w-auto"
+    >
+      {
+        [
+          [200, "5 / s"],
+          [33, "30 / s"],
+          [17, "60 / s"],
+        ].map(([speed, label]) => (
+          <button
+            class:list={[
+              "border-demo text-brown-70 h-9 flex-1 cursor-pointer border-l px-4 text-sm font-medium first:border-l-0 disabled:cursor-default disabled:opacity-40 md:flex-none",
+              { "bg-demo-soft text-ink": speed === 33 },
+            ]}
+            type="button"
+            data-life-event={`speed:${speed}`}
+            data-life-speed={speed}
+            disabled
+          >
+            {label}
+          </button>
+        ))
+      }
+    </div>
+  </nav>
+
+  <div
+    class="@min-demos/demos:flex-row contents md:order-none md:flex md:min-h-0 md:flex-1 md:flex-col"
+  >
+    <div
+      class="@min-demos/demos:min-w-0 @min-demos/demos:flex-1 @min-demos/demos:p-6 order-2 flex aspect-square w-full flex-none items-center justify-center p-3 md:order-none md:aspect-auto md:min-h-0 md:flex-1 md:p-6"
+    >
+      <div id="landing-life-root" class="size-full" data-life-root></div>
+    </div>
+
+    <aside
+      class="border-demo-soft @min-demos/demos:flex @min-demos/demos:h-auto @min-demos/demos:w-96 @min-demos/demos:flex-col @min-demos/demos:gap-0 @min-demos/demos:border-t-0 @min-demos/demos:border-l order-4 grid flex-none grid-cols-1 border-t px-5 py-5 md:order-none md:h-52 md:grid-cols-2 md:gap-8 md:px-6"
+    >
+      <section
+        class="@min-demos/demos:justify-start flex flex-col gap-4 md:justify-center"
+      >
+        <h3
+          class="font-label text-brown-60 text-xs font-medium tracking-[0.06em] uppercase"
+        >
+          This tick
+        </h3>
+        <div class="grid grid-cols-3 gap-4">
+          {
+            figures.map(({ key, label, value }) => (
+              <p class="flex min-w-0 flex-col gap-1">
+                <strong
+                  class:list={[
+                    "font-label text-ink @min-demos/demos:self-start self-start text-3xl leading-9 font-normal md:self-center",
+                    { "text-orange-text": key === "born" },
+                  ]}
+                  data-life-stat={key}
+                >
+                  {value}
+                </strong>
+                <span class="font-copy text-brown-60 flex items-center gap-1.5 text-xs leading-4 lowercase">
+                  {key === "born" && <i class="bg-orange size-2 not-italic" />}
+                  {label}
+                </span>
+              </p>
+            ))
+          }
+        </div>
+      </section>
+
+      <section
+        class="border-demo-soft @min-demos/demos:mt-2 @min-demos/demos:border-t @min-demos/demos:border-l-0 @min-demos/demos:pt-3 @min-demos/demos:pl-0 mt-5 border-t pt-4 md:mt-0 md:border-t-0 md:border-l md:pt-0 md:pl-8"
+        aria-label="Presets"
+      >
+        <h3
+          class="font-label text-brown-60 text-xs font-medium tracking-[0.06em] uppercase"
+        >
+          Presets
+        </h3>
+        <div
+          class="@min-demos/demos:mt-3 @min-demos/demos:gap-3 mt-2 grid grid-cols-2 gap-2"
+        >
+          {
+            patterns.map(({ id, label, path, size, iconClass }, index) => (
+              <button
+                class:list={[
+                  "text-brown-60 @min-demos/demos:gap-2 @min-demos/demos:p-2 flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-sm p-1 text-center disabled:cursor-default disabled:opacity-40",
+                  { "text-ink": index === 0 },
+                ]}
+                type="button"
+                data-life-event={`preset:${id}`}
+                data-life-pattern={id}
+                aria-pressed={index === 0}
+                disabled
+              >
+                <span class="@min-demos/demos:h-16 flex h-8 items-center justify-center">
+                  <svg
+                    class:list={[
+                      iconClass,
+                      "max-h-full max-w-full fill-current",
+                    ]}
+                    aria-hidden="true"
+                    viewBox={`0 0 ${size} ${size}`}
+                  >
+                    <path d={path} />
+                  </svg>
+                </span>
+                <span class="font-label text-xs leading-4">{label}</span>
+              </button>
+            ))
+          }
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div
+    class="bg-loading absolute inset-x-0 bottom-0 z-20 h-0.75"
+    data-life-loading
+  >
+    <span class="bg-orange block h-full w-3/5 animate-pulse"></span>
+  </div>
+
+  <p class="sr-only" aria-live="polite" data-life-status>Waiting to start</p>
+</section>
+
+<script>
+  import type { Popcorn } from "@swmansion/popcorn";
+
+  type Snapshot = {
+    generation: number;
+    alive: [number, number][];
+    born: [number, number][];
+    speed: number;
+    running: boolean;
+  };
+
+  const demo = document.querySelector<HTMLElement>("[data-game-of-life-demo]");
+  console.assert(demo instanceof HTMLElement);
+
+  if (demo instanceof HTMLElement) {
+    const root = demo.querySelector<HTMLElement>("[data-life-root]");
+    const loading = demo.querySelector<HTMLElement>("[data-life-loading]");
+    const status = demo.querySelector<HTMLElement>("[data-life-status]");
+    console.assert(root instanceof HTMLElement);
+    console.assert(loading instanceof HTMLElement);
+    console.assert(status instanceof HTMLElement);
+
+    if (
+      root instanceof HTMLElement &&
+      loading instanceof HTMLElement &&
+      status instanceof HTMLElement
+    ) {
+      let runtime: Popcorn | null = null;
+      let starting: Promise<void> | null = null;
+      let queue = Promise.resolve();
+      let selectedPattern = "rpentomino";
+
+      function serialize(action: () => Promise<void>) {
+        queue = queue.then(action, action);
+        return queue;
+      }
+
+      async function start() {
+        if (runtime !== null) return;
+        loading.classList.remove("hidden");
+        status.textContent = "Starting Game of Life";
+        const { Popcorn } = await import("@swmansion/popcorn");
+        const result = await Popcorn.init({
+          beam: { otpAssetsRoot: "/_astro/otp/" },
+          timeoutsMs: { boot: 30_000 },
+          onError: (error) => {
+            status.textContent = `Runtime ${error.kind}: ${error.data}`;
+          },
+        });
+        if (result.ok === false) throw result.error;
+        runtime = result.data;
+
+        const size =
+          root.clientWidth < 520 ? 20 : root.clientWidth < 800 ? 25 : 30;
+        await call([
+          "mount",
+          { rootId: root.id, rows: size, cols: size, controls: false },
+        ]);
+        render(await call(["event", "restart"]));
+        for (const button of demo.querySelectorAll<HTMLButtonElement>(
+          "[data-life-event]",
+        ))
+          button.disabled = false;
+        loading.classList.add("hidden");
+        status.textContent = "Game of Life is ready";
+      }
+
+      async function ensureStarted() {
+        starting ??= start().catch((error: unknown) => {
+          status.textContent =
+            error instanceof Error
+              ? error.message
+              : "Game of Life could not start";
+          loading.classList.add("hidden");
+          throw error;
+        });
+        return starting;
+      }
+
+      async function call(message: unknown) {
+        console.assert(runtime !== null);
+        const result = await runtime!.genserver.call(
+          "game_of_life_ui",
+          message,
+          { timeoutMs: 10_000 },
+        );
+        if (result.ok === false) throw result.error;
+        return result.data as Snapshot;
+      }
+
+      function render(snapshot: Snapshot) {
+        const values = {
+          generation: snapshot.generation,
+          alive: snapshot.alive.length,
+          born: snapshot.born.length,
+        };
+        for (const figure of demo.querySelectorAll<HTMLElement>(
+          "[data-life-stat]",
+        )) {
+          const key = figure.dataset.lifeStat as keyof typeof values;
+          figure.textContent = String(values[key]);
+        }
+        for (const button of demo.querySelectorAll<HTMLElement>(
+          "[data-life-running]",
+        )) {
+          button.hidden =
+            button.dataset.lifeRunning !== String(snapshot.running);
+        }
+        for (const button of demo.querySelectorAll<HTMLElement>(
+          "[data-life-speed]",
+        )) {
+          button.classList.toggle(
+            "bg-demo-soft",
+            button.dataset.lifeSpeed === String(snapshot.speed),
+          );
+          button.classList.toggle(
+            "text-ink",
+            button.dataset.lifeSpeed === String(snapshot.speed),
+          );
+        }
+      }
+
+      document
+        .querySelector("#demos")
+        ?.addEventListener("demo:select", (event) => {
+          if ((event as CustomEvent).detail.demo !== "game-of-life") return;
+          void ensureStarted();
+        });
+
+      root.addEventListener("life:update", (event) => {
+        render((event as CustomEvent<Snapshot>).detail);
+      });
+
+      demo.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement;
+        const cell = target.closest<HTMLElement>(".cell");
+        const button = target.closest<HTMLButtonElement>("[data-life-event]");
+        if (cell === null && button === null) return;
+
+        void serialize(async () => {
+          await ensureStarted();
+          let message: unknown;
+          if (cell !== null) {
+            message = [
+              "toggle",
+              Number(cell.dataset.coordsX),
+              Number(cell.dataset.coordsY),
+            ];
+          } else {
+            const action = button!.dataset.lifeEvent!;
+            if (action.startsWith("preset:")) {
+              selectedPattern = action.slice(7);
+              message = ["preset", selectedPattern];
+            } else if (action.startsWith("speed:")) {
+              message = ["speed", Number(action.slice(6))];
+            } else {
+              message = action;
+            }
+          }
+          const snapshot = await call(["event", message]);
+          render(snapshot);
+          for (const pattern of demo.querySelectorAll<HTMLElement>(
+            "[data-life-pattern]",
+          )) {
+            const active = pattern.dataset.lifePattern === selectedPattern;
+            pattern.classList.toggle("text-ink", active);
+            pattern.setAttribute("aria-pressed", String(active));
+          }
+        });
+      });
+
+      window.addEventListener("pagehide", () => runtime?.deinit(), {
+        once: true,
+      });
+      document.addEventListener("astro:before-swap", () => runtime?.deinit(), {
+        once: true,
+      });
+    }
+  }
+</script>
+
+<style is:global>
+  [data-life-root] {
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+
+  [data-life-root] .cell-grid {
+    display: flex;
+    width: min(100cqw, 100cqh);
+    height: min(100cqw, 100cqh);
+    flex-direction: column;
+  }
+
+  [data-life-root] .cell-row {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  [data-life-root] .cell {
+    position: relative;
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    padding: 0;
+    background: var(--color-transparent);
+    cursor: pointer;
+  }
+
+  [data-life-root] .cell:nth-child(5n + 1):not(:first-child) {
+    border-left: 1px solid var(--color-life-grid);
+  }
+
+  [data-life-root] .cell-row:nth-child(5n + 1):not(:first-child) .cell {
+    border-top: 1px solid var(--color-life-grid);
+  }
+
+  [data-life-root] .cell::after {
+    position: absolute;
+    inset: 22%;
+    background: var(--color-transparent);
+    content: "";
+  }
+
+  [data-life-root] .cell-alive::after {
+    background: var(--color-ink);
+  }
+
+  [data-life-root] .cell-born::after {
+    background: var(--color-orange);
+  }
+
+  [data-life-root] .cell:focus-visible::after {
+    outline: 1px solid var(--color-orange);
+    outline-offset: 1px;
+  }
+</style>
