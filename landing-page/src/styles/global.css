@@ -1,7 +1,8 @@
 @import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/fraunces";
 @import "@fontsource-variable/inter";
-@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 @import "tailwindcss";
 
 @theme {
@@ -9,13 +10,24 @@
   --color-cream-soft: #fbf4e5;
   --color-cream-button: #f7ebd480;
   --color-cream-muted: #c4b7a6;
+  --color-cream-terminal: #f2ebdd;
   --color-ink: #301b05;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-demo: #e3dbd1;
+  --color-demo-soft: #efeae3;
   --color-brown-60: #696057;
   --color-brown-70: #5f4122;
   --color-brown-80: #4a3520;
   --color-brown-90: #241505;
   --color-brown-muted: #9c8b79;
+  --color-memory-processes: #e06c00;
+  --color-memory-binary: #301b05;
+  --color-memory-code: #365e92;
+  --color-memory-ets: #5e9a48;
+  --color-memory-other: #7a7068;
   --color-orange: #ef7c00;
+  --color-orange-text: #a84f00;
   --color-orange-20: #ffe6cc;
   --container-demos: 82.375rem;
   --font-display: "Fraunces Variable", system-ui, sans-serif;

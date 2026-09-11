@@ -1,11 +1,11 @@
 ---
 import Heading from "../components/Heading.astro";
 import Hero from "../components/Hero.astro";
+import IexDemo from "../components/IexDemo.astro";
 import FeatureCard from "../components/FeatureCard.astro";
 import Footer from "../components/Footer.astro";
 import MovieStrip from "../components/MovieStrip.astro";
 import UseCaseCard from "../components/UseCaseCard.astro";
-import SectionPlaceholder from "../components/SectionPlaceholder.astro";
 import StripedBackground from "../components/StripedBackground.astro";
 import Layout from "../layouts/Layout.astro";
 
@@ -101,15 +101,17 @@ const useCases = [
       Demos
     </Heading>
 
-    <div class="@container/demos relative z-10 mx-auto w-full max-w-352">
+    <div
+      class="@container/demos relative z-10 mx-auto w-full max-w-352 2xl:max-w-480"
+    >
       <div
-        class="@min-demos/demos:flex-row @min-demos/demos:gap-6 flex flex-col gap-7 md:gap-9"
+        class="@min-demos/demos:max-w-none @min-demos/demos:flex-row @min-demos/demos:gap-6 mx-auto flex max-w-208 flex-col gap-7 md:gap-9"
       >
         <MovieStrip />
         <div
-          class="@min-demos/demos:h-203 @min-demos/demos:flex-1 @min-demos/demos:p-0 h-85 px-3 md:h-116 md:px-6"
+          class="@min-demos/demos:h-203 @min-demos/demos:flex-1 @min-demos/demos:p-0 h-85 min-w-0 px-3 md:h-116 md:px-6"
         >
-          <SectionPlaceholder label="Demo placeholder" class="h-full w-full" />
+          <IexDemo />
         </div>
       </div>
     </div>

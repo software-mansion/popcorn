@@ -1,6 +1,11 @@
 // @ts-check
 import { defineConfig } from "astro/config";
+import { fileURLToPath } from "node:url";
 
+import {
+  crossOriginIsolationHeaders,
+  popcorn,
+} from "@swmansion/popcorn/vite";
 import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
@@ -9,10 +14,20 @@ export default defineConfig({
   redirects: {
     "/docs": "https://hexdocs.pm/popcorn",
   },
+  server: { headers: crossOriginIsolationHeaders },
   experimental: {
     chromeDevtoolsWorkspace: true,
   },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      popcorn({
+        rootDir: fileURLToPath(
+          new URL("../examples/iex-wasm", import.meta.url),
+        ),
+        app: "iex",
+        extraApps: ["logger"],
+      }),
+      tailwindcss(),
+    ],
   },
 });
