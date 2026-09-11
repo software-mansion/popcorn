@@ -4,6 +4,7 @@ import dmSansUrl from "@fontsource-variable/dm-sans/files/dm-sans-latin-wght-nor
 import frauncesUrl from "@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2?url";
 import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import ibmPlexMonoUrl from "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2?url";
+import Header from "../components/Header.astro";
 
 interface Props {
   title?: string;
@@ -142,6 +143,7 @@ const structuredData = {
       )
     }
     <!-- End Google Tag Manager (noscript) -->
-    <main><slot /></main>
+    <Header />
+    <main class="pt-14 md:pt-16"><slot /></main>
   </body>
 </html>

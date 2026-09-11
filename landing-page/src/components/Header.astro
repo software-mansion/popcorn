@@ -1,0 +1,226 @@
+---
+import StripedBackground from "./StripedBackground.astro";
+
+const navLinks = [
+  { number: "01", label: "Demos", href: "/#demos" },
+  { number: "02", label: "Docs", href: "/docs" },
+  {
+    number: "03",
+    label: "Github",
+    href: "https://github.com/software-mansion/popcorn/",
+    external: true,
+  },
+];
+---
+
+<header
+  class="border-ink bg-cream-soft/0 fixed top-0 right-0 left-0 z-50 border-b backdrop-blur-md"
+>
+  <nav
+    class="text-ink flex h-14 items-center justify-between px-5 transition-colors md:h-16 md:px-8"
+    aria-label="Primary navigation"
+    data-navbar-content
+  >
+    <a class="flex items-center" href="/" aria-label="Popcorn home">
+      <img
+        class="h-8 w-30 transition"
+        src="/logo-text.svg"
+        alt=""
+        data-navbar-logo
+      />
+    </a>
+
+    <div class="hidden items-center gap-10 md:flex">
+      {
+        navLinks.map(({ label, href, external }) => (
+          <a
+            class="hover:text-orange focus-visible:text-orange text-sm leading-6 transition-colors"
+            href={href}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noreferrer" : undefined}
+          >
+            {label}
+            {external && (
+              <span
+                class="text-orange ml-1 transition-colors"
+                aria-hidden="true"
+                data-navbar-arrow
+              >
+                ↗
+              </span>
+            )}
+          </a>
+        ))
+      }
+    </div>
+
+    <button
+      class="relative flex size-11 items-center justify-center md:hidden"
+      type="button"
+      aria-label="Open navigation"
+      aria-expanded="false"
+      aria-controls="mobile-navigation"
+      data-menu-toggle
+    >
+      <span class="flex w-6 flex-col gap-1.5" data-menu-open-icon>
+        <span class="h-px bg-current"></span>
+        <span class="h-px bg-current"></span>
+      </span>
+      <svg
+        class="hidden size-6"
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+        data-menu-close-icon
+      >
+        <path
+          d="M4 4l16 16M20 4L4 20"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"></path>
+      </svg>
+    </button>
+  </nav>
+
+  <div
+    id="mobile-navigation"
+    class="fixed top-14 right-0 left-0 h-0 transition-[height] duration-500 ease-in-out motion-reduce:transition-none md:hidden"
+    aria-hidden="true"
+    data-mobile-menu
+  >
+    <div class="relative h-full overflow-hidden">
+      <StripedBackground />
+
+      <div class="relative flex flex-col gap-13 px-6 pt-20">
+        {
+          navLinks.map(({ number, label, href, external }) => (
+            <a
+              class="text-ink flex items-baseline gap-3.5"
+              href={href}
+              target={external ? "_blank" : undefined}
+              rel={external ? "noreferrer" : undefined}
+              tabindex="-1"
+              data-menu-link
+            >
+              <span class="font-label text-orange w-6 shrink-0 text-xs tracking-widest">
+                {number}
+              </span>
+              <span class="font-display text-5xl leading-none font-semibold tracking-tight">
+                {label}
+              </span>
+              {external && (
+                <span class="text-orange text-2xl" aria-hidden="true">
+                  ↗
+                </span>
+              )}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+
+    <div
+      class="relative h-0 opacity-0 transition-opacity duration-100"
+      aria-hidden="true"
+      data-menu-scallops
+    >
+      <StripedBackground edgeOnly />
+    </div>
+  </div>
+</header>
+
+<script>
+  function setupMenu() {
+    const button =
+      document.querySelector<HTMLButtonElement>("[data-menu-toggle]")!;
+    const header = button.closest("header")!;
+    const navbar = header.querySelector<HTMLElement>("[data-navbar-content]")!;
+    const logo = header.querySelector<HTMLImageElement>("[data-navbar-logo]")!;
+    const arrow = header.querySelector<HTMLElement>("[data-navbar-arrow]")!;
+    const main = document.querySelector("main")!;
+    const menu = document.querySelector<HTMLElement>("[data-mobile-menu]")!;
+    const openIcon = button.querySelector<HTMLElement>(
+      "[data-menu-open-icon]",
+    )!;
+    const closeIcon = button.querySelector<SVGElement>(
+      "[data-menu-close-icon]",
+    )!;
+    const scallops = menu.querySelector<HTMLElement>("[data-menu-scallops]")!;
+    const links = menu.querySelectorAll<HTMLAnchorElement>("[data-menu-link]");
+    const darkSections = document.querySelectorAll('[data-background="dark"]');
+    let darkBackground = false;
+    let observer: IntersectionObserver;
+
+    function updateNavbarColor() {
+      const lightText = darkBackground && button.ariaExpanded !== "true";
+      navbar.classList.toggle("text-cream", lightText);
+      navbar.classList.toggle("text-ink", !lightText);
+      logo.classList.toggle("invert", lightText);
+      arrow.classList.toggle("text-white", lightText);
+      arrow.classList.toggle("text-orange", !lightText);
+    }
+
+    function observeBackground() {
+      observer?.disconnect();
+      darkBackground = false;
+      updateNavbarColor();
+
+      const center = Math.round(navbar.offsetHeight / 2);
+      observer = new IntersectionObserver(
+        (entries) => {
+          darkBackground = entries.some((entry) => entry.isIntersecting);
+          updateNavbarColor();
+        },
+        {
+          rootMargin: `-${center}px 0px -${window.innerHeight - center - 1}px`,
+        },
+      );
+      for (const section of darkSections) {
+        observer.observe(section);
+      }
+    }
+
+    function setOpen(open: boolean) {
+      button.ariaExpanded = String(open);
+      button.ariaLabel = open ? "Close navigation" : "Open navigation";
+      menu.ariaHidden = String(!open);
+      menu.classList.toggle("h-[calc(100dvh-3.5rem)]", open);
+      menu.classList.toggle("h-0", !open);
+      openIcon.classList.toggle("hidden", open);
+      closeIcon.classList.toggle("hidden", !open);
+      if (open) scallops.classList.remove("opacity-0");
+      if (!open && matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        scallops.classList.add("opacity-0");
+      }
+      header.classList.toggle("bg-cream", open);
+      header.classList.toggle("bg-cream-soft/0", !open);
+      main.inert = open;
+      document.documentElement.classList.toggle("overflow-hidden", open);
+      updateNavbarColor();
+
+      for (const link of links) {
+        link.tabIndex = open ? 0 : -1;
+      }
+    }
+
+    function toggleMenu() {
+      setOpen(button.ariaExpanded !== "true");
+    }
+
+    button.addEventListener("click", toggleMenu);
+    menu.addEventListener("transitionend", (event) => {
+      if (event.propertyName !== "height") return;
+      if (button.ariaExpanded === "false") scallops.classList.add("opacity-0");
+    });
+    for (const link of links) {
+      link.addEventListener("click", () => setOpen(false));
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setOpen(false);
+    });
+    observeBackground();
+    window.addEventListener("resize", observeBackground, { passive: true });
+  }
+
+  setupMenu();
+</script>
