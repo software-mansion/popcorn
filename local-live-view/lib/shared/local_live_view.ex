@@ -111,6 +111,8 @@ defmodule LocalLiveView do
   Syncs the declared mirror assigns to the server-side mirror channel.
   Must be called from within a LocalLiveView callback (handle_event, handle_info)
   after assigns have been updated.
+
+  Does nothing when the view is not `connected?/1`.
   """
   def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
     payload =
@@ -118,7 +120,7 @@ defmodule LocalLiveView do
         {to_string(key), socket.assigns |> Map.get(key) |> LocalLiveView.Utils.to_serializable()}
       end)
 
-    unless payload == %{} do
+    if connected?(socket) and payload != %{} do
       Popcorn.Wasm.run_js(
         """
         ({ args }) => {
@@ -135,11 +137,22 @@ defmodule LocalLiveView do
   end
 
   @doc """
-  Mimics `Phoenix.LiveView.connected?/1`. Always returns `true`.
+  Returns `true` when the view runs in the browser and `false` when it is
+  being rendered on the server.
 
-  Helps code reusability between server and local LiveViews.
+  Same semantics as `Phoenix.LiveView.connected?/1`: a view is mounted once on
+  the server, to render the initial HTML, and once more in the browser, where
+  it stays connected and handles events. Use it to guard work that only makes
+  sense in the browser, such as timers, `mirror_sync/2` or JavaScript calls:
+
+  ```
+  def mount(_params, _session, socket) do
+    if connected?(socket), do: Process.send_after(self(), :tick, 1000)
+    {:ok, assign(socket, :time, Time.utc_now())}
+  end
+  ```
   """
-  def connected?(_socket), do: true
+  def connected?(%Socket{} = socket), do: Phoenix.LiveView.connected?(socket)
 
   @doc """
   Sends an event to the host (server) `LiveView` that mounts this local live view.
@@ -150,22 +163,26 @@ defmodule LocalLiveView do
 
   If the push fails (no host LiveView, disconnected socket, error reply or
   timeout), the view's `c:handle_push_error/4` callback is invoked.
+
+  Does nothing when the view is not `connected?/1`.
   """
   def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        if (window.__llvPushServer) {
-          window.__llvPushServer(args.id, args.event, args.payload);
+    if connected?(socket) do
+      Popcorn.Wasm.run_js(
+        """
+        ({ args }) => {
+          if (window.__llvPushServer) {
+            window.__llvPushServer(args.id, args.event, args.payload);
+          }
         }
-      }
-      """,
-      %{
-        id: socket.private[:llv_id],
-        event: to_string(event),
-        payload: LocalLiveView.Utils.to_serializable(payload)
-      }
-    )
+        """,
+        %{
+          id: socket.private[:llv_id],
+          event: to_string(event),
+          payload: LocalLiveView.Utils.to_serializable(payload)
+        }
+      )
+    end
 
     socket
   end
@@ -174,6 +191,7 @@ defmodule LocalLiveView do
     quote do
       import LocalLiveView,
         only: [
+          connected?: 1,
           mirror_sync: 2,
           push_patch: 2,
           push_server_event: 2,
@@ -214,7 +232,8 @@ defmodule LocalLiveView do
   Navigates to the given path with a browser history push, then calls `handle_params/3`
   with the new URL query params. No server round-trip.
 
-  Mirrors `Phoenix.LiveView.push_patch/2` semantics.
+  Mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when the
+  view is not `connected?/1`.
 
   ## Options
 
@@ -226,7 +245,7 @@ defmodule LocalLiveView do
     kind = if opts[:replace], do: :replace, else: :push
 
     # Handled by LocalLiveView.Proxy
-    send(self(), {:llv, :patch, to, kind})
+    if connected?(socket), do: send(self(), {:llv, :patch, to, kind})
     socket
   end
 
