@@ -99,6 +99,23 @@ defmodule LocalLiveView do
   rolling optimistic local edits back to the latest authoritative state.
 
   Another way of communicating the server is by using `mirror_sync/2`.
+
+  ## Server-side rendering
+
+  On the initial page load the view is also mounted and rendered on the
+  server, so its HTML is on the page before the Wasm runtime boots. The
+  server runs `c:mount/3`, `c:update/2` and `c:handle_params/3` the same way
+  the browser does, but `connected?/1` returns `false` there. Use it to skip
+  browser-only work, exactly as in `Phoenix.LiveView`:
+
+  ```
+  def mount(_params, _session, socket) do
+    if connected?(socket), do: Process.send_after(self(), :tick, 1000)
+    {:ok, assign(socket, :time, Time.utc_now())}
+  end
+  ```
+
+  See `LocalLiveView.SSR` and `LocalLiveView.Component.local_live_view/1`.
   '''
 
   alias Phoenix.LiveView.Socket
@@ -286,7 +303,9 @@ defmodule LocalLiveView do
   @callback render(assigns :: Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
 
   @doc """
-  Invoked once when the view is initialized, before the first `c:render/1`.
+  Invoked when the view is initialized, before the first `c:render/1`: once
+  on the server, to render the initial HTML, and once in the browser, where
+  the view then stays `connected?/1`.
 
   Use it to set up the initial assigns. Assigns coming from the host LiveView
   are not delivered here — `c:update/2` runs with them right after this

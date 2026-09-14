@@ -32,7 +32,7 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 
 1. Your `local/` project is compiled to a `.avm` Wasm bundle at build time.
 2. A server-side LiveView renders the mount point with `<.local_live_view view="MyLocal" />`. Every attribute other than `view` is passed down as assigns and delivered to the local view's `update/2` callback — so the host stays in control of the data, exactly as with `live_component/1`.
-3. When the page loads, Popcorn starts the Wasm runtime and mounts your LocalLiveViews.
+3. The page arrives with the views already rendered on the server. When it loads, Popcorn starts the Wasm runtime and mounts your LocalLiveViews in place of that HTML.
 4. User interactions are handled in the browser — no round-trip to the server.
 5. A local view can push events back to its host with `push_server_event/3`, which arrives at the host LiveView's `handle_event/3`. Handling the event locally first and pushing afterwards gives you optimistic updates, with the server's authoritative state arriving as the next `update/2`.
 6. Optionally, you can sync selected assigns to a server-side mirror module via `mirror_sync/2`, letting other users' LiveViews react to local state changes.
