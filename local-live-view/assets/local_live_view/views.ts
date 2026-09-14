@@ -55,7 +55,8 @@ export class Views {
       console.error("LLV: mount point has no [data-pop-root] element", llvId);
       return;
     }
-    this.socket.newRootView(this.installContainer(root, html)).join();
+    this.adoptContainer(root, html);
+    this.socket.newRootView(root).join();
   }
 
   unmount(pop_view_el: HTMLElement): void {
@@ -93,13 +94,20 @@ export class Views {
     this.pop.call({ action: "update_assigns", id: llvId, assigns });
   }
 
-  // Replaces the host-rendered placeholder with the locally
-  // rendered container
-  private installContainer(root: HTMLElement, html: string): HTMLElement {
+  // Turns the mount point into the view's container: the runtime returns an
+  // empty container carrying the LiveView session attributes, which are copied
+  // onto the mount point. The mount point itself stays in the DOM, so the
+  // view rendered on the server (if any) is kept and patched on join, the
+  // way LiveView patches its connected render onto the dead one. The
+  // server-rendered view is inert until now, so that its events don't reach
+  // the host LiveView; from now on they go to the local view.
+  private adoptContainer(root: HTMLElement, html: string): void {
     const template = document.createElement("template");
     template.innerHTML = html;
-    const rendered = template.content.firstElementChild as HTMLElement;
-    root.replaceWith(rendered);
-    return rendered;
+    const container = template.content.firstElementChild as HTMLElement;
+    for (const { name, value } of container.attributes) {
+      root.setAttribute(name, value);
+    }
+    root.removeAttribute("inert");
   }
 }
