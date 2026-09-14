@@ -4,12 +4,13 @@ defmodule LocalLiveView.Proxy do
 
   use Phoenix.LiveView
 
+  alias LocalLiveView.Lifecycle
   alias Phoenix.LiveView.Socket
 
   @impl true
   def mount(params, session, socket) do
     llv = session["llv"]
-    view = resolve_view_module!(llv.view)
+    view = Lifecycle.resolve_view_module!(llv.view)
 
     socket =
       socket
@@ -18,16 +19,16 @@ defmodule LocalLiveView.Proxy do
       |> put_private(:mirror_id, llv.mirror_id)
       |> render_with(&view.render/1)
 
-    {socket, opts} = call_mount(view, params, session, socket)
+    {socket, opts} = Lifecycle.mount(view, params, session, socket)
 
     assigns = decode_assigns(LocalLiveView.Dispatcher.current_assigns(llv.id))
     url = LocalLiveView.Dispatcher.current_url()
 
     socket =
       socket
-      |> call_update!(assigns)
+      |> then(&Lifecycle.update!(view, assigns, &1))
       |> put_server_assigns(assigns)
-      |> call_handle_params(query_params(url), url)
+      |> then(&Lifecycle.handle_params(view, url, &1))
 
     LocalLiveView.Dispatcher.register_channel(llv.id, llv.epoch)
 
@@ -46,7 +47,8 @@ defmodule LocalLiveView.Proxy do
   def handle_info({:llv, %{"action" => "update_assigns"} = msg}, socket) do
     %{"assigns" => encoded_assigns} = msg
     assigns = decode_assigns(encoded_assigns)
-    {:noreply, socket |> call_update!(assigns) |> put_server_assigns(assigns)}
+    socket = Lifecycle.update!(view(socket), assigns, socket)
+    {:noreply, put_server_assigns(socket, assigns)}
   end
 
   def handle_info({:llv, %{"action" => "server_event"} = msg}, socket) do
@@ -102,12 +104,12 @@ defmodule LocalLiveView.Proxy do
 
   def handle_info({:llv, %{"action" => "handle_params"} = msg}, socket) do
     %{"url" => url} = msg
-    {:noreply, call_handle_params(socket, query_params(url), url)}
+    {:noreply, Lifecycle.handle_params(view(socket), url, socket)}
   end
 
   def handle_info({:llv, :patch, to, kind}, socket) do
     push_url_update(to, kind == :replace)
-    {:noreply, call_handle_params(socket, query_params(to), to)}
+    {:noreply, Lifecycle.handle_params(view(socket), to, socket)}
   end
 
   def handle_info(msg, socket) do
@@ -118,90 +120,9 @@ defmodule LocalLiveView.Proxy do
 
   defp view(%Socket{private: %{llv_view: view}}), do: view
 
-  defp call_mount(view, params, session, socket) do
-    if function_exported?(view, :mount, 3) do
-      case view.mount(params, session, socket) do
-        {:ok, %Socket{} = socket} ->
-          {socket, []}
-
-        {:ok, %Socket{} = socket, opts} ->
-          {socket, opts}
-
-        other ->
-          raise ArgumentError, """
-          invalid return from #{inspect(view)}.mount/3 callback.
-
-          Expected {:ok, socket} or {:ok, socket, opts}, got: #{inspect(other)}
-          """
-      end
-    else
-      {socket, []}
-    end
-  end
-
-  defp call_handle_params(%Socket{} = socket, params, url) do
-    view = view(socket)
-
-    if function_exported?(view, :handle_params, 3) do
-      case view.handle_params(params, url, socket) do
-        {:noreply, %Socket{} = socket} ->
-          socket
-
-        other ->
-          raise ArgumentError, """
-          invalid return from #{inspect(view)}.handle_params/3 callback.
-
-          Expected {:noreply, socket}, got: #{inspect(other)}
-          """
-      end
-    else
-      socket
-    end
-  end
-
-  defp call_update!(%Socket{} = socket, assigns) do
-    view = view(socket)
-
-    case view.update(assigns, socket) do
-      {:ok, %Socket{} = socket} ->
-        socket
-
-      other ->
-        raise ArgumentError, """
-        expected #{inspect(view)}.update/2 to return {:ok, %Socket{}}, got:
-
-        #{inspect(other)}
-        """
-    end
-  end
-
-  defp resolve_view_module!(name) do
-    module = Module.concat([name])
-    loaded? = match?({:module, _module}, Code.ensure_loaded(module))
-
-    if not loaded? or not function_exported?(module, :render, 1) do
-      raise ArgumentError,
-            "#{inspect(module)} (view #{inspect(name)}) is not a LocalLiveView — " <>
-              "no such module, or it does not export render/1"
-    end
-
-    module
-  end
-
   # Last assigns received from the host, for handle_push_error.
   defp put_server_assigns(socket, assigns) do
     put_private(socket, :llv_server_assigns, assigns)
-  end
-
-  # Query params are always derived from the URL they accompany — the same
-  # parse for mount (create- or join-time URL) and live patches.
-  defp query_params(nil), do: %{}
-
-  defp query_params(url) do
-    case String.split(url, "?", parts: 2) do
-      [_path, query] -> URI.decode_query(query)
-      [_path] -> %{}
-    end
   end
 
   defp decode_assigns(nil), do: %{}
