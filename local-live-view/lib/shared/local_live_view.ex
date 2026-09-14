@@ -103,6 +103,10 @@ defmodule LocalLiveView do
 
   alias Phoenix.LiveView.Socket
 
+  # This module also compiles on the host, where Popcorn is not a dependency.
+  # The Wasm calls below only run inside the browser runtime.
+  @compile {:no_warn_undefined, Popcorn.Wasm}
+
   @doc """
   Syncs the declared mirror assigns to the server-side mirror channel.
   Must be called from within a LocalLiveView callback (handle_event, handle_info)
