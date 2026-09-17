@@ -43,22 +43,22 @@
     "zustand": "^5.0.7"
   },
   "devDependencies": {
-    "@eslint/js": "^9.30.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@types/mdast": "^4.0.4",
     "@types/node": "^24.9.1",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "eslint": "^9.30.1",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
     "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.14",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4",
-    "vite-plugin-svgr": "^4.3.0"
+    "typescript-eslint": "^8.70.0",
+    "vite": "^7.3.6",
+    "vite-plugin-svgr": "^5.2.0"
   }
 }

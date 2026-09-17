@@ -103,7 +103,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: ./.github/actions/setup-playwright
         with:
-          version: "1.61.1"
+          version: "1.63.0"
       - run: pnpm -F ./popcorn/js e2e
         env:
           CI: "true"
