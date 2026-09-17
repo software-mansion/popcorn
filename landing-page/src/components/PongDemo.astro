@@ -4,7 +4,14 @@
   tabindex="-1"
   data-pong-demo
 >
-  <div id="landing-pong" class="h-full" data-pop-view="Local.PongLive"></div>
+  <div
+    id="landing-pong-llv-hook"
+    class="h-full"
+    data-pop-view="Local.PongLive"
+    data-pop-id="landing-pong"
+  >
+    <div id="landing-pong" data-pop-root></div>
+  </div>
 
   <p class="sr-only" aria-live="polite" data-pong-status>Pong is loading.</p>
 </section>
@@ -93,10 +100,11 @@
           import("local_live_view"),
         ]);
         const liveSocket = new LiveSocket("/live", Socket, { params: {} });
-        await LLVEngine.create(liveSocket, {
+        const engine = LLVEngine.create(liveSocket, {
           bundlePaths: ["/wasm/local_pong.avm"],
         });
         liveSocket.connect();
+        engine.connect();
         await waitForCourt();
         status.textContent = "Pong is ready";
       }
