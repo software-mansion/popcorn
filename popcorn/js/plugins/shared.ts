@@ -24,15 +24,18 @@ export type Options = {
   app: string | null;
   /** Additional applications to package with their dependencies. */
   extraApps?: string[];
-  /** Adds Brotli tarball variants beside gzip and uncompressed files. */
+  /** Adds Brotli tarball variants beside gzip and uncompressed files. Defaults to `true`. */
   brotli?: boolean;
   /** Removes nonessential BEAM chunks. Defaults to `true`. */
   strip?: boolean;
-  /** Removes unreachable modules and functions. */
-  treeshake?: false | TreeshakeOptions;
+  /** Controls removal of unreachable modules and functions. Defaults to `none`. */
+  treeshake?: TreeshakeOptions;
 };
 
-export type TreeshakeOptions = { preservedApps?: string[] };
+export type TreeshakeOptions = {
+  mode: "all" | "none";
+  preservedApps?: string[];
+};
 
 export type Prepared = {
   dir: string;
@@ -56,9 +59,9 @@ export async function popcorn(options: Options): Promise<Prepared> {
   if (options.runtimeVariant !== undefined) {
     args.push("--runtime-variant", options.runtimeVariant);
   }
-  if (options.brotli ?? false) args.push("--brotli");
+  if (options.brotli ?? true) args.push("--brotli");
   if (!(options.strip ?? true)) args.push("--no-strip");
-  if (options.treeshake !== false && options.treeshake !== undefined) {
+  if (options.treeshake?.mode === "all") {
     args.push("--treeshake");
     for (const app of options.treeshake.preservedApps ?? []) {
       args.push("--preserved-app", app);
