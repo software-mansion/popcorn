@@ -175,6 +175,7 @@ defmodule Popcorn.Packager do
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
          :ok <- patch_apps(staged_apps),
+         staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
            maybe_treeshake(staged_apps, treeshake, out_dir) do
       vm_version = manifest.version
@@ -375,6 +376,36 @@ defmodule Popcorn.Packager do
     end
   end
 
+  defp remove_build_tools(staged_apps) do
+    case Map.fetch(staged_apps, "popcorn") do
+      :error ->
+        staged_apps
+
+      {:ok, info} ->
+        {build_tools, runtime_modules} =
+          info.props
+          |> Keyword.fetch!(:modules)
+          |> Enum.split_with(&build_tool?/1)
+
+        Enum.each(build_tools, fn module ->
+          File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
+        end)
+
+        replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
+    end
+  end
+
+  defp build_tool?(module) do
+    name = Atom.to_string(module)
+
+    String.starts_with?(name <> ".", [
+      "Elixir.Popcorn.Packager.",
+      "Elixir.Treeshake.",
+      "treeshake_helper.",
+      "Elixir.Mix.Tasks.Popcorn."
+    ])
+  end
+
   defp async_stream(enumerable, fun) do
     enumerable
     |> Task.async_stream(fun, timeout: :infinity)
@@ -544,41 +575,67 @@ defmodule Popcorn.Packager do
     staged_apps
     |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
     |> replace_beams(output_dir)
-    |> rewrite_app_contents()
 
     :ok
   end
 
   defp replace_beams(staged_apps, output_dir) do
     Map.new(staged_apps, fn {app, info} ->
-      original_beams = info.ebin_dir |> Path.join("*.beam") |> Path.wildcard()
-      Enum.each(original_beams, &File.rm!/1)
+      replacement_dir = info.ebin_dir <> ".replacement"
+      File.cp_r!(info.ebin_dir, replacement_dir)
+
+      replacement_beams = replacement_dir |> Path.join("*.beam") |> Path.wildcard()
+      Enum.each(replacement_beams, &File.rm!/1)
 
       surviving =
-        Enum.flat_map(original_beams, fn original ->
-          source = Path.join(output_dir, Path.basename(original))
+        Enum.flat_map(replacement_beams, fn replacement ->
+          source = Path.join(output_dir, Path.basename(replacement))
+          target = Path.join(replacement_dir, Path.basename(replacement))
 
-          if File.exists?(source) do
-            target = Path.join(info.ebin_dir, Path.basename(source))
-            File.cp!(source, target)
-            [source |> Path.basename(".beam") |> String.to_atom()]
-          else
-            []
+          case File.cp(source, target) do
+            :ok -> [source |> Path.basename(".beam") |> String.to_atom()]
+            {:error, :enoent} -> []
           end
         end)
 
-      {app, {info, Enum.sort(surviving)}}
+      replacement_info = %{info | ebin_dir: replacement_dir}
+
+      updated_info =
+        %{app => replacement_info}
+        |> replace_app_modules(%{app => Enum.sort(surviving)})
+        |> Map.fetch!(app)
+
+      replace_directory(info.ebin_dir, replacement_dir)
+
+      app_path = Path.join(info.ebin_dir, Path.basename(updated_info.app_path))
+      {app, %{updated_info | app_path: app_path, ebin_dir: info.ebin_dir}}
     end)
   end
 
-  defp rewrite_app_contents(replaced) do
-    Enum.each(replaced, fn {app, {info, modules}} ->
+  defp replace_directory(path, replacement) do
+    original = path <> ".original"
+    File.rename!(path, original)
+
+    try do
+      File.rename!(replacement, path)
+    rescue
+      error ->
+        File.rename!(original, path)
+        reraise error, __STACKTRACE__
+    end
+
+    File.rm_rf!(original)
+  end
+
+  defp replace_app_modules(staged_apps, app_modules) do
+    Enum.reduce(app_modules, staged_apps, fn {app, modules}, apps ->
+      info = Map.fetch!(apps, app)
+      props = Keyword.put(info.props, :modules, modules)
       app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
+      application = {:application, String.to_existing_atom(app), props}
 
-      term =
-        {:application, String.to_existing_atom(app), Keyword.put(info.props, :modules, modules)}
-
-      File.write!(app_path, :io_lib.format(~c"~tp.~n", [term]))
+      File.write!(app_path, :io_lib.format(~c"~tp.~n", [application]))
+      Map.put(apps, app, %{info | app_path: app_path, props: props})
     end)
   end
 
