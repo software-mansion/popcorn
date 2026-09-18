@@ -247,10 +247,10 @@ defmodule Popcorn.Packager do
   defp install_output(report, static_dir, out_dir, brotli) do
     variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
 
-    worker_js = {"worker.mjs", Path.join(static_dir, "worker.mjs")}
+    js_files = Enum.map(~w(index.mjs worker.mjs), &{&1, Path.join(static_dir, &1)})
     vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
 
-    with :ok <- copy_runtime_files([worker_js | vm_files], out_dir) do
+    with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join(out_dir, "otp/bin/vm.boot")
       lib_dir = Path.join(out_dir, "otp/lib")
@@ -279,7 +279,7 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp copy_runtime_files(files, out_dir) do
+  defp copy_assets(files, out_dir) do
     outdir_cp = fn {filename, source}, _ ->
       case File.cp(source, Path.join(out_dir, filename)) do
         :ok -> :ok

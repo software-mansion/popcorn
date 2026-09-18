@@ -7,6 +7,18 @@ esbuild plugins invoke the same task. Packaging does not replace `mix compile`.
 mix popcorn.cook --out-dir priv/static/popcorn
 ```
 
+The output includes the browser API and can be loaded without a JavaScript
+bundler:
+
+```html
+<script type="module">
+  import { Popcorn } from "/popcorn/index.mjs";
+
+  const result = await Popcorn.init();
+  if (!result.ok) throw result.error;
+</script>
+```
+
 ## Select the entrypoint
 
 Set the application in the bundler configuration:

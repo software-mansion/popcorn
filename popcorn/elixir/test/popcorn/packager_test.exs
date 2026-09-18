@@ -10,8 +10,8 @@ defmodule Popcorn.PackagerTest do
     out_dir = Path.join(tmp_dir, "cooked")
     File.mkdir_p!(runtime_dir)
 
-    for file <- ["worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
-      dir = if file == "worker.mjs", do: static_dir, else: runtime_dir
+    for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
+      dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
       File.write!(Path.join(dir, file), file)
     end
 
@@ -37,7 +37,7 @@ defmodule Popcorn.PackagerTest do
     assert "core" = report.runtimeVariant
     assert %{"popcorn" => _app} = report.apps
 
-    for file <- ["worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
+    for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
       assert File.regular?(Path.join(out_dir, file))
     end
 
