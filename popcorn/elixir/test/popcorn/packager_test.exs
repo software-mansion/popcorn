@@ -45,8 +45,43 @@ defmodule Popcorn.PackagerTest do
     assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar"))
     assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.gz"))
 
+    archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
+    assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.Shaker.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/treeshake_helper.beam")
+    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Mix.Tasks.Popcorn.Cook.beam")
+
+    modules = archive |> Map.fetch!("lib/popcorn/ebin/popcorn.app") |> app_modules()
+    assert Popcorn.Wasm in modules
+    refute Enum.any?(modules, &build_tool?/1)
+
     output_manifest = out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
     assert %{"runtimeVariant" => "core", "entrypoint" => "popcorn"} = output_manifest
+  end
+
+  defp read_archive(path) do
+    {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
+    Map.new(entries, fn {name, contents} -> {to_string(name), contents} end)
+  end
+
+  defp app_modules(contents) do
+    {:ok, tokens, _line} = contents |> to_charlist() |> :erl_scan.string()
+    {:ok, {:application, :popcorn, props}} = :erl_parse.parse_term(tokens)
+    Keyword.fetch!(props, :modules)
+  end
+
+  defp build_tool?(module) do
+    name = Atom.to_string(module)
+
+    String.starts_with?(name <> ".", [
+      "Elixir.Popcorn.Packager.",
+      "Elixir.Treeshake.",
+      "treeshake_helper.",
+      "Elixir.Mix.Tasks.Popcorn."
+    ])
   end
 
   defp host_otp_version do
