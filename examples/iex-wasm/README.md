@@ -20,7 +20,8 @@ repository root:
 
 ```bash
 pnpm install
-mise run build-otp-js
+mise run build-otp debug
+pnpm -F ./popcorn/js build
 ```
 
 Then build and serve the example from `assets/`:

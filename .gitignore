@@ -22,11 +22,13 @@ node_modules/
 # OTP/OpenSSL build sources
 popcorn/sources/
 popcorn/out/
-popcorn/js/dist/
+popcorn/js/dist
+popcorn/js/.dist-*/
 popcorn/js/assets/
 popcorn/js/e2e/setup/dist/
 popcorn/js/playwright-report/
 popcorn/js/test-results/
+popcorn/elixir/priv/static
 
 # Local environment
 .env

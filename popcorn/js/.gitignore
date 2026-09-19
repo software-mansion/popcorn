@@ -1,6 +1,7 @@
 # Build output
 dist/
 assets/
+*.tgz
 
 # Test artifacts
 playwright-report/
