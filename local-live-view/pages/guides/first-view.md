@@ -10,7 +10,8 @@ LocalLiveView modules live in the `local/lib/` directory of your project. Create
 defmodule CounterLocal do
   use LocalLiveView
 
-  # Runs once, in the browser, when the view is mounted — the counter starts at zero.
+  # Runs when the view is mounted: on the server, to render the initial HTML,
+  # then in the browser — the counter starts at zero.
   def mount(_params, _session, socket) do
     {:ok, assign(socket, count: 0)}
   end
@@ -71,11 +72,11 @@ update(socket, :count, &(&1 + 1))
 
 ## Timers and periodic updates
 
-You can schedule recurring messages using `Process.send_after/3`, just like in Phoenix LiveView:
+You can schedule recurring messages using `Process.send_after/3`, just like in Phoenix LiveView. The view is also mounted on the server to render the initial HTML, so guard the timer with `connected?/1`, which is `false` there:
 
 ```elixir
 def mount(_params, _session, socket) do
-  Process.send_after(self(), :tick, 1000)
+  if connected?(socket), do: Process.send_after(self(), :tick, 1000)
   {:ok, assign(socket, time: Time.utc_now())}
 end
 

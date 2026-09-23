@@ -140,9 +140,13 @@ defmodule LocalLiveView.MixProject do
 
   defp before_closing_body_tag(_), do: ""
 
-  defp elixirc_paths(:all), do: ["lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
-  defp elixirc_paths(:wasm), do: ["lib/local_live_view", "lib/stubs"]
-  defp elixirc_paths(_), do: ["lib/server", "lib/mix"]
+  # lib/shared holds the `LocalLiveView` behaviour itself: views `use` it, and
+  # they compile both to Wasm and on the host (where the server renders them).
+  defp elixirc_paths(:all),
+    do: ["lib/shared", "lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
+
+  defp elixirc_paths(:wasm), do: ["lib/shared", "lib/local_live_view", "lib/stubs"]
+  defp elixirc_paths(_), do: ["lib/shared", "lib/server", "lib/mix"]
 
   defp aliases() do
     [

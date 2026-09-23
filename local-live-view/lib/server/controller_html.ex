@@ -8,7 +8,7 @@ defmodule LocalLiveView.ControllerHTML do
 
   def index(assigns) do
     ~H"""
-    <.local_live_view view={@view} />
+    <.local_live_view view={@view} llv_url={Plug.Conn.request_url(@conn)} />
     """
   end
 end

@@ -27,6 +27,33 @@ defmodule LocalLvKanbanWeb.BoardLiveTest do
     assert "In Progress" in column_names
   end
 
+  test "GET /boards/:id renders the board on the server, inside the mount point",
+       %{conn: conn, board: board} do
+    dead = conn |> get(~p"/boards/#{board.id}") |> html_response(200)
+
+    # The mount point is followed by the view's event bus element
+    [_, mount_point] =
+      Regex.run(
+        ~r/data-pop-root data-pop-ssr inert>(.*?)<div id="llv-Local-Kanban-llv-event-bus"/s,
+        dead
+      )
+
+    assert mount_point =~ "To Do"
+    assert mount_point =~ "In Progress"
+  end
+
+  test "live navigation to /boards/:id renders the board on the server too",
+       %{conn: conn, board: board} do
+    # No dead render on live navigation: the connected mount is the only render
+    {:ok, index, _html} = live(conn, ~p"/")
+    {:ok, _board, html} = live_redirect(index, to: ~p"/boards/#{board.id}")
+
+    [_, mount_point] =
+      Regex.run(~r/data-pop-ssr="" inert="">(.*?)<div id="llv-Local-Kanban-llv-event-bus"/s, html)
+
+    assert mount_point =~ "To Do"
+  end
+
   defp decode_assigns(html) do
     [_, encoded] = Regex.run(~r/data-pop-assigns="([^"]*)"/, html)
     encoded |> Base.decode64!() |> :erlang.binary_to_term()

@@ -55,7 +55,8 @@ export class Views {
       console.error("LLV: mount point has no [data-pop-root] element", llvId);
       return;
     }
-    this.socket.newRootView(this.installContainer(root, html)).join();
+    this.adoptContainer(root, html);
+    this.socket.newRootView(root).join();
   }
 
   unmount(pop_view_el: HTMLElement): void {
@@ -93,13 +94,16 @@ export class Views {
     this.pop.call({ action: "update_assigns", id: llvId, assigns });
   }
 
-  // Replaces the host-rendered placeholder with the locally
-  // rendered container
-  private installContainer(root: HTMLElement, html: string): HTMLElement {
+  // Copies LV session attributes from the WASM-rendered empty container
+  // into a server-rendered container. Server-rendered container is kept
+  // so that SSR is handled properly.
+  private adoptContainer(root: HTMLElement, html: string): void {
     const template = document.createElement("template");
     template.innerHTML = html;
-    const rendered = template.content.firstElementChild as HTMLElement;
-    root.replaceWith(rendered);
-    return rendered;
+    const container = template.content.firstElementChild as HTMLElement;
+    for (const { name, value } of container.attributes) {
+      root.setAttribute(name, value);
+    }
+    root.removeAttribute("inert");
   }
 }

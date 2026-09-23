@@ -6,7 +6,7 @@
           Nav Test LLV — no LiveView host
         </p>
       </div>
-      <.local_live_view view="NavTestLive" />
+      <.local_live_view view="NavTestLive" llv_url={Plug.Conn.request_url(@conn)} />
     </div>
   </div>
 </div>
