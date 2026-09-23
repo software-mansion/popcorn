@@ -14,11 +14,13 @@ const columnByName = (page, name) => columns(page).filter({ hasText: name });
 // A task card located by its text.
 const taskCard = (page, text) => tasks(page).filter({ hasText: text });
 
-/** Wait until the Wasm local live view has booted and rendered the board. */
+/** Wait until the Wasm local live view has booted and taken over the board. */
 async function waitForBoard(page) {
-  // The heading now shows the board's own name, so the first rendered column is
-  // the name-agnostic boot signal.
-  await expect(columns(page).first()).toBeVisible({ timeout: 60_000 });
+  // The board is already on the page, rendered on the server, before the Wasm
+  // runtime boots. It only handles events once the local view has connected
+  // on the mount point (LiveView marks it with phx-connected).
+  await expect(page.locator("[data-pop-root].phx-connected")).toBeVisible({ timeout: 60_000 });
+  await expect(columns(page).first()).toBeVisible();
 }
 
 /** Create a fresh board from the index and land on its page. Returns the board URL. */

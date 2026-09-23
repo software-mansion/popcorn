@@ -4,18 +4,21 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
   def mount(_params, _session, socket) do
     {:ok,
      assign(socket,
-       current_step: 1
+       current_step: 1,
+       url: nil
      )}
   end
 
-  def handle_params(%{"step" => step}, _uri, socket) do
-    {:noreply, assign(socket, current_step: String.to_integer(step))}
+  # The URL is kept for the local view: rendered on the server, it reads the
+  # step from it in its own handle_params/3, like it does in the browser.
+  def handle_params(%{"step" => step}, uri, socket) do
+    {:noreply, assign(socket, current_step: String.to_integer(step), url: uri)}
   catch
-    _ -> {:noreply, socket}
+    _ -> {:noreply, assign(socket, url: uri)}
   end
 
-  def handle_params(_params, _uri, socket) do
-    {:noreply, socket}
+  def handle_params(_params, uri, socket) do
+    {:noreply, assign(socket, url: uri)}
   end
 
   def render(assigns) do
@@ -52,7 +55,7 @@ defmodule LocalLvCheckoutWeb.CheckoutLive do
 
         <!-- Local Live View -->
         <div style="background-color: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <.local_live_view id={"checkout-#{@socket.id}"} view="CheckoutLive" />
+          <.local_live_view id={"checkout-#{@socket.id}"} view="CheckoutLive" llv_url={@url} />
         </div>
       </div>
     </div>

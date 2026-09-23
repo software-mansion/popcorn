@@ -16,17 +16,27 @@ defmodule LocalLiveView.Component do
   """
   use Phoenix.Component
 
+  require Logger
+
   @doc ~S'''
   Renders a `LocalLiveView` mount point.
 
-  Like `Phoenix.Component.live_component/1`, any attribute other than `view` is
-  forwarded to the view as the assigns of its `c:LocalLiveView.update/2`
-  callback. `id` is forwarded too, and additionally used as the view's DOM id.
+  Like `Phoenix.Component.live_component/1`, any attribute other than the ones
+  listed below is forwarded to the view as the assigns of its
+  `c:LocalLiveView.update/2` callback. `id` is forwarded too, and additionally
+  used as the view's DOM id.
 
   ## Attributes
 
     * `view` (required) - the LocalLiveView module name, as a string.
     * `id` - stable element id; defaults to a server-generated random id.
+    * `llv_ssr` - whether to render the view on the server, defaults to `true`.
+      See 'Server-side render' paragraph in `LocalLiveView` module doc.
+    * `llv_url` - the URL of the page, given to the view's
+      `c:LocalLiveView.handle_params/3` when rendering on the server. It is
+      set automatically for routes declared with `LocalLiveView.Router.live_local/2`;
+      inside a host LiveView, pass the URL from its `handle_params/3` if the
+      view needs it.
 
   ## Examples
 
@@ -40,9 +50,14 @@ defmodule LocalLiveView.Component do
   '''
   def local_live_view(assigns) do
     view = assigns[:view]
-    id = assigns[:id] || default_id(view)
 
-    assigns = assign(assigns, id: id)
+    new_mount_point? = changed?(assigns, :view) or changed?(assigns, :id)
+
+    assigns =
+      assign(assigns,
+        id: assigns[:id] || default_id(view),
+        __llv__: %{new_mount_point: new_mount_point?}
+      )
 
     if mirror_exists?(view) do
       ~H"""
@@ -55,12 +70,14 @@ defmodule LocalLiveView.Component do
 
   defp render_static(assigns) do
     comp_assigns = comp_assigns(assigns)
+    ssr_html = if assigns.__llv__.new_mount_point, do: ssr_html(assigns, nil), else: nil
 
     assigns =
       assign(assigns,
         mirror_token: nil,
         mirror_id: nil,
-        comp_assigns: comp_assigns
+        comp_assigns: comp_assigns,
+        ssr_html: ssr_html
       )
 
     render_markup(assigns)
@@ -96,13 +113,20 @@ defmodule LocalLiveView.Component do
 
       comp_assings = LLVComponent.comp_assigns(assigns)
 
+      # Decided by local_live_view/1, see there
+      ssr_html =
+        if assigns.__llv__.new_mount_point,
+          do: LLVComponent.ssr_html(assigns, mirror_id),
+          else: nil
+
       socket =
         assign(socket,
           view: view,
           id: assigns.id,
           mirror_token: mirror_token,
           mirror_id: mirror_id,
-          comp_assigns: comp_assings
+          comp_assigns: comp_assings,
+          ssr_html: ssr_html
         )
 
       {:ok, socket}
@@ -145,8 +169,8 @@ defmodule LocalLiveView.Component do
       data-pop-mirror-token={@mirror_token}
       data-pop-mirror-id={@mirror_id}
     >
-    <%!-- Placeholder, replaced with LLV on the client --%>
-    <div id={@id} data-pop-root></div>
+    <%!-- Mark the div as inert so that events triggered before WASM takes over don't reach the server  --%>
+    <div id={@id} data-pop-root data-pop-ssr={@ssr_html != nil} inert={@ssr_html != nil}>{Phoenix.HTML.raw(@ssr_html)}</div>
     <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>
@@ -156,7 +180,45 @@ defmodule LocalLiveView.Component do
 
   @doc false
   def comp_assigns(assigns) do
-    Map.drop(assigns, [:__changed__, :view])
+    Map.drop(assigns, [:__changed__, :__llv__, :view, :llv_ssr, :llv_url])
+  end
+
+  # Renders the view on the server; nil when disabled or not possible.
+  @doc false
+  def ssr_html(assigns, mirror_id) do
+    view = assigns[:view]
+
+    if Map.get(assigns, :llv_ssr, Application.get_env(:local_live_view, :ssr, true)) do
+      opts = %{
+        view: view,
+        assigns: comp_assigns(assigns),
+        id: assigns.id,
+        url: assigns[:llv_url],
+        mirror_id: mirror_id
+      }
+
+      case LocalLiveView.SSR.render(opts) do
+        {:ok, html} ->
+          html
+
+        {:error, :not_loaded} ->
+          Logger.debug("LLV #{view}: not rendered on the server, module not available")
+          nil
+
+        {:error, :redirected} ->
+          nil
+      end
+    end
+  rescue
+    e ->
+      Logger.error("""
+      LLV #{assigns[:view]}: rendering on the server failed, the view is left for the browser \
+      to render. Guard browser-only code with LocalLiveView.connected?/1 or disable server \
+      rendering with llv_ssr={false}.
+      #{Exception.format(:error, e, __STACKTRACE__)}\
+      """)
+
+      nil
   end
 
   defp encode_assigns(assigns), do: Base.encode64(:erlang.term_to_binary(assigns))

@@ -10,7 +10,6 @@ defmodule Local.MixProject do
       deps_path: "../deps",
       lockfile: "../mix.lock",
       deps: deps(),
-      elixirc_paths: elixirc_paths(Mix.target()),
       compilers: Mix.compilers(),
       aliases: aliases()
     ]
@@ -23,9 +22,6 @@ defmodule Local.MixProject do
   def application do
     [extra_applications: [:logger]] ++ app_mod(Mix.target())
   end
-
-  defp elixirc_paths(:host), do: []
-  defp elixirc_paths(_), do: ["lib"]
 
   defp app_mod(:host), do: []
   defp app_mod(_), do: [mod: {Local.Application, []}]
