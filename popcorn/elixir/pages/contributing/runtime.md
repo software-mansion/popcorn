@@ -7,12 +7,20 @@ build the BEAM virtual machine.
 
 - `popcorn/patches/` contains Popcorn changes to Erlang/OTP.
 - `popcorn/sources/` contains generated source checkouts.
-- `popcorn/out/` contains virtual machine build output.
+- `popcorn/out/js/` contains generated JavaScript, declarations, and bundler tools.
+- `popcorn/out/runtimes/` contains the built virtual machine variants.
 - `popcorn/js/` contains the browser runtime, bridge, and bundler plugins.
 - `popcorn/elixir/` contains the Elixir bridge API.
 - `examples/` contains browser applications.
 
 Generated source and output directories are not release source files.
+
+The JS build replaces `out/js/` and links its `runtimes/` directory to
+`out/runtimes/`. Local `js/dist/` and `elixir/priv/static/` link to `out/js/`.
+The npm and Hex packages copy this tree with symlinks resolved. npm packaging
+requires both the core and crypto variants; Hex includes the variants built
+locally. Bundler plugins generate application boot files, tarballs, and manifests
+separately.
 
 ## Use the pinned toolchain
 

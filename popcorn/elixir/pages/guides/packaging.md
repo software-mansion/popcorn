@@ -1,7 +1,23 @@
 # Package an application
 
-The bundler plugin packages existing Mix build output. It does not replace
-`mix compile`.
+`mix popcorn.cook` packages existing Mix build output. The Vite, Rollup, and
+esbuild plugins invoke the same task. Packaging does not replace `mix compile`.
+
+```console
+mix popcorn.cook --out-dir priv/static/popcorn
+```
+
+The output includes the browser API and can be loaded without a JavaScript
+bundler:
+
+```html
+<script type="module">
+  import { Popcorn } from "/popcorn/index.mjs";
+
+  const result = await Popcorn.init();
+  if (!result.ok) throw result.error;
+</script>
+```
 
 ## Select the entrypoint
 
@@ -14,7 +30,7 @@ popcorn({
 });
 ```
 
-The plugin reads `_build/$MIX_ENV/lib`. `MIX_ENV` defaults to `dev`.
+The task uses the active Mix environment and target build path.
 
 The packager includes the entrypoint and its required application dependencies.
 Set `app: null` to start no application. This option does not package every

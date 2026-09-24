@@ -1,4 +1,4 @@
-import createModule from "../assets/beam.mjs";
+import createModule from "./beam.mjs";
 
 import { start, type Beam } from "./beam";
 import { readMainEvent, toMain } from "./events";
