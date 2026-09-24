@@ -11,7 +11,9 @@ defmodule LocalLiveView do
   The `LocalLiveView` API is similar to `Phoenix.LiveView`:
   - it runs in a separate Elixir process,
   - it has `c:mount/3`, `c:handle_params/3` and `c:render/1` callbacks,
-    which behave the same way as in a regular live view,
+    which behave the same way as in a regular live view. Like there,
+    only the view mounted at the router - the main view, see
+    `LocalLiveView.Router.live_local/2` - gets `c:handle_params/3`,
   - it can spawn regular `Phoenix.Component`s and `Phoenix.LiveComponent`s,
   - events from these components by default go to their parent
     local live view.
@@ -104,8 +106,9 @@ defmodule LocalLiveView do
 
   On the initial page load the view is also mounted and rendered on the
   server, so its HTML is on the page before the Wasm runtime boots. The
-  server runs `c:mount/3`, `c:update/2` and `c:handle_params/3` the same way
-  the browser does, but `connected?/1` returns `false` there. Use it to skip
+  server runs `c:mount/3`, `c:update/2` and, for the main view,
+  `c:handle_params/3` the same way the browser does, but `connected?/1`
+  returns `false` there. Use it to skip
   browser-only work, exactly as in a dead render in `Phoenix.LiveView`:
 
   ```
@@ -255,8 +258,16 @@ defmodule LocalLiveView do
   end
 
   @doc """
-  Navigates to the given path with a browser history push, then calls `handle_params/3`
-  with the new URL query params. No server round-trip.
+  Patches the page URL with a browser history push, then calls `handle_params/3`
+  of whoever owns the page:
+
+    * the main local view, with no server round-trip, see
+      `LocalLiveView.Router.live_local/2`,
+    * the host `Phoenix.LiveView`, on the server, when the local view is
+      rendered inside one. The host can then pass the new params down as
+      assigns.
+
+  Any local view can patch; only the main one gets `handle_params/3`.
 
   Mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when the
   view is not `connected?/1`.
@@ -336,9 +347,16 @@ defmodule LocalLiveView do
   @doc """
   Invoked with the query params of the page the view is rendered on.
 
-  Called after `c:mount/3` and again after every `push_patch/2`. `params` holds
-  the query string decoded into a map with string keys and `uri` is the full
-  URL.
+  Only the main view of the page gets it: the view mounted by a
+  `LocalLiveView.Router.live_local/2` route, just like only the view mounted
+  at the router gets `c:Phoenix.LiveView.handle_params/3`. Views rendered
+  with `LocalLiveView.Component.local_live_view/1` don't; if they need the
+  params, have the host pass them as assigns.
+
+  Called after `c:mount/3` and again after every patch of the page URL: a
+  patch link, back/forward navigation or `push_patch/2` from any local view
+  on the page. `params` holds the query string decoded into a map with
+  string keys and `uri` is the full URL.
 
   ```
   def handle_params(%{"tab" => tab}, _uri, socket) do

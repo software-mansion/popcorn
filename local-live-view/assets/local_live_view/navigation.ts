@@ -1,17 +1,20 @@
 import type { LLVConfig, LLVSocket } from "./types";
 import type { PopcornClient } from "./index";
 
-// LLV navigation runs in one of two modes:
+// Only the main LLV of the page - the one mounted by a `live_local` route -
+// gets handle_params, like only the LiveView mounted at the router does in
+// Phoenix. Any LLV can patch the URL, and the patch goes to whoever owns
+// the page:
 //
 //  - Hosted: the page has a connected host LiveView (liveSocket.main). Phoenix owns
-//    the browser history and the popstate handler, so we route LLV navigation through
-//    Phoenix (pushHistoryPatch) and just listen to phx:navigate to re-run handle_params
-//    in the LLV views. This keeps the host LV and history in sync
+//    the browser history and the popstate handler, so we route LLV patches through
+//    Phoenix (pushHistoryPatch), and the host LiveView handles them on the server.
+//    There's no main LLV on such a page.
 //
 //  - Standalone: the page is rendered with no host LiveView.
 //    There is no Phoenix popstate or [data-phx-link] click handler.
 //    LLV must own navigation itself: intercept patch-link clicks, push the
-//    history entry, and handle popstate.
+//    history entry, handle popstate, and run handle_params in the main LLV.
 export function registerNavigationHandlers(
   socket: LLVSocket,
   pop: PopcornClient,
@@ -21,11 +24,10 @@ export function registerNavigationHandlers(
 
   const phoenixOwnsNav = () => socket.isConnected();
 
+  // Runs handle_params in the main LLV, if there's one
   const llvHandleParams = (href: string) => {
     pop.call({ action: "navigated", url: absHref(href) });
   };
-
-  let lastLLVNavigatedHref: string | null = null;
 
   // Standalone-only: intercept clicks on patch links. Lets one `<.link patch>` work in
   // both modes, no separate LLV link component needed.
@@ -51,15 +53,18 @@ export function registerNavigationHandlers(
     llvHandleParams(window.location.href);
   });
 
-  // llv:navigate: LLV push_patch fires this event after the Wasm-side
-  // handle_params has run. We write the history entry per mode:
+  // llv:navigate: LLV push_patch fires this event. `handled` tells whether
+  // handle_params already ran, which it did if the main LLV patched. We
+  // write the history entry per mode:
   //  - hosted: hand to Phoenix via pushHistoryPatch (Phoenix-owned patch entry + host
-  //    handle_params); the phx:navigate echo is skipped via lastLLVNavigatedHref.
-  //  - standalone: just write the URL bar — the Wasm side already ran handle_params.
+  //    handle_params, on the server).
+  //  - standalone: write the URL bar, then run handle_params in the main LLV,
+  //    unless it's the one that patched.
   window.addEventListener("llv:navigate", (e: Event) => {
-    const { href, replace } = (e as CustomEvent<{ href: string; replace: boolean }>).detail;
-    lastLLVNavigatedHref = absHref(href);
-    pop.call({ action: "url_changed", url: lastLLVNavigatedHref });
+    const { href, replace, handled } = (
+      e as CustomEvent<{ href: string; replace: boolean; handled: boolean }>
+    ).detail;
+    pop.call({ action: "url_changed", url: absHref(href) });
 
     if (config.onNavigate) {
       config.onNavigate(href, replace);
@@ -73,27 +78,14 @@ export function registerNavigationHandlers(
         replace ? "replace" : "push",
         null,
       );
-    } else if (replace) {
+      return;
+    }
+
+    if (replace) {
       window.history.replaceState({ llv: true }, "", href);
     } else {
       window.history.pushState({ llv: true }, "", href);
     }
-  });
-
-  // phx:navigate: forward Phoenix LiveView patch navigations to all LLV views (hosted
-  // mode only — never dispatched in dead mode). Fires for <.link patch> clicks and
-  // browser back/forward. Skip navigations LLV itself triggered via push_patch, since
-  // LLV already ran handle_params on the Wasm side for those.
-  window.addEventListener("phx:navigate", (e: Event) => {
-    const detail = (e as CustomEvent<{ href?: string; patch?: boolean }>).detail;
-    if (!detail?.patch) return;
-
-    const url = absHref(detail.href ?? window.location.href);
-    if (url === lastLLVNavigatedHref) {
-      lastLLVNavigatedHref = null;
-      return;
-    }
-
-    llvHandleParams(url);
+    if (!handled) llvHandleParams(href);
   });
 }

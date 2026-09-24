@@ -8,7 +8,10 @@ defmodule LocalLiveView.Dispatcher.View do
               [
                 channel_pid: nil,
                 monitor_ref: nil,
-                pending: []
+                pending: [],
+                # Whether it's the main view of the page, see
+                # LocalLiveView.Router.live_local/2
+                main: false
               ]
 
   def render_container(id, session) do

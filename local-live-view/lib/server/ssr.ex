@@ -7,6 +7,8 @@ defmodule LocalLiveView.SSR do
           view: String.t(),
           assigns: map(),
           id: String.t() | nil,
+          # Only the main view of the page gets handle_params/3, with the url
+          main: boolean(),
           url: String.t() | nil,
           mirror_id: String.t() | nil
         }) :: {:ok, iodata()} | {:error, :not_loaded | :redirected}
@@ -26,10 +28,12 @@ defmodule LocalLiveView.SSR do
 
     {socket, _mount_opts} = Lifecycle.mount(module, :not_mounted_at_router, %{}, socket)
 
+    socket = Lifecycle.update!(module, opts.assigns, socket)
+
     socket =
-      socket
-      |> then(&Lifecycle.update!(module, opts.assigns, &1))
-      |> then(&Lifecycle.handle_params(module, opts[:url], &1))
+      if opts[:main],
+        do: Lifecycle.handle_params(module, opts[:url], socket),
+        else: socket
 
     if socket.redirected do
       {:error, :redirected}

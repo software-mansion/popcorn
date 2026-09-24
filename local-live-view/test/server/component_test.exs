@@ -70,6 +70,13 @@ defmodule LocalLiveView.ComponentTest do
              ~s(<div id="llv-#{id(Hello)}" data-pop-root data-pop-ssr inert><p>Hello, world</p></div>)
   end
 
+  test "marks only the main view, set by live_local routes, as main" do
+    refute render(%{view: inspect(Hello), name: "world"}) =~ "data-pop-main"
+
+    assert render(%{view: inspect(Hello), name: "world", __llv__: %{main: true, url: nil}}) =~
+             "data-pop-main"
+  end
+
   test "leaves the mount point empty on a re-render of the host" do
     html = render(%{view: inspect(Hello), name: "world", __changed__: %{name: true}})
     assert mount_point(html) == ~s(<div id="llv-#{id(Hello)}" data-pop-root></div>)
@@ -109,8 +116,7 @@ defmodule LocalLiveView.ComponentTest do
                view: "V",
                name: "world",
                llv_ssr: true,
-               llv_url: "http://localhost/",
-               __llv__: %{new_mount_point: true},
+               __llv__: %{new_mount_point: true, main: true, url: "http://localhost/"},
                __changed__: nil
              })
   end
@@ -132,7 +138,7 @@ defmodule LocalLiveView.ComponentTest do
         id: "m",
         view: inspect(Mirrored),
         name: "there",
-        __llv__: %{new_mount_point: new_mount_point?}
+        __llv__: %{new_mount_point: new_mount_point?, main: false, url: nil}
       }
     end
 

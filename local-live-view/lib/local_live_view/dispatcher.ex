@@ -146,8 +146,16 @@ defmodule LocalLiveView.Dispatcher do
     # assigns into an ETS table upfront, so the LLV can read
     # them during mount.
     if assigns, do: :ets.insert(@table, {{:assigns, id}, assigns})
-    state = put_in(state.views[id], %View{epoch: epoch})
-    session = %{"llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id}}
+
+    # The main view of the page, the only one getting handle_params/3,
+    # see LocalLiveView.Router.live_local/2
+    main = msg["main"] == true
+    state = put_in(state.views[id], %View{epoch: epoch, main: main})
+
+    session = %{
+      "llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id, main: main}
+    }
+
     {:resolve, %{html: View.render_container(id, session)}, state}
   end
 
@@ -240,7 +248,7 @@ defmodule LocalLiveView.Dispatcher do
   defp handle_wasm_call(%{"action" => "navigated", "url" => url}, _promise, state) do
     :ets.insert(@table, {:url, url})
 
-    for {_id, view} <- state.views do
+    for {_id, %View{main: true} = view} <- state.views do
       View.dispatch(view, {:llv, %{"action" => "handle_params", "url" => url}})
     end
 

@@ -31,6 +31,8 @@ export class Views {
         view: pop_view_el.getAttribute("data-pop-view")!,
         mirror_id: pop_view_el.dataset.popMirrorId ?? null,
         assigns,
+        // The main view of the page, the only one getting handle_params
+        main: pop_view_el.hasAttribute("data-pop-main"),
       },
       { suppressErrorLog: true },
     );

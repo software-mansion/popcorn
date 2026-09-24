@@ -1,32 +1,42 @@
 # Navigation
 
 LocalLiveView supports patch navigation: updating the URL and re-running
-`handle_params/3` without a full page reload. The state update runs in the Wasm
-VM, so it needs no network call; the URL change is coordinated between the Elixir
-code running in Wasm, the Phoenix LiveView JavaScript runtime, and the browser.
+`handle_params/3` without a full page reload. Navigating to another page, with
+`<.link navigate={...}>` or `<.link href={...}>`, goes through the server as
+usual.
 
-## Two modes
+## The main view
 
-Navigation behaves differently depending on how an LLV view is rendered.
+Like in Phoenix LiveView, where only the LiveView mounted at the router gets
+`handle_params/3`, only the **main** local view of a page gets it. The main view
+is the one mounted by a `LocalLiveView.Router.live_local/2` route:
 
-- **Hosted** - the LLV view is rendered as a child of a connected Phoenix
-  LiveView. Phoenix already owns the browser history, the `popstate` handler and
-  the click handler for patch links. LLV routes its navigation through Phoenix
-  and listens for the resulting `phx:navigate` event to re-run `handle_params/3`
-  in its own views.
+```elixir
+live_local "/dashboard", DashboardLocal
+```
 
-- **Standalone** - the LLV view is rendered directly in a HEEx or HTML template,
-  with no host LiveView on the page. There is nothing from Phoenix to lean on, so
-  LLV owns navigation itself: it intercepts patch-link clicks, writes the browser
-  history entry, and handles `popstate`.
+Views rendered with `<.local_live_view>` - inside a host LiveView or in a plain
+template - are not main and don't get `handle_params/3`, just like child
+LiveViews don't. If they need the URL params, have the host pass them down as
+assigns.
 
-The same `<.link patch={...}>` markup works in both modes. `<.link href={...}>` and
-`<.link navigate={...}>` are handled by Phoenix LiveView as usual and are not affected
-by LLV.
+Any local view can patch the URL, though. The patch goes to whoever owns the
+page:
+
+- **A main local view** - the page has no host LiveView, so LLV owns navigation
+  itself: it intercepts patch-link clicks, writes the browser history entry,
+  handles `popstate`, and runs `handle_params/3` in the main view, in the Wasm
+  VM, with no network call.
+
+- **A host LiveView** - Phoenix owns the browser history, the `popstate` handler
+  and the click handler for patch links. LLV routes its patches through Phoenix,
+  and the host LiveView handles them in its `handle_params/3`, on the server.
+
+The same `<.link patch={...}>` markup works in both cases.
 
 ## `handle_params/3`
 
-A view opts into navigation by exporting `handle_params/3`, mirroring
+The main view opts into navigation by exporting `handle_params/3`, mirroring
 `Phoenix.LiveView`. It receives the current query params and URL.
 
 ```elixir
@@ -36,7 +46,7 @@ end
 ```
 
 It runs at mount with the initial query params, and again on every patch
-navigation.
+of the page URL. It also runs when the view is rendered on the server.
 
 ## `push_patch/2`
 
@@ -49,20 +59,17 @@ def handle_event("select_tab", %{"tab" => tab}, socket) do
 end
 ```
 
-The state update happens client-side: `handle_params/3` runs in the Wasm VM and
-its diff is applied to the DOM with no network call. The Wasm side then emits an
-`llv:navigate` event, and how the history entry is written depends on the mode:
+The Wasm side emits an `llv:navigate` event, and what happens next depends on
+who owns the page:
 
-- **Standalone** - the JS layer writes the browser history entry directly. No
-  server is involved.
-- **Hosted** - the `llv:navigate` event hands the navigation to Phoenix, which
-  does a server round-trip to update the history it keeps on the LiveView side.
-  This round-trip is triggered after LLV emits `llv:navigate`, not as part of the
-  `push_patch/2` state update itself.
-
-As in a normal Phoenix LiveView, clicking a `<.link patch={...}>` also invokes
-`handle_params/3` with the new params. The behaviour is identical to LiveView, so
-the same link works without any LLV-specific markup.
+- **A main local view** - the JS layer writes the browser history entry directly
+  and `handle_params/3` runs in the main view. When the main view patches
+  itself, its `handle_params/3` runs right away, as part of the `push_patch/2`
+  state update. No server is involved.
+- **A host LiveView** - the `llv:navigate` event hands the patch to Phoenix,
+  which does a server round-trip: the host's `handle_params/3` runs and Phoenix
+  updates the history. The host can then pass the new params down to the
+  local view as assigns.
 
 ## `redirect/2`
 
@@ -83,27 +90,18 @@ and trigger the redirect on the server.
 over the existing socket through the router, and local views are not mounted
 at a router. Calling it logs an error and is ignored.
 
-## `phx:navigate`
-
-In hosted mode, Phoenix emits a `phx:navigate` event whenever it performs a patch
-(a patch-link click or browser back/forward). Its purpose here is to pass those
-Phoenix navigation events into the LLV views, which re-run `handle_params/3` in
-response. Patches that LLV itself initiated via `push_patch/2` are de-duplicated,
-so `handle_params/3` is not run twice for the same navigation.
-
 ## Flow
 
 ```mermaid
 flowchart TD
-    PP["push_patch/2 (LLV)"] --> Wasm["handle_params/3 runs in Wasm, diff to DOM"]
-    Wasm --> EMIT["local_live_view server emits llv:navigate event"]
-    EMIT --> H{Hosted?}
-    H -- yes --> PHX["route through Phoenix, phx:navigate echo de-duplicated"]
-    H -- no --> HIST["write browser history directly"]
+    PP["push_patch/2 (any local view)"] --> EMIT["llv:navigate event"]
+    EMIT --> H{Host LiveView?}
+    H -- yes --> PHX["Phoenix patches: host handle_params/3 on the server"]
+    H -- no --> HIST["write browser history directly"] --> MAIN["main view's handle_params/3 in Wasm"]
 
-    CLICK["patch link click / back-forward"] --> H2{Hosted?}
-    H2 -- yes --> NAV["Phoenix patches + emits phx:navigate"] --> LLV["LLV re-runs handle_params/3"]
-    H2 -- no --> LLV
+    CLICK["patch link click / back-forward"] --> H2{Host LiveView?}
+    H2 -- yes --> PHX
+    H2 -- no --> MAIN
 ```
 
 ## Customizing navigation
