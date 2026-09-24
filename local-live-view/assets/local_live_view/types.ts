@@ -67,6 +67,7 @@ export interface LLVView {
 export interface EventBusHook {
   el: HTMLElement;
   pushEvent(event: string, payload: Record<string, unknown>): Promise<unknown>;
+  js(): { patch(href: string, opts?: { replace?: boolean }): void };
 }
 
 /**
@@ -80,12 +81,6 @@ interface PhxLiveSocketInternals {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: Record<string, any>;
   debounce(el: Element, event: Event, eventType: string, callback: () => void): unknown;
-  pushHistoryPatch(
-    event: Event | { isTrusted: boolean; type: string },
-    href: string,
-    linkState: string,
-    targetEl: Element | null,
-  ): void;
   bindForms(): void;
 }
 

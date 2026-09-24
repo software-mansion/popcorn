@@ -111,7 +111,7 @@ defmodule LocalLiveView.Proxy do
   # The main view handles its own patch right away. The patch of any other
   # view goes to whoever owns the page: the main view or the host LiveView.
   def handle_info({:llv, :patch, to, kind}, socket) do
-    push_url_update(to, kind == :replace, main?(socket))
+    push_url_update(socket.private.llv_id, to, kind == :replace, main?(socket))
     {:noreply, maybe_handle_params(socket, to)}
   end
 
@@ -143,20 +143,21 @@ defmodule LocalLiveView.Proxy do
     encoded |> Base.decode64!() |> :erlang.binary_to_term()
   end
 
-  # `handled` tells whether handle_params/3 already ran for the patch
-  defp push_url_update(url, replace, handled) do
+  # `id` is the patching view's, `handled` tells whether handle_params/3
+  # already ran for the patch
+  defp push_url_update(id, url, replace, handled) do
     Popcorn.Wasm.run_js(
       """
       ({ args }) => {
         const event = new CustomEvent("llv:navigate", {
-          detail: { href: args.url, replace: args.replace, handled: args.handled },
+          detail: { id: args.id, href: args.url, replace: args.replace, handled: args.handled },
           cancelable: true,
         });
 
         window.dispatchEvent(event);
       }
       """,
-      %{url: url, replace: replace, handled: handled}
+      %{id: id, url: url, replace: replace, handled: handled}
     )
   end
 end

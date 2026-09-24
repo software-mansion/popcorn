@@ -1,4 +1,4 @@
-import type { LLVConfig, LLVSocket } from "./types";
+import type { EventBusHook, LLVConfig, LLVSocket } from "./types";
 import type { PopcornClient } from "./index";
 
 // Only the main LLV of the page - the one mounted by a `live_local` route -
@@ -8,7 +8,7 @@ import type { PopcornClient } from "./index";
 //
 //  - Hosted: the page has a connected host LiveView (liveSocket.main). Phoenix owns
 //    the browser history and the popstate handler, so we route LLV patches through
-//    Phoenix (pushHistoryPatch), and the host LiveView handles them on the server.
+//    Phoenix (a hook's `js().patch`), and the host LiveView handles them on the server.
 //    There's no main LLV on such a page.
 //
 //  - Standalone: the page is rendered with no host LiveView.
@@ -19,6 +19,8 @@ export function registerNavigationHandlers(
   socket: LLVSocket,
   pop: PopcornClient,
   config: LLVConfig,
+  // The host-side hook of the LLV with the given id, see LLVEngine
+  hookOf: (llvId: string) => EventBusHook | undefined,
 ) {
   const absHref = (href: string) => new URL(href, window.location.origin).href;
 
@@ -56,13 +58,14 @@ export function registerNavigationHandlers(
   // llv:navigate: LLV push_patch fires this event. `handled` tells whether
   // handle_params already ran, which it did if the main LLV patched. We
   // write the history entry per mode:
-  //  - hosted: hand to Phoenix via pushHistoryPatch (Phoenix-owned patch entry + host
+  //  - hosted: hand to Phoenix with the public hook JS patch command, through the
+  //    patching LLV's host-side hook (Phoenix-owned patch entry + host
   //    handle_params, on the server).
   //  - standalone: write the URL bar, then run handle_params in the main LLV,
   //    unless it's the one that patched.
   window.addEventListener("llv:navigate", (e: Event) => {
-    const { href, replace, handled } = (
-      e as CustomEvent<{ href: string; replace: boolean; handled: boolean }>
+    const { id, href, replace, handled } = (
+      e as CustomEvent<{ id: string; href: string; replace: boolean; handled: boolean }>
     ).detail;
     pop.call({ action: "url_changed", url: absHref(href) });
 
@@ -72,12 +75,12 @@ export function registerNavigationHandlers(
     }
 
     if (phoenixOwnsNav()) {
-      socket.pushHistoryPatch(
-        { isTrusted: false, type: "llv:navigate" },
-        href,
-        replace ? "replace" : "push",
-        null,
-      );
+      const hook = hookOf(id);
+      if (hook) {
+        hook.js().patch(href, { replace });
+      } else {
+        console.error("LLV push_patch: no host hook for view", id);
+      }
       return;
     }
 
