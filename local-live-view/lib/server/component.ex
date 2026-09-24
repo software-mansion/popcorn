@@ -31,7 +31,7 @@ defmodule LocalLiveView.Component do
     * `view` (required) - the LocalLiveView module name, as a string.
     * `id` - stable element id; defaults to a server-generated random id.
     * `llv_ssr` - whether to render the view on the server, defaults to `true`.
-      See 'Server-side render' paragraph in `LocalLiveView` module doc.
+      See the "Server-side rendering" section in the `LocalLiveView` module doc.
     * `llv_url` - the URL of the page, given to the view's
       `c:LocalLiveView.handle_params/3` when rendering on the server. It is
       set automatically for routes declared with `LocalLiveView.Router.live_local/2`;
