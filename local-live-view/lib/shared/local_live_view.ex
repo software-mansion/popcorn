@@ -117,7 +117,7 @@ defmodule LocalLiveView do
 
   SSR can be disabled per view:
 
-      <.local_live_view view="Cart" llv_ssr=false />
+      <.local_live_view view="Cart" llv_ssr={false} />
 
   or globally via config:
 
