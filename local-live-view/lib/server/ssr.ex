@@ -7,7 +7,6 @@ defmodule LocalLiveView.SSR do
           view: String.t(),
           assigns: map(),
           id: String.t() | nil,
-          # Only the main view of the page gets handle_params/3, with the url
           main: boolean(),
           url: String.t() | nil,
           mirror_id: String.t() | nil

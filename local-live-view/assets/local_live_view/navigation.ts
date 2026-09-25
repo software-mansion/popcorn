@@ -1,94 +1,91 @@
-import type { EventBusHook, LLVConfig, LLVSocket } from "./types";
+import type { EventBusHook, LLVSocket } from "./types";
 import type { PopcornClient } from "./index";
+import { llvIdOf } from "./helpers";
 
-// Only the main LLV of the page - the one mounted by a `live_local` route -
-// gets handle_params, like only the LiveView mounted at the router does in
-// Phoenix. Any LLV can patch the URL, and the patch goes to whoever owns
-// the page:
-//
-//  - Hosted: the page has a connected host LiveView (liveSocket.main). Phoenix owns
-//    the browser history and the popstate handler, so we route LLV patches through
-//    Phoenix (a hook's `js().patch`), and the host LiveView handles them on the server.
-//    There's no main LLV on such a page.
-//
-//  - Standalone: the page is rendered with no host LiveView.
-//    There is no Phoenix popstate or [data-phx-link] click handler.
-//    LLV must own navigation itself: intercept patch-link clicks, push the
-//    history entry, handle popstate, and run handle_params in the main LLV.
 export function registerNavigationHandlers(
-  socket: LLVSocket,
   pop: PopcornClient,
-  config: LLVConfig,
-  // The host-side hook of the LLV with the given id, see LLVEngine
-  hookOf: (llvId: string) => EventBusHook | undefined,
+  socket: LLVSocket,
+  getAnyHook: () => EventBusHook | undefined,
 ) {
-  const absHref = (href: string) => new URL(href, window.location.origin).href;
-
-  const phoenixOwnsNav = () => socket.isConnected();
-
-  // Runs handle_params in the main LLV, if there's one
-  const llvHandleParams = (href: string) => {
-    pop.call({ action: "navigated", url: absHref(href) });
-  };
-
-  // Standalone-only: intercept clicks on patch links. Lets one `<.link patch>` work in
-  // both modes, no separate LLV link component needed.
+  // Intercept clicks on patch links. Lets one `<.link patch>` work on any
+  // page, no separate LLV link component needed.
   document.addEventListener("click", (e: MouseEvent) => {
-    if (phoenixOwnsNav()) return;
+    const mainId = mainViewId();
+    if (!mainId) return;
 
-    const link = (e.target as Element).closest('a[data-phx-link="patch"]');
+    const link = (e.target as Element).closest<HTMLElement>('a[data-phx-link="patch"]');
     if (!link) return;
+    // For patch links, prevent the LV handlers from handling the event
+    // as they would reload the page if there's no main LV on the server
     e.preventDefault();
+    e.stopImmediatePropagation();
 
     const to = link.getAttribute("href") ?? window.location.href;
-    const replace = link.getAttribute("data-phx-link-state") === "replace";
-    if (replace) {
-      window.history.replaceState({ llv: true }, "", to);
-    } else {
-      window.history.pushState({ llv: true }, "", to);
-    }
-    llvHandleParams(to);
+    writeHistory(to, link.getAttribute("data-phx-link-state") === "replace");
+    handleParams(pop, mainId, to);
+
+    // Preventing the event propagation breaks phx-click handling,
+    // so it's triggered here manually.
+    const phxClick = link.getAttribute("phx-click");
+    if (phxClick) socket.execJS(link, phxClick, "click");
   });
 
-  window.addEventListener("popstate", () => {
-    if (phoenixOwnsNav()) return;
-    llvHandleParams(window.location.href);
+  // Runs before Phoenix's popstate handler, because
+  // it's registered first: LLVEngine.create must be called before
+  // liveSocket.connect(), which registers Phoenix's.
+  window.addEventListener("popstate", (e: PopStateEvent) => {
+    const mainId = mainViewId();
+    if (!mainId) return;
+    // Prevent the LV handlers from handling the event,
+    // as they would reload the page if there's no main LV on the server
+    e.stopImmediatePropagation();
+    handleParams(pop, mainId, window.location.href);
   });
 
-  // llv:navigate: LLV push_patch fires this event. `handled` tells whether
-  // handle_params already ran, which it did if the main LLV patched. We
-  // write the history entry per mode:
-  //  - hosted: hand to Phoenix with the public hook JS patch command, through the
-  //    patching LLV's host-side hook (Phoenix-owned patch entry + host
-  //    handle_params, on the server).
-  //  - standalone: write the URL bar, then run handle_params in the main LLV,
-  //    unless it's the one that patched.
+  // llv:navigate: an LLV called push_patch
   window.addEventListener("llv:navigate", (e: Event) => {
-    const { id, href, replace, handled } = (
-      e as CustomEvent<{ id: string; href: string; replace: boolean; handled: boolean }>
-    ).detail;
-    pop.call({ action: "url_changed", url: absHref(href) });
+    const { href, replace } = (e as CustomEvent<{ href: string; replace: boolean }>).detail;
 
-    if (config.onNavigate) {
-      config.onNavigate(href, replace);
+    const mainId = mainViewId();
+    if (mainId) {
+      writeHistory(href, replace);
+      handleParams(pop, mainId, href);
       return;
     }
 
-    if (phoenixOwnsNav()) {
-      const hook = hookOf(id);
-      if (hook) {
-        hook.js().patch(href, { replace });
-      } else {
-        console.error("LLV push_patch: no host hook for view", id);
-      }
-      return;
-    }
-
-    if (replace) {
-      window.history.replaceState({ llv: true }, "", href);
+    // Hooks only mount inside a LiveView, so there's none on a page without one
+    const hook = getAnyHook();
+    if (hook) {
+      hook.js().patch(href, { replace });
+    } else if (replace) {
+      window.location.replace(href);
     } else {
-      window.history.pushState({ llv: true }, "", href);
+      window.location.assign(href);
     }
-    if (!handled) llvHandleParams(href);
+  });
+}
+
+// The main LLV owns the page's navigation. Its mount point is in the
+// server-rendered page from the start.
+function mainViewId(): string | null {
+  const el = document.querySelector<HTMLElement>("[data-pop-main]");
+  return el ? llvIdOf(el) : null;
+}
+
+function writeHistory(href: string, replace: boolean): void {
+  if (replace) {
+    window.history.replaceState(null, "", href);
+  } else {
+    window.history.pushState(null, "", href);
+  }
+}
+
+// Runs handle_params in the main LLV. The dispatcher queues it if the view
+// is still mounting.
+function handleParams(pop: PopcornClient, mainId: string, href: string): void {
+  pop.call({
+    action: "dispatch_to_view",
+    id: mainId,
+    payload: { action: "handle_params", url: new URL(href, window.location.href).href },
   });
 }

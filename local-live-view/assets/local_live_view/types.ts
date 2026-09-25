@@ -10,12 +10,6 @@ export interface LLVConfig {
   debug?: boolean;
   /** Callback for raw Popcorn messages */
   eventHandler?: (msg: unknown) => void;
-  /**
-   * Override LLV's default navigation handler.
-   * Called instead of `liveSocket.historyPatch` when an LLV view calls `push_patch`.
-   * Pass a custom function to take full control of navigation.
-   */
-  onNavigate?: (href: string, replace: boolean) => void;
 }
 
 // --- Internal Phoenix types ---
@@ -72,12 +66,10 @@ export interface EventBusHook {
 
 /**
  * LiveSocket members missing from LV's published LiveSocketInstanceInterface,
- * which LLV accesses via type-cast. All are private API except isConnected —
- * a public runtime method their TS types simply don't declare.
+ * which LLV accesses via type-cast. All are private API.
  */
 interface PhxLiveSocketInternals {
   newRootView(el: HTMLElement, ...rest: unknown[]): LLVView;
-  isConnected(): boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hooks: Record<string, any>;
   debounce(el: Element, event: Event, eventType: string, callback: () => void): unknown;

@@ -23,7 +23,6 @@ export class Views {
     const assigns = pop_view_el.getAttribute("data-pop-assigns");
     const data: ViewData = { lastAssigns: assigns };
     this.data.set(llvId, data);
-    this.pop.call({ action: "url_changed", url: window.location.href });
     const result = await this.pop.call(
       {
         action: "create",
@@ -31,8 +30,8 @@ export class Views {
         view: pop_view_el.getAttribute("data-pop-view")!,
         mirror_id: pop_view_el.dataset.popMirrorId ?? null,
         assigns,
-        // The main view of the page, the only one getting handle_params
         main: pop_view_el.hasAttribute("data-pop-main"),
+        url: window.location.href,
       },
       { suppressErrorLog: true },
     );

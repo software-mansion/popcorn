@@ -25,13 +25,6 @@ defmodule LocalLiveView.Dispatcher do
     GenServer.start_link(__MODULE__, args, name: @process_name)
   end
 
-  def current_url do
-    case :ets.lookup(@table, :url) do
-      [{:url, url}] -> url
-      [] -> nil
-    end
-  end
-
   def current_assigns(id) do
     case :ets.lookup(@table, {:assigns, id}) do
       [{{:assigns, ^id}, assigns}] -> assigns
@@ -61,11 +54,7 @@ defmodule LocalLiveView.Dispatcher do
 
     Popcorn.Wasm.ready(@process_name)
 
-    {:ok,
-     %{
-       transport: transport,
-       views: %{}
-     }}
+    {:ok, %{transport: transport, views: %{}}}
   end
 
   @impl GenServer
@@ -147,13 +136,12 @@ defmodule LocalLiveView.Dispatcher do
     # them during mount.
     if assigns, do: :ets.insert(@table, {{:assigns, id}, assigns})
 
-    # The main view of the page, the only one getting handle_params/3,
-    # see LocalLiveView.Router.live_local/2
     main = msg["main"] == true
-    state = put_in(state.views[id], %View{epoch: epoch, main: main})
+    url = if main, do: msg["url"]
+    state = put_in(state.views[id], %View{epoch: epoch})
 
     session = %{
-      "llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id, main: main}
+      "llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id, main: main, url: url}
     }
 
     {:resolve, %{html: View.render_container(id, session)}, state}
@@ -237,22 +225,6 @@ defmodule LocalLiveView.Dispatcher do
     end
 
     {:resolve, :ok, %{state | views: views}}
-  end
-
-  # Keep the current url in the ETS table, so that LLVs can read it
-  defp handle_wasm_call(%{"action" => "url_changed", "url" => url}, _promise, state) do
-    :ets.insert(@table, {:url, url})
-    {:resolve, :ok, state}
-  end
-
-  defp handle_wasm_call(%{"action" => "navigated", "url" => url}, _promise, state) do
-    :ets.insert(@table, {:url, url})
-
-    for {_id, %View{main: true} = view} <- state.views do
-      View.dispatch(view, {:llv, %{"action" => "handle_params", "url" => url}})
-    end
-
-    {:resolve, :ok, state}
   end
 
   ## Socket plumbing

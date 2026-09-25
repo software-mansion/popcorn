@@ -33,11 +33,6 @@ defmodule LocalLiveView.Component do
     * `llv_ssr` - whether to render the view on the server, defaults to `true`.
       See the "Server-side rendering" section in the `LocalLiveView` module doc.
 
-  A view rendered with this component doesn't get
-  `c:LocalLiveView.handle_params/3`, just like a child `Phoenix.LiveView`
-  doesn't. Only the main view of the page, mounted with
-  `LocalLiveView.Router.live_local/2`, does.
-
   ## Examples
 
       <.local_live_view view="MyLocal" />
@@ -53,8 +48,6 @@ defmodule LocalLiveView.Component do
 
     new_mount_point? = changed?(assigns, :view) or changed?(assigns, :id)
 
-    # LocalLiveView.ControllerHTML passes `main` and `url` for the main view
-    # of a live_local/2 route
     llv =
       %{main: false, url: nil}
       |> Map.merge(assigns[:__llv__] || %{})

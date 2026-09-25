@@ -259,18 +259,12 @@ defmodule LocalLiveView do
 
   @doc """
   Patches the page URL with a browser history push, then calls `handle_params/3`
-  of whoever owns the page:
+  of the main view of the page.
 
-    * the main local view, with no server round-trip, see
-      `LocalLiveView.Router.live_local/2`,
-    * the host `Phoenix.LiveView`, on the server, when the local view is
-      rendered inside one. The host can then pass the new params down as
-      assigns.
+  Note that the main view can also be local, see `LocalLiveView.Router.live_local/2`.
 
-  Any local view can patch; only the main one gets `handle_params/3`.
-
-  Mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when the
-  view is not `connected?/1`.
+  This function mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when
+  the view is not `connected?/1`.
 
   ## Options
 
@@ -279,10 +273,9 @@ defmodule LocalLiveView do
   """
   def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
     to = Keyword.fetch!(opts, :to)
-    kind = if opts[:replace], do: :replace, else: :push
 
     # Handled by LocalLiveView.Proxy
-    if connected?(socket), do: send(self(), {:llv, :patch, to, kind})
+    if connected?(socket), do: send(self(), {:llv, :patch, to, !!opts[:replace]})
     socket
   end
 
@@ -347,16 +340,10 @@ defmodule LocalLiveView do
   @doc """
   Invoked with the query params of the page the view is rendered on.
 
-  Only the main view of the page gets it: the view mounted by a
-  `LocalLiveView.Router.live_local/2` route, just like only the view mounted
-  at the router gets `c:Phoenix.LiveView.handle_params/3`. Views rendered
-  with `LocalLiveView.Component.local_live_view/1` don't; if they need the
-  params, have the host pass them as assigns.
+  Called only for the main view of the page, see
+  `LocalLiveView.Router.live_local/2`.
 
-  Called after `c:mount/3` and again after every patch of the page URL: a
-  patch link, back/forward navigation or `push_patch/2` from any local view
-  on the page. `params` holds the query string decoded into a map with
-  string keys and `uri` is the full URL.
+  Called after `c:mount/3` and again after every patch of the page URL.
 
   ```
   def handle_params(%{"tab" => tab}, _uri, socket) do
