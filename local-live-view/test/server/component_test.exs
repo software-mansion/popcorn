@@ -67,7 +67,7 @@ defmodule LocalLiveView.ComponentTest do
     html = render(%{view: inspect(Hello), name: "world"})
 
     assert mount_point(html) ==
-             ~s(<div id="llv-#{id(Hello)}" data-pop-root data-pop-ssr inert><p>Hello, world</p></div>)
+             ~s(<div id="llv-#{id(Hello)}-llv-root" data-pop-root data-pop-ssr inert><p>Hello, world</p></div>)
   end
 
   test "marks only the main view, set by live_local routes, as main" do
@@ -79,7 +79,7 @@ defmodule LocalLiveView.ComponentTest do
 
   test "leaves the mount point empty on a re-render of the host" do
     html = render(%{view: inspect(Hello), name: "world", __changed__: %{name: true}})
-    assert mount_point(html) == ~s(<div id="llv-#{id(Hello)}" data-pop-root></div>)
+    assert mount_point(html) == ~s(<div id="llv-#{id(Hello)}-llv-root" data-pop-root></div>)
   end
 
   test "fills the mount point again when a re-render mounts another view" do
@@ -89,20 +89,20 @@ defmodule LocalLiveView.ComponentTest do
 
   test "leaves the mount point empty with llv_ssr={false}" do
     html = render(%{view: inspect(Hello), name: "world", llv_ssr: false})
-    assert mount_point(html) == ~s(<div id="llv-#{id(Hello)}" data-pop-root></div>)
+    assert mount_point(html) == ~s(<div id="llv-#{id(Hello)}-llv-root" data-pop-root></div>)
     refute html =~ "ssr"
   end
 
   test "leaves the mount point empty when the view module is not available" do
     html = render(%{view: "Nope.Missing", name: "world"})
-    assert mount_point(html) == ~s(<div id="llv-Nope-Missing" data-pop-root></div>)
+    assert mount_point(html) == ~s(<div id="llv-Nope-Missing-llv-root" data-pop-root></div>)
   end
 
   test "logs and leaves the mount point empty when the view raises on the server" do
     log =
       capture_log(fn ->
         html = render(%{view: inspect(Broken)})
-        assert mount_point(html) == ~s(<div id="llv-#{id(Broken)}" data-pop-root></div>)
+        assert mount_point(html) == ~s(<div id="llv-#{id(Broken)}-llv-root" data-pop-root></div>)
       end)
 
     assert log =~ "rendering on the server failed"

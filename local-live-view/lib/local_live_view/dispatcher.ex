@@ -261,7 +261,7 @@ defmodule LocalLiveView.Dispatcher do
         Logger.warning("LLV dispatcher: dropping push on unsupported topic #{inspect(topic)}")
 
       id ->
-        if validate_push(message) and Map.has_key?(state.views, id) do
+        if Map.has_key?(state.views, id) do
           Popcorn.Wasm.run_js(
             ~S|({ args }) => { window.__llvPopcornTransportPush?.(args); }|,
             message
@@ -270,19 +270,6 @@ defmodule LocalLiveView.Dispatcher do
     end
 
     :ok
-  end
-
-  defp validate_push(%{event: "live_redirect", topic: topic, payload: payload}) do
-    Logger.error("""
-    LLV #{topic_to_id(topic)}: push_navigate is not supported in local views \
-    — navigation to #{inspect(payload[:to])} ignored.
-    """)
-
-    false
-  end
-
-  defp validate_push(_message) do
-    true
   end
 
   defp topic_to_id("lv:" <> id), do: id

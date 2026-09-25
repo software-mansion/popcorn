@@ -222,6 +222,7 @@ defmodule LocalLiveView do
         only: [
           connected?: 1,
           mirror_sync: 2,
+          push_navigate: 2,
           push_patch: 2,
           push_server_event: 2,
           push_server_event: 3,
@@ -278,6 +279,20 @@ defmodule LocalLiveView do
     if connected?(socket), do: send(self(), {:llv, :patch, to, !!opts[:replace]})
     socket
   end
+
+  @doc """
+  Navigates to another page, like `<.link navigate={...}>`.
+
+  Mirrors `Phoenix.LiveView.push_navigate/2`, but Flash is not carried over
+  to the target page. If that's required, use `push_server_event/3` and trigger
+  the navigate on the server.
+
+  ## Options
+
+    * `:to` — the path to navigate to (required)
+    * `:replace` — when `true`, replaces the current history entry instead of pushing a new one
+  """
+  defdelegate push_navigate(socket, opts), to: Phoenix.LiveView
 
   @doc """
   Performs a full-page redirect to a path or an external URL. The browser

@@ -43,10 +43,9 @@ end
 If the page's main view is local, the patch is handled without the server round
 trip.
 
-## `redirect/2`
+## `redirect/2` and `push_navigate/2`
 
-`LocalLiveView.redirect/2` mirrors `Phoenix.LiveView.redirect/2`: it performs a
-full-page redirect to a path or an external URL:
+`LocalLiveView.redirect/2` and `LocalLiveView.push_navigate/2` mirror their `Phoenix.LiveView` counterparts.
 
 ```elixir
 def handle_event("checkout", _params, socket) do
@@ -54,10 +53,6 @@ def handle_event("checkout", _params, socket) do
 end
 ```
 
-The difference from server-side redirect is that Flash isn't carried over
-to the next page. If that's required, use `LocalLiveView.push_server_event/3`
-and trigger the redirect on the server.
-
-`push_navigate/2` is not supported. A live redirect mounts another LiveView
-over the existing socket through the router, and local views are not mounted
-at a router. Calling it logs an error and is ignored.
+The difference from server-side redirect/push_navigate is that Flash isn't
+carried over to the next page. If that's required, use `LocalLiveView.push_server_event/3`
+and navigate from the server.

@@ -169,7 +169,7 @@ defmodule LocalLiveView.Component do
       data-pop-main={@main}
     >
     <%!-- Mark the div as inert so that events triggered before WASM takes over don't reach the server  --%>
-    <div id={@id} data-pop-root data-pop-ssr={@ssr_html != nil} inert={@ssr_html != nil}>{Phoenix.HTML.raw(@ssr_html)}</div>
+    <div id={"#{@id}-llv-root"} data-pop-root data-pop-ssr={@ssr_html != nil} inert={@ssr_html != nil}>{Phoenix.HTML.raw(@ssr_html)}</div>
     <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>
