@@ -25,13 +25,6 @@ defmodule LocalLiveView.Dispatcher do
     GenServer.start_link(__MODULE__, args, name: @process_name)
   end
 
-  def current_url do
-    case :ets.lookup(@table, :url) do
-      [{:url, url}] -> url
-      [] -> nil
-    end
-  end
-
   def current_assigns(id) do
     case :ets.lookup(@table, {:assigns, id}) do
       [{{:assigns, ^id}, assigns}] -> assigns
@@ -61,11 +54,7 @@ defmodule LocalLiveView.Dispatcher do
 
     Popcorn.Wasm.ready(@process_name)
 
-    {:ok,
-     %{
-       transport: transport,
-       views: %{}
-     }}
+    {:ok, %{transport: transport, views: %{}}}
   end
 
   @impl GenServer
@@ -146,8 +135,15 @@ defmodule LocalLiveView.Dispatcher do
     # assigns into an ETS table upfront, so the LLV can read
     # them during mount.
     if assigns, do: :ets.insert(@table, {{:assigns, id}, assigns})
+
+    main = msg["main"] == true
+    url = if main, do: msg["url"]
     state = put_in(state.views[id], %View{epoch: epoch})
-    session = %{"llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id}}
+
+    session = %{
+      "llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id, main: main, url: url}
+    }
+
     {:resolve, %{html: View.render_container(id, session)}, state}
   end
 
@@ -231,22 +227,6 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, :ok, %{state | views: views}}
   end
 
-  # Keep the current url in the ETS table, so that LLVs can read it
-  defp handle_wasm_call(%{"action" => "url_changed", "url" => url}, _promise, state) do
-    :ets.insert(@table, {:url, url})
-    {:resolve, :ok, state}
-  end
-
-  defp handle_wasm_call(%{"action" => "navigated", "url" => url}, _promise, state) do
-    :ets.insert(@table, {:url, url})
-
-    for {_id, view} <- state.views do
-      View.dispatch(view, {:llv, %{"action" => "handle_params", "url" => url}})
-    end
-
-    {:resolve, :ok, state}
-  end
-
   ## Socket plumbing
 
   defp socket_in(state, frame) do
@@ -281,7 +261,7 @@ defmodule LocalLiveView.Dispatcher do
         Logger.warning("LLV dispatcher: dropping push on unsupported topic #{inspect(topic)}")
 
       id ->
-        if validate_push(message) and Map.has_key?(state.views, id) do
+        if Map.has_key?(state.views, id) do
           Popcorn.Wasm.run_js(
             ~S|({ args }) => { window.__llvPopcornTransportPush?.(args); }|,
             message
@@ -290,19 +270,6 @@ defmodule LocalLiveView.Dispatcher do
     end
 
     :ok
-  end
-
-  defp validate_push(%{event: "live_redirect", topic: topic, payload: payload}) do
-    Logger.error("""
-    LLV #{topic_to_id(topic)}: push_navigate is not supported in local views \
-    — navigation to #{inspect(payload[:to])} ignored.
-    """)
-
-    false
-  end
-
-  defp validate_push(_message) do
-    true
   end
 
   defp topic_to_id("lv:" <> id), do: id

@@ -11,7 +11,9 @@ defmodule LocalLiveView do
   The `LocalLiveView` API is similar to `Phoenix.LiveView`:
   - it runs in a separate Elixir process,
   - it has `c:mount/3`, `c:handle_params/3` and `c:render/1` callbacks,
-    which behave the same way as in a regular live view,
+    which behave the same way as in a regular live view. Like there,
+    only the view mounted at the router - the main view, see
+    `LocalLiveView.Router.live_local/2` - gets `c:handle_params/3`,
   - it can spawn regular `Phoenix.Component`s and `Phoenix.LiveComponent`s,
   - events from these components by default go to their parent
     local live view.
@@ -104,8 +106,9 @@ defmodule LocalLiveView do
 
   On the initial page load the view is also mounted and rendered on the
   server, so its HTML is on the page before the Wasm runtime boots. The
-  server runs `c:mount/3`, `c:update/2` and `c:handle_params/3` the same way
-  the browser does, but `connected?/1` returns `false` there. Use it to skip
+  server runs `c:mount/3`, `c:update/2` and, for the main view,
+  `c:handle_params/3` the same way the browser does, but `connected?/1`
+  returns `false` there. Use it to skip
   browser-only work, exactly as in a dead render in `Phoenix.LiveView`:
 
   ```
@@ -219,6 +222,7 @@ defmodule LocalLiveView do
         only: [
           connected?: 1,
           mirror_sync: 2,
+          push_navigate: 2,
           push_patch: 2,
           push_server_event: 2,
           push_server_event: 3,
@@ -255,11 +259,13 @@ defmodule LocalLiveView do
   end
 
   @doc """
-  Navigates to the given path with a browser history push, then calls `handle_params/3`
-  with the new URL query params. No server round-trip.
+  Patches the page URL with a browser history push, then calls `handle_params/3`
+  of the main view of the page.
 
-  Mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when the
-  view is not `connected?/1`.
+  Note that the main view can also be local, see `LocalLiveView.Router.live_local/2`.
+
+  This function mirrors `Phoenix.LiveView.push_patch/2` semantics. Does nothing when
+  the view is not `connected?/1`.
 
   ## Options
 
@@ -268,12 +274,25 @@ defmodule LocalLiveView do
   """
   def push_patch(%Phoenix.LiveView.Socket{} = socket, opts) when is_list(opts) do
     to = Keyword.fetch!(opts, :to)
-    kind = if opts[:replace], do: :replace, else: :push
 
     # Handled by LocalLiveView.Proxy
-    if connected?(socket), do: send(self(), {:llv, :patch, to, kind})
+    if connected?(socket), do: send(self(), {:llv, :patch, to, !!opts[:replace]})
     socket
   end
+
+  @doc """
+  Navigates to another page, like `<.link navigate={...}>`.
+
+  Mirrors `Phoenix.LiveView.push_navigate/2`, but Flash is not carried over
+  to the target page. If that's required, use `push_server_event/3` and trigger
+  the navigate on the server.
+
+  ## Options
+
+    * `:to` — the path to navigate to (required)
+    * `:replace` — when `true`, replaces the current history entry instead of pushing a new one
+  """
+  defdelegate push_navigate(socket, opts), to: Phoenix.LiveView
 
   @doc """
   Performs a full-page redirect to a path or an external URL. The browser
@@ -336,9 +355,10 @@ defmodule LocalLiveView do
   @doc """
   Invoked with the query params of the page the view is rendered on.
 
-  Called after `c:mount/3` and again after every `push_patch/2`. `params` holds
-  the query string decoded into a map with string keys and `uri` is the full
-  URL.
+  Called only for the main view of the page, see
+  `LocalLiveView.Router.live_local/2`.
+
+  Called after `c:mount/3` and again after every patch of the page URL.
 
   ```
   def handle_params(%{"tab" => tab}, _uri, socket) do

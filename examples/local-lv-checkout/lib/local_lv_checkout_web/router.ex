@@ -23,7 +23,7 @@ defmodule LocalLvCheckoutWeb.Router do
   scope "/", LocalLvCheckoutWeb do
     pipe_through :browser
 
-    live "/", CheckoutLive
+    live_local "/", CheckoutLive
   end
 
   scope "/", LocalLvCheckoutWeb do

@@ -22,13 +22,13 @@ defmodule LocalLiveView.Proxy do
     {socket, opts} = Lifecycle.mount(view, params, session, socket)
 
     assigns = decode_assigns(LocalLiveView.Dispatcher.current_assigns(llv.id))
-    url = LocalLiveView.Dispatcher.current_url()
 
     socket =
       socket
       |> then(&Lifecycle.update!(view, assigns, &1))
       |> put_server_assigns(assigns)
-      |> then(&Lifecycle.handle_params(view, url, &1))
+
+    socket = if llv.main, do: Lifecycle.handle_params(view, llv.url, socket), else: socket
 
     LocalLiveView.Dispatcher.register_channel(llv.id, llv.epoch)
 
@@ -107,9 +107,20 @@ defmodule LocalLiveView.Proxy do
     {:noreply, Lifecycle.handle_params(view(socket), url, socket)}
   end
 
-  def handle_info({:llv, :patch, to, kind}, socket) do
-    push_url_update(to, kind == :replace)
-    {:noreply, Lifecycle.handle_params(view(socket), to, socket)}
+  # Sent by LocalLiveView.push_patch/2. The browser side updates the URL
+  # and, on a page with a main view, sends it `handle_params`, see
+  # navigation.ts.
+  def handle_info({:llv, :patch, to, replace}, socket) do
+    Popcorn.Wasm.run_js(
+      """
+      ({ args }) => {
+        window.dispatchEvent(new CustomEvent("llv:navigate", { detail: args }));
+      }
+      """,
+      %{href: to, replace: replace}
+    )
+
+    {:noreply, socket}
   end
 
   def handle_info(msg, socket) do
@@ -129,21 +140,5 @@ defmodule LocalLiveView.Proxy do
 
   defp decode_assigns(encoded) do
     encoded |> Base.decode64!() |> :erlang.binary_to_term()
-  end
-
-  defp push_url_update(url, replace) do
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        const event = new CustomEvent("llv:navigate", {
-          detail: { href: args.url, replace: args.replace },
-          cancelable: true,
-        });
-
-        window.dispatchEvent(event);
-      }
-      """,
-      %{url: url, replace: replace}
-    )
   end
 end
