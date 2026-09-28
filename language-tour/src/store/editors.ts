@@ -53,7 +53,7 @@ export type EditorData = {
     stderrResult?: string[];
     errorMessage?: string;
     durationMs?: number;
-    output?: unknown;
+    output?: string;
   };
   executionState: ExecutionState;
 };
@@ -75,7 +75,7 @@ type EditorsStore = {
       stderrResult?: string[];
       errorMessage?: string;
       durationMs?: number;
-      output?: unknown;
+      output?: string;
     }
   ) => void;
 

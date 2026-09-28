@@ -21,7 +21,7 @@ export const usePopcorn = () => {
       const durationMs = performance.now() - start;
       if (!result.ok) return { ...result, durationMs };
 
-      const reply = result.data as { data?: unknown; error?: string };
+      const reply = result.data as { data?: string; error?: string };
       return reply.error === undefined
         ? { ok: true as const, data: reply.data, durationMs }
         : { ok: false as const, error: reply.error, durationMs };
