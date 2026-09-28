@@ -47,3 +47,9 @@ config.secret.exs
 # Rebuild manually with: mise run build-llv-js
 /priv/static/
 /priv/.assets_hash
+
+# Built and installed by the e2e tests, see test/e2e/README.md
+/test/e2e/priv/
+/test/e2e/playwright/node_modules/
+/test/e2e/playwright/playwright-report/
+/test/e2e/playwright/test-results/

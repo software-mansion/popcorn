@@ -2,8 +2,6 @@ defmodule LocalLvKanbanWeb.Endpoint do
   use Phoenix.Endpoint, otp_app: :local_lv_kanban
   plug :put_wasm_security_headers
 
-  socket "/llv_socket", LocalLiveView.Socket, websocket: true
-
   defp put_wasm_security_headers(conn, _opts) do
     conn
     |> put_resp_header("cross-origin-opener-policy", "same-origin")
@@ -23,6 +21,9 @@ defmodule LocalLvKanbanWeb.Endpoint do
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
+
+  socket "/llv_socket", LocalLiveView.Socket,
+    websocket: [connect_info: [session: @session_options]]
 
   # Serve at "/" the static files from "priv/static" directory.
   #
