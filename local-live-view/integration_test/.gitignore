@@ -1,0 +1,8 @@
+/_build/
+/deps/
+/local/_build/
+/priv/static/assets/
+/test/playwright/node_modules/
+/test/playwright/playwright-report/
+/test/playwright/test-results/
+erl_crash.dump
