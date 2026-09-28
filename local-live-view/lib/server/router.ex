@@ -24,6 +24,12 @@ defmodule LocalLiveView.Router do
 
       live_local "/counter", CounterLocal
 
+  The view is the page's main view. Like a `Phoenix.LiveView` mounted at the
+  router, it's the only one on the page getting
+  `c:LocalLiveView.handle_params/3`: at mount and on every patch of the URL,
+  whichever local view on the page patches it. Navigating to another route
+  loads a new page from the server.
+
   A view that receives assigns from the server, pushes events to it with
   `LocalLiveView.push_server_event/3` or handles
   `c:LocalLiveView.handle_push_error/4` needs a host LiveView to talk to. Then

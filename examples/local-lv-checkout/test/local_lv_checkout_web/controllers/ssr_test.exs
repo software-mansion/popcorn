@@ -1,9 +1,9 @@
 defmodule LocalLvCheckoutWeb.SSRTest do
   use LocalLvCheckoutWeb.ConnCase
 
-  # Both local views read the query string in handle_params/3. The pages pass
-  # the request URL to the component (llv_url), so the server render matches
-  # what the browser will show.
+  # The server render follows the URL, so it matches what the browser will
+  # show: both views are the main views of their live_local routes, so they
+  # get handle_params/3 with the URL.
 
   test "GET /?step=2 renders the checkout at the payment step", %{conn: conn} do
     html = conn |> get(~p"/?step=2") |> html_response(200)

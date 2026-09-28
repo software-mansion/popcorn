@@ -32,11 +32,6 @@ defmodule LocalLiveView.Component do
     * `id` - stable element id; defaults to a server-generated random id.
     * `llv_ssr` - whether to render the view on the server, defaults to `true`.
       See the "Server-side rendering" section in the `LocalLiveView` module doc.
-    * `llv_url` - the URL of the page, given to the view's
-      `c:LocalLiveView.handle_params/3` when rendering on the server. It is
-      set automatically for routes declared with `LocalLiveView.Router.live_local/2`;
-      inside a host LiveView, pass the URL from its `handle_params/3` if the
-      view needs it.
 
   ## Examples
 
@@ -53,11 +48,12 @@ defmodule LocalLiveView.Component do
 
     new_mount_point? = changed?(assigns, :view) or changed?(assigns, :id)
 
-    assigns =
-      assign(assigns,
-        id: assigns[:id] || default_id(view),
-        __llv__: %{new_mount_point: new_mount_point?}
-      )
+    llv =
+      %{main: false, url: nil}
+      |> Map.merge(assigns[:__llv__] || %{})
+      |> Map.put(:new_mount_point, new_mount_point?)
+
+    assigns = assign(assigns, id: assigns[:id] || default_id(view), __llv__: llv)
 
     if mirror_exists?(view) do
       ~H"""
@@ -77,7 +73,8 @@ defmodule LocalLiveView.Component do
         mirror_token: nil,
         mirror_id: nil,
         comp_assigns: comp_assigns,
-        ssr_html: ssr_html
+        ssr_html: ssr_html,
+        main: assigns.__llv__.main
       )
 
     render_markup(assigns)
@@ -126,7 +123,8 @@ defmodule LocalLiveView.Component do
           mirror_token: mirror_token,
           mirror_id: mirror_id,
           comp_assigns: comp_assings,
-          ssr_html: ssr_html
+          ssr_html: ssr_html,
+          main: assigns.__llv__.main
         )
 
       {:ok, socket}
@@ -168,9 +166,10 @@ defmodule LocalLiveView.Component do
       data-pop-assigns={encode_assigns(@comp_assigns)}
       data-pop-mirror-token={@mirror_token}
       data-pop-mirror-id={@mirror_id}
+      data-pop-main={@main}
     >
     <%!-- Mark the div as inert so that events triggered before WASM takes over don't reach the server  --%>
-    <div id={@id} data-pop-root data-pop-ssr={@ssr_html != nil} inert={@ssr_html != nil}>{Phoenix.HTML.raw(@ssr_html)}</div>
+    <div id={"#{@id}-llv-root"} data-pop-root data-pop-ssr={@ssr_html != nil} inert={@ssr_html != nil}>{Phoenix.HTML.raw(@ssr_html)}</div>
     <%!-- Stub for sending events from client to server. See LLVEngine class. --%>
     <div id={"#{@id}-llv-event-bus"} data-llv-event-bus-for={@id} phx-hook="LocalLiveViewEventBus" hidden>
     </div>
@@ -180,7 +179,7 @@ defmodule LocalLiveView.Component do
 
   @doc false
   def comp_assigns(assigns) do
-    Map.drop(assigns, [:__changed__, :__llv__, :view, :llv_ssr, :llv_url])
+    Map.drop(assigns, [:__changed__, :__llv__, :view, :llv_ssr])
   end
 
   # Renders the view on the server; nil when disabled or not possible.
@@ -193,7 +192,8 @@ defmodule LocalLiveView.Component do
         view: view,
         assigns: comp_assigns(assigns),
         id: assigns.id,
-        url: assigns[:llv_url],
+        main: assigns.__llv__.main,
+        url: assigns.__llv__.url,
         mirror_id: mirror_id
       }
 

@@ -87,7 +87,11 @@ export class LLVEngine {
   static create(liveSocket: LiveSocketInstanceInterface, config: LLVConfig = {}): LLVEngine {
     const engine = new LLVEngine(liveSocket as LLVSocket, config);
     engine.registerServerEventListener();
-    registerNavigationHandlers(engine.socket, engine.pop, engine.config);
+    registerNavigationHandlers(
+      engine.pop,
+      engine.socket,
+      () => engine.eventBusHooks.values().next().value,
+    );
     engine.registerHooks();
     engine.bindFormsIfHostless();
     engine.connectPopcornSocket();

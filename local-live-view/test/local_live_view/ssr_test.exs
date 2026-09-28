@@ -89,11 +89,12 @@ defmodule LocalLiveView.SSRTest do
     IO.iodata_to_binary(iodata)
   end
 
-  test "runs mount, update, handle_params and render, including components" do
+  test "runs mount, update, handle_params and render of the main view, including components" do
     html =
       html(%{
         view: inspect(Greeter),
         assigns: %{name: "world"},
+        main: true,
         url: "http://localhost:4000/page?tab=news"
       })
 
@@ -108,8 +109,20 @@ defmodule LocalLiveView.SSRTest do
   end
 
   test "handle_params gets no params and a nil url when the url is unknown" do
-    html = html(%{view: inspect(Greeter), assigns: %{name: "world"}})
+    html = html(%{view: inspect(Greeter), assigns: %{name: "world"}, main: true})
     assert_received {:params, %{}, nil}
+    assert html =~ ~s(<span class="badge">none</span>)
+  end
+
+  test "handle_params is only called for the main view" do
+    html =
+      html(%{
+        view: inspect(Greeter),
+        assigns: %{name: "world"},
+        url: "http://localhost:4000/page?tab=news"
+      })
+
+    refute_received {:params, _params, _url}
     assert html =~ ~s(<span class="badge">none</span>)
   end
 

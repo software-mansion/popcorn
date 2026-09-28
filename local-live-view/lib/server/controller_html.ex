@@ -8,7 +8,8 @@ defmodule LocalLiveView.ControllerHTML do
 
   def index(assigns) do
     ~H"""
-    <.local_live_view view={@view} llv_url={Plug.Conn.request_url(@conn)} />
+    <%!-- The main view of the page, see LocalLiveView.Router.live_local/2 --%>
+    <.local_live_view view={@view} __llv__={%{main: true, url: Plug.Conn.request_url(@conn)}} />
     """
   end
 end
