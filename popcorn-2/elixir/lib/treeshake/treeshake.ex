@@ -7,138 +7,35 @@ defmodule Treeshake do
   @non_treeshakable_apps [:erts, :stdlib, :kernel, :logger]
 
   @non_treeshakable_exclusions [
-                                 :unicode_util,
-                                 :erl_parse,
-                                 :epp,
-                                 :erl_scan,
-                                 :prim_inet,
-                                 :qlc,
-                                 :qlc_pt,
-                                 :dets_v9,
-                                 :dets,
-                                 :sofs,
-                                 :erl_tar,
-                                 :file_sorter,
-                                 :global,
-                                 :disk_log,
-                                 :net_kernel,
-                                 :zip,
-                                 # :inet_db,
-                                 :edlin_expand,
-                                 :dets_utils,
-                                 :erl_pp,
-                                 :beam_lib,
-                                 :ms_transform,
-                                 :lists,
-                                 :erlang,
-                                 :string,
-                                 :uri_string,
-                                 :inet,
-                                 :rand
-                               ] ++
-                                 [
-                                   # Shakable by normal reachability; anything here that the
-                                   # shaker still keeps despite being dead at runtime belongs
-                                   # in the cook-level drop list instead. Careful when adding:
-                                   # `leave`d modules are not analyzed, so a module referenced
-                                   # only by left modules reads as unreachable and is removed.
-
-                                   # app-start machinery (replaced under the popcorn static boot)
-                                   :application_controller,
-                                   :application_master,
-                                   :application_starter,
-                                   # distribution & network name resolution
-                                   :dist_ac,
-                                   :global_group,
-                                   :global_search,
-                                   :erpc,
-                                   :erl_epmd,
-                                   :auth,
-                                   :socket_registry,
-                                   :inet_res,
-                                   :inet_parse,
-                                   :inet_config,
-                                   :inet_hosts,
-                                   :inet_gethost_native,
-                                   :inet_epmd_dist,
-                                   :inet_epmd_socket,
-                                   :inet_tcp_dist,
-                                   :inet6_tcp_dist,
-                                   :inet_tcp,
-                                   :inet6_tcp,
-                                   :inet_udp,
-                                   :inet6_udp,
-                                   :inet_sctp,
-                                   :inet6_sctp,
-                                   :local_tcp,
-                                   :local_udp,
-                                   :gen_sctp,
-                                   :net_adm,
-                                   :erl_distribution,
-                                   :erl_boot_server,
-                                   :pool,
-                                   :slave,
-                                   :peer,
-                                   # shell / REPL / compiler tooling
-                                   :argparse,
-                                   :c,
-                                   :shell_docs,
-                                   :shell_default,
-                                   :escript,
-                                   :user_drv,
-                                   :group,
-                                   :group_history,
-                                   :erl_expand_records,
-                                   :erl_compile,
-                                   :erl_compile_server,
-                                   :otp_internal,
-                                   :gen_fsm,
-                                   :random,
-                                   :heart,
-                                   :kernel_config,
-                                   :erl_ddll,
-                                   :seq_trace,
-                                   # storage backends
-                                   :dets_server,
-                                   :dets_sup,
-                                   :disk_log_server,
-                                   :disk_log_sup,
-                                   :wrap_log_reader,
-                                   :log_mf_h,
-                                   :ram_file,
-                                   :raw_file_io_compressed,
-                                   :raw_file_io_inflate,
-                                   :raw_file_io_deflate,
-                                   :raw_file_io_delayed,
-                                   :raw_file_io_list,
-                                   :prim_zip,
-                                   :base64,
-                                   # OTP logger machinery (the atomvm naive logger replaces it;
-                                   # logger_std_h must stay reachable — it is the default handler)
-                                   :logger_server,
-                                   :logger_h_common,
-                                   :logger_olp,
-                                   :logger_formatter,
-                                   :logger_disk_log_h,
-                                   :logger_proxy,
-                                   :logger_sup,
-                                   :logger_simple_h,
-                                   :logger_filters,
-                                   :logger_handler_watcher,
-                                   :logger_backend,
-                                   :logger_config,
-                                   :error_logger,
-                                   :error_logger_tty_h,
-                                   :error_logger_file_h,
-                                   # misc stdlib decided by reachability
-                                   :gen_statem,
-                                   :timer,
-                                   :io_lib_fread,
-                                   :dict,
-                                   :array,
-                                   :digraph,
-                                   :digraph_utils
-                                 ]
+    :unicode_util,
+    :erl_parse,
+    :epp,
+    :erl_scan,
+    :prim_inet,
+    :qlc,
+    :qlc_pt,
+    :dets_v9,
+    :dets,
+    :sofs,
+    :erl_tar,
+    :file_sorter,
+    :global,
+    :disk_log,
+    :net_kernel,
+    :zip,
+    # :inet_db,
+    :edlin_expand,
+    :dets_utils,
+    :erl_pp,
+    :beam_lib,
+    :ms_transform,
+    :lists,
+    :erlang,
+    :string,
+    :uri_string,
+    :inet,
+    :rand
+  ]
 
   @default_ignore_modules [:prim_eval]
 
@@ -167,6 +64,7 @@ defmodule Treeshake do
           | {:keep, [keep_entry()]}
           | {:drop, [module()]}
           | {:leave, [module()]}
+          | {:shake, [module()]}
           | {:ignore, [module() | mfa()]}
 
   @type stats :: %{
@@ -252,12 +150,15 @@ defmodule Treeshake do
     compile and tree-shaking will fail.
     When a module is in both `leave` and `ignore` lists, it's not read and it's copied
     to the output without changes.
+  - `shake` - List of modules that are left by default (see 'Modules left by default'),
+    but should be tree-shaked as usual.
 
   ## Modules left by default
 
   Some stdlib modules are hard to tree-shake and they're therefore left by default.
   The behaviour is the same as if they were in the `leave` list. These modules can still
-  be removed if added to `drop` or `ignore` list.
+  be removed if added to `drop` or `ignore` list, or tree-shaked if added to the `shake`
+  list.
 
   The modules from the following stdlib apps: #{list_atoms.(@non_treeshakable_apps)},
   are left by default, except the following modules:
@@ -346,7 +247,8 @@ defmodule Treeshake do
       |> Keyword.put_new(:drop, [])
       |> keyword_concat_default(:ignore, @default_ignore_modules)
 
-    default_leave = non_treeshakable_stdlib_modules()
+    {shake, opts} = Keyword.pop(opts, :shake, [])
+    default_leave = non_treeshakable_stdlib_modules() -- shake
     opts = keyword_concat_default(opts, :leave, default_leave -- opts[:drop])
 
     {project, opts} = Keyword.pop(opts, :project)

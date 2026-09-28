@@ -23,7 +23,7 @@ defmodule Popcorn do
   # the shaker's conservative analysis (literal module atoms, hardcoded
   # behaviour impls) still qualifies these as reachable, so they are dropped
   # explicitly. The rest of the old drop list is now covered by
-  # Treeshake @non_treeshakable_exclusions + plain reachability.
+  # `@shakable_stdlib` + plain reachability.
   @static_boot_drop [
                       # reachable, but its beam does not survive function-shaking
                       # (same family as prim_eval)
@@ -75,6 +75,111 @@ defmodule Popcorn do
                         :gen_statem,
                         :timer
                       ]
+
+  # Stdlib modules that Treeshake leaves by default, but that are dead in Popcorn
+  # bundles: AtomVM doesn't boot through `init`, so the host VM boot, distribution,
+  # shell and OTP logger machinery is never used. They're passed as `shake`,
+  # so reachability decides whether they stay. Anything here that the shaker
+  # still keeps despite being dead at runtime belongs in `@static_boot_drop`
+  # instead. Careful when adding: `leave`d modules are not analyzed, so a module
+  # referenced only by left modules reads as unreachable and is removed.
+  @shakable_stdlib [
+    # app-start machinery (replaced under the popcorn static boot)
+    :application_controller,
+    :application_master,
+    :application_starter,
+    # distribution & network name resolution
+    :dist_ac,
+    :global_group,
+    :global_search,
+    :erpc,
+    :erl_epmd,
+    :auth,
+    :socket_registry,
+    :inet_res,
+    :inet_parse,
+    :inet_config,
+    :inet_hosts,
+    :inet_gethost_native,
+    :inet_epmd_dist,
+    :inet_epmd_socket,
+    :inet_tcp_dist,
+    :inet6_tcp_dist,
+    :inet_tcp,
+    :inet6_tcp,
+    :inet_udp,
+    :inet6_udp,
+    :inet_sctp,
+    :inet6_sctp,
+    :local_tcp,
+    :local_udp,
+    :gen_sctp,
+    :net_adm,
+    :erl_distribution,
+    :erl_boot_server,
+    :pool,
+    :slave,
+    :peer,
+    # shell / REPL / compiler tooling
+    :argparse,
+    :c,
+    :shell_docs,
+    :shell_default,
+    :escript,
+    :user_drv,
+    :group,
+    :group_history,
+    :erl_expand_records,
+    :erl_compile,
+    :erl_compile_server,
+    :otp_internal,
+    :gen_fsm,
+    :random,
+    :heart,
+    :kernel_config,
+    :erl_ddll,
+    :seq_trace,
+    # storage backends
+    :dets_server,
+    :dets_sup,
+    :disk_log_server,
+    :disk_log_sup,
+    :wrap_log_reader,
+    :log_mf_h,
+    :ram_file,
+    :raw_file_io_compressed,
+    :raw_file_io_inflate,
+    :raw_file_io_deflate,
+    :raw_file_io_delayed,
+    :raw_file_io_list,
+    :prim_zip,
+    :base64,
+    # OTP logger machinery (the atomvm naive logger replaces it;
+    # logger_std_h must stay reachable — it is the default handler)
+    :logger_server,
+    :logger_h_common,
+    :logger_olp,
+    :logger_formatter,
+    :logger_disk_log_h,
+    :logger_proxy,
+    :logger_sup,
+    :logger_simple_h,
+    :logger_filters,
+    :logger_handler_watcher,
+    :logger_backend,
+    :logger_config,
+    :error_logger,
+    :error_logger_tty_h,
+    :error_logger_file_h,
+    # misc stdlib decided by reachability
+    :gen_statem,
+    :timer,
+    :io_lib_fread,
+    :dict,
+    :array,
+    :digraph,
+    :digraph_utils
+  ]
 
   @doc """
   Builds a Popcorn `.avm` bundle.
@@ -195,7 +300,7 @@ defmodule Popcorn do
            # TODO application_controller references a lot of code that it doesn't use,
            # we need to figure out if we can avoid keeping it. The master/starter are
            # only reachable through it, so with the controller ignored they must be
-           # left explicitly (they are shakable via @non_treeshakable_exclusions).
+           # left explicitly (they are shakable via @shakable_stdlib).
            :application_controller
          ],
          [
@@ -227,6 +332,7 @@ defmodule Popcorn do
         ] ++ keep_extra,
       ignore: ignore_extra,
       leave: leave_extra,
+      shake: @shakable_stdlib,
       drop:
         [
           Code.Formatter,
