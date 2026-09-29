@@ -62,6 +62,10 @@ jobs:
         run: mix deps.get
         working-directory: examples/hello-popcorn
 
+      - name: Install IEx Wasm Elixir dependencies
+        run: mix deps.get
+        working-directory: examples/iex-wasm
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
