@@ -54,6 +54,18 @@ jobs:
           elixir-version: "1.20.4"
           otp-version: *host_otp
 
+      - name: Install Game of Life Elixir dependencies
+        run: mix deps.get
+        working-directory: examples/game-of-life
+
+      - name: Install Hello Popcorn Elixir dependencies
+        run: mix deps.get
+        working-directory: examples/hello-popcorn
+
+      - name: Install IEx Wasm Elixir dependencies
+        run: mix deps.get
+        working-directory: examples/iex-wasm
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 

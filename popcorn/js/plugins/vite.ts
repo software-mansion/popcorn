@@ -54,8 +54,8 @@ export function popcorn(options: Options): Plugin {
   let outDir: string | undefined;
   let assetsDir = "assets";
 
-  // Dev/preview: pack once at first request, re-pack lazily after the app's
-  // compiled beams change. A single in-flight promise dedupes concurrent
+  // Dev/preview: pack once at server startup, then re-pack lazily after the
+  // app's compiled beams change. A single in-flight promise dedupes concurrent
   // requests; a change during a re-pack re-sets `dirty` so it isn't lost.
   const ensurePrepared = (): Promise<Prepared> => {
     if (prepared !== undefined && !dirty) return Promise.resolve(prepared);
@@ -176,7 +176,7 @@ export function popcorn(options: Options): Plugin {
       assetsDir = config.build.assetsDir;
     },
 
-    configureServer(server) {
+    async configureServer(server) {
       const rootDir = resolve(options.rootDir);
       server.httpServer?.prependListener("request", setIsolationHeaders);
       server.watcher.add(rootDir);
@@ -185,12 +185,15 @@ export function popcorn(options: Options): Plugin {
       });
       server.middlewares.use(serve);
       server.httpServer?.once("close", cleanup);
+      await ensurePrepared();
+      dirty = false;
     },
 
-    configurePreviewServer(server) {
+    async configurePreviewServer(server) {
       server.httpServer?.prependListener("request", setIsolationHeaders);
       server.middlewares.use(serve);
       server.httpServer?.once("close", cleanup);
+      await ensurePrepared();
     },
 
     async closeBundle() {

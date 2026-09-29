@@ -1,5 +1,5 @@
-defmodule Popcorn.BeamTools.Packager do
-  alias Popcorn.BeamTools.BeamPatcher
+defmodule Popcorn.Packager do
+  alias Popcorn.Packager.BeamPatcher
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
 
@@ -15,9 +15,9 @@ defmodule Popcorn.BeamTools.Packager do
   }
 
   @boot_name "bin/vm.boot"
+  @runtime_files ~w(beam.mjs beam.emu.mjs beam.wasm)
 
-  # Using `__DIR__` is safe – the plugin is compiled on user's machine
-  @patches_dir Path.expand("../../../patches", __DIR__)
+  @patches_dir Path.expand("../../patches", __DIR__)
 
   # To run, Beam needs following apps:
   # - kernel
@@ -30,14 +30,28 @@ defmodule Popcorn.BeamTools.Packager do
   # All of them should be in elixir's transitive dependency closure
   @base_apps ["elixir"]
 
-  @type options :: %{
-          root_dir: Path.t(),
+  @type options :: [
+          {:root_dir, Path.t()}
+          | {:build_path, Path.t()}
+          | {:out_dir, Path.t()}
+          | {:app, String.t() | nil}
+          | {:extra_apps, [String.t()]}
+          | {:runtime_variant, String.t() | nil}
+          | {:brotli, boolean()}
+          | {:strip, boolean()}
+          | {:treeshake, false | [preserved_apps: [String.t()]]}
+          | {:static_dir, Path.t()}
+        ]
+
+  @type pack_options :: %{
+          build_path: Path.t(),
           entrypoint_app: String.t() | nil,
           extra_apps: [String.t()],
           out_dir: Path.t(),
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
-          strip: boolean()
+          strip: boolean(),
+          treeshake: false | [preserved_apps: [String.t()]]
         }
 
   defp strip_tarball(path, out_dir) do
@@ -79,21 +93,79 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
-  @spec run(options()) :: {:ok, map()} | {:error, map()}
-  def run(args) do
+  @spec build(options()) :: {:ok, map()} | {:error, map()}
+  def build(options) do
+    options =
+      Keyword.validate!(options,
+        root_dir: File.cwd!(),
+        build_path: nil,
+        out_dir: "priv/static/popcorn",
+        app: nil,
+        extra_apps: [],
+        runtime_variant: nil,
+        brotli: false,
+        strip: true,
+        treeshake: false,
+        static_dir: Application.app_dir(:popcorn, "priv/static")
+      )
+
+    root_dir = Path.expand(options[:root_dir])
+
+    build_path =
+      Path.expand(options[:build_path] || Path.join(Mix.Project.build_path(), "lib"), root_dir)
+
+    out_dir = options |> Keyword.fetch!(:out_dir) |> Path.expand(root_dir)
+    static_dir = options |> Keyword.fetch!(:static_dir) |> Path.expand(root_dir)
+    packed_dir = Path.join(out_dir, ".packager")
+
+    File.rm_rf!(out_dir)
+    File.mkdir_p!(out_dir)
+
+    result =
+      with {:ok, report} <-
+             pack(%{
+               build_path: build_path,
+               entrypoint_app: options[:app],
+               extra_apps: options[:extra_apps],
+               out_dir: packed_dir,
+               runtimes_dir: Path.join(static_dir, "runtimes"),
+               runtime_variant: options[:runtime_variant],
+               strip: options[:strip],
+               treeshake: options[:treeshake]
+             }),
+           {:ok, installed} <-
+             install_output(report, static_dir, out_dir, options[:brotli]) do
+        {:ok, installed}
+      end
+
+    File.rm_rf!(packed_dir)
+
+    case result do
+      {:ok, _report} = ok ->
+        ok
+
+      {:error, _reason} = error ->
+        File.rm_rf!(out_dir)
+        error
+    end
+  end
+
+  @spec pack(pack_options()) :: {:ok, map()} | {:error, map()}
+  defp pack(args) do
     %{
-      root_dir: root_dir,
+      build_path: build_path,
       entrypoint_app: entrypoint_app,
       extra_apps: extra_apps,
       out_dir: out_dir,
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
-      strip: strip
+      strip: strip,
+      treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
 
-    with {:ok, project_apps} <- root_dir |> project_build_dir() |> get_apps_info(),
+    with {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
          variant = runtime_variant || required_runtime(apps_info),
@@ -102,7 +174,10 @@ defmodule Popcorn.BeamTools.Packager do
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
-         :ok <- patch_apps(staged_apps) do
+         :ok <- patch_apps(staged_apps),
+         staged_apps = remove_build_tools(staged_apps),
+         {:ok, staged_apps, treeshake_report} <-
+           maybe_treeshake(staged_apps, treeshake, out_dir) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -143,6 +218,7 @@ defmodule Popcorn.BeamTools.Packager do
 
       manifest = %{
         entrypoint: entrypoint_app,
+        runtimeVariant: variant,
         apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain,
@@ -160,10 +236,70 @@ defmodule Popcorn.BeamTools.Packager do
         tarPaths: tar_paths,
         apps: packed_apps,
         notes: diagnostics,
-        toolchain: toolchain
+        toolchain: toolchain,
+        treeshake: treeshake_report
       }
 
       {:ok, result}
+    end
+  end
+
+  defp install_output(report, static_dir, out_dir, brotli) do
+    variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
+
+    js_files = Enum.map(~w(index.mjs worker.mjs), &{&1, Path.join(static_dir, &1)})
+    vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
+
+    with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
+      manifest_path = Path.join(out_dir, "otp/manifest.json")
+      boot_path = Path.join(out_dir, "otp/bin/vm.boot")
+      lib_dir = Path.join(out_dir, "otp/lib")
+
+      File.mkdir_p!(Path.dirname(manifest_path))
+      File.mkdir_p!(Path.dirname(boot_path))
+      File.mkdir_p!(lib_dir)
+      File.cp!(report.manifestPath, manifest_path)
+      File.cp!(report.bootPath, boot_path)
+
+      tar_paths =
+        Enum.map(report.tarPaths, fn source ->
+          target = Path.join(lib_dir, Path.basename(source))
+          File.cp!(source, target)
+          compress(target, brotli)
+          Path.expand(target)
+        end)
+
+      {:ok,
+       %{
+         report
+         | manifestPath: Path.expand(manifest_path),
+           bootPath: Path.expand(boot_path),
+           tarPaths: tar_paths
+       }}
+    end
+  end
+
+  defp copy_assets(files, out_dir) do
+    outdir_cp = fn {filename, source}, _ ->
+      case File.cp(source, Path.join(out_dir, filename)) do
+        :ok -> :ok
+        {:error, reason} -> err(:missing_runtime_resource, {source, reason})
+      end
+    end
+
+    case reduce_while_ok(files, :ok, outdir_cp) do
+      {:ok, _} -> :ok
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp compress(path, brotli) do
+    contents = File.read!(path)
+    File.write!(path <> ".gz", :zlib.gzip(contents))
+
+    if brotli do
+      {:ok, compressed} = :brotli.encode(contents, %{quality: 11})
+      File.write!(path <> ".br", compressed)
     end
   end
 
@@ -240,6 +376,36 @@ defmodule Popcorn.BeamTools.Packager do
     end
   end
 
+  defp remove_build_tools(staged_apps) do
+    case Map.fetch(staged_apps, "popcorn") do
+      :error ->
+        staged_apps
+
+      {:ok, info} ->
+        {build_tools, runtime_modules} =
+          info.props
+          |> Keyword.fetch!(:modules)
+          |> Enum.split_with(&build_tool?/1)
+
+        Enum.each(build_tools, fn module ->
+          File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
+        end)
+
+        replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
+    end
+  end
+
+  defp build_tool?(module) do
+    name = Atom.to_string(module)
+
+    String.starts_with?(name <> ".", [
+      "Elixir.Popcorn.Packager.",
+      "Elixir.Treeshake.",
+      "treeshake_helper.",
+      "Elixir.Mix.Tasks.Popcorn."
+    ])
+  end
+
   defp async_stream(enumerable, fun) do
     enumerable
     |> Task.async_stream(fun, timeout: :infinity)
@@ -253,13 +419,6 @@ defmodule Popcorn.BeamTools.Packager do
       :ok = strip_tarball(path, out_dir)
       Path.expand(Path.join(out_dir, Path.basename(path)))
     end)
-  end
-
-  defp project_build_dir(root_dir) do
-    build_env = System.get_env("MIX_ENV", "dev")
-    build_lib_dir = Path.join([root_dir, "_build", build_env, "lib"])
-
-    build_lib_dir
   end
 
   defp get_apps_info(root_dir) do
@@ -345,6 +504,141 @@ defmodule Popcorn.BeamTools.Packager do
     if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
+  defp validate_preserved_apps(apps_info, treeshake) do
+    selected = MapSet.new(apps_info, fn {name, _info} -> name end)
+
+    unknown =
+      treeshake
+      |> Keyword.fetch!(:preserved_apps)
+      |> Enum.reject(&MapSet.member?(selected, &1))
+      |> Enum.sort()
+
+    case unknown do
+      [] -> :ok
+      unknown -> err(:unknown_preserved_apps, unknown)
+    end
+  end
+
+  defp maybe_treeshake(staged_apps, false, _out_dir), do: {:ok, staged_apps, nil}
+
+  defp maybe_treeshake(staged_apps, options, out_dir) do
+    preserved_apps = Keyword.fetch!(options, :preserved_apps)
+
+    with :ok <- validate_preserved_apps(staged_apps, options),
+         preserved_modules = preserved_modules(staged_apps, preserved_apps),
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
+         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+      report = %{
+        preserved_apps: preserved_apps,
+        modules_removed: Enum.map(stats.modules_removed, &to_string/1),
+        modules_shaken:
+          stats.modules_shaked |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
+      }
+
+      {:ok, staged_apps, report}
+    end
+  end
+
+  defp preserved_modules(staged_apps, preserved_apps) do
+    Enum.flat_map(preserved_apps, fn app ->
+      staged_apps
+      |> Map.fetch!(app)
+      |> Map.fetch!(:props)
+      |> Keyword.fetch!(:modules)
+    end)
+  end
+
+  defp run_treeshake(staged_apps, preserved_modules, out_dir) do
+    files =
+      Enum.flat_map(staged_apps, fn {_app, info} ->
+        info.ebin_dir |> Path.join("*") |> Path.wildcard()
+      end)
+
+    output_dir = Path.join(out_dir, "treeshaken")
+
+    report =
+      Treeshake.run(
+        ebin_files: files,
+        output_dir: output_dir,
+        keep: preserved_modules,
+        leave: preserved_modules
+      )
+
+    {:ok, report}
+  rescue
+    error -> err(:treeshake_failed, Exception.message(error))
+  end
+
+  defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
+    preserved = MapSet.new(preserved_apps)
+
+    staged_apps
+    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+    |> replace_beams(output_dir)
+
+    :ok
+  end
+
+  defp replace_beams(staged_apps, output_dir) do
+    Map.new(staged_apps, fn {app, info} ->
+      replacement_dir = info.ebin_dir <> ".replacement"
+      File.cp_r!(info.ebin_dir, replacement_dir)
+
+      replacement_beams = replacement_dir |> Path.join("*.beam") |> Path.wildcard()
+      Enum.each(replacement_beams, &File.rm!/1)
+
+      surviving =
+        Enum.flat_map(replacement_beams, fn replacement ->
+          source = Path.join(output_dir, Path.basename(replacement))
+          target = Path.join(replacement_dir, Path.basename(replacement))
+
+          case File.cp(source, target) do
+            :ok -> [source |> Path.basename(".beam") |> String.to_atom()]
+            {:error, :enoent} -> []
+          end
+        end)
+
+      replacement_info = %{info | ebin_dir: replacement_dir}
+
+      updated_info =
+        %{app => replacement_info}
+        |> replace_app_modules(%{app => Enum.sort(surviving)})
+        |> Map.fetch!(app)
+
+      replace_directory(info.ebin_dir, replacement_dir)
+
+      app_path = Path.join(info.ebin_dir, Path.basename(updated_info.app_path))
+      {app, %{updated_info | app_path: app_path, ebin_dir: info.ebin_dir}}
+    end)
+  end
+
+  defp replace_directory(path, replacement) do
+    original = path <> ".original"
+    File.rename!(path, original)
+
+    try do
+      File.rename!(replacement, path)
+    rescue
+      error ->
+        File.rename!(original, path)
+        reraise error, __STACKTRACE__
+    end
+
+    File.rm_rf!(original)
+  end
+
+  defp replace_app_modules(staged_apps, app_modules) do
+    Enum.reduce(app_modules, staged_apps, fn {app, modules}, apps ->
+      info = Map.fetch!(apps, app)
+      props = Keyword.put(info.props, :modules, modules)
+      app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
+      application = {:application, String.to_existing_atom(app), props}
+
+      File.write!(app_path, :io_lib.format(~c"~tp.~n", [application]))
+      Map.put(apps, app, %{info | app_path: app_path, props: props})
+    end)
+  end
+
   defp root_apps(all_apps_info, extra_apps, entrypoint) do
     with {:ok, roots} <- entrypoint_roots(all_apps_info, entrypoint),
          {:ok, extra} <- extra_roots(all_apps_info, extra_apps) do
@@ -414,7 +708,7 @@ defmodule Popcorn.BeamTools.Packager do
     tar
   end
 
-  defp loaded_dynamic_nifs(app, ebin_dir) do
+  defp loaded_dynamic_nifs(_app, ebin_dir) do
     Path.join(ebin_dir, "*.beam")
     |> Path.wildcard()
     |> Enum.filter(&imports_load_nif?/1)
@@ -491,6 +785,33 @@ defmodule Popcorn.BeamTools.Packager do
     |> Enum.map(&to_string/1)
   end
 
+  @spec format_error(map()) :: String.t()
+  def format_error(%{code: "missing_dep"} = error) do
+    "#{error.app} depends on #{error.dep}, which is not available. " <>
+      "Project applications: #{Enum.join(error.available_apps, ", ")}."
+  end
+
+  def format_error(%{code: "unsupported_apps", apps: apps}) do
+    apps = Enum.map_join(apps, ", ", &"#{&1.app} (requires #{&1.capability})")
+    "The WASM runtime lacks native support required by: #{apps}."
+  end
+
+  def format_error(%{code: "missing_extra_apps", apps: apps}) do
+    "Extra applications not found: #{Enum.join(apps, ", ")}."
+  end
+
+  def format_error(%{code: "unknown_preserved_apps", apps: apps}) do
+    "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
+  end
+
+  def format_error(%{code: "treeshake_failed", message: message}), do: message
+
+  def format_error(%{code: "missing_runtime_resource", path: path}) do
+    "Runtime resource not found: #{path}. Build the Popcorn JavaScript artifacts first."
+  end
+
+  def format_error(error), do: "Packaging failed: #{inspect(error)}"
+
   defp err(:missing_entrypoint, app) do
     {:error, %{code: "missing_entrypoint", app: app}}
   end
@@ -526,6 +847,18 @@ defmodule Popcorn.BeamTools.Packager do
 
   defp err(:dynamic_nifs_loading, {app, beams}) do
     {:error, %{code: "dynamic_nifs_loading", app: app, beams: beams}}
+  end
+
+  defp err(:unknown_preserved_apps, apps) do
+    {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:treeshake_failed, message) do
+    {:error, %{code: "treeshake_failed", message: message}}
+  end
+
+  defp err(:missing_runtime_resource, {path, reason}) do
+    {:error, %{code: "missing_runtime_resource", path: path, reason: to_string(reason)}}
   end
 
   defp encode_json(term) do

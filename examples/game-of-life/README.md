@@ -12,7 +12,8 @@ repository root:
 
 ```bash
 pnpm install
-mise run build-otp-js
+mise run build-otp debug
+pnpm -F ./popcorn/js build
 ```
 
 Then start the example from the repository root:

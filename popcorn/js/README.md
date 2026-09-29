@@ -81,7 +81,7 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Vite sets these headers for development and preview. Configure your production server separately.
 Serve `.wasm` as `application/wasm`. Serve compressed `.tar.gz` files with `Content-Encoding: gzip` for `.tar` requests.
-The package also emits uncompressed tar files. Brotli variants require `brotli: true` and the corresponding server configuration.
+The package also emits uncompressed tar files and Brotli variants by default. Set `brotli: false` to disable Brotli output when the server does not use it.
 
 The JavaScript bridge currently requires a Content Security Policy that permits `unsafe-eval`.
 See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.0/) for interoperability details.
