@@ -22,6 +22,7 @@ function compileGameOfLife() {
     name: "compile-game-of-life",
     hooks: {
       "astro:config:setup": async () => {
+        await run("mix", ["deps.get"], { cwd: gameOfLifeRoot });
         await run("mix", ["compile"], { cwd: gameOfLifeRoot });
       },
     },
