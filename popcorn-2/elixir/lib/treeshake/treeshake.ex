@@ -64,6 +64,7 @@ defmodule Treeshake do
           | {:keep, [keep_entry()]}
           | {:drop, [module()]}
           | {:leave, [module()]}
+          | {:shake, [module()]}
           | {:ignore, [module() | mfa()]}
 
   @type stats :: %{
@@ -149,12 +150,15 @@ defmodule Treeshake do
     compile and tree-shaking will fail.
     When a module is in both `leave` and `ignore` lists, it's not read and it's copied
     to the output without changes.
+  - `shake` - List of modules that are left by default (see 'Modules left by default'),
+    but should be tree-shaked as usual.
 
   ## Modules left by default
 
   Some stdlib modules are hard to tree-shake and they're therefore left by default.
   The behaviour is the same as if they were in the `leave` list. These modules can still
-  be removed if added to `drop` or `ignore` list.
+  be removed if added to `drop` or `ignore` list, or tree-shaked if added to the `shake`
+  list.
 
   The modules from the following stdlib apps: #{list_atoms.(@non_treeshakable_apps)},
   are left by default, except the following modules:
@@ -243,7 +247,8 @@ defmodule Treeshake do
       |> Keyword.put_new(:drop, [])
       |> keyword_concat_default(:ignore, @default_ignore_modules)
 
-    default_leave = non_treeshakable_stdlib_modules()
+    {shake, opts} = Keyword.pop(opts, :shake, [])
+    default_leave = non_treeshakable_stdlib_modules() -- shake
     opts = keyword_concat_default(opts, :leave, default_leave -- opts[:drop])
 
     {project, opts} = Keyword.pop(opts, :project)

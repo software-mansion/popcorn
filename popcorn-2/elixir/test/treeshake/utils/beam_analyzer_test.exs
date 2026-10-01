@@ -270,6 +270,18 @@ defmodule Treeshake.Utils.BeamAnalyzerTest do
            end)
   end
 
+  test "erlang:spawn_opt/4 and erlang:spawn_monitor/3 targets appear in calls" do
+    info = analyze(:code.which(:proc_lib))
+
+    # proc_lib:spawn_opt/4 calls erlang:spawn_opt(proc_lib, init_p, [_, _, M, F, A], Opts)
+    spawn_opt = find_fun(info.functions, :spawn_opt, 4)
+    assert {:proc_lib, :init_p, 5} in spawn_opt.calls
+
+    # proc_lib:spawn_mon/3 calls erlang:spawn_monitor(proc_lib, init_p, [_, _, M, F, A])
+    spawn_mon = find_fun(info.functions, :spawn_mon, 3)
+    assert {:proc_lib, :init_p, 5} in spawn_mon.calls
+  end
+
   describe "macro_generated" do
     test "detects functions injected by `use GenServer`" do
       info = analyze(HelloPopcorn)

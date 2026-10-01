@@ -4,7 +4,8 @@ defmodule Popcorn.Config do
     extra_apps: [],
     out_dir: nil,
     add_tracing: false,
-    treeshake: false
+    treeshake: false,
+    static_boot: false
   }
 
   def get(key) do

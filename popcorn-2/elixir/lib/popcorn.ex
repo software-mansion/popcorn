@@ -15,6 +15,172 @@ defmodule Popcorn do
     defexception [:message]
   end
 
+  # Modules dropped from static-boot bundles on top of the regular drop list:
+  # machinery that only the classic application_controller boot (or a host VM)
+  # can reach. Validated against the kanban e2e suite; if an app under
+  # static_boot genuinely needs one of these, the drop list needs an override.
+  # Dead at runtime under the static boot, but not removable by reachability:
+  # the shaker's conservative analysis (literal module atoms, hardcoded
+  # behaviour impls) still qualifies these as reachable, so they are dropped
+  # explicitly. The rest of the old drop list is now covered by
+  # `@shakable_stdlib` + plain reachability.
+  @static_boot_drop [
+                      # reachable, but its beam does not survive function-shaking
+                      # (same family as prim_eval)
+                      :prim_tty
+                    ] ++
+                      [
+                        # app-start machinery
+                        :application_controller,
+                        :application_master,
+                        :application_starter,
+                        :epp,
+                        :erl_scan,
+                        # distribution & network name resolution
+                        :dist_ac,
+                        :global_group,
+                        :global_search,
+                        :erpc,
+                        :auth,
+                        :inet_res,
+                        :inet_parse,
+                        :inet_hosts,
+                        :inet_gethost_native,
+                        :inet_udp,
+                        :net_adm,
+                        :erl_distribution,
+                        :erl_boot_server,
+                        :peer,
+                        # shell / tooling
+                        :user_drv,
+                        :group,
+                        :group_history,
+                        :erl_compile,
+                        :erl_compile_server,
+                        :otp_internal,
+                        :kernel_config,
+                        :beam_lib,
+                        # storage backends
+                        :disk_log_server,
+                        :disk_log_sup,
+                        :prim_zip,
+                        # OTP logger machinery (logger_std_h stays: patched default handler)
+                        :logger_server,
+                        :logger_olp,
+                        :logger_proxy,
+                        :logger_sup,
+                        :logger_handler_watcher,
+                        :logger_config,
+                        # misc
+                        :gen_statem,
+                        :timer
+                      ]
+
+  # Stdlib modules that Treeshake leaves by default, but that are dead in Popcorn
+  # bundles: AtomVM doesn't boot through `init`, so the host VM boot, distribution,
+  # shell and OTP logger machinery is never used. They're passed as `shake`,
+  # so reachability decides whether they stay. Anything here that the shaker
+  # still keeps despite being dead at runtime belongs in `@static_boot_drop`
+  # instead. Careful when adding: `leave`d modules are not analyzed, so a module
+  # referenced only by left modules reads as unreachable and is removed.
+  @shakable_stdlib [
+    # app-start machinery (replaced under the popcorn static boot)
+    :application_controller,
+    :application_master,
+    :application_starter,
+    # distribution & network name resolution
+    :dist_ac,
+    :global_group,
+    :global_search,
+    :erpc,
+    :erl_epmd,
+    :auth,
+    :socket_registry,
+    :inet_res,
+    :inet_parse,
+    :inet_config,
+    :inet_hosts,
+    :inet_gethost_native,
+    :inet_epmd_dist,
+    :inet_epmd_socket,
+    :inet_tcp_dist,
+    :inet6_tcp_dist,
+    :inet_tcp,
+    :inet6_tcp,
+    :inet_udp,
+    :inet6_udp,
+    :inet_sctp,
+    :inet6_sctp,
+    :local_tcp,
+    :local_udp,
+    :gen_sctp,
+    :net_adm,
+    :erl_distribution,
+    :erl_boot_server,
+    :pool,
+    :slave,
+    :peer,
+    # shell / REPL / compiler tooling
+    :argparse,
+    :c,
+    :shell_docs,
+    :shell_default,
+    :escript,
+    :user_drv,
+    :group,
+    :group_history,
+    :erl_expand_records,
+    :erl_compile,
+    :erl_compile_server,
+    :otp_internal,
+    :gen_fsm,
+    :random,
+    :heart,
+    :kernel_config,
+    :erl_ddll,
+    :seq_trace,
+    # storage backends
+    :dets_server,
+    :dets_sup,
+    :disk_log_server,
+    :disk_log_sup,
+    :wrap_log_reader,
+    :log_mf_h,
+    :ram_file,
+    :raw_file_io_compressed,
+    :raw_file_io_inflate,
+    :raw_file_io_deflate,
+    :raw_file_io_delayed,
+    :raw_file_io_list,
+    :prim_zip,
+    :base64,
+    # OTP logger machinery (the atomvm naive logger replaces it;
+    # logger_std_h must stay reachable — it is the default handler)
+    :logger_server,
+    :logger_h_common,
+    :logger_olp,
+    :logger_formatter,
+    :logger_disk_log_h,
+    :logger_proxy,
+    :logger_sup,
+    :logger_simple_h,
+    :logger_filters,
+    :logger_handler_watcher,
+    :logger_backend,
+    :logger_config,
+    :error_logger,
+    :error_logger_tty_h,
+    :error_logger_file_h,
+    # misc stdlib decided by reachability
+    :gen_statem,
+    :timer,
+    :io_lib_fread,
+    :dict,
+    :array,
+    :digraph,
+    :digraph_utils
+  ]
+
   @doc """
   Builds a Popcorn `.avm` bundle.
 
@@ -25,17 +191,24 @@ defmodule Popcorn do
   - `treeshake` - [Experimental] When `true`, removes unused modules and functions to reduce bundle size.
     Also removes location data (files and line numbers), which results in less useful stack traces.
     Defaults to `false`.
+  - `static_boot` - [Experimental] When `true`, applications are started with direct
+    `Mod.start(:normal, args)` calls generated at cook time (dependency order), instead of
+    going through `application_controller`/`application_master`. App env is served from an
+    ETS table (see `:popcorn_app_env`). Application lifecycle APIs (`ensure_all_started`,
+    `Application.spec/1`, stop/restart) are unavailable at runtime. Defaults to `false`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:extra_beams, [String.t()]}
           | {:treeshake, boolean()}
+          | {:static_boot, boolean()}
         ]) :: :ok
   def cook(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       treeshake: Popcorn.Config.get(:treeshake),
+      static_boot: Popcorn.Config.get(:static_boot),
       start_module: nil,
       extra_beams: []
     ]
@@ -67,92 +240,141 @@ defmodule Popcorn do
     apps = Map.keys(apps_specs)
     generated_ebin_dir = Path.join(tmp_dir, "generated_ebin")
     File.mkdir(generated_ebin_dir)
-    boot_module = create_boot_module(app, start_module, apps_specs, generated_ebin_dir)
+
+    # `data_modules` hold generated literal data (app specs/env). They are
+    # treeshake-ignored: module atoms inside the data would otherwise look like
+    # references and defeat shaking.
+    {boot_module, data_modules} =
+      if options.static_boot do
+        create_static_boot_module(app, start_module, apps_specs, generated_ebin_dir)
+      else
+        {create_boot_module(app, start_module, apps_specs, generated_ebin_dir), []}
+      end
+
     ebins = options.extra_beams ++ get_all_ebins(apps, generated_ebin_dir)
 
+    # The tree-shaker roots every .app file's `mod` start/2 as an entry point.
+    # Under the static boot the started closure is known exactly, so drop the
+    # .app files of apps that are never started (their modules stay in the
+    # bundle only if genuinely referenced from kept code).
     ebins =
-      if options.treeshake, do: treeshake(ebins, boot_module, start_module, tmp_dir), else: ebins
+      if options.static_boot do
+        Enum.reject(ebins, fn path ->
+          app_name = path |> Path.basename(".app") |> String.to_atom()
+          Path.extname(path) == ".app" and app_name not in apps
+        end)
+      else
+        ebins
+      end
+
+    ebins =
+      if options.treeshake,
+        do:
+          treeshake(ebins, boot_module, data_modules, options.static_boot, start_module, tmp_dir),
+        else: ebins
 
     beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
     pack_bundle(options.out_dir, beams, boot_module, options.treeshake)
   end
 
-  defp treeshake(ebin_files, boot_module, start_module, tmp_dir) do
+  defp treeshake(ebin_files, boot_module, data_modules, static_boot, start_module, tmp_dir) do
     treeshaked_dir = Path.join(tmp_dir, "treeshaked_ebin")
     File.mkdir!(treeshaked_dir)
 
     start_fun = if start_module, do: [{start_module, :start, 0}], else: []
+
+    {keep_extra, ignore_extra, leave_extra, drop_extra} =
+      if static_boot do
+        # The static boot module's literal `Mod.start(:normal, args)` calls are
+        # statically analyzable, so it is a keep-root instead of being ignored;
+        # only the generated data modules (module atoms as data) are ignored.
+        # The app-start machinery is never invoked: drop it. Env reads work
+        # through the patched application.erl (direct ac_tab lookups).
+        {[boot_module], data_modules, data_modules, @static_boot_drop}
+      else
+        {[],
+         [
+           # Boot module is ignored because it contains hardcoded list of all modules
+           # of all apps, making treeshake think they're referenced, while they aren't
+           boot_module,
+           # TODO application_controller references a lot of code that it doesn't use,
+           # we need to figure out if we can avoid keeping it. The master/starter are
+           # only reachable through it, so with the controller ignored they must be
+           # left explicitly (they are shakable via @shakable_stdlib).
+           :application_controller
+         ],
+         [
+           boot_module,
+           :application_controller,
+           :application_master,
+           :application_starter
+         ], []}
+      end
 
     opts = [
       ebin_files: ebin_files,
       # verbose: true,
       output_dir: treeshaked_dir,
       # stub_removed_functions: true,
-      keep: [
-        # Phoenix resolves Jason via `Phoenix.json_library/0`, what makes it
-        # invisible for treeshaking. Jason is low overhead and needed for
-        # most Popcorn stuff anyway, so at least for now we keep it unconditionally.
-        Jason,
-        # LiveView/LLV modules are resolved via Heex templates, which are just strings,
-        # what makes them invisible for treeshaking. For now we keep all LLV impls.
-        %{behaviour_impls: LocalLiveView},
-        # Popcorn.Init is called by the boot module, which is ignored (see `:ignore`)
-        Popcorn.Init
-        | start_fun
-      ],
-      ignore: [
-        # Boot module is ignored because it contains hardcoded list of all modules
-        # of all apps, making treeshake think they're referenced, while they aren't
-        boot_module,
-        # TODO application_controller references a lot of code that it doesn't use,
-        # we need to figure out if we can avoid keeping it
-        :application_controller
-      ],
-      leave: [
-        boot_module,
-        :application_controller
-      ],
-      drop: [
-        Code.Formatter,
-        :elixir_parser,
-        :elixir_tokenizer,
-        :erl_lint,
-        :erl_parse,
-        :erl_eval,
-        # TODO why logger needs these?
-        # :epp,
-        # :erl_scan,
-        :prim_inet,
-        :qlc,
-        :qlc_pt,
-        :dets_v9,
-        :dets,
-        :sofs,
-        :erl_tar,
-        :file_sorter,
-        :global,
-        :disk_log,
-        :disk_log_1,
-        :net_kernel,
-        :zip,
-        :inet_db,
-        :shell,
-        :edlin,
-        :edlin_expand,
-        :edlin_type_suggestion,
-        :edlin_context,
-        :dets_utils,
-        :gen_tcp_socket,
-        :socket,
-        :prim_socket,
-        :eval_bits,
-        :inet_dns,
-        :net,
-        :rpc,
-        :gen_udp_socket,
-        :dist_util,
-        :win32reg
-      ]
+      keep:
+        [
+          # Phoenix resolves Jason via `Phoenix.json_library/0`, what makes it
+          # invisible for treeshaking. Jason is low overhead and needed for
+          # most Popcorn stuff anyway, so at least for now we keep it unconditionally.
+          Jason,
+          # LiveView/LLV modules are resolved via Heex templates, which are just strings,
+          # what makes them invisible for treeshaking. For now we keep all LLV impls.
+          %{behaviour_impls: LocalLiveView},
+          # Popcorn.Init is called by the boot module (which is ignored in the
+          # classic mode, see `:ignore`)
+          Popcorn.Init
+          | start_fun
+        ] ++ keep_extra,
+      ignore: ignore_extra,
+      leave: leave_extra,
+      shake: @shakable_stdlib,
+      drop:
+        [
+          Code.Formatter,
+          :elixir_parser,
+          :elixir_tokenizer,
+          :erl_lint,
+          :erl_parse,
+          :erl_eval,
+          # TODO why logger needs these?
+          # :epp,
+          # :erl_scan,
+          :prim_inet,
+          :qlc,
+          :qlc_pt,
+          :dets_v9,
+          :dets,
+          :sofs,
+          :erl_tar,
+          :file_sorter,
+          :global,
+          :disk_log,
+          :disk_log_1,
+          :net_kernel,
+          :zip,
+          :inet_db,
+          :shell,
+          :edlin,
+          :edlin_expand,
+          :edlin_type_suggestion,
+          :edlin_context,
+          :dets_utils,
+          :gen_tcp_socket,
+          :socket,
+          :prim_socket,
+          :eval_bits,
+          :inet_dns,
+          :net,
+          :rpc,
+          :gen_udp_socket,
+          :dist_util,
+          :win32reg
+        ] ++ drop_extra
     ]
 
     Treeshake.run(opts)
@@ -280,6 +502,110 @@ defmodule Popcorn do
     path = Path.join(generated_ebin_dir, "#{module_name}.beam")
     File.write!(path, binary_content)
     module_name
+  end
+
+  # Generates the static boot pair (see the `static_boot` cook option):
+  #
+  #   * a data module holding the app env entries — treeshake-ignored, because
+  #     module atoms inside the data would otherwise look like references;
+  #   * the boot module: `Popcorn.Init.static_boot/4` around literal
+  #     `Mod.start(:normal, args)` calls in dependency order. The literal calls
+  #     make the whole app startup statically visible to the tree-shaker.
+  #
+  # No application_controller/application_master is involved at runtime; env is
+  # served from an ac_tab-shaped ETS table (:popcorn_app_env) through the
+  # patched application.erl.
+  defp create_static_boot_module(app, start_module, apps_specs, generated_ebin_dir) do
+    # Ensure shell_history is disabled as it will cause crash due to unimplemented IO & others
+    apps_specs = put_in(apps_specs[:kernel][:env][:shell_history], :disabled)
+
+    order = topo_sort_apps(apps_specs)
+
+    env_entries =
+      for app_name <- order, {key, value} <- apps_specs[app_name][:env] || [] do
+        {app_name, key, value}
+      end
+
+    start_calls =
+      for app_name <- order, match?({_mod, _args}, apps_specs[app_name][:mod]) do
+        {mod, args} = apps_specs[app_name][:mod]
+
+        quote do
+          :popcorn_app_env.app_started(
+            unquote(app_name),
+            unquote(mod).start(:normal, unquote(Macro.escape(args)))
+          )
+        end
+      end
+
+    unique = System.unique_integer([:positive, :monotonic])
+    data_module = Module.concat(Popcorn, "BootData#{unique}")
+
+    data_contents =
+      quote do
+        @compile autoload: false
+
+        def env_entries() do
+          unquote(Macro.escape(env_entries))
+        end
+      end
+
+    boot_module = Module.concat(Popcorn, "Boot#{unique}")
+
+    boot_contents =
+      quote do
+        @compile autoload: false
+        @compile {:no_warn_undefined, :all}
+
+        def start() do
+          Popcorn.Init.static_boot(
+            unquote(data_module).env_entries(),
+            unquote(app),
+            unquote(start_module),
+            fn ->
+              (unquote_splicing(start_calls))
+              :ok
+            end
+          )
+        end
+      end
+
+    for {module, contents} <- [{data_module, data_contents}, {boot_module, boot_contents}] do
+      {:module, _name, binary, _term} =
+        Module.create(module, contents, Macro.Env.location(__ENV__))
+
+      File.write!(Path.join(generated_ebin_dir, "#{module}.beam"), binary)
+    end
+
+    {boot_module, [data_module]}
+  end
+
+  # Dependency-first order over the gathered specs; only edges between gathered
+  # apps are followed (others are either preboot or absent from the bundle).
+  defp topo_sort_apps(apps_specs) do
+    apps_specs
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.reduce({[], MapSet.new()}, &topo_visit(&1, &2, apps_specs))
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
+  defp topo_visit(app, {order, visited}, apps_specs) do
+    if app in visited or not Map.has_key?(apps_specs, app) do
+      {order, visited}
+    else
+      visited = MapSet.put(visited, app)
+
+      {order, visited} =
+        Enum.reduce(
+          apps_specs[app][:applications] || [],
+          {order, visited},
+          &topo_visit(&1, &2, apps_specs)
+        )
+
+      {[app | order], visited}
+    end
   end
 
   defp gather_app_specs([], specs), do: specs
