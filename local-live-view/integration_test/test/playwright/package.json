@@ -1,0 +1,12 @@
+{
+  "name": "local-live-view-integration-e2e",
+  "private": true,
+  "description": "End-to-end Playwright tests for LocalLiveView, run against the integration_test app.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1"
+  }
+}
