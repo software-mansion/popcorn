@@ -87,27 +87,20 @@ defmodule Popcorn.MixProject do
       extras: [
         "pages/getting-started/introduction.md",
         "pages/getting-started/installation.md",
-        "pages/getting-started/first-application.md",
+        # "pages/getting-started/first-application.md",
         "pages/concepts/runtime-model.md",
         "pages/concepts/values.md",
-        "pages/guides/messaging.md",
         "pages/guides/javascript-interop.md",
         "pages/guides/http.md",
         "pages/guides/terminal.md",
         "pages/guides/packaging.md",
         "pages/guides/deployment.md",
-        "pages/reference/compatibility.md",
-        "pages/reference/troubleshooting.md",
-        "pages/migration/from-0-3.md",
-        "pages/comparisons/frameworks.md",
         "pages/contributing/runtime.md"
       ],
       groups_for_extras: [
         "Getting started": ~r"/getting-started/",
-        "Understand Popcorn": ~r"/concepts/",
         Guides: ~r"/guides/",
-        Reference: ~r"/reference/",
-        "Migration and comparisons": ~r"/(?:migration|comparisons)/",
+        Concepts: ~r"/concepts/",
         Contributing: ~r"/contributing/"
       ],
       formatters: ["html"],
@@ -126,6 +119,8 @@ defmodule Popcorn.MixProject do
       {:brotli, "~> 0.3.3", runtime: false},
       {:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0", optional: true},
       {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
+      {:makeup_diff, ">= 0.0.0", only: :dev, runtime: false},
+      {:makeup_html, ">= 0.0.0", only: :dev, runtime: false},
       {:ex_doc_js, github: "software-mansion-labs/ex_doc_js", only: [:dev, :test], runtime: false}
     ]
   end

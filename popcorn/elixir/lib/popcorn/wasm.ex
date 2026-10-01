@@ -63,6 +63,7 @@ defmodule Popcorn.Wasm do
   An opaque handle that keeps a JavaScript value alive.
 
   Return `new TrackedValue(value, cleanup)` from JavaScript function to create a handle.
+  Cleanup function has `() => void` signature.
   Pass the handle in `run_js/3` arguments to access the original value.
 
   The runtime calls `cleanup` function after BEAM garbage collection releases the handle, or when the VM stops.

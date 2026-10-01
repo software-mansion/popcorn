@@ -11,10 +11,7 @@ Add Req to the application dependencies:
 {:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0"}
 ```
 
-This Popcorn release supports Req 0.5.x through 0.7.x and Req 0.8.0-rc.0.
-
-Popcorn installs its Req adapter inside the browser runtime. It preserves a
-custom adapter from the Req default options.
+Popcorn installs its Req adapter when ran in the browser. If you already customized adapter, Popcorn won't install its own.
 
 ```elixir
 response = Req.get!("https://api.example.com/status")

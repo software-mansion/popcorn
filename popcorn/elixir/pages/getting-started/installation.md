@@ -1,77 +1,41 @@
 # Installation
 
-This guide installs the Popcorn 0.4 prerelease in an existing Mix application.
+This guide installs the Popcorn 0.4 in a new Mix application.
+
+We have separate guide for [JavaScript-first applications](TODO) (e.g. using Vite). If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://local-live-view.hexdocs.pm/) documentation.
 
 ## Requirements
 
-Use Elixir 1.19 or later. Use the OTP version from the selected Popcorn release
-toolchain.
+- Elixir 1.19 or later
+- OTP 29 or later
 
-You also need Node.js, a JavaScript package manager, and a supported bundler.
-Popcorn provides plugins for Vite, Rollup, and esbuild.
+## Initialization
 
-## Add the packages
+Create a new application with a supervision tree:
+
+```sh
+mix new foo --sup
+```
+
+## Adding the package
 
 Add Popcorn to `mix.exs`:
 
 ```elixir
 defp deps do
   [
-    {:popcorn, "0.4.0-next.0"}
+    {:popcorn, "0.4.0"}
   ]
 end
 ```
 
 Get the dependency and compile the application:
 
-```console
+```bash
 mix deps.get
 mix compile
 ```
 
-Install the matching JavaScript package:
+That's it!
 
-```console
-npm install @swmansion/popcorn@next
-```
-
-The Elixir and JavaScript package versions must match.
-
-## Configure Vite
-
-Add the Popcorn plugin to `vite.config.ts`:
-
-```typescript
-import { defineConfig } from "vite";
-import { popcorn } from "@swmansion/popcorn/vite";
-
-export default defineConfig({
-  plugins: [
-    popcorn({
-      rootDir: "../",
-    }),
-  ],
-});
-```
-
-Set `rootDir` to the Mix project directory. The plugin compiles the project and
-uses its current OTP application by default. Set `app` only to select another
-application, or set `app: null` to start no application.
-
-## Start the runtime
-
-Start Popcorn from the JavaScript entry point:
-
-```typescript
-import { Popcorn } from "@swmansion/popcorn";
-
-const result = await Popcorn.init();
-if (!result.ok) throw result.error;
-
-const popcorn = result.data;
-```
-
-Vite supplies the required development headers. Your production server must
-supply them too. See [Deploy Popcorn](deployment.html).
-
-Continue with [Build your first Popcorn application](first-application.html).
+Now, you need a HTML page and some JS. Continue on [Hello world](TODO) for minimal guide. If you want to see different Popcorn APIs, check out [Hello counters](TODO).

@@ -1,12 +1,6 @@
 # Deploy Popcorn
 
-A Popcorn deployment must serve the page, worker, WebAssembly file, boot file,
-manifest, and application archives.
-
-## Use a secure context
-
-Serve the application over HTTPS. Browsers also accept `localhost` during
-development.
+A Popcorn deployment must serve the VM and tarballs with compiled apps.
 
 ## Set cross-origin isolation headers
 
@@ -17,7 +11,9 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-The Vite plugin sets them for development and preview. Configure the production
+These headers are required for [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) to work.
+
+The Vite plugin and `mix popcorn.dev` sets them for development and preview. Configure the production
 server separately.
 
 ## Set response metadata
@@ -27,28 +23,15 @@ Serve `.wasm` files as `application/wasm`.
 When the server selects a gzip archive, set `Content-Encoding: gzip`. When it
 selects a Brotli archive, set `Content-Encoding: br`.
 
-The `Content-Encoding` header must match the compressed asset.
+The `Content-Encoding` header must match the compressed asset. Popcorn by default generates uncompressed, gzip, and brotli assets. You can [configure Brotli effort](TODO) for slightly smaller assets.
 
 ## Keep generated paths intact
 
-Keep the generated worker, runtime files, and `otp/` directory at their output
-locations. Web Workers resolve related runtime files by URL, so these locations
-must remain stable.
+Make sure that output layout is unmodified. Popcorn uses WebWorkers which need a stable location for scripts they run.
 
-Use `beam.otpAssetsRoot` only for custom hosting. The value must end with `/`.
+Use `beam.otpAssetsRoot` if you want to run it on subpage. The value must end with `/`.
 
 ## Configure the Content Security Policy
 
 `Popcorn.Wasm.run_js/3` currently evaluates JavaScript source. The page Content
-Security Policy must permit `unsafe-eval`.
-
-`Popcorn.init()` returns `runtime:eval-unavailable` when the page blocks this
-operation.
-
-## Check the production build
-
-1. Load the application from its final HTTPS origin.
-2. Confirm that the worker and WebAssembly requests succeed.
-3. Confirm that the boot file, manifest, and archives return successful responses.
-4. Confirm that the browser reports cross-origin isolation.
-5. Exercise one JavaScript-to-BEAM call and one BEAM-to-JavaScript event.
+Security Policy must permit `unsafe-eval` — Popcorn initialization will fail if it's not allowed.

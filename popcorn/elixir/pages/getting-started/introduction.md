@@ -2,32 +2,21 @@
 
 Popcorn runs Elixir and Erlang applications in a web browser.
 
-It uses the BEAM virtual machine from Erlang/OTP, compiled to WebAssembly.
-Your compiled BEAM code runs in a Web Worker on the user's device.
+It uses the Erlang/OTP VM, compiled to WebAssembly: you can run your application on user's device.
+
+It's a perfect choice for code playgrounds, interactive documentation, offline tools, and more.
 
 ## What Popcorn provides
 
-Popcorn provides a runtime and a bridge.
+Popcorn provides:
 
-The runtime supports standard OTP concepts such as processes, GenServers,
-supervisors, monitors, and message passing. The bridge connects those processes
-to JavaScript in the page.
+- a VM compiled for browsers use-case,
+- [APIs](TODO) to communicate with JavaScript (and with Elixir from JavaScript),
+- [a packager](TODO) to create files for deployment.
 
-Use Popcorn when an application needs local work in the browser. Examples
-include offline tools, simulations, interactive documentation, and code
-playgrounds.
+It also provides browser-specific alternatives for common tasks. For example, `Popcorn.Fetch` Req adapter sends HTTP requests through the browser.
 
-Popcorn does not provide a user interface model. Use plain JavaScript, React,
-Phoenix, or another interface with it.
-
-## How Popcorn differs from server Elixir
-
-A Popcorn application runs inside the browser sandbox. It does not have direct
-access to operating-system processes, native sockets, or arbitrary dynamic
-native implemented functions (NIFs).
-
-Popcorn provides browser-specific alternatives for common tasks. For example,
-`Popcorn.Fetch` sends HTTP requests through the browser.
+The VM supports same functionality as native one, with small exceptions (such as distribution or TCP sockets). You can use processes, supervision trees, OTP components (e.g. `GenServer`), timers, monitors, ...
 
 See [Compatibility and browser limits](compatibility.html) before you migrate
 an existing application.
