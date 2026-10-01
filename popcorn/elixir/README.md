@@ -36,8 +36,8 @@ The npm package includes both `core` and `crypto` runtime variants.
 The bundler plugin selects one from your application's dependencies.
 Use `runtimeVariant` to override the selection. Both variants use this Hex package.
 
-Compile your application with `mix deps.get` and `mix compile` before building its JavaScript assets.
-The bundler plugin invokes `mix popcorn.cook` to package your application and its standard-library dependencies.
+Fetch your application dependencies with `mix deps.get` before building its JavaScript assets.
+The bundler plugin invokes `mix popcorn.cook`, which compiles and packages your application and its standard-library dependencies.
 Use the toolchain in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/mise.toml) for this release.
 
 You can also prepare the complete browser asset directory without a JavaScript

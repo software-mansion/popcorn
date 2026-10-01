@@ -11,7 +11,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     extra_app: [:string, :keep],
     out_dir: :string,
     runtime_variant: :string,
-    brotli: :boolean,
+    brotli_effort: :string,
     strip: :boolean,
     treeshake: :boolean,
     preserved_app: [:string, :keep]
@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       app: entrypoint(options),
       extra_apps: Keyword.get_values(options, :extra_app),
       runtime_variant: options[:runtime_variant],
-      brotli: Keyword.get(options, :brotli, false),
+      brotli_effort: brotli_effort(options[:brotli_effort]),
       strip: Keyword.get(options, :strip, true),
       treeshake: if(options[:treeshake], do: [preserved_apps: preserved_apps], else: false)
     ]
@@ -65,5 +65,13 @@ defmodule Mix.Tasks.Popcorn.Cook do
       options[:app] -> options[:app]
       true -> Mix.Project.config() |> Keyword.fetch!(:app) |> to_string()
     end
+  end
+
+  defp brotli_effort(nil), do: :standard
+  defp brotli_effort("standard"), do: :standard
+  defp brotli_effort("max"), do: :max
+
+  defp brotli_effort(effort) do
+    Mix.raise("Unknown Brotli effort: #{effort}. Expected standard or max")
   end
 end

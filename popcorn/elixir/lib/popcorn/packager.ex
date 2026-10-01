@@ -1,4 +1,6 @@
 defmodule Popcorn.Packager do
+  @moduledoc false
+
   alias Popcorn.Packager.BeamPatcher
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
@@ -37,7 +39,7 @@ defmodule Popcorn.Packager do
           | {:app, String.t() | nil}
           | {:extra_apps, [String.t()]}
           | {:runtime_variant, String.t() | nil}
-          | {:brotli, boolean()}
+          | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
           | {:treeshake, false | [preserved_apps: [String.t()]]}
           | {:static_dir, Path.t()}
@@ -103,7 +105,7 @@ defmodule Popcorn.Packager do
         app: nil,
         extra_apps: [],
         runtime_variant: nil,
-        brotli: false,
+        brotli_effort: :standard,
         strip: true,
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
@@ -134,7 +136,7 @@ defmodule Popcorn.Packager do
                treeshake: options[:treeshake]
              }),
            {:ok, installed} <-
-             install_output(report, static_dir, out_dir, options[:brotli]) do
+             install_output(report, static_dir, out_dir, options[:brotli_effort]) do
         {:ok, installed}
       end
 
@@ -244,7 +246,7 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp install_output(report, static_dir, out_dir, brotli) do
+  defp install_output(report, static_dir, out_dir, brotli_effort) do
     variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
 
     js_files = Enum.map(~w(index.mjs worker.mjs), &{&1, Path.join(static_dir, &1)})
@@ -265,7 +267,7 @@ defmodule Popcorn.Packager do
         Enum.map(report.tarPaths, fn source ->
           target = Path.join(lib_dir, Path.basename(source))
           File.cp!(source, target)
-          compress(target, brotli)
+          compress(target, brotli_effort)
           Path.expand(target)
         end)
 
@@ -293,15 +295,16 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp compress(path, brotli) do
+  defp compress(path, brotli_effort) do
     contents = File.read!(path)
     File.write!(path <> ".gz", :zlib.gzip(contents))
 
-    if brotli do
-      {:ok, compressed} = :brotli.encode(contents, %{quality: 11})
-      File.write!(path <> ".br", compressed)
-    end
+    {:ok, compressed} = :brotli.encode(contents, %{quality: brotli_quality(brotli_effort)})
+    File.write!(path <> ".br", compressed)
   end
+
+  defp brotli_quality(:standard), do: 9
+  defp brotli_quality(:max), do: 11
 
   defp create_boot(out_dir, otp_root, runtime_preloaded) do
     boot_path = Path.join([Path.dirname(otp_root), "bin", "no_dot_erlang.boot"])

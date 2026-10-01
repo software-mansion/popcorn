@@ -28,7 +28,6 @@ export default defineConfig({
   plugins: [
     popcorn({
       rootDir: resolve(__dirname, "entrypoint-app"),
-      app: "test_entrypoint",
     }),
     httpEndpoints(),
   ],
