@@ -44,6 +44,7 @@ defmodule Popcorn.PackagerTest do
     assert File.regular?(Path.join(out_dir, "otp/bin/vm.boot"))
     assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar"))
     assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.gz"))
+    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.br"))
 
     archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")

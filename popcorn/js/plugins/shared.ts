@@ -24,8 +24,8 @@ export type Options = {
   app: string | null;
   /** Additional applications to package with their dependencies. */
   extraApps?: string[];
-  /** Adds Brotli tarball variants beside gzip and uncompressed files. Defaults to `true`. */
-  brotli?: boolean;
+  /** Brotli compression effort. Defaults to `standard`. */
+  brotliEffort?: "standard" | "max";
   /** Removes nonessential BEAM chunks. Defaults to `true`. */
   strip?: boolean;
   /** Controls removal of unreachable modules and functions. Defaults to `none`. */
@@ -59,7 +59,9 @@ export async function popcorn(options: Options): Promise<Prepared> {
   if (options.runtimeVariant !== undefined) {
     args.push("--runtime-variant", options.runtimeVariant);
   }
-  if (options.brotli ?? true) args.push("--brotli");
+  if (options.brotliEffort !== undefined) {
+    args.push("--brotli-effort", options.brotliEffort);
+  }
   if (!(options.strip ?? true)) args.push("--no-strip");
   if (options.treeshake?.mode === "all") {
     args.push("--treeshake");

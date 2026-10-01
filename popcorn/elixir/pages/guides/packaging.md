@@ -69,7 +69,10 @@ an explicit `core` choice conflicts with application requirements.
 The `strip` option removes nonessential BEAM chunks. It defaults to `true` and
 remains experimental.
 
-The `brotli` option adds Brotli tar variants. It defaults to `false`.
+The packager always adds Brotli tar variants. Standard effort uses quality 9.
+Use `brotliEffort: "max"` in a bundler plugin or
+`--brotli-effort max` with `mix popcorn.cook` to use quality 11 for a release
+build.
 
 Application packaging currently includes `ebin` directories. It does not copy
 `priv` files or Mix runtime configuration.

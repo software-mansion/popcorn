@@ -124,10 +124,7 @@ export function popcorn(options: Options): Plugin {
     try {
       const compressible = isCompressible(filePath);
       const encoding = compressible
-        ? selectEncoding(
-            req.headers["accept-encoding"]?.toString(),
-            options.brotli ?? false,
-          )
+        ? selectEncoding(req.headers["accept-encoding"]?.toString())
         : ({ name: null, suffix: "" } as const);
       if (compressible && encoding.name === null) {
         res.statusCode = 406;
@@ -217,12 +214,11 @@ function isCompressible(path: string): boolean {
 
 function selectEncoding(
   header: string | undefined,
-  useBrotli: boolean,
 ): {
   name: "br" | "gzip" | null;
   suffix: ".br" | ".gz" | "";
 } {
-  if (useBrotli && header?.includes("br")) {
+  if (header?.includes("br")) {
     return { name: "br", suffix: ".br" };
   }
   if (header?.includes("gzip")) return { name: "gzip", suffix: ".gz" };
