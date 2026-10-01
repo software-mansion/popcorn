@@ -49,17 +49,14 @@ export default defineConfig({
   plugins: [
     popcorn({
       rootDir: "../",
-      app: "my_app",
     }),
   ],
 });
 ```
 
-Set `rootDir` to the Mix project directory. Set `app` to the OTP application
-name from `mix.exs`.
-
-The plugin packages compiled BEAM files. Run `mix compile` before the JavaScript
-build.
+Set `rootDir` to the Mix project directory. The plugin compiles the project and
+uses its current OTP application by default. Set `app` only to select another
+application, or set `app: null` to start no application.
 
 ## Start the runtime
 

@@ -14,8 +14,9 @@ npm install @swmansion/popcorn@next
 ```
 
 Add `{:popcorn, "0.4.0-next.0"}` to your Elixir application's dependencies.
-Run `mix deps.get` and `mix compile` before building the JavaScript application.
-The bundler plugins invoke Mix locally to package application and standard-library code.
+Run `mix deps.get` before building the JavaScript application. The bundler
+plugins invoke Mix locally to compile and package application and
+standard-library code.
 
 Use the toolchain pinned in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.0/popcorn/mise.toml).
 The packager checks host OTP compatibility against the selected runtime's manifest.
@@ -30,13 +31,13 @@ export default defineConfig({
   plugins: [
     popcorn({
       rootDir: "../",
-      app: "my_app",
     }),
   ],
 });
 ```
 
-Set `rootDir` to the compiled Mix project's directory and `app` to its OTP application name.
+Set `rootDir` to the Mix project directory. The current Mix application is the
+default entrypoint. Set `app` to select another OTP application explicitly.
 Use `app: null` to package the base runtime without starting an application.
 
 The npm package contains two variants:

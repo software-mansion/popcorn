@@ -1,7 +1,7 @@
 # Package an application
 
-`mix popcorn.cook` packages existing Mix build output. The Vite, Rollup, and
-esbuild plugins invoke the same task. Packaging does not replace `mix compile`.
+`mix popcorn.cook` compiles the Mix project and packages its build output. The
+Vite, Rollup, and esbuild plugins invoke the same task.
 
 ```console
 mix popcorn.cook --out-dir priv/static/popcorn
@@ -26,11 +26,12 @@ Set the application in the bundler configuration:
 ```typescript
 popcorn({
   rootDir: "../",
-  app: "my_app",
 });
 ```
 
-The task uses the active Mix environment and target build path.
+The task uses the active Mix environment and target build path. By default it
+packages and starts the current Mix application. Set `app` to select another
+application explicitly.
 
 The packager includes the entrypoint and its required application dependencies.
 Set `app: null` to start no application. This option does not package every
@@ -43,7 +44,6 @@ Use `extraApps` for optional or dynamically loaded applications:
 ```typescript
 popcorn({
   rootDir: "../",
-  app: "my_app",
   extraApps: ["eex"],
 });
 ```
@@ -68,6 +68,10 @@ an explicit `core` choice conflicts with application requirements.
 
 The `strip` option removes nonessential BEAM chunks. It defaults to `true` and
 remains experimental.
+
+The `treeshake` option removes unreachable modules and functions. It is
+disabled by default. Set it to an object to enable it, and use
+`preservedApps` to keep every module in selected applications.
 
 The packager always adds Brotli tar variants. Standard effort uses quality 9.
 Use `brotliEffort: "max"` in a bundler plugin or

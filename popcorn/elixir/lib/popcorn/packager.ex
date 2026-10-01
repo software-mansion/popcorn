@@ -1,4 +1,6 @@
 defmodule Popcorn.Packager do
+  @moduledoc false
+
   alias Popcorn.Packager.BeamPatcher
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])

@@ -30,7 +30,7 @@ type Res = ServerResponse<IncomingMessage>;
  * import { popcorn } from "@swmansion/popcorn/vite";
  *
  * export default defineConfig({
- *   plugins: [popcorn({ rootDir: "../my_app", app: "my_app" })],
+ *   plugins: [popcorn({ rootDir: "../my_app" })],
  * });
  * ```
  *

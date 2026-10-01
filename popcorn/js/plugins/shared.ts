@@ -12,16 +12,19 @@ type RuntimeVariant = "core" | "crypto";
 /**
  * Shared options for the Vite, Rollup, and esbuild plugins.
  *
- * Compile the project before the plugin runs. The plugins invoke
- * `mix popcorn.cook` in the project directory.
+ * The plugins invoke `mix popcorn.cook` in the project directory, which
+ * compiles the project before packaging it.
  */
 export type Options = {
   /** Runtime variant override. */
   runtimeVariant?: RuntimeVariant;
   /** Mix project directory. */
   rootDir: string;
-  /** OTP application to start after VM boot. */
-  app: string | null;
+  /**
+   * OTP application to start after VM boot.
+   * Defaults to the current Mix application.
+   */
+  app?: string | null;
   /** Additional applications to package with their dependencies. */
   extraApps?: string[];
   /** Brotli compression effort. Defaults to `standard`. */
@@ -33,7 +36,6 @@ export type Options = {
 };
 
 export type TreeshakeOptions = {
-  mode: "all" | "none";
   preservedApps?: string[];
 };
 
@@ -53,7 +55,7 @@ export async function popcorn(options: Options): Promise<Prepared> {
   const args = ["popcorn.cook", "--out-dir", dir];
 
   if (options.app === null) args.push("--no-app");
-  else args.push("--app", options.app);
+  else if (options.app !== undefined) args.push("--app", options.app);
 
   for (const app of options.extraApps ?? []) args.push("--extra-app", app);
   if (options.runtimeVariant !== undefined) {
@@ -62,8 +64,8 @@ export async function popcorn(options: Options): Promise<Prepared> {
   if (options.brotliEffort !== undefined) {
     args.push("--brotli-effort", options.brotliEffort);
   }
-  if (!(options.strip ?? true)) args.push("--no-strip");
-  if (options.treeshake?.mode === "all") {
+  if (options.strip === false) args.push("--no-strip");
+  if (options.treeshake !== undefined) {
     args.push("--treeshake");
     for (const app of options.treeshake.preservedApps ?? []) {
       args.push("--preserved-app", app);

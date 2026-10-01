@@ -119,16 +119,17 @@ export default defineConfig({
   plugins: [
     popcorn({
       rootDir: "../",
-      app: "my_app",
     }),
   ],
 });
 ```
 
 Set `rootDir` to the Mix project directory.
-Set `app` to the application name from `mix.exs`.
+The plugin uses the current Mix application by default. Set `app` only to
+select another application.
 
-The plugin reads `_build/$MIX_ENV/lib` after `mix compile`.
+The plugin runs `mix popcorn.cook`, which compiles the project before packaging
+the active Mix environment and target.
 It packages the application, its dependencies, the boot file, and the runtime manifest.
 
 Remove the old `treeshake` and `extra_beams` build options.
@@ -139,7 +140,6 @@ Use `extraApps` for applications that dependency analysis cannot find:
 ```typescript
 popcorn({
   rootDir: "../",
-  app: "my_app",
   extraApps: ["eex"],
 });
 ```
