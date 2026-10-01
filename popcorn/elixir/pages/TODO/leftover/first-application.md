@@ -31,7 +31,7 @@ end
 The process owns the count. Its registered name lets JavaScript address it.
 JavaScript arrays become BEAM lists, so the callback matches a list.
 
-## Add the counter to the supervision tree
+## Add the bridge to the supervision tree
 
 Update `lib/my_app/application.ex`:
 
@@ -42,6 +42,7 @@ defmodule MyApp.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      Popcorn.Proxy,
       MyApp.Counter
     ]
 
@@ -53,9 +54,8 @@ defmodule MyApp.Application do
 end
 ```
 
-The `:popcorn` application automatically starts `Popcorn.Proxy` in WASM to
-connect JavaScript calls and casts to GenServers. A plain `send()` does not
-use the proxy.
+`Popcorn.Proxy` connects JavaScript calls and casts to GenServers. A plain
+`send()` does not use the proxy.
 
 Compile the application again:
 
