@@ -27,6 +27,20 @@ test.describe("boot", () => {
     });
   });
 
+  test("PAX module path", async ({ otp }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+        42 = test_entrypoint_module_with_a_name_long_enough_for_a_posix_pax_extended_tar_header_and_cannot_fit_in_ustar_name:answer(),
+        ok = wasm:send(#{pax_module => loaded}).
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("pax_module")).toEqual({
+      pax_module: "loaded",
+    });
+  });
+
   test("startup bridge", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const events: unknown[] = [];
