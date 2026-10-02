@@ -351,9 +351,14 @@ defmodule Popcorn.Packager do
     apps_info
     |> async_stream(fn {app, info} ->
       ebin_dir = Path.join([staging_dir, app, "ebin"])
+      priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
 
       File.mkdir_p!(Path.dirname(ebin_dir))
       File.cp_r!(info.ebin_dir, ebin_dir)
+
+      if File.dir?(priv_dir) do
+        File.cp_r!(priv_dir, Path.join([staging_dir, app, "priv"]), dereference_symlinks: true)
+      end
 
       {app, %{info | ebin_dir: ebin_dir}}
     end)
@@ -702,11 +707,19 @@ defmodule Popcorn.Packager do
     tar = "lib/#{app}.tar"
     tar_path = Path.join(outdir, tar)
     tar_path_c = to_charlist(tar_path)
-    arc_name = ~c"lib/#{app}/ebin"
-    ebin_dir_c = to_charlist(ebin_dir)
+    app_dir = Path.dirname(ebin_dir)
+    priv_dir = Path.join(app_dir, "priv")
+    entries = [{~c"lib/#{app}/ebin", to_charlist(ebin_dir)}]
+
+    entries =
+      if File.dir?(priv_dir) do
+        [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | entries]
+      else
+        entries
+      end
 
     File.mkdir_p!(Path.dirname(tar_path))
-    :ok = :erl_tar.create(tar_path_c, [{arc_name, ebin_dir_c}], [])
+    :ok = :erl_tar.create(tar_path_c, entries, [])
 
     tar
   end

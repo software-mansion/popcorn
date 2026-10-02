@@ -78,5 +78,4 @@ Use `brotliEffort: "max"` in a bundler plugin or
 `--brotli-effort max` with `mix popcorn.cook` to use quality 11 for a release
 build.
 
-Application packaging currently includes `ebin` directories. It does not copy
-`priv` files or Mix runtime configuration.
+Application packaging includes each selected application's `ebin` directory and `priv` directory when present.
