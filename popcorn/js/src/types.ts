@@ -55,6 +55,7 @@ export type BeamEvent =
   | { type: "otp:error"; payload: OtpErrorPayload }
   | { type: "otp:message"; payload: AnyValue }
   | { type: "otp:run_js"; payload: RunJsRequest }
+  | { type: "otp:await-ready"; payload: ReadyRequest }
   | { type: "otp:tracked-value-delete"; payload: number };
 
 export type RunJsRequest = {
@@ -63,6 +64,8 @@ export type RunJsRequest = {
   replyTo: Uint8Array;
   return: "value" | "ref";
 };
+
+export type ReadyRequest = { replyTo: Uint8Array };
 
 /**
  * VM shutdown notification.

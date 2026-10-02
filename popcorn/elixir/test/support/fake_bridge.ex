@@ -8,6 +8,12 @@ defmodule Popcorn.Wasm.FakeBridge do
   # with `stub_fetch/1` is pushed into the target's mailbox in the shape the
   # real bridge delivers.
 
+  def await_ready(opts) do
+    Process.put(:await_ready_opts, opts)
+    if opts[:timeout] == 0, do: :erlang.error(:await_ready_timeout)
+    :ok
+  end
+
   def run_js(_code, %{mode: :timeout}, _opts), do: :erlang.error(:run_js_timeout)
   def run_js(_code, %{mode: :js_error}, _opts), do: :erlang.error({:run_js, "TypeError: x"})
   def run_js(_code, %{mode: :badarg}, _opts), do: :erlang.error(:badarg)

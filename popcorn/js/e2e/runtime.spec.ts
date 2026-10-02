@@ -71,11 +71,40 @@ test.describe("boot", () => {
     });
   });
 
+  test("readiness", async ({ otp }) => {
+    const boot = await otp.boot({
+      beam: { env: { POPCORN_STARTUP_EVENT: "await_ready" } },
+    });
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("async_ready")).toEqual({
+      async_ready: true,
+    });
+    assert((await otp.send("await_ready_task", {})).ok);
+    expect(await otp.waitForEvent("after_boot")).toEqual({
+      after_boot: true,
+    });
+  });
+
+  test("readiness timeout", async ({ otp }) => {
+    const boot = await otp.boot({
+      beam: { env: { POPCORN_STARTUP_EVENT: "await_ready_timeout" } },
+    });
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("await_ready_timeout")).toEqual({
+      await_ready_timeout: true,
+    });
+  });
+
   test("no options", async ({ page }) => {
     await page.route("/assets/otp/manifest.json", async (route) => {
       const response = await route.fetch();
       const manifest = (await response.json()) as Record<string, unknown>;
-      await route.fulfill({ response, json: { ...manifest, entrypoint: null } });
+      await route.fulfill({
+        response,
+        json: { ...manifest, entrypoint: null },
+      });
     });
 
     const result = await page.evaluate(async () => {
@@ -354,8 +383,7 @@ test.describe("lifecycle", () => {
 
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const init = await window.Popcorn.init({
-      });
+      const init = await window.Popcorn.init({});
       if (!init.ok) return { ok: false, error: init.error.serialize() };
       init.data.deinit();
       return { ok: true };

@@ -133,7 +133,7 @@ index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc0
 +  },
 +});
 diff --git a/erts/emulator/nifs/common/prim_tty_nif.c b/erts/emulator/nifs/common/prim_tty_nif.c
-index 1538b23d107f1718c87e389d9bb42da913eca002..aeec8a3cc4f163ceeaca2bddb1ba642e7fd0b5e2 100644
+index 1538b23d107f1718c87e389d9bb42da913eca002..4aba419d0543181e34a61e873dae6aa5caf6418d 100644
 --- a/erts/emulator/nifs/common/prim_tty_nif.c
 +++ b/erts/emulator/nifs/common/prim_tty_nif.c
 @@ -38,6 +38,7 @@
@@ -1143,10 +1143,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..90bd457be65aa7cc28cfbd33d5686fdb6e8e1567
+index 0000000000000000000000000000000000000000..18cc6cd478bd646311388bb85879bc2a4ce760ce
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,153 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1173,7 +1173,8 @@ index 0000000000000000000000000000000000000000..90bd457be65aa7cc28cfbd33d5686fdb
 +
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
-+-export([on_load/0, send/1, run_js/2, run_js/3, keep_alive/1]).
++-export([on_load/0, send/1, run_js/2, run_js/3, await_ready/0, await_ready/1,
++         keep_alive/1]).
 +
 +-nifs([send_raw/1, materialize_ref/1, ref_key/1]).
 +
@@ -1212,6 +1213,28 @@ index 0000000000000000000000000000000000000000..90bd457be65aa7cc28cfbd33d5686fdb
 +    case Reply of
 +        timeout -> error(run_js_timeout);
 +        ReplyPayload -> handle_run_js_reply(ReplyPayload)
++    end.
++
++-spec await_ready() -> ok.
++await_ready() ->
++    await_ready([]).
++
++-spec await_ready(proplists:proplist()) -> ok.
++await_ready(Opts) when is_list(Opts) ->
++    Timeout = proplists:get_value(timeout, Opts, ?RUN_JS_TIMEOUT),
++    Token = erlang:unique_integer(),
++    ReplyTo = base64:encode(term_to_binary({self(), Token})),
++    Envelope = #{type => await_ready, reply_to => ReplyTo},
++    ok = send_raw(iolist_to_binary(json:encode(Envelope))),
++    Reply = receive
++                {wasm, {Token, true}} -> ok
++            after Timeout ->
++                timeout
++            end,
++    ?MODULE:keep_alive(Envelope),
++    case Reply of
++        timeout -> error(await_ready_timeout);
++        ok -> ok
 +    end.
 +
 +-spec keep_alive(Term) -> Term when Term :: term().
