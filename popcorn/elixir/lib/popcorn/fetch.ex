@@ -6,11 +6,12 @@ defmodule Popcorn.Fetch do
 
   Req is optional. If your application includes Req, Popcorn installs this adapter when it starts inside the Popcorn runtime.
   Popcorn preserves any adapter in Req's `:default_options` configuration.
+  The adapter supports Req versions from `0.5.0` through `0.8.0-rc.0`.
 
   You can also select the adapter per request:
 
   ```elixir
-  Req.get!("https://api.example.com/status", adapter: Popcorn.Fetch)
+  Req.get!("https://api.example.com/status", adapter: Popcorn.Fetch.adapter())
   ```
 
   The adapter supports Req's `:into` functions, collectables, and `:self` streams.
@@ -33,7 +34,11 @@ defmodule Popcorn.Fetch do
 
   # Req is an optional dependency
   @compile {:no_warn_undefined,
-            [Req.Fields, Req.Response, Req.Response.Async, Req.TransportError]}
+            [Req.Adapter, Req.Fields, Req.Response, Req.Response.Async, Req.TransportError]}
+
+  if Code.ensure_loaded?(Req.Adapter) do
+    @behaviour Req.Adapter
+  end
 
   alias Popcorn.Wasm
 
@@ -170,26 +175,32 @@ defmodule Popcorn.Fetch do
     end
   end
 
+  @doc "Returns the adapter value for the installed Req version."
+  def adapter do
+    version = :req |> Application.spec(:vsn) |> to_string()
+
+    if Version.match?(version, ">= 0.7.0") do
+      __MODULE__
+    else
+      &__MODULE__.run/1
+    end
+  end
+
   @doc false
   def run(request) do
-    case normalize_body(request) do
+    case legacy_normalize_body(request) do
       {:ok, body, request} ->
-        run(request, body)
+        legacy_run(request, body)
 
-      # A halted req_body_fun means "close the connection without reading a
-      # response", which has no fetch equivalent beyond never starting.
       {:halt, request} ->
         {request, Req.Response.new(status: nil)}
     end
   end
 
-  defp run(request, body) do
+  defp legacy_run(request, body) do
     method = request.method |> to_string() |> String.upcase()
 
-    headers =
-      request.headers
-      |> Req.Fields.get_list()
-      |> Enum.map(fn {name, value} -> [name, value] end)
+    headers = Enum.map(request_headers(request), fn {name, value} -> [name, value] end)
 
     req = %{
       method: method,
@@ -201,12 +212,12 @@ defmodule Popcorn.Fetch do
     timeout = Map.get(request.options, :receive_timeout, @default_timeout)
 
     case request.into do
-      :self -> run_into_self(request, req, timeout)
-      into -> run_into(request, req, into, timeout)
+      :self -> legacy_run_into_self(request, req, timeout)
+      into -> legacy_run_into(request, req, into, timeout)
     end
   end
 
-  defp run_into(request, req, into, timeout) do
+  defp legacy_run_into(request, req, into, timeout) do
     wait = {:each, timeout}
 
     with {:ok, handle} <- start(req, self()),
@@ -214,38 +225,35 @@ defmodule Popcorn.Fetch do
       response = Req.Response.new(status: status, headers: headers)
 
       case into do
-        nil -> into_body(request, response, handle, wait)
-        fun when is_function(fun, 2) -> into_fun(request, response, handle, wait, fun)
-        collectable -> into_collectable(request, response, handle, wait, collectable)
+        nil -> legacy_into_body(request, response, handle, wait)
+        fun when is_function(fun, 2) -> legacy_into_fun(request, response, handle, wait, fun)
+        collectable -> legacy_into_collectable(request, response, handle, wait, collectable)
       end
     else
-      {:error, reason} -> transport_error(request, reason)
+      {:error, reason} -> legacy_transport_error(request, reason)
     end
   end
 
-  defp into_body(request, response, handle, wait) do
+  defp legacy_into_body(request, response, handle, wait) do
     case collect_body(handle, wait) do
       {:ok, body} -> {request, %{response | body: body}}
-      {:error, reason} -> transport_error(request, reason)
+      {:error, reason} -> legacy_transport_error(request, reason)
     end
   end
 
-  defp into_fun(request, response, handle, wait, fun) do
+  defp legacy_into_fun(request, response, handle, wait, fun) do
     result =
       handle
       |> body_stream(wait)
-      |> Enum.reduce_while({:ok, {request, response}}, wrapped_reducer(fun))
+      |> Enum.reduce_while({:ok, {request, response}}, legacy_wrapped_reducer(fun))
 
     case result do
-      {:ok, acc} ->
-        acc
-
-      {:error, reason, {request, _response}} ->
-        transport_error(request, reason)
+      {:ok, acc} -> acc
+      {:error, reason, {request, _response}} -> legacy_transport_error(request, reason)
     end
   end
 
-  defp into_collectable(request, response, handle, wait, collectable) do
+  defp legacy_into_collectable(request, response, handle, wait, collectable) do
     collectable = if response.status == 200, do: collectable, else: ""
     {acc, collector} = Collectable.into(collectable)
 
@@ -257,7 +265,7 @@ defmodule Popcorn.Fetch do
     result =
       handle
       |> body_stream(wait)
-      |> Enum.reduce_while({:ok, {request, {acc, response}}}, wrapped_reducer(fun))
+      |> Enum.reduce_while({:ok, {request, {acc, response}}}, legacy_wrapped_reducer(fun))
 
     case result do
       {:ok, {request, {acc, response}}} ->
@@ -265,11 +273,11 @@ defmodule Popcorn.Fetch do
 
       {:error, reason, {request, {acc, _response}}} ->
         collector.(acc, :halt)
-        transport_error(request, reason)
+        legacy_transport_error(request, reason)
     end
   end
 
-  defp wrapped_reducer(fun) do
+  defp legacy_wrapped_reducer(fun) do
     fn
       {:data, _data} = event, {:ok, acc} ->
         case fun.(event, acc) do
@@ -289,6 +297,128 @@ defmodule Popcorn.Fetch do
     end
   end
 
+  defp legacy_run_into_self(request, req, timeout) do
+    ref = make_ref()
+    owner = self()
+    {relay, monitor} = spawn_monitor(fn -> relay(owner, ref, timeout) end)
+
+    result =
+      with {:ok, handle} <- start(req, relay),
+           {:ok, status, headers} <- await_head(ref, relay, monitor, handle) do
+        async = async_body(owner, ref, relay, handle)
+        {request, Req.Response.new(status: status, headers: headers, body: async)}
+      else
+        {:error, reason} ->
+          send(relay, :cancel)
+          legacy_transport_error(request, reason)
+      end
+
+    Process.demonitor(monitor, [:flush])
+    result
+  end
+
+  if Code.ensure_loaded?(Req.Adapter) do
+    @impl Req.Adapter
+  end
+
+  @doc false
+  def stream(request, acc, fun, state) when is_function(fun, 4) do
+    response = Req.Response.new(status: nil, body: nil, request: request)
+
+    case normalize_body(request.body, acc) do
+      {:ok, body, acc} ->
+        stream(request, response, body, acc, fun, state)
+
+      {:halt, acc} ->
+        {:halt, response, acc, state}
+
+      {{:error, exception}, acc} ->
+        {{:error, exception}, response, acc, state}
+    end
+  end
+
+  defp stream(request, response, body, acc, fun, state) do
+    method = request.method |> to_string() |> String.upcase()
+
+    headers =
+      request.headers
+      |> Req.Fields.get_list()
+      |> Enum.map(fn {name, value} -> [name, value] end)
+
+    req = %{
+      method: method,
+      url: URI.to_string(request.url),
+      headers: headers,
+      body: body
+    }
+
+    timeout = Map.get(request.options, :receive_timeout, @default_timeout)
+
+    case request.into do
+      :self -> stream_into_self(response, req, acc, fun, state, timeout)
+      _other -> stream_response(response, req, acc, fun, state, timeout)
+    end
+  end
+
+  defp stream_response(response, req, acc, fun, state, timeout) do
+    wait = {:each, timeout}
+
+    with {:ok, handle} <- start(req, self()),
+         {:ok, status, headers} <- collect_head(handle, wait) do
+      response = %{response | status: status}
+
+      case fun.({:status, status}, response, acc, state) do
+        {:ok, response, acc, state} ->
+          headers_field = Req.Fields.new_without_normalize_with_duplicates(headers)
+          response = %{response | headers: headers_field}
+
+          case fun.({:headers, headers}, response, acc, state) do
+            {:ok, response, acc, state} ->
+              stream_body(response, acc, fun, state, handle, wait)
+
+            {:halt, _, _, _} = result ->
+              cancel(handle)
+              result
+
+            {{:error, _exception}, _, _, _} = result ->
+              cancel(handle)
+              result
+          end
+
+        {:halt, _, _, _} = result ->
+          cancel(handle)
+          result
+
+        {{:error, _exception}, _, _, _} = result ->
+          cancel(handle)
+          result
+      end
+    else
+      {:error, reason} -> transport_error(response, acc, state, reason)
+    end
+  end
+
+  defp stream_body(response, acc, fun, state, handle, wait) do
+    handle
+    |> body_stream(wait)
+    |> Enum.reduce_while({:ok, response, acc, state}, fn
+      {:data, data}, {:ok, response, acc, state} ->
+        case fun.({:data, data}, response, acc, state) do
+          {:ok, response, acc, state} ->
+            {:cont, {:ok, response, acc, state}}
+
+          {:halt, response, acc, state} ->
+            {:halt, {:halt, response, acc, state}}
+
+          {{:error, _exception}, _, _, _} = result ->
+            {:halt, result}
+        end
+
+      {:error, reason}, {:ok, response, acc, state} ->
+        {:halt, transport_error(response, acc, state, reason)}
+    end)
+  end
+
   defp body_stream(handle, wait) do
     Stream.resource(
       fn -> %{handle: handle, wait: wait, completed: false} end,
@@ -306,7 +436,7 @@ defmodule Popcorn.Fetch do
     )
   end
 
-  defp run_into_self(request, req, timeout) do
+  defp stream_into_self(response, req, acc, fun, state, timeout) do
     ref = make_ref()
     owner = self()
     {relay, monitor} = spawn_monitor(fn -> relay(owner, ref, timeout) end)
@@ -314,16 +444,48 @@ defmodule Popcorn.Fetch do
     result =
       with {:ok, handle} <- start(req, relay),
            {:ok, status, headers} <- await_head(ref, relay, monitor, handle) do
-        async = async_body(owner, ref, relay, handle)
-        {request, Req.Response.new(status: status, headers: headers, body: async)}
+        response = %{response | status: status}
+
+        case fun.({:status, status}, response, acc, state) do
+          {:ok, response, acc, state} ->
+            headers_field = Req.Fields.new_without_normalize_with_duplicates(headers)
+            response = %{response | headers: headers_field}
+
+            case fun.({:headers, headers}, response, acc, state) do
+              {:ok, response, acc, state} ->
+                async = async_body(owner, ref, relay, handle)
+                {:ok, %{response | body: async}, acc, state}
+
+              {:halt, _, _, _} = result ->
+                cancel_async(relay, handle)
+                result
+
+              {{:error, _exception}, _, _, _} = result ->
+                cancel_async(relay, handle)
+                result
+            end
+
+          {:halt, _, _, _} = result ->
+            cancel_async(relay, handle)
+            result
+
+          {{:error, _exception}, _, _, _} = result ->
+            cancel_async(relay, handle)
+            result
+        end
       else
         {:error, reason} ->
           send(relay, :cancel)
-          transport_error(request, reason)
+          transport_error(response, acc, state, reason)
       end
 
     Process.demonitor(monitor, [:flush])
     result
+  end
+
+  defp cancel_async(relay, handle) do
+    send(relay, :cancel)
+    cancel(handle)
   end
 
   defp await_head(ref, relay, monitor, handle) do
@@ -406,11 +568,27 @@ defmodule Popcorn.Fetch do
 
   defp parse_message(_ref, _message), do: :unknown
 
-  defp transport_error(request, reason) do
+  defp transport_error(response, acc, state, reason) do
+    exception = Req.TransportError.exception(reason: reason)
+    {{:error, exception}, response, acc, state}
+  end
+
+  defp legacy_transport_error(request, reason) do
     {request, Req.TransportError.exception(reason: reason)}
   end
 
-  defp normalize_body(request) do
+  defp request_headers(request) do
+    if Code.ensure_loaded?(Req.Fields) do
+      Req.Fields.get_list(request.headers)
+    else
+      for {name, values} <- request.headers,
+          value <- List.wrap(values) do
+        {name, value}
+      end
+    end
+  end
+
+  defp legacy_normalize_body(request) do
     case request.body do
       nil ->
         {:ok, nil, request}
@@ -419,17 +597,17 @@ defmodule Popcorn.Fetch do
         {:ok, IO.iodata_to_binary(iodata), request}
 
       req_body_fun when is_function(req_body_fun, 1) ->
-        drain_body(req_body_fun, request)
+        legacy_drain_body(req_body_fun, request)
 
       enumerable ->
         {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), request}
     end
   end
 
-  defp drain_body(req_body_fun, request, chunks \\ []) do
+  defp legacy_drain_body(req_body_fun, request, chunks \\ []) do
     case req_body_fun.(request) do
       {:data, chunk, request} ->
-        drain_body(req_body_fun, request, [chunk | chunks])
+        legacy_drain_body(req_body_fun, request, [chunk | chunks])
 
       {:done, request} ->
         binary = chunks |> Enum.reverse() |> IO.iodata_to_binary()
@@ -443,6 +621,45 @@ defmodule Popcorn.Fetch do
         expected req_body_fun to return {:data, chunk, request}, {:done, request},
         or {:halt, request}, got: #{inspect(other)}
         """
+    end
+  end
+
+  defp normalize_body(nil, acc), do: {:ok, nil, acc}
+
+  defp normalize_body(iodata, acc) when is_binary(iodata) or is_list(iodata) do
+    {:ok, IO.iodata_to_binary(iodata), acc}
+  end
+
+  defp normalize_body(req_body_fun, acc) when is_function(req_body_fun, 1) do
+    drain_body(req_body_fun, acc)
+  end
+
+  defp normalize_body(enumerable, acc) do
+    {:ok, enumerable |> Enum.to_list() |> IO.iodata_to_binary(), acc}
+  end
+
+  defp drain_body(req_body_fun, acc, chunks \\ []) do
+    case req_body_fun.(acc) do
+      {:data, chunk, acc} ->
+        drain_body(req_body_fun, acc, [chunk | chunks])
+
+      {:done, chunk, acc} ->
+        binary = [chunk | chunks] |> Enum.reverse() |> IO.iodata_to_binary()
+        {:ok, binary, acc}
+
+      {:done, acc} ->
+        binary = chunks |> Enum.reverse() |> IO.iodata_to_binary()
+        {:ok, binary, acc}
+
+      {:halt, acc} ->
+        {:halt, acc}
+
+      {:error, exception, acc} ->
+        {{:error, exception}, acc}
+
+      other ->
+        raise "expected req_body_fun to return {:data, chunk, acc}, {:done, chunk, acc}, " <>
+                "{:done, acc}, {:halt, acc}, or {:error, exception, acc}, got: #{inspect(other)}"
     end
   end
 

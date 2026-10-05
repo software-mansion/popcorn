@@ -8,8 +8,10 @@ browser `fetch()` API. Use it directly or through Req.
 Add Req to the application dependencies:
 
 ```elixir
-{:req, ">= 0.5.0"}
+{:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0"}
 ```
+
+This Popcorn release supports Req 0.5.x through 0.7.x and Req 0.8.0-rc.0.
 
 Popcorn installs its Req adapter inside the browser runtime. It preserves a
 custom adapter from the Req default options.
@@ -24,7 +26,7 @@ You can also select the adapter for one request:
 response =
   Req.get!(
     "https://api.example.com/status",
-    adapter: Popcorn.Fetch
+    adapter: Popcorn.Fetch.adapter()
   )
 ```
 
