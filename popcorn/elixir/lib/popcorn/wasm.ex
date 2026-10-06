@@ -18,6 +18,13 @@ defmodule Popcorn.Wasm.Error do
   defp format(reason), do: inspect(reason)
 end
 
+defmodule Popcorn.Wasm.Mock do
+  @moduledoc false
+
+  def run_js(_code, _args, _opts), do: nil
+  def send(_message), do: :ok
+end
+
 defmodule Popcorn.Wasm do
   @moduledoc """
   Connects Elixir processes to JavaScript in the browser page.
@@ -44,6 +51,7 @@ defmodule Popcorn.Wasm do
   ## Outside the browser
 
   Use `available?/0` to check if your code is running natively or in the browser.
+  On a native VM, JavaScript calls use a no-op mock so Popcorn applications can run in tests.
   """
 
   # The runtime provides `:wasm`, so the compiler never sees it. Silencing the
@@ -152,5 +160,11 @@ defmodule Popcorn.Wasm do
     bridge().send(message)
   end
 
-  defp bridge, do: Application.get_env(:popcorn, :wasm_bridge, :wasm)
+  defp bridge do
+    Application.get_env(:popcorn, :wasm_bridge) || default_bridge()
+  end
+
+  defp default_bridge do
+    if available?(), do: :wasm, else: Popcorn.Wasm.Mock
+  end
 end

@@ -1,14 +1,9 @@
 defmodule Popcorn.WasmTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case
 
   require Popcorn.Wasm
   alias Popcorn.Wasm
   alias Popcorn.Wasm.FakeBridge
-
-  setup do
-    Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
-    on_exit(fn -> Application.delete_env(:popcorn, :wasm_bridge) end)
-  end
 
   describe "available?/0" do
     test "is false on the host, where the runtime module is absent" do
@@ -34,6 +29,8 @@ defmodule Popcorn.WasmTest do
   end
 
   describe "run_js/3" do
+    setup :use_fake_bridge
+
     test "wraps the bridge result in :ok and forwards args and opts" do
       assert {:ok, %{"args" => %{n: 1}, "opts" => [timeout: 10]}} =
                Wasm.run_js("f", %{n: 1}, timeout: 10)
@@ -59,6 +56,8 @@ defmodule Popcorn.WasmTest do
   end
 
   describe "run_js!/3" do
+    setup :use_fake_bridge
+
     test "returns the result directly" do
       assert %{"args" => %{n: 1}} = Wasm.run_js!("f", %{n: 1})
     end
@@ -106,9 +105,24 @@ defmodule Popcorn.WasmTest do
   end
 
   describe "send/1" do
+    setup :use_fake_bridge
+
     test "delegates to the bridge" do
       assert Wasm.send(%{hello: "js"}) == :ok
       assert Process.get(:sent) == %{hello: "js"}
     end
+  end
+
+  describe "host fallback" do
+    test "uses a no-op mock" do
+      assert {:ok, nil} = Wasm.run_js("f", %{n: 1})
+      assert is_nil(Wasm.run_js!("f", %{n: 1}))
+      assert :ok = Wasm.send(%{hello: "js"})
+    end
+  end
+
+  defp use_fake_bridge(_context) do
+    Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
+    on_exit(fn -> Application.delete_env(:popcorn, :wasm_bridge) end)
   end
 end
