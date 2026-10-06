@@ -8,7 +8,18 @@ defmodule Popcorn.PackagerTest do
     static_dir = Path.join(tmp_dir, "static")
     runtime_dir = Path.join(static_dir, "runtimes/core")
     out_dir = Path.join(tmp_dir, "cooked")
+    build_path = Path.join(tmp_dir, "build/lib")
+    app_dir = Path.join(build_path, "popcorn")
     File.mkdir_p!(runtime_dir)
+    File.mkdir_p!(app_dir)
+
+    File.cp_r!(
+      Path.join(Mix.Project.build_path(), "lib/popcorn/ebin"),
+      Path.join(app_dir, "ebin")
+    )
+
+    File.mkdir_p!(Path.join(app_dir, "priv/nested"))
+    File.write!(Path.join(app_dir, "priv/nested/fixture.txt"), "from priv")
 
     for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
       dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
@@ -27,7 +38,7 @@ defmodule Popcorn.PackagerTest do
 
     result =
       Packager.build(
-        build_path: Path.join(Mix.Project.build_path(), "lib"),
+        build_path: build_path,
         out_dir: out_dir,
         app: "popcorn",
         static_dir: static_dir
@@ -48,6 +59,7 @@ defmodule Popcorn.PackagerTest do
 
     archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
+    assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
