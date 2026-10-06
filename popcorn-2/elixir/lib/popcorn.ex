@@ -25,17 +25,23 @@ defmodule Popcorn do
   - `treeshake` - [Experimental] When `true`, removes unused modules and functions to reduce bundle size.
     Also removes location data (files and line numbers), which results in less useful stack traces.
     Defaults to `false`.
+  - `keep` - List of public functions that must not be removed by the tree-shaker, along with all code they rely on.
+    Passing a module means 'all functions from this module', passing `%{benaviour_impls: behaviour}` means 'all modules implementing this behaviour'.
+    Has no effect unless `treeshake` is enabled.
+    Defaults to `[]`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:extra_beams, [String.t()]}
           | {:treeshake, boolean()}
+          | {:keep, [module() | mfa() | %{behaviour_impls: module()}]}
         ]) :: :ok
   def cook(options \\ []) do
     default_options = [
       out_dir: Popcorn.Config.get(:out_dir),
       treeshake: Popcorn.Config.get(:treeshake),
+      keep: Popcorn.Config.get(:keep),
       start_module: nil,
       extra_beams: []
     ]
@@ -71,13 +77,15 @@ defmodule Popcorn do
     ebins = options.extra_beams ++ get_all_ebins(apps, generated_ebin_dir)
 
     ebins =
-      if options.treeshake, do: treeshake(ebins, boot_module, start_module, tmp_dir), else: ebins
+      if options.treeshake,
+        do: treeshake(ebins, boot_module, start_module, options.keep, tmp_dir),
+        else: ebins
 
     beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
     pack_bundle(options.out_dir, beams, boot_module, options.treeshake)
   end
 
-  defp treeshake(ebin_files, boot_module, start_module, tmp_dir) do
+  defp treeshake(ebin_files, boot_module, start_module, extra_keep, tmp_dir) do
     treeshaked_dir = Path.join(tmp_dir, "treeshaked_ebin")
     File.mkdir!(treeshaked_dir)
 
@@ -98,7 +106,7 @@ defmodule Popcorn do
         %{behaviour_impls: LocalLiveView},
         # Popcorn.Init is called by the boot module, which is ignored (see `:ignore`)
         Popcorn.Init
-        | start_fun
+        | start_fun ++ extra_keep
       ],
       ignore: [
         # Boot module is ignored because it contains hardcoded list of all modules
