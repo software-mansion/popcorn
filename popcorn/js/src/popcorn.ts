@@ -208,6 +208,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
+  private readonly readyWaiters: Uint8Array[] = [];
   private callSeq = 0;
   private readonly trackedValues = new Map<number, TrackedEntry>();
   private trackedKeySeq = 0;
@@ -241,6 +242,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       case "otp:run_js":
         this.vmReady = true;
         this.runJs(data.payload);
+        return;
+      case "otp:await-ready":
+        this.handleReadyRequest(data.payload.replyTo);
         return;
       case "otp:tracked-value-delete":
         this.deleteTrackedValue(data.payload);
@@ -366,6 +370,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.Pid = createPidClass();
     this.io = createIoState();
     this.output = resolveOutputHandlers(this.opts);
+    check(this.readyWaiters.length === 0);
     this.state = { status: "booting" };
 
     return await new Promise<Result<Popcorn<Output>>>((resolve) => {
@@ -403,6 +408,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
             break;
           case "popcorn:boot-end":
             this.state = { status: "booted" };
+            this.flushReadyWaiters();
             settle({ ok: true, data: this });
             break;
           case "popcorn:boot-fail": {
@@ -602,6 +608,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.state = { status: "closed", error };
     this.vmReady = false;
+    this.readyWaiters.length = 0;
     for (const resolve of this.pendingSends.values()) {
       resolve({ ok: false, error });
     }
@@ -812,7 +819,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       for (const { key, value, cleanup } of tracked) {
         this.trackedValues.set(key, { value, cleanup });
       }
-      this.sendRunJsReply(command.data);
+      this.sendBridgeReply(command.data);
       return;
     }
 
@@ -821,7 +828,27 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       error: { unserializable: command.error.data.reason },
     });
     check(failure.ok);
-    this.sendRunJsReply(failure.data);
+    this.sendBridgeReply(failure.data);
+  }
+
+  private handleReadyRequest(replyTo: Uint8Array): void {
+    if (this.state.status === "booted") {
+      this.sendReadyReply(replyTo);
+      return;
+    }
+    check(this.state.status === "booting");
+    this.readyWaiters.push(replyTo);
+  }
+
+  private flushReadyWaiters(): void {
+    for (const replyTo of this.readyWaiters) this.sendReadyReply(replyTo);
+    this.readyWaiters.length = 0;
+  }
+
+  private sendReadyReply(replyTo: Uint8Array): void {
+    const message = serializeSendPayload({ pid: replyTo }, true);
+    check(message.ok);
+    this.sendBridgeReply(message.data);
   }
 
   private asRef(value: unknown): unknown {
@@ -829,10 +856,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return new this.TrackedValue(value);
   }
 
-  private sendRunJsReply(message: BeamSendPayload): void {
+  private sendBridgeReply(message: BeamSendPayload): void {
     toVm(
       this.vmWorker,
-      { type: "popcorn:run-js-reply", payload: { message } },
+      { type: "popcorn:bridge-reply", payload: { message } },
       [message.etf.buffer],
     );
   }

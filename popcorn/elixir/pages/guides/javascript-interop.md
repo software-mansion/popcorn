@@ -20,6 +20,28 @@ the returned value to a BEAM term.
 
 Use `run_js!/3` when a JavaScript error must raise an Elixir exception.
 
+## Wait for JavaScript boot
+
+Browser initialization that starts with the application should run in an
+ordinary supervised Task:
+
+```elixir
+children = [
+  {Task, &MyApp.API.run/0}
+]
+
+defmodule MyApp.API do
+  def run do
+    with :ok <- Popcorn.Wasm.await_ready(),
+         {:ok, _value} <- Popcorn.Wasm.run_js("() => initializeBrowser()") do
+      :ok
+    end
+  end
+end
+```
+
+To avoid racing with remaining JavaScript initialization (after supervision tree started), we use `Popcorn.Wasm.await_ready/1`.
+
 ## Use arguments
 
 Pass data separately from the function source:

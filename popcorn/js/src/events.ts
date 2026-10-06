@@ -32,13 +32,13 @@ type SendEvent = {
   payload: SendRequestPayload;
 };
 
-export type RunJsReplyPayload = {
+export type BridgeReplyPayload = {
   message: BeamSendPayload;
 };
 
-type RunJsReplyEvent = {
-  type: "popcorn:run-js-reply";
-  payload: RunJsReplyPayload;
+type BridgeReplyEvent = {
+  type: "popcorn:bridge-reply";
+  payload: BridgeReplyPayload;
 };
 
 export type SendRequestPayload = {
@@ -65,7 +65,7 @@ type BootEndEvent =
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
 export type MainToVmEvent =
-  BootEvent | SendEvent | RunJsReplyEvent | StdinEvent | TtyResizeEvent;
+  BootEvent | SendEvent | BridgeReplyEvent | StdinEvent | TtyResizeEvent;
 
 /**
  * A decoded BEAM message payload.
@@ -93,6 +93,10 @@ type BridgeEnvelope =
       args: AnyValue;
       reply_to: string;
       return: "value" | "ref";
+    }
+  | {
+      type: "await_ready";
+      reply_to: string;
     };
 
 export function readMainEvent(value: unknown): MainToVmEvent {
@@ -104,7 +108,7 @@ export function readMainEvent(value: unknown): MainToVmEvent {
     case "popcorn:stdin":
     case "popcorn:tty-resize":
     case "popcorn:send":
-    case "popcorn:run-js-reply":
+    case "popcorn:bridge-reply":
       return data as MainToVmEvent;
     default:
       unreachable();
@@ -121,6 +125,7 @@ export function readWorkerEvent(value: unknown): VmToMainEvent {
     case "otp:error":
     case "otp:message":
     case "otp:run_js":
+    case "otp:await-ready":
     case "otp:tracked-value-delete":
     case "popcorn:boot-vm-ready":
     case "popcorn:boot-end":
@@ -161,7 +166,7 @@ export function deserializeBridgeMessage(
   text: string,
 ): Extract<
   BeamEvent,
-  { type: "otp:message" | "otp:error" | "otp:run_js" }
+  { type: "otp:message" | "otp:error" | "otp:run_js" | "otp:await-ready" }
 > | null {
   try {
     const parsed = JSON.parse(text) as unknown;
@@ -184,6 +189,11 @@ export function deserializeBridgeMessage(
             replyTo: base64ToBytes(parsed.reply_to),
             return: parsed.return,
           },
+        };
+      case "await_ready":
+        return {
+          type: "otp:await-ready",
+          payload: { replyTo: base64ToBytes(parsed.reply_to) },
         };
       default:
         return null;
@@ -215,7 +225,12 @@ function getTransferables(event: VmToMainEvent): Transferable[] {
 }
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
-  const KNOWN_MESSAGE_TYPES: unknown[] = ["vm_message", "vm_error", "run_js"];
+  const KNOWN_MESSAGE_TYPES: unknown[] = [
+    "vm_message",
+    "vm_error",
+    "run_js",
+    "await_ready",
+  ];
   const data = objectWithKeys(value, ["type"]);
   return data !== null && KNOWN_MESSAGE_TYPES.includes(data.type);
 }

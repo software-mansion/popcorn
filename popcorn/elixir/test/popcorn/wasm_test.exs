@@ -11,6 +11,17 @@ defmodule Popcorn.WasmTest do
     end
   end
 
+  describe "await_ready/1" do
+    setup :use_fake_bridge
+
+    test "waits until JS is ready" do
+      assert :ok = Wasm.await_ready(timeout: 10)
+      assert [timeout: 10] = Process.get(:await_ready_opts)
+      assert {:error, :timeout} = Wasm.await_ready(timeout: 0)
+      assert_raise FunctionClauseError, fn -> apply(Wasm, :await_ready, [:infinity]) end
+    end
+  end
+
   describe "is_message/1" do
     test "matches messages from JS" do
       assert Wasm.is_message({:wasm, %{"a" => 1}})
@@ -115,6 +126,7 @@ defmodule Popcorn.WasmTest do
 
   describe "host fallback" do
     test "uses a no-op mock" do
+      assert :ok = Wasm.await_ready(timeout: 10)
       assert {:ok, nil} = Wasm.run_js("f", %{n: 1})
       assert is_nil(Wasm.run_js!("f", %{n: 1}))
       assert :ok = Wasm.send(%{hello: "js"})

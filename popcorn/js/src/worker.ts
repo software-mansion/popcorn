@@ -54,7 +54,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
       });
       break;
     }
-    case "popcorn:run-js-reply": {
+    case "popcorn:bridge-reply": {
       // ignore the `send()` result, process could've died
       check(instance !== null);
       instance.send(data.payload.message);

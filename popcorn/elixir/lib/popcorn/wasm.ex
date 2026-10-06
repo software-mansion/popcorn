@@ -21,6 +21,7 @@ end
 defmodule Popcorn.Wasm.Mock do
   @moduledoc false
 
+  def await_ready(_opts), do: :ok
   def run_js(_code, _args, _opts), do: nil
   def send(_message), do: :ok
 end
@@ -91,6 +92,42 @@ defmodule Popcorn.Wasm do
   @spec available?() :: boolean()
   def available? do
     Code.ensure_loaded?(:wasm) and function_exported?(:wasm, :run_js, 3)
+  end
+
+  @doc """
+  Waits until the JavaScript `Popcorn` instance has finished booting.
+
+  Use this only from asynchronous work whose process startup has already been
+  acknowledged, such as the body of a supervised `Task`:
+
+  ```elixir
+  children = [
+    {Task, &MyApp.API.run/0}
+  ]
+
+  def run do
+    with :ok <- Popcorn.Wasm.await_ready(),
+         {:ok, _value} <- Popcorn.Wasm.run_js("() => initializeBrowser()") do
+      :ok
+    end
+  end
+  ```
+
+  ## Options
+
+  - `:timeout` - the reply timeout, or `:infinity`. Defaults to `5_000` ms.
+
+  ## Notes
+  - Do not call this function from `Application.start/2`, `c:GenServer.init/1`, a
+  child `start_link` path that has not returned, or an OTP start phase — it will deadlock.
+
+
+  """
+  @spec await_ready(run_js_opts()) :: :ok | {:error, :timeout}
+  def await_ready(opts \\ []) when is_list(opts) do
+    bridge().await_ready(opts)
+  catch
+    :error, :await_ready_timeout -> {:error, :timeout}
   end
 
   @doc """
