@@ -17,7 +17,7 @@ defmodule Popcorn.Application do
     opts = Application.get_env(:req, :default_options, [])
 
     if not Keyword.has_key?(opts, :adapter) do
-      opts = Keyword.put(opts, :adapter, Popcorn.Fetch)
+      opts = Keyword.put(opts, :adapter, Popcorn.Fetch.adapter())
       Application.put_env(:req, :default_options, opts)
       Logger.debug(app: :popcorn, message: "using Popcorn.Fetch as Req's adapter")
     end

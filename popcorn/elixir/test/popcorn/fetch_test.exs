@@ -75,7 +75,82 @@ defmodule Popcorn.FetchTest do
     end
   end
 
-  describe "run/1 as a Req adapter" do
+  describe "Req adapter" do
+    if Code.ensure_loaded?(Req.Adapter) do
+      test "threads request and response streams through the callback" do
+        FakeBridge.stub_fetch(%{
+          status: 201,
+          headers: [{"x-fetch", "streamed"}],
+          chunks: ["one", "two"]
+        })
+
+        body = fn
+          [] -> {:data, "pay", [:body_started]}
+          [:body_started] -> {:done, "load", [:body_done, :body_started]}
+        end
+
+        request =
+          Req.new(
+            method: :post,
+            url: "https://example.test/x",
+            headers: [{"x-request", "yes"}],
+            body: body
+          )
+
+        callback = fn event, response, acc, state ->
+          {:ok, response, [event | acc], [event | state]}
+        end
+
+        assert {:ok, response, acc, state} = Fetch.stream(request, [], callback, [])
+        assert %Req.Response{status: 201, request: ^request} = response
+        assert ["streamed"] = Req.Response.get_header(response, "x-fetch")
+
+        assert [
+                 {:data, "two"},
+                 {:data, "one"},
+                 {:headers, [{"x-fetch", "streamed"}]},
+                 {:status, 201},
+                 :body_done,
+                 :body_started
+               ] = acc
+
+        assert [
+                 {:data, "two"},
+                 {:data, "one"},
+                 {:headers, [{"x-fetch", "streamed"}]},
+                 {:status, 201}
+               ] = state
+
+        assert %{body: encoded_body, headers: headers} = FakeBridge.fetch_request()
+        assert Base.decode64!(encoded_body) == "payload"
+        assert ["x-request", "yes"] in headers
+      end
+
+      test "returns request body errors before starting fetch" do
+        error = RuntimeError.exception("upload failed")
+
+        request =
+          Req.new(url: "https://example.test/", body: fn :start -> {:error, error, :failed} end)
+
+        callback = fn event, response, acc, state -> {:ok, response, [event | acc], state} end
+
+        assert {{:error, ^error}, response, :failed, [:wrapper]} =
+                 Fetch.stream(request, :start, callback, [:wrapper])
+
+        assert %Req.Response{status: nil, body: nil, request: ^request} = response
+        assert is_nil(FakeBridge.fetch_request())
+      end
+    end
+
+    test "supports the legacy run contract" do
+      FakeBridge.stub_fetch(%{status: 201, chunks: ["legacy"]})
+      request = Req.new(method: :post, url: "https://example.test/", body: "payload")
+
+      assert {^request, %Req.Response{status: 201, body: "legacy"}} = Fetch.run(request)
+      assert %{body: encoded_body} = FakeBridge.fetch_request()
+      assert Base.decode64!(encoded_body) == "payload"
+    end
+
     test "translates requests and composes with Req steps" do
       FakeBridge.stub_fetch(%{
         status: 200,
@@ -85,7 +160,7 @@ defmodule Popcorn.FetchTest do
 
       assert %{status: 200, body: %{"a" => 1}} =
                Req.post!("https://example.test/x",
-                 adapter: Fetch,
+                 adapter: adapter(),
                  body: "payload",
                  headers: [{"x-test", "1"}]
                )
@@ -101,7 +176,7 @@ defmodule Popcorn.FetchTest do
       FakeBridge.stub_fetch(%{error: "TypeError: Failed to fetch"})
 
       assert {:error, %Req.TransportError{reason: {:fetch, _}}} =
-               Req.get("https://example.test/", adapter: Fetch, retry: false)
+               Req.get("https://example.test/", adapter: adapter(), retry: false)
     end
 
     test "streams into functions and collectables" do
@@ -109,7 +184,7 @@ defmodule Popcorn.FetchTest do
 
       response =
         Req.get!("https://example.test/",
-          adapter: Fetch,
+          adapter: adapter(),
           into: fn {:data, data}, {req, resp} ->
             {:cont, {req, update_in(resp.body, &(&1 <> data))}}
           end
@@ -121,7 +196,7 @@ defmodule Popcorn.FetchTest do
 
       halted =
         Req.get!("https://example.test/",
-          adapter: Fetch,
+          adapter: adapter(),
           into: fn {:data, data}, {req, resp} ->
             {:halt, {req, update_in(resp.body, &(&1 <> data))}}
           end
@@ -132,14 +207,14 @@ defmodule Popcorn.FetchTest do
 
       FakeBridge.stub_fetch(%{chunks: ["x", "y"]})
 
-      response = Req.get!("https://example.test/", adapter: Fetch, into: [])
+      response = Req.get!("https://example.test/", adapter: adapter(), into: [])
       assert response.body == ["x", "y"]
     end
 
     test "streams into the mailbox and aborts receive timeouts" do
       FakeBridge.stub_fetch(%{status: 200, chunks: ["one", "two"]})
 
-      response = Req.get!("https://example.test/", adapter: Fetch, into: :self)
+      response = Req.get!("https://example.test/", adapter: adapter(), into: :self)
       assert response.status == 200
       assert Enum.to_list(response.body) == ["one", "two"]
 
@@ -147,7 +222,7 @@ defmodule Popcorn.FetchTest do
 
       response =
         Req.get!("https://example.test/",
-          adapter: Fetch,
+          adapter: adapter(),
           into: :self,
           receive_timeout: 10
         )
@@ -155,5 +230,9 @@ defmodule Popcorn.FetchTest do
       assert_raise Req.TransportError, fn -> Enum.to_list(response.body) end
       assert FakeBridge.fetch_aborted?()
     end
+  end
+
+  defp adapter do
+    Fetch.adapter()
   end
 end

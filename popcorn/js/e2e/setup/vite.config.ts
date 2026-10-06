@@ -8,6 +8,25 @@ function httpEndpoints(): Plugin {
   return {
     name: "e2e-http-endpoints",
     configureServer(server) {
+      server.middlewares.use("/req/get", (_req, res) => {
+        res.statusCode = 206;
+        res.setHeader("content-type", "text/plain");
+        res.setHeader("x-popcorn-fixture", "get");
+        res.write("browser-");
+        setTimeout(() => res.end("stream"), 10);
+      });
+
+      server.middlewares.use("/req/post", (req, res) => {
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk: Buffer) => chunks.push(chunk));
+        req.on("end", () => {
+          res.statusCode = 201;
+          res.setHeader("content-type", "application/octet-stream");
+          res.setHeader("x-popcorn-fixture", "post");
+          res.end(Buffer.concat(chunks));
+        });
+      });
+
       server.middlewares.use("/echo", (req, res) => {
         const chunks: Buffer[] = [];
         req.on("data", (chunk: Buffer) => chunks.push(chunk));

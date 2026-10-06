@@ -483,11 +483,34 @@ test.describe("fetch", () => {
         {ok, DefaultOptions} = application:get_env(req, default_options),
         'Elixir.Popcorn.Fetch' = proplists:get_value(adapter, DefaultOptions),
         {ok, _} = application:ensure_all_started(req),
-        Response = 'Elixir.Req':'get!'(<<"${FETCH_URL}">>, [
-          {decode_body, true}
+        {ok, GetResponse, GetChunks} = 'Elixir.Req':stream(
+          <<"/req/get">>,
+          [],
+          fun(Data, _Response, Chunks) -> {cont, [Data | Chunks]} end,
+          [{decode_body, false}]
+        ),
+        GetStatus = maps:get(status, GetResponse),
+        GetHeaders = 'Elixir.Req.Fields':get_list(maps:get(headers, GetResponse)),
+        GetBody = iolist_to_binary(lists:reverse(GetChunks)),
+        ok = wasm:send(#{
+          get_status => GetStatus,
+          get_headers => GetHeaders,
+          get_body => GetBody
+        }),
+
+        Payload = <<"posted through Req">>,
+        PostResponse = 'Elixir.Req':'post!'(<<"/req/post">>, [
+          {body, Payload},
+          {decode_body, false}
         ]),
-        Status = maps:get(status, Response),
-        Body = maps:get(body, Response),
+        PostStatus = maps:get(status, PostResponse),
+        PostHeaders = 'Elixir.Req.Fields':get_list(maps:get(headers, PostResponse)),
+        PostBody = maps:get(body, PostResponse),
+        ok = wasm:send(#{
+          post_status => PostStatus,
+          post_headers => PostHeaders,
+          post_body => PostBody
+        }),
 
         ok = application:stop(popcorn),
         ok = application:set_env(req, default_options, [
@@ -498,17 +521,23 @@ test.describe("fetch", () => {
         'Elixir.Req.Finch' = proplists:get_value(adapter, UpdatedOptions),
 
         ok = wasm:send(#{
-          status => Status,
-          has_vm => is_map_key(<<"vm">>, Body),
           adapter_preserved => true
         }).
       `),
     );
     assert(boot.ok);
 
-    expect(await otp.waitForEvent("status")).toEqual({
-      status: 200,
-      has_vm: true,
+    expect(await otp.waitForEvent("get_status")).toEqual({
+      get_status: 206,
+      get_headers: expect.arrayContaining([["x-popcorn-fixture", "get"]]),
+      get_body: "browser-stream",
+    });
+    expect(await otp.waitForEvent("post_status")).toEqual({
+      post_status: 201,
+      post_headers: expect.arrayContaining([["x-popcorn-fixture", "post"]]),
+      post_body: "posted through Req",
+    });
+    expect(await otp.waitForEvent("adapter_preserved")).toEqual({
       adapter_preserved: true,
     });
   });
