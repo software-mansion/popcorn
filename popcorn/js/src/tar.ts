@@ -20,6 +20,8 @@ const T = {
   PREFIX_N: 155,
   /// entry type=dir, '5' in ASCII
   TYPE_DIR: 53,
+  /// entry type=PAX extended header, 'x' in ASCII
+  TYPE_PAX: 120,
 };
 
 type OnDir = (path: string) => void;
@@ -33,29 +35,101 @@ export function extractTar(
   check(data.length % T.BLK_N === 0, "tar:bad_chunk");
   const decoder = new TextDecoder();
   let offset = 0;
+  let paxPath: string | null = null;
 
   while (offset + T.BLK_N <= data.length) {
     const header = data.slice(offset, offset + T.BLK_N);
-    if (isZeroBlock(header)) break;
+    if (isZeroBlock(header)) {
+      check(paxPath === null, "tar:dangling_pax");
+      break;
+    }
 
     const name = readString(decoder, header, T.NAME_OFF, T.NAME_N);
     const prefix = readString(decoder, header, T.PREFIX_OFF, T.PREFIX_N);
-    const fullName = prefix ? `${prefix}/${name}` : name;
+    const headerName = prefix ? `${prefix}/${name}` : name;
     const size = parseOctal(readString(decoder, header, T.SIZE_OFF, T.SIZE_N));
     const type = header[T.TYPEFLAG_OFF];
 
     offset += T.BLK_N;
+    check(offset + size <= data.length, "tar:truncated_entry");
+    const contents = data.slice(offset, offset + size);
 
-    const path = fullName.startsWith("/") ? fullName : `/${fullName}`;
-    if (type === T.TYPE_DIR) {
-      onDir(path);
-    } else if (fullName) {
-      const contents = data.slice(offset, offset + size);
-      onFile(path, contents);
+    if (type === T.TYPE_PAX) {
+      check(paxPath === null, "tar:unexpected_pax");
+      paxPath = readPaxPath(decoder, contents);
+    } else {
+      const fullName = paxPath ?? headerName;
+      paxPath = null;
+      const path = fullName.startsWith("/") ? fullName : `/${fullName}`;
+      if (type === T.TYPE_DIR) {
+        onDir(path);
+      } else if (fullName) {
+        onFile(path, contents);
+      }
     }
 
     offset += Math.ceil(size / T.BLK_N) * T.BLK_N;
   }
+
+  check(paxPath === null, "tar:dangling_pax");
+}
+
+function readPaxPath(decoder: TextDecoder, data: Uint8Array): string {
+  let offset = 0;
+  let path: string | null = null;
+
+  while (offset < data.length) {
+    const { length, recordStart } = readPaxLength(decoder, data, offset);
+    const recordEnd = offset + length;
+    offset = recordEnd;
+
+    const [key, value] = readPaxRecord(decoder, data, recordStart, recordEnd);
+
+    if (key === "path") {
+      check(value.length > 0, "tar:bad_pax_path");
+      path = value;
+    }
+  }
+
+  check(path !== null, "tar:missing_pax_path");
+  return path;
+}
+
+function readPaxLength(
+  decoder: TextDecoder,
+  data: Uint8Array,
+  offset: number,
+): { length: number; recordStart: number } {
+  const SPACE = 32;
+  const separator = data.indexOf(SPACE, offset);
+  check(separator > offset, "tar:bad_pax_length");
+
+  const source = decoder.decode(data.subarray(offset, separator));
+  const length = Number(source);
+
+  const isInt =
+    Number.isSafeInteger(length) && length >= 0 && String(length) === source;
+  check(isInt, "tar:bad_pax_length");
+
+  return { length, recordStart: separator + 1 };
+}
+
+function readPaxRecord(
+  decoder: TextDecoder,
+  data: Uint8Array,
+  start: number,
+  end: number,
+): [key: string, value: string] {
+  const record = decoder.decode(data.subarray(start, end));
+  check(record.endsWith("\n"), "tar:bad_pax_record");
+
+  const separator = record.indexOf("=");
+  check(separator > 0, "tar:bad_pax_record");
+  const key = record.slice(0, separator);
+  // drop '\n'
+  const value = record.slice(separator + 1, -1);
+
+  return [key, value];
 }
 
 function isZeroBlock(block: Uint8Array): boolean {
