@@ -21,12 +21,10 @@ RUN apt-get -y update && \
     automake make gcc g++ libssl-dev libncurses-dev \
     default-jre-headless python3 xz-utils gpg wget
 
-RUN wget -q https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.gz && \
-    tar xzf autoconf-2.72.tar.gz && \
-    cd autoconf-2.72 && \
-    ./configure --prefix=/usr/local && \
-    make -j1 && \
-    make install
+RUN wget -q https://mirrors.kernel.org/ubuntu/pool/main/a/autoconf/autoconf_2.72-3.1ubuntu2_all.deb && \
+    echo "9edd0db0fa94580ab013529d6842a8e89b8ed22ab337da5e95cbb43971978815  autoconf_2.72-3.1ubuntu2_all.deb" | sha256sum -c - && \
+    apt-get -y install ./autoconf_2.72-3.1ubuntu2_all.deb && \
+    rm autoconf_2.72-3.1ubuntu2_all.deb
 
 # install mise
 RUN install -dm 755 /etc/apt/keyrings && \
