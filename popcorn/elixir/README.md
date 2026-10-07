@@ -27,7 +27,7 @@ Add the Elixir package to your Mix dependencies:
 
 ```elixir
 defp deps do
-  [{:popcorn, "0.4.0-next.1"}]
+  [{:popcorn, "0.4.0-next.2"}]
 end
 ```
 
@@ -38,7 +38,7 @@ Use `runtimeVariant` to override the selection. Both variants use this Hex packa
 
 Fetch your application dependencies with `mix deps.get` before building its JavaScript assets.
 The bundler plugin invokes `mix popcorn.cook`, which compiles and packages your application and its standard-library dependencies.
-Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.1/mise.toml) for this release.
+Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.2/mise.toml) for this release.
 
 You can also prepare the complete browser asset directory without a JavaScript
 bundler:
@@ -50,9 +50,9 @@ mix popcorn.cook --out-dir priv/static/popcorn
 The task uses the current Mix application by default. Use `--no-app` to package
 the base runtime without an entrypoint.
 
-Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.1/introduction.html).
-Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.1/first-application.html).
+Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.2/introduction.html).
+Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.2/first-application.html).
 
-The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.1/popcorn/js/README.md)
+The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.2/popcorn/js/README.md)
 contains a short package reference. The versioned documentation contains the
 complete Elixir and JavaScript API reference.
