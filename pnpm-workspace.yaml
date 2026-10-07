@@ -10,6 +10,7 @@ packages:
   - examples/game-of-life/assets
   - examples/local-lv-kanban/test/playwright
   - local-live-view
+  - local-live-view/test/e2e/playwright
   - landing-page
   - language-tour
 

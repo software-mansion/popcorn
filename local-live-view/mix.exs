@@ -14,7 +14,7 @@ defmodule LocalLiveView.MixProject do
       app: :local_live_view,
       version: @version,
       elixir: "~> 1.17",
-      elixirc_paths: elixirc_paths(Mix.target()),
+      elixirc_paths: elixirc_paths(Mix.target()) ++ test_elixirc_paths(Mix.env(), Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       preferred_cli_target: [
@@ -76,6 +76,9 @@ defmodule LocalLiveView.MixProject do
       {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
       # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
       {:cowlib, "~> 2.13", override: true, runtime: false, only: :test},
+      # For the e2e tests' app, see test/e2e/README.md
+      {:bandit, "~> 1.5", runtime: false, only: :test},
+      {:esbuild, "~> 0.8", runtime: false, only: :test},
       {:phoenix, "~> 1.8.4", runtime: false},
       {:phoenix_live_view, "~> 1.1", runtime: false},
       {:phoenix_html, "~> 4.1", runtime: false},
@@ -147,6 +150,11 @@ defmodule LocalLiveView.MixProject do
 
   defp elixirc_paths(:wasm), do: ["lib/shared", "lib/local_live_view", "lib/stubs"]
   defp elixirc_paths(_), do: ["lib/shared", "lib/server", "lib/mix"]
+
+  # The app the e2e tests run against, and its local views, which the app
+  # renders on the server. See test/e2e/README.md.
+  defp test_elixirc_paths(:test, :host), do: ["test/e2e/support", "test/e2e/local/lib"]
+  defp test_elixirc_paths(_env, _target), do: []
 
   defp aliases() do
     [

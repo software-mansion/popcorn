@@ -130,8 +130,10 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
 
   defp start_phoenix_server(project_dir) do
     Task.start_link(fn ->
-      System.shell(
-        "mix phx.server",
+      # No shell around the server, which would report it being killed
+      System.cmd(
+        "mix",
+        ["phx.server"],
         cd: project_dir,
         env: [{"PORT", to_string(@port)}, {"MIX_ENV", "dev"}],
         into: IO.stream(:stdio, :line)
@@ -139,14 +141,33 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     end)
   end
 
+  # Kills the server listening on `port` along with every process it started:
+  # its watchers (esbuild, tailwind and LocalLiveView's Wasm build) and their
+  # children would outlive it otherwise, and fail writing to its closed output.
+  # They aren't in its process group, so the tree is walked from the server,
+  # stopping each process before listing its children, so that none can start
+  # another one in the meantime.
   defp kill_port(port) do
-    System.shell("lsof -ti :#{port} | xargs -r kill -9 2>/dev/null", into: "")
+    {pids, _status} = System.shell("lsof -ti tcp:#{port} -sTCP:LISTEN")
+
+    pids
+    |> String.split("\n", trim: true)
+    |> Enum.flat_map(&stop_tree/1)
+    |> Enum.each(&signal("KILL", &1))
+  end
+
+  defp stop_tree(pid) do
+    signal("STOP", pid)
+    {children, _status} = System.cmd("pgrep", ["-P", pid])
+    [pid | children |> String.split("\n", trim: true) |> Enum.flat_map(&stop_tree/1)]
+  end
+
+  defp signal(signal, pid) do
+    System.cmd("kill", ["-#{signal}", pid], stderr_to_stdout: true)
   end
 
   defp kill_phoenix_subprocesses do
     kill_port(@port)
-    System.shell("pkill -f 'esbuild.*test_app' 2>/dev/null", into: "")
-    System.shell("pkill -f 'tailwind.*test_app' 2>/dev/null", into: "")
   end
 
   # --- Utilities ---
