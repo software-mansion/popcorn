@@ -19,7 +19,7 @@ runs:
         import os, tomllib
         from pathlib import Path
 
-        tools = tomllib.loads(Path("popcorn/mise.toml").read_text())["tools"]
+        tools = tomllib.loads(Path("mise.toml").read_text())["tools"]
         otp = tools["erlang"]
         elixir = tools["elixir"].split("-otp-", 1)[0]
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:

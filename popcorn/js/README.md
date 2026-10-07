@@ -18,7 +18,7 @@ Run `mix deps.get` before building the JavaScript application. The bundler
 plugins invoke Mix locally to compile and package application and
 standard-library code.
 
-Use the toolchain pinned in [popcorn/mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.1/popcorn/mise.toml).
+Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.1/mise.toml).
 The packager checks host OTP compatibility against the selected runtime's manifest.
 
 ## Configure Vite
