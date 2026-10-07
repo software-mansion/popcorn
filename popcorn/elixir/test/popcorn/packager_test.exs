@@ -7,9 +7,9 @@ defmodule Popcorn.PackagerTest do
   test "build/1: complete output", %{tmp_dir: tmp_dir} do
     static_dir = Path.join(tmp_dir, "static")
     runtime_dir = Path.join(static_dir, "runtimes/core")
-    out_dir = Path.join(tmp_dir, "cooked")
     build_path = Path.join(tmp_dir, "build/lib")
     app_dir = Path.join(build_path, "popcorn")
+    out_dir = Path.join(app_dir, "priv/static/popcorn")
     File.mkdir_p!(runtime_dir)
     File.mkdir_p!(app_dir)
 
@@ -60,6 +60,7 @@ defmodule Popcorn.PackagerTest do
     archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
     assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
+    refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
