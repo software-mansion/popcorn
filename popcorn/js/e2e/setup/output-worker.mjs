@@ -1,8 +1,10 @@
 let ttySize;
+let noshell;
 
 self.onmessage = (event) => {
   if (event.data?.type === "popcorn:boot") {
     ttySize = event.data.payload.ttySize;
+    noshell = event.data.payload.noshell;
     emit("otp:stdout", [0xf0, 0x9f]);
     emit("otp:stderr", [0xf0, 0x9f, 0x9a]);
     emit("otp:stdout", [0x91, 0xa9, 0xe2, 0x80]);
@@ -23,7 +25,7 @@ self.onmessage = (event) => {
     self.postMessage({ type: "otp:stdin-consumed", payload: 1 });
     self.postMessage({
       type: "otp:message",
-      payload: command === 2 ? { ttySize } : { command },
+      payload: command === 2 ? { ttySize, noshell } : { command },
     });
   }
 };

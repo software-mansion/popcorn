@@ -308,7 +308,7 @@ test.describe("lifecycle", () => {
           if (!write.ok) throw new Error("stdin command failed");
         });
 
-      // Default text decodes split UTF-8 and uses 80×24.
+      // Default text decodes split UTF-8, uses 80×24 and no shell.
       const stdout: string[] = [];
       const stderr: string[] = [];
       const text = new window.Popcorn({
@@ -321,7 +321,7 @@ test.describe("lifecycle", () => {
       const ctrlD = await command(text, 4);
       text.deinit();
 
-      // init infers byte callbacks and forwards custom size.
+      // init infers byte callbacks and forwards custom size; tty keeps the shell.
       const rawStdout: number[][] = [];
       const rawStderr: number[][] = [];
       const init = await window.Popcorn.init({
@@ -374,9 +374,15 @@ test.describe("lifecycle", () => {
         [0x8d, 0xf0, 0x9f, 0x9a, 0x80],
       ],
       rawStderr: [[0xf0, 0x9f, 0x9a], [0x80]],
-      defaultSize: { ttySize: { columns: 80, rows: 24 } },
+      defaultSize: {
+        ttySize: { columns: 80, rows: 24 },
+        noshell: true,
+      },
       ctrlD: { command: 4 },
-      customSize: { ttySize: { columns: 100, rows: 30 } },
+      customSize: {
+        ttySize: { columns: 100, rows: 30 },
+        noshell: false,
+      },
       rebootStdout: ["👩‍🚀"],
     });
   });

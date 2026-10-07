@@ -430,7 +430,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       this.vmWorker.addEventListener("message", onBootMessage);
       toVm(this.vmWorker, {
         type: "popcorn:boot",
-        payload: { ...this.opts.beam, ttySize: this.ttySize },
+        payload: {
+          ...this.opts.beam,
+          ttySize: this.ttySize,
+          noshell: this.opts.tty === undefined,
+        },
       });
     });
   }

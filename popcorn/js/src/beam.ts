@@ -88,6 +88,7 @@ async function boot(
     extraArgs,
     env,
     ttySize,
+    noshell,
     createModule,
     emit,
   } = opts;
@@ -141,6 +142,7 @@ async function boot(
     arguments: buildArgs({
       appNames: fsData.appNames,
       entrypoint: fsData.entrypoint,
+      noshell,
       emulator: emulatorArgs ?? [],
       extra: extraArgs ?? [],
     }),
@@ -220,6 +222,7 @@ function toPopcornError(error: unknown): PopcornError {
 type BuildArgsArgs = {
   appNames: string[];
   entrypoint: string | null;
+  noshell: boolean;
   emulator: string[];
   extra: string[];
 };
@@ -227,10 +230,13 @@ type BuildArgsArgs = {
 function buildArgs({
   appNames,
   entrypoint,
+  noshell,
   emulator,
   extra,
 }: BuildArgsArgs): string[] {
   const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
+
+  if (noshell) args.push("-noshell");
 
   for (const app of CORE_APPS) {
     args.push("-pa", `/lib/${app}/ebin`);

@@ -3,6 +3,21 @@
 Popcorn can connect BEAM terminal input and output to a browser terminal.
 The IEx example uses this API.
 
+## Enable the terminal
+
+Popcorn starts the VM with `-noshell`, so no Erlang shell runs. Pass `tty` to
+`Popcorn.init` to start the shell and attach it to your terminal. Use `tty: {}`
+for the default size:
+
+```typescript
+const result = await Popcorn.init({
+  tty: { size: { columns: terminal.cols, rows: terminal.rows } },
+});
+```
+
+`beam.extraArgs` cannot re-enable the shell, because `erl` has no flag that
+cancels `-noshell`.
+
 ## Receive output
 
 Pass output handlers when you start Popcorn:

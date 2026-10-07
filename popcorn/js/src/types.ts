@@ -44,6 +44,7 @@ export type BeamBootOptions = {
   /** VM environment variables. */
   env?: Record<string, string>;
   ttySize: TtySize;
+  noshell: boolean;
   createModule: CreateModuleFn<EmscriptenModule>;
   emit: (event: BeamEvent) => void;
 };
