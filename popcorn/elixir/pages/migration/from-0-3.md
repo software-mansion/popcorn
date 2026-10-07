@@ -28,7 +28,7 @@ Replace the Popcorn dependency in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:popcorn, "0.4.0-next.0"}
+    {:popcorn, "0.4.0-next.1"}
   ]
 end
 ```
