@@ -1,3 +1,39 @@
+diff --git a/erts/emulator/beam/erl_init.c b/erts/emulator/beam/erl_init.c
+--- a/erts/emulator/beam/erl_init.c
++++ b/erts/emulator/beam/erl_init.c
+@@ -2699,6 +2699,32 @@
+ {
+     system_cleanup(flush);
+ 
++#ifdef ERTS_EMSCRIPTEN
++    {
++        extern void js_bridge_on_error(const char *, int);
++        int hasMessage = fmt != NULL && *fmt != '\0';
++        int isExitCode = n == ERTS_ERROR_EXIT || n == ERTS_DUMP_EXIT || n == ERTS_ABORT_EXIT;
++        int isErrorCodeWithMessage = n > 0 && hasMessage;
++
++        if (isExitCode || isErrorCodeWithMessage) {
++            if (hasMessage) {
++                erts_dsprintf_buf_t *message = erts_create_tmp_dsbuf(0);
++                va_list args;
++                int messageLength;
++                va_copy(args, args2);
++                messageLength = erts_vdsprintf(message, fmt, args);
++                va_end(args);
++                ASSERT(messageLength >= 0);
++                js_bridge_on_error(message->str, messageLength);
++                erts_destroy_tmp_dsbuf(message);
++            } else {
++                js_bridge_on_error("Erlang VM terminated",
++                                   sizeof("Erlang VM terminated") - 1);
++            }
++        }
++    }
++#endif
++
+     if (fmt != NULL && *fmt != '\0')
+ 	erl_error(fmt, args2);	/* Print error message. */
+ 
 diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
 index d77f46fc7cf16dd1644ed1777137762870ca7880..ae77630dba5020c6fb2e7329e4050312e4867947 100644
 --- a/erts/emulator/Makefile.in
