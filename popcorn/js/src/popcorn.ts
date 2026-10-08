@@ -28,6 +28,11 @@ const UTF8 = new TextEncoder();
 const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
 const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
 
+type MemoryLimits = {
+  mobile?: `${number}${"M" | "G"}`;
+  desktop?: `${number}${"M" | "G"}`;
+};
+
 /** Output type for a terminal. */
 type TtyOutput = "text" | "bytes";
 type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
@@ -37,6 +42,12 @@ type OutputChunk<Output extends TtyOutput> = Output extends "bytes"
 /** Browser VM configuration. */
 export type PopcornOpts<Output extends TtyOutput = "text"> = {
   beam?: Pick<BeamBootOptions, "emulatorArgs" | "extraArgs" | "env"> & {
+    /**
+     * Maximum Wasm linear memory by platform. Omitted keys default to
+     * mobile: "256M", desktop: "2G". M and G mean MiB and GiB.
+     * Limits must be in 64 KiB increments between 64 MiB and 2 GiB.
+     */
+    maxMemory?: MemoryLimits;
     /**
      * Asset directory URL.
      *
@@ -201,6 +212,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts<Output>;
+  private readonly maxMemoryBytes: number;
   private readonly ttySize: TtySize;
   private output: OutputHandlers;
   private requestSeq = 0;
@@ -284,13 +296,14 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         opts.beam.otpAssetsRoot.endsWith("/"),
       "otpAssetsRoot must end with a slash",
     );
+    const { maxMemory, ...beam } = opts.beam ?? {};
+    this.maxMemoryBytes = resolveMaxMemory(maxMemory);
     this.opts = {
       ...opts,
       beam: {
-        ...opts.beam,
+        ...beam,
         emulatorArgs:
-          opts.beam?.emulatorArgs ??
-          schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
+          beam.emulatorArgs ?? schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
       },
     };
     this.ttySize = { ...ttySize };
@@ -432,6 +445,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         type: "popcorn:boot",
         payload: {
           ...this.opts.beam,
+          maxMemoryBytes: this.maxMemoryBytes,
           ttySize: this.ttySize,
           noshell: this.opts.tty === undefined,
         },
@@ -973,6 +987,29 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.deinit(exitReason(payload));
   }
+}
+
+function resolveMaxMemory(limits: MemoryLimits | undefined): number {
+  const mobileLimit = parseMemorySize(limits?.mobile ?? "256M");
+  const desktopLimit = parseMemorySize(limits?.desktop ?? "2G");
+  const mobile = /Android|Mobile|iPad|iPhone|iPod/.test(navigator.userAgent);
+  const ipad =
+    /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
+  return mobile || ipad ? mobileLimit : desktopLimit;
+}
+
+function parseMemorySize(size: string): number {
+  const match = /^(\d+(?:\.\d+)?)([MG])$/.exec(size);
+  check(match !== null, 'maxMemory must use M or G, such as "256M" or "2G"');
+  const bytes = Number(match[1]) * (match[2] === "M" ? 1024 ** 2 : 1024 ** 3);
+  check(
+    Number.isSafeInteger(bytes) &&
+      bytes >= 64 * 1024 * 1024 &&
+      bytes <= 2 * 1024 * 1024 * 1024 &&
+      bytes % 65536 === 0,
+    "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
+  );
+  return bytes;
 }
 
 /**

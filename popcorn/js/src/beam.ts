@@ -168,6 +168,13 @@ async function boot(
   };
 
   try {
+    if (opts.maxMemoryBytes !== undefined) {
+      moduleConfig.wasmMemory = new WebAssembly.Memory({
+        initial: 1024,
+        maximum: opts.maxMemoryBytes / 65536,
+        shared: true,
+      });
+    }
     const ready = Promise.all([vmReady, appReady]);
     const module = await createModule(moduleConfig);
     check(state.module === module);

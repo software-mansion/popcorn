@@ -21,6 +21,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         emulatorArgs: data.payload.emulatorArgs,
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,
+        maxMemoryBytes: data.payload.maxMemoryBytes,
         ttySize: data.payload.ttySize,
         noshell: data.payload.noshell,
         createModule,

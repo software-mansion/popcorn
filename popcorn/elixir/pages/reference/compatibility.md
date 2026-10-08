@@ -21,6 +21,30 @@ Test each dependency against the selected Popcorn release.
 | Application `priv` files          | Manual        | The packager does not copy them.                               |
 | Mix runtime configuration         | Manual        | The packager does not transfer it into the browser.            |
 
+## Browser memory
+
+Each VM starts with 64 MiB of shared Wasm linear memory. It can grow to 256 MiB
+on phones and tablets, or 2 GiB on desktop. Popcorn uses the browser's user agent
+and touch support to select the platform, including iPads in desktop mode.
+This is a device heuristic, not a measurement of available memory.
+
+Configure the limits for an application that needs a different budget:
+
+```javascript
+const result = await Popcorn.init({
+  beam: { maxMemory: { mobile: "512M", desktop: "1G" } },
+});
+```
+
+Omit `maxMemory` to keep the defaults. Each key can be overridden separately;
+for example, `{ mobile: "512M" }` keeps the desktop limit at 2 GiB.
+Only `M` and `G` suffixes are supported; they mean MiB and GiB.
+
+Each limit must be a multiple of 64 KiB between 64 MiB and 2 GiB. It applies to
+Wasm linear memory; JavaScript, the virtual filesystem, and browser resources
+use additional memory. A browser can refuse an allocation below the configured
+limit. Lower limits reduce the memory available to large BEAM workloads.
+
 ## Toolchain compatibility
 
 Use the toolchain linked from the selected Popcorn release. The packager checks
