@@ -4,7 +4,7 @@ Run Elixir in a browser with OTP/BEAM compiled to WebAssembly.
 This prerelease replaces the AtomVM runtime used by Popcorn 0.3.x.
 
 Start with the
-[versioned Popcorn guide](https://popcorn.hexdocs.pm/0.4.0-next.2/introduction.html).
+[versioned Popcorn guide](https://popcorn.hexdocs.pm/0.4.0-next.3/introduction.html).
 It includes a complete Mix and Vite tutorial.
 
 ## Install
@@ -13,12 +13,12 @@ It includes a complete Mix and Vite tutorial.
 npm install @swmansion/popcorn@next
 ```
 
-Add `{:popcorn, "0.4.0-next.2"}` to your Elixir application's dependencies.
+Add `{:popcorn, "0.4.0-next.3"}` to your Elixir application's dependencies.
 Run `mix deps.get` before building the JavaScript application. The bundler
 plugins invoke Mix locally to compile and package application and
 standard-library code.
 
-Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.2/mise.toml).
+Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.3/mise.toml).
 The packager checks host OTP compatibility against the selected runtime's manifest.
 
 ## Configure Vite
@@ -85,4 +85,4 @@ Serve `.wasm` as `application/wasm`. Serve compressed `.tar.gz` files with `Cont
 The package also emits uncompressed tar files and Brotli variants. Brotli uses standard effort by default. Set `brotliEffort: "max"` for maximum compression in release builds.
 
 The JavaScript bridge currently requires a Content Security Policy that permits `unsafe-eval`.
-See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.2/) for interoperability details.
+See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.3/) for interoperability details.

@@ -30,7 +30,7 @@ stable npm channel remains on Popcorn 0.3 until the 0.4 release.
 The stable documentation is available at <https://hexdocs.pm/popcorn>.
 
 The versioned 0.4 prerelease documentation is available at
-<https://popcorn.hexdocs.pm/0.4.0-next.2/>.
+<https://popcorn.hexdocs.pm/0.4.0-next.3/>.
 
 ## Examples
 
