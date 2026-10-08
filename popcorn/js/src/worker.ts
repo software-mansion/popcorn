@@ -22,6 +22,7 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,
         ttySize: data.payload.ttySize,
+        noshell: data.payload.noshell,
         createModule,
         emit: toMain,
       });
