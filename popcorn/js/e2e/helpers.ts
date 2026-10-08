@@ -36,6 +36,8 @@ type OtpFactory = (id?: string) => Promise<OtpHandle>;
 type Otp = {
   id: string;
   events: PopcornEvent[];
+  errors: OtpErrorPayload[];
+  waitForError(): Promise<OtpErrorPayload>;
   boot(options: InitOptions): Promise<BootResult>;
   send(target: string | Pid, payload?: unknown): Promise<BootResult>;
   genserver: {
@@ -89,6 +91,7 @@ export const test = base.extend<Fixtures>({
 
 export class OtpHandle {
   public readonly events = new Set<PopcornEvent>();
+  public readonly errors: OtpErrorPayload[] = [];
   public readonly genserver = {
     call: async (
       target: string | JSHandle<Pid>,
@@ -128,7 +131,7 @@ export class OtpHandle {
       (otp, initOptions) => otp.boot(initOptions),
       options,
     );
-    await this.syncEvents();
+    await this.syncState();
     return result;
   }
 
@@ -140,7 +143,7 @@ export class OtpHandle {
       (otp, args) => otp.send(args.target, args.payload),
       { target, payload },
     );
-    await this.syncEvents();
+    await this.syncState();
     return result;
   }
 
@@ -149,8 +152,14 @@ export class OtpHandle {
       (otp, eventName) => otp.waitForEvent(eventName),
       name,
     );
-    await this.syncEvents();
+    await this.syncState();
     return event;
+  }
+
+  public async waitForError(): Promise<OtpErrorPayload> {
+    const error = await this.otp.evaluate((otp) => otp.waitForError());
+    await this.syncState();
+    return error;
   }
 
   public async eventValueHandle<T>(name: string): Promise<JSHandle<T>> {
@@ -179,8 +188,12 @@ export class OtpHandle {
     return this.otpHandle;
   }
 
-  private async syncEvents(): Promise<void> {
-    const events = await this.otp.evaluate((otp) => otp.events);
+  private async syncState(): Promise<void> {
+    const { events, errors } = await this.otp.evaluate((otp) => ({
+      events: otp.events,
+      errors: otp.errors,
+    }));
+    this.errors.splice(0, this.errors.length, ...errors);
     this.events.clear();
     for (const event of events) {
       this.events.add(event);
@@ -219,6 +232,7 @@ function createOtp(id: string): Otp {
   class Otp {
     public readonly id = id;
     public readonly events: PopcornEvent[] = [];
+    public readonly errors: OtpErrorPayload[] = [];
     public readonly genserver = {
       call: async (
         target: string | Pid,
@@ -244,6 +258,7 @@ function createOtp(id: string): Otp {
     };
 
     private popcornHandle: Popcorn | null = null;
+    private errorWaiter: ((error: OtpErrorPayload) => void) | null = null;
     private readonly eventWaiters = new Map<string, Array<EventWaiter>>();
 
     public async boot(options: InitOptions): Promise<BootResult> {
@@ -285,6 +300,16 @@ function createOtp(id: string): Otp {
       });
     }
 
+    public async waitForError(): Promise<OtpErrorPayload> {
+      if (this.errors.length > 0) {
+        return this.errors[0];
+      }
+      check(this.errorWaiter === null, "Already waiting for an error");
+      return await new Promise<OtpErrorPayload>((resolve) => {
+        this.errorWaiter = resolve;
+      });
+    }
+
     public eventValue(name: string): unknown {
       const event = this.findEvent(name);
       check(event !== null, `Missing event: ${name}`);
@@ -313,7 +338,12 @@ function createOtp(id: string): Otp {
         ...options,
         onStdout: (text) => console.log(`${this.logPrefix} stdout:`, text),
         onStderr: (text) => console.error(`${this.logPrefix} stderr:`, text),
-        onError: (event) => logOtpError(this.logPrefix, event),
+        onError: (event) => {
+          this.errors.push(event);
+          this.errorWaiter?.(event);
+          this.errorWaiter = null;
+          logOtpError(this.logPrefix, event);
+        },
       };
     }
 

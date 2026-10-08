@@ -6,6 +6,7 @@ import type {
   BeamSendPayload,
   BeamTarget,
   EmscriptenModule,
+  OtpErrorPayload,
 } from "./types";
 import {
   check,
@@ -112,24 +113,33 @@ async function boot(
     LINES: String(ttySize.rows),
     ERL_INETRC: INETRC_PATH,
   };
+  let emitError: ((payload: OtpErrorPayload) => void) | null = function (payload) {
+    emitError = null;
+    state.isVmReady = false;
+    emit({ type: "otp:error", payload });
+  };
   const moduleConfig: Partial<EmscriptenModule> = {
     print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
     printErr: (text) =>
       emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
-    onExit: (code) =>
-      emit({ type: "otp:error", payload: { kind: "exit", data: code } }),
-    onAbort: (text) =>
-      emit({ type: "otp:error", payload: { kind: "abort", data: text } }),
+    onExit: (code) => emitError?.({ kind: "exit", data: code }),
+    onAbort: (text) => emitError?.({ kind: "abort", data: text }),
     onBeamMessage: (text) => {
+      if (emitError === null) {
+        return;
+      }
       const event = deserializeBridgeMessage(text);
       if (event === null) return;
+      if (event.type === "otp:error") {
+        emitError(event.payload);
+        return;
+      }
       if (handleVmReady(event)) return;
       if (handleAppReady(event)) return;
 
       emit(event);
     },
-    onError: (text) =>
-      emit({ type: "otp:error", payload: { kind: "error", data: text } }),
+    onError: (text) => emitError?.({ kind: "error", data: text }),
     onStdinConsumed: (size) =>
       emit({ type: "otp:stdin-consumed", payload: size }),
     onTrackedValueDelete: (key) =>

@@ -137,6 +137,21 @@ test.describe("boot", () => {
     });
   });
 
+  test("kernel failure", async ({ otp }) => {
+    test.setTimeout(10_000);
+    const boot = await otp.boot({
+      beam: { extraArgs: ["-user", "missing_user"] },
+      timeoutsMs: { boot: 30_000, appStartup: 30_000 },
+    });
+
+    const diagnostic = expect.stringMatching(/Kernel pid terminated.*missing_user/s);
+    expect(boot).toEqual({
+      ok: false,
+      error: { t: "vm:exited", data: { reason: "error", data: diagnostic } },
+    });
+    expect(otp.errors).toEqual([{ kind: "error", data: diagnostic }]);
+  });
+
   test("schedulers", async ({ otp }) => {
     const boot = await otp.boot({
       beam: {
@@ -226,6 +241,36 @@ test.describe("boot", () => {
 });
 
 test.describe("runtime", () => {
+  test("shutdown", async ({ createOtp }) => {
+    for (const [expression, error] of [
+      [
+        'erlang:halt("fatal diagnostic")',
+        { kind: "error", data: "fatal diagnostic\n" },
+      ],
+      ["erlang:halt(abort)", { kind: "error", data: "Erlang VM terminated" }],
+      ["init:stop()", { kind: "exit", data: 0 }],
+      ["erlang:halt(7)", { kind: "exit", data: 7 }],
+    ] as const) {
+      const otp = await createOtp();
+      const boot = await otp.boot(evalOpts(`
+        true = register(shutdown_test, self()),
+        wasm:send(#{shutdown_ready => true}),
+        receive {wasm, _} -> ${expression} end.
+      `));
+      assert(boot.ok);
+      await otp.waitForEvent("shutdown_ready");
+
+      const sent = await otp.send("shutdown_test", true);
+      assert(sent.ok);
+      expect(await otp.waitForError()).toEqual(error);
+      expect(otp.errors).toEqual([error]);
+      expect(await otp.send("shutdown_test", true)).toEqual({
+        ok: false,
+        error: { t: "vm:exited", data: { reason: error.kind, data: error.data } },
+      });
+    }
+  });
+
   test("spawning OS processes don't kill the VM", async ({ otp }) => {
     const boot = await otp.boot(
       evalOpts(`
