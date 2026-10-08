@@ -43,6 +43,8 @@ export type BeamBootOptions = {
   extraArgs?: string[];
   /** VM environment variables. */
   env?: Record<string, string>;
+  /** Resolved maximum Wasm linear memory in bytes. */
+  maxMemoryBytes?: number;
   ttySize: TtySize;
   noshell: boolean;
   createModule: CreateModuleFn<EmscriptenModule>;
@@ -86,6 +88,7 @@ export type TtySize = {
 
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
+  wasmMemory?: WebAssembly.Memory;
   ENV: Record<string, string>;
   FS_mkdirTree: (path: string) => void;
   FS_createDataFile: (

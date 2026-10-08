@@ -1,9 +1,176 @@
-import { schedulers } from "@swmansion/popcorn";
+import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 const FETCH_URL = "/assets/otp/manifest.json";
+type MemoryProbe = {
+  descriptor: WebAssembly.MemoryDescriptor;
+  memory: WebAssembly.Memory;
+};
 
 test.describe("boot", () => {
+  test("memory limits", async ({ page, createOtp }) => {
+    await page.route("**/worker.mjs*", async (route) => {
+      const response = await route.fetch();
+      const source = await response.text();
+      await route.fulfill({
+        response,
+        body: `
+          WebAssembly.Memory = new Proxy(WebAssembly.Memory, {
+            construct(target, args) {
+              const memory = Reflect.construct(target, args);
+              self.memoryProbe = { descriptor: args[0], memory };
+              return memory;
+            }
+          });
+          ${source}
+        `,
+      });
+    });
+
+    const cases: {
+      userAgent: string;
+      touch: number;
+      maximum: number;
+      maxMemory?: NonNullable<PopcornOpts["beam"]>["maxMemory"];
+      grow?: boolean;
+    }[] = [
+      {
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+        touch: 0,
+        maximum: 32768,
+        maxMemory: { mobile: "128M" },
+      },
+      {
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS) Mobile",
+        touch: 5,
+        maximum: 4096,
+        maxMemory: { mobile: "256M", desktop: "2G" },
+      },
+      { userAgent: "Mozilla/5.0 (Linux; Android 16)", touch: 5, maximum: 4096 },
+      {
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+        touch: 5,
+        maximum: 4096,
+        maxMemory: { desktop: "1G" },
+      },
+      {
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS) Mobile",
+        touch: 5,
+        maximum: 2048,
+        maxMemory: { mobile: "128M" },
+        grow: true,
+      },
+      {
+        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)",
+        touch: 0,
+        maximum: 16384,
+        maxMemory: { desktop: "1G" },
+      },
+    ];
+
+    for (const device of cases) {
+      await page.evaluate(({ userAgent, touch }) => {
+        Object.defineProperty(navigator, "userAgent", {
+          configurable: true,
+          value: userAgent,
+        });
+        Object.defineProperty(navigator, "maxTouchPoints", {
+          configurable: true,
+          value: touch,
+        });
+      }, device);
+
+      const otp = await createOtp();
+      const workerStarted = page.waitForEvent("worker", (worker) =>
+        worker.url().includes("worker.mjs"),
+      );
+      let extraArgs: string[] = [];
+      if (device.grow) {
+        extraArgs = [
+          "-eval",
+          `
+          true = register(memory_probe, self()),
+          Binary = binary:copy(<<0>>, 80 * 1024 * 1024),
+          wasm:send(#{memory_growth => byte_size(Binary)}),
+          receive {wasm, _} -> wasm:send(#{memory_kept => byte_size(Binary)}) end.
+        `,
+        ];
+      }
+      const boot = await otp.boot({
+        beam: { maxMemory: device.maxMemory, extraArgs },
+      });
+      assert(boot.ok);
+      const worker = await workerStarted;
+      const descriptor = await worker.evaluate(() => {
+        const probe = (self as unknown as { memoryProbe: MemoryProbe })
+          .memoryProbe;
+        return probe.descriptor;
+      });
+      expect(descriptor).toEqual({
+        initial: 1024,
+        maximum: device.maximum,
+        shared: true,
+      });
+
+      if (device.grow) {
+        expect(await otp.waitForEvent("memory_growth")).toEqual({
+          memory_growth: 80 * 1024 * 1024,
+        });
+        const growth = await worker.evaluate(() => {
+          const probe = (self as unknown as { memoryProbe: MemoryProbe })
+            .memoryProbe;
+          const memory = probe.memory;
+          const before = memory.buffer.byteLength;
+          memory.grow(2048 - memory.buffer.byteLength / 65536);
+          let capped = false;
+          try {
+            memory.grow(1);
+          } catch (error) {
+            capped = error instanceof RangeError;
+          }
+          return { before, bytes: memory.buffer.byteLength, capped };
+        });
+        expect(growth.before).toBeGreaterThan(64 * 1024 * 1024);
+        expect(growth.bytes).toBe(device.maximum * 65536);
+        expect(growth.capped).toBe(true);
+        assert((await otp.send("memory_probe", true)).ok);
+        expect(await otp.waitForEvent("memory_kept")).toEqual({
+          memory_kept: 80 * 1024 * 1024,
+        });
+      }
+      await otp.deinit();
+    }
+
+    const invalid = await page.evaluate(() =>
+      ["256K", "3G", "64.01M"].map((size) => {
+        try {
+          new window.Popcorn({
+            beam: { maxMemory: { mobile: size as `${number}M` } },
+          });
+          return null;
+        } catch (error) {
+          if (!(error instanceof Error)) throw error;
+          return error.cause;
+        }
+      }),
+    );
+    expect(invalid).toEqual([
+      {
+        t: "internal:check",
+        data: {
+          detail: 'maxMemory must use M or G, such as "256M" or "2G"',
+        },
+      },
+      ...Array(2).fill({
+        t: "internal:check",
+        data: {
+          detail:
+            "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
+        },
+      }),
+    ]);
+  });
+
   test("apps and eval", async ({ otp }) => {
     const boot = await otp.boot(
       evalOpts(`

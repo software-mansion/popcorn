@@ -13,7 +13,12 @@ type BootEvent = {
   type: "popcorn:boot";
   payload: Pick<
     BeamBootOptions,
-    "emulatorArgs" | "extraArgs" | "env" | "ttySize" | "noshell"
+    | "emulatorArgs"
+    | "extraArgs"
+    | "env"
+    | "maxMemoryBytes"
+    | "ttySize"
+    | "noshell"
   > & { otpAssetsRoot?: string };
 };
 

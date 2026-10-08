@@ -71,6 +71,15 @@ vm.deinit();
 `popcorn.genserver.call()` to call a supervised GenServer from JavaScript.
 Use `popcorn.onEvent()` to receive events from BEAM processes.
 
+Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on
+phones/tablets or 2 GiB on desktop. Device detection uses the browser's user
+agent and touch support. Configure the limits with
+`Popcorn.init({ beam: { maxMemory: { mobile: "256M", desktop: "2G" } } })`.
+Omit `maxMemory` to keep these defaults, or override either key separately.
+Only `M` and `G` suffixes are supported; they mean MiB and GiB.
+The limit must be a multiple of 64 KiB between 64 MiB and 2 GiB; JavaScript and
+filesystem memory are additional.
+
 ## Serve in production
 
 Serve over HTTPS or localhost. Set these headers on the application and runtime responses:
