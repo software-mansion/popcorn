@@ -71,14 +71,14 @@ defmodule Mix.Tasks.Popcorn.Dev do
 
       Application.ensure_all_started(:bandit)
 
-      plug = [
-        {Popcorn.DevServer.Router, dir},
+      bandit = [
+        plug: {Popcorn.DevServer.Router, dir},
         scheme: :http,
         port: port,
         startup_log: false
       ]
 
-      {:ok, _} = Supervisor.start_link([{Bandit, plug: plug}], strategy: :one_for_one)
+      {:ok, _} = Supervisor.start_link([{Bandit, bandit}], strategy: :one_for_one)
 
       IO.puts("Serving #{Path.relative_to(dir, File.cwd!())}")
       IO.puts("Popcorn dev server: http://localhost:#{port}")
