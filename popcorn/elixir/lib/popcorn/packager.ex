@@ -760,10 +760,23 @@ defmodule Popcorn.Packager do
     compatible = runtime_major - 2 <= host_major and version_lte?(host, runtime)
 
     if compatible do
+      if Enum.take(host, 2) != Enum.take(runtime, 2) do
+        warn("""
+        Native OTP #{host_version} differs from Popcorn's OTP #{runtime_version} version.
+        This can cause runtime crashes.
+
+        Consider using matching major and minor OTP version.
+        """)
+      end
+
       :ok
     else
       err(:unsupported_otp, {host_version, runtime_version})
     end
+  end
+
+  defp warn(msg) do
+    IO.puts(:stderr, IO.ANSI.format([:yellow, msg]))
   end
 
   defp host_otp_version do
