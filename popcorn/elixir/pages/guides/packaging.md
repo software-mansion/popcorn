@@ -19,6 +19,32 @@ bundler:
 </script>
 ```
 
+## Develop locally
+
+Run the development task from your Mix project:
+
+```console
+mix popcorn.dev
+```
+
+It cooks the application, serves `priv/static` at `http://localhost:4000` with
+COOP and COEP headers, and cooks again when source files change. Open your
+`priv/static/index.html` page and refresh the browser after a successful cook.
+Project configuration, `priv` files, and local path dependency sources are
+watched through native filesystem events using `file_system`. Generated cook
+output is excluded. If a rebuild fails, fix the source
+and the next edit triggers another cook.
+
+The task accepts every `popcorn.cook` option, plus `--dir` and `--port`:
+
+```console
+mix popcorn.dev --dir public --out-dir public/popcorn --port 8080
+```
+
+The server installs Bandit and Plug in a separate process on its first run,
+which requires network access. They are not added to your application's
+dependencies. On Linux, install `inotify-tools` for the file watcher.
+
 ## Select the entrypoint
 
 Set the application in the bundler configuration:
