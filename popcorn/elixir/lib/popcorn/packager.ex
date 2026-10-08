@@ -118,29 +118,33 @@ defmodule Popcorn.Packager do
 
     out_dir = options |> Keyword.fetch!(:out_dir) |> Path.expand(root_dir)
     static_dir = options |> Keyword.fetch!(:static_dir) |> Path.expand(root_dir)
-    packed_dir = Path.join(out_dir, ".packager")
+
+    tmp_dir_name = "popcorn-packager-#{System.pid()}-#{System.unique_integer([:positive])}"
+    packed_dir = Path.join(System.tmp_dir!(), tmp_dir_name)
 
     File.rm_rf!(out_dir)
     File.mkdir_p!(out_dir)
 
     result =
-      with {:ok, report} <-
-             pack(%{
-               build_path: build_path,
-               entrypoint_app: options[:app],
-               extra_apps: options[:extra_apps],
-               out_dir: packed_dir,
-               runtimes_dir: Path.join(static_dir, "runtimes"),
-               runtime_variant: options[:runtime_variant],
-               strip: options[:strip],
-               treeshake: options[:treeshake]
-             }),
-           {:ok, installed} <-
-             install_output(report, static_dir, out_dir, options[:brotli_effort]) do
-        {:ok, installed}
+      try do
+        with {:ok, report} <-
+               pack(%{
+                 build_path: build_path,
+                 entrypoint_app: options[:app],
+                 extra_apps: options[:extra_apps],
+                 out_dir: packed_dir,
+                 runtimes_dir: Path.join(static_dir, "runtimes"),
+                 runtime_variant: options[:runtime_variant],
+                 strip: options[:strip],
+                 treeshake: options[:treeshake]
+               }),
+             {:ok, installed} <-
+               install_output(report, static_dir, out_dir, options[:brotli_effort]) do
+          {:ok, installed}
+        end
+      after
+        File.rm_rf!(packed_dir)
       end
-
-    File.rm_rf!(packed_dir)
 
     case result do
       {:ok, _report} = ok ->
