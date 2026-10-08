@@ -17,6 +17,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
     preserved_app: [:string, :keep]
   ]
 
+  @doc false
+  def switches, do: @switches
+
   @impl Mix.Task
   def run(argv) do
     Mix.Task.run("compile")
