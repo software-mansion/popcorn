@@ -7,13 +7,13 @@ defmodule Mix.Tasks.Popcorn.Dev do
 
   Accepts all `mix popcorn.cook` options, plus:
 
-    * `--dir` - directory to serve (default: `priv/static`)
+    * `--dir` - directory to serve (default: `public`)
     * `--port` - HTTP port (default: `4000`)
 
   On Linux, file watching requires `inotify-tools`.
 
       mix popcorn.dev
-      mix popcorn.dev --dir public --out-dir public/popcorn --port 8080
+      mix popcorn.dev --dir www --out-dir www/out --port 8080
   """
 
   defmacrop server_script do
@@ -98,8 +98,8 @@ defmodule Mix.Tasks.Popcorn.Dev do
     end
 
     cook_args = options |> Keyword.drop([:dir, :port]) |> OptionParser.to_argv()
-    dir = options |> Keyword.get(:dir, "priv/static") |> Path.expand()
-    out_dir = options |> Keyword.get(:out_dir, "priv/static/popcorn") |> Path.expand()
+    dir = options |> Keyword.get(:dir, "public") |> Path.expand()
+    out_dir = options |> Keyword.get(:out_dir, "public/out") |> Path.expand()
     port = Keyword.get(options, :port, 4000)
 
     Mix.Task.run("deps.loadpaths")

@@ -4,15 +4,18 @@
 Vite, Rollup, and esbuild plugins invoke the same task.
 
 ```console
-mix popcorn.cook --out-dir priv/static/popcorn
+mix popcorn.cook --out-dir public/out
 ```
+
+Keep the output outside `priv`: Mix packs `priv` into the application archive, so
+the assets would ship twice.
 
 The output includes the browser API and can be loaded without a JavaScript
 bundler:
 
 ```html
 <script type="module">
-  import { Popcorn } from "/popcorn/index.mjs";
+  import { Popcorn } from "/out/index.mjs";
 
   const result = await Popcorn.init();
   if (!result.ok) throw result.error;
@@ -27,9 +30,9 @@ Run the development task from your Mix project:
 mix popcorn.dev
 ```
 
-It cooks the application, serves `priv/static` at `http://localhost:4000` with
+It cooks the application, serves `public` at `http://localhost:4000` with
 COOP and COEP headers, and cooks again when source files change. Open your
-`priv/static/index.html` page and refresh the browser after a successful cook.
+`public/index.html` page and refresh the browser after a successful cook.
 Project configuration, `priv` files, and local path dependency sources are
 watched through native filesystem events using `file_system`. Generated cook
 output is excluded. If a rebuild fails, fix the source
@@ -38,7 +41,7 @@ and the next edit triggers another cook.
 The task accepts every `popcorn.cook` option, plus `--dir` and `--port`:
 
 ```console
-mix popcorn.dev --dir public --out-dir public/popcorn --port 8080
+mix popcorn.dev --port 8080
 ```
 
 The server installs Bandit and Plug in a separate process on its first run,

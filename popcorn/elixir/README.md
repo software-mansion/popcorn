@@ -44,7 +44,7 @@ You can also prepare the complete browser asset directory without a JavaScript
 bundler:
 
 ```console
-mix popcorn.cook --out-dir priv/static/popcorn
+mix popcorn.cook --out-dir public/out
 ```
 
 The task uses the current Mix application by default. Use `--no-app` to package
