@@ -438,6 +438,8 @@ build_beam() {
 
     local extra_emcc_link_flags
     extra_emcc_link_flags=$(emulator_link_settings "${mode}")
+    local clock_library="${PROJECT_ROOT}/popcorn/emscripten/monotonic-clock.js"
+    extra_emcc_link_flags+=" --js-library ${clock_library}"
     # Set up JS bridge link flags if the bridge exists in the patched source
     local js_bridge_dir="${beam_dir}/erts/emulator/js_bridge"
     if [[ -d "${js_bridge_dir}" ]]; then
@@ -452,6 +454,12 @@ build_beam() {
         extra_emcc_link_flags+=" -Oz --closure 1"
     fi
     export EXTRA_EMCC_LINK_FLAGS="${extra_emcc_link_flags}"
+
+    # OTP's makefiles do not track external JS libraries.
+    if [[ "${clock_library}" -nt "${beam_dir}/bin/wasm32-unknown-emscripten/beam.emu" ]]; then
+        rm -f "${beam_dir}/bin/wasm32-unknown-emscripten/beam.emu" \
+            "${beam_dir}/bin/wasm32-unknown-emscripten/beam.smp"
+    fi
 
     # erts/lib_src target dir is created on first build only
     if [[ ! -d "${beam_dir}/erts/lib_src/wasm32-unknown-emscripten" ]]; then
