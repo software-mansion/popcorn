@@ -5,4 +5,5 @@ config :popcorn,
   # Temporarily off: the dispatcher now drives the real Phoenix.Socket stack
   # (Phoenix.Socket, Channel.Server, PoolSupervisor), which is wired through
   # dynamic calls the treeshaker cannot see; keeps are not in place yet.
-  treeshake: true
+  treeshake: true,
+  static_boot: true

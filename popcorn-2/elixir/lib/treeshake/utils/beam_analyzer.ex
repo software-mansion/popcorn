@@ -209,10 +209,10 @@ defmodule Treeshake.Utils.BeamAnalyzer do
 
   # Functions of the form remote_mod:fun(M, F, Args, ...) where M and F are atom
   # literals and Args is the argument list — extract as a static call to M:F/arity.
-  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:apply/3,
+  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:spawn_monitor/3, erlang:apply/3,
   # erlang:spawn_opt/4, proc_lib:start*/3-5, proc_lib:spawn*/3-5, etc.
   @mfa_callers %{
-    erlang: [:spawn, :spawn_link, :apply],
+    erlang: [:spawn, :spawn_link, :spawn_monitor, :spawn_opt, :apply],
     proc_lib: [:start, :start_link, :start_monitor, :spawn, :spawn_link, :spawn_opt, :spawn_mon]
   }
 
@@ -223,16 +223,13 @@ defmodule Treeshake.Utils.BeamAnalyzer do
        when is_atom(m) and is_atom(f) and is_map_key(@mfa_callers, mod) do
     funs = Map.fetch!(@mfa_callers, mod)
 
-    if fun in funs do
-      own =
-        case count_list(args_expr) do
-          {:ok, arity} -> [{m, f, arity}]
-          :error -> []
-        end
-
-      [{mod, fun, length(all_args)}] ++ own ++ collect_calls(args_expr) ++ collect_calls(rest)
+    with true <- fun in funs,
+         {:ok, arity} <- count_list(args_expr) do
+      [{mod, fun, length(all_args)}, {m, f, arity}] ++
+        collect_calls(args_expr) ++ collect_calls(rest)
     else
-      [{mod, fun, length(all_args)}] ++ collect_calls(all_args)
+      # Unknown arity: at least keep `m` as a potential module reference
+      _other -> [{mod, fun, length(all_args)}] ++ collect_calls(all_args)
     end
   end
 

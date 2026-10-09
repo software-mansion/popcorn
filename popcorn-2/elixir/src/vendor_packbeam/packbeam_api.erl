@@ -752,10 +752,24 @@ uncompress_literals(Chunks) ->
 
 %% @private
 write_packbeam(OutputFilePath, ParsedFiles) ->
+    print_element_sizes(ParsedFiles),
     PackedData =
         [<<?AVM_HEADER>> | [pack_data(ParsedFile) || ParsedFile <- ParsedFiles]] ++
             [create_header(0, 0, <<"end">>)],
     file:write_file(OutputFilePath, PackedData).
+
+%% @private
+print_element_sizes(ParsedFiles) ->
+    Sizes = [
+        {get_element_name(ParsedFile), byte_size(get_element_data(ParsedFile))}
+     || ParsedFile <- ParsedFiles
+    ],
+    lists:foreach(
+        fun({Name, Size}) ->
+            io:format("~10B  ~s~n", [Size, Name])
+        end,
+        lists:reverse(lists:keysort(2, Sizes))
+    ).
 
 %% @private
 pack_data(ParsedFile) ->
