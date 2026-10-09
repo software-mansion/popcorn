@@ -42,7 +42,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     packager_options = [
       root_dir: File.cwd!(),
       build_path: Path.join(Mix.Project.build_path(), "lib"),
-      out_dir: Keyword.get(options, :out_dir, "priv/static/popcorn"),
+      out_dir: Keyword.get(options, :out_dir, "public/out"),
       app: entrypoint(options),
       extra_apps: Keyword.get_values(options, :extra_app),
       runtime_variant: options[:runtime_variant],
