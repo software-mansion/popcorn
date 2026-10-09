@@ -15,6 +15,8 @@ defmodule Popcorn do
     defexception [:message]
   end
 
+  @type treeshake_opts() :: [{:keep, [module() | mfa() | %{behaviour_impls: module()}]}]
+
   @doc """
   Builds a Popcorn `.avm` bundle.
 
@@ -22,15 +24,20 @@ defmodule Popcorn do
   - `out_dir` - The directory to write artifacts to. Required, unless provided via `config.exs`.
   - `start_module` - Optional; a module with `start/0` function that will be called after applications start.
   - `extra_beams` - Compiled BEAMs that should be included in the generated bundle.
-  - `treeshake` - [Experimental] When `true`, removes unused modules and functions to reduce bundle size.
+  - `treeshake` - [Experimental] When `true` or a keyword list of options, removes unused modules and functions to reduce bundle size.
     Also removes location data (files and line numbers), which results in less useful stack traces.
-    Defaults to `false`.
+    Defaults to `false`. Accepts the following options:
+    - `keep` - List of public functions that must not be removed by the tree-shaker, along with all code they rely on.
+      Passing a module means 'all functions from this module', passing `%{behaviour_impls: behaviour}` means
+      'all modules implementing this behaviour'. This can be used for including modules that the tree-shaker
+      cannot detect, or to temporarily work around a tree-shaker malfunction. In the latter case, please
+      submit an issue/PR to Popcorn. Defaults to `[]`.
   """
   @spec cook([
           {:out_dir, String.t()}
           | {:start_module, module}
           | {:extra_beams, [String.t()]}
-          | {:treeshake, boolean()}
+          | {:treeshake, boolean() | treeshake_opts()}
         ]) :: :ok
   def cook(options \\ []) do
     default_options = [
@@ -40,7 +47,16 @@ defmodule Popcorn do
       extra_beams: []
     ]
 
-    options = options |> Keyword.validate!(default_options) |> Map.new()
+    options =
+      options
+      |> Keyword.validate!(default_options)
+      |> Map.new()
+      |> Map.update!(:treeshake, fn
+        false -> false
+        true -> %{keep: []}
+        opts -> opts |> Keyword.validate!(keep: []) |> Map.new()
+      end)
+
     ensure_option_present(options, :out_dir, "Output directory")
     File.mkdir_p!(options.out_dir)
 
@@ -71,13 +87,15 @@ defmodule Popcorn do
     ebins = options.extra_beams ++ get_all_ebins(apps, generated_ebin_dir)
 
     ebins =
-      if options.treeshake, do: treeshake(ebins, boot_module, start_module, tmp_dir), else: ebins
+      if options.treeshake,
+        do: treeshake(ebins, boot_module, start_module, options.treeshake, tmp_dir),
+        else: ebins
 
     beams = Enum.filter(ebins, &(Path.extname(&1) == ".beam"))
-    pack_bundle(options.out_dir, beams, boot_module, options.treeshake)
+    pack_bundle(options.out_dir, beams, boot_module, options.treeshake != false)
   end
 
-  defp treeshake(ebin_files, boot_module, start_module, tmp_dir) do
+  defp treeshake(ebin_files, boot_module, start_module, options, tmp_dir) do
     treeshaked_dir = Path.join(tmp_dir, "treeshaked_ebin")
     File.mkdir!(treeshaked_dir)
 
@@ -98,7 +116,7 @@ defmodule Popcorn do
         %{behaviour_impls: LocalLiveView},
         # Popcorn.Init is called by the boot module, which is ignored (see `:ignore`)
         Popcorn.Init
-        | start_fun
+        | start_fun ++ options.keep
       ],
       ignore: [
         # Boot module is ignored because it contains hardcoded list of all modules
