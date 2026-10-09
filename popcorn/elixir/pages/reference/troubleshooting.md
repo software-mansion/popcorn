@@ -33,8 +33,8 @@ Update the policy only after you review its security effect.
 
 ## A GenServer call returns `genserver:noproc`
 
-Confirm that the target has a registered name. Confirm that the application
-supervises both the target and `Popcorn.Proxy`.
+Confirm that the target has a registered name and the application supervises it.
+The `:popcorn` application automatically supervises the default `Popcorn.Proxy`.
 
 Use the same name in JavaScript and Elixir. JavaScript uses a string such as
 `"counter"` for the Elixir name `:counter`.

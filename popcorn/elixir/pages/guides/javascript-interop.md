@@ -82,8 +82,8 @@ Popcorn.Wasm.run_js!(
 
 The BEAM process receives `{:wasm, %{"event" => "refresh"}}`.
 
-The action object also provides `call` and `cast`. Those actions require a
-running `Popcorn.Proxy`.
+The action object also provides `call` and `cast`. The `:popcorn` application
+automatically starts `Popcorn.Proxy` in WASM for these actions.
 
 ## Keep a JavaScript object
 
