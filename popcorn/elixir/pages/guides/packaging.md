@@ -46,7 +46,9 @@ mix popcorn.dev --port 8080
 
 The server installs Bandit and Plug in a separate process on its first run,
 which requires network access. They are not added to your application's
-dependencies. On Linux, install `inotify-tools` for the file watcher.
+dependencies. On Linux, install `inotify-tools` for the file watcher. If watching
+cannot start, the task warns and keeps serving the initial build. Restart
+`mix popcorn.dev` after editing Elixir sources in this mode.
 
 ## Select the entrypoint
 
