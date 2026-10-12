@@ -73,7 +73,7 @@ defmodule Mix.Tasks.Llv.InstallTest do
       + |import { LLVEngine } from "local_live_view";
       """)
       |> assert_has_patch(@app_js_path, """
-      + |const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+      + |const llvEngine = LLVEngine.create(liveSocket);
       """)
       |> assert_has_patch(@app_js_path, """
       + |llvEngine.connect();
@@ -103,7 +103,6 @@ defmodule Mix.Tasks.Llv.InstallTest do
     test "creates all the local/* template files" do
       installed()
       |> assert_creates("local/mix.exs")
-      |> assert_creates("local/config/config.exs")
       |> assert_creates("local/.formatter.exs")
       |> assert_creates("local/lib/local/application.ex")
       |> assert_creates("local/lib/hello_local.ex")

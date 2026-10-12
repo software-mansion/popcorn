@@ -2,7 +2,7 @@ defmodule LocalLiveView.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @popcorn_version "0.3.3"
+  @popcorn_version "0.4.0-next.4"
   @github "https://github.com/software-mansion/popcorn"
 
   # LICENSE lives in the repo root and is copied in before packaging, see copy_meta/1.
@@ -13,14 +13,10 @@ defmodule LocalLiveView.MixProject do
     [
       app: :local_live_view,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.target()) ++ test_elixirc_paths(Mix.env(), Mix.target()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      preferred_cli_target: [
-        docs: :all,
-        "hex.publish": :all
-      ],
       deps: deps(),
 
       # hex
@@ -38,10 +34,11 @@ defmodule LocalLiveView.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      # priv/static holds the JS bundle and Popcorn runtime files. They are not
-      # committed — the release pipeline builds them via `mix llv.assets` (wired
-      # into hex.build/hex.publish below) and they ship inside the tarball, so
-      # apps get all their JS through Mix with no npm involved.
+      # priv/static holds the JS bundle. It is not committed — the release
+      # pipeline builds it via `mix llv.assets` (wired into hex.build/hex.publish
+      # below) and it ships inside the tarball, so apps get all their JS through
+      # Mix with no npm involved. The Wasm runtime comes from the Popcorn
+      # package, via `mix llv.build`.
       #
       # package.json must ship too: Phoenix's esbuild config puts deps/ on
       # NODE_PATH, so `import ... from "local_live_view"` resolves through its
@@ -53,6 +50,10 @@ defmodule LocalLiveView.MixProject do
         "Popcorn website" => "https://popcorn.swmansion.com"
       }
     ]
+  end
+
+  def cli do
+    [preferred_targets: [docs: :all, "hex.publish": :all]]
   end
 
   # Run "mix help compile.app" to learn about applications.
@@ -79,21 +80,25 @@ defmodule LocalLiveView.MixProject do
       # For the e2e tests' app, see test/e2e/README.md
       {:bandit, "~> 1.5", runtime: false, only: :test},
       {:esbuild, "~> 0.8", runtime: false, only: :test},
-      {:phoenix, "~> 1.8.4", runtime: false},
-      {:phoenix_live_view, "~> 1.1", runtime: false},
-      {:phoenix_html, "~> 4.1", runtime: false},
-      {:phoenix_ecto, "~> 4.6", runtime: false},
-      {:ecto, "~> 3.12", runtime: false},
-      {:plug, "~> 1.14", runtime: false},
+      # Popcorn packages and starts the applications the local project
+      # depends on at runtime, so the ones local views use in the browser
+      # can't be `runtime: false`.
+      {:phoenix, "~> 1.8.4"},
+      {:phoenix_live_view, "~> 1.1"},
+      {:phoenix_html, "~> 4.1"},
+      {:phoenix_ecto, "~> 4.6"},
+      {:ecto, "~> 3.12"},
+      {:plug, "~> 1.14"},
       # plug_crypto is needed in runtime for signing LV tokens
       {:plug_crypto, "~> 2.0"},
       {:tailwind, "~> 0.3", runtime: false},
       {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      {:file_system, "~> 1.0", targets: [:host, :all]}
+      # For LocalLiveView.Watcher, which runs on the host only
+      {:file_system, "~> 1.0", runtime: Mix.target() != :wasm}
     ]
   end
 
-  @popcorn_source Path.expand("../popcorn-2/elixir", __DIR__)
+  @popcorn_source Path.expand("../popcorn/elixir", __DIR__)
 
   defp popcorn_dep do
     if File.dir?(@popcorn_source) and System.get_env("LLV_RELEASE") == nil do
@@ -146,9 +151,12 @@ defmodule LocalLiveView.MixProject do
   # lib/shared holds the `LocalLiveView` behaviour itself: views `use` it, and
   # they compile both to Wasm and on the host (where the server renders them).
   defp elixirc_paths(:all),
-    do: ["lib/shared", "lib/server", "lib/mix", "lib/local_live_view", "lib/stubs"]
+    do: ["lib/shared", "lib/server", "lib/mix", "lib/local_live_view"]
 
-  defp elixirc_paths(:wasm), do: ["lib/shared", "lib/local_live_view", "lib/stubs"]
+  # llv.build too, so that it's available in the local project
+  defp elixirc_paths(:wasm),
+    do: ["lib/shared", "lib/local_live_view", "lib/mix/tasks/llv.build.ex"]
+
   defp elixirc_paths(_), do: ["lib/shared", "lib/server", "lib/mix"]
 
   # The app the e2e tests run against, and its local views, which the app
@@ -165,29 +173,12 @@ defmodule LocalLiveView.MixProject do
         "compile --force --warnings-as-errors",
         "cmd MIX_TARGET=all mix docs --warnings-as-errors"
       ],
-      build: [
-        "deps.get",
-        "compile",
-        &pnpm_install/1,
-        fn _args ->
-          {_out, 0} =
-            System.shell("MIX_TARGET=wasm mix popcorn.cook", into: IO.stream(:stdio, :line))
-        end
-      ],
+      build: ["deps.get", "compile", "llv.assets"],
       # build_assets/1 guarantees priv/static is built and current, so a tarball
       # can never go out without the JS bundle it is supposed to ship.
       "hex.build": [&copy_meta/1, &build_assets/1, "hex.build"],
       "hex.publish": [&copy_meta/1, &build_assets/1, "hex.publish"]
     ]
-  end
-
-  defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
   end
 
   # In a subprocess on purpose: running llv.assets in-process pulls in

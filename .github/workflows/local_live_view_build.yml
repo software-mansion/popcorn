@@ -14,6 +14,13 @@ on:
       - "examples/local-lv-compare/**"
       - "examples/local-lv-forms/**"
       - ".github/workflows/local_live_view_build.yml"
+      # LocalLiveView runs on Popcorn from this repo
+      - "popcorn/elixir/**"
+      - "popcorn/js/**"
+      - "popcorn/patches/**"
+      - "scripts/build-beam.sh"
+      - ".github/actions/build-otp-wasm/action.yml"
+      - ".github/actions/setup-llv/action.yml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "package.json"
@@ -50,22 +57,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install JS dependencies
-        run: pnpm install
-        working-directory: .
+      - name: Setup LocalLiveView
+        uses: ./.github/actions/setup-llv
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
@@ -79,18 +72,6 @@ jobs:
 
       - name: Install Phoenix installer (needed by Igniter.Test.phx_test_project)
         run: mix archive.install hex phx_new --force
-
-      - name: Build AtomVM
-        uses: ./.github/actions/build-atomvm
-        with:
-          working-directory: local-live-view
-          build-mode: debug-wasm
-          outdir: popcorn_runtime_source/artifacts/wasm
-          cmake-opts: "SANITIZER=OFF"
-
-      - name: Configure runtime source
-        run: |
-          printf '\nconfig :popcorn, runtime: {:path, "popcorn_runtime_source/artifacts/$target"}\n' >> config/config.exs
 
       - name: Compile Hex dependencies
         run: mix deps.compile

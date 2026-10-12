@@ -6,7 +6,7 @@ LocalLiveView brings local-first interactivity to Phoenix applications by runnin
 
 In a standard Phoenix LiveView app, UI state lives on the server. Every interaction travels over the network: user clicks button → server processes event → server sends diff → browser updates DOM. This works great, but it means latency is always in the loop.
 
-LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to WebAssembly and executed via [Popcorn](https://hexdocs.pm/popcorn/introduction.html), which runs AtomVM — a tiny Erlang virtual machine — directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
+LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to WebAssembly and executed via [Popcorn](https://hexdocs.pm/popcorn/introduction.html), which runs the Erlang virtual machine (BEAM), compiled to WebAssembly, directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
 
 The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveView programming model.
 
@@ -15,7 +15,7 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 ```
            Server                                      Browser                 
 ┌───────────────────────────────┐              ┌──────────────────────────────┐
-│ Phoenix LiveView (host)       │              │ Popcorn (AtomVM Wasm)        │
+│ Phoenix LiveView (host)       │              │ Popcorn (BEAM Wasm)          │
 │                               │              │                              │
 │ render/1                      │              │ MyLocal                      │
 │   <.local_live_view           │              │   mount/3                    │
@@ -30,7 +30,7 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 └───────────────────────────────┘              └──────────────────────────────┘
 ```
 
-1. Your `local/` project is compiled to a `.avm` Wasm bundle at build time.
+1. Your `local/` project is compiled and packaged for the Popcorn Wasm runtime at build time.
 2. A server-side LiveView renders the mount point with `<.local_live_view view="MyLocal" />`. Every attribute other than `view` is passed down as assigns and delivered to the local view's `update/2` callback — so the host stays in control of the data, exactly as with `live_component/1`.
 3. The page arrives with the views already rendered on the server. When it loads, Popcorn starts the Wasm runtime and mounts your LocalLiveViews in place of that HTML.
 4. User interactions are handled in the browser — no round-trip to the server.

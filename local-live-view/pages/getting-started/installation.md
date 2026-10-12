@@ -5,6 +5,7 @@ LocalLiveView is installed into an existing Phoenix project using the `mix llv.i
 ## Prerequisites
 
 - A Phoenix project generated with `mix phx.new`
+- Elixir 1.19 or later, and the Erlang/OTP version required by [Popcorn](https://hexdocs.pm/popcorn/compatibility.html#toolchain-compatibility)
 - `:local_live_view` added as a dependency
 - `npm` for JS package management
 
@@ -57,7 +58,7 @@ mix setup
 
 The installer already added `llv.build` to the `setup` alias in `mix.exs`. `llv.build` creates popcorn runtime for browser-side elixir.
 
-This compiles your `local/` project to a Wasm bundle at `priv/static/assets/js/wasm/bundle.avm`.
+This compiles your `local/` project and packages it, together with the Popcorn Wasm runtime, into `priv/static/assets/js/popcorn/`. LocalLiveView's JS loads it from there: the `popcorn/` directory next to the `app.js` bundle.
 
 
 ## Step 4 — Start the server
@@ -74,14 +75,12 @@ The installer creates a `local/` directory — a separate Mix project for your c
 
 ```
 local/
-├── config/
-│   └── config.exs          # Popcorn output path config
 ├── lib/
 │   ├── local/
 │   │   └── application.ex  # OTP application
 │   └── hello_local.ex      # Sample LocalLiveView
 ├── .formatter.exs
-└── mix.exs                 # Compiles to Wasm via popcorn.cook
+└── mix.exs                 # Packaged for the browser by `mix llv.build`
 ```
 
 Now you can add your LocalLiveView modules to `local/lib/`. When the server is running, the LLV watcher detects changes and automatically rebuilds the local code. To enforce rebuild, run `mix llv.build` and restart the server.

@@ -5,13 +5,12 @@ defmodule Local.MixProject do
     [
       app: :local,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps_path: "../deps",
       lockfile: "../mix.lock",
       deps: deps(),
-      compilers: Mix.compilers(),
-      aliases: aliases()
+      compilers: Mix.compilers()
     ]
   end
 
@@ -25,13 +24,6 @@ defmodule Local.MixProject do
 
   defp app_mod(:host), do: []
   defp app_mod(_), do: [mod: {Local.Application, []}]
-
-  defp aliases do
-    [
-      build: ["deps.get", "popcorn.cook"],
-      dev: ["build", "popcorn.server"]
-    ]
-  end
 
   defp deps do
     [

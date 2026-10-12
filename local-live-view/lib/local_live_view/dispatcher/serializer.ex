@@ -2,36 +2,38 @@ defmodule LocalLiveView.Dispatcher.Serializer do
   @moduledoc false
   # Serializer for transport frames sent between JS and LV channels
   # through the dispatcher.
-  # There's no real serialization here, only reshaping the transport
-  # frames as Phoenix requires.
+  # Frames are JSON-encoded the way they are over LiveView's websocket, with
+  # Phoenix's JSON library, so that payloads look the same to the LiveView
+  # client.
 
   @behaviour Phoenix.Socket.Serializer
 
-  alias Phoenix.Socket.{Message, Reply}
+  alias Phoenix.Socket.{Broadcast, Message, Reply}
 
   @impl true
   def encode!(%Reply{} = reply) do
-    {:socket_push, :binary,
-     %{
-       topic: reply.topic,
-       event: "phx_reply",
-       payload: %{status: reply.status, response: reply.payload},
-       ref: reply.ref,
-       join_ref: reply.join_ref
-     }}
+    push(%{
+      topic: reply.topic,
+      event: "phx_reply",
+      payload: %{status: reply.status, response: reply.payload},
+      ref: reply.ref,
+      join_ref: reply.join_ref
+    })
   end
 
   def encode!(%Message{} = message) do
-    {:socket_push, :binary, Map.from_struct(message)}
+    push(Map.from_struct(message))
   end
 
-  def encode!(message), do: {:socket_push, :binary, message}
+  @impl true
+  def fastlane!(%Broadcast{} = broadcast) do
+    push(%{topic: broadcast.topic, event: broadcast.event, payload: broadcast.payload})
+  end
 
   @impl true
-  def fastlane!(message), do: {:socket_push, :binary, message}
+  def decode!(raw_frame, _opts) do
+    frame = Phoenix.json_library().decode!(raw_frame)
 
-  @impl true
-  def decode!(frame, _opts) do
     %Message{
       topic: frame["topic"],
       event: frame["event"],
@@ -39,5 +41,10 @@ defmodule LocalLiveView.Dispatcher.Serializer do
       ref: frame["ref"],
       join_ref: frame["join_ref"]
     }
+  end
+
+  # The topic stays outside of the JSON for routing, see the dispatcher.
+  defp push(%{topic: topic} = message) do
+    {:socket_push, :text, {topic, Phoenix.json_library().encode!(message)}}
   end
 end

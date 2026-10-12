@@ -104,7 +104,7 @@ async function watchForText(page, text) {
 async function openWithoutWasm(browser, baseURL, path) {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
-  await page.route("**/*.avm", (route) => route.abort());
+  await page.route("**/assets/js/popcorn/**", (route) => route.abort());
   await page.goto(path);
   return { page, context };
 }

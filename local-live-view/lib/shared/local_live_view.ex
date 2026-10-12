@@ -130,9 +130,9 @@ defmodule LocalLiveView do
 
   alias Phoenix.LiveView.Socket
 
-  # This module also compiles on the host, where Popcorn is not a dependency.
-  # The Wasm calls below only run inside the browser runtime.
-  @compile {:no_warn_undefined, Popcorn.Wasm}
+  # This module also compiles on the host, where LocalLiveView.Dispatcher
+  # doesn't exist. It's only called when connected, i.e. in the browser.
+  @compile {:no_warn_undefined, LocalLiveView.Dispatcher}
 
   @doc """
   Syncs the declared mirror assigns to the server-side mirror channel.
@@ -142,22 +142,13 @@ defmodule LocalLiveView do
   Does nothing when the view is not `connected?/1`.
   """
   def mirror_sync(%Phoenix.LiveView.Socket{} = socket, mirror_keys) do
-    payload =
-      Map.new(mirror_keys, fn key ->
-        {to_string(key), socket.assigns |> Map.get(key) |> LocalLiveView.Utils.to_serializable()}
-      end)
+    payload = Map.new(mirror_keys, &{to_string(&1), Map.get(socket.assigns, &1)})
 
     if connected?(socket) and payload != %{} do
-      Popcorn.Wasm.run_js(
-        """
-        ({ args }) => {
-          if (window.__llvSync) {
-            window.__llvSync(args.mirror_id, "sync", args.payload);
-          }
-        }
-        """,
-        %{mirror_id: socket.private[:mirror_id], payload: payload}
-      )
+      LocalLiveView.Dispatcher.send_to_js(:mirror_sync, %{
+        mirror_id: socket.private[:mirror_id],
+        payload: Phoenix.json_library().encode!(payload)
+      })
     end
 
     socket
@@ -197,20 +188,11 @@ defmodule LocalLiveView do
   """
   def push_server_event(%Socket{} = socket, event, payload \\ %{}) do
     if connected?(socket) do
-      Popcorn.Wasm.run_js(
-        """
-        ({ args }) => {
-          if (window.__llvPushServer) {
-            window.__llvPushServer(args.id, args.event, args.payload);
-          }
-        }
-        """,
-        %{
-          id: socket.private[:llv_id],
-          event: to_string(event),
-          payload: LocalLiveView.Utils.to_serializable(payload)
-        }
-      )
+      LocalLiveView.Dispatcher.send_to_js(:push_server_event, %{
+        id: socket.private[:llv_id],
+        event: to_string(event),
+        payload: Phoenix.json_library().encode!(payload)
+      })
     end
 
     socket

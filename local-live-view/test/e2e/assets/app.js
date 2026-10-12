@@ -7,7 +7,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, { params: { _csrf_token: csrfToken } });
 
 // LLVEngine.create must come before liveSocket.connect()
-const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+const llvEngine = LLVEngine.create(liveSocket);
 liveSocket.connect();
 llvEngine.connect();
 

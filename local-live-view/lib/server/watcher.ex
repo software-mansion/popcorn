@@ -6,7 +6,7 @@ defmodule LocalLiveView.Watcher do
 
   ```
   config :my_app, MyEndpoint, watchers: [
-      local_live_view: {#{inspect(__MODULE__)}, :start_link, []},
+      local_live_view: {#{inspect(__MODULE__)}, :run, []},
       # other watchers
     ]
   ```
@@ -20,38 +20,34 @@ defmodule LocalLiveView.Watcher do
 
   require Logger
 
-  @trigger_events [:created, :modified, [:modified, :closed], [:inodemetamod, :modified]]
+  # A single save can emit a few events, e.g. MODIFY and CLOSE_WRITE on Linux
+  @debounce_ms 100
 
   @type option :: {:dirs, [Path.t()]}
 
   @doc """
-  Builds the local project once, then starts the watcher.
+  Starts the watcher, which builds the local project right away, in case it
+  changed while the server was down, and then whenever it changes.
 
-  This is the entry point used from the endpoint's `:watchers` config, so the
-  bundle is up to date before the first request even if the local project
-  changed while the server was down.
+  This is the entry point used from the endpoint's `:watchers` config.
 
   ## Options
 
-    * `:dirs` — directories to watch, defaults to `["local"]` relative to the
-      project root
+    * `:dirs` — directories to watch, defaults to `["local/lib"]` relative to
+      the project root
   """
   @spec run([option]) :: :ok
   def run(opts \\ []) do
-    cook()
     {:ok, _watcher} = start_link(opts)
     :ok
   end
 
   @doc """
-  Starts the watcher without the initial build.
-
-  Takes the same options as `run/1`. Use it when the local project is already
-  built and you only want to react to later changes.
+  Same as `run/1`, but returns the watcher's pid.
   """
   @spec start_link([option]) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    opts = Keyword.validate!(opts, dirs: [Path.absname("local")])
+    opts = Keyword.validate!(opts, dirs: [Path.absname("local/lib")])
     GenServer.start_link(__MODULE__, opts)
   end
 
@@ -59,60 +55,49 @@ defmodule LocalLiveView.Watcher do
   def init(opts) do
     {:ok, fs_worker} = FileSystem.Worker.start_link(Keyword.take(opts, [:dirs]))
     FileSystem.subscribe(fs_worker)
-    {:ok, %{cooking: false, cook_queued: false}}
+    ref = make_ref()
+    send(self(), {:cook, ref})
+    {:ok, %{cook_ref: ref}}
   end
 
+  # Any event counts: edits, deletions and renames all change the build, and a
+  # touch forces a rebuild, like it does with `mix compile`. Hidden files are
+  # skipped, as they're editors' temp files, like Vim's swap files.
   @impl true
-  def handle_info({:file_event, _pid, {path, event}}, state) do
-    trigger_cook = Path.extname(path) == ".ex" and event in @trigger_events
-
-    cond do
-      not trigger_cook ->
-        {:noreply, state}
-
-      state.cooking ->
-        {:noreply, %{state | cook_queued: true}}
-
-      true ->
-        cook_async()
-        {:noreply, %{state | cooking: true}}
-    end
-  end
-
-  @impl true
-  def handle_info(:cooked, state) do
-    # Phoenix doesn't watch for Wasm files by default
-    # so we touch a stub JS file.
-    File.touch!("priv/static/assets/js/wasm/_reload.js")
-
-    if state.cook_queued do
-      cook()
-      {:noreply, %{state | cook_queued: false}}
+  def handle_info({:file_event, _pid, {path, _events}}, state) do
+    if String.starts_with?(Path.basename(path), ".") do
+      {:noreply, state}
     else
-      {:noreply, %{state | cooking: false}}
+      # Debounced: only the timer of the latest event cooks
+      ref = make_ref()
+      Process.send_after(self(), {:cook, ref}, @debounce_ms)
+      {:noreply, %{state | cook_ref: ref}}
     end
   end
 
-  @impl true
+  # Cooks synchronously, so changes made in the meantime wait in the mailbox
+  # and trigger another cook afterwards
+  def handle_info({:cook, ref}, %{cook_ref: ref} = state) do
+    cook()
+    {:noreply, %{state | cook_ref: nil}}
+  end
+
   def handle_info(_message, state) do
     {:noreply, state}
   end
 
-  defp cook_async() do
-    reply_to = self()
-
-    {:ok, _pid} =
-      Task.start_link(fn ->
-        cook()
-        send(reply_to, :cooked)
-      end)
-
-    :ok
-  end
-
   defp cook() do
     Logger.debug("Cooking local project")
-    {_output, status} = System.shell("mix popcorn.cook", cd: "local")
-    if status != 0, do: Logger.warning("Failed to cook local project")
+
+    # In the local project, llv.build only cooks it
+    case System.cmd("mix", ["llv.build"], cd: "local", into: IO.stream(), stderr_to_stdout: true) do
+      {_output, 0} ->
+        # Phoenix doesn't watch for Wasm files by default
+        # so we touch a stub JS file.
+        File.touch!(Path.join(Mix.Tasks.Llv.Build.out_dir(), "_reload.js"))
+
+      _error ->
+        Logger.warning("Failed to cook local project")
+    end
   end
 end

@@ -12,11 +12,10 @@ defmodule LocalLiveView.Dispatcher do
 
   use GenServer
   require Logger
-  require Popcorn.Wasm, as: Wasm
 
   alias __MODULE__.View
 
-  @process_name :main
+  @process_name :local_live_view_dispatcher
 
   @table :local_live_view_dispatcher
 
@@ -37,6 +36,15 @@ defmodule LocalLiveView.Dispatcher do
     :ok
   end
 
+  @doc """
+  Sends an event to LLV's JS part, see `handleEvent` in
+  assets/local_live_view/index.ts. It's sent straight from the calling
+  process, not through the dispatcher.
+  """
+  def send_to_js(event, payload) when is_atom(event) and is_map(payload) do
+    Popcorn.Wasm.send(Map.put(payload, :__llv__, event))
+  end
+
   @impl true
   def init(_init_arg) do
     {:ok, transport} =
@@ -52,27 +60,19 @@ defmodule LocalLiveView.Dispatcher do
 
     :ets.new(@table, [:named_table])
 
-    Popcorn.Wasm.ready(@process_name)
-
     {:ok, %{transport: transport, views: %{}}}
   end
 
   @impl GenServer
-  def handle_info(raw_msg, state) when Wasm.is_wasm_message(raw_msg) do
-    {:wasm_call, msg, promise} = Wasm.parse_message!(raw_msg)
-
-    case handle_wasm_call(msg, promise, state) do
-      {:resolve, reply, state} ->
-        Wasm.resolve(reply, promise)
-        {:noreply, state}
-
-      {:reject, reason, state} ->
-        Wasm.reject(reason, promise)
-        {:noreply, state}
+  def handle_call(msg, _from, state) do
+    case handle_wasm_call(msg, state) do
+      {:resolve, reply, state} -> {:reply, %{ok: true, data: reply}, state}
+      {:reject, reason, state} -> {:reply, %{ok: false, error: reason}, state}
     end
   end
 
   # Message/reply from the LiveView.Socket to the LiveView JS
+  @impl GenServer
   def handle_info({:socket_push, _opcode, message}, state) do
     push_to_browser(message, state)
     {:noreply, state}
@@ -96,14 +96,9 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   # Handle LLV process' death
-  def handle_info({:DOWN, ref, :process, _pid, reason} = msg, state) do
+  def handle_info({:DOWN, ref, :process, _pid, _reason} = msg, state) do
     case Enum.find(state.views, fn {_id, view} -> view.monitor_ref == ref end) do
       {id, view} ->
-        # TODO: drop the log once migrated to BEAM, where GenServer reports it
-        unless reason in [:normal, :shutdown] or match?({:shutdown, _}, reason) do
-          Logger.error("LLV #{id} channel exited: #{inspect(reason)}")
-        end
-
         {:noreply, put_in(state.views[id], View.channel_down(view))}
 
       nil ->
@@ -115,11 +110,7 @@ defmodule LocalLiveView.Dispatcher do
     socket_handle_info(msg, state)
   end
 
-  defp handle_wasm_call(
-         %{"action" => "create", "id" => id} = msg,
-         _promise,
-         state
-       )
+  defp handle_wasm_call(%{"action" => "create", "id" => id} = msg, state)
        when not is_map_key(state.views, id) do
     %{"view" => view, "mirror_id" => mirror_id, "assigns" => assigns} = msg
 
@@ -147,16 +138,13 @@ defmodule LocalLiveView.Dispatcher do
     {:resolve, %{html: View.render_container(id, session)}, state}
   end
 
-  defp handle_wasm_call(%{"action" => "create"}, _promise, state) do
+  defp handle_wasm_call(%{"action" => "create"}, state) do
     {:reject, "error creating LLV", state}
   end
 
-  # Frame sent by the JS transport
-  defp handle_wasm_call(
-         %{"action" => "transport_frame", "id" => id, "frame" => frame},
-         _promise,
-         state
-       )
+  # Frame sent by the JS transport. It's JSON-encoded, as over a websocket,
+  # and decoded by LocalLiveView.Dispatcher.Serializer.
+  defp handle_wasm_call(%{"action" => "transport_frame", "id" => id, "frame" => frame}, state)
        when is_map_key(state.views, id) do
     case socket_in(state, frame) do
       {:pending, state} ->
@@ -170,23 +158,18 @@ defmodule LocalLiveView.Dispatcher do
 
   # When phx_leave comes, we may have removed the view from the state already
   defp handle_wasm_call(
-         %{"action" => "transport_frame", "frame" => %{"event" => "phx_leave"} = frame},
-         _promise,
+         %{"action" => "transport_frame", "event" => "phx_leave", "frame" => frame},
          state
        ) do
     {_result, state} = socket_in(state, frame)
     {:resolve, :ok, state}
   end
 
-  defp handle_wasm_call(%{"action" => "transport_frame"}, _promise, state) do
+  defp handle_wasm_call(%{"action" => "transport_frame"}, state) do
     {:reject, "view not mounted", state}
   end
 
-  defp handle_wasm_call(
-         %{"action" => "update_assigns", "id" => id, "assigns" => assigns},
-         _promise,
-         state
-       ) do
+  defp handle_wasm_call(%{"action" => "update_assigns", "id" => id, "assigns" => assigns}, state) do
     if view = state.views[id] do
       :ets.insert(@table, {{:assigns, id}, assigns})
       View.dispatch(view, {:llv, %{"action" => "update_assigns", "assigns" => assigns}})
@@ -198,7 +181,6 @@ defmodule LocalLiveView.Dispatcher do
   # LLV-specific messages to be delivered to the view. See View.dispatch/2
   defp handle_wasm_call(
          %{"action" => "dispatch_to_view", "id" => id, "payload" => payload},
-         _promise,
          state
        ) do
     case state.views[id] do
@@ -212,7 +194,7 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp handle_wasm_call(%{"action" => "destroy", "id" => id}, _promise, state) do
+  defp handle_wasm_call(%{"action" => "destroy", "id" => id}, state) do
     :ets.delete(@table, {:assigns, id})
     {view, views} = Map.pop(state.views, id)
 
@@ -255,17 +237,15 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
-  defp push_to_browser(%{topic: topic} = message, state) do
+  # `frame` is already JSON-encoded, see LocalLiveView.Dispatcher.Serializer
+  defp push_to_browser({topic, frame}, state) do
     case topic_to_id(topic) do
       nil ->
         Logger.warning("LLV dispatcher: dropping push on unsupported topic #{inspect(topic)}")
 
       id ->
         if Map.has_key?(state.views, id) do
-          Popcorn.Wasm.run_js(
-            ~S|({ args }) => { window.__llvPopcornTransportPush?.(args); }|,
-            message
-          )
+          send_to_js(:transport_push, %{frame: frame})
         end
     end
 

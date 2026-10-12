@@ -86,10 +86,10 @@ test.describe("server-side rendering", () => {
   });
 
   test("the local view takes over the server-rendered element", async ({ page }) => {
-    // Hold the Wasm bundle back until the server-rendered element is marked
+    // Hold the Wasm runtime back until the server-rendered element is marked
     let release = () => {};
     const released = new Promise((resolve) => (release = resolve));
-    await page.route("**/*.avm", async (route) => {
+    await page.route("**/assets/js/popcorn/**", async (route) => {
       await released;
       await route.continue();
     });

@@ -10,11 +10,11 @@ test.describe("server-side rendering", () => {
   test("the board is on the page before the Wasm runtime boots", async ({ page, browser }) => {
     const url = await h.createBoard(page);
 
-    // A fresh page that never receives the Wasm bundle: what the user sees
+    // A fresh page that never receives the Wasm runtime: what the user sees
     // while the runtime is still loading.
     const context = await browser.newContext();
     const blocked = await context.newPage();
-    await blocked.route("**/*.avm", (route) => route.abort());
+    await blocked.route("**/assets/js/popcorn/**", (route) => route.abort());
     await blocked.goto(url);
 
     await expect(blocked.locator(SSR_ROOT)).toBeVisible();

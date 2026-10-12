@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
   HelloLocal component renders "Hello from Wasm!" in the browser.
 
   Slow (~1-2 min) — covers what unit tests can't: real `mix llv.build`,
-  real esbuild + popcorn.cook + AtomVM bootstrap, real DOM render.
+  real esbuild + popcorn.cook + Wasm runtime boot, real DOM render.
   """
 
   use ExUnit.Case, async: false
@@ -61,6 +61,8 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
       fn ->
         text = Playwright.Page.text_content(page, "body")
         assert text =~ "Hello from Wasm!"
+        # Server-side rendering shows the text too; this is the Wasm runtime
+        assert Playwright.Page.query_selector(page, "[data-pop-root].phx-connected")
       end,
       @assertion_timeout
     )

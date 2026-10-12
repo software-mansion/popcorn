@@ -27,8 +27,8 @@ defmodule Mix.Tasks.Llv.Install do
     * Generate a `local/` project with a sample HelloLocal local live view
     * Generate a HelloLocalLive LiveView that renders it and route it at `/hello_local`
 
-  `mix setup` will then run `mix llv.build` which copies the LLV JS runtime files
-  into your project's `priv/static/assets/js/` and builds the Wasm bundle from `local/`.
+  `mix setup` will then run `mix llv.build` which builds the Wasm runtime from `local/`
+  into your project's `priv/static/assets/js/popcorn/`.
   """
 
   @templates_dir Path.expand("../../../priv/templates/llv.install", __DIR__)
@@ -233,7 +233,7 @@ defmodule Mix.Tasks.Llv.Install do
 
   @llv_js """
   import { LLVEngine } from "local_live_view";
-  const llvEngine = LLVEngine.create(liveSocket, { bundlePaths: ["/assets/js/wasm/bundle.avm"] });
+  const llvEngine = LLVEngine.create(liveSocket);
   """
 
   @llv_js_after_connect """
@@ -363,11 +363,11 @@ defmodule Mix.Tasks.Llv.Install do
 
   defp inject_tsconfig_path_entry(content, llv_dts_path) do
     entry = ~s|"local_live_view": ["#{llv_dts_path}"]|
-    # Strip // line comments so Jason can parse the file. All replacements
+    # Strip // line comments so JSON can parse the file. All replacements
     # are done on the original `content` so comments are preserved in output.
     stripped = String.replace(content, ~r|//[^\n]*|, "")
 
-    with {:ok, parsed} <- Jason.decode(stripped),
+    with {:ok, parsed} <- JSON.decode(stripped),
          {:ok, compiler_opts} <- Map.fetch(parsed, "compilerOptions") do
       if Map.has_key?(compiler_opts, "paths") do
         String.replace(
@@ -464,7 +464,6 @@ defmodule Mix.Tasks.Llv.Install do
     else
       igniter
       |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_dep: llv_dep_from_local())
-      |> copy_template("#{@local_project_dir}/config/config.exs", "config.exs")
       |> copy_template("#{@local_project_dir}/.formatter.exs", "formatter.exs")
       |> copy_template("#{@local_project_dir}/lib/local/application.ex", "application.ex")
       |> copy_template("#{@local_project_dir}/lib/hello_local.ex", "hello_local.ex")

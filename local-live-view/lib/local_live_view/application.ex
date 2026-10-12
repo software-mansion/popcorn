@@ -4,6 +4,11 @@ defmodule LocalLiveView.Application do
 
   @impl true
   def start(_type, _args) do
+    # Default to JSON instead of Jason
+    if Application.get_env(:phoenix, :json_library) == nil do
+      Application.put_env(:phoenix, :json_library, JSON)
+    end
+
     children = [
       {LocalLiveView.Endpoint, endpoint_config()},
       LocalLiveView.Dispatcher
