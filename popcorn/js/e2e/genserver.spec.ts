@@ -2,9 +2,10 @@ import { assert, evalOpts, expect, test } from "./helpers";
 
 const STOPPABLE_GEN_SERVER = `
   {ok, Counter} = gen_server:start({local, counter}, test_gen_server, 0, []),
-  {ok, Proxy} = 'Elixir.Popcorn.Proxy':start_link([]),
+  Proxy = whereis(popcorn_proxy),
+  [{'Elixir.Popcorn.Proxy', Proxy, worker, _}] =
+    supervisor:which_children('Elixir.Popcorn.Supervisor'),
   true = unlink(Counter),
-  true = unlink(Proxy),
   ok = wasm:send(#{genserver_ready => true}),
   receive stop -> ok end.
 `;

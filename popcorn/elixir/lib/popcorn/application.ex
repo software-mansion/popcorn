@@ -10,7 +10,7 @@ defmodule Popcorn.Application do
       install_req_adapter()
     end
 
-    Supervisor.start_link([], strategy: :one_for_one, name: Popcorn.Supervisor)
+    Supervisor.start_link([Popcorn.Proxy], strategy: :one_for_one, name: Popcorn.Supervisor)
   end
 
   defp install_req_adapter do

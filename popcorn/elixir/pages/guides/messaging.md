@@ -15,8 +15,9 @@ if (!result.ok) throw result.error;
 console.log(result.data);
 ```
 
-Add `Popcorn.Proxy` to the application supervision tree before you use calls.
-The target process receives a normal `handle_call/3` callback.
+The `:popcorn` application automatically starts `Popcorn.Proxy` in WASM.
+The target process receives a normal `handle_call/3` callback. Do not add the
+default proxy to your application's supervision tree.
 
 A call timeout does not cancel work in the GenServer.
 

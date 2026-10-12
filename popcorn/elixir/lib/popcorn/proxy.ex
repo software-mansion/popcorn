@@ -5,11 +5,13 @@ defmodule Popcorn.Proxy do
   @moduledoc """
   Connects JavaScript calls and casts to GenServers in the VM.
 
-  To receive them, add `Popcorn.Proxy` to your supervision tree.
+  It's automatically started under :popcorn application.
+  Starting one yourself and routing requests through it is a rare use-case (hooks, large quantity of requests, etc).
 
   Notes:
   - One proxy handles concurrent requests to multiple GenServers.
   - Targets can be registered names or PID handles from the same VM.
+  - On non-Wasm environments it returns `:ignore` from `start_link/2`.
 
   See `Popcorn.Wasm` for value conversions.
 
@@ -36,10 +38,10 @@ defmodule Popcorn.Proxy do
   end
   ```
 
-  Add both processes to your application supervisor:
+  Add the counter to your application supervisor:
 
   ```elixir
-  children = [MyApp.Counter, Popcorn.Proxy]
+  children = [MyApp.Counter]
   Supervisor.start_link(children, strategy: :one_for_one)
   ```
 
@@ -75,14 +77,20 @@ defmodule Popcorn.Proxy do
   @doc """
   Starts a proxy linked to the current process.
 
+  Returns `:ignore` outside WASM so supervisors can include the proxy on a native VM.
+
   ## Options
 
   - `:name` - the registered name. Defaults to `#{inspect(@default_name)}`. JavaScript selects this name with its `proxy` option.
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    {name, opts} = Keyword.pop(opts, :name, @default_name)
-    GenServer.start_link(__MODULE__, opts, name: name)
+    if Wasm.available?() do
+      {name, opts} = Keyword.pop(opts, :name, @default_name)
+      GenServer.start_link(__MODULE__, opts, name: name)
+    else
+      :ignore
+    end
   end
 
   @impl GenServer

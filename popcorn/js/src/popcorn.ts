@@ -165,9 +165,7 @@ export type GenServer = {
   /**
    * Calls a GenServer by registered name or {@link Pid} and waits for its reply.
    *
-   * Requires a running `Popcorn.Proxy`, registered as `popcorn_proxy` by default.
-   *
-   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy.
+   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy (see `Popcorn.Proxy`).
    * @returns A {@link Result} with the reply or a bridge, VM, timeout, or GenServer error.
    *
    * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
