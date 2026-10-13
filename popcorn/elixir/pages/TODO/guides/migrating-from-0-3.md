@@ -28,7 +28,7 @@ Replace the Popcorn dependency in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:popcorn, "0.4.0-next.4"}
+    {:popcorn, "0.4.0-next.0"}
   ]
 end
 ```
@@ -83,6 +83,7 @@ defmodule MyApp.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      Popcorn.Proxy,
       MyApp.Worker
     ]
 
@@ -94,9 +95,8 @@ defmodule MyApp.Application do
 end
 ```
 
-The `:popcorn` application automatically starts `Popcorn.Proxy` in WASM with
-the registered name `:popcorn_proxy`. Remove any explicit default proxy from
-your application's supervision tree to avoid an `already_started` error.
+Add `Popcorn.Proxy` only when JavaScript uses GenServer calls or casts.
+The proxy has the registered name `:popcorn_proxy` by default.
 
 ## Replace `.avm` bundle creation
 
@@ -475,7 +475,7 @@ Use this checklist after the application builds:
 2. Confirm that the bundler plugin names the correct OTP application.
 3. Confirm that no build script creates or copies an `.avm` file.
 4. Confirm that `Popcorn.init()` handles both result variants.
-5. Confirm that the default `Popcorn.Proxy` is absent from your application's supervision tree.
+5. Confirm that each GenServer call has a supervised `Popcorn.Proxy`.
 6. Confirm that every JavaScript call or cast has an explicit target.
 7. Confirm that browser events use one payload value.
 8. Confirm that `run_js/3` functions use the new arguments.

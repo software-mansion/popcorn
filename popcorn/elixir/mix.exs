@@ -83,34 +83,24 @@ defmodule Popcorn.MixProject do
 
   defp docs do
     [
-      main: "introduction",
+      main: "about",
+      markdown_processor: {ExDoc.Markdown.Earmark, footnotes: true},
       extras: [
-        "pages/getting-started/introduction.md",
+        "pages/getting-started/about.md",
         "pages/getting-started/installation.md",
-        "pages/getting-started/first-application.md",
-        "pages/concepts/runtime-model.md",
-        "pages/concepts/values.md",
-        "pages/guides/messaging.md",
-        "pages/guides/javascript-interop.md",
-        "pages/guides/http.md",
-        "pages/guides/terminal.md",
-        "pages/guides/packaging.md",
-        "pages/guides/deployment.md",
-        "pages/reference/compatibility.md",
-        "pages/reference/troubleshooting.md",
-        "pages/migration/from-0-3.md",
-        "pages/comparisons/frameworks.md",
-        "pages/contributing/runtime.md"
+        "pages/getting-started/hello-world.md",
+        "pages/getting-started/hello-counters.md"
       ],
       groups_for_extras: [
         "Getting started": ~r"/getting-started/",
-        "Understand Popcorn": ~r"/concepts/",
         Guides: ~r"/guides/",
-        Reference: ~r"/reference/",
-        "Migration and comparisons": ~r"/(?:migration|comparisons)/",
+        Concepts: ~r"/concepts/",
         Contributing: ~r"/contributing/"
       ],
+      assets: %{"pages/assets" => "assets"},
       formatters: ["html"],
+      before_closing_head_tag: &docs_head/1,
+      before_closing_body_tag: &docs_body/1,
       source_url_pattern: "#{@github}/blob/v#{@version}/popcorn/elixir/%{path}#L%{line}",
       source_ref: "v#{@version}"
     ]
@@ -122,15 +112,88 @@ defmodule Popcorn.MixProject do
     )
   end
 
+  defp docs_head(:html) do
+    """
+    <style>
+      .makeup-string {
+        font-style: italic;
+      }
+
+      .content-inner .footnotes > ol > li > p {
+        margin: 0;
+      }
+
+      .content-inner .footnotes > ol > li {
+        position: relative;
+        padding-right: 1.5em;
+      }
+
+      .content-inner .reversefootnote {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .content-inner a.footnote {
+        font-size: 0.75em;
+        line-height: 0;
+        vertical-align: super;
+      }
+    </style>
+    """
+  end
+
+  defp docs_head(_format), do: ""
+
+  defp docs_body(:html) do
+    """
+    <script>
+      function wrapMakeupStrings() {
+        document.querySelectorAll("code.makeup").forEach((code) => {
+          const starts = code.querySelectorAll('[data-group-id="makeup-string-start"]');
+          const ends = code.querySelectorAll('[data-group-id="makeup-string-end"]');
+
+          starts.forEach((start, index) => {
+            const end = ends[index];
+            if (!end || start.closest(".makeup-string")) return;
+
+            const range = document.createRange();
+            const wrapper = document.createElement("span");
+            wrapper.className = "makeup-string";
+            range.setStartBefore(start);
+            range.setEndAfter(end);
+            wrapper.append(range.extractContents());
+            range.insertNode(wrapper);
+          });
+        });
+      }
+
+      window.addEventListener("exdoc:loaded", wrapMakeupStrings);
+      window.addEventListener("exdoc:loaded", () => {
+        document.querySelectorAll("a.reversefootnote").forEach((link) => {
+          const item = link.closest("li");
+          link.textContent = "↵";
+          item.append(link);
+        });
+      });
+    </script>
+    """
+  end
+
+  defp docs_body(_format), do: ""
+
   defp deps do
     [
       {:brotli, "~> 0.3.3", runtime: false},
       {:file_system, "~> 1.0", runtime: false},
       {:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0", optional: true},
       {:exdoc_folds, path: "../exdoc_folds", only: [:dev, :test], runtime: false},
+      {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
       {:makeup_strings, path: "../makeup_strings", only: :dev, runtime: false},
       {:makeup_syntect, "~> 0.1.4", only: :dev, runtime: false},
-      {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
+      {:makeup_diff, ">= 0.0.0", only: :dev, runtime: false},
+      {:makeup_html, ">= 0.0.0", only: :dev, runtime: false},
       {:ex_doc_js, github: "software-mansion-labs/ex_doc_js", only: [:dev, :test], runtime: false}
     ]
   end

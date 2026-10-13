@@ -34,6 +34,33 @@ description = "Build JS bundle for LocalLiveView"
 run = "pnpm -F ./local-live-view dev"
 description = "Watch & rebuild LocalLiveView JS bundle"
 
+[tasks.live-docs]
+description = "Watch, rebuild, and serve Elixir documentation"
+run = """
+set -e
+cd popcorn/elixir
+mix docs
+
+npx --yes browser-sync start \
+  --server doc \
+  --files 'doc/**/*.html' \
+  --port 8000 \
+  --no-open \
+  --no-ui \
+  --no-notify &
+server_pid=$!
+trap 'kill "$server_pid" 2>/dev/null || true' EXIT INT TERM
+
+watchexec --postpone \
+  --watch lib \
+  --watch pages \
+  --watch README.md \
+  --watch mix.exs \
+  --exts ex,exs,md \
+  --debounce 500ms \
+  -- mix docs
+"""
+
 [tasks.build-otp-with-crypto]
 run = "scripts/build-beam.sh --with-crypto"
 description = "Build OTP/BEAM for Wasm with crypto/asn1 NIFs"
