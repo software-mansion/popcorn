@@ -53,6 +53,7 @@ export function popcorn(options: Options): Plugin {
   let dirty = false;
   let outDir: string | undefined;
   let assetsDir = "assets";
+  let workerDerivedOtpRoot = `/@fs${distDir}/otp/`;
 
   // Dev/preview: pack once at server startup, then re-pack lazily after the
   // app's compiled beams change. A single in-flight promise dedupes concurrent
@@ -97,7 +98,7 @@ export function popcorn(options: Options): Plugin {
     const requestPath = decodeURIComponent(
       new URL(url, "http://localhost").pathname,
     );
-    const requestRoot = [`/${assetsDir}/otp/`, `/@fs${distDir}/otp/`].find(
+    const requestRoot = [`/${assetsDir}/otp/`, workerDerivedOtpRoot].find(
       (root) => requestPath.startsWith(root),
     );
     if (requestRoot === undefined) {
@@ -171,6 +172,10 @@ export function popcorn(options: Options): Plugin {
       config.server.fs.allow.push(distDir);
       outDir = resolve(config.root, config.build.outDir);
       assetsDir = config.build.assetsDir;
+      const servedDistDir = isUnder(config.root, distDir)
+        ? `/${relative(config.root, distDir)}`
+        : `/@fs${distDir}`;
+      workerDerivedOtpRoot = `${servedDistDir}/otp/`;
     },
 
     async configureServer(server) {
