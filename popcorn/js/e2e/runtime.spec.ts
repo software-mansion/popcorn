@@ -212,16 +212,15 @@ test.describe("boot", () => {
     const result = await page.evaluate(async () => {
       const events: unknown[] = [];
       let booted = false;
-      const popcorn = new window.Popcorn({
+      const boot = await window.Popcorn.init({
         beam: {
           env: { POPCORN_STARTUP_EVENT: "bridge" },
         },
+        onEvent: (event) => events.push({ event, beforeBoot: !booted }),
       });
-      popcorn.onEvent((event) => events.push({ event, beforeBoot: !booted }));
-
-      const boot = await popcorn.boot();
       booted = true;
-      popcorn.deinit();
+      if (!boot.ok) throw boot.error;
+      boot.data.deinit();
       return {
         boot: boot.ok,
         events,

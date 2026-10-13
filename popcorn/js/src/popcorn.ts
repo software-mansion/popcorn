@@ -102,6 +102,8 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
    * Defaults to console output.
    */
   onError?: (event: OtpErrorPayload) => void;
+  /** Receives BEAM message payloads, including messages sent during startup. */
+  onEvent?: (event: PopcornEvent) => void;
   /**
    * Module worker URL.
    *
@@ -306,6 +308,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     };
     this.ttySize = { ...ttySize };
     this.output = resolveOutputHandlers(opts);
+    if (opts.onEvent) this.onEvent(opts.onEvent);
     this.spawnWorker();
   }
 
@@ -322,7 +325,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   /**
    * Creates an instance and waits for {@link boot}.
    *
-   * For startup messages, use the constructor and register {@link onEvent} before boot.
+   * Use `opts.onEvent` to receive messages sent during startup.
    *
    * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
    */
