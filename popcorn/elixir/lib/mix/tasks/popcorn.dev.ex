@@ -10,7 +10,8 @@ defmodule Mix.Tasks.Popcorn.Dev do
     * `--dir` - directory to serve (default: `public`)
     * `--port` - HTTP port (default: `4000`)
 
-  On Linux, file watching requires `inotify-tools`.
+  On Linux, file watching requires `inotify-tools`. If watching cannot start,
+  the initial build is still served. Restart the task after editing Elixir sources.
 
       mix popcorn.dev
       mix popcorn.dev --dir www --out-dir www/out --port 8080
@@ -128,13 +129,25 @@ defmodule Mix.Tasks.Popcorn.Dev do
       ])
 
     {:ok, _apps} = Application.ensure_all_started(:file_system)
-    {:ok, watcher} = FileSystem.start_link(dirs: roots)
-    :ok = FileSystem.subscribe(watcher)
+
+    watcher =
+      case FileSystem.start_link(dirs: roots) do
+        {:ok, watcher} -> watcher
+        _ -> nil
+      end
 
     try do
+      if watcher do
+        :ok = FileSystem.subscribe(watcher)
+      else
+        Mix.shell().error(
+          "Automatic rebuilding unavailable. Install inotify-tools on Linux or restart after editing Elixir sources. Serving the initial build."
+        )
+      end
+
       watch(server, watcher, sources, out_dir, cook_args, false)
     after
-      GenServer.stop(watcher)
+      if watcher && Process.alive?(watcher), do: GenServer.stop(watcher)
       if Port.info(server), do: Port.close(server)
     end
   end
