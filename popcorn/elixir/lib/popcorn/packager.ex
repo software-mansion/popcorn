@@ -17,7 +17,7 @@ defmodule Popcorn.Packager do
   }
 
   @boot_name "bin/vm.boot"
-  @runtime_files ~w(beam.mjs beam.emu.mjs beam.wasm)
+  @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
 
@@ -34,6 +34,10 @@ defmodule Popcorn.Packager do
   # All of them should be in elixir's transitive dependency closure
   @base_apps ["elixir"]
 
+  # The VM starts the entrypoint with Popcorn.Boot, from Popcorn's application
+  @boot_app "popcorn"
+  @boot_function {Popcorn.Boot, :start, 1}
+
   @type options :: [
           {:root_dir, Path.t()}
           | {:build_path, Path.t()}
@@ -43,7 +47,8 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
-          | {:treeshake, false | [preserved_apps: [String.t()]]}
+          | {:exclude_priv, [String.t()]}
+          | {:treeshake, false | treeshake_options()}
           | {:static_dir, Path.t()}
         ]
 
@@ -55,8 +60,64 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
-          treeshake: false | [preserved_apps: [String.t()]]
+          exclude_priv: [String.t()],
+          treeshake: false | treeshake_options()
         }
+
+  @type treeshake_options :: [
+          preserved_apps: [String.t()],
+          keep: [module() | mfa()],
+          drop: [module()]
+        ]
+
+  # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
+  # runtime, which has its NIFs linked in.
+  @native_libraries "*/priv/**/*.{so,dylib,dll}"
+
+  # Tree-shaking keeps these, as they're only called dynamically: LocalLiveView
+  # views, which it looks up by name, and referenced Ecto schemas, whose
+  # generated functions Ecto calls. Generated functions of modules implementing
+  # behaviours, like LiveComponents, are kept anyway.
+  @kept [%{behaviour_impls: LocalLiveView}, %{referenced_modules_defining: {:__changeset__, 0}}]
+
+  # Tree-shaking removes these unless they're kept: they're reachable, but
+  # only used to compile, evaluate or format code, by a shell or in
+  # distribution. These can't be removed: erl_parse and eval_bits read
+  # applications' .app files, kernel starts inet_db, group calls edlin even
+  # with no shell, and pg calls net_kernel with no distribution.
+  @dropped_modules [
+    Code.Formatter,
+    :elixir_parser,
+    :elixir_tokenizer,
+    :erl_lint,
+    :erl_eval,
+    :prim_inet,
+    :qlc,
+    :qlc_pt,
+    :dets_v9,
+    :dets,
+    :sofs,
+    :erl_tar,
+    :file_sorter,
+    :global,
+    :disk_log,
+    :disk_log_1,
+    :zip,
+    :shell,
+    :edlin_expand,
+    :edlin_type_suggestion,
+    :edlin_context,
+    :dets_utils,
+    :gen_tcp_socket,
+    :socket,
+    :prim_socket,
+    :inet_dns,
+    :net,
+    :rpc,
+    :gen_udp_socket,
+    :dist_util,
+    :win32reg
+  ]
 
   defp strip_tarball(path, out_dir) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
@@ -109,6 +170,7 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        exclude_priv: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
@@ -138,6 +200,7 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 exclude_priv: options[:exclude_priv],
                  treeshake: options[:treeshake]
                }),
              {:ok, installed} <-
@@ -168,12 +231,15 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      exclude_priv: exclude_priv,
       treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
+    staging_dir = Path.join(out_dir, "staging")
 
-    with {:ok, project_apps} <- get_apps_info(build_path),
+    with :ok <- validate_priv_patterns(exclude_priv),
+         {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
          variant = runtime_variant || required_runtime(apps_info),
@@ -181,11 +247,13 @@ defmodule Popcorn.Packager do
          :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
-         staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info),
+         remove_priv_files(staging_dir, [@native_libraries | exclude_priv]),
          :ok <- patch_apps(staged_apps),
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
-           maybe_treeshake(staged_apps, treeshake, out_dir) do
+           maybe_treeshake(staged_apps, treeshake, out_dir),
+         prune_boot(boot_path, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -259,6 +327,10 @@ defmodule Popcorn.Packager do
     vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
+      for {filename, _source} <- js_files ++ vm_files do
+        compress(Path.join(out_dir, filename), brotli_effort)
+      end
+
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join(out_dir, "otp/bin/vm.boot")
       lib_dir = Path.join(out_dir, "otp/lib")
@@ -357,6 +429,26 @@ defmodule Popcorn.Packager do
     end
   end
 
+  # The boot script loads every module of kernel and stdlib, and fails if
+  # tree-shaking removed any, so they're left out of it. The others are loaded
+  # when used.
+  defp prune_boot(boot_path, staged_apps) do
+    packaged =
+      staged_apps
+      |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
+      |> MapSet.new(&(&1 |> Path.basename(".beam") |> String.to_atom()))
+
+    {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
+
+    commands =
+      Enum.map(commands, fn
+        {:primLoad, modules} -> {:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}
+        command -> command
+      end)
+
+    File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
+  end
+
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
   defp drop_app_versions({:path, dirs}) do
     {:path, Enum.map(dirs, &drop_version_fragment/1)}
@@ -388,6 +480,38 @@ defmodule Popcorn.Packager do
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  # Patterns are relative to the staging directory: `<app>/priv/...`. The files
+  # and directories they match are removed, along with directories left empty.
+  defp remove_priv_files(staging_dir, patterns) do
+    patterns
+    |> Enum.flat_map(&Path.wildcard(Path.join(staging_dir, &1), match_dot: true))
+    |> Enum.each(fn path ->
+      [app, "priv" | _] = path |> Path.relative_to(staging_dir) |> Path.split()
+      File.rm_rf!(path)
+      remove_if_empty(Path.dirname(path), Path.join([staging_dir, app, "priv"]))
+    end)
+  end
+
+  defp validate_priv_patterns(patterns) do
+    case Enum.reject(patterns, &priv_pattern?/1) do
+      [] -> :ok
+      invalid -> err(:bad_priv_patterns, invalid)
+    end
+  end
+
+  defp priv_pattern?(pattern) do
+    case Path.split(pattern) do
+      [_app, "priv" | rest] -> ".." not in rest
+      _other -> false
+    end
+  end
+
+  defp remove_if_empty(dir, priv_dir) do
+    if File.rmdir(dir) == :ok and dir != priv_dir do
+      remove_if_empty(Path.dirname(dir), priv_dir)
+    end
   end
 
   # we patch only selected modules from OTP, see patches/
@@ -423,6 +547,9 @@ defmodule Popcorn.Packager do
         Enum.each(build_tools, fn module ->
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
+
+        # The JS and the Wasm runtimes, which the output already has
+        File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
 
         replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
     end
@@ -556,10 +683,14 @@ defmodule Popcorn.Packager do
 
   defp maybe_treeshake(staged_apps, options, out_dir) do
     preserved_apps = Keyword.fetch!(options, :preserved_apps)
+    keep = Keyword.get(options, :keep, [])
+    drop = Keyword.get(options, :drop, [])
 
     with :ok <- validate_preserved_apps(staged_apps, options),
+         :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
+         drop = dropped_modules(drop, keep, preserved_modules),
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir),
          :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
       report = %{
         preserved_apps: preserved_apps,
@@ -572,6 +703,47 @@ defmodule Popcorn.Packager do
     end
   end
 
+  # Only the packaged ones, as the tree-shaker requires
+  defp kept(staged_apps) do
+    packaged = packaged_modules(staged_apps)
+    Enum.filter(@kept, &(is_map(&1) or MapSet.member?(packaged, &1)))
+  end
+
+  defp packaged_modules(staged_apps) do
+    staged_apps
+    |> Enum.flat_map(fn {_app, info} -> Keyword.fetch!(info.props, :modules) end)
+    |> MapSet.new()
+  end
+
+  defp dropped_modules(drop, keep, preserved_modules) do
+    kept =
+      Enum.map(keep, fn
+        {module, _fun, _arity} -> module
+        module -> module
+      end)
+
+    Enum.uniq((@dropped_modules -- (kept ++ preserved_modules)) ++ drop)
+  end
+
+  defp validate_keep(staged_apps, keep) do
+    packaged = packaged_modules(staged_apps)
+
+    unknown =
+      keep
+      |> Enum.map(fn
+        {module, _fun, _arity} -> module
+        module -> module
+      end)
+      |> Enum.reject(&MapSet.member?(packaged, &1))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    case unknown do
+      [] -> :ok
+      unknown -> err(:unknown_kept_modules, unknown)
+    end
+  end
+
   defp preserved_modules(staged_apps, preserved_apps) do
     Enum.flat_map(preserved_apps, fn app ->
       staged_apps
@@ -581,7 +753,7 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp run_treeshake(staged_apps, preserved_modules, out_dir) do
+  defp run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
     files =
       Enum.flat_map(staged_apps, fn {_app, info} ->
         info.ebin_dir |> Path.join("*") |> Path.wildcard()
@@ -593,8 +765,9 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: preserved_modules,
-        leave: preserved_modules
+        keep: [@boot_function | kept(staged_apps) ++ preserved_modules ++ keep],
+        leave: preserved_modules,
+        drop: drop
       )
 
     {:ok, report}
@@ -685,7 +858,11 @@ defmodule Popcorn.Packager do
   # doesn't need a stub application just to depend on one.
   defp entrypoint_roots(all_apps_info, entrypoint)
        when is_map_key(all_apps_info, entrypoint) do
-    {:ok, [entrypoint | @base_apps]}
+    if is_map_key(all_apps_info, @boot_app) do
+      {:ok, [entrypoint, @boot_app | @base_apps]}
+    else
+      err(:missing_boot_app, @boot_app)
+    end
   end
 
   defp entrypoint_roots(_all_apps_info, entrypoint),
@@ -858,6 +1035,19 @@ defmodule Popcorn.Packager do
     "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
   end
 
+  def format_error(%{code: "missing_boot_app", app: app}) do
+    "Starting the entrypoint requires the #{app} application, which is not available."
+  end
+
+  def format_error(%{code: "bad_priv_patterns", patterns: patterns}) do
+    "Patterns of priv files to leave out must be within applications' priv " <>
+      "directories, like phoenix/priv/static: #{Enum.join(patterns, ", ")}."
+  end
+
+  def format_error(%{code: "unknown_kept_modules", modules: modules}) do
+    "Modules to keep are not packaged: #{Enum.map_join(modules, ", ", &inspect/1)}."
+  end
+
   def format_error(%{code: "treeshake_failed", message: message}), do: message
 
   def format_error(%{code: "missing_runtime_resource", path: path}) do
@@ -905,6 +1095,18 @@ defmodule Popcorn.Packager do
 
   defp err(:unknown_preserved_apps, apps) do
     {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:missing_boot_app, app) do
+    {:error, %{code: "missing_boot_app", app: app}}
+  end
+
+  defp err(:bad_priv_patterns, patterns) do
+    {:error, %{code: "bad_priv_patterns", patterns: patterns}}
+  end
+
+  defp err(:unknown_kept_modules, modules) do
+    {:error, %{code: "unknown_kept_modules", modules: modules}}
   end
 
   defp err(:treeshake_failed, message) do

@@ -28,6 +28,7 @@ defmodule LocalThermostatWeb.Endpoint do
     at: "/",
     from: :local_thermostat,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: LocalThermostatWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 
