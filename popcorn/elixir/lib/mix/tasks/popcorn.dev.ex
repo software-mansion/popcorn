@@ -1,9 +1,9 @@
 defmodule Mix.Tasks.Popcorn.Dev do
   use Mix.Task
 
-  @shortdoc "Cooks, serves, and re-cooks Popcorn applications on source changes"
+  @shortdoc "A live-reloading server to develop Popcorn apps."
   @moduledoc """
-  Cooks the current project and serves static files with COOP/COEP headers.
+  Cooks the current project and serves static files with appropriate setup.
 
   Accepts all `mix popcorn.cook` options, plus:
 
