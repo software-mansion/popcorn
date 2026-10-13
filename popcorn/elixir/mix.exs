@@ -97,7 +97,7 @@ defmodule Popcorn.MixProject do
         Concepts: ~r"/concepts/",
         Contributing: ~r"/contributing/"
       ],
-      assets: %{"pages/assets" => "assets"},
+      assets: %{"pages/assets" => "assets", "pages/config" => "."},
       formatters: ["html"],
       before_closing_head_tag: &docs_head/1,
       before_closing_body_tag: &docs_body/1,
