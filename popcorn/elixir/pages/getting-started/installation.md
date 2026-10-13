@@ -2,7 +2,7 @@
 
 This guide installs the Popcorn 1.0 in a new Mix application.
 
-We have separate guide for [JavaScript-first applications](TODO) (e.g. using Vite).
+We have separate guide for ["JavaScript-first applications"](hello-js.md) (e.g. using Vite).
 If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://local-live-view.hexdocs.pm/) documentation.
 
 ## Requirements

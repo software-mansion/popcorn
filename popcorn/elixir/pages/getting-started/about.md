@@ -10,7 +10,7 @@ It's a perfect choice for code playgrounds, interactive documentation, offline t
 Popcorn provides:
 
 - an Erlang/OTP VM adapted to work in browsers.
-- [APIs](TODO) to communicate with JavaScript from Elixir (and vice versa).
+- [APIs](js-apis.md) to communicate with JavaScript from Elixir (and vice versa).
 - Scripts to package application files, HTML, and the VM for deployment.
 
 It also provides browser-specific alternatives for common tasks. For example, `Popcorn.Fetch` helps with sending HTTP requests through the browser. It can be used directly or as [Req](https://hex.pm/packages/req) adapter.
@@ -25,4 +25,4 @@ Browsers do have their limits though. We disabled distribution, TCP/UDP sockets,
 
 See ["Installation"](installation.md) to add Popcorn to a project.
 
-To build a bare bones application, see ["Hello World"](hello-world.md). More realistic project and advanced API use are shown in ["Hello counters"](TODO) document.
+To build a bare bones application, see ["Hello World"](hello-world.md). More realistic project and advanced API use are shown in ["Hello counters"](hello-counters.md) document.

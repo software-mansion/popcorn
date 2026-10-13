@@ -1,20 +1,18 @@
+# Making HTTP requests
+
 # Send HTTP requests
 
 Use `Popcorn.Fetch` when Elixir code needs HTTP in the browser. It uses the
-browser `fetch()` API. Use it directly or through Req.
+browser `fetch()` API. You can Use it directly or through Req.
 
-## Use Req
+## Using `Req`
 
-Add Req to the application dependencies:
-
-```elixir
-{:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0"}
-```
+Add Req to the application dependencies, we support Req from 0.5 to 0.8.
 
 The adapter is compiled only when Req is available. If you add Req after
 Popcorn has already compiled, recompile it with `mix deps.compile popcorn --force`.
 
-Popcorn installs its Req adapter when ran in the browser. If you already customized adapter, Popcorn won't install its own.
+Popcorn installs its Req adapter when ran in the browser. If you already customized the adapter, Popcorn won't install its own.
 
 ```elixir
 response = Req.get!("https://api.example.com/status")
