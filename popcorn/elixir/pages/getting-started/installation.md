@@ -9,6 +9,7 @@ If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://loca
 
 - Elixir 1.19 or later
 - OTP 29 or later
+- `make` (Brotli library NIF), `inotify-tools` (Linux, for `popcorn.dev` FS watching)
 
 These are versions that Popcorn uses for its VM. Try to match it. You can read more about Popcorn versioning in VM
 

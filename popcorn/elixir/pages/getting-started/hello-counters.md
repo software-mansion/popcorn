@@ -34,7 +34,7 @@ Create a `public` directory. Our static assets will live there. We also need a d
 
 ```
 mkdir -p public public/out
-# Keep generated runtime files out of version control.
+# if you use Git for this example
 echo "/public/out/" >> .gitignore
 ```
 
@@ -308,6 +308,7 @@ defmodule Counters.Unit do
       {DynamicSupervisor, name: Counter.via({:children, path})}
     ]
 
+    # :rest_for_one, so `Counter` crash restarts its children too.
     Supervisor.init(children, strategy: :rest_for_one)
   end
 end
