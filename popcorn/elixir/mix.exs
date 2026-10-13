@@ -108,7 +108,7 @@ defmodule Popcorn.MixProject do
     |> ExDocJs.configure(
       entry_points: ["../js/src/index.ts"],
       tsconfig: "../js/tsconfig.json",
-      root_module: "JS"
+      root_module: "JSLib"
     )
   end
 
