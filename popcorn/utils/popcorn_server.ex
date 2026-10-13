@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Popcorn.Server do
 
   ## Options
 
-    * `--port` - port to listen on (default: 4000)
+    * `--port` - port to listen on (default: 4000); uses an available port if occupied
     * `--dir` - directory to serve files from (default: "dist")
 
   ## Examples
@@ -79,6 +79,29 @@ defmodule Mix.Tasks.Popcorn.Server do
         end
       end
 
+      defmodule Popcorn.DevServer do
+        def start(supervisor, dir, port) do
+          bandit = [
+            plug: {Popcorn.DevServer.Router, dir},
+            scheme: :http,
+            port: port,
+            startup_log: false
+          ]
+
+          case Supervisor.start_child(supervisor, {Bandit, bandit}) do
+            {:ok, server} ->
+              {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+              port
+
+            {:error, {{:shutdown, {:failed_to_start_child, :listener, :eaddrinuse}}, _child}} ->
+              start(supervisor, dir, 0)
+
+            {:error, reason} ->
+              raise "Popcorn development server failed to start: #{inspect(reason)}"
+          end
+        end
+      end
+
       # stdout is a pipe to the parent Mix task, so it defaults to latin-1.
       :io.setopts(:standard_io, encoding: :unicode)
 
@@ -90,14 +113,15 @@ defmodule Mix.Tasks.Popcorn.Server do
 
       Application.ensure_all_started(:bandit)
 
-      {:ok, _} =
-        Supervisor.start_link(
-          [
-            {Bandit,
-             plug: {Popcorn.DevServer.Router, dir}, scheme: :http, port: port, startup_log: false}
-          ],
-          strategy: :one_for_one
+      {:ok, supervisor} = Supervisor.start_link([], strategy: :one_for_one)
+      requested_port = port
+      port = Popcorn.DevServer.start(supervisor, dir, requested_port)
+
+      if requested_port != 0 and port != requested_port do
+        IO.puts(
+          "Port #{requested_port} is already in use; using port #{port} instead. Use --port <port> to choose a port."
         )
+      end
 
       IO.puts(
         "Serving #{Path.basename(File.cwd!())}/#{Path.relative_to(dir, File.cwd!())} at http://localhost:#{port}"

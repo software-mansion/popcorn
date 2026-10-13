@@ -8,7 +8,7 @@ defmodule Mix.Tasks.Popcorn.Dev do
   Accepts all `mix popcorn.cook` options, plus:
 
     * `--dir` - directory to serve (default: `public`)
-    * `--port` - HTTP port (default: `4000`)
+    * `--port` - HTTP port (default: `4000`); uses an available port if occupied
 
   On Linux, file watching requires `inotify-tools`. If watching cannot start,
   the initial build is still served. Restart the task after editing Elixir sources.
@@ -64,6 +64,29 @@ defmodule Mix.Tasks.Popcorn.Dev do
         end
       end
 
+      defmodule Popcorn.DevServer do
+        def start(supervisor, dir, port) do
+          bandit = [
+            plug: {Popcorn.DevServer.Router, dir},
+            scheme: :http,
+            port: port,
+            startup_log: false
+          ]
+
+          case Supervisor.start_child(supervisor, {Bandit, bandit}) do
+            {:ok, server} ->
+              {:ok, {_address, port}} = ThousandIsland.listener_info(server)
+              port
+
+            {:error, {{:shutdown, {:failed_to_start_child, :listener, :eaddrinuse}}, _child}} ->
+              start(supervisor, dir, 0)
+
+            {:error, reason} ->
+              raise "Popcorn development server failed to start: #{inspect(reason)}"
+          end
+        end
+      end
+
       flag_config = [strict: [port: :integer, dir: :string]]
       {opts, _} = OptionParser.parse!(System.argv(), flag_config)
 
@@ -72,14 +95,15 @@ defmodule Mix.Tasks.Popcorn.Dev do
 
       Application.ensure_all_started(:bandit)
 
-      bandit = [
-        plug: {Popcorn.DevServer.Router, dir},
-        scheme: :http,
-        port: port,
-        startup_log: false
-      ]
+      {:ok, supervisor} = Supervisor.start_link([], strategy: :one_for_one)
+      requested_port = port
+      port = Popcorn.DevServer.start(supervisor, dir, requested_port)
 
-      {:ok, _} = Supervisor.start_link([{Bandit, bandit}], strategy: :one_for_one)
+      if requested_port != 0 and port != requested_port do
+        IO.puts(
+          "Port #{requested_port} is already in use; using port #{port} instead. Use --port <port> to choose a port."
+        )
+      end
 
       IO.puts("Serving #{Path.relative_to(dir, File.cwd!())}")
       IO.puts("Popcorn dev server: http://localhost:#{port}")
