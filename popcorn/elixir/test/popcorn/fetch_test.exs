@@ -12,6 +12,25 @@ defmodule Popcorn.FetchTest do
     on_exit(fn -> Application.delete_env(:popcorn, :wasm_bridge) end)
   end
 
+  describe "compilation" do
+    test "omits Req without losing plain Fetch" do
+      fixture = Path.expand("../fixtures/fetch_without_req_helper.exs", __DIR__)
+      {output, status} = System.cmd("elixir", [fixture], stderr_to_stdout: true)
+
+      assert status == 0, output
+      assert output == ""
+    end
+
+    test "installs the compiled adapter and preserves overrides" do
+      fixture = Path.expand("../fixtures/fetch_with_req_helper.exs", __DIR__)
+      paths = Enum.flat_map(:code.get_path(), fn path -> ["-pa", to_string(path)] end)
+      {output, status} = System.cmd("elixir", paths ++ [fixture], stderr_to_stdout: true)
+
+      assert status == 0, output
+      assert output == ""
+    end
+  end
+
   describe "request/2" do
     test "translates requests and responses without changing bytes" do
       FakeBridge.stub_fetch(%{
