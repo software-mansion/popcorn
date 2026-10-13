@@ -89,7 +89,8 @@ defmodule Popcorn.MixProject do
         "pages/getting-started/about.md",
         "pages/getting-started/installation.md",
         "pages/getting-started/hello-world.md",
-        "pages/getting-started/hello-counters.md"
+        "pages/getting-started/hello-counters.md",
+        "pages/guides/deployment.md"
       ],
       groups_for_extras: [
         "Getting started": ~r"/getting-started/",
