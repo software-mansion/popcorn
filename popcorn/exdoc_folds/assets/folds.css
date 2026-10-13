@@ -1,0 +1,51 @@
+pre[data-exdoc-folds]:not([data-folds-ready]) .exdoc-fold-content[hidden] { display: inline; }
+.exdoc-fold-content[hidden] { display: none; }
+pre[data-folds-ready] { --fold-gutter: 1em; }
+.exdoc-fold-control {
+  display: grid; grid-template-columns: 16px 1fr; align-items: center;
+  column-gap: 10px; row-gap: 2px;
+  box-sizing: border-box; width: calc(100% + 2 * var(--fold-gutter));
+  min-height: 40px; margin: 8px calc(-1 * var(--fold-gutter));
+  padding: 8px var(--fold-gutter); text-align: left;
+  border: 0; background: color-mix(in srgb, var(--link-color) 8%, var(--codeBackground));
+  color: currentColor; font: inherit; line-height: inherit; cursor: pointer;
+}
+.exdoc-fold-control svg { grid-column: 1; grid-row: 1; width: 16px; height: 16px; opacity: .6; }
+.exdoc-fold-control::after {
+  content: attr(data-label); grid-column: 2; grid-row: 1;
+  font-family: var(--sansFontFamily); font-size: var(--text-xs);
+  line-height: 20px; opacity: .55;
+}
+.exdoc-fold-control:hover { background: color-mix(in srgb, var(--link-color) 13%, var(--codeBackground)); }
+.exdoc-fold-control:hover::after, .exdoc-fold-control:focus-visible::after { opacity: 1; }
+.exdoc-fold-control:focus-visible { outline: 2px solid var(--link-color); outline-offset: -2px; }
+.exdoc-fold.is-expanded > .exdoc-fold-control svg { transform: rotate(90deg); }
+pre[data-folds-ready] > code { position: relative; isolation: isolate; }
+.exdoc-fold-highlight {
+  position: absolute; z-index: -1; pointer-events: none; visibility: hidden; opacity: 0;
+  box-sizing: content-box; padding: 2px 4px; margin: -2px -4px; border-radius: var(--borderRadius-sm);
+  background: color-mix(in srgb, var(--link-color) 10%, var(--codeBackground));
+}
+.exdoc-fold.is-expanded > .exdoc-fold-highlight { visibility: visible; }
+.exdoc-fold.is-expanded:has(> .exdoc-fold-control:is(:hover, :focus-visible)) > .exdoc-fold-highlight { opacity: 1; }
+.exdoc-fold-preview { display: block; grid-column: 1 / -1; grid-row: 2; }
+.exdoc-fold-preview::after { content: attr(data-preview); white-space: pre; }
+.exdoc-fold.is-expanded .exdoc-fold-preview { display: none; }
+@media screen and (max-width: 768px) {
+  .content-inner > pre[data-folds-ready],
+  .content-inner section > pre[data-folds-ready] { --fold-gutter: var(--content-gutter); }
+}
+.exdoc-fold-all {
+  display: flex; opacity: 0; position: absolute; top: 7px; right: 52px;
+  padding: 8px; background: transparent; backdrop-filter: blur(8px);
+  border-radius: var(--borderRadius-sm); border: 1px solid var(--codeBorder);
+  cursor: pointer; transition: var(--transition-all); font-size: var(--text-sm);
+  line-height: 24px; color: currentColor;
+}
+.exdoc-fold-all svg { width: 20px; height: 20px; opacity: .5; transition: var(--transition-all); }
+pre:hover .exdoc-fold-all, .exdoc-fold-all:focus { opacity: 1; }
+.exdoc-fold-all:is(:hover, :focus-visible) svg { opacity: 1; }
+@media print {
+  .exdoc-fold-content[hidden] { display: inline; }
+  .exdoc-fold-control, .exdoc-fold-all, .exdoc-fold-highlight { display: none; }
+}

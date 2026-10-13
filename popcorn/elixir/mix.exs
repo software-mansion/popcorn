@@ -114,6 +114,7 @@ defmodule Popcorn.MixProject do
       source_url_pattern: "#{@github}/blob/v#{@version}/popcorn/elixir/%{path}#L%{line}",
       source_ref: "v#{@version}"
     ]
+    |> ExDocFolds.configure()
     |> ExDocJs.configure(
       entry_points: ["../js/src/index.ts"],
       tsconfig: "../js/tsconfig.json",
@@ -126,6 +127,7 @@ defmodule Popcorn.MixProject do
       {:brotli, "~> 0.3.3", runtime: false},
       {:file_system, "~> 1.0", runtime: false},
       {:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0", optional: true},
+      {:exdoc_folds, path: "../exdoc_folds", only: [:dev, :test], runtime: false},
       {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
       {:ex_doc_js, github: "software-mansion-labs/ex_doc_js", only: [:dev, :test], runtime: false}
     ]
