@@ -1,22 +1,20 @@
-# Migrate from Popcorn 0.3
+# Migrating from Popcorn 0.3
 
-Popcorn 0.4 replaces AtomVM with Erlang/OTP compiled to WebAssembly.
-This change removes the AtomVM bundle and changes both bridge APIs.
+Popcorn 1.0 replaces AtomVM with Erlang/OTP compiled to WebAssembly.
+This change removes the AtomVM bundle and changes APIs.
 
 Use this guide to migrate an application from Popcorn 0.3.
 The guide uses Vite, but the Rollup and esbuild plugins use the same options.
 
 ## Review the main changes
 
-| Popcorn 0.3 | Popcorn 0.4 |
-| --- | --- |
-| AtomVM runs in a hidden iframe. | The Erlang/OTP BEAM runs in a Web Worker. |
-| `mix popcorn.cook` creates one `.avm` bundle. | The bundler plugin packages compiled applications as runtime assets. |
-| The application calls <code>Popcorn.Wasm.ready/1</code>. | OTP starts the application through its normal application callback. |
-| JavaScript calls a custom mailbox protocol. | JavaScript can use normal GenServer calls and casts. |
-| The bridge uses JSON values. | The bridge uses Erlang external term format (ETF) values. |
-| JavaScript methods can throw or return mixed result shapes. | Bridge operations return typed result objects. |
-| Browser code uses iframe-specific helpers. | Browser code runs in the page and uses explicit bridge actions. |
+| Popcorn 0.3                                                    | Popcorn 1.0                                                                                                                                                   |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AtomVM runs in a hidden iframe.                                | The Erlang/OTP BEAM runs in a Web Worker.                                                                                                                     |
+| `mix popcorn.cook` creates one `.avm` bundle.                  | `mix popcorn.cook` packages application to set of tarballs.                                                                                                   |
+| The application calls `Popcorn.Wasm.ready/1`.                  | OTP starts the application through its normal application callback. You can use `Popcorn.Wasm.await_ready/1` to wait for JavaScript initialization to finish. |
+| `cast()` and `calls()` are plain messages, processed manually. | JavaScript can use normal GenServer calls and casts.                                                                                                          |
+| JavaScript methods can throw on errors.                        | Bridge operations return typed result objects. Exceptions shouldn't be handled.                                                                               |
 
 The new runtime supports more OTP behavior than AtomVM.
 It still operates inside the browser sandbox.
@@ -28,26 +26,25 @@ Replace the Popcorn dependency in `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:popcorn, "0.4.0-next.0"}
+    {:popcorn, "1.0.0-next.0"}
   ]
 end
 ```
 
-Install the matching JavaScript prerelease:
+Install the matching JavaScript prerelease if your project uses JavaScript bundler:
 
-```console
+```bash
 npm install @swmansion/popcorn@next
 ```
 
 The Elixir and JavaScript package versions must match.
-Popcorn 0.4 requires Elixir 1.19 or later.
+Popcorn 1.0 requires Elixir 1.19 or later.
 
-Use the toolchain from the selected Popcorn release.
-The packager checks the host OTP version against the WebAssembly runtime.
+Use the toolchain from the selected Popcorn release, the packager checks the host OTP version against the WebAssembly runtime.
 
 Then get the dependencies and compile the application:
 
-```console
+```bash
 mix deps.get
 mix compile
 ```
@@ -56,11 +53,11 @@ mix compile
 
 Remove these calls from application startup:
 
-- <code>Popcorn.Wasm.ready/0</code>
-- <code>Popcorn.Wasm.ready/1</code>
-- <code>Popcorn.Wasm.set_default_receiver/1</code>
+- `Popcorn.Wasm.ready/0`
+- `Popcorn.Wasm.ready/1`
+- `Popcorn.Wasm.set_default_receiver/1`
 
-Popcorn 0.4 starts the application from its `.app` specification.
+Popcorn 1.0 starts the application from its `.app` specification.
 `Popcorn.init()` waits for the application callback and supervision tree.
 
 Keep the application callback in `mix.exs`:
@@ -83,7 +80,6 @@ defmodule MyApp.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      Popcorn.Proxy,
       MyApp.Worker
     ]
 
@@ -95,9 +91,6 @@ defmodule MyApp.Application do
 end
 ```
 
-Add `Popcorn.Proxy` only when JavaScript uses GenServer calls or casts.
-The proxy has the registered name `:popcorn_proxy` by default.
-
 ## Replace `.avm` bundle creation
 
 Delete the Popcorn 0.3 output configuration:
@@ -105,9 +98,6 @@ Delete the Popcorn 0.3 output configuration:
 ```elixir
 config :popcorn, out_dir: "dist/wasm"
 ```
-
-Also remove `mix popcorn.cook` from build scripts.
-Popcorn 0.4 does not create or load `.avm` files.
 
 Configure the bundler plugin with the Mix project and OTP application:
 
@@ -130,9 +120,9 @@ select another application.
 
 The plugin runs `mix popcorn.cook`, which compiles the project before packaging
 the active Mix environment and target.
-It packages the application, its dependencies, the boot file, and the runtime manifest.
+It packages the application, its dependencies, and the boot file.
 
-Remove the old `treeshake` and `extra_beams` build options.
+Remove the old `treeshake` and `extra_beams` build options. See `mix popcorn.cook` to check current treeshake options. Treeshaking is disabled by default.
 The new `strip` option removes nonessential BEAM chunks but does not remove functions.
 
 Use `extraApps` for applications that dependency analysis cannot find:
@@ -145,16 +135,6 @@ popcorn({
 ```
 
 Use `app: null` when the runtime must not start an application.
-See [Package an application](packaging.html) for all plugin options.
-
-Popcorn 0.4 removes these Mix tasks:
-
-- `mix popcorn.cook`
-- `mix popcorn.gen.js`
-- `mix popcorn.build_runtime`
-- `mix popcorn.server`
-
-Use the selected bundler for development and production builds.
 
 ## Update JavaScript startup
 
@@ -166,7 +146,7 @@ const popcorn = await Popcorn.init({
 });
 ```
 
-Popcorn 0.4 returns a result object:
+Popcorn 1.0 returns a result object:
 
 ```typescript
 import { Popcorn } from "@swmansion/popcorn";
@@ -192,16 +172,6 @@ Remove these old initialization options:
 The bundler plugin now supplies the generated runtime asset locations.
 Use `beam.otpAssetsRoot` only when you host OTP assets at a custom location.
 
-Use separate boot phases when the application must receive startup events:
-
-```typescript
-const popcorn = new Popcorn();
-const removeHandler = popcorn.onEvent((event) => console.log(event));
-
-const result = await popcorn.boot();
-if (!result.ok) throw result.error;
-```
-
 `deinit()` now stops the Web Worker.
 You can call `boot()` on the same instance after shutdown.
 
@@ -210,13 +180,13 @@ You can call `boot()` on the same instance after shutdown.
 Popcorn 0.3 sent calls to a custom process mailbox:
 
 ```typescript
-const result = await popcorn.call(
-  ["add", 2],
-  { process: "counter", timeoutMs: 5_000 },
-);
+const result = await popcorn.call(["add", 2], {
+  process: "counter",
+  timeoutMs: 5_000,
+});
 ```
 
-The receiving process used <code>Popcorn.Wasm.handle_message!/2</code>:
+The receiving process used `Popcorn.Wasm.handle_message!/2`:
 
 ```elixir
 def handle_info(message, state) when Popcorn.Wasm.is_wasm_message(message) do
@@ -228,7 +198,7 @@ def handle_info(message, state) when Popcorn.Wasm.is_wasm_message(message) do
 end
 ```
 
-Popcorn 0.4 sends a standard GenServer call through `Popcorn.Proxy`:
+Popcorn 1.0 sends a standard GenServer call through `Popcorn.Proxy`:
 
 ```typescript
 const result = await popcorn.genserver.call("counter", ["add", 2], {
@@ -249,14 +219,11 @@ def handle_call(["add", amount], _from, state) do
 end
 ```
 
-The JavaScript target is now the first argument.
-Popcorn does not use a default receiver.
-
-The target can be a registered process name or a PID from the same runtime boot.
-Calls use a five-second timeout by default.
-
-The new result does not contain `durationMs`.
-Measure elapsed time in application code when you need it.
+- The JavaScript target is now the first argument.
+- The target can be a registered process name or a PID from the same runtime boot.
+- Calls use a five-second timeout by default.
+- The new result does not contain `durationMs`.
+- Measure elapsed time in application code when you need it.
 
 ## Replace custom casts with GenServer casts
 
@@ -266,7 +233,7 @@ Update a Popcorn 0.3 cast:
 popcorn.cast("reset", { process: "counter" });
 ```
 
-Use the Popcorn 0.4 GenServer API:
+Use the Popcorn 1.0 GenServer API:
 
 ```typescript
 const result = await popcorn.genserver.cast("counter", "reset");
@@ -282,13 +249,13 @@ def handle_cast("reset", _state) do
 end
 ```
 
-The new cast method is asynchronous.
-A successful result confirms delivery to `Popcorn.Proxy`.
-It does not confirm that the target handled the cast.
+- The new cast method is asynchronous.
+- A successful result confirms delivery to `Popcorn.Proxy`.
+  It does not confirm that the target handled the cast.
 
 ## Use direct process messages when you do not need GenServer
 
-Popcorn 0.4 adds a direct send operation:
+Popcorn 1.0 adds a direct send operation:
 
 ```typescript
 const result = await popcorn.send("worker", { action: "refresh" });
@@ -320,7 +287,7 @@ popcorn.onMessage((eventName, payload) => {
 });
 ```
 
-Popcorn 0.4 sends one value:
+Popcorn 1.0 sends one value:
 
 ```elixir
 Popcorn.Wasm.send(%{event: "counter_updated", count: count})
@@ -335,11 +302,9 @@ const removeHandler = popcorn.onEvent((event) => {
 ```
 
 Include an event name in the value when the application needs one.
-Register the handler before `boot()` when the application sends startup events.
 
 `onEvent()` returns a function that removes the handler.
-Popcorn 0.4 removes `registerLogListener()` and `unregisterLogListener()`.
-Pass `onStdout` and `onStderr` when you create the Popcorn instance.
+Popcorn 1.0 removes `registerLogListener()` and `unregisterLogListener()`.
 
 ## Update JavaScript calls from Elixir
 
@@ -358,7 +323,7 @@ Popcorn.Wasm.run_js(
 )
 ```
 
-Popcorn 0.4 passes the arguments and bridge actions separately:
+Popcorn 1.0 passes the arguments and bridge actions separately:
 
 ```elixir
 Popcorn.Wasm.run_js(
@@ -372,22 +337,19 @@ Popcorn.Wasm.run_js(
 )
 ```
 
-Return a normal value directly.
-Remove the `:return` option and array wrapper.
-
-The function no longer receives `wasm` or `iframeWindow`.
-Use the `send`, `call`, and `cast` actions to contact BEAM processes.
-
-The non-raising function returns `{:ok, value}` or `{:error, reason}`.
-Use `run_js!/3` when a JavaScript failure must raise an exception.
-
-The current bridge evaluates JavaScript source in the page.
-The page Content Security Policy must permit `unsafe-eval`.
+- Return a normal value directly.
+- Remove the `:return` option and array wrapper.
+- The function no longer receives `wasm` or `iframeWindow`.
+  Use the `send`, `call`, and `cast` actions to contact BEAM processes.
+- The non-raising function returns `{:ok, value}` or `{:error, reason}`.
+  Use `run_js!/3` when a JavaScript failure must raise an exception.
+- The current bridge evaluates JavaScript source in the page.
+  The page Content Security Policy must permit `unsafe-eval`.
 
 ## Replace tracked objects
 
 Popcorn 0.3 used `%Popcorn.TrackedObject{}` and separate value lookup functions.
-Popcorn 0.4 uses an opaque `Popcorn.Wasm.tracked_value()` handle.
+Popcorn 1.0 uses an opaque `Popcorn.Wasm.tracked_value()` handle.
 
 Create the handle in the JavaScript function:
 
@@ -413,10 +375,10 @@ return new TrackedValue(controller, () => controller.abort());
 
 Remove calls to these Popcorn 0.3 functions:
 
-- <code>Popcorn.Wasm.get_tracked_values/1</code>
-- <code>Popcorn.Wasm.get_tracked_values!/1</code>
-- <code>Popcorn.Wasm.register_event_listener/2</code>
-- <code>Popcorn.Wasm.unregister_event_listener/1</code>
+- `Popcorn.Wasm.get_tracked_values/1`
+- `Popcorn.Wasm.get_tracked_values!/1`
+- `Popcorn.Wasm.register_event_listener/2`
+- `Popcorn.Wasm.unregister_event_listener/1`
 
 Use `run_js/3` to add browser event listeners.
 Use the supplied `send` action inside the listener.
@@ -424,20 +386,20 @@ Use the supplied `send` action inside the listener.
 ## Review values across the bridge
 
 Popcorn 0.3 accepted JSON-compatible values.
-Popcorn 0.4 uses a typed ETF bridge with more BEAM value types.
+Popcorn 1.0 uses a typed ETF bridge with more BEAM value types.
 
 Important JavaScript-to-BEAM conversions include:
 
-| JavaScript value | BEAM value |
-| --- | --- |
-| String | UTF-8 binary |
-| Safe integer | Integer |
-| Other finite number | Float |
-| Array | List |
-| Plain object | Map with binary keys |
-| `null` or `undefined` | `nil` |
-| `atom("ok")` | Existing atom |
-| `tuple(a, b)` | Tuple |
+| JavaScript value      | BEAM value           |
+| --------------------- | -------------------- |
+| String                | UTF-8 binary         |
+| Safe integer          | Integer              |
+| Other finite number   | Float                |
+| Array                 | List                 |
+| Plain object          | Map with binary keys |
+| `null` or `undefined` | `nil`                |
+| `atom("ok")`          | Existing atom        |
+| `tuple(a, b)`         | Tuple                |
 
 Import `atom` and `tuple` from `@swmansion/popcorn` when JavaScript must create these terms.
 Popcorn rejects unknown atoms, cyclic objects, class instances, functions, and unsafe numbers.
@@ -445,7 +407,7 @@ Popcorn rejects unknown atoms, cyclic objects, class instances, functions, and u
 BEAM PIDs become opaque JavaScript values.
 Do not use a PID with another Popcorn instance or another runtime boot.
 
-See [Values across the bridge](values.html) for the complete conversion rules.
+See [Values across the bridge](values.md) for the complete conversion rules.
 
 ## Review runtime and deployment limits
 
@@ -464,23 +426,10 @@ Check these application requirements:
 The plugin sets cross-origin isolation headers for Vite development and preview.
 Your production server must set the same headers.
 
-See [Compatibility and browser limits](compatibility.html) and
-[Deploy Popcorn](deployment.html) before the production release.
+See [Compatibility and browser limits](compatibility.md) and
+[Deploy Popcorn](deployment.md) before the production release.
 
-## Complete the migration
-
-Use this checklist after the application builds:
-
-1. Confirm that `mix compile` succeeds with the selected Popcorn toolchain.
-2. Confirm that the bundler plugin names the correct OTP application.
-3. Confirm that no build script creates or copies an `.avm` file.
-4. Confirm that `Popcorn.init()` handles both result variants.
-5. Confirm that each GenServer call has a supervised `Popcorn.Proxy`.
-6. Confirm that every JavaScript call or cast has an explicit target.
-7. Confirm that browser events use one payload value.
-8. Confirm that `run_js/3` functions use the new arguments.
-9. Confirm that the production server uses HTTPS, COOP, and COEP.
-10. Test one message in each bridge direction in the production build.
+## Examples
 
 Use these migrated examples as working references:
 

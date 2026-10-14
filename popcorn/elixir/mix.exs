@@ -89,7 +89,16 @@ defmodule Popcorn.MixProject do
         "pages/getting-started/about.md",
         "pages/getting-started/installation.md",
         "pages/getting-started/hello-world.md",
-        "pages/getting-started/hello-counters.md"
+        "pages/getting-started/hello-counters.md",
+        "pages/getting-started/hello-js.md",
+        "pages/concepts/architecture.md",
+        "pages/concepts/compatibility.md",
+        "pages/concepts/values.md",
+        "pages/guides/js-apis.md",
+        "pages/guides/deployment.md",
+        "pages/guides/http.md",
+        "pages/guides/terminal.md",
+        "pages/guides/0-3-migration.md"
       ],
       groups_for_extras: [
         "Getting started": ~r"/getting-started/",
@@ -97,18 +106,28 @@ defmodule Popcorn.MixProject do
         Concepts: ~r"/concepts/",
         Contributing: ~r"/contributing/"
       ],
-      assets: %{"pages/assets" => "assets"},
+      assets: %{"pages/assets" => "assets", "pages/config" => "."},
       formatters: ["html"],
       before_closing_head_tag: &docs_head/1,
       before_closing_body_tag: &docs_body/1,
       source_url_pattern: "#{@github}/blob/v#{@version}/popcorn/elixir/%{path}#L%{line}",
-      source_ref: "v#{@version}"
+      source_ref: "v#{@version}",
+      skip_code_autolink_to: [
+        "Popcorn.Wasm.ready/0",
+        "Popcorn.Wasm.ready/1",
+        "Popcorn.Wasm.set_default_receiver/1",
+        "Popcorn.Wasm.handle_message!/2",
+        "Popcorn.Wasm.get_tracked_values/1",
+        "Popcorn.Wasm.get_tracked_values!/1",
+        "Popcorn.Wasm.register_event_listener/2",
+        "Popcorn.Wasm.unregister_event_listener/1"
+      ]
     ]
     |> ExDocFolds.configure()
     |> ExDocJs.configure(
       entry_points: ["../js/src/index.ts"],
       tsconfig: "../js/tsconfig.json",
-      root_module: "JS"
+      root_module: "JSLib"
     )
   end
 

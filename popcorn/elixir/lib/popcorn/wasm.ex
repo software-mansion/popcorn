@@ -145,7 +145,7 @@ defmodule Popcorn.Wasm do
 
   The `send` helper sends a message to a BEAM process.
   The `call` and `cast` helpers use `Popcorn.Proxy` to contact GenServers.
-  These helpers return promises with the same result objects as their [JavaScript API](JS.Popcorn.html) counterparts.
+  These helpers return promises with the same result objects as their [JavaScript API](JSLib.Popcorn.html) counterparts.
 
   Notes:
   - Calls during application startup run before `popcorn.boot()` resolves.

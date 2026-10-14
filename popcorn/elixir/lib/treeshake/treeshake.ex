@@ -1,7 +1,6 @@
 defmodule Treeshake do
-  @moduledoc """
-  Tree-shaker for compiled BEAM code. See `run/1` for details.
-  """
+  @moduledoc false
+  # Tree-shaker for compiled BEAM code. See `run/1` for details.
 
   @stdlib_apps [:erts, :kernel, :stdlib, :compiler, :elixir, :logger]
   @non_treeshakable_apps [:erts, :stdlib, :kernel, :logger]

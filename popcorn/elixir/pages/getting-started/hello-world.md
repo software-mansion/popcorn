@@ -122,6 +122,6 @@ The `mix popcorn.dev` command also packaged our application to a tarball and inc
 
 ## Next
 
-Now, you can play around with [Popcorn APIs](TODO) in that example app or check out a bit more complex project in ["Hello counters"](TODO).
+Now, you can play around with [Popcorn APIs](guides/js-apis.md) in that example app or check out a bit more complex project in ["Hello counters"](hello-counters.md).
 
-[^init]: In Popcorn, JS waits until supervision tree is ready and then finishes initialization, while Elixir runs asynchrounously. Read more in ["Architecture: initialization"](TODO).
+[^init]: In Popcorn, JS waits until supervision tree is ready and then finishes initialization, while Elixir runs asynchrounously. Read more in ["Architecture: initialization"](architecture.md#initialization).

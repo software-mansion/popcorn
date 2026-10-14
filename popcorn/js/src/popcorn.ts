@@ -335,6 +335,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Use `opts.onEvent` to receive messages sent during startup.
    *
    * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
+   *
+   * @see {@link PopcornOpts}
    */
   public static async init<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output> = {},

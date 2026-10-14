@@ -1,14 +1,13 @@
 defmodule Popcorn.Packager.BeamPatcher do
-  @moduledoc """
-  Replaces functions in a compiled BEAM with implementations taken from a patch
-  module, by merging both modules as Core Erlang and recompiling with the host
-  compiler.
-
-  A patch function replaces the original of the same name and arity, including
-  for calls made from the original module's own code. Exported patch functions
-  listed in `-compile([{popcorn_patch_private, [{f, a}]}])` stay private.
-  `popcorn_module:f(...)` calls the original implementation of `f`.
-  """
+  @moduledoc false
+  #   Replaces functions in a compiled BEAM with implementations taken from a patch
+  #   module, by merging both modules as Core Erlang and recompiling with the host
+  #   compiler.
+  #
+  #   A patch function replaces the original of the same name and arity, including
+  #   for calls made from the original module's own code. Exported patch functions
+  #   listed in `-compile([{popcorn_patch_private, [{f, a}]}])` stay private.
+  #   `popcorn_module:f(...)` calls the original implementation of `f`.
 
   @orig_prefix "popcorn_orig"
   @patch_prefix "popcorn_patch"
