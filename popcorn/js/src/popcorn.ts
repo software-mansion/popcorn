@@ -86,14 +86,14 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
    * Receives stdout.
    *
    * Defaults to `console.log`.
-   * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
+   * Receives `Uint8Array` when `tty.output` is "bytes", and `string` otherwise.
    */
   onStdout?: (chunk: OutputChunk<Output>) => void;
   /**
    * Receives stderr.
    *
    * Defaults to `console.error`.
-   * When `tty.output` is "bytes", we pass an `ArrayBuffer` as an argument and `string` otherwise
+   * Receives `Uint8Array` when `tty.output` is "bytes", and `string` otherwise.
    */
   onStderr?: (chunk: OutputChunk<Output>) => void;
   /**
@@ -209,6 +209,11 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
  * Use {@link Popcorn.init} to create and start an instance.
  **/
 export class Popcorn<Output extends TtyOutput = "text"> {
+  /** Receives stdout. Can be replaced at any time; `undefined` restores the default output handler. */
+  public onStdout?: (chunk: OutputChunk<Output>) => void;
+  /** Receives stderr. Can be replaced at any time; `undefined` restores the default output handler. */
+  public onStderr?: (chunk: OutputChunk<Output>) => void;
+
   private vmWorker!: Worker;
   private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts<Output>;
@@ -307,7 +312,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       },
     };
     this.ttySize = { ...ttySize };
-    this.output = resolveOutputHandlers(opts);
+    this.onStdout = opts.onStdout;
+    this.onStderr = opts.onStderr;
+    this.output = resolveOutputHandlers(this.opts, this);
     if (opts.onEvent) this.onEvent(opts.onEvent);
     this.spawnWorker();
   }
@@ -383,7 +390,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.Pid = createPidClass();
     this.io = createIoState();
-    this.output = resolveOutputHandlers(this.opts);
+    this.output = resolveOutputHandlers(this.opts, this);
     check(this.readyWaiters.length === 0);
     this.state = { status: "booting" };
 
@@ -1049,28 +1056,39 @@ function isValidTtySize({ columns, rows }: TtySize): boolean {
 
 function resolveOutputHandlers<Output extends TtyOutput>(
   opts: PopcornOpts<Output>,
+  callbacks: Pick<PopcornOpts<Output>, "onStdout" | "onStderr">,
 ): OutputHandlers {
   type BytesHandler = (chunk: Uint8Array) => void;
   type TextHandler = (chunk: string) => void;
 
   if (opts.tty?.output === "bytes") {
-    const onStdout = opts.onStdout as BytesHandler | undefined;
-    const onStderr = opts.onStderr as BytesHandler | undefined;
     return {
-      stdout: onStdout ?? defaultOnStdoutBytes,
-      stderr: onStderr ?? defaultOnStderrBytes,
+      stdout: (chunk) =>
+        ((callbacks.onStdout as BytesHandler | undefined) ?? defaultOnStdoutBytes)(
+          chunk,
+        ),
+      stderr: (chunk) =>
+        ((callbacks.onStderr as BytesHandler | undefined) ?? defaultOnStderrBytes)(
+          chunk,
+        ),
     };
   }
 
   const stdoutDecoder = new TextDecoder();
   const stderrDecoder = new TextDecoder();
-  const onStdout =
-    (opts.onStdout as TextHandler | undefined) ?? defaultOnStdout;
-  const onStderr =
-    (opts.onStderr as TextHandler | undefined) ?? defaultOnStderr;
   return {
-    stdout: (chunk) => decodeOutput(stdoutDecoder, onStdout, chunk),
-    stderr: (chunk) => decodeOutput(stderrDecoder, onStderr, chunk),
+    stdout: (chunk) =>
+      decodeOutput(
+        stdoutDecoder,
+        (callbacks.onStdout as TextHandler | undefined) ?? defaultOnStdout,
+        chunk,
+      ),
+    stderr: (chunk) =>
+      decodeOutput(
+        stderrDecoder,
+        (callbacks.onStderr as TextHandler | undefined) ?? defaultOnStderr,
+        chunk,
+      ),
   };
 }
 
