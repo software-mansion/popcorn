@@ -2,14 +2,12 @@
 
 Popcorn has multiple ways to communicate with Elixir from JavaScript.
 
-<!-- TODO: link tryInit() -->
-
 > #### Philosophy {: .neutral}
 >
 > The main philosophy of the API is that exceptions aren't meant to be caught — exceptions signify misconfiguration, mistake in using the APIs, or bug in the Popcorn.
 >
 > For errors that can be handled, we return `{ok: true | false, data, error}` result object.
-> All API functions have non-prefix variation (which throws the result if it's an error) and `try` prefixed variation which returns mentioned result object. For example, [`Popcorn.tryInit()`](`JSLib.Popcorn.tryInit/1`) and `Popcorn.tryInit()`. [List of errors](`t:JSLib.popcorn_errors/0`).
+> All API functions have non-prefix variation (which throws the result if it's an error) and `try` prefixed variation which returns mentioned result object. For example, [`Popcorn.init()`](`JSLib.Popcorn.init/1`) and [`Popcorn.tryInit()`](`JSLib.Popcorn.tryInit/1`). [List of errors](`t:JSLib.popcorn_errors/0`).
 >
 > Use former if you don't expect errors and latter if you can handle them in some way (e.g. retry the operation on timeout).
 
@@ -17,9 +15,9 @@ Popcorn has multiple ways to communicate with Elixir from JavaScript.
 
 ### Initialization
 
-In JavaScript, we have two ways of creating Popcorn instance. First is [`async Popcorn.tryInit(opts)`](`JSLib.Popcorn.tryInit/1`), which sets up initial state and boots a VM.
+In JavaScript, we have two ways of creating Popcorn instance. First is [`async Popcorn.init(opts)`](`JSLib.Popcorn.init/1`), which sets up initial state and boots a VM.
 
-This can be split into [`const popcorn = new Popcorn(opts)`](JSLib.Popcorn.html#Popcorn/1) and [`async popcorn.tryBoot()`](`JSLib.Popcorn.tryBoot/0`). It's rare to do that, it's mostly needed if you need to do some setup before booting the VM.
+This can be split into [`const popcorn = new Popcorn(opts)`](JSLib.Popcorn.html#Popcorn/1) and [`async popcorn.boot()`](`JSLib.Popcorn.boot/0`). It's rare to do that, it's mostly needed if you need to do some setup before booting the VM.
 
 List of options, including VM ones is in [`PopcornOpts`](`t:JSLib.popcorn_opts/0`).
 
@@ -31,7 +29,7 @@ To handle input and output, we have:
 - `onStderr(text)`
 - `writeStdin(text)`
 
-First two can be set when constructing the instance via [`Popcorn.tryInit()`](`JSLib.Popcorn.tryInit/1`) or replaced on instance anytime.
+First two can be set when constructing the instance via [`Popcorn.init()`](`JSLib.Popcorn.init/1`) or replaced on instance anytime.
 
 See ["Interacting with terminal"](terminal.md) to learn more.
 
@@ -39,9 +37,9 @@ See ["Interacting with terminal"](terminal.md) to learn more.
 
 Elixir can send events to the JavaScript via `Popcorn.Wasm.send/1`. To receive them, we need to register [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler.
 
-We can also send events back using [`async popcorn.trySend(pid, payload)`](`JSLib.Popcorn.trySend/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.Wasm.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
+We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.Wasm.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
 
-Additionally, we have [`async popcorn.cast(pid, payload, opts)`](`JSLib.Popcorn.Genserver.cast/3`) and [`async popcorn.call(pid, payload, opts)`](`JSLib.Popcorn.Genserver.call/3`). They're used to communicate with GenServers.
+Additionally, we have [`async popcorn.genserver.cast(pid, payload, opts)`](`JSLib.Popcorn.Genserver.cast/3`) and [`async popcorn.genserver.call(pid, payload, opts)`](`JSLib.Popcorn.Genserver.call/3`). They're used to communicate with GenServers.
 All `cast()`s and `call()`s are going through internal `Popcorn.Proxy` which keeps tabs of timeouts and routes the messages to correct processes.
 
 Messages sent to the Elixir will convert the JavaScript types to the Elixir ones. Popcorn provides [`atom()`](`JSLib.atom/1`) (`a()` alias) and [`tuple()`](`JSLib.tuple/3`) (`t()` alias) helpers to create native Elixir types.
@@ -69,7 +67,7 @@ Example:
 """
 (args, actions) => {
   const { node, pid, event } = args;
-  const { tryCast: cast } = actions;
+  const { cast } = actions;
 
   node.onclick = () => cast(pid, event);
 
@@ -86,7 +84,7 @@ The first argument is the deserialized map of arguments and second is a map of a
 - `call()`
 - `send()`
 
-Actions perform the same thing as [`async popcorn.trySend(pid, payload)`](`JSLib.Popcorn.trySend/2`) and others, mentioned earlier.
+Actions perform the same thing as [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`) and others, mentioned earlier.
 
 > One thing to be mindful of is to not `call()` the process that runs `run_js/3`. It will deadlock.
 

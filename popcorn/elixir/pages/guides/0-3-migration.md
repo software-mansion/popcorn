@@ -14,7 +14,7 @@ The guide uses Vite, but the Rollup and esbuild plugins use the same options.
 | `mix popcorn.cook` creates one `.avm` bundle.                  | `mix popcorn.cook` packages application to set of tarballs.                                                                                                   |
 | The application calls `Popcorn.Wasm.ready/1`.                  | OTP starts the application through its normal application callback. You can use `Popcorn.Wasm.await_ready/1` to wait for JavaScript initialization to finish. |
 | `cast()` and `calls()` are plain messages, processed manually. | JavaScript can use normal GenServer calls and casts.                                                                                                          |
-| JavaScript methods can throw on errors.                        | Bridge operations return typed result objects. Exceptions shouldn't be handled.                                                                               |
+| JavaScript methods can throw on errors.                        | Bridge operations throw; `try*` variants return typed result objects.                                                                               |
 
 The new runtime supports more OTP behavior than AtomVM.
 It still operates inside the browser sandbox.
@@ -146,19 +146,18 @@ const popcorn = await Popcorn.init({
 });
 ```
 
-Popcorn 1.0 returns a result object:
+Popcorn 1.0 returns an instance or rejects:
 
 ```typescript
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.tryInit({
+const popcorn = await Popcorn.init({
   onStdout: console.log,
   onStderr: console.error,
 });
-
-if (!result.ok) throw result.error;
-const popcorn = result.data;
 ```
+
+Use `Popcorn.tryInit()` when you need a result object instead.
 
 Remove these old initialization options:
 
@@ -201,12 +200,11 @@ end
 Popcorn 1.0 sends a standard GenServer call through `Popcorn.Proxy`:
 
 ```typescript
-const result = await popcorn.tryCall("counter", ["add", 2], {
+const result = await popcorn.call("counter", ["add", 2], {
   timeoutMs: 5_000,
 });
 
-if (!result.ok) throw result.error;
-console.log(result.data);
+console.log(result);
 ```
 
 Handle the call with `handle_call/3`:
@@ -222,7 +220,7 @@ end
 - The JavaScript target is now the first argument.
 - The target can be a registered process name or a PID from the same runtime boot.
 - Calls use a five-second timeout by default.
-- The new result does not contain `durationMs`.
+- The reply does not contain `durationMs`.
 - Measure elapsed time in application code when you need it.
 
 ## Replace custom casts with GenServer casts
@@ -236,8 +234,7 @@ popcorn.cast("reset", { process: "counter" });
 Use the Popcorn 1.0 GenServer API:
 
 ```typescript
-const result = await popcorn.tryCast("counter", "reset");
-if (!result.ok) throw result.error;
+await popcorn.cast("counter", "reset");
 ```
 
 Handle it with `handle_cast/2`:
@@ -250,7 +247,7 @@ end
 ```
 
 - The new cast method is asynchronous.
-- A successful result confirms delivery to `Popcorn.Proxy`.
+- A successful cast confirms delivery to `Popcorn.Proxy`.
   It does not confirm that the target handled the cast.
 
 ## Use direct process messages when you do not need GenServer
@@ -258,8 +255,7 @@ end
 Popcorn 1.0 adds a direct send operation:
 
 ```typescript
-const result = await popcorn.trySend("worker", { action: "refresh" });
-if (!result.ok) throw result.error;
+await popcorn.send("worker", { action: "refresh" });
 ```
 
 The process receives this message:

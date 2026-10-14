@@ -47,7 +47,7 @@ Each VM starts with 64 MiB of shared Wasm linear memory. It can grow to 256 MiB 
 Configure the limits for an application that needs a different budget:
 
 ```typescript
-const result = await Popcorn.tryInit({
+const popcorn = await Popcorn.init({
   beam: { maxMemory: { mobile: "512M", desktop: "1G" } },
 });
 ```

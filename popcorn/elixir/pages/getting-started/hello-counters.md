@@ -134,8 +134,7 @@ Now, HTML template in `public/index.html`:
     <script type="module">
       import { Popcorn } from "./out/index.mjs";
 
-      const { ok, data, error } = await Popcorn.tryInit();
-      if (!ok) throw error;
+      await Popcorn.init();
     </script>
   </body>
 </html>
@@ -181,7 +180,7 @@ defmodule Counters.HTML do
   def on_click(node, event) do
     # exdoc:fold Implementation
     """
-    ({ node, pid, event }, { tryCast: cast }) => {
+    ({ node, pid, event }, { cast }) => {
       node.onclick = () => cast(pid, event);
     }
     """
@@ -267,7 +266,7 @@ Here's full `on_click/2` implementation:
 def on_click(node, event) do
 
   """
-  ({ node, pid, event }, { tryCast: cast }) => {
+  ({ node, pid, event }, { cast }) => {
     node.onclick = () => cast(pid, event);
   }
   """

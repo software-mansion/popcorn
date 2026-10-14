@@ -73,7 +73,7 @@ focusTerminal();
 
 // Resizes emitted while the VM was booting had nowhere to go yet.
 fitAddon.fit();
-popcorn.tryResizeTty(terminal.cols, terminal.rows);
+popcorn.resizeTty(terminal.cols, terminal.rows);
 
 terminal.onData((data) => {
   const input = popcorn.tryWriteStdin(data);

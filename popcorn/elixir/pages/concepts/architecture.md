@@ -31,7 +31,7 @@ Booting the VM works roughly as follows:
 - Register handlers for events coming from the VM in the Popcorn class instance. Start the timers which will fire if booting process take too long.
 - Create the main Web Worker which loads Emscripten module of the VM. This creates new Web Workers (e.g. for schedulers) in turn.
 - Run Erlang's boot file, which loads core modules and starts typical OTP `init` process. This starts applications and their supervision trees.
-- After all apps (including user's) are up, finish the initialization from JavaScript side, resolve the `Popcorn.tryInit()` promise and give control back to the user.
+- After all apps (including user's) are up, finish the initialization from JavaScript side, resolve the `Popcorn.init()` promise and give control back to the user.
 
 JavaScript and VM aren't synchronized in execution and you need explicit messages to wait on each other.
 

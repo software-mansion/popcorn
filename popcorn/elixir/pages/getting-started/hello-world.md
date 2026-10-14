@@ -42,14 +42,13 @@ Now, HTML template in `public/index.html`:
     <script type="module">
       import { Popcorn } from "./out/index.mjs";
 
-      const { ok, data, error } = await Popcorn.tryInit();
-      if (!ok) throw error;
+      await Popcorn.init();
     </script>
   </body>
 </html>
 ```
 
-It's a minimal HTML file. It contains a paragraph (`<p id="status">...</p>`) we will change in our application. It also has a Popcorn instance initialization (`await Popcorn.tryInit()`).
+It's a minimal HTML file. It contains a paragraph (`<p id="status">...</p>`) we will change in our application. It also has a Popcorn instance initialization (`await Popcorn.init()`).
 
 Your project should look like this:
 
