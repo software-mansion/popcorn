@@ -15,7 +15,9 @@ const LARGE_TUPLE_EXT = 0x69;
 const NIL_EXT = 0x6a;
 const LIST_EXT = 0x6c;
 const BINARY_EXT = 0x6d;
+const BINARY_HEADER_SIZE = 1 + 4;
 const SMALL_BIG_EXT = 0x6e;
+const LARGE_BIG_EXT = 0x6f;
 const MAP_EXT = 0x74;
 const ATOM_UTF8_EXT = 0x76;
 const SMALL_ATOM_UTF8_EXT = 0x77;
@@ -127,6 +129,15 @@ class Encoder {
       case "number":
         this.number(value);
         return;
+      case "bigint":
+        this.integer(value);
+        return;
+      case "symbol": {
+        const name = Symbol.keyFor(value) ?? value.description;
+        if (name === undefined) throw err("unsupported", value);
+        this.atom(name);
+        return;
+      }
       case "object":
         this.object(value);
         return;
@@ -147,31 +158,30 @@ class Encoder {
     if (!Number.isSafeInteger(value)) {
       throw err("lossy-int", value);
     }
-    if (value >= 0 && value < 2 ** 8) {
-      this.byte(SMALL_INTEGER_EXT);
-      this.byte(value);
-      return;
-    }
-    if (value >= -(2 ** 31) && value < 2 ** 31) {
-      this.byte(INTEGER_EXT);
-      this.int32(value);
-      return;
-    }
-
-    this.smallBigInt(value);
+    this.integer(BigInt(value));
   }
 
-  // https://www.erlang.org/doc/apps/erts/erl_ext_dist.html#small_big_ext
-  private smallBigInt(value: number): void {
-    let magnitude = BigInt(Math.abs(value));
+  private integer(value: bigint): void {
+    if (value >= 0n && value < 256n) {
+      this.byte(SMALL_INTEGER_EXT);
+      this.byte(Number(value));
+      return;
+    }
+    if (value >= -2147483648n && value < 2147483648n) {
+      this.byte(INTEGER_EXT);
+      this.int32(Number(value));
+      return;
+    }
+    let magnitude = value < 0n ? -value : value;
     const digits: number[] = [];
     while (magnitude > 0n) {
       digits.push(Number(magnitude & 0xffn));
       magnitude >>= 8n;
     }
-    this.byte(SMALL_BIG_EXT);
-    this.byte(digits.length);
-    this.byte(value < 0 ? 1 : 0);
+    this.byte(digits.length < 256 ? SMALL_BIG_EXT : LARGE_BIG_EXT);
+    if (digits.length < 256) this.byte(digits.length);
+    else this.uint32(digits.length);
+    this.byte(value < 0n ? 1 : 0);
     this.bytes(digits);
   }
 
@@ -199,12 +209,39 @@ class Encoder {
         return;
       }
 
+      if (value instanceof ArrayBuffer) {
+        const bytes = new Uint8Array(value);
+        this.binary(bytes);
+        return;
+      }
+      if (ArrayBuffer.isView(value)) {
+        const bytes = new Uint8Array(
+          value.buffer,
+          value.byteOffset,
+          value.byteLength,
+        );
+        this.binary(bytes);
+        return;
+      }
+      if (value instanceof Date) {
+        this.date(value);
+        return;
+      }
+      if (value instanceof Map) {
+        this.entries(value.entries(), value);
+        return;
+      }
+      if (value instanceof Set) {
+        this.set(value);
+        return;
+      }
+
       const prototype = Object.getPrototypeOf(value);
       const isObject = prototype === Object.prototype || prototype === null;
       if (!isObject) {
         throw err("non-plain-object", value);
       }
-      this.map(value);
+      this.entries(Object.entries(value), value);
     } finally {
       this.ancestors.delete(value);
     }
@@ -237,19 +274,95 @@ class Encoder {
     this.byte(NIL_EXT);
   }
 
-  private map(value: object): void {
-    const keys = Object.keys(value).sort();
-    this.byte(MAP_EXT);
-    this.uint32(keys.length);
-    for (const key of keys) {
-      this.binary(key);
-      this.value((value as Record<string, unknown>)[key]);
+  private set(value: Set<unknown>): void {
+    // Elixir 1.20 uses the version-2 Erlang sets map representation.
+    const members: [unknown, unknown][] = [];
+    for (const member of value) members.push([member, []]);
+    const memberBytes = this.mapBytes(members, value, true);
+    const map = new RawTerm(memberBytes);
+    const fields: [unknown, unknown][] = [
+      [atom("__struct__"), atom("Elixir.MapSet")],
+      [atom("map"), map],
+    ];
+    this.entries(fields, value);
+  }
+
+  private date(value: Date): void {
+    const year = value.getUTCFullYear();
+    const validDate = Number.isFinite(value.getTime());
+    const supportedYear = year >= -9999 && year <= 9999;
+    if (!validDate || !supportedYear) {
+      throw err("unsupported", value);
     }
+    const fields = {
+      __struct__: atom("Elixir.DateTime"),
+      calendar: atom("Elixir.Calendar.ISO"),
+      year,
+      month: value.getUTCMonth() + 1,
+      day: value.getUTCDate(),
+      hour: value.getUTCHours(),
+      minute: value.getUTCMinutes(),
+      second: value.getUTCSeconds(),
+      microsecond: tuple(value.getUTCMilliseconds() * 1000, 3),
+      time_zone: "Etc/UTC",
+      zone_abbr: "UTC",
+      utc_offset: 0,
+      std_offset: 0,
+    };
+    const entries: [unknown, unknown][] = [];
+    for (const [key, item] of Object.entries(fields)) {
+      entries.push([atom(key), item]);
+    }
+    this.entries(entries, value);
+  }
+
+  private termBytes(value: unknown): number[] {
+    const start = this.output.length;
+    this.value(value);
+    return this.output.splice(start);
+  }
+
+  private mapBytes(
+    entries: Iterable<readonly [unknown, unknown]>,
+    source: object,
+    merge = false,
+  ): Uint8Array {
+    const encoded = [...entries].map(([key, value]) => ({
+      key: this.termBytes(key),
+      value: this.termBytes(value),
+    }));
+    encoded.sort((left, right) => compareKeys(left.key, right.key));
+    const unique: typeof encoded = [];
+    for (const entry of encoded) {
+      const previous = unique.at(-1);
+      const duplicate =
+        previous !== undefined && compareBytes(entry.key, previous.key) === 0;
+      if (duplicate) {
+        if (!merge) throw err("unsupported", source);
+        continue;
+      }
+      unique.push(entry);
+    }
+    const start = this.output.length;
+    this.byte(MAP_EXT);
+    this.uint32(unique.length);
+    for (const entry of unique) {
+      this.bytes(entry.key);
+      this.bytes(entry.value);
+    }
+    return new Uint8Array(this.output.splice(start));
+  }
+
+  private entries(
+    entries: Iterable<readonly [unknown, unknown]>,
+    source: object,
+  ): void {
+    this.bytes(this.mapBytes(entries, source));
   }
 
   private atom(atom: string): void {
     const bytes = UTF8.encode(atom);
-    if (bytes.length >= 2 ** 16) {
+    if ([...atom].length > 255) {
       throw err("unsupported", atom);
     }
     if (bytes.length < 2 ** 8) {
@@ -262,8 +375,8 @@ class Encoder {
     this.bytes(bytes);
   }
 
-  private binary(value: string): void {
-    const bytes = UTF8.encode(value);
+  private binary(value: string | Uint8Array): void {
+    const bytes = typeof value === "string" ? UTF8.encode(value) : value;
     this.byte(BINARY_EXT);
     this.uint32(bytes.length);
     this.bytes(bytes);
@@ -302,4 +415,20 @@ class Encoder {
 
 function err(reason: UnserializableReason, part: unknown): TypeError {
   return new TypeError(reason, { cause: part });
+}
+
+function compareBytes(a: number[], b: number[], start = 0): number {
+  const length = Math.min(a.length, b.length);
+  for (let i = start; i < length; i++) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return a.length - b.length;
+}
+
+function compareKeys(left: number[], right: number[]): number {
+  const leftTag = left[0];
+  const rightTag = right[0];
+  const binaryKeys = leftTag === BINARY_EXT && rightTag === BINARY_EXT;
+  const offset = binaryKeys ? BINARY_HEADER_SIZE : 0;
+  return compareBytes(left, right, offset);
 }

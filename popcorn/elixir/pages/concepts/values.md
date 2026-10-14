@@ -19,18 +19,37 @@ Do not assume that a value can make a lossless round trip.
 | `atom("ok")`                                                                                                          | Existing atom          |
 | `tuple(a, b)`                                                                                                         | Tuple                  |
 
-Use `atom()` only for atoms that already exist in the virtual machine. Popcorn
-rejects unknown atoms instead of creating them.
+Buffers and typed-array views become binaries containing their visible bytes.
+BigInt becomes an integer. Date becomes a UTC Calendar.ISO DateTime with millisecond precision.
+Map becomes a native map. Set becomes MapSet. Symbols use their registry key or description to name existing atoms.
 
-Popcorn rejects cyclic objects, class instances, functions, symbols, bigints,
-unsafe integers, and non-finite numbers.
+`atom()` also names an existing atom. Unknown atoms and unnamed symbols fail.
+Cycles, unsupported instances, functions, unsafe Numbers, and non-finite numbers also fail.
 
 ## BEAM to JavaScript
 
-Most atoms become strings. The atoms `true` and `false` become booleans.
-Tuples become arrays, and maps become objects.
+| BEAM value | JavaScript value |
+| --- | --- |
+| Valid UTF-8 binary | String |
+| Other binary | Uint8Array |
+| Integer | Number when safe, otherwise BigInt |
+| Float | Number |
+| List or tuple | Array |
+| Map | Plain object |
+| DateTime | Date |
+| MapSet | Set |
+| `true` or `false` | Boolean |
+| `nil` or `:null` | `null` |
+| Other atom | String |
+| PID | Opaque process handle |
 
-BEAM PIDs become opaque JavaScript values. PIDs are only usable from the same VM instance (and boot) that created them.
+Map keys must be atoms, UTF-8 binaries, or numbers with distinct string forms.
+Popcorn rejects keys that become equal after conversion. Set members that become
+equal can merge, such as `1` and `1n` sent from JavaScript.
+
+DateTimes must use Calendar.ISO and have whole-millisecond precision. Conversion
+does not preserve time-zone names, buffer types, object identity, or set order.
+PID handles are only usable in the VM instance and boot that created them.
 
 ## Tracked JavaScript values
 

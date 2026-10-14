@@ -884,6 +884,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   private reviveHandles(value: unknown): unknown {
+    const marker = objectWithKeys(value, ["popcorn_value"]);
+    if (marker !== null && Object.keys(marker).length === 1) {
+      return this.reviveValueTag(marker.popcorn_value);
+    }
     const key = trackedRefKey(value);
     if (key !== null) {
       const entry = this.trackedValues.get(key);
@@ -899,13 +903,56 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
     const obj = objectWithKeys(value, []);
     if (obj !== null) {
-      const revived: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(obj)) {
-        revived[k] = this.reviveHandles(v);
-      }
-      return revived;
+      const entries = Object.entries(obj).map(([key, item]) => [
+        key,
+        this.reviveHandles(item),
+      ]);
+      return Object.fromEntries(entries);
     }
     return value;
+  }
+
+  private reviveValueTag(payload: unknown): unknown {
+    check(Array.isArray(payload) && payload.length === 2);
+    const [tag, data] = payload;
+    switch (tag) {
+      case "binary":
+        check(typeof data === "string");
+        return base64ToBytes(data);
+      case "integer": {
+        const integer = readInteger(data);
+        const safe =
+          integer >= BigInt(Number.MIN_SAFE_INTEGER) &&
+          integer <= BigInt(Number.MAX_SAFE_INTEGER);
+        if (safe) return Number(integer);
+        return integer;
+      }
+      case "datetime": {
+        const milliseconds = readInteger(data);
+        const inRange =
+          milliseconds >= -377705116800000n && milliseconds <= 253402300799999n;
+        check(inRange);
+        return new Date(Number(milliseconds));
+      }
+      case "set":
+        check(Array.isArray(data));
+        return new Set(data.map((item) => this.reviveHandles(item)));
+      case "object": {
+        check(Array.isArray(data));
+        const entries: [string, unknown][] = [];
+        for (const entry of data) {
+          check(Array.isArray(entry) && entry.length === 2);
+          const [key, value] = entry;
+          check(typeof key === "string");
+          entries.push([key, this.reviveHandles(value)]);
+        }
+        const object = Object.fromEntries(entries);
+        check(Object.keys(object).length === entries.length);
+        return object;
+      }
+      default:
+        check(false, "unknown popcorn value tag");
+    }
   }
 
   /** Maps pids and `TrackedValue`s during encoding, collecting handles into
@@ -1049,13 +1096,15 @@ function resolveOutputHandlers<Output extends TtyOutput>(
   if (opts.tty?.output === "bytes") {
     return {
       stdout: (chunk) =>
-        ((callbacks.onStdout as BytesHandler | undefined) ?? defaultOnStdoutBytes)(
-          chunk,
-        ),
+        (
+          (callbacks.onStdout as BytesHandler | undefined) ??
+          defaultOnStdoutBytes
+        )(chunk),
       stderr: (chunk) =>
-        ((callbacks.onStderr as BytesHandler | undefined) ?? defaultOnStderrBytes)(
-          chunk,
-        ),
+        (
+          (callbacks.onStderr as BytesHandler | undefined) ??
+          defaultOnStderrBytes
+        )(chunk),
     };
   }
 
@@ -1177,4 +1226,10 @@ function defaultOnError(payload: OtpErrorPayload): void {
     default:
       unreachable();
   }
+}
+
+function readInteger(value: unknown): bigint {
+  check(typeof value === "string");
+  check(/^-?(0|[1-9][0-9]*)$/.test(value));
+  return BigInt(value);
 }

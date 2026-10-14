@@ -573,12 +573,13 @@ defmodule Popcorn.Packager do
   end
 
   defp preserved_modules(staged_apps, preserved_apps) do
-    Enum.flat_map(preserved_apps, fn app ->
-      staged_apps
-      |> Map.fetch!(app)
-      |> Map.fetch!(:props)
-      |> Keyword.fetch!(:modules)
-    end)
+    [DateTime, Calendar.ISO, MapSet] ++
+      Enum.flat_map(preserved_apps, fn app ->
+        staged_apps
+        |> Map.fetch!(app)
+        |> Map.fetch!(:props)
+        |> Keyword.fetch!(:modules)
+      end)
   end
 
   defp run_treeshake(staged_apps, preserved_modules, out_dir) do

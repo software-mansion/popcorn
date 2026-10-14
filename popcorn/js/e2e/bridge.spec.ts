@@ -1,6 +1,7 @@
 import { a, atom, encode, t, tuple } from "../src/etf";
 import { assert, evalOpts, expect, test } from "./helpers";
 
+const LARGE_INTEGER = -(1n << 2048n);
 const OVERFLOWED = Number.MAX_SAFE_INTEGER + 1;
 const PAYLOAD = {
   text: "żółw",
@@ -62,12 +63,70 @@ test.describe("ETF", () => {
     assert.equal(hex(Object.assign([], { extra: true })), hex([]));
   });
 
+  test("bytes and integers", () => {
+    const storage = new Uint8Array([1, 0, 128, 255, 2]);
+    const bytes = storage.subarray(1, 4);
+    const view = new DataView(storage.buffer, 1, 3);
+    const buffer = Buffer.from([0, 128, 255]);
+    const floats = new Float32Array([1.5]);
+    const floatBytes = new Uint8Array(floats.buffer);
+    const largeInteger = encodePayload(LARGE_INTEGER);
+    const safeInteger = Number.MAX_SAFE_INTEGER;
+    const safeBigInt = BigInt(safeInteger);
+
+    assert.equal(hex(bytes), "836d000000030080ff");
+    assert.equal(hex(view), hex(bytes));
+    assert.equal(hex(buffer), hex(bytes));
+    assert.equal(hex(floats), hex(floatBytes));
+    assert.equal(hex(new ArrayBuffer(0)), hex(""));
+    assert.equal(hex(42n), hex(42));
+    assert.equal(hex(safeBigInt), hex(safeInteger));
+    assert.equal(largeInteger[1], 0x6f);
+  });
+
+  test("containers", () => {
+    const map = new Map<string, number>([
+      ["b", 2],
+      ["a", 1],
+    ]);
+    const set = new Set([1, 1n]);
+    const normalizedSet = new Set([1]);
+    const minDate = new Date("-009999-01-01T00:00:00.000Z");
+    const maxDate = new Date("9999-12-31T23:59:59.999Z");
+    const outsideRange = new Date("+010000-01-01T00:00:00.000Z");
+    const numericKeys = new Map<unknown, boolean>([
+      [1, true],
+      [1n, false],
+    ]);
+    const objectKey = { a: 1, b: 2 };
+    const equalKeys = new Map<unknown, boolean>([
+      [map, true],
+      [objectKey, false],
+    ]);
+    const cyclicMap = new Map();
+    cyclicMap.set("self", cyclicMap);
+    const cyclicSet = new Set();
+    cyclicSet.add(cyclicSet);
+
+    assert.equal(hex(map), hex({ a: 1, b: 2 }));
+    assert.equal(hex(set), hex(normalizedSet));
+    assert.equal(hex(Symbol.for("ok")), hex(atom("ok")));
+    assert(encode(minDate).ok);
+    assert(encode(maxDate).ok);
+    assert(!encode(outsideRange).ok);
+    assert(!encode(atom("a".repeat(256))).ok);
+    assert(!encode(numericKeys).ok);
+    assert(!encode(equalKeys).ok);
+    assert(!encode(cyclicMap).ok);
+    assert(!encode(cyclicSet).ok);
+  });
+
   test("errors", () => {
     const cyclic: unknown[] = [];
     cyclic.push(cyclic);
     const fn = () => null;
-    const symbol = Symbol("value");
-    const date = new Date();
+    const symbol = Symbol();
+    const date = new Date(NaN);
 
     for (const [value, part, reason] of [
       [OVERFLOWED, OVERFLOWED, "lossy-int"],
@@ -77,7 +136,7 @@ test.describe("ETF", () => {
       [cyclic, cyclic, "cyclic-object"],
       [fn, fn, "unsupported"],
       [symbol, symbol, "unsupported"],
-      [date, date, "non-plain-object"],
+      [date, date, "unsupported"],
       [[fn], fn, "unsupported"],
     ] as const) {
       const result = encode(value);
@@ -90,6 +149,131 @@ test.describe("ETF", () => {
 });
 
 test.describe("events", () => {
+  test("bytes and integers", async ({ otp, page }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+      true = register(term_receiver, self()),
+      ok = wasm:send(#{bridge_ready => true}),
+      receive
+        {wasm, [Binary, Integer, Small]} ->
+          true = is_binary(Binary),
+          3 = byte_size(Binary),
+          true = is_integer(Integer),
+          42 = Small,
+          ok = wasm:send(#{received => [Binary, Integer, Small]})
+      end,
+      Args = #{bytes => <<0, 128, 255>>, text => <<"żółw"/utf8>>, big => 9007199254740993},
+      #{<<"bytes">> := <<0, 128, 255>>, <<"text">> := <<"żółw"/utf8>>,
+        <<"big">> := 9007199254740993} = wasm:run_js(<<"args => args">>, Args),
+      ok = wasm:send(#{run_js_bytes => true}),
+      receive stop -> ok end.
+    `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("bridge_ready");
+    const payload = await page.evaluateHandle((integer) => {
+      const storage = new Uint8Array([1, 0, 128, 255, 2]);
+      const bytes = new DataView(storage.buffer, 1, 3);
+      return [bytes, integer, 42n];
+    }, LARGE_INTEGER);
+    const sent = await otp.send("term_receiver", payload);
+    assert(sent.ok);
+    await payload.dispose();
+
+    const handle =
+      await otp.eventValueHandle<[Uint8Array, bigint, number]>("received");
+    const received = await handle.evaluate(([bytes, integer, small]) => ({
+      isBytes: bytes instanceof Uint8Array,
+      bytes: Array.from(bytes),
+      integer,
+      small,
+    }));
+    await handle.dispose();
+    expect(received).toEqual({
+      isBytes: true,
+      bytes: [0, 128, 255],
+      integer: LARGE_INTEGER,
+      small: 42,
+    });
+    expect(await otp.waitForEvent("run_js_bytes")).toEqual({
+      run_js_bytes: true,
+    });
+  });
+
+  test("native containers", async ({ otp, page }) => {
+    const boot = await otp.boot(
+      evalOpts(`
+      true = register(term_receiver, self()),
+      ok = wasm:send(#{bridge_ready => true}),
+      receive
+        {wasm, [DateTime, Set, Map, ok]} ->
+          1704067200123 = 'Elixir.DateTime':to_unix(DateTime, millisecond),
+          2 = 'Elixir.MapSet':size(Set),
+          true = 'Elixir.MapSet':'member?'(Set, 1),
+          ExtendedSet = 'Elixir.MapSet':put(Set, 2),
+          3 = 'Elixir.MapSet':size(ExtendedSet),
+          #{<<"key">> := 42} = Map,
+          Returned = wasm:run_js(<<"args => args">>, #{date => DateTime, set => Set}),
+          #{<<"date">> := DateTime, <<"set">> := Set} = Returned,
+          ok = wasm:send(#{containers => true})
+      end,
+      ok = wasm:send(#{escaped => #{
+        pid => #{popcorn_pid => <<"ordinary">>},
+        ref => #{popcorn_ref => 999},
+        value => #{popcorn_value => [<<"integer">>, <<"999">>]},
+        proto => #{<<"__proto__">> => #{safe => true}},
+        fields => #{<<"constructor">> => <<"own">>, nested => <<128>>}
+      }}),
+      receive stop -> ok end.
+    `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("bridge_ready");
+    const payload = await page.evaluateHandle(() => {
+      const date = new Date(1704067200123);
+      const set = new Set([1, 1n, "text"]);
+      const map = new Map([["key", 42]]);
+      return [date, set, map, Symbol.for("ok")];
+    });
+    const sent = await otp.send("term_receiver", payload);
+    assert(sent.ok);
+    await payload.dispose();
+    expect(await otp.waitForEvent("containers")).toEqual({ containers: true });
+
+    const handle =
+      await otp.eventValueHandle<Record<string, Record<string, unknown>>>(
+        "escaped",
+      );
+    const escaped = await handle.evaluate((values) => ({
+      pid: values.pid,
+      ref: values.ref,
+      value: values.value,
+      ownProto: Object.hasOwn(values.proto, "__proto__"),
+      plainProto: Object.getPrototypeOf(values.proto) === Object.prototype,
+      protoValue: values.proto.__proto__,
+      constructor: values.fields["constructor"],
+      bytes: Array.from(values.fields.nested as Uint8Array),
+    }));
+    await handle.dispose();
+    expect(escaped).toEqual({
+      pid: { popcorn_pid: "ordinary" },
+      ref: { popcorn_ref: 999 },
+      value: { popcorn_value: ["integer", "999"] },
+      ownProto: true,
+      plainProto: true,
+      protoValue: { safe: true },
+      constructor: "own",
+      bytes: [128],
+    });
+    const unknown = await page.evaluateHandle(() =>
+      Symbol("popcorn_unknown_symbol_atom"),
+    );
+    const result = await otp.send("term_receiver", unknown);
+    assert(!result.ok);
+    assert.equal(result.error.t, "bridge:unserializable");
+    await unknown.dispose();
+  });
+
   test("local fun ETF round trip", async ({ otp }) => {
     const boot = await otp.boot(
       evalOpts(`
