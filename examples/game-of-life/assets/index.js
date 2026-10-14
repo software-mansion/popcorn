@@ -6,5 +6,5 @@ const result = await Popcorn.init({
 
 if (!result.ok) throw result.error;
 
-const mounted = await result.data.genserver.call("game_of_life_ui", "mount");
+const mounted = await result.data.call("game_of_life_ui", "mount");
 if (!mounted.ok) throw mounted.error;
