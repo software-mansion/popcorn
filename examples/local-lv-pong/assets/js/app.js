@@ -40,8 +40,7 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 import { LLVEngine } from "local_live_view";
 const llvEngine = LLVEngine.create(liveSocket);
 
-// LiveView turns its debug log on by default on localhost, which logs every
-// frame of the game. Re-enable with liveSocket.enableDebug() in the console.
+// Prevents spamming console with game events
 liveSocket.disableDebug();
 
 // connect if there are any LiveViews on the page

@@ -32,7 +32,6 @@ class PopcornClient {
   /**
    * Sends an action to the dispatcher and returns the dispatcher's reply.
    * Error replies are logged by default; pass suppressErrorLog to silence them.
-   * Rejects if the runtime isn't ready or the call itself fails.
    */
   async call(
     message: { action: string; [key: string]: unknown },
@@ -46,7 +45,18 @@ class PopcornClient {
       const reply = await popcorn.genserver.call(DISPATCHER_PROCESS_REF, message, {
         timeoutMs: DEFAULT_CALL_TIMEOUT_MS,
       });
-      result = reply.ok ? (reply.data as CallResult) : reply;
+      // The dispatcher replies with :ok, {:ok, data} or {:error, reason},
+      // which arrive as "ok", ["ok", data] and ["error", reason].
+      if (!reply.ok) {
+        result = reply;
+      } else if (reply.data == "ok") {
+        result = { ok: true, data: null };
+      } else if (Array.isArray(reply.data)) {
+        const [replyStatus, data] = reply.data;
+        result = replyStatus == "ok" ? { ok: true, data } : { ok: false, error: data };
+      } else {
+        throw new Error(`LLV: invalid dispatcher reply to ${message.action}: ${reply.data}`);
+      }
     }
     if (!result.ok && !opts?.suppressErrorLog) {
       console.error(`LLV ${message.action} error`, result.error);

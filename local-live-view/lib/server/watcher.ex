@@ -53,8 +53,14 @@ defmodule LocalLiveView.Watcher do
 
   @impl true
   def init(opts) do
-    {:ok, fs_worker} = FileSystem.Worker.start_link(Keyword.take(opts, [:dirs]))
-    FileSystem.subscribe(fs_worker)
+    case FileSystem.Worker.start_link(Keyword.take(opts, [:dirs])) do
+      {:ok, fs_worker} ->
+        FileSystem.subscribe(fs_worker)
+
+      :ignore ->
+        Logger.warning("Can't watch the local project, it will only be built once")
+    end
+
     ref = make_ref()
     send(self(), {:cook, ref})
     {:ok, %{cook_ref: ref}}

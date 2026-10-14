@@ -1,13 +1,10 @@
 # Exclude everything
 **
 # Re-include only what the Dockerfile COPYs
-!popcorn/
 !popcorn/elixir/
-!popcorn/elixir/**
-
 !local-live-view/
-!local-live-view/**
-
-!examples/
 !examples/local-lv-burrito/
-!examples/local-lv-burrito/**
+# but not local build output, the image builds its own
+**/_build
+**/deps
+**/node_modules

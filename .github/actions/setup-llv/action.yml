@@ -1,13 +1,11 @@
 name: Setup LocalLiveView
 description: >-
   Build the OTP/BEAM Wasm runtime and Popcorn's JS package, and install the
-  toolchain and JS dependencies that LocalLiveView and its examples build with
+  toolchain and JS dependencies for LocalLiveView and its examples
 
 runs:
   using: composite
   steps:
-    # Produces popcorn/out with the OTP/BEAM Wasm runtime (cached across runs).
-    # LocalLiveView needs crypto, for signing LiveView tokens.
     - name: Build OTP/BEAM for Wasm
       uses: ./.github/actions/build-otp-wasm
       with:
@@ -15,8 +13,6 @@ runs:
         build-mode: debug
         with-crypto: "true"
 
-    # Local views are compiled to BEAM that runs on the OTP 29 runtime shipped
-    # in the Wasm VM, so the host toolchain must match it.
     - name: Set up Elixir
       uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
       with:
@@ -37,8 +33,6 @@ runs:
       shell: bash
       run: pnpm install
 
-    # Popcorn's priv/static, which `mix popcorn.cook` packages the local views
-    # with: Popcorn's JS and (linked) the Wasm runtime from popcorn/out.
     - name: Build Popcorn JS package
       shell: bash
       run: pnpm -F ./popcorn/js build

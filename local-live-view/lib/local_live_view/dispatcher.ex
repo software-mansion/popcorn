@@ -63,14 +63,6 @@ defmodule LocalLiveView.Dispatcher do
     {:ok, %{transport: transport, views: %{}}}
   end
 
-  @impl GenServer
-  def handle_call(msg, _from, state) do
-    case handle_wasm_call(msg, state) do
-      {:resolve, reply, state} -> {:reply, %{ok: true, data: reply}, state}
-      {:reject, reason, state} -> {:reply, %{ok: false, error: reason}, state}
-    end
-  end
-
   # Message/reply from the LiveView.Socket to the LiveView JS
   @impl GenServer
   def handle_info({:socket_push, _opcode, message}, state) do
@@ -79,6 +71,7 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   # Handle LLV's registration via register_channel/2
+  @impl GenServer
   def handle_info({:llv_register_channel, id, epoch, pid}, state) do
     case state.views[id] do
       %View{epoch: ^epoch} ->
@@ -96,6 +89,7 @@ defmodule LocalLiveView.Dispatcher do
   end
 
   # Handle LLV process' death
+  @impl GenServer
   def handle_info({:DOWN, ref, :process, _pid, _reason} = msg, state) do
     case Enum.find(state.views, fn {_id, view} -> view.monitor_ref == ref end) do
       {id, view} ->
@@ -106,12 +100,14 @@ defmodule LocalLiveView.Dispatcher do
     end
   end
 
+  @impl GenServer
   def handle_info(msg, state) do
     socket_handle_info(msg, state)
   end
 
-  defp handle_wasm_call(%{"action" => "create", "id" => id} = msg, state)
-       when not is_map_key(state.views, id) do
+  @impl GenServer
+  def handle_call(%{"action" => "create", "id" => id} = msg, _from, state)
+      when not is_map_key(state.views, id) do
     %{"view" => view, "mirror_id" => mirror_id, "assigns" => assigns} = msg
 
     # When an LLV is created, destroyed/crashes and created again
@@ -135,66 +131,83 @@ defmodule LocalLiveView.Dispatcher do
       "llv" => %{id: id, view: view, epoch: epoch, mirror_id: mirror_id, main: main, url: url}
     }
 
-    {:resolve, %{html: View.render_container(id, session)}, state}
+    {:reply, {:ok, %{html: View.render_container(id, session)}}, state}
   end
 
-  defp handle_wasm_call(%{"action" => "create"}, state) do
-    {:reject, "error creating LLV", state}
+  @impl GenServer
+  def handle_call(%{"action" => "create"}, _from, state) do
+    {:reply, {:error, "error creating LLV"}, state}
   end
 
   # Frame sent by the JS transport. It's JSON-encoded, as over a websocket,
   # and decoded by LocalLiveView.Dispatcher.Serializer.
-  defp handle_wasm_call(%{"action" => "transport_frame", "id" => id, "frame" => frame}, state)
-       when is_map_key(state.views, id) do
+  @impl GenServer
+  def handle_call(
+        %{"action" => "transport_frame", "id" => id, "frame" => frame},
+        _from,
+        state
+      )
+      when is_map_key(state.views, id) do
     case socket_in(state, frame) do
       {:pending, state} ->
-        {:resolve, :ok, state}
+        {:reply, :ok, state}
 
       {{:reply, message}, state} ->
         push_to_browser(message, state)
-        {:resolve, :ok, state}
+        {:reply, :ok, state}
     end
   end
 
   # When phx_leave comes, we may have removed the view from the state already
-  defp handle_wasm_call(
-         %{"action" => "transport_frame", "event" => "phx_leave", "frame" => frame},
-         state
-       ) do
+  @impl GenServer
+  def handle_call(
+        %{"action" => "transport_frame", "event" => "phx_leave", "frame" => frame},
+        _from,
+        state
+      ) do
     {_result, state} = socket_in(state, frame)
-    {:resolve, :ok, state}
+    {:reply, :ok, state}
   end
 
-  defp handle_wasm_call(%{"action" => "transport_frame"}, state) do
-    {:reject, "view not mounted", state}
+  @impl GenServer
+  def handle_call(%{"action" => "transport_frame"}, _from, state) do
+    {:reply, {:error, "view not mounted"}, state}
   end
 
-  defp handle_wasm_call(%{"action" => "update_assigns", "id" => id, "assigns" => assigns}, state) do
+  @impl GenServer
+  def handle_call(
+        %{"action" => "update_assigns", "id" => id, "assigns" => assigns},
+        _from,
+        state
+      ) do
     if view = state.views[id] do
       :ets.insert(@table, {{:assigns, id}, assigns})
       View.dispatch(view, {:llv, %{"action" => "update_assigns", "assigns" => assigns}})
     end
 
-    {:resolve, :ok, state}
+    {:reply, :ok, state}
   end
 
   # LLV-specific messages to be delivered to the view. See View.dispatch/2
-  defp handle_wasm_call(
-         %{"action" => "dispatch_to_view", "id" => id, "payload" => payload},
-         state
-       ) do
+  @impl GenServer
+  def handle_call(
+        %{"action" => "dispatch_to_view", "id" => id, "payload" => payload},
+        _from,
+        state
+      ) do
     case state.views[id] do
       nil ->
         Logger.debug("LLV #{id}: dispatch to a view that is not mounted ignored")
-        {:resolve, :ok, state}
+        {:reply, :ok, state}
 
       view ->
         state = put_in(state.views[id], View.dispatch_queue(view, {:llv, payload}))
-        {:resolve, :ok, state}
+        {:reply, :ok, state}
     end
   end
 
-  defp handle_wasm_call(%{"action" => "destroy", "id" => id}, state) do
+  @impl GenServer
+  def handle_call(%{"action" => "destroy", "id" => id}, _from, state) do
     :ets.delete(@table, {:assigns, id})
     {view, views} = Map.pop(state.views, id)
 
@@ -206,7 +219,7 @@ defmodule LocalLiveView.Dispatcher do
       Process.exit(pid, {:shutdown, :destroyed})
     end
 
-    {:resolve, :ok, %{state | views: views}}
+    {:reply, :ok, %{state | views: views}}
   end
 
   ## Socket plumbing

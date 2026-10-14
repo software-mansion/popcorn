@@ -171,7 +171,7 @@ defmodule LocalLiveView.MixProject do
         "deps.unlock --check-unused",
         "deps.compile",
         "compile --force --warnings-as-errors",
-        "cmd MIX_TARGET=all mix docs --warnings-as-errors"
+        "cmd --shell MIX_TARGET=all mix docs --warnings-as-errors"
       ],
       build: ["deps.get", "compile", "llv.assets"],
       # build_assets/1 guarantees priv/static is built and current, so a tarball
