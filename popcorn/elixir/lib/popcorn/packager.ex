@@ -18,6 +18,8 @@ defmodule Popcorn.Packager do
 
   @boot_name "bin/vm.boot"
   @runtime_files ~w(beam.mjs beam.emu.mjs beam.wasm)
+  @brotli_block_bits 20
+  @brotli_block_bytes 1024 * 1024
 
   @patches_dir Path.expand("../../patches", __DIR__)
 
@@ -303,8 +305,27 @@ defmodule Popcorn.Packager do
     contents = File.read!(path)
     File.write!(path <> ".gz", :zlib.gzip(contents))
 
-    {:ok, compressed} = :brotli.encode(contents, %{quality: brotli_quality(brotli_effort)})
+    # The Brotli NIF drops unconsumed input when a call crosses a block boundary.
+    encoder =
+      :brotli_encoder.new(%{
+        quality: brotli_quality(brotli_effort),
+        block_size: @brotli_block_bits,
+        size_hint: byte_size(contents)
+      })
+
+    compressed = compress_brotli(encoder, contents, [])
+    true = :brotli_encoder.is_finished(encoder)
     File.write!(path <> ".br", compressed)
+  end
+
+  defp compress_brotli(encoder, <<block::binary-size(@brotli_block_bytes), rest::binary>>, acc) do
+    {:ok, output} = :brotli_encoder.append(encoder, block)
+    compress_brotli(encoder, rest, [output | acc])
+  end
+
+  defp compress_brotli(encoder, rest, acc) do
+    {:ok, output} = :brotli_encoder.finish(encoder, rest)
+    Enum.reverse([output | acc])
   end
 
   defp brotli_quality(:standard), do: 9
