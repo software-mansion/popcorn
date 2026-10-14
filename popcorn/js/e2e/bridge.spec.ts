@@ -91,7 +91,7 @@ test.describe("ETF", () => {
 
 test.describe("events", () => {
   test("local fun ETF round trip", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           Fun = fun(Value) -> Value + 1 end,
           Encoded = term_to_binary(Fun),
@@ -125,7 +125,7 @@ test.describe("events", () => {
       return page.evaluateHandle(fn);
     }
 
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           true = register(term_receiver, self()),
           ok = wasm:send(#{bridge_ready => true}),
@@ -148,7 +148,7 @@ test.describe("events", () => {
       const t = window.popcorn.tuple;
       return t(a("ok"), "value");
     });
-    assert((await otp.send("term_receiver", tuplePayload)).ok);
+    assert((await otp.trySend("term_receiver", tuplePayload)).ok);
     await tuplePayload.dispose();
     expect(await otp.waitForEvent("term_received")).toEqual({
       term_received: true,
@@ -158,14 +158,14 @@ test.describe("events", () => {
       const a = window.popcorn.atom;
       return a("popcorn_atom_that_does_not_exist");
     });
-    const result = await otp.send("term_receiver", atomPayload);
+    const result = await otp.trySend("term_receiver", atomPayload);
     await atomPayload.dispose();
     assert(!result.ok);
     assert.equal(result.error.t, "bridge:unserializable");
   });
 
   test("round trip", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           spawn(fun() ->
             ExpectedPayload = #{
@@ -203,7 +203,7 @@ test.describe("events", () => {
       etf_expected: Buffer.from(encodePayload(PAYLOAD)).toString("base64"),
     });
     await otp.waitForEvent("bridge_ready");
-    assert((await otp.send("żółw", structuredClone(PAYLOAD))).ok);
+    assert((await otp.trySend("żółw", structuredClone(PAYLOAD))).ok);
     expect(await otp.waitForEvent("reply")).toEqual({
       reply: PAYLOAD,
       decoded: true,
@@ -213,7 +213,7 @@ test.describe("events", () => {
 
 test.describe("run_js", () => {
   test("values", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           Sync = wasm:run_js(<<"({a, b}) => a + b">>, #{a => 1, b => 2}),
           Async = wasm:run_js(
@@ -238,7 +238,7 @@ test.describe("run_js", () => {
   });
 
   test("errors", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           Timeout = try
             wasm:run_js(<<"() => new Promise(() => {})">>, #{}, [{timeout, 0}])
@@ -282,7 +282,7 @@ test.describe("run_js", () => {
 test.describe("send", () => {
   test("errors", async ({ createOtp }) => {
     const otp = await createOtp();
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         true = register(controller, self()),
         ok = wasm:send(#{ready => true}),
@@ -292,14 +292,14 @@ test.describe("send", () => {
     assert(boot.ok);
     await otp.waitForEvent("ready");
 
-    expect(await otp.send("unknown", {})).toEqual({
+    expect(await otp.trySend("unknown", {})).toEqual({
       ok: false,
       error: {
         t: "bridge:listener-not-found",
         data: { targetName: "unknown" },
       },
     });
-    expect(await otp.send("controller", OVERFLOWED)).toEqual({
+    expect(await otp.trySend("controller", OVERFLOWED)).toEqual({
       ok: false,
       error: {
         t: "bridge:unserializable",
@@ -315,8 +315,8 @@ test.describe("send", () => {
     const bootOpts = {
       timeoutsMs: { send: 0 },
     };
-    assert((await timedOut.boot(bootOpts)).ok);
-    expect(await timedOut.send("any-target", {})).toEqual({
+    assert((await timedOut.tryBoot(bootOpts)).ok);
+    expect(await timedOut.trySend("any-target", {})).toEqual({
       ok: false,
       error: { t: "timeout:send", data: { timeoutMs: 0 } },
     });

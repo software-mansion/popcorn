@@ -32,7 +32,7 @@ defmodule Popcorn.Wasm do
 
   ## Receiving messages
 
-  JavaScript calls to `popcorn.send(target, payload)` deliver `{:wasm, payload}` to the target process.
+  JavaScript calls to `popcorn.trySend(target, payload)` deliver `{:wasm, payload}` to the target process.
   Use `is_message/1` in guards to match for it.
   Use `Popcorn.Proxy` for GenServer calls and casts.
 
@@ -148,7 +148,7 @@ defmodule Popcorn.Wasm do
   These helpers return promises with the same result objects as their [JavaScript API](JSLib.Popcorn.html) counterparts.
 
   Notes:
-  - Calls during application startup run before `popcorn.boot()` resolves.
+  - Calls during application startup run before `popcorn.tryBoot()` resolves.
   - Do not await a `call` to the process that executes `run_js/3`. It will cause deadlocks.
 
   ## Options

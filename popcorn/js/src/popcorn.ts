@@ -144,7 +144,7 @@ type SendFn = (
   target: string | Pid,
   payload?: AnyValue,
 ) => Promise<Result<null>>;
-type RunJsActions = { send: SendFn } & GenServer;
+type RunJsActions = { trySend: SendFn } & GenServer;
 type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
 
 type CallOpts = { timeoutMs?: number; proxy?: string };
@@ -163,7 +163,7 @@ type ProxyReply =
         | { kind: "unserializable" }
         | { kind: "timeout" };
     };
-export type GenServer = Pick<Popcorn, "call" | "cast">;
+export type GenServer = Pick<Popcorn, "tryCall" | "tryCast">;
 
 function createPidClass() {
   return class {
@@ -178,7 +178,7 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
 /**
  * A BEAM VM in a browser worker.
  *
- * Use {@link Popcorn.init} to create and start an instance.
+ * Use {@link Popcorn.tryInit} to create and start an instance.
  **/
 export class Popcorn<Output extends TtyOutput = "text"> {
   /** Receives stdout. Can be replaced at any time; `undefined` restores the default output handler. */
@@ -258,7 +258,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   /**
    * Creates the worker.
    *
-   * Call {@link boot} to start the VM.
+   * Call {@link tryBoot} to start the VM.
    **/
   public constructor(opts: PopcornOpts<Output> = {}) {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
@@ -297,7 +297,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Creates an instance and waits for {@link boot}.
+   * Creates an instance and waits for {@link tryBoot}.
    *
    * Use `opts.onEvent` to receive messages sent during startup.
    *
@@ -305,7 +305,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * @see {@link PopcornOpts}
    */
-  public static async init<Output extends TtyOutput = "text">(
+  public static async tryInit<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output> = {},
   ): Promise<Result<Popcorn<Output>>> {
     if (!canEval()) {
@@ -313,7 +313,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
 
     const popcorn = new Popcorn(opts);
-    const result = await popcorn.boot();
+    const result = await popcorn.tryBoot();
 
     if (!result.ok) {
       return result;
@@ -335,11 +335,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * ```ts
    * const popcorn = new Popcorn({});
    * popcorn.onEvent((message) => console.log(message));
-   * const result = await popcorn.boot();
+   * const result = await popcorn.tryBoot();
    * if (!result.ok) throw result.error;
    * ```
    */
-  public async boot(): Promise<Result<Popcorn<Output>>> {
+  public async tryBoot(): Promise<Result<Popcorn<Output>>> {
     if (this.state.status === "booted") {
       return { ok: true, data: this };
     }
@@ -438,7 +438,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Returns `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
    * An overflow leaves the queue unchanged.
    */
-  public writeStdin(chunk: string | Uint8Array): Result<null> {
+  public tryWriteStdin(chunk: string | Uint8Array): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
     }
@@ -468,7 +468,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Each dimension must be between 1 and 65,535.
    */
-  public resizeTty(columns: number, rows: number): Result<null> {
+  public tryResizeTty(columns: number, rows: number): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
     }
@@ -495,7 +495,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Send an Erlang `{ok, <<"value">>}` tuple to a registered `receiver` process.
    *
    * ```ts
-   * const result = await popcorn.send("receiver", tuple(atom("ok"), "value"));
+   * const result = await popcorn.trySend("receiver", tuple(atom("ok"), "value"));
    * if (!result.ok) throw result.error;
    * ```
    *
@@ -503,7 +503,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * @see {@link atom}
    * @see {@link tuple}
    */
-  public async send(
+  public async trySend(
     rawTarget: string | Pid,
     payload?: AnyValue,
   ): Promise<Result<null>> {
@@ -572,7 +572,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   /**
    * Registers a handler for BEAM message payloads.
    *
-   * Messages with no handlers are lost. Startup messages can arrive before {@link boot} resolves.
+   * Messages with no handlers are lost. Startup messages can arrive before {@link tryBoot} resolves.
    * VM errors and terminal output use the callbacks in {@link PopcornOpts}.
    *
    * @returns a function that removes the handler.
@@ -700,7 +700,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
    * A call timeout does not cancel server work.
    */
-  public async call(
+  public async tryCall(
     rawTarget: string | Pid,
     request?: AnyValue,
     opts?: CallOpts,
@@ -763,10 +763,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Sends a cast through the proxy.
    *
    * Success confirms delivery to the proxy
-   * @see {@link call}
+   * @see {@link tryCall}
    * @param opts - `proxy` allows to select another registered proxy.
    */
-  public async cast(
+  public async tryCast(
     rawTarget: string | Pid,
     request?: AnyValue,
     opts?: { proxy?: string },
@@ -807,9 +807,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const args = this.reviveHandles(request.args);
       check(this.vmReady);
       const actions: RunJsActions = {
-        send: (target, payload) => this.sendBridge(target, payload),
-        call: (target, payload, opts) => this.callBridge(target, payload, opts),
-        cast: (target, payload, opts) => this.castBridge(target, payload, opts),
+        trySend: (target, payload) => this.sendBridge(target, payload),
+        tryCall: (target, payload, opts) => this.callBridge(target, payload, opts),
+        tryCast: (target, payload, opts) => this.castBridge(target, payload, opts),
       };
       const result = await fn(args, actions);
       const value = request.return === "ref" ? this.asRef(result) : result;

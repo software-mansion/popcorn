@@ -47,7 +47,7 @@ terminalElement.addEventListener("touchstart", focusTerminal, {
 
 terminal.writeln("\x1b[90mBooting BEAM and starting the shell…\x1b[0m");
 
-const result = await Popcorn.init({
+const result = await Popcorn.tryInit({
   beam: {
     env: { TERM: "xterm-256color" },
     extraArgs: SHELL_ARGS[LANGUAGE],
@@ -73,15 +73,15 @@ focusTerminal();
 
 // Resizes emitted while the VM was booting had nowhere to go yet.
 fitAddon.fit();
-popcorn.resizeTty(terminal.cols, terminal.rows);
+popcorn.tryResizeTty(terminal.cols, terminal.rows);
 
 terminal.onData((data) => {
-  const input = popcorn.writeStdin(data);
+  const input = popcorn.tryWriteStdin(data);
   if (!input.ok) status.textContent = input.error.message;
 });
 
 terminal.onResize(({ cols, rows }) => {
-  const resize = popcorn.resizeTty(cols, rows);
+  const resize = popcorn.tryResizeTty(cols, rows);
   if (!resize.ok) status.textContent = resize.error.message;
 });
 

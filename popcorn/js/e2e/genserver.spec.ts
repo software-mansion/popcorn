@@ -12,37 +12,39 @@ const STOPPABLE_GEN_SERVER = `
 
 test.describe("genserver", () => {
   test("call and cast", async ({ otp }) => {
-    const boot = await otp.boot(evalOpts(STOPPABLE_GEN_SERVER));
+    const boot = await otp.tryBoot(evalOpts(STOPPABLE_GEN_SERVER));
     assert(boot.ok);
     await otp.waitForEvent("genserver_ready");
 
-    expect(await otp.call("counter", ["add", 2])).toEqual({
+    expect(await otp.tryCall("counter", ["add", 2])).toEqual({
       ok: true,
       data: 2,
     });
-    expect(await otp.cast("counter", ["add", 4])).toEqual({
+    expect(await otp.tryCast("counter", ["add", 4])).toEqual({
       ok: true,
       data: null,
     });
-    expect(await otp.call("counter", "get")).toEqual({
+    expect(await otp.tryCall("counter", "get")).toEqual({
       ok: true,
       data: 6,
     });
   });
 
   test("errors", async ({ otp }) => {
-    const boot = await otp.boot(evalOpts(STOPPABLE_GEN_SERVER));
+    const boot = await otp.tryBoot(evalOpts(STOPPABLE_GEN_SERVER));
     assert(boot.ok);
     await otp.waitForEvent("genserver_ready");
 
-    expect(await otp.call("counter", "wait", { timeoutMs: 0 })).toEqual({
+    expect(
+      await otp.tryCall("counter", "wait", { timeoutMs: 0 }),
+    ).toEqual({
       ok: false,
       error: {
         t: "timeout:call",
         data: { timeoutMs: 0 },
       },
     });
-    expect(await otp.call("missing", "get")).toEqual({
+    expect(await otp.tryCall("missing", "get")).toEqual({
       ok: false,
       error: {
         t: "genserver:noproc",

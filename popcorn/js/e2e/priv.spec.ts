@@ -1,7 +1,7 @@
 import { assert, evalOpts, expect, test } from "./helpers";
 
 test("application priv files", async ({ otp }) => {
-  const boot = await otp.boot(
+  const boot = await otp.tryBoot(
     evalOpts(`
       PrivDir = code:priv_dir(test_entrypoint),
       AppPath = 'Elixir.Application':app_dir(test_entrypoint, <<"priv/fixture.txt">>),

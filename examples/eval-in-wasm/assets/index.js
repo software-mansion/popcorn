@@ -44,7 +44,7 @@ const Elements = {
 };
 
 async function setup() {
-  const result = await Popcorn.init({
+  const result = await Popcorn.tryInit({
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
@@ -105,7 +105,7 @@ async function sendEvalRequest(popcorn, code) {
   try {
     const action = getEvalAction(code);
     const start = performance.now();
-    const result = await popcorn.call("main", [action, code], {
+    const result = await popcorn.tryCall("main", [action, code], {
       timeoutMs: 10_000,
     });
     const durationMs = performance.now() - start;

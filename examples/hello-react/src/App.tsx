@@ -4,7 +4,7 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 
-const result = await Popcorn.init({
+const result = await Popcorn.tryInit({
   onStdout: console.log,
   onStderr: console.warn,
 });

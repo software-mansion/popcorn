@@ -1,6 +1,6 @@
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.init({
+const result = await Popcorn.tryInit({
   onStdout: console.log,
 });
 

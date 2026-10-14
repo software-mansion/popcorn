@@ -59,7 +59,7 @@ Use ESM output with those bundlers.
 ```ts
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.init();
+const result = await Popcorn.tryInit();
 if (!result.ok) throw result.error;
 
 const vm = result.data;
@@ -67,14 +67,14 @@ const vm = result.data;
 vm.deinit();
 ```
 
-`Popcorn.init()` waits for the OTP application tree to start. Use
-`popcorn.call()` to call a supervised GenServer from JavaScript.
+`Popcorn.tryInit()` waits for the OTP application tree to start. Use
+`popcorn.tryCall()` to call a supervised GenServer from JavaScript.
 Use `popcorn.onEvent()` to receive events from BEAM processes.
 
 Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on
 phones/tablets or 2 GiB on desktop. Device detection uses the browser's user
 agent and touch support. Configure the limits with
-`Popcorn.init({ beam: { maxMemory: { mobile: "256M", desktop: "2G" } } })`.
+`Popcorn.tryInit({ beam: { maxMemory: { mobile: "256M", desktop: "2G" } } })`.
 Omit `maxMemory` to keep these defaults, or override either key separately.
 Only `M` and `G` suffixes are supported; they mean MiB and GiB.
 The limit must be a multiple of 64 KiB between 64 MiB and 2 GiB; JavaScript and

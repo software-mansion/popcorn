@@ -151,7 +151,7 @@ Popcorn 1.0 returns a result object:
 ```typescript
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.init({
+const result = await Popcorn.tryInit({
   onStdout: console.log,
   onStderr: console.error,
 });
@@ -201,7 +201,7 @@ end
 Popcorn 1.0 sends a standard GenServer call through `Popcorn.Proxy`:
 
 ```typescript
-const result = await popcorn.call("counter", ["add", 2], {
+const result = await popcorn.tryCall("counter", ["add", 2], {
   timeoutMs: 5_000,
 });
 
@@ -236,7 +236,7 @@ popcorn.cast("reset", { process: "counter" });
 Use the Popcorn 1.0 GenServer API:
 
 ```typescript
-const result = await popcorn.cast("counter", "reset");
+const result = await popcorn.tryCast("counter", "reset");
 if (!result.ok) throw result.error;
 ```
 
@@ -258,7 +258,7 @@ end
 Popcorn 1.0 adds a direct send operation:
 
 ```typescript
-const result = await popcorn.send("worker", { action: "refresh" });
+const result = await popcorn.trySend("worker", { action: "refresh" });
 if (!result.ok) throw result.error;
 ```
 

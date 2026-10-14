@@ -142,7 +142,7 @@ defmodule GameOfLife.Ui do
   defp start_timer(ms, receiver) do
     Wasm.run_js!(
       """
-      (args, {send}) => {
+      (args, {trySend: send}) => {
         const id = setInterval(
           () => send(args.receiver, "tick"),
           args.ms,
@@ -258,7 +258,7 @@ defmodule GameOfLife.Ui do
   defp register_click_listeners(selectors, receiver) do
     Wasm.run_js!(
       """
-      (args, {cast}) => {
+      (args, {tryCast: cast}) => {
         const { selectors, event_name, event_receiver } = args;
         const removeListenersFunctions = [];
         selectors.forEach((selector) => {

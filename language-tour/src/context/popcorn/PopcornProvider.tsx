@@ -119,7 +119,7 @@ async function initPopcorn({
   logSink
 }: InitPopcornArgs): Promise<{ instance: Popcorn | null; error: unknown }> {
   try {
-    const result = await Popcorn.init({
+    const result = await Popcorn.tryInit({
       beam: { extraArgs: ["-noshell"] },
       onStdout: logSink.onStdout,
       onStderr: logSink.onStderr,

@@ -48,11 +48,11 @@ defmodule Popcorn.Proxy do
   After the VM boots, call the counter from JavaScript:
 
   ```js
-  const result = await popcorn.call("counter", ["add", 1]);
+  const result = await popcorn.tryCall("counter", ["add", 1]);
   if (!result.ok) throw result.error;
   console.log(result.data); // 1
 
-  await popcorn.cast("counter", "reset");
+  await popcorn.tryCast("counter", "reset");
   ```
 
   ## Calls and casts
