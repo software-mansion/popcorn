@@ -53,3 +53,126 @@ test.describe("genserver", () => {
     });
   });
 });
+
+test("throwing APIs", async ({ page }) => {
+  const options = evalOpts(
+    STOPPABLE_GEN_SERVER.replace(
+      "ok = wasm:send(#{genserver_ready => true}),",
+      `true = register(controller, self()),
+     0 = wasm:run_js(<<"async (_, {call, cast, send}) => {
+       await cast('counter', ['add', 0]);
+       await send('controller', {});
+       return await call('counter', 'get');
+     }">>, #{}),
+     ok = wasm:send(#{genserver_ready => true}),`,
+    ),
+  );
+  const result = await page.evaluate(async (options) => {
+    async function failure(operation: () => unknown) {
+      try {
+        await operation();
+      } catch (error) {
+        if (!(error instanceof Error)) throw error;
+        return { name: error.name, cause: error.cause };
+      }
+      throw new Error("Expected failure");
+    }
+
+    let ready!: () => void;
+    const readiness = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    const popcorn = await window.Popcorn.init({
+      ...options,
+      onEvent: () => ready(),
+    });
+    try {
+      await readiness;
+      const sameInstance = (await popcorn.boot()) === popcorn;
+      const initial = await popcorn.call("counter", "get");
+      const cast = await popcorn.cast("counter", ["add", 4]);
+      const updated = await popcorn.call("counter", "get");
+      const send = await popcorn.send("controller", {});
+      const stdin = popcorn.writeStdin("x");
+      const resize = popcorn.resizeTty(80, 24);
+      const missing = await failure(() =>
+        popcorn.call("missing", "get"),
+      );
+      const invalidInput = await failure(() => popcorn.writeStdin(""));
+      const invalidOptions = await failure(() =>
+        window.Popcorn.init({ tty: { size: { columns: 0, rows: 24 } } }),
+      );
+      popcorn.deinit();
+      const closed = await failure(() => popcorn.send("controller", {}));
+      const closedCast = await failure(() =>
+        popcorn.cast("counter", "reset"),
+      );
+      const closedStdin = await failure(() => popcorn.writeStdin("x"));
+      const closedResize = await failure(() => popcorn.resizeTty(80, 24));
+      const timedOut = new window.Popcorn({
+        workerUrl: "/fault-worker.mjs",
+        timeoutsMs: { boot: 0 },
+      });
+      const bootFailure = await failure(() => timedOut.boot());
+      timedOut.deinit();
+      const initFailure = await failure(() =>
+        window.Popcorn.init({
+          workerUrl: "/fault-worker.mjs",
+          timeoutsMs: { boot: 0 },
+        }),
+      );
+      return {
+        sameInstance,
+        initial,
+        updated,
+        noValues: [cast, send, stdin, resize].every(
+          (value) => value === undefined,
+        ),
+        missing,
+        invalidInput,
+        invalidOptions,
+        closed,
+        closedCast,
+        closedStdin,
+        closedResize,
+        bootFailure,
+        initFailure,
+      };
+    } finally {
+      popcorn.deinit();
+    }
+  }, options);
+
+  const closed = {
+    name: "PopcornError",
+    cause: { t: "vm:exited", data: { reason: "deinit" } },
+  };
+  const timeout = {
+    name: "PopcornError",
+    cause: { t: "timeout:init", data: { timeoutMs: 0 } },
+  };
+  expect(result).toEqual({
+    sameInstance: true,
+    initial: 0,
+    updated: 4,
+    noValues: true,
+    missing: {
+      name: "PopcornError",
+      cause: { t: "genserver:noproc", data: { target: "missing" } },
+    },
+    invalidInput: {
+      name: "PopcornError",
+      cause: { t: "internal:check", data: { detail: undefined } },
+    },
+    invalidOptions: {
+      name: "PopcornError",
+      cause: { t: "internal:check", data: { detail: undefined } },
+    },
+    closed,
+    closedCast: closed,
+    closedStdin: closed,
+    closedResize: closed,
+    bootFailure: timeout,
+    initFailure: timeout,
+  });
+});

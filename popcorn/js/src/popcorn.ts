@@ -1,4 +1,4 @@
-import { PopcornError, err, type Result } from "./errors";
+import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
   readWorkerEvent,
@@ -140,11 +140,14 @@ type PopcornState =
   | { status: "booted" }
   | { status: "closed"; error: PopcornError<"vm:exited"> };
 type PendingSend = (result: Result<null>) => void;
-type SendFn = (
+type TrySendFn = (
   target: string | Pid,
   payload?: AnyValue,
 ) => Promise<Result<null>>;
-type RunJsActions = { trySend: SendFn } & GenServer;
+type RunJsActions = {
+  send: (target: string | Pid, payload?: AnyValue) => Promise<void>;
+  trySend: TrySendFn;
+} & GenServer;
 type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
 
 type CallOpts = { timeoutMs?: number; proxy?: string };
@@ -163,7 +166,7 @@ type ProxyReply =
         | { kind: "unserializable" }
         | { kind: "timeout" };
     };
-export type GenServer = Pick<Popcorn, "tryCall" | "tryCast">;
+export type GenServer = Pick<Popcorn, "call" | "cast" | "tryCall" | "tryCast">;
 
 function createPidClass() {
   return class {
@@ -178,7 +181,7 @@ function assertRunJsFn(value: unknown): asserts value is RunJsFn {
 /**
  * A BEAM VM in a browser worker.
  *
- * Use {@link Popcorn.tryInit} to create and start an instance.
+ * Use {@link Popcorn.init} to create and start an instance.
  **/
 export class Popcorn<Output extends TtyOutput = "text"> {
   /** Receives stdout. Can be replaced at any time; `undefined` restores the default output handler. */
@@ -203,6 +206,24 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private trackedKeySeq = 0;
   private io = createIoState();
   private vmReady = false;
+
+  /** Calls a GenServer and returns its reply. See {@link tryCall} for a result instead of throwing. */
+  public async call(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: CallOpts,
+  ): Promise<AnyValue> {
+    return unwrap(await this.tryCall(target, request, opts));
+  }
+
+  /** Sends a cast through the proxy. See {@link tryCast} for a result instead of throwing. */
+  public async cast(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<void> {
+    unwrap(await this.tryCast(target, request, opts));
+  }
 
   private readonly TrackedValue = class {
     public constructor(
@@ -258,7 +279,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   /**
    * Creates the worker.
    *
-   * Call {@link tryBoot} to start the VM.
+   * Call {@link boot} to start the VM.
    **/
   public constructor(opts: PopcornOpts<Output> = {}) {
     const ttySize = opts.tty?.size ?? DEFAULT_TTY_SIZE;
@@ -297,14 +318,22 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   }
 
   /**
-   * Creates an instance and waits for {@link tryBoot}.
+   * Creates an instance and waits for {@link boot}.
    *
    * Use `opts.onEvent` to receive messages sent during startup.
    *
-   * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
+   * @returns The instance. Rejects on failure.
    *
    * @see {@link PopcornOpts}
+   * @see {@link tryInit} for a result instead of throwing on expected failures.
    */
+  public static async init<Output extends TtyOutput = "text">(
+    opts: PopcornOpts<Output> = {},
+  ): Promise<Popcorn<Output>> {
+    return unwrap(await Popcorn.tryInit(opts));
+  }
+
+  /** See {@link init}. */
   public static async tryInit<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output> = {},
   ): Promise<Result<Popcorn<Output>>> {
@@ -329,16 +358,22 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * After shutdown, starts a fresh VM with the original options.
    *
-   * @returns Ok tuple with `this` if boot completes or error tuple.
+   * @returns This instance. Rejects on failure.
    *
    * @example
    * ```ts
    * const popcorn = new Popcorn({});
    * popcorn.onEvent((message) => console.log(message));
-   * const result = await popcorn.tryBoot();
-   * if (!result.ok) throw result.error;
+   * await popcorn.boot();
    * ```
+   *
+   * @see {@link tryBoot} for a result instead of throwing on expected failures.
    */
+  public async boot(): Promise<Popcorn<Output>> {
+    return unwrap(await this.tryBoot());
+  }
+
+  /** See {@link boot}. */
   public async tryBoot(): Promise<Result<Popcorn<Output>>> {
     if (this.state.status === "booted") {
       return { ok: true, data: this };
@@ -435,9 +470,16 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Encodes strings as UTF-8 and copies byte arrays. Does not append a newline.
    *
-   * Returns `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
+   * Throws `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
    * An overflow leaves the queue unchanged.
+   *
+   * @see {@link tryWriteStdin} for a result instead of throwing on expected failures.
    */
+  public writeStdin(chunk: string | Uint8Array): void {
+    unwrap(this.tryWriteStdin(chunk));
+  }
+
+  /** See {@link writeStdin}. */
   public tryWriteStdin(chunk: string | Uint8Array): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
@@ -467,7 +509,16 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Sends new terminal dimensions to a booted VM.
    *
    * Each dimension must be between 1 and 65,535.
+   *
+   * Throws on failure.
+   *
+   * @see {@link tryResizeTty} for a result instead of throwing on expected failures.
    */
+  public resizeTty(columns: number, rows: number): void {
+    unwrap(this.tryResizeTty(columns, rows));
+  }
+
+  /** See {@link resizeTty}. */
   public tryResizeTty(columns: number, rows: number): Result<null> {
     if (this.state.status === "closed") {
       return { ok: false, error: this.state.error };
@@ -489,20 +540,29 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * A send timeout does not cancel delivery.
    * Uses the value conversions in {@link AnyValue}. An omitted, `null`, or `undefined` payload becomes an empty map.
    *
-   * @returns Ok tuple or `bridge:not-started` before boot and `vm:exited` after shutdown.
+   * @returns Rejects on failure.
    *
    * @example
    * Send an Erlang `{ok, <<"value">>}` tuple to a registered `receiver` process.
    *
    * ```ts
-   * const result = await popcorn.trySend("receiver", tuple(atom("ok"), "value"));
-   * if (!result.ok) throw result.error;
+   * await popcorn.send("receiver", tuple(atom("ok"), "value"));
    * ```
    *
    * @see {@link AnyValue}
    * @see {@link atom}
    * @see {@link tuple}
+   *
+   * @see {@link trySend} for a result instead of throwing on expected failures.
    */
+  public async send(
+    rawTarget: string | Pid,
+    payload?: AnyValue,
+  ): Promise<void> {
+    unwrap(await this.trySend(rawTarget, payload));
+  }
+
+  /** See {@link send}. */
   public async trySend(
     rawTarget: string | Pid,
     payload?: AnyValue,
@@ -572,7 +632,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   /**
    * Registers a handler for BEAM message payloads.
    *
-   * Messages with no handlers are lost. Startup messages can arrive before {@link tryBoot} resolves.
+   * Messages with no handlers are lost. Startup messages can arrive before {@link boot} resolves.
    * VM errors and terminal output use the callbacks in {@link PopcornOpts}.
    *
    * @returns a function that removes the handler.
@@ -807,9 +867,19 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const args = this.reviveHandles(request.args);
       check(this.vmReady);
       const actions: RunJsActions = {
+        send: async (target, payload) => {
+          unwrap(await this.sendBridge(target, payload));
+        },
+        call: async (target, payload, opts) =>
+          unwrap(await this.callBridge(target, payload, opts)),
+        cast: async (target, payload, opts) => {
+          unwrap(await this.castBridge(target, payload, opts));
+        },
         trySend: (target, payload) => this.sendBridge(target, payload),
-        tryCall: (target, payload, opts) => this.callBridge(target, payload, opts),
-        tryCast: (target, payload, opts) => this.castBridge(target, payload, opts),
+        tryCall: (target, payload, opts) =>
+          this.callBridge(target, payload, opts),
+        tryCast: (target, payload, opts) =>
+          this.castBridge(target, payload, opts),
       };
       const result = await fn(args, actions);
       const value = request.return === "ref" ? this.asRef(result) : result;
