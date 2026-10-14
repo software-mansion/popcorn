@@ -37,7 +37,7 @@ const popcornTheme = {
 } as const;
 
 const interopCode = `const result =
-  await popcorn.genserver.call(
+  await popcorn.call(
     "counter",
     ["add", 1],
   );

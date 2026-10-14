@@ -201,7 +201,7 @@ end
 Popcorn 1.0 sends a standard GenServer call through `Popcorn.Proxy`:
 
 ```typescript
-const result = await popcorn.genserver.call("counter", ["add", 2], {
+const result = await popcorn.call("counter", ["add", 2], {
   timeoutMs: 5_000,
 });
 
@@ -236,7 +236,7 @@ popcorn.cast("reset", { process: "counter" });
 Use the Popcorn 1.0 GenServer API:
 
 ```typescript
-const result = await popcorn.genserver.cast("counter", "reset");
+const result = await popcorn.cast("counter", "reset");
 if (!result.ok) throw result.error;
 ```
 

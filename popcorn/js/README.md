@@ -68,7 +68,7 @@ vm.deinit();
 ```
 
 `Popcorn.init()` waits for the OTP application tree to start. Use
-`popcorn.genserver.call()` to call a supervised GenServer from JavaScript.
+`popcorn.call()` to call a supervised GenServer from JavaScript.
 Use `popcorn.onEvent()` to receive events from BEAM processes.
 
 Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on

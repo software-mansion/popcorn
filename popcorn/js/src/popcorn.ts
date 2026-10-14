@@ -163,35 +163,7 @@ type ProxyReply =
         | { kind: "unserializable" }
         | { kind: "timeout" };
     };
-export type GenServer = {
-  /**
-   * Calls a GenServer by registered name or {@link Pid} and waits for its reply.
-   *
-   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy (see `Popcorn.Proxy`).
-   * @returns A {@link Result} with the reply or a bridge, VM, timeout, or GenServer error.
-   *
-   * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
-   * A call timeout does not cancel server work.
-   */
-  call(
-    target: string | Pid,
-    request?: AnyValue,
-    opts?: CallOpts,
-  ): Promise<Result<AnyValue>>;
-
-  /**
-   * Sends a cast through the proxy.
-   *
-   * Success confirms delivery to the proxy
-   * @see {@link call}
-   * @param opts - `proxy` allows to select another registered proxy.
-   */
-  cast(
-    target: string | Pid,
-    request?: AnyValue,
-    opts?: { proxy?: string },
-  ): Promise<Result<null>>;
-};
+export type GenServer = Pick<Popcorn, "call" | "cast">;
 
 function createPidClass() {
   return class {
@@ -231,11 +203,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private trackedKeySeq = 0;
   private io = createIoState();
   private vmReady = false;
-
-  public readonly genserver: GenServer = {
-    call: (target, request, opts) => this.call(target, request, opts),
-    cast: (target, request, opts) => this.cast(target, request, opts),
-  };
 
   private readonly TrackedValue = class {
     public constructor(
@@ -724,9 +691,18 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
   }
 
-  private async call(
+  /**
+   * Calls a GenServer by registered name or {@link Pid} and waits for its reply.
+   *
+   * @param opts - `timeoutMs` defaults to 5 000 ms. `proxy` allows to select another registered proxy (see `Popcorn.Proxy`).
+   * @returns A {@link Result} with the reply or a bridge, VM, timeout, or GenServer error.
+   *
+   * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
+   * A call timeout does not cancel server work.
+   */
+  public async call(
     rawTarget: string | Pid,
-    request: AnyValue,
+    request?: AnyValue,
     opts?: CallOpts,
   ): Promise<Result<AnyValue>> {
     if (this.state.status !== "booted") {
@@ -783,9 +759,16 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return result;
   }
 
-  private async cast(
+  /**
+   * Sends a cast through the proxy.
+   *
+   * Success confirms delivery to the proxy
+   * @see {@link call}
+   * @param opts - `proxy` allows to select another registered proxy.
+   */
+  public async cast(
     rawTarget: string | Pid,
-    request: AnyValue,
+    request?: AnyValue,
     opts?: { proxy?: string },
   ): Promise<Result<null>> {
     if (this.state.status !== "booted") {

@@ -16,15 +16,15 @@ test.describe("genserver", () => {
     assert(boot.ok);
     await otp.waitForEvent("genserver_ready");
 
-    expect(await otp.genserver.call("counter", ["add", 2])).toEqual({
+    expect(await otp.call("counter", ["add", 2])).toEqual({
       ok: true,
       data: 2,
     });
-    expect(await otp.genserver.cast("counter", ["add", 4])).toEqual({
+    expect(await otp.cast("counter", ["add", 4])).toEqual({
       ok: true,
       data: null,
     });
-    expect(await otp.genserver.call("counter", "get")).toEqual({
+    expect(await otp.call("counter", "get")).toEqual({
       ok: true,
       data: 6,
     });
@@ -35,16 +35,14 @@ test.describe("genserver", () => {
     assert(boot.ok);
     await otp.waitForEvent("genserver_ready");
 
-    expect(
-      await otp.genserver.call("counter", "wait", { timeoutMs: 0 }),
-    ).toEqual({
+    expect(await otp.call("counter", "wait", { timeoutMs: 0 })).toEqual({
       ok: false,
       error: {
         t: "timeout:call",
         data: { timeoutMs: 0 },
       },
     });
-    expect(await otp.genserver.call("missing", "get")).toEqual({
+    expect(await otp.call("missing", "get")).toEqual({
       ok: false,
       error: {
         t: "genserver:noproc",

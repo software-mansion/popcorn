@@ -319,7 +319,7 @@ const figures = [
 
       async function call(message: unknown) {
         console.assert(runtime !== null);
-        const result = await runtime!.genserver.call(
+        const result = await runtime!.call(
           "game_of_life_ui",
           message,
           { timeoutMs: 10_000 },

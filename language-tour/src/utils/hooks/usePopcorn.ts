@@ -13,7 +13,7 @@ export const usePopcorn = () => {
   const call = useCallback(
     async (args: unknown, options: { process?: string; timeoutMs?: number }) => {
       const start = performance.now();
-      const result = await ensureInstance().genserver.call(
+      const result = await ensureInstance().call(
         options.process ?? "main",
         args,
         { timeoutMs: options.timeoutMs }
@@ -31,7 +31,7 @@ export const usePopcorn = () => {
 
   const cast = useCallback(
     (args: unknown, options: { process?: string }) => {
-      return ensureInstance().genserver.cast(options.process ?? "main", args);
+      return ensureInstance().cast(options.process ?? "main", args);
     },
     [ensureInstance]
   );
