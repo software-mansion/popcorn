@@ -161,6 +161,7 @@ defmodule Popcorn.PackagerTest do
       archive = read_archive(bundle_path(out_dir, "deps"))
       assert Map.has_key?(archive, "lib/extra_app/priv/data.txt")
       assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
+      assert line_numbers?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
       assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
       refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
 
@@ -206,6 +207,17 @@ defmodule Popcorn.PackagerTest do
       assert after_app["bundles"]["deps"] == before["bundles"]["deps"]
       assert after_app["bundles"]["stdlib"] == before["bundles"]["stdlib"]
       assert after_app["vm"] == before["vm"]
+    end
+
+    test "leaving out line numbers", %{options: options, out_dir: out_dir} do
+      options = Keyword.put(options, :treeshake, preserved_apps: [], line_info: false)
+      assert {:ok, _report} = Packager.build(options)
+
+      # Tree-shaken and recompiled, and left as it is
+      deps = read_archive(bundle_path(out_dir, "deps"))
+      refute line_numbers?(deps, "lib/popcorn/ebin/Elixir.Popcorn.Boot.beam")
+      stdlib = read_archive(bundle_path(out_dir, "stdlib"))
+      refute line_numbers?(stdlib, "lib/kernel/ebin/application_controller.beam")
     end
 
     test "leaving out priv files of applications that aren't packaged", %{options: options} do
@@ -293,6 +305,18 @@ defmodule Popcorn.PackagerTest do
   defp read_archive(path) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
     Map.new(entries, fn {name, contents} -> {to_string(name), contents} end)
+  end
+
+  # Whether a module has line numbers, which the Line chunk counts. Modules
+  # compiled without them have one too, with no line instructions.
+  defp line_numbers?(archive, path) do
+    case archive |> Map.fetch!(path) |> :beam_lib.chunks([~c"Line"]) do
+      {:ok, {_module, [{~c"Line", <<_version::32, _flags::32, instructions::32, _::binary>>}]}} ->
+        instructions > 0
+
+      {:error, :beam_lib, {:missing_chunk, _beam, _chunk}} ->
+        false
+    end
   end
 
   # Whether a module has tables compacted, which it looks up with

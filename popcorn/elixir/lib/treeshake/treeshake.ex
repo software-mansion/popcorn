@@ -150,6 +150,7 @@ defmodule Treeshake do
           | {:include_stdlibs, boolean()}
           | {:stub_removed_functions, boolean()}
           | {:stub_removed_modules, boolean()}
+          | {:line_info, boolean()}
           | {:verbose, boolean()}
           | {:keep, [keep_entry()]}
           | {:drop, [module()]}
@@ -223,6 +224,9 @@ defmodule Treeshake do
     that raise an error. Defaults to `false`.
   - `stub_removed_modules` - If `true`, replace removed modules with empty stubs.
     Has no effect when `stub_removed_functions` is set to `true`. Defaults to `false`.
+  - `line_info` - If `false`, leaves out the line numbers that stack traces show:
+    tree-shaken modules are compiled without them, and the modules that are left
+    lose their `Line` chunks. Defaults to `true`.
   - `verbose` - Print status logs.
 
   ### Manual adjustment of tree-shaking
@@ -338,6 +342,7 @@ defmodule Treeshake do
       |> Keyword.put_new(:dry_run, false)
       |> Keyword.put_new(:stub_removed_functions, false)
       |> Keyword.put_new(:stub_removed_modules, false)
+      |> Keyword.put_new(:line_info, true)
       |> Keyword.put_new(:drop, [])
       |> keyword_concat_default(:ignore, @default_ignore_modules)
 

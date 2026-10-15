@@ -82,6 +82,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
     treeshake: [keep: [MyApp.Plugin, {MyApp.Codec, :decode, 1}], drop: [MyApp.Codegen]]
   ```
 
+  `line_info: false` leaves out BEAM line numbers, which saves about 7% of the
+  compressed archive, but stack traces show no line numbers.
+
   Some code reached dynamically is kept by default. That includes the
   functions that a library's macros, like `use`, generate in a module
   implementing the library's behaviour, like `__live__/0` of LiveComponents,

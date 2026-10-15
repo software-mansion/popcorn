@@ -63,7 +63,8 @@ defmodule Popcorn.Packager do
   @type treeshake_options :: [
           preserved_apps: [atom()],
           keep: [module() | mfa()],
-          drop: [module()]
+          drop: [module()],
+          line_info: boolean()
         ]
 
   # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
@@ -691,12 +692,14 @@ defmodule Popcorn.Packager do
     preserved_apps = Keyword.fetch!(options, :preserved_apps)
     keep = Keyword.get(options, :keep, [])
     drop = Keyword.get(options, :drop, [])
+    line_info = Keyword.get(options, :line_info, true)
 
     with :ok <- validate_preserved_apps(staged_apps, options),
          :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
          drop = dropped_modules(drop, keep, preserved_modules),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
+         {:ok, stats} <-
+           run_treeshake(staged_apps, preserved_modules, keep, drop, line_info, out_dir) do
       staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
 
       report = %{
@@ -761,7 +764,7 @@ defmodule Popcorn.Packager do
       end)
   end
 
-  defp run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
+  defp run_treeshake(staged_apps, preserved_modules, keep, drop, line_info, out_dir) do
     files =
       Enum.flat_map(staged_apps, fn {_app, info} ->
         info.ebin_dir |> Path.join("*") |> Path.wildcard()
@@ -775,7 +778,8 @@ defmodule Popcorn.Packager do
         output_dir: output_dir,
         keep: @boot_functions ++ kept(staged_apps) ++ preserved_modules ++ keep,
         leave: preserved_modules,
-        drop: drop
+        drop: drop,
+        line_info: line_info
       )
 
     {:ok, report}

@@ -9,10 +9,12 @@ defmodule Treeshake.Utils.BeamRewriter do
   #   raising an error
   # - `export` - functions to export, if they're kept
   # - `compact_tables` - compacts the kept functions, see Treeshake.TableCompactor
+  # - `line_info` - if `false`, compiles the module without line numbers
   @spec keep_funs(Path.t(), [function_arity], [
           {:stub_removed_public, boolean()}
           | {:export, [function_arity]}
           | {:compact_tables, boolean()}
+          | {:line_info, boolean()}
         ]) :: {binary(), [function_arity]}
         when function_arity: {atom(), non_neg_integer()}
   def keep_funs(beam_path, functions, opts \\ []) do
@@ -64,7 +66,7 @@ defmodule Treeshake.Utils.BeamRewriter do
         do: new_core |> Treeshake.TableCompactor.compact() |> elem(0),
         else: new_core
 
-    {compile!(module, new_core, beam_path), removed}
+    {compile!(module, new_core, beam_path, Keyword.get(opts, :line_info, true)), removed}
   end
 
   defp make_stub({fname, farity}, module) do
@@ -78,9 +80,11 @@ defmodule Treeshake.Utils.BeamRewriter do
     {{:c_var, [], {fname, farity}}, {:c_fun, [], vars, body}}
   end
 
-  defp compile!(module, core, beam_path) do
-    # TODO: optionally add no_line_info to save a few bytes from the code chunk
-    case :compile.noenv_forms(core, [:from_core, :return_errors, :return_warnings, :debug_info]) do
+  defp compile!(module, core, beam_path, line_info) do
+    options = [:from_core, :return_errors, :return_warnings, :debug_info]
+    options = if line_info, do: options, else: [:no_line_info | options]
+
+    case :compile.noenv_forms(core, options) do
       {:ok, ^module, binary, _warnings} ->
         binary
 
