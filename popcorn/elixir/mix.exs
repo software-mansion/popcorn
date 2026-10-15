@@ -82,6 +82,9 @@ defmodule Popcorn.MixProject do
   end
 
   defp docs do
+    {lexer, options} = Makeup.Registry.fetch_lexer_by_name!("bourne_again_shell_bash")
+    Makeup.Registry.register_lexer(lexer, names: ["bash", "sh"], options: options)
+
     [
       main: "about",
       markdown_processor: {ExDoc.Markdown.Earmark, footnotes: true},
