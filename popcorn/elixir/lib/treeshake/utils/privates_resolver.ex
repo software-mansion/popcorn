@@ -21,7 +21,8 @@ defmodule Treeshake.Utils.PrivatesResolver do
           behaviour_impls: [module()],
           protocol_impl: {module(), module()} | nil,
           nifs: [name_arity()],
-          undeclared_nifs: boolean()
+          undeclared_nifs: boolean(),
+          macro_generated: [name_arity()]
         }
 
   @spec resolve(BeamAnalyzer.module_info()) :: module_info()
@@ -78,7 +79,8 @@ defmodule Treeshake.Utils.PrivatesResolver do
         :behaviour_impls,
         :protocol_impl,
         :nifs,
-        :undeclared_nifs
+        :undeclared_nifs,
+        :macro_generated
       ])
     )
   end

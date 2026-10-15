@@ -4,6 +4,7 @@
 
 start(_Type, _Args) ->
     struct_builder:build(),
+    persistent_term:put(generated_impl, 'Elixir.GeneratedImpl'),
     {ok, self()}.
 stop(_State) -> callbacks_stop_dependency:stop().
 prep_stop(State) -> nif_module:used(), declared_nif_module:used(), State.
