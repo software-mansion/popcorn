@@ -41,6 +41,9 @@ defmodule Treeshake.ReachabilityTest do
 
     assert functions(output, :on_load_dependency) == [init: 0, path: 0]
 
+    # Spawned with erlang:spawn_opt/4 and erlang:spawn_monitor/3
+    assert functions(output, :spawner) == [monitor_loop: 0, opt_loop: 0, start: 0]
+
     # Kernel.struct!/2 calls __struct__/1 of its module, Kernel.struct/2
     # __struct__/0
     assert functions(output, :struct_module) == [__struct__: 1]
