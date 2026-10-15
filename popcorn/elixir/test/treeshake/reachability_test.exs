@@ -63,6 +63,17 @@ defmodule Treeshake.ReachabilityTest do
     assert :not_schema_like in stats.modules_removed
   end
 
+  # Kernel and stdlib modules are left by default, even if unreachable, except
+  # the ones tree-shaken like others
+  @tag :tmp_dir
+  test "modules left by default", %{tmp_dir: tmp_dir, ebin_files: ebin_files} do
+    stdlib = Enum.map([:array, :queue], &to_string(:code.which(&1)))
+    stats = Treeshake.run(ebin_files: ebin_files ++ stdlib, output_dir: tmp_dir)
+
+    assert :array in stats.modules_removed
+    refute :queue in stats.modules_removed
+  end
+
   defp compile_fixture(input) do
     File.mkdir_p!(input)
 
