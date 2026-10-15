@@ -11,9 +11,9 @@ The guide uses Vite, but the Rollup and esbuild plugins use the same options.
 | Popcorn 0.3                                                    | Popcorn 1.0                                                                                                                                                   |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AtomVM runs in a hidden iframe.                                | The Erlang/OTP BEAM runs in a Web Worker.                                                                                                                     |
-| `mix popcorn.cook` creates one `.avm` bundle.                  | `mix popcorn.cook` packages application to set of tarballs.                                                                                                   |
+| `mix popcorn.cook` creates one `.avm` bundle.                  | `mix popcorn.cook` packages the application into a set of tarballs.                                                                                                   |
 | The application calls `Popcorn.Wasm.ready/1`.                  | OTP starts the application through its normal application callback. You can use `Popcorn.JS.await_ready/1` to wait for JavaScript initialization to finish. |
-| `cast()` and `calls()` are plain messages, processed manually. | JavaScript can use normal GenServer calls and casts.                                                                                                          |
+| `cast()` and `call()` are plain messages, processed manually. | JavaScript can use normal GenServer calls and casts.                                                                                                          |
 | JavaScript methods can throw on errors.                        | Bridge operations throw; `try*` variants return typed result objects.                                                                               |
 
 The new runtime supports more OTP behavior than AtomVM.
@@ -31,7 +31,7 @@ defp deps do
 end
 ```
 
-Install the matching JavaScript prerelease if your project uses JavaScript bundler:
+Install the matching JavaScript prerelease if your project uses a JavaScript bundler:
 
 ```bash
 npm install @swmansion/popcorn@next
@@ -40,7 +40,7 @@ npm install @swmansion/popcorn@next
 The Elixir and JavaScript package versions must match.
 Popcorn 1.0 requires Elixir 1.19 or later.
 
-Use the toolchain from the selected Popcorn release, the packager checks the host OTP version against the WebAssembly runtime.
+Use the toolchain from the selected Popcorn release; the packager checks the host OTP version against the WebAssembly runtime.
 
 Then get the dependencies and compile the application:
 
@@ -356,7 +356,7 @@ Popcorn.JS.run(
 ## Replace tracked objects
 
 Popcorn 0.3 used `%Popcorn.TrackedObject{}` and separate value lookup functions.
-Popcorn 1.0 uses an opaque `Popcorn.JS.tracked_value()` handle.
+Popcorn 1.0 uses an opaque `t:Popcorn.JS.tracked_value/0` handle.
 
 Create the handle in the JavaScript function:
 

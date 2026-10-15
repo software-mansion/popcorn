@@ -1,26 +1,26 @@
 # Deployment
 
-To host the Popcorn app you need to configure your webserver.
+To host a Popcorn app, you need to configure your web server.
 
 ## Set cross-origin isolation headers
 
-Popcorn requires [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) to work. This buffer will work on the page if you pass following headers with the page response:
+Popcorn requires [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer) to work. This buffer will work on the page if you send the following headers with the page response:
 
 ```text
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-In development, both `popcorn.dev` and Vite plugins sets them.
+In development, both `mix popcorn.dev` and the Vite plugin set them.
 
 ## Set response metadata
 
-1. Serve `.wasm` file with `Content-type: application/wasm`.
+1. Serve `.wasm` files with `Content-Type: application/wasm`.
 2. Set `Content-Encoding: gzip` or `Content-Encoding: br` to serve compressed assets. Popcorn generates them automatically. `br` is Brotli compression and works better than Gzip. Compression is configurable in the packager.
 
 ## Avoid transforming the output
 
-Popcorn relies on Web Workers which needs stable paths for scripts they will execute. Popcorn's packager is configured to output file layout correctly, make sure you don't foil its plans.
+Popcorn relies on Web Workers, which need stable paths for the scripts they execute. Popcorn's packager is configured to output the correct file layout. Keep that layout when deploying.
 
 Use `beam.otpAssetsRoot` if you want to run it on subpage. The value must end with `/`.
 

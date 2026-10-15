@@ -33,7 +33,7 @@ defmodule Popcorn.JS do
   ## Receiving messages
 
   JavaScript calls to `popcorn.send(target, payload)` deliver `{:wasm, payload}` to the target process.
-  Use `is_message/1` in guards to match for it.
+  Use `is_message/1` in guards to match it.
   Use `Popcorn.Proxy` for GenServer calls and casts.
 
   ## Values
@@ -55,11 +55,11 @@ defmodule Popcorn.JS do
   @typedoc """
   An opaque handle that keeps a JavaScript value alive.
 
-  Return `new TrackedValue(value, cleanup)` from JavaScript function to create a handle.
-  Cleanup function has `() => void` signature.
+  Return `new TrackedValue(value, cleanup)` from a JavaScript function to create a handle.
+  The cleanup function has the signature `() => void`.
   Pass the handle in `run/3` arguments to access the original value.
 
-  The runtime calls `cleanup` function after BEAM garbage collection releases the handle, or when the VM stops.
+  The runtime calls the `cleanup` function after BEAM garbage collection releases the handle, or when the VM stops.
 
   Note:
   Garbage collection does not guarantee prompt cleanup.
@@ -174,7 +174,7 @@ defmodule Popcorn.JS do
   end
 
   @doc """
-  See run/3.
+  See `run/3`.
   """
   @spec run!(String.t(), map(), run_opts()) :: term()
   def run!(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do

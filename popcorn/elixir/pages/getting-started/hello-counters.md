@@ -1,14 +1,14 @@
 # Building a complex Popcorn app
 
-> This guide assumes you have Popcorn installed in "Counters" application, with supervision tree. Change names to apropriate ones. See ["Installation"](installation.md) for installation instructions.
+> This guide assumes you have Popcorn installed in a "Counters" application with a supervision tree. Adjust the names to match your application. See ["Installation"](installation.md) for installation instructions.
 
 In the [previous guide](hello-world.md), we created a simple app using Popcorn. Now, let's get a bit more ambitious and use more APIs for communication between JavaScript and Elixir. We will exchange events and talk back to Elixir from `run!` snippets.
 
-Typically, guides go for an example showing a counter. As I said, we're a bit more ambitious so let's create a Counter of Counters!
+Typically, guides go for an example showing a counter. As I said, we're a bit more ambitious, so let's create a Counter of Counters!
 
 ## Rough plan
 
-We will add an HTML page with a template for creating counters. Each counter will have a parent and will add its own HTML to the page, removing it if the counter process dies or its parent removes it. All of them will be under a `DynamicSupervisor` and have increment/decrement buttons with one special button to blow up the process.
+We will add an HTML page with a template for creating counters. Each counter will have a parent and will add its own HTML to the page, removing it if the counter process dies or its parent removes it. All of them will be under a `DynamicSupervisor` and have add/remove buttons with one special button to blow up the process.
 
 The end result will look like this:
 
@@ -28,7 +28,7 @@ It compiles and packages the application into `public/out`, then serves `public`
 >
 > On Linux, to get the live reload, install `inotify-tools`. It's needed for watching files.
 
-## Add a HTML template
+## Add an HTML template
 
 Create a `public` directory. Our static assets will live there. We also need a directory where we will put the built app files. We will use `public/out` for that.
 
@@ -38,7 +38,7 @@ mkdir -p public public/out
 echo "/public/out/" >> .gitignore
 ```
 
-Now, HTML template in `public/index.html`:
+Now, add an HTML template in `public/index.html`:
 
 ```html
 <!-- exdoc:fold `<html> ...` | HTML and styles -->
@@ -140,7 +140,7 @@ Now, HTML template in `public/index.html`:
 </html>
 ```
 
-The styles and the rest of the HTML markup aren't that important, it's only there to make our page look half-decent.
+The styles and the rest of the HTML markup aren't that important. They're only there to make our page look half-decent.
 
 > #### Note {: .neutral}
 >
@@ -150,7 +150,7 @@ Now, let's get to the actual logic.
 
 ## OTP structure
 
-We will use a shared Registry for each `Counter`, and each `Counter` will be also paired with `DynamicSupervisor` for its children. This creates a nice tree:
+We will use a shared Registry for each `Counter`, and each `Counter` will also be paired with a `DynamicSupervisor` for its children. This creates a nice tree:
 
 <div style="text-align: center;">
 <img src="assets/otp-tree-light.svg#gh-light-mode-only" style="width: 700px; max-width: 100%;" alt="OTP supervision tree: Counters.Application starts Counters.Supervisor, which supervises the Registry and a Counters.Unit. Each Unit supervises a Counter and a DynamicSupervisor for child Units." />
@@ -238,17 +238,17 @@ Most of this is plumbing. Let's look at the Popcorn APIs it uses:
 |> JS.run!(%{root: root, selector: selector})
 ```
 
-`JS.run!/3` is a function that evaluates JavaScript source and hands the result back to the Elixir. First argument is a JavaScript source and the second is a map of arguments we want to pass from Elixir to it.
+`Popcorn.JS.run!/3` is a function that evaluates JavaScript source and hands the result back to Elixir. The first argument is JavaScript source, and the second is a map of arguments we want to pass from Elixir to it.
 
-In JavaScript source, we create a function to run. It takes two parameters: `args` (a map of passed arguments) and `actions` (a map of functions we can call — `send()`, `cast()`, `call()`).
+In the JavaScript source, we create a function to run. It takes two parameters: `args` (a map of passed arguments) and `actions` (a map of functions we can call — `send()`, `cast()`, `call()`).
 
-In this case, we use JavaScript syntax to deconstruct the `args` object and assign variables. We could also write `args.root` and `args.selector` but deconstructing is shorter.
+In this case, we use JavaScript syntax to destructure the `args` object and assign variables. We could also write `args.root` and `args.selector` but destructuring is shorter.
 
 ### `return new TrackedValue()`
 
-`TrackedValue` is a JavaScript class that is treated specially when passing data to Elixir. It allows us to keep a reference to object living in JavaScript side. In `find/2`, we use it to keep a HTML node.
+`TrackedValue` is a JavaScript class that is treated specially when passing data to Elixir. It allows us to keep a reference to an object living on the JavaScript side. In `find/2`, we use it to keep an HTML node.
 
-When Elixir releases the handle, through garbage collection or when the process holding it dies, Popcorn releases the JavaScript reference and runs cleanup function. You can see it in `add_counter/3`:
+When Elixir releases the handle, through garbage collection or when the process holding it dies, Popcorn releases the JavaScript reference and runs the cleanup function. You can see it in `add_counter/3`:
 
 ```typescript
 ({ container, id, label }) => {
@@ -263,7 +263,7 @@ When Elixir releases the handle, through garbage collection or when the process 
 
 ### `cast()`
 
-Here's full `on_click/2` implementation:
+Here's the full `on_click/2` implementation:
 
 ```elixir
 def on_click(node, event) do
@@ -277,13 +277,13 @@ def on_click(node, event) do
 end
 ```
 
-Note that we pass the PID of current process (`pid: self()`) and we pass it to `cast()` function (`cast(pid, event)`). This together creates a click handler in JavaScript that will send messages to our Counter processes later on.
+Note that we pass the PID of the current process (`pid: self()`) and we pass it to the `cast()` function (`cast(pid, event)`). Together, these create a click handler in JavaScript that will send messages to our Counter processes later on.
 
 ## Registry and supervisor
 
-Before we get to the implementation, we need a `DynamicSupervisor` and a `Registry` for our Counters. Both are standard OTP components, first allows us to dynamically modify supervision tree (which we need to add and remove counters), second gives us a predictable name pattern to find `Counter` processes.
+Before we get to the implementation, we need a `DynamicSupervisor` and a `Registry` for our Counters. Both are standard OTP components: the first allows us to dynamically modify the supervision tree (which we need to add and remove counters), and the second gives us a predictable name pattern to find `Counter` processes.
 
-The `Counters.Unit` supervisor will keep a `Counter` and its children. In each `Counter`, we keep its path (e.g. `1.2.1`, which is one highlighted in the image) and the DOM node it is tied to.
+The `Counters.Unit` supervisor will keep a `Counter` and its children. In each `Counter`, we keep its path (e.g. `1.2.1`, which is the one highlighted in the image) and the DOM node it is tied to.
 
 <div style="text-align: center;">
 <img src="assets/counter-light.svg#gh-light-mode-only" style="width: 300px;" alt="Counters structure, 1.2.1 counter highlighted." />
@@ -296,7 +296,7 @@ Create `lib/counters/unit.ex`:
 # lib/counters/unit.ex
 defmodule Counters.Unit do
   use Supervisor
-  # exdoc:fold start_link/2
+  # exdoc:fold start_link/1
   alias Counters.Counter
 
   def start_link({path, container}) do
@@ -345,11 +345,11 @@ end
 
 ## `Counter` GenServer
 
-Now we're ready to do useful work and handle the events we send from `Counters.HTML.on_click/2`. Starting with module outline, we use the Registry and support three operations:
+Now we're ready to do useful work and handle the events we send from `Counters.HTML.on_click/2`. Starting with the module outline, we use the Registry and support three operations:
 
 - `add` which creates a new child counter
 - `remove` which removes **last** counter from its children
-- `crash` which explodes the genserver and allows OTP to do its thing
+- `crash` which explodes the GenServer and allows OTP to do its thing
 
 Create `lib/counters/counter.ex` with the outline below. Replace its `:todo` callbacks with the implementations in the following sections, keeping them inside `Counters.Counter`. Add the `Counters.HTML` alias and private helpers inside the same module.
 
@@ -383,7 +383,7 @@ end
 
 ### Mounting a counter in the page
 
-Let's go with implementation bit by bit. After creating a GenServer, we need to create a counter in the page, set the initial state, and register click handlers.
+Let's go through the implementation bit by bit. After creating a GenServer, we need to create a counter in the page, set the initial state, and register click handlers.
 
 ```elixir
 # lib/counters/counter.ex
@@ -395,7 +395,7 @@ def handle_continue(:mount, {path, container}) do
   id = List.last(path, 0)
   node = HTML.add_counter(container, id, label(path))
 
-  # Register click handlers for increment, decrement, and "crash" buttons.
+  # Register click handlers for add, remove, and "crash" buttons.
   node |> HTML.find(".inc") |> HTML.on_click("add")
   node |> HTML.find(".dec") |> HTML.on_click("remove")
   node |> HTML.find(".crash") |> HTML.on_click("crash")
@@ -419,17 +419,17 @@ defp label(path), do: "Counter #{Enum.join(path, ".")}"
 ```
 
 Now, when we create a Counter, we get new markup on the page. The HTML is removed when we don't have access to `node` `TrackedValue` anymore (i.e. GenServer dies).
-Notice how defining few helpers improved readability of the "frontend" Elixir code. You could build an entire framework from that!
+Notice how defining a few helpers improved readability of the "frontend" Elixir code. You could build an entire framework from that!
 
 ### Adding a counter
 
 A few things happen here:
 
 - we construct the counter path (e.g. 1.2) and increment the counter's count.
-- we use `via()` to get the children supervisor and create new `Counter` under it.
-- we're passing `state.children_node` as a HTML root for the new counter.
+- we use `via()` to get the children supervisor and create a new `Counter` under it.
+- we're passing `state.children_node` as an HTML root for the new counter.
 
-We don't manage HTML lifecycle ourselves, it's directly tied to GenServer lifetime. If it dies, HTML is removed from the page.
+We don't manage the HTML lifecycle ourselves; it's directly tied to the GenServer's lifetime. If it dies, the HTML is removed from the page.
 
 ```elixir
 # lib/counters/counter.ex
@@ -475,7 +475,7 @@ def handle_cast("crash", _state), do: raise("boom")
 
 Fortunately, here we don't need much work. OTP handles that for us. If you repeatedly crash the same counter, you may see its whole subtree disappear.
 
-This is OTP Supervisor at work — if child repeteatedly crashes, it isn't possible to have a stable system. Therefore, it terminates all of its children and then itself.
+This is an OTP supervisor at work — if a child repeatedly crashes, it isn't possible to have a stable system. Therefore, it terminates all of its children and then itself.
 
 ## End result
 

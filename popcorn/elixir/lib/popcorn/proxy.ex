@@ -5,13 +5,13 @@ defmodule Popcorn.Proxy do
   @moduledoc """
   Connects JavaScript calls and casts to GenServers in the VM.
 
-  It's automatically started under :popcorn application.
-  Starting one yourself and routing requests through it is a rare use-case (hooks, large quantity of requests, etc).
+  It's automatically started under the `:popcorn` application.
+  Starting one yourself and routing requests through it is a rare use-case (hooks, a large number of requests, etc).
 
   Notes:
   - One proxy handles concurrent requests to multiple GenServers.
   - Targets can be registered names or PID handles from the same VM.
-  - On non-Wasm environments it returns `:ignore` from `start_link/2`.
+  - In non-Wasm environments it returns `:ignore` from `start_link/1`.
 
   See `Popcorn.JS` for value conversions.
 

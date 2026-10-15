@@ -1,11 +1,7 @@
-# Popcorn OTP
+# Popcorn JavaScript
 
-Run Elixir in a browser with OTP/BEAM compiled to WebAssembly.
-This prerelease replaces the AtomVM runtime used by Popcorn 0.3.x.
-
-Start with the
-[versioned Popcorn guide](https://popcorn.hexdocs.pm/0.4.0-next.6/introduction.html).
-It includes a complete Mix and Vite tutorial.
+JavaScript API and bundler plugins for running Elixir and Erlang applications
+in the browser with Popcorn's WebAssembly runtime.
 
 ## Install
 
@@ -13,97 +9,53 @@ It includes a complete Mix and Vite tutorial.
 npm install @swmansion/popcorn@next
 ```
 
-Add `{:popcorn, "0.4.0-next.6"}` to your Elixir application's dependencies.
-Run `mix deps.get` before building the JavaScript application. The bundler
-plugins invoke Mix locally to compile and package application and
-standard-library code.
+Use the matching Elixir package version. See the
+[Elixir package README](https://github.com/software-mansion/popcorn/blob/main/popcorn/elixir/README.md)
+for application setup, toolchain requirements, and packaging configuration.
 
-Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.6/mise.toml).
-The packager checks host OTP compatibility against the selected runtime's manifest.
+## Bundler setup
 
-## Configure Vite
+For Vite:
 
 ```ts
 import { defineConfig } from "vite";
 import { popcorn } from "@swmansion/popcorn/vite";
 
 export default defineConfig({
-  plugins: [
-    popcorn({
-      rootDir: "../",
-    }),
-  ],
+  plugins: [popcorn({ rootDir: "../" })],
 });
 ```
 
-Set `rootDir` to the Mix project directory. The current Mix application is the
-default entrypoint. Configure cooking in the Mix project's `config/config.exs`:
+Set `rootDir` to the Mix project directory. The plugin compiles and packages
+the application and runtime assets.
 
-```elixir
-import Config
+Rollup and esbuild plugins use the same option, imported from
+`@swmansion/popcorn/rollup` and `@swmansion/popcorn/esbuild`. Use ESM output.
 
-config :popcorn,
-  extra_apps: [:eex],
-  treeshake: [preserved_apps: [:eex]]
-```
-
-Set `app: :other_app` to select another OTP application, or `app: nil` to
-package the base runtime without starting an application. Cooking settings
-belong exclusively to Elixir config; the JS plugins accept only `rootDir`.
-See `mix help popcorn.cook` for all settings.
-
-The npm package contains two variants:
-
-- `core`: without native crypto support.
-- `crypto`: includes native crypto and ASN.1 support for applications that depend on crypto, public_key, or ssl.
-
-The plugin emits only the selected variant. The browser does not download both.
-Both variants share one JavaScript API and one Hex package.
-The cook task selects `crypto` when the application's dependencies or configured `extra_apps` require it; otherwise it selects `core`.
-Set `runtime_variant: :core` or `runtime_variant: :crypto` in Elixir config to override this choice.
-An explicit `"core"` selection produces a build error if the application requires crypto.
-
-Rollup and esbuild plugins accept the same options through `@swmansion/popcorn/rollup` and `@swmansion/popcorn/esbuild`.
-Use ESM output with those bundlers.
-
-## Start the runtime
+## JavaScript API
 
 ```ts
 import { Popcorn } from "@swmansion/popcorn";
 
 const vm = await Popcorn.init();
+
+vm.onEvent((event) => console.log(event));
+const count = await vm.call("counter", ["add", 1]);
+console.log(count);
+
 // Stop the runtime when the application no longer needs it.
 vm.deinit();
 ```
 
-`Popcorn.init()` waits for the OTP application tree to start. Use
-`popcorn.call()` to call a supervised GenServer from JavaScript.
-Use `popcorn.onEvent()` to receive events from BEAM processes.
+`Popcorn.init()` waits for the application's supervision tree to start.
+This example assumes the application starts a GenServer registered as `:counter`
+that handles `["add", amount]` requests.
 
-Methods throw or reject on failure. Only `send`, `call`, and `cast` also have
-`trySend`, `tryCall`, and `tryCast` variants that return `Result` objects.
+Use `send()` for process messages, `call()` and `cast()` for GenServer requests,
+and `onEvent()` for events from Elixir. Methods throw or reject on failure;
+`trySend()`, `tryCall()`, and `tryCast()` return result objects instead.
 
-Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on
-phones/tablets or 2 GiB on desktop. Device detection uses the browser's user
-agent and touch support. Configure the limits with
-`Popcorn.init({ beam: { maxMemory: { mobile: "256M", desktop: "2G" } } })`.
-Omit `maxMemory` to keep these defaults, or override either key separately.
-Only `M` and `G` suffixes are supported; they mean MiB and GiB.
-The limit must be a multiple of 64 KiB between 64 MiB and 2 GiB; JavaScript and
-filesystem memory are additional.
-
-## Serve in production
-
-Serve over HTTPS or localhost. Set these headers on the application and runtime responses:
-
-```text
-Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
-```
-
-Vite sets these headers for development and preview. Configure your production server separately.
-Serve `.wasm` as `application/wasm`. Serve compressed `.tar.gz` files with `Content-Encoding: gzip` for `.tar` requests.
-The package also emits uncompressed tar files and Brotli variants. Brotli uses standard effort by default. Set `config :popcorn, brotli_effort: :max` in `config/config.exs` for maximum compression in release builds.
-
-The JavaScript bridge currently requires a Content Security Policy that permits `unsafe-eval`.
-See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.6/) for interoperability details.
+See the [JavaScript API reference](https://hexdocs.pm/popcorn/JSLib.Popcorn.html)
+for options, terminal IO, and memory limits. Follow the
+[deployment guide](https://hexdocs.pm/popcorn/deployment.html)
+for required response headers and Content Security Policy settings.

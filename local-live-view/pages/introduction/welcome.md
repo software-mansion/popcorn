@@ -6,7 +6,7 @@ LocalLiveView brings local-first interactivity to Phoenix applications by runnin
 
 In a standard Phoenix LiveView app, UI state lives on the server. Every interaction travels over the network: user clicks button → server processes event → server sends diff → browser updates DOM. This works great, but it means latency is always in the loop.
 
-LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to WebAssembly and executed via [Popcorn](https://hexdocs.pm/popcorn/introduction.html), which runs the Erlang virtual machine (BEAM), compiled to WebAssembly, directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
+LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to BEAM bytecode and executed via [Popcorn](https://popcorn.hexdocs.pm/1.0.0-next.0/about.html), which runs the Erlang virtual machine (BEAM), compiled to WebAssembly, directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
 
 The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveView programming model.
 
@@ -51,6 +51,6 @@ The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveV
 
 If you know Phoenix LiveView, you already know LocalLiveView. The callbacks (`mount/3`, `render/1` with `~H`, `handle_event/3`), the assign functions (`assign/2`, `update/3`) and the template bindings (`phx-click` and friends) are all the same — LocalLiveView intercepts Phoenix LiveView's standard JavaScript layer, so event attributes work exactly the same way.
 
-The main differences between LLV and standard LiveView are that LLV uses `use LocalLiveView` instead of `use Phoenix.LiveView`, relies on the `update/3` callback to update its assigns, and runs directly in the browser's Popcorn runtime rather than on the server.
+The main differences between LLV and standard LiveView are that LLV uses `use LocalLiveView` instead of `use Phoenix.LiveView`, relies on the `update/2` callback to update its assigns, and runs directly in the browser's Popcorn runtime rather than on the server.
 
 LLV can also render LiveComponents and function components natively. These will similarly execute as part of the browser's Popcorn runtime.

@@ -8,11 +8,11 @@ The local part of the project is located in the `local` directory.
 
 The most important files to look at are:
 
-`compare_live_views/lib/compare_live_views_web/live/demo_modal_online.ex` - Phoenix LiveView that represents online part of the demo and is rendered on the left side of the page.
+[`lib/compare_live_views_web/live/demo_modal_online.ex`](lib/compare_live_views_web/live/demo_modal_online.ex) - Phoenix LiveView that represents the online part of the demo and is rendered on the left side of the page.
 
-`compare_live_views/local/lib/demo_modal_offline.ex` - LocalLiveView that represents offline part of the demo and is rendered on the right side of the page.
+[`local/lib/demo_modal_offline.ex`](local/lib/demo_modal_offline.ex) - LocalLiveView that represents the offline part of the demo and is rendered on the right side of the page.
 
-`compare_live_views/lib/compare_live_views_web/controllers/page_html/home.html.heex` - home page that renders both views.
+[`lib/compare_live_views_web/controllers/page_html/home.html.heex`](lib/compare_live_views_web/controllers/page_html/home.html.heex) - home page that renders both views.
 
 ## Usage
 
@@ -31,4 +31,4 @@ mix dev
 
 and visit [localhost:4000](http://localhost:4000)
 
-_The project enables Phoenix LiveView latency simulation by using `liveSocket.enableLatencySim(1000)` to show response time difference between the LiveViews. It can be later changed by calling `liveSocket.enableLatencySim` in the console._
+_The project enables Phoenix LiveView latency simulation by using `liveSocket.enableLatencySim(1000)` to show the response time difference between the LiveViews. It can later be changed by calling `liveSocket.enableLatencySim` in the console._
