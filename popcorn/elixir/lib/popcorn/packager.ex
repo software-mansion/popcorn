@@ -17,7 +17,7 @@ defmodule Popcorn.Packager do
   }
 
   @boot_name "bin/vm.boot"
-  @runtime_files ~w(beam.mjs beam.emu.mjs beam.wasm)
+  @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
 
