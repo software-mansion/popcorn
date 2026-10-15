@@ -17,7 +17,9 @@ defmodule Treeshake.Utils.BeamAnalyzer do
           abstraction:
             {:behaviour | :protocol, [{callback :: atom(), arity :: non_neg_integer()}]} | nil,
           behaviour_impls: [module()],
-          protocol_impl: {protocol :: module(), type :: module()} | nil
+          protocol_impl: {protocol :: module(), type :: module()} | nil,
+          # :unknown when the module calls load_nif/2 but doesn't declare NIFs
+          nifs: [{atom(), non_neg_integer()}] | :unknown
         }
 
   @spec analyze(module(), core_ast :: term()) :: module_info()
@@ -36,7 +38,18 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       end
 
     is_protocol = protocol_definition?(core)
-    functions = collect_functions(core, exports)
+    declared_nifs = collect_nifs(core)
+
+    functions =
+      core
+      |> collect_functions(exports)
+      |> add_nif_calls(declared_nifs)
+      |> add_on_load_calls(collect_on_load(core))
+
+    nifs =
+      if declared_nifs == [] and Enum.any?(functions, &loads_nifs?/1),
+        do: :unknown,
+        else: declared_nifs
 
     abstraction =
       cond do
@@ -50,7 +63,8 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       functions: functions,
       abstraction: abstraction,
       behaviour_impls: behaviours,
-      protocol_impl: protocol_impl
+      protocol_impl: protocol_impl,
+      nifs: nifs
     }
   end
 
@@ -80,6 +94,41 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       _ ->
         []
     end)
+  end
+
+  defp collect_on_load({:c_module, _, _, _, attrs, _}) do
+    Enum.flat_map(attrs, fn
+      {{:c_literal, _, :on_load}, {:c_literal, _, funs}} when is_list(funs) -> funs
+      _ -> []
+    end)
+  end
+
+  # Functions declared with `-nifs`, whose bodies the compiler starts with
+  # a nif_start primop
+  defp collect_nifs({:c_module, _, _, _, _, defs}) do
+    for {{:c_var, _, name_arity}, {:c_fun, _, _, body}} <- defs,
+        match?({:c_seq, _, {:c_primop, _, {:c_literal, _, :nif_start}, []}, _}, body),
+        do: name_arity
+  end
+
+  # Loading NIFs fails unless every NIF in the library has a function in the
+  # module, so they're considered called by the function loading them.
+  defp add_nif_calls(functions, []), do: functions
+
+  defp add_nif_calls(functions, nifs) do
+    calls = Enum.map(nifs, fn {name, arity} -> {nil, name, arity} end)
+    Enum.map(functions, &if(loads_nifs?(&1), do: %{&1 | calls: calls ++ &1.calls}, else: &1))
+  end
+
+  defp loads_nifs?(function), do: {:erlang, :load_nif, 2} in function.calls
+
+  # The on_load function, which typically loads NIFs, runs whenever the module
+  # is loaded, so it's considered called by every public function.
+  defp add_on_load_calls(functions, []), do: functions
+
+  defp add_on_load_calls(functions, on_load) do
+    calls = Enum.map(on_load, fn {name, arity} -> {nil, name, arity} end)
+    Enum.map(functions, &if(&1.public, do: %{&1 | calls: calls ++ &1.calls}, else: &1))
   end
 
   # Elixir protocol implementations do not use a :protocol_impl attribute.

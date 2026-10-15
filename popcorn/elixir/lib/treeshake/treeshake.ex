@@ -85,7 +85,7 @@ defmodule Treeshake do
   The removal is done by tree-shaking on the function level: reachable functions
   are found and all others are removed. The following functions are considered
   reachable:
-  - `start/2` functions of applications
+  - callbacks of applications' modules (`start/2`, `stop/1`, etc.)
   - functions called or captured (`&Module.fun/arity`) by a reachable function
   - functions referenced as a hard-coded module-function-arity (MFA) tuple
     or module-function-arguments tuple in a reachable function
@@ -134,7 +134,7 @@ defmodule Treeshake do
     `mod: module` means 'all public functions of this module',
     `mfa: {module, fun, arity}` means 'this public function',
     and `behaviour_impls: behaviour` means 'all modules implementing this behaviour'.
-    Applications' `start/2` functions are automatically added to this list.
+    Applications' callbacks are automatically added to this list.
   - `drop` - Modules to be removed regardless of the tree-shaking results, as
     `mod: module` entries.
   - `leave` - Modules that must not be changed or removed, as `mod: module` entries,
@@ -296,7 +296,13 @@ defmodule Treeshake do
       with {:ok, [{:application, _name, attrs}]} <-
              :file.consult(String.to_charlist(app_file)),
            {mod, _args} <- Keyword.get(attrs, :mod) do
-        [mfa: {mod, :start, 2}]
+        # The application callbacks, optional ones included
+        [
+          mfa: {mod, :start, 2},
+          mfa: {mod, :stop, 1},
+          mfa: {mod, :prep_stop, 1},
+          mfa: {mod, :config_change, 3}
+        ]
       else
         _not_found -> []
       end

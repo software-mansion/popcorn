@@ -4,8 +4,17 @@ defmodule Treeshake.Utils.BeamRewriter do
   # Rewrites a core erlang module, keeping only given functions.
   # Mostly vibe-coded.
 
-  @spec keep_funs(Path.t(), [function_arity], [{:stub_removed_public, boolean()}]) ::
-          {binary(), [function_arity]}
+  @doc """
+  Prunes a beam file so that only given functions are left.
+
+  Options:
+  - `stub_removed_public` - replaces removed public functions with stubs
+    raising an error
+  - `export` - functions to export (if they're kept or stubbed)
+  """
+  @spec keep_funs(Path.t(), [function_arity], [
+          {:stub_removed_public, boolean()} | {:export, [function_arity]}
+        ]) :: {binary(), [function_arity]}
         when function_arity: {atom(), non_neg_integer()}
   def keep_funs(beam_path, functions, opts \\ []) do
     to_keep = MapSet.new(functions)
@@ -14,6 +23,9 @@ defmodule Treeshake.Utils.BeamRewriter do
     {module, core} = Treeshake.Utils.BeamReader.read_core!(beam_path)
 
     {:c_module, anno, name, exports, attrs, defs} = core
+
+    new_exports = opts |> Keyword.get(:export, []) |> Enum.map(&{:c_var, [], &1})
+    exports = Enum.uniq_by(exports ++ new_exports, fn {:c_var, _meta, fa} -> fa end)
 
     stubbable =
       if stub_removed_public do
@@ -37,18 +49,16 @@ defmodule Treeshake.Utils.BeamRewriter do
           end
       end)
 
-    new_exports =
+    exports =
       if stub_removed_public do
         exports
       else
-        Enum.filter(exports, fn {:c_var, _, {fname, farity}} ->
-          MapSet.member?(to_keep, {fname, farity})
-        end)
+        Enum.filter(exports, fn {:c_var, _meta, fa} -> fa in to_keep end)
       end
 
     new_attrs = filter_attrs(attrs, to_keep)
 
-    new_core = {:c_module, anno, name, new_exports, new_attrs, new_defs}
+    new_core = {:c_module, anno, name, exports, new_attrs, new_defs}
 
     {compile!(module, new_core, beam_path), removed}
   end
