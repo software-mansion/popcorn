@@ -627,7 +627,7 @@ const figures = [
     terminal.open(terminalElement);
     const dimensions = fitTerminal(terminal, fitAddon);
 
-    const result = await Popcorn.init({
+    const popcorn = await Popcorn.init({
       beam: {
         otpAssetsRoot: "/_astro/otp/",
         env: { TERM: "xterm-256color" },
@@ -640,40 +640,39 @@ const figures = [
       onError: (error) => {
         status.textContent = `Runtime ${error.kind}: ${error.data}`;
       },
-    });
-
-    if (result.ok === false) {
+    }).catch((error: Error) => {
       loadingElement.classList.remove("hidden");
-      loadingMessage.textContent = result.error.message;
+      loadingMessage.textContent = error.message;
       progress.classList.add("hidden");
-      status.textContent = result.error.message;
+      status.textContent = error.message;
       terminal.dispose();
       terminalElement.replaceChildren();
+      return null;
+    });
+    if (popcorn === null) {
       return { popcorn: null, terminal: null, stopStatistics: null };
     }
-
-    const popcorn = result.data;
     terminal.onData((data) => {
-      const input = popcorn.writeStdin(data);
-      if (input.ok === false) status.textContent = input.error.message;
+      try {
+        popcorn.writeStdin(data);
+      } catch (error) {
+        status.textContent = (error as Error).message;
+      }
     });
     terminal.onResize(({ cols, rows }) => {
-      const resize = popcorn.resizeTty(cols, rows);
-      if (resize.ok === false) status.textContent = resize.error.message;
+      popcorn.resizeTty(cols, rows);
     });
 
     fitAddon.observeResize();
     const fitted = fitTerminal(terminal, fitAddon);
-    const resize = popcorn.resizeTty(fitted.columns, fitted.rows);
-    console.assert(resize.ok);
+    popcorn.resizeTty(fitted.columns, fitted.rows);
     terminalElement.dataset.ready = "true";
     status.textContent = "IEx is ready";
     setLoading(exampleButtons, restart, loadingElement, progress, false);
     await nextFrame();
     terminal.options.fontFamily = TERMINAL_FONT;
     const redrawn = fitTerminal(terminal, fitAddon);
-    const redrawResize = popcorn.resizeTty(redrawn.columns, redrawn.rows);
-    console.assert(redrawResize.ok);
+    popcorn.resizeTty(redrawn.columns, redrawn.rows);
     const stopStatistics = popcorn.onEvent((event) => {
       const statistics = getRuntimeStatistics(event);
       if (statistics !== null) updateStatistics(demo, statistics);
@@ -684,8 +683,7 @@ const figures = [
 
   function runExample(popcorn: PopcornInstance, commands: string[]) {
     for (const command of commands) {
-      const input = popcorn.writeStdin(`${command}\r`);
-      console.assert(input.ok);
+      popcorn.writeStdin(`${command}\r`);
     }
   }
 

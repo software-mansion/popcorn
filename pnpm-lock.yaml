@@ -200,8 +200,8 @@ importers:
         specifier: ^1.7.21
         version: 1.8.13
       phoenix_live_view:
-        specifier: ^1.1.30
-        version: 1.2.11
+        specifier: 1.1.30
+        version: 1.1.30
       tailwindcss:
         specifier: ^4.1.11
         version: 4.3.3
