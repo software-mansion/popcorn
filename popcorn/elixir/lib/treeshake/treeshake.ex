@@ -62,7 +62,11 @@ defmodule Treeshake do
     }
   }
 
-  @type keep_entry :: {:mod, module()} | {:mfa, mfa()} | {:behaviour_impls, module()}
+  @type keep_entry ::
+          {:mod, module()}
+          | {:mfa, mfa()}
+          | {:behaviour_impls, module()}
+          | {:referenced_modules_defining, {atom(), non_neg_integer()}}
 
   @type run_option ::
           {:ebin_files, [Path.t()]}
@@ -150,7 +154,9 @@ defmodule Treeshake do
   - `keep` - What must not be removed, along with all code it relies on:
     `mod: module` means 'all public functions of this module',
     `mfa: {module, fun, arity}` means 'this public function',
-    and `behaviour_impls: behaviour` means 'all modules implementing this behaviour'.
+    `behaviour_impls: behaviour` means 'all modules implementing this behaviour',
+    and `referenced_modules_defining: {fun, arity}` means 'all modules defining this
+    public function, once a reachable function references them'.
     Applications' callbacks are automatically added to this list.
   - `drop` - Modules to be removed regardless of the tree-shaking results, as
     `mod: module` entries.
@@ -251,7 +257,7 @@ defmodule Treeshake do
       raise "Either :ebin_files or :project option must be provided"
     end
 
-    validate_entries!(opts, :keep, [:mod, :mfa, :behaviour_impls])
+    validate_entries!(opts, :keep, [:mod, :mfa, :behaviour_impls, :referenced_modules_defining])
     validate_entries!(opts, :drop, [:mod])
     validate_entries!(opts, :leave, [:mod])
     validate_entries!(opts, :ignore, [:mod, :mfa])
@@ -358,7 +364,8 @@ defmodule Treeshake do
   @entry_kinds %{
     mod: "mod: module",
     mfa: "mfa: {module, fun, arity}",
-    behaviour_impls: "behaviour_impls: behaviour"
+    behaviour_impls: "behaviour_impls: behaviour",
+    referenced_modules_defining: "referenced_modules_defining: {fun, arity}"
   }
 
   defp validate_entries!(opts, option, kinds) do
@@ -377,6 +384,10 @@ defmodule Treeshake do
 
   defp valid_entry?({:behaviour_impls, behaviour}, kinds),
     do: :behaviour_impls in kinds and is_atom(behaviour)
+
+  defp valid_entry?({:referenced_modules_defining, {fun, arity}}, kinds),
+    do:
+      :referenced_modules_defining in kinds and is_atom(fun) and is_integer(arity) and arity >= 0
 
   defp valid_entry?(_entry, _kinds), do: false
 
