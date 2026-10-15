@@ -42,7 +42,7 @@ class PopcornClient {
     if (!popcorn) {
       result = { ok: false, error: new Error("LLV: popcorn call before runtime was ready") };
     } else {
-      const reply = await popcorn.genserver.call(DISPATCHER_PROCESS_REF, message, {
+      const reply = await popcorn.call(DISPATCHER_PROCESS_REF, message, {
         timeoutMs: DEFAULT_CALL_TIMEOUT_MS,
       });
       // The dispatcher replies with :ok, {:ok, data} or {:error, reason},
