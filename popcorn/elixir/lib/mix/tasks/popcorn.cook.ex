@@ -54,6 +54,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `--extra-app NAME` | Includes an application and its required dependencies. Can be repeated. |
   | `--runtime-variant NAME` | Selects `core` or `crypto` instead of automatic runtime selection. |
   | `--no-strip` | Keeps BEAM debug and documentation chunks. The task strips these by default. |
+  | `--no-line-info` | Leaves out BEAM line numbers, which saves about 4% of the archive's size, but stack traces show no line numbers. |
   | `--exclude-priv PATTERN` | Leaves out `priv` files matching a glob pattern, like `phoenix/priv/static`. Can be repeated. |
   | `--treeshake` | Removes unreachable modules and functions. Experimental. Disabled by default. |
   | `--preserved-app NAME` | Preserves an application's code during tree-shaking. Requires `--treeshake`. Can be repeated. |
@@ -83,12 +84,15 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   Conversely, some reachable code that's only used to compile, evaluate or
   format code, by a shell, or in distribution, is removed by default:
-  Erlang's code evaluator and linter, Elixir's parser and code formatter, the
-  shell's line editing, and modules for distribution and a few storage formats.
-  Calling a function of a removed module raises `UndefinedFunctionError`, so
-  keep the ones an application needs. To evaluate Erlang code, keep
-  `:erl_eval` and `:erl_lint`, and to evaluate Elixir code, also preserve
-  `elixir`. Evaluated code can only call functions that are packaged.
+  Erlang's parser, code evaluator and linter, Elixir's parser and code
+  formatter, the shell's line editing, and modules for distribution and a few
+  storage formats. Calling a function of a removed module raises
+  `UndefinedFunctionError`, so keep the ones an application needs. To
+  evaluate Erlang code, keep `:erl_eval`, `:erl_lint`, `:erl_parse` and
+  `:eval_bits`, and to evaluate Elixir code, also preserve `elixir`. Evaluated
+  code can only call functions that are packaged. Configuring applications
+  through VM arguments, like `-kernel shell_history enabled`, needs
+  `:erl_parse` too.
 
   Tree-shaking leaves Erlang's `kernel` and `stdlib` as they are, except for
   modules of the shell, networking and distribution, which it removes when
@@ -98,11 +102,10 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
   runtime. The `otp/` directory contains `manifest.json`, the boot script, and
-  application archives. Each archive includes the application's `ebin` and
-  `priv` directories, if present, without native libraries (`.so`, `.dylib`
-  and `.dll` files), which the runtime can't load: the NIFs it supports, like
-  `crypto`'s, are linked into it. The archives and the runtime files also have
-  `.gz` and `.br` copies.
+  `lib.tar`, an archive of the applications' `ebin` and `priv` directories.
+  It leaves out native libraries (`.so`, `.dylib` and `.dll` files), which the
+  runtime can't load: the NIFs it supports, like `crypto`'s, are linked into
+  it. The archive and the runtime files also have `.gz` and `.br` copies.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.
@@ -126,6 +129,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     runtime_variant: :string,
     brotli_effort: :string,
     strip: :boolean,
+    line_info: :boolean,
     exclude_priv: [:string, :keep],
     treeshake: :boolean,
     preserved_app: [:string, :keep],
@@ -167,6 +171,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       runtime_variant: options[:runtime_variant],
       brotli_effort: brotli_effort(options[:brotli_effort]),
       strip: Keyword.get(options, :strip, true),
+      line_info: Keyword.get(options, :line_info, true),
       exclude_priv: Keyword.get_values(options, :exclude_priv),
       treeshake:
         if(options[:treeshake],

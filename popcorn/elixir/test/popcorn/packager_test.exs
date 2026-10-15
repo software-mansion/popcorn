@@ -5,18 +5,9 @@ defmodule Popcorn.PackagerTest do
 
   @tag :tmp_dir
   test "build/1: complete output", %{tmp_dir: tmp_dir} do
-    static_dir = Path.join(tmp_dir, "static")
-    runtime_dir = Path.join(static_dir, "runtimes/core")
-    build_path = Path.join(tmp_dir, "build/lib")
+    %{static_dir: static_dir, build_path: build_path} = setup_build(tmp_dir)
     app_dir = Path.join(build_path, "popcorn")
     out_dir = Path.join(app_dir, "priv/static/popcorn")
-    File.mkdir_p!(runtime_dir)
-    File.mkdir_p!(app_dir)
-
-    File.cp_r!(
-      Path.join(Mix.Project.build_path(), "lib/popcorn/ebin"),
-      Path.join(app_dir, "ebin")
-    )
 
     File.mkdir_p!(Path.join(app_dir, "priv/nested"))
     File.write!(Path.join(app_dir, "priv/nested/fixture.txt"), "from priv")
@@ -29,21 +20,6 @@ defmodule Popcorn.PackagerTest do
     File.write!(Path.join(app_dir, "priv/nested/notes.tmp"), "excluded")
     File.mkdir_p!(Path.join(app_dir, "priv/docs"))
     File.write!(Path.join(app_dir, "priv/docs/guide.md"), "excluded")
-
-    for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"] do
-      dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
-      File.write!(Path.join(dir, file), file)
-    end
-
-    manifest = %{
-      vm: %{
-        version: host_otp_version(),
-        preloaded: host_preloaded_modules(),
-        capabilities: %{crypto: false}
-      }
-    }
-
-    File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
 
     result =
       Packager.build(
@@ -65,19 +41,37 @@ defmodule Popcorn.PackagerTest do
 
     assert "beam.wasm" = out_dir |> Path.join("beam.wasm.gz") |> File.read!() |> :zlib.gunzip()
 
-    assert File.regular?(Path.join(out_dir, "otp/bin/vm.boot"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.gz"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.br"))
+    # The boot script loads the applications from their specs and turns off
+    # distribution, so that booting doesn't need the Erlang parser
+    {:script, _id, commands} =
+      out_dir |> Path.join("otp/bin/vm.boot") |> File.read!() |> :erlang.binary_to_term()
 
-    archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
+    assert {:apply, {:application, :load, [{:application, :popcorn, popcorn_spec}]}} =
+             Enum.find(commands, &match?({:apply, {:application, :load, [{_, :popcorn, _}]}}, &1))
+
+    assert Popcorn.Wasm in popcorn_spec[:modules]
+
+    assert [{:application, :kernel, kernel_spec}] =
+             for({:kernelProcess, :application_controller, {_m, _f, args}} <- commands, do: args)
+             |> List.flatten()
+
+    assert kernel_spec[:env][:start_distribution] == false
+
+    for variant <- ["", ".gz", ".br"] do
+      assert File.regular?(Path.join(out_dir, "otp/lib.tar" <> variant))
+    end
+
+    # One archive has all applications
+    archive = out_dir |> Path.join("otp/lib.tar") |> read_archive()
+    assert Map.has_key?(archive, "lib/kernel/ebin/kernel.app")
+    assert chunks(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam") =~ "Line"
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
     assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
     refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
 
     # Native libraries are left out, along with directories they leave empty
     {:ok, entries} =
-      out_dir |> Path.join("otp/lib/popcorn.tar") |> to_charlist() |> :erl_tar.table()
+      out_dir |> Path.join("otp/lib.tar") |> to_charlist() |> :erl_tar.table()
 
     entries = Enum.map(entries, &to_string/1)
     refute "lib/popcorn/priv/nested/native.so" in entries
@@ -99,6 +93,29 @@ defmodule Popcorn.PackagerTest do
 
     output_manifest = out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
     assert %{"runtimeVariant" => "core", "entrypoint" => "popcorn"} = output_manifest
+
+    assert %{"archive" => "lib.tar", "apps" => %{"popcorn" => %{"version" => _}}} =
+             output_manifest
+  end
+
+  @tag :tmp_dir
+  test "build/1: leaving out line numbers", %{tmp_dir: tmp_dir} do
+    %{static_dir: static_dir, build_path: build_path} = setup_build(tmp_dir)
+    out_dir = Path.join(tmp_dir, "out")
+
+    assert {:ok, _report} =
+             Packager.build(
+               build_path: build_path,
+               out_dir: out_dir,
+               app: "popcorn",
+               static_dir: static_dir,
+               line_info: false
+             )
+
+    archive = out_dir |> Path.join("otp/lib.tar") |> read_archive()
+    chunks = chunks(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
+    assert chunks =~ "Code"
+    refute chunks =~ "Line"
   end
 
   @tag :tmp_dir
@@ -130,6 +147,43 @@ defmodule Popcorn.PackagerTest do
                out_dir: Path.join(tmp_dir, "out"),
                exclude_priv: patterns
              )
+  end
+
+  # The popcorn app and fake runtime files
+  defp setup_build(tmp_dir) do
+    static_dir = Path.join(tmp_dir, "static")
+    runtime_dir = Path.join(static_dir, "runtimes/core")
+    build_path = Path.join(tmp_dir, "build/lib")
+    File.mkdir_p!(runtime_dir)
+    File.mkdir_p!(Path.join(build_path, "popcorn"))
+
+    File.cp_r!(
+      Path.join(Mix.Project.build_path(), "lib/popcorn/ebin"),
+      Path.join(build_path, "popcorn/ebin")
+    )
+
+    for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"] do
+      dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
+      File.write!(Path.join(dir, file), file)
+    end
+
+    manifest = %{
+      vm: %{
+        version: host_otp_version(),
+        preloaded: host_preloaded_modules(),
+        capabilities: %{crypto: false}
+      }
+    }
+
+    File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
+
+    %{static_dir: static_dir, build_path: build_path}
+  end
+
+  # The names of a BEAM file's chunks, joined
+  defp chunks(archive, path) do
+    {:ok, _module, chunks} = archive |> Map.fetch!(path) |> :beam_lib.all_chunks()
+    Enum.map_join(chunks, " ", fn {name, _data} -> name end)
   end
 
   defp read_archive(path) do

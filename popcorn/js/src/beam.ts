@@ -27,13 +27,6 @@ const MANIFEST_NAME = "manifest.json";
 // Popcorn.Boot in the Elixir package
 const BOOT_MODULE = "Elixir.Popcorn.Boot";
 
-// https://www.erlang.org/doc/apps/erts/inet_cfg.html
-const INETRC_PATH = "/etc/inetrc";
-// lookup types: `native | file | dns`
-// We need `file` lookup to avoid spawning
-// /bin/inet_gethost which is not available
-const INETRC = "{lookup, [file]}.\n";
-
 const STDOUT_FD = 1;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
@@ -45,9 +38,6 @@ const BASE_ARGS = [
   "erl",
   "-home",
   DEFAULT_HOME_DIR,
-  "-kernel",
-  "start_distribution",
-  "false",
 ];
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
@@ -110,7 +100,6 @@ async function boot(
     LOGNAME: DEFAULT_USER,
     COLUMNS: String(ttySize.columns),
     LINES: String(ttySize.rows),
-    ERL_INETRC: INETRC_PATH,
   };
   let emitError: ((payload: OtpErrorPayload) => void) | null = function (payload) {
     emitError = null;
@@ -285,21 +274,19 @@ function isBridgeMarker(
 
 type BeamManifest = {
   entrypoint: string | null;
-  apps: Record<string, BeamManifestApp>;
+  apps: Record<string, unknown>;
+  // The applications' files, in `lib/<app>/`
+  archive: string;
   vm: {
     boot: string;
   };
-};
-
-type BeamManifestApp = {
-  tar: string;
 };
 
 type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
   bootFile: Uint8Array;
-  tarballs: Uint8Array[];
+  archive: Uint8Array;
 };
 
 type InitFsArgs = {
@@ -336,29 +323,13 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     };
   }
 
-  const loadedTarballs = await Promise.all(
-    appNames.map(async (name): Promise<Result<Uint8Array>> => {
-      const entry = manifest.apps[name];
-      const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
-      const tar = await fetchBinary(tarUrl);
-      if (tar === null) {
-        return {
-          ok: false,
-          error: err("beam:missing-tarball", { name, all: appNames }),
-        };
-      }
-
-      return { ok: true, data: tar };
-    }),
-  );
-
-  const tarballs: Uint8Array[] = [];
-  for (const tarball of loadedTarballs) {
-    if (!tarball.ok) {
-      return { ok: false, error: tarball.error };
-    }
-
-    tarballs.push(tarball.data);
+  const archiveUrl = resolveAssetsPath(assetsRoot, manifest.archive);
+  const archive = await fetchBinary(archiveUrl);
+  if (archive === null) {
+    return {
+      ok: false,
+      error: err("beam:missing-archive", { url: archiveUrl }),
+    };
   }
 
   return {
@@ -367,7 +338,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
       appNames,
       entrypoint: manifest.entrypoint ?? null,
       bootFile,
-      tarballs,
+      archive,
     },
   };
 }
@@ -382,7 +353,6 @@ function initFs({ module, fsData }: InitFsArgs): void {
   }
 
   writeFile(BOOT_PATH, fsData.bootFile);
-  writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {
     module.FS_mkdirTree(dirPath);
@@ -392,9 +362,7 @@ function initFs({ module, fsData }: InitFsArgs): void {
     writeFile(path, content);
   };
 
-  for (const tarball of fsData.tarballs) {
-    extractTar(tarball, createDir, createFile);
-  }
+  extractTar(fsData.archive, createDir, createFile);
 }
 
 function resolveAssetsPath(assetsRoot: string, relativePath: string): string {

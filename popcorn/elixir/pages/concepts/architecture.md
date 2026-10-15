@@ -17,7 +17,7 @@ Popcorn works by:
 ## Packaging
 
 While Popcorn doesn't modify `.beam` files executed in the browser, we still do post-processing on them. Most notably, stripping unused chunks and tree-shaking parts of the code that are unreachable.
-We also pack the apps into tarballs to ship few bigger files instead of a lot of smaller ones. This allows us to introspect the files themselves and build a metadata file about them. This is important for selecting correct VM variants (Popcorn ships crypto-less and crypto-full VM versions) and detecting incompatibilities.
+We also pack the apps into one tarball to ship a single file instead of a lot of smaller ones, which also compresses better. This allows us to introspect the files themselves and build a metadata file about them. This is important for selecting correct VM variants (Popcorn ships crypto-less and crypto-full VM versions) and detecting incompatibilities.
 
 Popcorn provides `popcorn.cook` Mix task that does that and Vite/Esbuild/Rollup plugins that do the same.
 

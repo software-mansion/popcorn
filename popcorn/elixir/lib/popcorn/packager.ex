@@ -1,7 +1,7 @@
 defmodule Popcorn.Packager do
   @moduledoc false
 
-  alias Popcorn.Packager.BeamPatcher
+  alias Popcorn.Packager.{BeamPatcher, TableCompactor}
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
 
@@ -17,6 +17,7 @@ defmodule Popcorn.Packager do
   }
 
   @boot_name "bin/vm.boot"
+  @archive_name "lib.tar"
   @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
@@ -47,6 +48,7 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
+          | {:line_info, boolean()}
           | {:exclude_priv, [String.t()]}
           | {:treeshake, false | treeshake_options()}
           | {:static_dir, Path.t()}
@@ -60,6 +62,7 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
+          line_info: boolean(),
           exclude_priv: [String.t()],
           treeshake: false | treeshake_options()
         }
@@ -82,15 +85,17 @@ defmodule Popcorn.Packager do
 
   # Tree-shaking removes these unless they're kept: they're reachable, but
   # only used to compile, evaluate or format code, by a shell or in
-  # distribution. These can't be removed: erl_parse and eval_bits read
-  # applications' .app files, kernel starts inet_db, group calls edlin even
-  # with no shell, and pg calls net_kernel with no distribution.
+  # distribution. These can't be removed: io_lib quotes atoms with erl_scan,
+  # kernel starts inet_db, group calls edlin even with no shell, and pg calls
+  # net_kernel with no distribution.
   @dropped_modules [
     Code.Formatter,
     :elixir_parser,
     :elixir_tokenizer,
     :erl_lint,
     :erl_eval,
+    :erl_parse,
+    :eval_bits,
     :prim_inet,
     :qlc,
     :qlc_pt,
@@ -195,37 +200,31 @@ defmodule Popcorn.Packager do
     :random
   ]
 
-  defp strip_tarball(path, out_dir) do
+  defp strip_archive(path, strip, line_info) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
+
+    retained? = fn chunk ->
+      (not strip or chunk in @retained_chunks) and (line_info or chunk != ~c"Line")
+    end
 
     stripped =
       entries
       |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
-      |> Enum.map(&strip_beam/1)
+      |> Enum.map(&strip_beam(&1, retained?))
 
-    output = Path.join(out_dir, Path.basename(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
 
-    :ok = :erl_tar.create(to_charlist(output), stripped, opts)
+    :ok = :erl_tar.create(to_charlist(path), stripped, opts)
   end
 
   defp beam?(path), do: Path.extname(path) == ".beam"
 
   # Reimplementation of :beam_lib.strip_files/2.
   # Original also gzip compresses modules.
-  defp strip_beam({name, content}) do
+  defp strip_beam({name, content}, retained?) do
     if beam?(to_string(name)) do
       {:ok, _module, chunks} = :beam_lib.all_chunks(content)
-      chunks_by_name = Map.new(chunks)
-
-      chunks =
-        Enum.flat_map(@retained_chunks, fn name ->
-          case Map.fetch(chunks_by_name, name) do
-            {:ok, data} -> [{name, data}]
-            :error -> []
-          end
-        end)
-
+      chunks = Enum.filter(chunks, fn {chunk, _data} -> retained?.(chunk) end)
       {:ok, stripped} = :beam_lib.build_module(chunks)
 
       {name, stripped}
@@ -246,6 +245,7 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        line_info: true,
         exclude_priv: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
@@ -276,6 +276,7 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 line_info: options[:line_info],
                  exclude_priv: options[:exclude_priv],
                  treeshake: options[:treeshake]
                }),
@@ -307,6 +308,7 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      line_info: line_info,
       exclude_priv: exclude_priv,
       treeshake: treeshake
     } = args
@@ -329,21 +331,20 @@ defmodule Popcorn.Packager do
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
            maybe_treeshake(staged_apps, treeshake, out_dir),
-         prune_boot(boot_path, staged_apps) do
+         compact_tables(staged_apps),
+         complete_boot(boot_path, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
       File.mkdir_p!(out_dir)
 
       packed_apps =
-        staged_apps
-        |> async_stream(fn {app, info} ->
-          version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
-          tar_path = create_tarball(out_dir, app, info.ebin_dir)
-
-          {app, %{tar: tar_path, version: version}}
+        Map.new(staged_apps, fn {app, info} ->
+          {app, %{version: info.props |> Keyword.get(:vsn, ~c"") |> to_string()}}
         end)
-        |> Map.new()
+
+      archive_path = create_archive(out_dir, staged_apps)
+      if strip or not line_info, do: strip_archive(archive_path, strip, line_info)
 
       diagnostics =
         staged_apps
@@ -361,17 +362,11 @@ defmodule Popcorn.Packager do
 
       manifest_path = Path.join(out_dir, "manifest.json")
 
-      packed_tar_paths =
-        packed_apps
-        |> Map.values()
-        |> Enum.map(&Path.expand(Path.join(out_dir, &1.tar)))
-
-      tar_paths = maybe_strip_tarballs(packed_tar_paths, strip, out_dir)
-
       manifest = %{
         entrypoint: entrypoint_app,
         runtimeVariant: variant,
         apps: packed_apps,
+        archive: @archive_name,
         notes: diagnostics,
         toolchain: toolchain,
         vm: %{boot: @boot_name, version: vm_version}
@@ -385,7 +380,7 @@ defmodule Popcorn.Packager do
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
         bootPath: Path.expand(boot_path),
-        tarPaths: tar_paths,
+        archivePath: Path.expand(archive_path),
         apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain,
@@ -409,28 +404,21 @@ defmodule Popcorn.Packager do
 
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join(out_dir, "otp/bin/vm.boot")
-      lib_dir = Path.join(out_dir, "otp/lib")
+      archive_path = Path.join(out_dir, "otp/#{@archive_name}")
 
       File.mkdir_p!(Path.dirname(manifest_path))
       File.mkdir_p!(Path.dirname(boot_path))
-      File.mkdir_p!(lib_dir)
       File.cp!(report.manifestPath, manifest_path)
       File.cp!(report.bootPath, boot_path)
-
-      tar_paths =
-        Enum.map(report.tarPaths, fn source ->
-          target = Path.join(lib_dir, Path.basename(source))
-          File.cp!(source, target)
-          compress(target, brotli_effort)
-          Path.expand(target)
-        end)
+      File.cp!(report.archivePath, archive_path)
+      compress(archive_path, brotli_effort)
 
       {:ok,
        %{
          report
          | manifestPath: Path.expand(manifest_path),
            bootPath: Path.expand(boot_path),
-           tarPaths: tar_paths
+           archivePath: Path.expand(archive_path)
        }}
     end
   end
@@ -491,12 +479,13 @@ defmodule Popcorn.Packager do
 
     case preloaded -- runtime_preloaded do
       [] ->
-        boot = {:script, id, Enum.map(commands, &drop_app_versions/1)}
+        commands = Enum.map(commands, &(&1 |> drop_app_versions() |> configure_kernel()))
+        boot = {:script, id, commands}
         path = Path.join(out_dir, @boot_name)
 
         File.mkdir_p!(Path.dirname(path))
 
-        File.write!(path, :erlang.term_to_binary(boot))
+        File.write!(path, :erlang.term_to_binary(boot, compressed: 9))
 
         {:ok, path}
 
@@ -507,23 +496,51 @@ defmodule Popcorn.Packager do
 
   # The boot script loads every module of kernel and stdlib, and fails if
   # tree-shaking removed any, so they're left out of it. The others are loaded
-  # when used.
-  defp prune_boot(boot_path, staged_apps) do
+  # when used. The other applications are loaded from their specs, like
+  # stdlib, as reading their .app files would need the Erlang parser.
+  defp complete_boot(boot_path, staged_apps) do
     packaged =
       staged_apps
       |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
       |> MapSet.new(&(&1 |> Path.basename(".beam") |> String.to_atom()))
 
+    app_loads =
+      for {app, info} <- Enum.sort(staged_apps), app not in ["kernel", "stdlib"] do
+        spec = {:application, String.to_existing_atom(app), info.props}
+        {:apply, {:application, :load, [spec]}}
+      end
+
     {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
 
     commands =
-      Enum.map(commands, fn
-        {:primLoad, modules} -> {:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}
-        command -> command
+      Enum.flat_map(commands, fn
+        {:primLoad, modules} ->
+          [{:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}]
+
+        {:progress, :applications_loaded} = command ->
+          app_loads ++ [command]
+
+        command ->
+          [command]
       end)
 
-    File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
+    boot = {:script, id, commands}
+    File.write!(boot_path, :erlang.term_to_binary(boot, compressed: 9))
   end
+
+  # The runtime has no distribution. It's configured in the kernel's spec, as
+  # the `-kernel start_distribution false` arguments would need the Erlang
+  # parser.
+  defp configure_kernel(
+         {:kernelProcess, :application_controller, {m, f, [{:application, :kernel, props}]}}
+       ) do
+    env = props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, false)
+    spec = {:application, :kernel, Keyword.put(props, :env, env)}
+
+    {:kernelProcess, :application_controller, {m, f, [spec]}}
+  end
+
+  defp configure_kernel(command), do: command
 
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
   defp drop_app_versions({:path, dirs}) do
@@ -609,6 +626,16 @@ defmodule Popcorn.Packager do
     end
   end
 
+  # Only big modules have tables worth compacting
+  @compactable_size 32 * 1024
+
+  defp compact_tables(staged_apps) do
+    staged_apps
+    |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
+    |> Enum.filter(&(File.stat!(&1).size >= @compactable_size))
+    |> async_stream(&TableCompactor.compact_beam/1)
+  end
+
   defp remove_build_tools(staged_apps) do
     case Map.fetch(staged_apps, "popcorn") do
       :error ->
@@ -646,15 +673,6 @@ defmodule Popcorn.Packager do
     enumerable
     |> Task.async_stream(fun, timeout: :infinity)
     |> Enum.map(fn {:ok, result} -> result end)
-  end
-
-  defp maybe_strip_tarballs(paths, false, _out_dir), do: paths
-
-  defp maybe_strip_tarballs(paths, true, out_dir) do
-    Enum.map(paths, fn path ->
-      :ok = strip_tarball(path, out_dir)
-      Path.expand(Path.join(out_dir, Path.basename(path)))
-    end)
   end
 
   defp get_apps_info(root_dir) do
@@ -766,8 +784,9 @@ defmodule Popcorn.Packager do
          :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
          drop = dropped_modules(drop, keep, preserved_modules),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir),
-         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
+      staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
+
       report = %{
         preserved_apps: preserved_apps,
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
@@ -855,11 +874,12 @@ defmodule Popcorn.Packager do
   defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
     preserved = MapSet.new(preserved_apps)
 
-    staged_apps
-    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
-    |> replace_beams(output_dir)
+    shaken_apps =
+      staged_apps
+      |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+      |> replace_beams(output_dir)
 
-    :ok
+    Map.merge(staged_apps, shaken_apps)
   end
 
   defp replace_beams(staged_apps, output_dir) do
@@ -982,25 +1002,26 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, app, ebin_dir) do
-    tar = "lib/#{app}.tar"
-    tar_path = Path.join(outdir, tar)
-    tar_path_c = to_charlist(tar_path)
-    app_dir = Path.dirname(ebin_dir)
-    priv_dir = Path.join(app_dir, "priv")
-    entries = [{~c"lib/#{app}/ebin", to_charlist(ebin_dir)}]
+  # One archive for all applications compresses better than one each, as
+  # they have a lot in common, like the names of modules and functions.
+  defp create_archive(out_dir, staged_apps) do
+    path = Path.join(out_dir, @archive_name)
 
     entries =
-      if File.dir?(priv_dir) do
-        [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | entries]
-      else
-        entries
-      end
+      staged_apps
+      |> Enum.sort()
+      |> Enum.flat_map(fn {app, info} ->
+        priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
+        ebin = [{~c"lib/#{app}/ebin", to_charlist(info.ebin_dir)}]
 
-    File.mkdir_p!(Path.dirname(tar_path))
-    :ok = :erl_tar.create(tar_path_c, entries, [])
+        if File.dir?(priv_dir),
+          do: [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | ebin],
+          else: ebin
+      end)
 
-    tar
+    :ok = :erl_tar.create(to_charlist(path), entries, [])
+
+    path
   end
 
   defp loaded_dynamic_nifs(_app, ebin_dir) do

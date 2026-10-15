@@ -81,7 +81,10 @@ defmodule Treeshake.Utils.BeamRewriter do
 
   defp compile!(module, core, beam_path) do
     # TODO: optionally add no_line_info to save a few bytes from the code chunk
-    case :compile.noenv_forms(core, [:from_core, :return_errors, :return_warnings, :debug_info]) do
+    # With the Core as debug info, later steps can read the module
+    options = [:from_core, :return_errors, :return_warnings, debug_info: {:core_v1, core}]
+
+    case :compile.noenv_forms(core, options) do
       {:ok, ^module, binary, _warnings} ->
         binary
 
