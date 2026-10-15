@@ -71,14 +71,18 @@ defmodule Popcorn.Packager do
   @excluded_priv ["**/*.{so,dylib,dll}", "**/*.plt"]
 
   # Tree-shaking keeps these, as they're only called dynamically: LocalLiveView
-  # views, which it looks up by name
+  # views, which it looks up by name, and referenced Ecto schemas, whose
+  # generated functions Ecto calls. Generated functions of modules implementing
+  # behaviours, like LiveComponents, are kept anyway.
   @kept_always [
     # Modules below are used by Popcorn for term <-> JS conversion
     mod: DateTime,
     mod: Calendar.ISO,
     mod: MapSet,
     # Local views are looked up by name (string) and called dynamically
-    behaviour_impls: LocalLiveView
+    behaviour_impls: LocalLiveView,
+    # Ecto schemas
+    referenced_modules_defining: {:__changeset__, 0}
   ]
 
   # Tree-shaking removes these unless they're kept: they're reachable, but

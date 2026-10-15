@@ -88,7 +88,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
   entries:
   - `mod: module` - keeps all public functions of a module,
   - `mfa: {module, fun, arity}` - keeps a given function,
-  - `behaviour_impls: behaviour` - keeps all modules implementing a given behaviour
+  - `behaviour_impls: behaviour` - keeps all modules implementing a given behaviour,
+  - `referenced_modules_defining: {fun, arity}` - if a module is referenced in the reachable code,
+    keeps it as a whole as long as it defines a given function
 
   For example:
 
