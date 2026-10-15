@@ -280,15 +280,13 @@ const figures = [
         loading.classList.remove("hidden");
         status.textContent = "Starting Game of Life";
         const { Popcorn } = await import("@swmansion/popcorn");
-        const result = await Popcorn.init({
+        runtime = await Popcorn.init({
           beam: { otpAssetsRoot: "/_astro/otp/" },
           timeoutsMs: { boot: 30_000 },
           onError: (error) => {
             status.textContent = `Runtime ${error.kind}: ${error.data}`;
           },
         });
-        if (result.ok === false) throw result.error;
-        runtime = result.data;
 
         const size =
           root.clientWidth < 520 ? 20 : root.clientWidth < 800 ? 25 : 30;
@@ -319,13 +317,10 @@ const figures = [
 
       async function call(message: unknown) {
         console.assert(runtime !== null);
-        const result = await runtime!.call(
-          "game_of_life_ui",
-          message,
-          { timeoutMs: 10_000 },
-        );
-        if (result.ok === false) throw result.error;
-        return result.data as Snapshot;
+        const result = await runtime!.call("game_of_life_ui", message, {
+          timeoutMs: 10_000,
+        });
+        return result as Snapshot;
       }
 
       function render(snapshot: Snapshot) {

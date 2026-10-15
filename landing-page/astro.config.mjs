@@ -64,6 +64,7 @@ export default defineConfig({
   },
   vite: {
     resolve: {
+      dedupe: ["phoenix_live_view"],
       alias: {
         // Let Vite resolve Popcorn's worker relative to its package.
         local_live_view: fileURLToPath(
