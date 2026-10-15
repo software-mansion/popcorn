@@ -91,6 +91,8 @@ defmodule Treeshake do
     or module-function-arguments tuple in a reachable function
   - callback implementations of behaviours, if their module is referenced
     in a reachable function
+  - macro-generated functions in modules implementing behaviours, if the module
+    is referenced in a reachable function
   - callback implementations of protocols, if their module is referenced
     and the protocol function is called in a reachable function
 

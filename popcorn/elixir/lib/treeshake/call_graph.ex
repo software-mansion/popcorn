@@ -121,9 +121,10 @@ defmodule Treeshake.CallGraph do
 
     behaviour_calls = find_behaviour_calls(referenced_modules_info, module_index)
     child_spec_calls = find_child_spec_calls(referenced_modules_info)
+    generated_funs = find_generated_funs(referenced_modules_info)
 
     all_calls =
-      (function_info.calls ++ behaviour_calls ++ child_spec_calls)
+      (function_info.calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
       |> Enum.reject(&(&1 == mfa))
 
     {protocol_entries, acc_protocol_calls} =
@@ -176,6 +177,20 @@ defmodule Treeshake.CallGraph do
     referenced_modules_info
     |> Enum.filter(fn info -> Map.has_key?(info.public_functions, {:child_spec, 1}) end)
     |> Enum.map(fn info -> {info.module, :child_spec, 1} end)
+  end
+
+  # A module implementing a behaviour typically gets it with `use`, whose macros
+  # generate functions that the behaviour's library calls on the module, like
+  # __live__/0 of LiveComponents. They're kept whenever the module is referenced.
+  defp find_generated_funs(referenced_modules_info) do
+    referenced_modules_info
+    |> Enum.filter(fn info -> info.behaviour_impls != [] end)
+    |> Enum.flat_map(fn info ->
+      info.macro_generated
+      |> Enum.filter(&Map.has_key?(info.public_functions, &1))
+      |> Enum.reject(fn {f, _a} -> f == :__struct__ end)
+      |> Enum.map(fn {f, a} -> {info.module, f, a} end)
+    end)
   end
 
   # A protocol callback implementation impl_mod.fun is included when both conditions are met:
