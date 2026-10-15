@@ -15,6 +15,8 @@ defmodule Mix.Tasks.Llv.Build do
        the Popcorn runtime. LocalLiveView's JS loads it from there: the
        `popcorn/` directory next to the `app.js` bundle. Unused code of the
        dependencies is tree-shaken, while the local project is kept whole.
+       In the `prod` environment, the Brotli-compressed variants are made with
+       the maximum effort: about 12% smaller, but several seconds slower.
 
   ## Usage
 
@@ -96,6 +98,12 @@ defmodule Mix.Tasks.Llv.Build do
   # `mix popcorn.cook`'s options for the local project, also used by the e2e
   # tests. Popcorn's tree-shaker knows to keep LocalLiveView's views.
   def cook_args do
-    Enum.flat_map(@excluded_priv, &["--exclude-priv", &1]) ++ ["--treeshake"]
+    Enum.flat_map(@excluded_priv, &["--exclude-priv", &1]) ++
+      brotli_effort_args(Mix.env()) ++
+      ["--treeshake"]
   end
+
+  # Too slow for the watcher to rebuild with on every change
+  defp brotli_effort_args(:prod), do: ["--brotli-effort", "max"]
+  defp brotli_effort_args(_env), do: []
 end
