@@ -48,6 +48,7 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
+          | {:line_info, boolean()}
           | {:exclude_priv, [String.t()]}
           | {:treeshake, false | treeshake_options()}
           | {:static_dir, Path.t()}
@@ -61,6 +62,7 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
+          line_info: boolean(),
           exclude_priv: [String.t()],
           treeshake: false | treeshake_options()
         }
@@ -198,13 +200,17 @@ defmodule Popcorn.Packager do
     :random
   ]
 
-  defp strip_archive(path) do
+  defp strip_archive(path, strip, line_info) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
+
+    retained? = fn chunk ->
+      (not strip or chunk in @retained_chunks) and (line_info or chunk != ~c"Line")
+    end
 
     stripped =
       entries
       |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
-      |> Enum.map(&strip_beam/1)
+      |> Enum.map(&strip_beam(&1, retained?))
 
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
 
@@ -215,19 +221,10 @@ defmodule Popcorn.Packager do
 
   # Reimplementation of :beam_lib.strip_files/2.
   # Original also gzip compresses modules.
-  defp strip_beam({name, content}) do
+  defp strip_beam({name, content}, retained?) do
     if beam?(to_string(name)) do
       {:ok, _module, chunks} = :beam_lib.all_chunks(content)
-      chunks_by_name = Map.new(chunks)
-
-      chunks =
-        Enum.flat_map(@retained_chunks, fn name ->
-          case Map.fetch(chunks_by_name, name) do
-            {:ok, data} -> [{name, data}]
-            :error -> []
-          end
-        end)
-
+      chunks = Enum.filter(chunks, fn {chunk, _data} -> retained?.(chunk) end)
       {:ok, stripped} = :beam_lib.build_module(chunks)
 
       {name, stripped}
@@ -248,6 +245,7 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        line_info: true,
         exclude_priv: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
@@ -278,6 +276,7 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 line_info: options[:line_info],
                  exclude_priv: options[:exclude_priv],
                  treeshake: options[:treeshake]
                }),
@@ -309,6 +308,7 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      line_info: line_info,
       exclude_priv: exclude_priv,
       treeshake: treeshake
     } = args
@@ -344,7 +344,7 @@ defmodule Popcorn.Packager do
         end)
 
       archive_path = create_archive(out_dir, staged_apps)
-      if strip, do: strip_archive(archive_path)
+      if strip or not line_info, do: strip_archive(archive_path, strip, line_info)
 
       diagnostics =
         staged_apps

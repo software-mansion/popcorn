@@ -54,6 +54,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `--extra-app NAME` | Includes an application and its required dependencies. Can be repeated. |
   | `--runtime-variant NAME` | Selects `core` or `crypto` instead of automatic runtime selection. |
   | `--no-strip` | Keeps BEAM debug and documentation chunks. The task strips these by default. |
+  | `--no-line-info` | Leaves out BEAM line numbers, which saves about 4% of the archive's size, but stack traces show no line numbers. |
   | `--exclude-priv PATTERN` | Leaves out `priv` files matching a glob pattern, like `phoenix/priv/static`. Can be repeated. |
   | `--treeshake` | Removes unreachable modules and functions. Experimental. Disabled by default. |
   | `--preserved-app NAME` | Preserves an application's code during tree-shaking. Requires `--treeshake`. Can be repeated. |
@@ -128,6 +129,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     runtime_variant: :string,
     brotli_effort: :string,
     strip: :boolean,
+    line_info: :boolean,
     exclude_priv: [:string, :keep],
     treeshake: :boolean,
     preserved_app: [:string, :keep],
@@ -169,6 +171,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       runtime_variant: options[:runtime_variant],
       brotli_effort: brotli_effort(options[:brotli_effort]),
       strip: Keyword.get(options, :strip, true),
+      line_info: Keyword.get(options, :line_info, true),
       exclude_priv: Keyword.get_values(options, :exclude_priv),
       treeshake:
         if(options[:treeshake],

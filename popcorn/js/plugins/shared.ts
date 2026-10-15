@@ -32,6 +32,11 @@ export type Options = {
   /** Removes nonessential BEAM chunks. Defaults to `true`. */
   strip?: boolean;
   /**
+   * Keeps BEAM line numbers, which stack traces show. Leaving them out saves
+   * about 4% of the archive's size. Defaults to `true`.
+   */
+  lineInfo?: boolean;
+  /**
    * Files in applications' `priv` directories to leave out, as glob patterns
    * like `"phoenix/priv/static"` or `"phoenix_live_view/priv/static/*.map"`,
    * where the application can be `*`. A matched directory is left out with
@@ -83,6 +88,7 @@ export async function popcorn(options: Options): Promise<Prepared> {
     args.push("--brotli-effort", options.brotliEffort);
   }
   if (options.strip === false) args.push("--no-strip");
+  if (options.lineInfo === false) args.push("--no-line-info");
   for (const pattern of options.excludePriv ?? []) {
     args.push("--exclude-priv", pattern);
   }

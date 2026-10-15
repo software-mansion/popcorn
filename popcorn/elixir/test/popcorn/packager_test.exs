@@ -5,18 +5,9 @@ defmodule Popcorn.PackagerTest do
 
   @tag :tmp_dir
   test "build/1: complete output", %{tmp_dir: tmp_dir} do
-    static_dir = Path.join(tmp_dir, "static")
-    runtime_dir = Path.join(static_dir, "runtimes/core")
-    build_path = Path.join(tmp_dir, "build/lib")
+    %{static_dir: static_dir, build_path: build_path} = setup_build(tmp_dir)
     app_dir = Path.join(build_path, "popcorn")
     out_dir = Path.join(app_dir, "priv/static/popcorn")
-    File.mkdir_p!(runtime_dir)
-    File.mkdir_p!(app_dir)
-
-    File.cp_r!(
-      Path.join(Mix.Project.build_path(), "lib/popcorn/ebin"),
-      Path.join(app_dir, "ebin")
-    )
 
     File.mkdir_p!(Path.join(app_dir, "priv/nested"))
     File.write!(Path.join(app_dir, "priv/nested/fixture.txt"), "from priv")
@@ -29,21 +20,6 @@ defmodule Popcorn.PackagerTest do
     File.write!(Path.join(app_dir, "priv/nested/notes.tmp"), "excluded")
     File.mkdir_p!(Path.join(app_dir, "priv/docs"))
     File.write!(Path.join(app_dir, "priv/docs/guide.md"), "excluded")
-
-    for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"] do
-      dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
-      File.write!(Path.join(dir, file), file)
-    end
-
-    manifest = %{
-      vm: %{
-        version: host_otp_version(),
-        preloaded: host_preloaded_modules(),
-        capabilities: %{crypto: false}
-      }
-    }
-
-    File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
 
     result =
       Packager.build(
@@ -88,6 +64,7 @@ defmodule Popcorn.PackagerTest do
     # One archive has all applications
     archive = out_dir |> Path.join("otp/lib.tar") |> read_archive()
     assert Map.has_key?(archive, "lib/kernel/ebin/kernel.app")
+    assert chunks(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam") =~ "Line"
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
     assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
     refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
@@ -122,6 +99,26 @@ defmodule Popcorn.PackagerTest do
   end
 
   @tag :tmp_dir
+  test "build/1: leaving out line numbers", %{tmp_dir: tmp_dir} do
+    %{static_dir: static_dir, build_path: build_path} = setup_build(tmp_dir)
+    out_dir = Path.join(tmp_dir, "out")
+
+    assert {:ok, _report} =
+             Packager.build(
+               build_path: build_path,
+               out_dir: out_dir,
+               app: "popcorn",
+               static_dir: static_dir,
+               line_info: false
+             )
+
+    archive = out_dir |> Path.join("otp/lib.tar") |> read_archive()
+    chunks = chunks(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
+    assert chunks =~ "Code"
+    refute chunks =~ "Line"
+  end
+
+  @tag :tmp_dir
   test "build/1: starting an entrypoint requires Popcorn", %{tmp_dir: tmp_dir} do
     ebin_dir = Path.join(tmp_dir, "build/app/ebin")
     File.mkdir_p!(ebin_dir)
@@ -150,6 +147,43 @@ defmodule Popcorn.PackagerTest do
                out_dir: Path.join(tmp_dir, "out"),
                exclude_priv: patterns
              )
+  end
+
+  # The popcorn app and fake runtime files
+  defp setup_build(tmp_dir) do
+    static_dir = Path.join(tmp_dir, "static")
+    runtime_dir = Path.join(static_dir, "runtimes/core")
+    build_path = Path.join(tmp_dir, "build/lib")
+    File.mkdir_p!(runtime_dir)
+    File.mkdir_p!(Path.join(build_path, "popcorn"))
+
+    File.cp_r!(
+      Path.join(Mix.Project.build_path(), "lib/popcorn/ebin"),
+      Path.join(build_path, "popcorn/ebin")
+    )
+
+    for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"] do
+      dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
+      File.write!(Path.join(dir, file), file)
+    end
+
+    manifest = %{
+      vm: %{
+        version: host_otp_version(),
+        preloaded: host_preloaded_modules(),
+        capabilities: %{crypto: false}
+      }
+    }
+
+    File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
+
+    %{static_dir: static_dir, build_path: build_path}
+  end
+
+  # The names of a BEAM file's chunks, joined
+  defp chunks(archive, path) do
+    {:ok, _module, chunks} = archive |> Map.fetch!(path) |> :beam_lib.all_chunks()
+    Enum.map_join(chunks, " ", fn {name, _data} -> name end)
   end
 
   defp read_archive(path) do
