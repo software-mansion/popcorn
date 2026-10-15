@@ -1,7 +1,7 @@
 defmodule Popcorn.Packager do
   @moduledoc false
 
-  alias Popcorn.Packager.BeamPatcher
+  alias Popcorn.Packager.{BeamPatcher, TableCompactor}
 
   @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
 
@@ -331,6 +331,7 @@ defmodule Popcorn.Packager do
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
            maybe_treeshake(staged_apps, treeshake, out_dir),
+         compact_tables(staged_apps),
          complete_boot(boot_path, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
@@ -623,6 +624,16 @@ defmodule Popcorn.Packager do
       {:ok, _} -> :ok
       {:error, _} = error -> error
     end
+  end
+
+  # Only big modules have tables worth compacting
+  @compactable_size 32 * 1024
+
+  defp compact_tables(staged_apps) do
+    staged_apps
+    |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
+    |> Enum.filter(&(File.stat!(&1).size >= @compactable_size))
+    |> async_stream(&TableCompactor.compact_beam/1)
   end
 
   defp remove_build_tools(staged_apps) do
