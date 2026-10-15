@@ -252,6 +252,20 @@ defmodule Treeshake.Utils.BeamAnalyzer do
     end
   end
 
+  # Kernel.struct!(Mod, fields) and Kernel.struct(Mod, fields), which build
+  # the struct with Mod.__struct__/1 and Mod.__struct__/0. Exceptions'
+  # exception/1 does it with struct!(__MODULE__, args).
+  @struct_builders %{struct!: 1, struct: 0}
+
+  defp collect_calls(
+         {:c_call, _, {:c_literal, _, Kernel}, {:c_literal, _, fun},
+          [{:c_literal, _, m} | _] = args}
+       )
+       when is_map_key(@struct_builders, fun) and is_atom(m) do
+    struct_arity = Map.fetch!(@struct_builders, fun)
+    [{Kernel, fun, length(args)}, {m, :__struct__, struct_arity}] ++ collect_calls(args)
+  end
+
   # Remote call: Mod.fun(args)
   defp collect_calls({:c_call, _, {:c_literal, _, mod}, {:c_literal, _, fun}, args})
        when is_atom(mod) and is_atom(fun) do

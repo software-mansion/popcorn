@@ -89,6 +89,8 @@ defmodule Treeshake do
   - functions called or captured (`&Module.fun/arity`) by a reachable function
   - functions referenced as a hard-coded module-function-arity (MFA) tuple
     or module-function-arguments tuple in a reachable function
+  - `__struct__` functions of modules whose structs are built by a reachable
+    function with `struct/2` or `struct!/2`, as exceptions' `exception/1` does
   - callback implementations of behaviours, if their module is referenced
     in a reachable function
   - callback implementations of protocols, if their module is referenced
