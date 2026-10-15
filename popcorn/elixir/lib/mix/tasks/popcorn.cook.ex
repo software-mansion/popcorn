@@ -75,6 +75,20 @@ defmodule Mix.Tasks.Popcorn.Cook do
   Select it through the entrypoint, its dependencies, or `--extra-app` first.
   For particular modules or functions, use `--keep`.
 
+  Some code reached dynamically is kept by default. That includes the
+  functions that a library's macros, like `use`, generate in a module
+  implementing the library's behaviour, like `__live__/0` of LiveComponents,
+  Ecto schemas once they're referenced, and LocalLiveView's views.
+
+  Conversely, some reachable code that's only used to compile, evaluate or
+  format code, by a shell, or in distribution, is removed by default:
+  Erlang's code evaluator and linter, Elixir's parser and code formatter, the
+  shell's line editing, and modules for distribution and a few storage formats.
+  Calling a function of a removed module raises `UndefinedFunctionError`, so
+  keep the ones an application needs. To evaluate Erlang code, keep
+  `:erl_eval` and `:erl_lint`, and to evaluate Elixir code, also preserve
+  `elixir`. Evaluated code can only call functions that are packaged.
+
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly

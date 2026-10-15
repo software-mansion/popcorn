@@ -68,6 +68,51 @@ defmodule Popcorn.Packager do
           drop: [module()]
         ]
 
+  # Tree-shaking keeps these, as they're only called dynamically: LocalLiveView
+  # views, which it looks up by name, and referenced Ecto schemas, whose
+  # generated functions Ecto calls. Generated functions of modules implementing
+  # behaviours, like LiveComponents, are kept anyway.
+  @kept [%{behaviour_impls: LocalLiveView}, %{referenced_modules_defining: {:__changeset__, 0}}]
+
+  # Tree-shaking removes these unless they're kept: they're reachable, but
+  # only used to compile, evaluate or format code, by a shell or in
+  # distribution. These can't be removed: erl_parse and eval_bits read
+  # applications' .app files, kernel starts inet_db, group calls edlin even
+  # with no shell, and pg calls net_kernel with no distribution.
+  @dropped_modules [
+    Code.Formatter,
+    :elixir_parser,
+    :elixir_tokenizer,
+    :erl_lint,
+    :erl_eval,
+    :prim_inet,
+    :qlc,
+    :qlc_pt,
+    :dets_v9,
+    :dets,
+    :sofs,
+    :erl_tar,
+    :file_sorter,
+    :global,
+    :disk_log,
+    :disk_log_1,
+    :zip,
+    :shell,
+    :edlin_expand,
+    :edlin_type_suggestion,
+    :edlin_context,
+    :dets_utils,
+    :gen_tcp_socket,
+    :socket,
+    :prim_socket,
+    :inet_dns,
+    :net,
+    :rpc,
+    :gen_udp_socket,
+    :dist_util,
+    :win32reg
+  ]
+
   defp strip_tarball(path, out_dir) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
 
@@ -195,7 +240,8 @@ defmodule Popcorn.Packager do
          :ok <- patch_apps(staged_apps),
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
-           maybe_treeshake(staged_apps, treeshake, out_dir) do
+           maybe_treeshake(staged_apps, treeshake, out_dir),
+         prune_boot(boot_path, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -365,6 +411,26 @@ defmodule Popcorn.Packager do
       missing ->
         err(:unsupported_boot, {boot_path, missing})
     end
+  end
+
+  # The boot script loads every module of kernel and stdlib, and fails if
+  # tree-shaking removed any, so they're left out of it. The others are loaded
+  # when used.
+  defp prune_boot(boot_path, staged_apps) do
+    packaged =
+      staged_apps
+      |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
+      |> MapSet.new(&(&1 |> Path.basename(".beam") |> String.to_atom()))
+
+    {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
+
+    commands =
+      Enum.map(commands, fn
+        {:primLoad, modules} -> {:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}
+        command -> command
+      end)
+
+    File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
   end
 
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
@@ -572,6 +638,7 @@ defmodule Popcorn.Packager do
     with :ok <- validate_preserved_apps(staged_apps, options),
          :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
+         drop = dropped_modules(drop, keep, preserved_modules),
          {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir),
          :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
       report = %{
@@ -585,10 +652,26 @@ defmodule Popcorn.Packager do
     end
   end
 
+  # Only the packaged ones, as the tree-shaker requires
+  defp kept(staged_apps) do
+    packaged = packaged_modules(staged_apps)
+    Enum.filter(@kept, &(is_map(&1) or MapSet.member?(packaged, &1)))
+  end
+
   defp packaged_modules(staged_apps) do
     staged_apps
     |> Enum.flat_map(fn {_app, info} -> Keyword.fetch!(info.props, :modules) end)
     |> MapSet.new()
+  end
+
+  defp dropped_modules(drop, keep, preserved_modules) do
+    kept =
+      Enum.map(keep, fn
+        {module, _fun, _arity} -> module
+        module -> module
+      end)
+
+    Enum.uniq((@dropped_modules -- (kept ++ preserved_modules)) ++ drop)
   end
 
   defp validate_keep(staged_apps, keep) do
@@ -631,7 +714,7 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: [@boot_function | preserved_modules ++ keep],
+        keep: [@boot_function | kept(staged_apps) ++ preserved_modules ++ keep],
         leave: preserved_modules,
         drop: drop
       )
