@@ -1,10 +1,5 @@
 # Architecture
 
-<style>
-  .popcorn-architecture { color-scheme: light; }
-  body.dark .popcorn-architecture { color-scheme: dark; }
-</style>
-
 ## Overview
 
 Popcorn works by:
@@ -14,7 +9,10 @@ Popcorn works by:
 - Providing some API surface to hook the VM to the JavaScript. For example, sending messages to processes works by `:wasm` module which exposes JavaScript API to Emscripten, and at the same time, exposes Erlang API for Popcorn modules to use. The `:wasm` module is a wrapper for a NIF (which is written in C).
 - Including the batteries: packaging applications into tarballs, reducing their size, exposing adapters for low-level APIs (Req adapter, terminal API), and making sure that this C-JS-Erlang-Elixir-Wasm amalgamation works well.
 
-<img class="popcorn-architecture" src="assets/architecture.svg" style="display: block; margin: auto; width: 700px; max-width: 100%;" alt="Popcorn runtime: browser API, VM worker, and BEAM with OTP applications on Emscripten pthread workers." />
+<div style="text-align: center;">
+<img src="assets/architecture-light.svg#gh-light-mode-only" style="width: 700px; max-width: 100%;" alt="Popcorn runtime: browser API, VM worker, and BEAM with OTP applications on Emscripten pthread workers." />
+<img src="assets/architecture-dark.svg#gh-dark-mode-only" style="width: 700px; max-width: 100%;" alt="Popcorn runtime: browser API, VM worker, and BEAM with OTP applications on Emscripten pthread workers." />
+</div>
 
 ## Packaging
 
