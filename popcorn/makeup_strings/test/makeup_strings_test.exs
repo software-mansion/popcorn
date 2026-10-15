@@ -15,8 +15,8 @@ defmodule MakeupStringsTest do
 
     Application.put_env(:makeup_strings, :languages,
       javascript: [
-        {Popcorn.Wasm, :run_js, 3},
-        {Popcorn.Wasm, :run_js!, 3}
+        {Popcorn.JS, :run_js, 3},
+        {Popcorn.JS, :run_js!, 3}
       ]
     )
 
@@ -26,13 +26,13 @@ defmodule MakeupStringsTest do
   describe "configured calls" do
     test "highlights every direct string argument through the configured arity" do
       source = ~S'''
-      Popcorn.Wasm.run_js("one")
-      Popcorn.Wasm.run_js("two", %{})
-      Popcorn.Wasm.run_js("three", "also three", %{label: "nested"})
-      Popcorn.Wasm.run_js!("bang")
+      Popcorn.JS.run_js("one")
+      Popcorn.JS.run_js("two", %{})
+      Popcorn.JS.run_js("three", "also three", %{label: "nested"})
+      Popcorn.JS.run_js!("bang")
 
-      alias Popcorn.Wasm
-      Wasm.run_js!("aliased")
+      alias Popcorn.JS
+      JS.run_js!("aliased")
       '''
 
       tokens = ElixirLexer.lex(source, group_prefix: "group")
@@ -49,9 +49,9 @@ defmodule MakeupStringsTest do
     test "leaves non-matches and incomplete strings alone" do
       source = ~S'''
       Other.run_js("wrong module")
-      Popcorn.Wasm.other("wrong function")
-      Popcorn.Wasm.run_js("one", "two", "three", "too many")
-      Popcorn.Wasm.run_js("const #{name} = true")
+      Popcorn.JS.other("wrong function")
+      Popcorn.JS.run_js("one", "two", "three", "too many")
+      Popcorn.JS.run_js("const #{name} = true")
       '''
 
       tokens = ElixirLexer.lex(source, group_prefix: "group")
@@ -62,16 +62,16 @@ defmodule MakeupStringsTest do
 
     test "pipes" do
       source = ~S'''
-      "inline" |> Popcorn.Wasm.run_js()
+      "inline" |> Popcorn.JS.run_js()
       "separate"
-      |> Popcorn.Wasm.run_js!(%{})
+      |> Popcorn.JS.run_js!(%{})
       """
       const value = 1;
       """
-      |> Popcorn.Wasm.run_js("explicit", %{})
-      Popcorn.Wasm.run_js("nested" |> Popcorn.Wasm.run_js!())
-      alias Popcorn.Wasm
-      "aliased pipe" |> Wasm.run_js!()
+      |> Popcorn.JS.run_js("explicit", %{})
+      Popcorn.JS.run_js("nested" |> Popcorn.JS.run_js!())
+      alias Popcorn.JS
+      "aliased pipe" |> JS.run_js!()
       '''
 
       tokens = ElixirLexer.lex(source, group_prefix: "group")
@@ -91,12 +91,12 @@ defmodule MakeupStringsTest do
     test "pipe boundaries" do
       source = ~S'''
       "wrong module" |> Other.run_js()
-      "wrong function" |> Popcorn.Wasm.other()
-      "too many" |> Popcorn.Wasm.run_js("one", "two", "three")
-      "interpolated #{name}" |> Popcorn.Wasm.run_js()
-      "indirect" |> String.trim() |> Popcorn.Wasm.run_js()
-      %{label: "nested"} |> Popcorn.Wasm.run_js()
-      value |> Popcorn.Wasm.run_js("one", "two", "three")
+      "wrong function" |> Popcorn.JS.other()
+      "too many" |> Popcorn.JS.run_js("one", "two", "three")
+      "interpolated #{name}" |> Popcorn.JS.run_js()
+      "indirect" |> String.trim() |> Popcorn.JS.run_js()
+      %{label: "nested"} |> Popcorn.JS.run_js()
+      value |> Popcorn.JS.run_js("one", "two", "three")
       '''
 
       tokens = ElixirLexer.lex(source, group_prefix: "group")

@@ -35,9 +35,9 @@ See ["Interacting with terminal"](terminal.md) to learn more.
 
 ### Sending and receiving events
 
-Elixir can send events to the JavaScript via `Popcorn.Wasm.send/1`. To receive them, we need to register [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler.
+Elixir can send events to the JavaScript via `Popcorn.JS.send/1`. To receive them, we need to register [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler.
 
-We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.Wasm.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
+We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.JS.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
 
 Additionally, we have [`async popcorn.cast(pid, payload, opts)`](`JSLib.Popcorn.cast/3`) and [`async popcorn.call(pid, payload, opts)`](`JSLib.Popcorn.call/3`). They're used to communicate with GenServers.
 All `cast()`s and `call()`s are going through internal `Popcorn.Proxy` which keeps tabs of timeouts and routes the messages to correct processes.
@@ -48,18 +48,18 @@ Messages sent to the Elixir will convert the JavaScript types to the Elixir ones
 
 ### Initialization
 
-You can interact with JavaScript after it finished initialization. After OTP application supervision tree finishes, the JavaScript may be still initializing. Use `Popcorn.Wasm.await_ready/0` to explicitly wait for it to finish or:
+You can interact with JavaScript after it finished initialization. After OTP application supervision tree finishes, the JavaScript may be still initializing. Use `Popcorn.JS.await_ready/0` to explicitly wait for it to finish or:
 
 - synchronize by sending an event from JavaScript
 - register handlers and wait for user interaction
 
 ### Sending events to JavaScript
 
-Use `Popcorn.Wasm.send/1` to send the events from the Elixir to JavaScript. They will be processed in [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler. All values will be serialized and deserialized back, check ["Sharing values across languages"](concepts/values.md) to see supported list of types.
+Use `Popcorn.JS.send/1` to send the events from the Elixir to JavaScript. They will be processed in [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler. All values will be serialized and deserialized back, check ["Sharing values across languages"](concepts/values.md) to see supported list of types.
 
 ### Running JS scripts in Elixir
 
-`Popcorn.Wasm.run_js/3` and `Popcorn.Wasm.run_js!/3` can be used to do that. First argument is a string with JavaScript source, second is a map of arguments passed to that source.
+`Popcorn.JS.run_js/3` and `Popcorn.JS.run_js!/3` can be used to do that. First argument is a string with JavaScript source, second is a map of arguments passed to that source.
 
 Example:
 
@@ -74,7 +74,7 @@ Example:
   return pid;
 }
 """
-|> Popcorn.Wasm.run_js!(%{node: node, pid: self(), event: event})
+|> Popcorn.JS.run_js!(%{node: node, pid: self(), event: event})
 ```
 
 You can see that JavaScript source is a function that takes two arguments and returns a value.

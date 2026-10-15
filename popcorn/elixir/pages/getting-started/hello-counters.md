@@ -164,7 +164,7 @@ Create `lib/counters/html.ex` to manage the template from Elixir:
 ```elixir
 # lib/counters/html.ex
 defmodule Counters.HTML do
-  alias Popcorn.Wasm
+  alias Popcorn.JS
 
   def find(root, selector) do
     # exdoc:fold Implementation
@@ -176,7 +176,7 @@ defmodule Counters.HTML do
       return new TrackedValue(node);
     }
     """
-    |> Wasm.run_js!(%{root: root, selector: selector})
+    |> JS.run_js!(%{root: root, selector: selector})
     # exdoc:endfold
   end
 
@@ -187,7 +187,7 @@ defmodule Counters.HTML do
       node.onclick = () => cast(pid, event);
     }
     """
-    |> Wasm.run_js!(%{node: node, pid: self(), event: event})
+    |> JS.run_js!(%{node: node, pid: self(), event: event})
     # exdoc:endfold
   end
 
@@ -198,7 +198,7 @@ defmodule Counters.HTML do
       counter.querySelector(".count").textContent = count;
     }
     """
-    |> Wasm.run_js!(%{counter: counter, count: count})
+    |> JS.run_js!(%{counter: counter, count: count})
     # exdoc:endfold
   end
 
@@ -219,7 +219,7 @@ defmodule Counters.HTML do
       return new TrackedValue(counter, () => counter.remove());
     }
     """
-    |> Wasm.run_js!(%{container: container, id: id, label: label})
+    |> JS.run_js!(%{container: container, id: id, label: label})
     # exdoc:endfold
   end
 end
@@ -227,7 +227,7 @@ end
 
 Most of this is plumbing. Let's look at the Popcorn APIs it uses:
 
-### `Wasm.run_js!()`
+### `JS.run_js!()`
 
 ```elixir
 """
@@ -235,10 +235,10 @@ Most of this is plumbing. Let's look at the Popcorn APIs it uses:
   // ...
 }
 """
-|> Wasm.run_js!(%{root: root, selector: selector})
+|> JS.run_js!(%{root: root, selector: selector})
 ```
 
-`Wasm.run_js!/3` is a function that evaluates JavaScript source and hands the result back to the Elixir. First argument is a JavaScript source and the second is a map of arguments we want to pass from Elixir to it.
+`JS.run_js!/3` is a function that evaluates JavaScript source and hands the result back to the Elixir. First argument is a JavaScript source and the second is a map of arguments we want to pass from Elixir to it.
 
 In JavaScript source, we create a function to run. It takes two parameters: `args` (a map of passed arguments) and `actions` (a map of functions we can call — `send()`, `cast()`, `call()`).
 
@@ -259,7 +259,7 @@ When Elixir releases the handle, through garbage collection or when the process 
 
 > ### Info {: .info}
 >
-> This is part of Popcorn that makes it very easy to use unserializable values from JavaScript. Read more in `t:Popcorn.Wasm.tracked_value/0`.
+> This is part of Popcorn that makes it very easy to use unserializable values from JavaScript. Read more in `t:Popcorn.JS.tracked_value/0`.
 
 ### `cast()`
 
@@ -273,7 +273,7 @@ def on_click(node, event) do
     node.onclick = () => cast(pid, event);
   }
   """
-  |> Wasm.run_js!(%{node: node, pid: self(), event: event})
+  |> JS.run_js!(%{node: node, pid: self(), event: event})
 end
 ```
 

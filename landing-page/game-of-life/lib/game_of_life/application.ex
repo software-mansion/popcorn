@@ -18,7 +18,7 @@ defmodule GameOfLife.Application do
   # The bridge exists only inside the OTP/Wasm runtime; on the host BEAM
   # (e.g. `mix test`) the app runs without the UI.
   defp ui() do
-    if Popcorn.Wasm.available?() do
+    if Popcorn.JS.available?() do
       [{GameOfLife.Ui, %{size: 20}}]
     else
       []

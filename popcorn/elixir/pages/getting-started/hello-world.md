@@ -68,11 +68,11 @@ foo/
 Edit the `lib/foo.ex` and add a function to run JavaScript from Elixir side:
 
 ```elixir
-alias Popcorn.Wasm
+alias Popcorn.JS
 
 def set_html do
-  with :ok <- Wasm.await_ready() do
-    Wasm.run_js!("""
+  with :ok <- JS.await_ready() do
+    JS.run_js!("""
       () => {
         const status = document.querySelector("#status");
 

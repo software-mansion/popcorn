@@ -1,8 +1,8 @@
 defmodule PopdocWasm do
   use GenServer
 
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
-  alias Popcorn.Wasm
+  import Popcorn.JS, only: [is_wasm_message: 1]
+  alias Popcorn.JS
 
   @process_name :main
   @ellipsis_sentinel :__popdoc_ellipsis__
@@ -14,7 +14,7 @@ defmodule PopdocWasm do
 
   @impl true
   def init(_args) do
-    Wasm.ready(@process_name)
+    JS.ready(@process_name)
     # TODO: needed?
     :application.set_env(:elixir, :ansi_enabled, false)
     {:ok, %{sessions: %{}}}
@@ -22,7 +22,7 @@ defmodule PopdocWasm do
 
   @impl true
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    new_state = JS.handle_message!(raw_msg, &handle_wasm(&1, state))
     {:noreply, new_state}
   end
 

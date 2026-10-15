@@ -5,7 +5,7 @@ defmodule Popcorn.TrackedObject do
   Tracked objects are registered in the VM to keep a reference to JS value.
   If there is no reference to tracked object, corresponding JS value is removed.
 
-  See `Popcorn.Wasm.run_js/3` for more details.
+  See `Popcorn.JS.run_js/3` for more details.
   """
   @type t :: %__MODULE__{ref: term()}
   defstruct ref: nil
@@ -18,7 +18,7 @@ defimpl Jason.Encoder, for: Popcorn.TrackedObject do
   end
 end
 
-defmodule Popcorn.Wasm do
+defmodule Popcorn.JS do
   @moduledoc """
   Functions for JS side communication.
   """
@@ -164,7 +164,7 @@ defmodule Popcorn.Wasm do
 
   ## Example
   ```
-  Popcorn.Wasm.run_js(\"""
+  Popcorn.JS.run_js(\"""
   ({ args }) => {
     const n = args.n;
     return [n-1, n, n-1];

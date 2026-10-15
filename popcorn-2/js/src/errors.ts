@@ -104,7 +104,7 @@ export function buildError(error: ErrorData): PopcornInternalError {
     case "app_ready_timeout":
       return new PopcornInternalError(
         "app_ready_timeout",
-        `Elixir app did not call Popcorn.Wasm.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
+        `Elixir app did not call Popcorn.JS.ready() within ${INIT_VM_TIMEOUT_MS}ms`,
       );
     case "bundle_not_found":
       return new PopcornInternalError(

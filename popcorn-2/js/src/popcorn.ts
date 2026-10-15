@@ -149,7 +149,7 @@ export class Popcorn {
 
   /**
    * Creates an iframe and sets up communication channels.
-   * Returns after the Elixir app calls `Popcorn.Wasm.ready/0,1`.
+   * Returns after the Elixir app calls `Popcorn.JS.ready/0,1`.
    *
    * @example
    * import { Popcorn } from "@swmansion/popcorn";
@@ -216,7 +216,7 @@ export class Popcorn {
    *
    * If Elixir doesn't respond in configured timeout, the returned promise will be rejected with "process timeout" error.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `Popcorn.JS.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    *
    * @example
@@ -256,7 +256,7 @@ export class Popcorn {
   /**
    * Sends a message to an Elixir process (default or from options) and returns immediately.
    *
-   * Unless passed via options, the name passed in `Popcorn.Wasm.set_default_receiver/1` on the Elixir side is used.
+   * Unless passed via options, the name passed in `Popcorn.JS.set_default_receiver/1` on the Elixir side is used.
    * Throws "Unspecified target process" if default process is not set and no process is specified.
    */
   cast(args: AnySerializable, { process }: CastOptions = {}): void {

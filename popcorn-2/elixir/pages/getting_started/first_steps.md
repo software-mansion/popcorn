@@ -42,7 +42,7 @@ defmodule MyApp.Application do
 end
 ```
 
-After initialization is complete, we must call `Popcorn.Wasm.ready/1`. `Popcorn.init()` on the JS side waits until this is called before resolving. Passing a process name registers it as the default receiver for JS `call`/`cast`:
+After initialization is complete, we must call `Popcorn.JS.ready/1`. `Popcorn.init()` on the JS side waits until this is called before resolving. Passing a process name registers it as the default receiver for JS `call`/`cast`:
 
 ```elixir
 # lib/my_app/worker.ex
@@ -58,7 +58,7 @@ defmodule MyApp.Worker do
 
   @impl true
   def init(_init_arg) do
-    Popcorn.Wasm.ready(@process_name)
+    Popcorn.JS.ready(@process_name)
     IO.puts("Hello from Wasm!")
     {:ok, %{}}
   end

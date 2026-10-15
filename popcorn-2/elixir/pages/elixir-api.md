@@ -3,7 +3,7 @@ title: Elixir API
 description: Reference of APIs available in Elixir
 ---
 
-`Popcorn.Wasm` module handles communication with JS and provides APIs for running JavaScript code from Elixir.
+`Popcorn.JS` module handles communication with JS and provides APIs for running JavaScript code from Elixir.
 
 ## Types
 
@@ -29,8 +29,8 @@ Events sent during startup (before `Popcorn.init()` resolves on the JS side) are
 **Example:**
 
 ```elixir
-Popcorn.Wasm.send_event("processing_finished", %{id: 123})
-Popcorn.Wasm.send_event("simple_event")
+Popcorn.JS.send_event("processing_finished", %{id: 123})
+Popcorn.JS.send_event("simple_event")
 ```
 
 ### `ready(name \\ nil)`
@@ -49,10 +49,10 @@ Optionally registers the calling process as the default receiver under `name`, w
 
 ```elixir
 # Without default receiver
-Popcorn.Wasm.ready()
+Popcorn.JS.ready()
 
 # With default receiver
-Popcorn.Wasm.ready(:main)
+Popcorn.JS.ready(:main)
 ```
 
 **Notes:**
@@ -73,7 +73,7 @@ Sets the default receiver process for JS calls/casts. Registers the calling proc
 **Example:**
 
 ```elixir
-Popcorn.Wasm.set_default_receiver(:main)
+Popcorn.JS.set_default_receiver(:main)
 ```
 
 ### `handle_message!(raw_message, handler)`
@@ -106,7 +106,7 @@ Popcorn expects handler to return one of the following:
 **Example**
 
 ```elixir
-Popcorn.Wasm.handle_message!(raw_msg, fn
+Popcorn.JS.handle_message!(raw_msg, fn
   {:wasm_call, data} -> {:resolve, "success", data}
   {:wasm_cast, data} -> :ok
   {:wasm_event, :click, event_data, custom} -> handle_click(event_data)
@@ -152,7 +152,7 @@ JS function should return either single value, array of values or nothing. See n
 **Example**
 
 ```elixir
-Popcorn.Wasm.run_js("""
+Popcorn.JS.run_js("""
 ({ args }) => {
   const element = document.getElementById(args.id);
   return [element];
@@ -201,7 +201,7 @@ Registers event listener for DOM element. Events are sent as `:wasm_event` messa
 **Example**
 
 ```elixir
-{:ok, cleanup_ref} = Popcorn.Wasm.register_event_listener(:click, [
+{:ok, cleanup_ref} = Popcorn.JS.register_event_listener(:click, [
   target_node: button_ref,
   event_receiver: "click_handler",
   event_keys: [:clientX, :clientY],

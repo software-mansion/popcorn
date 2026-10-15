@@ -58,7 +58,7 @@ defmodule Popcorn.PackagerTest do
     assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.br"))
 
     archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
-    assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
+    assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
     assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
     refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
@@ -69,7 +69,7 @@ defmodule Popcorn.PackagerTest do
     refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Mix.Tasks.Popcorn.Cook.beam")
 
     modules = archive |> Map.fetch!("lib/popcorn/ebin/popcorn.app") |> app_modules()
-    assert Popcorn.Wasm in modules
+    assert Popcorn.JS in modules
     refute Enum.any?(modules, &build_tool?/1)
 
     output_manifest = out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()

@@ -8,7 +8,7 @@ defmodule Popcorn.JSInteropTest do
 
   test "run_js cross-realm checks", %{tmp_dir: tmp_dir} do
     quote do
-      Popcorn.Wasm.run_js!(
+      Popcorn.JS.run_js!(
         """
         ({ args }) => {
           return [args.a instanceof Array && args.b instanceof Object]

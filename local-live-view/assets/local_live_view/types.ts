@@ -9,7 +9,7 @@ export interface LLVConfig {
    * resolved against the URL of the script. Defaults to `"popcorn/"`.
    */
   assetsUrl?: string;
-  /** Receives messages sent from the Wasm runtime with `Popcorn.Wasm.send/1` */
+  /** Receives messages sent from the Wasm runtime with `Popcorn.JS.send/1` */
   eventHandler?: (event: unknown) => void;
 }
 

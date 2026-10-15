@@ -1,8 +1,8 @@
-defmodule Popcorn.Wasm.Error do
+defmodule Popcorn.JS.Error do
   @moduledoc """
-  Raised by `Popcorn.Wasm.run_js!/3` when JavaScript fails or the reply times out.
+  Raised by `Popcorn.JS.run_js!/3` when JavaScript fails or the reply times out.
 
-  The `:reason` field contains the reason from the `{:error, reason}` result of `Popcorn.Wasm.run_js/3`.
+  The `:reason` field contains the reason from the `{:error, reason}` result of `Popcorn.JS.run_js/3`.
   """
 
   @type t :: %__MODULE__{reason: :timeout | {:js, term()}}
@@ -18,7 +18,7 @@ defmodule Popcorn.Wasm.Error do
   defp format(reason), do: inspect(reason)
 end
 
-defmodule Popcorn.Wasm.Mock do
+defmodule Popcorn.JS.Mock do
   @moduledoc false
 
   def await_ready(_opts), do: :ok
@@ -26,7 +26,7 @@ defmodule Popcorn.Wasm.Mock do
   def send(_message), do: :ok
 end
 
-defmodule Popcorn.Wasm do
+defmodule Popcorn.JS do
   @moduledoc """
   Connects Elixir processes to JavaScript in the browser page.
 
@@ -100,8 +100,8 @@ defmodule Popcorn.Wasm do
   ]
 
   def run do
-    with :ok <- Popcorn.Wasm.await_ready(),
-         {:ok, _value} <- Popcorn.Wasm.run_js("() => initializeBrowser()") do
+    with :ok <- Popcorn.JS.await_ready(),
+         {:ok, _value} <- Popcorn.JS.run_js("() => initializeBrowser()") do
       :ok
     end
   end
@@ -152,15 +152,15 @@ defmodule Popcorn.Wasm do
   ## Examples
 
   ```elixir
-  Popcorn.Wasm.run_js("({n}) => n + 1", %{n: 1})
+  Popcorn.JS.run_js("({n}) => n + 1", %{n: 1})
   #=> {:ok, 2}
   ```
 
   Use a `t:tracked_value/0` for values such as DOM elements:
 
   ```elixir
-  {:ok, element} = Popcorn.Wasm.run_js("() => new TrackedValue(document.body)")
-  Popcorn.Wasm.run_js!("({element}) => { element.textContent = 'Ready'; }", %{element: element})
+  {:ok, element} = Popcorn.JS.run_js("() => new TrackedValue(document.body)")
+  Popcorn.JS.run_js!("({element}) => { element.textContent = 'Ready'; }", %{element: element})
   ```
   """
   @spec run_js(String.t(), map(), run_js_opts()) ::
@@ -180,7 +180,7 @@ defmodule Popcorn.Wasm do
   def run_js!(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
     case run_js(code, args, opts) do
       {:ok, value} -> value
-      {:error, reason} -> raise Popcorn.Wasm.Error, reason: reason
+      {:error, reason} -> raise Popcorn.JS.Error, reason: reason
     end
   end
 
@@ -197,6 +197,6 @@ defmodule Popcorn.Wasm do
   end
 
   defp default_bridge do
-    if available?(), do: :wasm, else: Popcorn.Wasm.Mock
+    if available?(), do: :wasm, else: Popcorn.JS.Mock
   end
 end

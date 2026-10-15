@@ -8,11 +8,11 @@ start(_Type, _Args) ->
 start("await_ready") ->
     Child = 'Elixir.Task':child_spec(fun() ->
         true = register(await_ready_task, self()),
-        ok = 'Elixir.Popcorn.Wasm':await_ready([]),
+        ok = 'Elixir.Popcorn.JS':await_ready([]),
         ok = wasm:send(#{async_ready => true}),
         receive
             {wasm, _Payload} ->
-                ok = 'Elixir.Popcorn.Wasm':await_ready([]),
+                ok = 'Elixir.Popcorn.JS':await_ready([]),
                 ok = wasm:send(#{after_boot => true})
         end
     end),
@@ -44,7 +44,7 @@ startup_event("bridge") ->
 startup_event("fail") ->
     error(startup_failed);
 startup_event("await_ready_timeout") ->
-    {error, timeout} = 'Elixir.Popcorn.Wasm':await_ready([{timeout, 0}]),
+    {error, timeout} = 'Elixir.Popcorn.JS':await_ready([{timeout, 0}]),
     ok = wasm:send(#{await_ready_timeout => true});
 startup_event(false) ->
     ok.

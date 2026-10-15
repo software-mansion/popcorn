@@ -42,7 +42,7 @@ defmodule LocalLiveView.Dispatcher do
   process, not through the dispatcher.
   """
   def send_to_js(event, payload) when is_atom(event) and is_map(payload) do
-    Popcorn.Wasm.send(Map.put(payload, :__llv__, event))
+    Popcorn.JS.send(Map.put(payload, :__llv__, event))
   end
 
   @impl true
