@@ -28,6 +28,7 @@ defmodule FormDemoWeb.Endpoint do
     at: "/",
     from: :form_demo,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: FormDemoWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 

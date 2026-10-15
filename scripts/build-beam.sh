@@ -455,10 +455,18 @@ build_beam() {
     fi
     export EXTRA_EMCC_LINK_FLAGS="${extra_emcc_link_flags}"
 
-    # OTP's makefiles do not track external JS libraries.
-    if [[ "${clock_library}" -nt "${beam_dir}/bin/wasm32-unknown-emscripten/beam.emu" ]]; then
-        rm -f "${beam_dir}/bin/wasm32-unknown-emscripten/beam.emu" \
-            "${beam_dir}/bin/wasm32-unknown-emscripten/beam.smp"
+    # OTP links the emulator with -export-dynamic, so that dynamically loaded
+    # NIFs and drivers find its symbols. The Wasm runtime links them statically,
+    # and exporting every symbol keeps unused code in it and bloats the JS glue.
+    local make_settings="DEXPORT="
+
+    # OTP's makefiles track neither external JS libraries nor link settings.
+    local wasm_bin_dir="${beam_dir}/bin/wasm32-unknown-emscripten"
+    local link_stamp="${wasm_bin_dir}/.stamp-link"
+    local link_settings="${extra_emcc_link_flags} ${make_settings}"
+    if [[ "${clock_library}" -nt "${wasm_bin_dir}/beam.emu" ]] ||
+        [[ "$(cat "${link_stamp}" 2>/dev/null)" != "${link_settings}" ]]; then
+        rm -f "${wasm_bin_dir}/beam.emu" "${wasm_bin_dir}/beam.smp"
     fi
 
     # erts/lib_src target dir is created on first build only
@@ -466,7 +474,8 @@ build_beam() {
         (cd "${beam_dir}" && export ERL_TOP="${beam_dir}" && run emmake make -C erts/lib_src TARGET=wasm32-unknown-emscripten)
     fi
 
-    (cd "${beam_dir}" && run emmake make TARGET=wasm32-unknown-emscripten -j"${jobs}")
+    (cd "${beam_dir}" && run emmake make TARGET=wasm32-unknown-emscripten "${make_settings}" -j"${jobs}")
+    echo "${link_settings}" > "${link_stamp}"
 
     success "BEAM build complete."
 }
@@ -489,14 +498,14 @@ copy_artifacts() {
     wasm_size=$(du -h "${outdir}/beam.wasm" | cut -f1)
     log "beam.wasm: ${wasm_size}"
 
-    sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
-        "${wasm_bin_dir}/beam.smp" > "${outdir}/beam.mjs"
+    # Emscripten's threads load the JS by its file name, which is also the name
+    # Popcorn's worker imports it by, so that browsers download it once
     sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
         "${wasm_bin_dir}/beam.emu" > "${outdir}/beam.emu.mjs"
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"
-    cp "${outdir}/beam.wasm" "${outdir}/beam.mjs" "${outdir}/beam.emu.mjs" \
+    cp "${outdir}/beam.wasm" "${outdir}/beam.emu.mjs" \
         "${outdir}/otp/manifest.json" "${runtime_dir}/"
 
     for boot in start.boot start_clean.boot no_dot_erlang.boot vm.boot; do

@@ -13,7 +13,11 @@ defmodule Mix.Tasks.Llv.Build do
     2. Fetches the dependencies of the local project and packages it with
        `mix popcorn.cook` into `priv/static/assets/js/popcorn/`, along with
        the Popcorn runtime. LocalLiveView's JS loads it from there: the
-       `popcorn/` directory next to the `app.js` bundle.
+       `popcorn/` directory next to the `app.js` bundle. Unused code is
+       tree-shaken. In the `prod` environment, the Brotli-compressed variants
+       are made with the maximum effort, which makes them about 12% smaller,
+       but takes several seconds longer, and line numbers are left out of the
+       code, which makes it about 4% smaller, but stack traces show none.
 
   ## Usage
 
@@ -32,6 +36,9 @@ defmodule Mix.Tasks.Llv.Build do
 
   @out_dir "priv/static/assets/js/popcorn"
 
+  # Web assets, served by the host app, and generators' templates
+  @excluded_priv ["*/priv/static", "phoenix/priv/templates", "local_live_view/priv"]
+
   # The target is only :wasm in the local project (it has `default_target: :wasm`)
   @impl Mix.Task
   def run(args) do
@@ -45,7 +52,7 @@ defmodule Mix.Tasks.Llv.Build do
       Mix.raise("Host app not found in the parent directory, run `mix llv.build` from there.")
     end
 
-    Mix.Task.run("popcorn.cook", ["--out-dir", Path.expand(@out_dir, host_dir)])
+    Mix.Task.run("popcorn.cook", ["--out-dir", Path.expand(@out_dir, host_dir)] ++ cook_args())
   end
 
   defp build(args) do
@@ -77,7 +84,9 @@ defmodule Mix.Tasks.Llv.Build do
   # Packages the local project into `@out_dir`. Returns the exit status.
   defp cook(local_dir) do
     {_output, status} =
-      System.cmd("mix", ["popcorn.cook", "--out-dir", Path.absname(@out_dir)],
+      System.cmd(
+        "mix",
+        ["popcorn.cook", "--out-dir", Path.absname(@out_dir)] ++ cook_args(),
         cd: local_dir,
         into: IO.stream(),
         stderr_to_stdout: true
@@ -85,4 +94,18 @@ defmodule Mix.Tasks.Llv.Build do
 
     status
   end
+
+  @doc false
+  # `mix popcorn.cook`'s options for the local project, also used by the e2e
+  # tests. Popcorn's tree-shaker knows to keep LocalLiveView's views.
+  def cook_args do
+    Enum.flat_map(@excluded_priv, &["--exclude-priv", &1]) ++
+      env_args(Mix.env()) ++
+      ["--treeshake"]
+  end
+
+  # Max effort is too slow for the watcher to rebuild with on every change,
+  # and line numbers help while developing
+  defp env_args(:prod), do: ["--brotli-effort", "max", "--no-line-info"]
+  defp env_args(_env), do: []
 end

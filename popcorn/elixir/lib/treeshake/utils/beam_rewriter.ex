@@ -4,8 +4,13 @@ defmodule Treeshake.Utils.BeamRewriter do
   # Rewrites a core erlang module, keeping only given functions.
   # Mostly vibe-coded.
 
-  @spec keep_funs(Path.t(), [function_arity], [{:stub_removed_public, boolean()}]) ::
-          {binary(), [function_arity]}
+  # Options:
+  # - `stub_removed_public` - replaces removed public functions with stubs
+  #   raising an error
+  # - `export` - functions to export, if they're kept
+  @spec keep_funs(Path.t(), [function_arity], [
+          {:stub_removed_public, boolean()} | {:export, [function_arity]}
+        ]) :: {binary(), [function_arity]}
         when function_arity: {atom(), non_neg_integer()}
   def keep_funs(beam_path, functions, opts \\ []) do
     to_keep = MapSet.new(functions)
@@ -46,6 +51,16 @@ defmodule Treeshake.Utils.BeamRewriter do
         end)
       end
 
+    exported = MapSet.new(new_exports, fn {:c_var, _, fun_arity} -> fun_arity end)
+
+    newly_exported =
+      opts
+      |> Keyword.get(:export, [])
+      |> Enum.filter(&(MapSet.member?(to_keep, &1) and not MapSet.member?(exported, &1)))
+      |> Enum.map(&{:c_var, [], &1})
+
+    new_exports = new_exports ++ newly_exported
+
     new_attrs = filter_attrs(attrs, to_keep)
 
     new_core = {:c_module, anno, name, new_exports, new_attrs, new_defs}
@@ -66,7 +81,10 @@ defmodule Treeshake.Utils.BeamRewriter do
 
   defp compile!(module, core, beam_path) do
     # TODO: optionally add no_line_info to save a few bytes from the code chunk
-    case :compile.noenv_forms(core, [:from_core, :return_errors, :return_warnings, :debug_info]) do
+    # With the Core as debug info, later steps can read the module
+    options = [:from_core, :return_errors, :return_warnings, debug_info: {:core_v1, core}]
+
+    case :compile.noenv_forms(core, options) do
       {:ok, ^module, binary, _warnings} ->
         binary
 

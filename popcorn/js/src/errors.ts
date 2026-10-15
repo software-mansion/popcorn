@@ -27,6 +27,7 @@ export type PopcornErrors = {
   "stdio:overflow": { capacityBytes: number; attemptedBytes: number };
   "beam:missing-boot-script": { url: string };
   "beam:missing-manifest": { url: string };
+  "beam:missing-archive": { url: string };
   "beam:missing-tarball": { name: string; all: string[] };
   "internal:check": { detail?: string };
   "internal:unreachable": EmptyData;
@@ -141,9 +142,11 @@ function message(error: SerializedError): string {
     case "beam:missing-boot-script":
       return `Missing boot script: '${error.data.url}'`;
     case "beam:missing-manifest":
-      return `Missing tarball manifest: '${error.data.url}'`;
+      return `Missing manifest: '${error.data.url}'`;
+    case "beam:missing-archive":
+      return `Missing applications archive: '${error.data.url}'`;
     case "beam:missing-tarball":
-      return `Missing tarball: '${error.data.name}'. Available tarballs: ${error.data.all.join(", ")}`;
+      return `Missing application: '${error.data.name}'. Available applications: ${error.data.all.join(", ")}`;
     case "internal:check":
       return error.data.detail === undefined
         ? "Check failed"
@@ -187,6 +190,7 @@ function parse(value: unknown): SerializedError {
       return { t: value.t, data: value.data };
     case "beam:missing-boot-script":
     case "beam:missing-manifest":
+    case "beam:missing-archive":
       check(isUrlData(value.data));
       return { t: value.t, data: value.data };
     case "beam:missing-tarball":
