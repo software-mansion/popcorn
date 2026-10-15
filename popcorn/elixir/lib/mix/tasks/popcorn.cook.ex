@@ -83,12 +83,15 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   Conversely, some reachable code that's only used to compile, evaluate or
   format code, by a shell, or in distribution, is removed by default:
-  Erlang's code evaluator and linter, Elixir's parser and code formatter, the
-  shell's line editing, and modules for distribution and a few storage formats.
-  Calling a function of a removed module raises `UndefinedFunctionError`, so
-  keep the ones an application needs. To evaluate Erlang code, keep
-  `:erl_eval` and `:erl_lint`, and to evaluate Elixir code, also preserve
-  `elixir`. Evaluated code can only call functions that are packaged.
+  Erlang's parser, code evaluator and linter, Elixir's parser and code
+  formatter, the shell's line editing, and modules for distribution and a few
+  storage formats. Calling a function of a removed module raises
+  `UndefinedFunctionError`, so keep the ones an application needs. To
+  evaluate Erlang code, keep `:erl_eval`, `:erl_lint`, `:erl_parse` and
+  `:eval_bits`, and to evaluate Elixir code, also preserve `elixir`. Evaluated
+  code can only call functions that are packaged. Configuring applications
+  through VM arguments, like `-kernel shell_history enabled`, needs
+  `:erl_parse` too.
 
   Tree-shaking leaves Erlang's `kernel` and `stdlib` as they are, except for
   modules of the shell, networking and distribution, which it removes when

@@ -83,15 +83,17 @@ defmodule Popcorn.Packager do
 
   # Tree-shaking removes these unless they're kept: they're reachable, but
   # only used to compile, evaluate or format code, by a shell or in
-  # distribution. These can't be removed: erl_parse and eval_bits read
-  # applications' .app files, kernel starts inet_db, group calls edlin even
-  # with no shell, and pg calls net_kernel with no distribution.
+  # distribution. These can't be removed: io_lib quotes atoms with erl_scan,
+  # kernel starts inet_db, group calls edlin even with no shell, and pg calls
+  # net_kernel with no distribution.
   @dropped_modules [
     Code.Formatter,
     :elixir_parser,
     :elixir_tokenizer,
     :erl_lint,
     :erl_eval,
+    :erl_parse,
+    :eval_bits,
     :prim_inet,
     :qlc,
     :qlc_pt,
@@ -329,7 +331,7 @@ defmodule Popcorn.Packager do
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
            maybe_treeshake(staged_apps, treeshake, out_dir),
-         prune_boot(boot_path, staged_apps) do
+         complete_boot(boot_path, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -476,12 +478,13 @@ defmodule Popcorn.Packager do
 
     case preloaded -- runtime_preloaded do
       [] ->
-        boot = {:script, id, Enum.map(commands, &drop_app_versions/1)}
+        commands = Enum.map(commands, &(&1 |> drop_app_versions() |> configure_kernel()))
+        boot = {:script, id, commands}
         path = Path.join(out_dir, @boot_name)
 
         File.mkdir_p!(Path.dirname(path))
 
-        File.write!(path, :erlang.term_to_binary(boot))
+        File.write!(path, :erlang.term_to_binary(boot, compressed: 9))
 
         {:ok, path}
 
@@ -492,23 +495,51 @@ defmodule Popcorn.Packager do
 
   # The boot script loads every module of kernel and stdlib, and fails if
   # tree-shaking removed any, so they're left out of it. The others are loaded
-  # when used.
-  defp prune_boot(boot_path, staged_apps) do
+  # when used. The other applications are loaded from their specs, like
+  # stdlib, as reading their .app files would need the Erlang parser.
+  defp complete_boot(boot_path, staged_apps) do
     packaged =
       staged_apps
       |> Enum.flat_map(fn {_app, info} -> Path.wildcard(Path.join(info.ebin_dir, "*.beam")) end)
       |> MapSet.new(&(&1 |> Path.basename(".beam") |> String.to_atom()))
 
+    app_loads =
+      for {app, info} <- Enum.sort(staged_apps), app not in ["kernel", "stdlib"] do
+        spec = {:application, String.to_existing_atom(app), info.props}
+        {:apply, {:application, :load, [spec]}}
+      end
+
     {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
 
     commands =
-      Enum.map(commands, fn
-        {:primLoad, modules} -> {:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}
-        command -> command
+      Enum.flat_map(commands, fn
+        {:primLoad, modules} ->
+          [{:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}]
+
+        {:progress, :applications_loaded} = command ->
+          app_loads ++ [command]
+
+        command ->
+          [command]
       end)
 
-    File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
+    boot = {:script, id, commands}
+    File.write!(boot_path, :erlang.term_to_binary(boot, compressed: 9))
   end
+
+  # The runtime has no distribution. It's configured in the kernel's spec, as
+  # the `-kernel start_distribution false` arguments would need the Erlang
+  # parser.
+  defp configure_kernel(
+         {:kernelProcess, :application_controller, {m, f, [{:application, :kernel, props}]}}
+       ) do
+    env = props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, false)
+    spec = {:application, :kernel, Keyword.put(props, :env, env)}
+
+    {:kernelProcess, :application_controller, {m, f, [spec]}}
+  end
+
+  defp configure_kernel(command), do: command
 
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
   defp drop_app_versions({:path, dirs}) do
@@ -742,8 +773,9 @@ defmodule Popcorn.Packager do
          :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
          drop = dropped_modules(drop, keep, preserved_modules),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir),
-         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
+      staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
+
       report = %{
         preserved_apps: preserved_apps,
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
@@ -831,11 +863,12 @@ defmodule Popcorn.Packager do
   defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
     preserved = MapSet.new(preserved_apps)
 
-    staged_apps
-    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
-    |> replace_beams(output_dir)
+    shaken_apps =
+      staged_apps
+      |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+      |> replace_beams(output_dir)
 
-    :ok
+    Map.merge(staged_apps, shaken_apps)
   end
 
   defp replace_beams(staged_apps, output_dir) do

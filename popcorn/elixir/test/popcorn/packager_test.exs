@@ -65,7 +65,21 @@ defmodule Popcorn.PackagerTest do
 
     assert "beam.wasm" = out_dir |> Path.join("beam.wasm.gz") |> File.read!() |> :zlib.gunzip()
 
-    assert File.regular?(Path.join(out_dir, "otp/bin/vm.boot"))
+    # The boot script loads the applications from their specs and turns off
+    # distribution, so that booting doesn't need the Erlang parser
+    {:script, _id, commands} =
+      out_dir |> Path.join("otp/bin/vm.boot") |> File.read!() |> :erlang.binary_to_term()
+
+    assert {:apply, {:application, :load, [{:application, :popcorn, popcorn_spec}]}} =
+             Enum.find(commands, &match?({:apply, {:application, :load, [{_, :popcorn, _}]}}, &1))
+
+    assert Popcorn.Wasm in popcorn_spec[:modules]
+
+    assert [{:application, :kernel, kernel_spec}] =
+             for({:kernelProcess, :application_controller, {_m, _f, args}} <- commands, do: args)
+             |> List.flatten()
+
+    assert kernel_spec[:env][:start_distribution] == false
 
     for variant <- ["", ".gz", ".br"] do
       assert File.regular?(Path.join(out_dir, "otp/lib.tar" <> variant))

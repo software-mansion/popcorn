@@ -27,13 +27,6 @@ const MANIFEST_NAME = "manifest.json";
 // Popcorn.Boot in the Elixir package
 const BOOT_MODULE = "Elixir.Popcorn.Boot";
 
-// https://www.erlang.org/doc/apps/erts/inet_cfg.html
-const INETRC_PATH = "/etc/inetrc";
-// lookup types: `native | file | dns`
-// We need `file` lookup to avoid spawning
-// /bin/inet_gethost which is not available
-const INETRC = "{lookup, [file]}.\n";
-
 const STDOUT_FD = 1;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
@@ -45,9 +38,6 @@ const BASE_ARGS = [
   "erl",
   "-home",
   DEFAULT_HOME_DIR,
-  "-kernel",
-  "start_distribution",
-  "false",
 ];
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
@@ -110,7 +100,6 @@ async function boot(
     LOGNAME: DEFAULT_USER,
     COLUMNS: String(ttySize.columns),
     LINES: String(ttySize.rows),
-    ERL_INETRC: INETRC_PATH,
   };
   let emitError: ((payload: OtpErrorPayload) => void) | null = function (payload) {
     emitError = null;
@@ -364,7 +353,6 @@ function initFs({ module, fsData }: InitFsArgs): void {
   }
 
   writeFile(BOOT_PATH, fsData.bootFile);
-  writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {
     module.FS_mkdirTree(dirPath);
