@@ -227,39 +227,10 @@ defmodule Treeshake.Utils.BeamAnalyzer do
   defp collect_calls([head | tail]), do: collect_calls(head) ++ collect_calls(tail)
   defp collect_calls([]), do: []
 
-  # Functions of the form remote_mod:fun(M, F, Args, ...) where M and F are atom
-  # literals and Args is the argument list — extract as a static call to M:F/arity.
-  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:apply/3,
-  # erlang:spawn_opt/4, proc_lib:start*/3-5, proc_lib:spawn*/3-5, etc.
-  @mfa_callers %{
-    erlang: [:spawn, :spawn_link, :apply],
-    proc_lib: [:start, :start_link, :start_monitor, :spawn, :spawn_link, :spawn_opt, :spawn_mon]
-  }
-
-  defp collect_calls(
-         {:c_call, _, {:c_literal, _, mod}, {:c_literal, _, fun},
-          [{:c_literal, _, m}, {:c_literal, _, f}, args_expr | rest] = all_args}
-       )
-       when is_atom(m) and is_atom(f) and is_map_key(@mfa_callers, mod) do
-    funs = Map.fetch!(@mfa_callers, mod)
-
-    if fun in funs do
-      own =
-        case count_list(args_expr) do
-          {:ok, arity} -> [{m, f, arity}]
-          :error -> []
-        end
-
-      [{mod, fun, length(all_args)}] ++ own ++ collect_calls(args_expr) ++ collect_calls(rest)
-    else
-      [{mod, fun, length(all_args)}] ++ collect_calls(all_args)
-    end
-  end
-
   # Remote call: Mod.fun(args)
   defp collect_calls({:c_call, _, {:c_literal, _, mod}, {:c_literal, _, fun}, args})
        when is_atom(mod) and is_atom(fun) do
-    [{mod, fun, length(args)}] ++ collect_calls(args)
+    [{mod, fun, length(args)}] ++ collect_special_calls(mod, fun, args)
   end
 
   # Remote call through variable/expression
@@ -341,6 +312,48 @@ defmodule Treeshake.Utils.BeamAnalyzer do
   end
 
   defp collect_calls(_), do: []
+
+  # Functions of the form remote_mod:fun(M, F, Args, ...) where M and F are atom
+  # literals and Args is the argument list — extract as a static call to M:F/arity.
+  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:apply/3,
+  # erlang:spawn_opt/4, proc_lib:start*/3-5, proc_lib:spawn*/3-5, etc.
+  @mfa_callers %{
+    erlang: [:spawn, :spawn_link, :apply],
+    proc_lib: [:start, :start_link, :start_monitor, :spawn, :spawn_link, :spawn_opt, :spawn_mon]
+  }
+
+  defp collect_special_calls(
+         mod,
+         fun,
+         [{:c_literal, _, m}, {:c_literal, _, f}, args_expr | rest] = all_args
+       )
+       when is_atom(m) and is_atom(f) and is_map_key(@mfa_callers, mod) do
+    funs = Map.fetch!(@mfa_callers, mod)
+
+    if fun in funs do
+      own =
+        case count_list(args_expr) do
+          {:ok, arity} -> [{m, f, arity}]
+          :error -> []
+        end
+
+      own ++ collect_calls(args_expr) ++ collect_calls(rest)
+    else
+      collect_calls(all_args)
+    end
+  end
+
+  # Kernel.struct!(Mod, fields) and Kernel.struct(Mod, fields), which build
+  # the struct with Mod.__struct__/1 and Mod.__struct__/0, respectively.
+  @struct_builders %{:struct! => {:__struct__, 1}, :struct => {:__struct__, 0}}
+
+  defp collect_special_calls(Kernel, fun, [{:c_literal, _, m} | _] = args)
+       when is_map_key(@struct_builders, fun) and is_atom(m) do
+    {f, a} = Map.fetch!(@struct_builders, fun)
+    [{m, f, a}] ++ collect_calls(args)
+  end
+
+  defp collect_special_calls(_mod, _fun, args), do: collect_calls(args)
 
   defp collect_literal_atoms(atom) when is_atom(atom), do: [atom]
 
