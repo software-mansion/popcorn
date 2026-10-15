@@ -153,7 +153,10 @@ Now, let's get to the actual logic.
 
 We will use a shared Registry for each `Counter`, and each `Counter` will be also paired with `DynamicSupervisor` for its children. This creates a nice tree:
 
-<img src="assets/otp-tree.svg" style="display: block; margin: auto; width: 700px; max-width: 100%;" alt="OTP supervision tree: Counters.Application starts Counters.Supervisor, which supervises the Registry and a Counters.Unit. Each Unit supervises a Counter and a DynamicSupervisor for child Units." />
+<div style="text-align: center;">
+<img src="assets/otp-tree-light.svg#gh-light-mode-only" style="width: 700px; max-width: 100%;" alt="OTP supervision tree: Counters.Application starts Counters.Supervisor, which supervises the Registry and a Counters.Unit. Each Unit supervises a Counter and a DynamicSupervisor for child Units." />
+<img src="assets/otp-tree-dark.svg#gh-dark-mode-only" style="width: 700px; max-width: 100%;" alt="OTP supervision tree: Counters.Application starts Counters.Supervisor, which supervises the Registry and a Counters.Unit. Each Unit supervises a Counter and a DynamicSupervisor for child Units." />
+</div>
 
 ## Add the HTML handling code
 
@@ -283,7 +286,10 @@ Before we get to the implementation, we need a `DynamicSupervisor` and a `Regist
 
 The `Counters.Unit` supervisor will keep a `Counter` and its children. In each `Counter`, we keep its path (e.g. `1.2.1`, which is one highlighted in the image) and the DOM node it is tied to.
 
-<img src="assets/counter.svg" style="display: block; margin: auto; width: 300px;" alt="Counters structure, 1.2.1 counter highlighted." />
+<div style="text-align: center;">
+<img src="assets/counter-light.svg#gh-light-mode-only" style="width: 300px;" alt="Counters structure, 1.2.1 counter highlighted." />
+<img src="assets/counter-dark.svg#gh-dark-mode-only" style="width: 300px;" alt="Counters structure, 1.2.1 counter highlighted." />
+</div>
 
 Create `lib/counters/unit.ex`:
 
