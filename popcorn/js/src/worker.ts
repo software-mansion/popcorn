@@ -1,4 +1,5 @@
-import createModule from "./beam.mjs";
+// Emscripten's threads load it under this name too, so it's downloaded once
+import createModule from "./beam.emu.mjs";
 
 import { start, type Beam } from "./beam";
 import { readMainEvent, toMain } from "./events";

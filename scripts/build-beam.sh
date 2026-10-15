@@ -490,13 +490,11 @@ copy_artifacts() {
     log "beam.wasm: ${wasm_size}"
 
     sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
-        "${wasm_bin_dir}/beam.smp" > "${outdir}/beam.mjs"
-    sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
         "${wasm_bin_dir}/beam.emu" > "${outdir}/beam.emu.mjs"
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"
-    cp "${outdir}/beam.wasm" "${outdir}/beam.mjs" "${outdir}/beam.emu.mjs" \
+    cp "${outdir}/beam.wasm" "${outdir}/beam.emu.mjs" \
         "${outdir}/otp/manifest.json" "${runtime_dir}/"
 
     for boot in start.boot start_clean.boot no_dot_erlang.boot vm.boot; do

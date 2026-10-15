@@ -24,7 +24,7 @@ defmodule Popcorn.PackagerTest do
     File.mkdir_p!(Path.join(app_dir, "priv/nested"))
     File.write!(Path.join(app_dir, "priv/nested/fixture.txt"), "from priv")
 
-    for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
+    for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"] do
       dir = if file in ["index.mjs", "worker.mjs"], do: static_dir, else: runtime_dir
       File.write!(Path.join(dir, file), file)
     end
@@ -81,7 +81,7 @@ defmodule Popcorn.PackagerTest do
       assert "core" = report.runtimeVariant
       assert %{"popcorn" => _app} = report.apps
 
-      for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"],
+      for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"],
           variant <- ["", ".gz", ".br"] do
         assert File.regular?(Path.join(out_dir, file <> variant))
       end

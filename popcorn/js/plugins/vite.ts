@@ -41,11 +41,11 @@ export function popcorn(options: Options): Plugin {
     if (
       importer !== undefined &&
       resolve(dirname(importer.split("?")[0]), source) ===
-        join(distDir, "beam.mjs")
+        join(distDir, "beam.emu.mjs")
     ) {
       const { runtimeVariant } = await ensurePrepared();
       const runtimeDir = runtimeDirectory(runtimeVariant);
-      return join(runtimeDir, "beam.mjs");
+      return join(runtimeDir, "beam.emu.mjs");
     }
   };
   let prepared: Prepared | undefined;
