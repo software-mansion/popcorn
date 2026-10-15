@@ -1,6 +1,8 @@
 defmodule Popcorn.PackagerTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias Popcorn.Packager
 
   @moduletag :tmp_dir
@@ -55,8 +57,25 @@ defmodule Popcorn.PackagerTest do
   end
 
   describe "build/1" do
-    test "complete output", %{options: options, out_dir: out_dir} do
-      options = Keyword.put(options, :extra_apps, ["extra_app"])
+    test "complete output", %{options: options, build_path: build_path, out_dir: out_dir} do
+      app_dir = Path.join(build_path, "popcorn")
+      File.mkdir_p!(Path.join(app_dir, "priv/static"))
+      File.write!(Path.join(app_dir, "priv/static/index.mjs"), "Popcorn's JS")
+      File.write!(Path.join(app_dir, "priv/nested/native.so"), "native")
+      File.mkdir_p!(Path.join(app_dir, "priv/lib/arch"))
+      File.write!(Path.join(app_dir, "priv/lib/nif.so"), "native")
+      File.write!(Path.join(app_dir, "priv/lib/arch/driver.dylib"), "native")
+      File.mkdir_p!(Path.join(app_dir, "priv/plts"))
+      File.write!(Path.join(app_dir, "priv/plts/dialyzer.plt"), "PLT")
+      File.write!(Path.join(app_dir, "priv/nested/notes.tmp"), "excluded")
+      File.mkdir_p!(Path.join(app_dir, "priv/docs"))
+      File.write!(Path.join(app_dir, "priv/docs/guide.md"), "excluded")
+
+      options =
+        Keyword.merge(options,
+          extra_apps: ["extra_app"],
+          exclude_priv: [{"popcorn", "docs"}, "nested/*.tmp"]
+        )
 
       assert {:ok, report} = Packager.build(options)
       assert "core" = report.runtimeVariant
@@ -95,6 +114,14 @@ defmodule Popcorn.PackagerTest do
       assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
       assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
       refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
+
+      # Native libraries and PLT files are left out, and so are the excluded files
+      refute Map.has_key?(archive, "lib/popcorn/priv/nested/native.so")
+      refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/lib"))
+      refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/plts"))
+      refute Map.has_key?(archive, "lib/popcorn/priv/nested/notes.tmp")
+      refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/docs"))
+
       refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
       refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
       refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
@@ -127,6 +154,13 @@ defmodule Popcorn.PackagerTest do
       assert after_app["bundles"]["deps"] == before["bundles"]["deps"]
       assert after_app["bundles"]["stdlib"] == before["bundles"]["stdlib"]
       assert after_app["vm"] == before["vm"]
+    end
+
+    test "leaving out priv files of applications that aren't packaged", %{options: options} do
+      options = Keyword.put(options, :exclude_priv, [{"phoneix", "static"}])
+
+      assert capture_io(:stderr, fn -> assert {:ok, _report} = Packager.build(options) end) =~
+               "exclude_priv names applications that aren't packaged: phoneix"
     end
   end
 

@@ -43,6 +43,7 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
+          | {:exclude_priv, [String.t() | {String.t(), String.t()}]}
           | {:treeshake, false | [preserved_apps: [String.t()]]}
           | {:static_dir, Path.t()}
         ]
@@ -55,8 +56,14 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
+          exclude_priv: [String.t() | {String.t(), String.t()}],
           treeshake: false | [preserved_apps: [String.t()]]
         }
+
+  # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
+  # runtime, which has its NIFs linked in. Dialyzer's PLT files, which some
+  # packages ship, are only read by Dialyzer.
+  @excluded_priv ["**/*.{so,dylib,dll}", "**/*.plt"]
 
   defp beam?(path), do: Path.extname(path) == ".beam"
 
@@ -95,6 +102,7 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        exclude_priv: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
@@ -124,6 +132,7 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 exclude_priv: options[:exclude_priv],
                  treeshake: options[:treeshake]
                }),
              {:ok, installed} <-
@@ -154,10 +163,12 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      exclude_priv: exclude_priv,
       treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
+    staging_dir = Path.join(out_dir, "staging")
 
     with {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
@@ -168,7 +179,8 @@ defmodule Popcorn.Packager do
          :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
-         staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info),
+         remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
@@ -378,6 +390,31 @@ defmodule Popcorn.Packager do
     |> Map.new()
   end
 
+  defp remove_priv_files(staged_apps, patterns) do
+    {app_patterns, shared_patterns} = Enum.split_with(patterns, &is_tuple/1)
+    app_patterns = Enum.group_by(app_patterns, &elem(&1, 0), &elem(&1, 1))
+    unknown_apps = Map.keys(app_patterns) -- Map.keys(staged_apps)
+
+    if unknown_apps != [] do
+      apps = Enum.join(unknown_apps, ", ")
+      warn("exclude_priv names applications that aren't packaged: #{apps}")
+    end
+
+    for {app, info} <- staged_apps,
+        priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv"),
+        pattern <- shared_patterns ++ Map.get(app_patterns, app, []),
+        path <- Path.wildcard(Path.join(priv_dir, pattern), match_dot: true) do
+      File.rm_rf!(path)
+      remove_if_empty(Path.dirname(path), priv_dir)
+    end
+  end
+
+  defp remove_if_empty(dir, priv_dir) do
+    if File.rmdir(dir) == :ok and dir != priv_dir do
+      remove_if_empty(Path.dirname(dir), priv_dir)
+    end
+  end
+
   # we patch only selected modules from OTP, see patches/
   defp patch_apps(staged_apps) do
     [@patches_dir, "*", "*.erl"]
@@ -411,6 +448,9 @@ defmodule Popcorn.Packager do
         Enum.each(build_tools, fn module ->
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
+
+        # The JS and the Wasm runtimes, which the output already has
+        File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
 
         replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
     end

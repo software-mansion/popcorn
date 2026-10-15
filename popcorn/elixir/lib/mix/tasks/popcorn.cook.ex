@@ -42,6 +42,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `extra_apps` | Additional applications to include with their required dependencies. Default: `[]`. |
   | `runtime_variant` | Selects `:core` or `:crypto` instead of automatic runtime selection. |
   | `strip` | Removes BEAM debug and documentation chunks. Default: `true`. |
+  | `exclude_priv` | Leaves out `priv` files matching glob patterns, which are relative to `priv`: `{app, pattern}` in one application's, like `{:phoenix, "templates"}`, and a bare pattern in every application's, like `"static/*.map"`. A matched directory is left out with its contents. Default: `[]`. |
   | `treeshake` | Removes unreachable modules and functions. Experimental. Default: `false`. Set `[preserved_apps: [...]]` to enable. |
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
@@ -113,6 +114,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       runtime_variant: app_name(Application.get_env(:popcorn, :runtime_variant)),
       brotli_effort: Application.get_env(:popcorn, :brotli_effort, :standard),
       strip: Application.get_env(:popcorn, :strip, true),
+      exclude_priv: exclude_priv_options(Application.get_env(:popcorn, :exclude_priv, [])),
       treeshake: treeshake_options(Application.get_env(:popcorn, :treeshake, false))
     ]
 
@@ -129,6 +131,13 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   defp app_name(nil), do: nil
   defp app_name(name), do: to_string(name)
+
+  defp exclude_priv_options(patterns) do
+    Enum.map(patterns, fn
+      {app, pattern} -> {to_string(app), pattern}
+      pattern -> pattern
+    end)
+  end
 
   defp treeshake_options(false), do: false
 
