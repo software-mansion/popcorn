@@ -38,9 +38,28 @@ defmodule Treeshake do
 
   @default_ignore_modules [:prim_eval]
 
+  # `calls` are the calls the tree-shaker can't find, mostly to modules known
+  # only at runtime, by the functions or modules making them. A function
+  # returning the module to call stands for its callers. A called module means
+  # all its public functions.
   @hardcoded %{
     calls: %{
-      Supervisor => [{Supervisor.Default, :init, 1}]
+      Supervisor => [{Supervisor.Default, :init, 1}],
+      {:elixir_config, :identifier_tokenizer, 0} => [{String.Tokenizer, :tokenize, 1}],
+      # The translators from the :logger app's environment
+      Logger.Utils => [{Logger.Translator, :translate, 4}],
+      # The formatter of the default handler, called by :logger
+      Logger.App => [{Logger.Formatter, :format, 2}],
+      # The backend stored in a persistent term (telemetry 1.4)
+      :telemetry_handler_table => [:telemetry_ets, :telemetry_pt],
+      # When it's JSON
+      {Phoenix, :json_library, 0} => [JSON],
+      # `form[field]`: Phoenix.HTML.Form implements Access without declaring
+      # the behaviour
+      Access => [Phoenix.HTML.Form],
+      # Through the form's Phoenix.HTML.FormData implementation, bypassing
+      # the protocol
+      Phoenix.HTML.Form => [Phoenix.HTML.FormData]
     },
     behaviour_impls: %{
       :application_controller => [:gen_server]
