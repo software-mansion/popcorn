@@ -27,7 +27,7 @@ Add the Elixir package to your Mix dependencies:
 
 ```elixir
 defp deps do
-  [{:popcorn, "0.4.0-next.5"}]
+  [{:popcorn, "0.4.0-next.6"}]
 end
 ```
 
@@ -38,7 +38,7 @@ Use `config :popcorn, runtime_variant: :crypto` to override the selection. Both 
 
 Fetch your application dependencies with `mix deps.get` before building its JavaScript assets.
 The bundler plugin invokes `mix popcorn.cook`, which compiles and packages your application and its standard-library dependencies.
-Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.5/mise.toml) for this release.
+Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.6/mise.toml) for this release.
 
 You can also prepare the complete browser asset directory without a JavaScript
 bundler:
@@ -53,9 +53,9 @@ without an entrypoint. Configure all cooking settings there; `--out-dir` is the
 only CLI option and cannot be set in application config. The JS plugins use the
 same configuration. See `mix help popcorn.cook` for the available settings.
 
-Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.5/introduction.html).
-Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.5/first-application.html).
+Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.6/introduction.html).
+Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.6/first-application.html).
 
-The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.5/popcorn/js/README.md)
+The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.6/popcorn/js/README.md)
 contains a short package reference. The versioned documentation contains the
 complete Elixir and JavaScript API reference.
