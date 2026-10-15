@@ -11,9 +11,9 @@ defmodule Treeshake.ReachabilityTest do
   end
 
   # Only start/2 of the application module is reached directly, the rest
-  # through the other callbacks and on_load functions.
+  # through the other callbacks, on_load functions and struct building.
   @tag :tmp_dir
-  test "application callbacks, on_load functions and NIF modules", %{
+  test "application callbacks, on_load functions, NIF modules and structs", %{
     tmp_dir: tmp_dir,
     ebin_files: ebin_files
   } do
@@ -35,6 +35,11 @@ defmodule Treeshake.ReachabilityTest do
     assert functions(output, :nif_module) == [init: 0, nif_stub: 0, unused: 0, used: 0]
 
     assert functions(output, :on_load_dependency) == [init: 0, path: 0]
+
+    # Kernel.struct!/2 calls __struct__/1 of its module, Kernel.struct/2
+    # __struct__/0
+    assert functions(output, :struct_module) == [__struct__: 1]
+    assert functions(output, :other_struct_module) == [__struct__: 0]
   end
 
   defp compile_fixture(input) do

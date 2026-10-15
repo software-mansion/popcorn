@@ -2,7 +2,9 @@
 -behaviour(application).
 -export([start/2, stop/1, prep_stop/1, unused/0]).
 
-start(_Type, _Args) -> {ok, self()}.
+start(_Type, _Args) ->
+    struct_builder:build(),
+    {ok, self()}.
 stop(_State) -> callbacks_stop_dependency:stop().
 prep_stop(State) -> nif_module:used(), declared_nif_module:used(), State.
 unused() -> unused.
