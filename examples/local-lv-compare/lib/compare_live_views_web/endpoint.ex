@@ -28,6 +28,7 @@ defmodule CompareLiveViewsWeb.Endpoint do
     at: "/",
     from: :compare_live_views,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: CompareLiveViewsWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 

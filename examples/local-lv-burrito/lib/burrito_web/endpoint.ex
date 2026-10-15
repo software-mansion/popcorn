@@ -19,6 +19,7 @@ defmodule BurritoWeb.Endpoint do
     at: "/",
     from: :burrito,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     headers: [
       {"Access-Control-Allow-Origin", "*"},
       {"Cross-Origin-Opener-Policy", "same-origin"},
