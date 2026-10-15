@@ -1,0 +1,51 @@
+defmodule Treeshake.ReachabilityTest do
+  use ExUnit.Case, async: true
+
+  @fixture Path.expand("../fixtures/treeshake_reachability", __DIR__)
+
+  # Only start/2 of the application module is reached directly, the rest
+  # through the other callbacks and on_load functions.
+  @tag :tmp_dir
+  test "application callbacks, on_load functions and NIF modules", %{tmp_dir: tmp_dir} do
+    input = Path.join(tmp_dir, "input")
+    output = Path.join(tmp_dir, "output")
+    File.mkdir_p!(input)
+
+    beams =
+      for source <- Path.wildcard(Path.join(@fixture, "*.erl")) do
+        {:ok, _module} =
+          :compile.file(to_charlist(source), [:debug_info, outdir: to_charlist(input)])
+
+        Path.join(input, Path.basename(source, ".erl") <> ".beam")
+      end
+
+    app_file = Path.join(input, "reachability.app")
+    File.cp!(Path.join(@fixture, "reachability.app"), app_file)
+
+    Treeshake.run(ebin_files: [app_file | beams], output_dir: output)
+
+    assert functions(output, :app_callbacks) == [prep_stop: 1, start: 2, stop: 1]
+    assert functions(output, :callbacks_stop_dependency) == [stop: 0]
+
+    # The on_load function is kept with what it calls
+    assert functions(output, :on_load_module) == [init: 0, used: 0]
+
+    # Loading NIFs requires their stubs, which nothing calls, so the ones
+    # declared with -nifs are kept, or everything if there are none
+    assert functions(output, :declared_nif_module) ==
+             [init: 0, nif: 0, private_nif: 1, stub: 0, used: 0]
+
+    assert functions(output, :nif_module) == [init: 0, nif_stub: 0, unused: 0, used: 0]
+
+    assert functions(output, :on_load_dependency) == [init: 0, path: 0]
+  end
+
+  defp functions(output, module) do
+    path = output |> Path.join("#{module}.beam") |> to_charlist()
+    {:ok, {^module, chunks}} = :beam_lib.chunks(path, [:exports, :locals])
+
+    (chunks[:exports] ++ chunks[:locals])
+    |> Enum.reject(fn {name, _arity} -> name == :module_info end)
+    |> Enum.sort()
+  end
+end
