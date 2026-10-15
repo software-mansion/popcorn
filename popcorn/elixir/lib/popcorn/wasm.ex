@@ -38,16 +38,9 @@ defmodule Popcorn.Wasm do
 
   ## Values
 
-  From JS side:
-  - strings become binaries.
-  - arrays become lists.
-  - plain objects become maps with string keys.
-  - `atom()` and `tuple()` helpers send atoms and tuples. Atoms must already exist in the VM.
-
-  From VM side:
-  - Tuples become arrays.
-  - Most atoms become strings, with exception of `true`, `false` and `nil` (mapped to `null`).
-  - PID handles refer to processes in the VM.
+  Messages and `run_js/3` arguments and results are converted between Elixir and JavaScript.
+  See [Sharing values across languages](values.md) for supported types and conversions.
+  Use a `t:tracked_value/0` to keep a JavaScript value's identity.
 
   ## Outside the browser
 

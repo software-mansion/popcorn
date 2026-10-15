@@ -1,16 +1,9 @@
 type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
 
 /**
- * A message value. JavaScript sends use these BEAM conversions:
+ * A value exchanged with BEAM. Containers convert their contents recursively.
  *
- * - Strings become UTF-8 binaries. Booleans become `true` and `false` atoms.
- * - Integers become integers. Other finite numbers become floats.
- * - Arrays become lists.
- * - Plain objects become maps with binary string keys.
- * - `null` and `undefined` become the `nil` atom.
- * - `atom()` and `tuple()` create atoms and tuples. PIDs retain their BEAM identity.
- *
- * Cycles, class instances, functions, symbols, bigints, unsafe integers, and non-finite numbers cause `bridge:unserializable`.
+ * See [Sharing values across languages](values.html) for supported types and conversions.
  */
 export type AnyValue = unknown;
 

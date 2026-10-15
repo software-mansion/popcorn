@@ -1179,10 +1179,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..18cc6cd478bd646311388bb85879bc2a4ce760ce
+index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77dcafd36c
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,202 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1307,12 +1307,61 @@ index 0000000000000000000000000000000000000000..18cc6cd478bd646311388bb85879bc2a
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
 +encode_arg(Pid, Encoder) when is_pid(Pid) ->
 +    json:encode_value(#{popcorn_pid => base64:encode(term_to_binary(Pid))}, Encoder);
-+%% JavaScript has no tuple type, so tuples are normalized to lists. The clause must
-+%% stay below the ones above, which match tuples of their own.
++encode_arg(Integer, Encoder) when is_integer(Integer),
++                                 (Integer > 9007199254740991 orelse Integer < -9007199254740991) ->
++    value_tag(integer, integer_to_binary(Integer), Encoder);
++encode_arg(Binary, Encoder) when is_binary(Binary) ->
++    case unicode:characters_to_binary(Binary, utf8, utf8) of
++        Binary -> json:encode_binary(Binary);
++        _ -> value_tag(binary, base64:encode(Binary), Encoder)
++    end;
++encode_arg(#{'__struct__' := 'Elixir.DateTime'} = DateTime, Encoder) ->
++    #{calendar := Calendar, microsecond := {Microsecond, _}} = DateTime,
++    case Calendar =:= 'Elixir.Calendar.ISO' andalso Microsecond rem 1000 =:= 0 of
++        true -> ok;
++        false -> error({unsupported_type, DateTime})
++    end,
++    Milliseconds = 'Elixir.DateTime':to_unix(DateTime, millisecond),
++    case Milliseconds >= -377705116800000 andalso Milliseconds =< 253402300799999 of
++        true -> value_tag(datetime, integer_to_binary(Milliseconds), Encoder);
++        false -> error({unsupported_type, DateTime})
++    end;
++encode_arg(#{'__struct__' := 'Elixir.MapSet'} = Set, Encoder) ->
++    value_tag(set, 'Elixir.MapSet':to_list(Set), Encoder);
++encode_arg(Map, Encoder) when is_map(Map) ->
++    Entries = [{object_key(Key), Value} || Key := Value <- Map],
++    %% Validate collisions before wrapping a reserved marker-shaped object.
++    Encoded = json:encode_key_value_list_checked(Entries, Encoder),
++    case Entries of
++        [{Key, Value}] when Key =:= <<"popcorn_ref">>; Key =:= <<"popcorn_pid">>;
++                            Key =:= <<"popcorn_value">> ->
++            value_tag(object, [[Key, Value]], Encoder);
++        _ -> Encoded
++    end;
 +encode_arg(Tuple, Encoder) when is_tuple(Tuple) ->
 +    json:encode_value(tuple_to_list(Tuple), Encoder);
++encode_arg(List, Encoder) when is_list(List) ->
++    ensure_proper_list(List),
++    json:encode_value(List, Encoder);
 +encode_arg(Other, Encoder) ->
 +    json:encode_value(Other, Encoder).
++
++value_tag(Tag, Payload, Encoder) ->
++    json:encode_value(#{popcorn_value => [Tag, Payload]}, Encoder).
++
++object_key(Key) when is_atom(Key) -> object_key(atom_to_binary(Key, utf8));
++object_key(Key) when is_integer(Key) -> integer_to_binary(Key);
++object_key(Key) when is_float(Key) -> float_to_binary(Key, [short]);
++object_key(Key) when is_binary(Key) ->
++    case unicode:characters_to_binary(Key, utf8, utf8) of
++        Key -> Key;
++        _ -> error({unsupported_type, Key})
++    end;
++object_key(Key) -> error({unsupported_type, Key}).
++
++ensure_proper_list([]) -> ok;
++ensure_proper_list([_ | Tail]) -> ensure_proper_list(Tail);
++ensure_proper_list(Other) -> error({unsupported_type, Other}).
 +
 +revive_refs(#{<<"popcorn_ref">> := Key} = Marker)
 +  when is_integer(Key), map_size(Marker) =:= 1 ->

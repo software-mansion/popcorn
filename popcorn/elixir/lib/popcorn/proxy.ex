@@ -184,9 +184,8 @@ defmodule Popcorn.Proxy do
   defp send_result(id, {:ok, value}) do
     try do
       reply(id, %{ok: true, value: value})
-    rescue
-      error in ErlangError ->
-        {:unsupported_type, _term} = error.original
+    catch
+      :error, {kind, _term} when kind in [:unsupported_type, :duplicate_key] ->
         reply(id, %{ok: false, error: %{kind: "unserializable"}})
     end
   end
