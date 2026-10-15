@@ -20,11 +20,11 @@ defmodule Mix.Tasks.Llv.Assets do
   #     priv/.assets_hash, so repeated runs are a no-op and only actual source
   #     changes trigger a rebuild.
 
-  @artifacts ~w(local_live_view.js local_live_view.d.ts AtomVM.mjs AtomVM.wasm iframe.mjs)
+  @artifacts ~w(local_live_view.js local_live_view.d.ts)
   @extra_sources ~w(rollup.config.mjs package.json tsconfig.json)
 
-  @popcorn_dist "node_modules/@swmansion/popcorn/dist"
-  @copied_runtime_files ~w(AtomVM.mjs AtomVM.wasm iframe.mjs)
+  # The bundle inlines Popcorn's JS
+  @popcorn_js "node_modules/@swmansion/popcorn/dist/index.mjs"
   # Kept outside priv/static so it stays out of the hex package.
   @hash_file "priv/.assets_hash"
 
@@ -98,7 +98,7 @@ defmodule Mix.Tasks.Llv.Assets do
     Mix.shell().info("[llv] Installing JS dependencies...")
     cmd!("pnpm", ["install"], llv_dir)
 
-    check_popcorn_dist!(llv_dir)
+    check_popcorn_js!(llv_dir)
 
     Mix.shell().info("[llv] Building JS bundle...")
     cmd!("pnpm", ["run", "build"], llv_dir)
@@ -109,22 +109,19 @@ defmodule Mix.Tasks.Llv.Assets do
     end
   end
 
-  # The bundle inlines @swmansion/popcorn and copies the runtime files out of
-  # its dist/. In this repo that package is a workspace link to popcorn/js,
-  # whose dist/ is generated as well — so check it here instead of letting
-  # rollup fail on a bare ENOENT deep inside the plugin.
-  defp check_popcorn_dist!(llv_dir) do
-    dist = Path.join(llv_dir, @popcorn_dist)
+  # In this repo, @swmansion/popcorn is a workspace link to popcorn/js, whose
+  # dist/ is generated as well — so check it here instead of letting rollup
+  # fail on an unresolved import.
+  defp check_popcorn_js!(llv_dir) do
+    popcorn_js = Path.join(llv_dir, @popcorn_js)
 
-    unless File.regular?(Path.join(dist, "AtomVM.wasm")) do
+    unless File.regular?(popcorn_js) do
       Mix.raise("""
-      #{dist} has no AtomVM.wasm.
+      #{popcorn_js} is missing.
 
       Popcorn's JS package has not been built. From the repo root run:
 
-          pnpm -F popcorn build
-
-      It builds AtomVM, so it needs emsdk (see mise.toml).
+          pnpm -F ./popcorn/js build
       """)
     end
   end
@@ -152,7 +149,7 @@ defmodule Mix.Tasks.Llv.Assets do
     sources =
       Path.wildcard(Path.join(llv_dir, "assets/local_live_view/**/*.ts")) ++
         Enum.map(@extra_sources, &Path.join(llv_dir, &1)) ++
-        Enum.map(@copied_runtime_files, &Path.join([llv_dir, @popcorn_dist, &1]))
+        [Path.join(llv_dir, @popcorn_js)]
 
     sources
     |> Enum.sort()

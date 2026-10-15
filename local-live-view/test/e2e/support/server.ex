@@ -8,29 +8,23 @@ defmodule LocalLiveView.E2E.Server do
   @e2e_dir Path.expand("..", __DIR__)
   @llv_dir Path.expand("../../..", __DIR__)
   @js_dir Path.join(@e2e_dir, "priv/static/assets/js")
-  @runtime_files ~w(iframe.mjs AtomVM.mjs AtomVM.wasm)
 
   @doc """
-  Builds LocalLiveView's JS bundle, the local views' Wasm bundle and the
+  Builds LocalLiveView's JS bundle, the local views' Wasm runtime and the
   app's `app.js`, from the current sources.
   """
   def build! do
     Mix.Task.run("llv.assets")
 
-    File.mkdir_p!(Path.join(@js_dir, "wasm"))
-
-    for file <- @runtime_files do
-      File.cp!(Path.join(@llv_dir, "priv/static/#{file}"), Path.join(@js_dir, file))
-    end
-
+    # Where LocalLiveView's JS loads the runtime from by default: next to app.js
     {output, status} =
-      System.cmd("mix", ["build"],
+      System.cmd("mix", ["popcorn.cook", "--out-dir", Path.join(@js_dir, "popcorn")],
         cd: Path.join(@e2e_dir, "local"),
         env: [{"MIX_ENV", "dev"}],
         stderr_to_stdout: true
       )
 
-    if status != 0, do: raise("building the Wasm bundle failed:\n#{output}")
+    if status != 0, do: raise("building the Wasm runtime failed:\n#{output}")
 
     # The esbuild package is held at 0.8 by playwright, and that version only
     # verifies binaries npm signed before rotating its key in 2025.

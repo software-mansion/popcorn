@@ -13,10 +13,8 @@ export class Mirrors {
     this.pop = pop;
   }
 
-  installSync(): void {
-    window.__llvSync = (mirrorId: string, eventName: string, payload: Record<string, unknown>) => {
-      this.channels[mirrorId]?.push(eventName, payload);
-    };
+  sync(mirrorId: string, payload: Record<string, unknown>): void {
+    this.channels[mirrorId]?.push("sync", payload);
   }
 
   ensureChannel(pop_view_el: HTMLElement): void {

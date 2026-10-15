@@ -2,6 +2,8 @@ defmodule FormDemoLocal.User do
   use Ecto.Schema
   import Ecto.Changeset
 
+  # Synced to the server-side mirror, see FormDemoLocal
+  @derive {JSON.Encoder, only: [:username, :email]}
   @primary_key false
   embedded_schema do
     field :username, :string

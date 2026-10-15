@@ -58,5 +58,8 @@ RUN git config --global user.email "ci@ci.local" && \
     git config --global user.name "CI"
 RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
     scripts/build-beam.sh release
+# LocalLiveView (the burrito demo) needs the crypto runtime variant
+RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
+    scripts/build-beam.sh --with-crypto release
 RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
     pnpm -F ./popcorn/js build

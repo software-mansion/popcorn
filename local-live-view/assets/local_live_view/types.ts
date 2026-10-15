@@ -4,13 +4,23 @@ import type { LiveSocketInstanceInterface } from "phoenix_live_view";
 // --- Public API ---
 
 export interface LLVConfig {
-  /** Paths to compiled Wasm bundle files. Defaults to `["wasm/bundle.avm"]` */
-  bundlePaths?: string[];
-  /** Enable Popcorn debug logging */
-  debug?: boolean;
-  /** Callback for raw Popcorn messages */
-  eventHandler?: (msg: unknown) => void;
+  /**
+   * URL of the directory with the Wasm runtime built by `mix llv.build`,
+   * resolved against the URL of the script. Defaults to `"popcorn/"`.
+   */
+  assetsUrl?: string;
+  /** Receives messages sent from the Wasm runtime with `Popcorn.Wasm.send/1` */
+  eventHandler?: (event: unknown) => void;
 }
+
+// --- Wasm runtime events ---
+
+/** Events sent by LocalLiveView.Dispatcher.send_to_js/2. Payloads are JSON-encoded. */
+export type LLVEvent =
+  | { __llv__: "transport_push"; frame: string }
+  | { __llv__: "mirror_sync"; mirror_id: string; payload: string }
+  | { __llv__: "push_server_event"; id: string; event: string; payload: string }
+  | { __llv__: "navigate"; href: string; replace: boolean };
 
 // --- Internal Phoenix types ---
 
@@ -78,11 +88,3 @@ interface PhxLiveSocketInternals {
 
 /** Public LiveSocket interface extended with Phoenix internals accessed by LLV. */
 export type LLVSocket = LiveSocketInstanceInterface & PhxLiveSocketInternals;
-
-declare global {
-  interface Window {
-    __llvPopcornTransportPush?: (frame: TransportFrame) => void;
-    __llvSync?: (id: string, eventName: string, payload: Record<string, unknown>) => void;
-    __llvPushServer?: (llvId: string, event: string, payload: Record<string, unknown>) => void;
-  }
-}

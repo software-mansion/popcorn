@@ -3,7 +3,7 @@ ARG POPCORN_BASE_TAG=latest
 
 FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder
 
-COPY popcorn-2/elixir/ /build/popcorn/popcorn-2/elixir/
+COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
 COPY local-live-view/ /build/popcorn/local-live-view/
 
 WORKDIR /build/popcorn
@@ -21,8 +21,6 @@ RUN mix tailwind.install --if-missing
 RUN mix esbuild.install --if-missing
 
 COPY examples/local-lv-burrito/local/ local/
-RUN cd local && mix deps.get && MIX_TARGET=wasm mix popcorn.cook
-
 RUN mix llv.build
 
 COPY examples/local-lv-burrito/lib/ lib/

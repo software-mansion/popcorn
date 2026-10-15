@@ -1,0 +1,38 @@
+name: Setup LocalLiveView
+description: >-
+  Build the OTP/BEAM Wasm runtime and Popcorn's JS package, and install the
+  toolchain and JS dependencies for LocalLiveView and its examples
+
+runs:
+  using: composite
+  steps:
+    - name: Build OTP/BEAM for Wasm
+      uses: ./.github/actions/build-otp-wasm
+      with:
+        host-otp-version: "29.0.6"
+        build-mode: debug
+        with-crypto: "true"
+
+    - name: Set up Elixir
+      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      with:
+        elixir-version: "1.20.4"
+        otp-version: "29.0.6"
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "24"
+        cache: "pnpm"
+        cache-dependency-path: pnpm-lock.yaml
+
+    - name: Install JS dependencies
+      shell: bash
+      run: pnpm install
+
+    - name: Build Popcorn JS package
+      shell: bash
+      run: pnpm -F ./popcorn/js build

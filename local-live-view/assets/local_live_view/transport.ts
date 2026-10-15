@@ -69,8 +69,13 @@ export function createPopcornSocket(
         return;
       }
 
+      // JSON-encoded, as over a websocket, see LocalLiveView.Dispatcher.Serializer.
+      // The event lets the dispatcher route the frame without decoding it.
       pop
-        .call({ action: "transport_frame", id, frame }, { suppressErrorLog: true })
+        .call(
+          { action: "transport_frame", id, event: frame.event, frame: JSON.stringify(frame) },
+          { suppressErrorLog: true },
+        )
         .then((result) => {
           if (!result.ok) this.ack(frame, "error", result.error);
         });

@@ -18,7 +18,7 @@ Browser                          Server
 │  MyLocal            │          │  Mirror.MyLocal           │
 │  handle_event(...)  │          │  handle_sync(             │
 │    mirror_sync(     │──sync───▶│    local_assigns,         │
-│      socket,        │          │    mirror_assigns,        │ 
+│      socket,        │          │    mirror_assigns,        │
 │      [:count]       │          │    params                 │
 │    )                │          │  )                        │
 └─────────────────────┘          └───────────────────────────┘
@@ -76,6 +76,7 @@ end
 The module must be named `Mirror.<ViewName>` — the view name is the last part of your LocalLiveView module name. `LocalLiveView.Component` auto-detects the mirror module and enables the sync channel when rendering the mount point.
 
 `handle_sync/3` receives:
+
 - `local_assigns` — a map of the synced assigns (keys are strings)
 - `mirror_assigns` — the mirror's current state (what was returned from the previous `handle_sync` call)
 - `params` - a map containing its mirror_id (mirror_id is a composition of parent LV socket id and a LLV dom element id which are assembled via `LocalLiveView.Component.mirror_id/2` function)
@@ -136,14 +137,3 @@ The returned value becomes `mirror_assigns` in the next call, but it is **not** 
 ## Sync frequency
 
 `mirror_sync/2` sends over the wire every time it's called. Call it only when state has changed and the server needs to know — typically at the end of `handle_event/3` when relevant assigns were updated.
-
-## Serialization
-
-Assigns are serialized as a JSON-compatible map before being sent. The following types are supported:
-
-- Primitives: strings, numbers, booleans, nil
-- Lists
-- Maps (keys are converted to strings)
-- Structs (converted to maps via `Map.from_struct/1`)
-
-Atoms, tuples, and PIDs are not serializable and will cause a runtime error if included.

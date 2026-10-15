@@ -111,14 +111,7 @@ defmodule LocalLiveView.Proxy do
   # and, on a page with a main view, sends it `handle_params`, see
   # navigation.ts.
   def handle_info({:llv, :patch, to, replace}, socket) do
-    Popcorn.Wasm.run_js(
-      """
-      ({ args }) => {
-        window.dispatchEvent(new CustomEvent("llv:navigate", { detail: args }));
-      }
-      """,
-      %{href: to, replace: replace}
-    )
+    LocalLiveView.Dispatcher.send_to_js(:navigate, %{href: to, replace: replace})
 
     {:noreply, socket}
   end

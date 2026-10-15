@@ -1,13 +1,7 @@
 import { Popcorn } from "@swmansion/popcorn";
 import type { Socket as PhoenixSocket } from "phoenix";
 import type { Hook, LiveSocketInstanceInterface } from "phoenix_live_view";
-import type {
-  EventBusHook,
-  LLVConfig,
-  LLVSocket,
-  LLVServerEventDetail,
-  TransportFrame,
-} from "./types";
+import type { EventBusHook, LLVConfig, LLVEvent, LLVSocket, LLVServerEventDetail } from "./types";
 import { createPopcornSocket, type PopcornLink } from "./transport";
 import { registerNavigationHandlers } from "./navigation";
 import { registerCustomEventBindings } from "./events";
@@ -20,7 +14,9 @@ export type { PopcornClient };
 
 const DEFAULT_CALL_TIMEOUT_MS = 10_000;
 
-type CallResult = Awaited<ReturnType<Popcorn["call"]>>;
+const DISPATCHER_PROCESS_REF = "local_live_view_dispatcher";
+
+type CallResult = { ok: true; data: unknown } | { ok: false; error: unknown };
 
 class PopcornClient {
   private popcorn: Popcorn | null = null;
@@ -36,23 +32,31 @@ class PopcornClient {
   /**
    * Sends an action to the dispatcher and returns the dispatcher's reply.
    * Error replies are logged by default; pass suppressErrorLog to silence them.
-   * Rejects if the runtime isn't ready or the call itself fails.
    */
   async call(
     message: { action: string; [key: string]: unknown },
     opts?: { suppressErrorLog?: boolean },
   ): Promise<CallResult> {
     let result: CallResult;
-    try {
-      const { popcorn } = this;
-      if (!popcorn) throw new Error("LLV: popcorn call before runtime was ready");
-      result = await popcorn.call(message, { timeoutMs: DEFAULT_CALL_TIMEOUT_MS });
-    } catch (err) {
-      result = {
-        ok: false,
-        error: err instanceof Error ? err : new Error(String(err)),
-        durationMs: 0,
-      };
+    const { popcorn } = this;
+    if (!popcorn) {
+      result = { ok: false, error: new Error("LLV: popcorn call before runtime was ready") };
+    } else {
+      const reply = await popcorn.genserver.call(DISPATCHER_PROCESS_REF, message, {
+        timeoutMs: DEFAULT_CALL_TIMEOUT_MS,
+      });
+      // The dispatcher replies with :ok, {:ok, data} or {:error, reason},
+      // which arrive as "ok", ["ok", data] and ["error", reason].
+      if (!reply.ok) {
+        result = reply;
+      } else if (reply.data == "ok") {
+        result = { ok: true, data: null };
+      } else if (Array.isArray(reply.data)) {
+        const [replyStatus, data] = reply.data;
+        result = replyStatus == "ok" ? { ok: true, data } : { ok: false, error: data };
+      } else {
+        throw new Error(`LLV: invalid dispatcher reply to ${message.action}: ${reply.data}`);
+      }
     }
     if (!result.ok && !opts?.suppressErrorLog) {
       console.error(`LLV ${message.action} error`, result.error);
@@ -112,8 +116,6 @@ export class LLVEngine {
     try {
       await this.bootPopcorn();
 
-      this.mirrors.installSync();
-      this.exposeGlobals();
       registerCustomEventBindings(this.socket);
 
       this.scanAndMount();
@@ -214,40 +216,58 @@ export class LLVEngine {
   }
 
   private async bootPopcorn(): Promise<void> {
-    const popcorn = await Popcorn.init({
-      debug: this.config.debug ?? false,
-      bundlePaths: this.config.bundlePaths ?? ["wasm/bundle.avm"],
-    });
+    // The worker, and the Wasm runtime it loads, are where `mix llv.build`
+    // puts them.
+    const assetsUrl = new URL(this.config.assetsUrl ?? "popcorn/", import.meta.url);
+    const popcorn = new Popcorn({ workerUrl: new URL("worker.mjs", assetsUrl) });
+    popcorn.onEvent((event) => this.handleEvent(event));
+    const result = await popcorn.boot();
+    if (!result.ok) throw result.error;
     this.pop.attach(popcorn);
+  }
 
-    if (this.config.eventHandler) {
-      popcorn.onMessage(this.config.eventHandler);
+  // Events sent from the Wasm runtime by LocalLiveView.Dispatcher.send_to_js/2
+  private handleEvent(event: unknown): void {
+    const llvEvent = event as LLVEvent;
+    switch (llvEvent?.__llv__) {
+      case "transport_push":
+        this.popcornLink.inject(JSON.parse(llvEvent.frame));
+        return;
+      case "mirror_sync":
+        this.mirrors.sync(llvEvent.mirror_id, JSON.parse(llvEvent.payload));
+        return;
+      case "push_server_event":
+        this.pushServerEvent(llvEvent.id, llvEvent.event, JSON.parse(llvEvent.payload));
+        return;
+      case "navigate":
+        window.dispatchEvent(
+          new CustomEvent("llv:navigate", {
+            detail: { href: llvEvent.href, replace: llvEvent.replace },
+          }),
+        );
+        return;
+      default:
+        this.config.eventHandler?.(event);
     }
   }
 
-  private exposeGlobals(): void {
-    window.__llvPopcornTransportPush = (frame: TransportFrame) => {
-      this.popcornLink.inject(frame);
-    };
-
-    window.__llvPushServer = (llvId: string, event: string, payload: Record<string, unknown>) => {
-      const pushError = () =>
-        this.pop.call({
-          action: "dispatch_to_view",
-          id: llvId,
-          payload: { action: "push_error", event, params: payload },
-        });
-      const eventBus = this.eventBusHooks.get(llvId);
-      if (!eventBus) {
-        console.error("LLV push_server_event: no host event bus for view", llvId);
-        pushError();
-        return;
-      }
-      eventBus.pushEvent(event, payload).catch((err: unknown) => {
-        console.error("LLV push_server_event failed", err);
-        pushError();
+  private pushServerEvent(llvId: string, event: string, payload: Record<string, unknown>): void {
+    const pushError = () =>
+      this.pop.call({
+        action: "dispatch_to_view",
+        id: llvId,
+        payload: { action: "push_error", event, params: payload },
       });
-    };
+    const eventBus = this.eventBusHooks.get(llvId);
+    if (!eventBus) {
+      console.error("LLV push_server_event: no host event bus for view", llvId);
+      pushError();
+      return;
+    }
+    eventBus.pushEvent(event, payload).catch((err: unknown) => {
+      console.error("LLV push_server_event failed", err);
+      pushError();
+    });
   }
 
   // Startup scan: mount every [data-pop-view] present now that Popcorn is up.

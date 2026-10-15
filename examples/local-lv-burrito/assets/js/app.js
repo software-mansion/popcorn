@@ -346,9 +346,7 @@ window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
 
 import { LLVEngine } from "local_live_view";
 
-const llvEngine = LLVEngine.create(liveSocket, {
-  bundlePaths: ["/assets/js/wasm/bundle.avm"],
-});
+const llvEngine = LLVEngine.create(liveSocket);
 
 liveSocket.connect();
 window.liveSocket = liveSocket;

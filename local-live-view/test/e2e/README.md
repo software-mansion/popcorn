@@ -28,7 +28,7 @@ cd test/e2e/playwright && BASE_URL=http://localhost:4905 pnpm test
   local view (`Patcher`), a patch link, or a regular LiveView (`LayoutLive`)
   outside the page's own views.
 - `local/`: the local views. They're compiled into local_live_view's test
-  build, for server-side rendering, and built to the Wasm bundle by the
+  build, for server-side rendering, and packaged for the Wasm runtime as the
   `local/mix.exs` project.
 - `assets/app.js`: the app's JS, bundled with esbuild.
 

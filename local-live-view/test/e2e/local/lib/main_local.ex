@@ -25,7 +25,7 @@ defmodule MainLocal do
      assign(socket,
        tab: params["tab"] || "none",
        uri: uri,
-       path: path(uri),
+       path: URI.parse(uri).path || "/",
        params_calls: socket.assigns.params_calls + 1
      )}
   end
@@ -83,15 +83,5 @@ defmodule MainLocal do
       <p id="main-submitted">submitted: {@submitted}</p>
     </div>
     """
-  end
-
-  # URI.parse/1 needs regexes, which AtomVM doesn't support.
-  defp path(uri) do
-    [_scheme, rest] = String.split(uri, "://", parts: 2)
-
-    case String.split(rest, "/", parts: 2) do
-      [_authority, path] -> "/" <> hd(String.split(path, ["?", "#"], parts: 2))
-      [_authority] -> "/"
-    end
   end
 end

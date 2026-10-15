@@ -11,6 +11,9 @@ on:
     paths: &llv_paths
       - "examples/local-lv-compare/**"
       - "local-live-view/**"
+      - "popcorn/elixir/**"
+      - "popcorn/js/**"
+      - "popcorn/patches/**"
       - ".github/workflows/local_lv_compare_test.yml"
       - ".github/actions/**"
       - "pnpm-workspace.yaml"
@@ -34,7 +37,7 @@ env:
 
 jobs:
   # The online half is a regular Phoenix LiveView app, tested on the BEAM
-  # with Phoenix.LiveViewTest (no AtomVM involved).
+  # with Phoenix.LiveViewTest (no Wasm involved).
   online:
     name: Online (Phoenix LiveView, BEAM)
     runs-on: ubuntu-22.04
@@ -47,8 +50,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
+      # Matches the toolchain the local views are built with, see setup-llv.
+      - name: Set up Elixir
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.20.4"
+          otp-version: "29.0.6"
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
@@ -63,10 +70,10 @@ jobs:
       - name: Run tests
         run: mix test
 
-  # The offline half is a LocalLiveView app that runs in the browser via AtomVM.
-  # We test it headless on the native (unix) AtomVM through Popcorn.Support.AtomVM.
-  offline-atomvm:
-    name: Offline (LocalLiveView, AtomVM)
+  # The offline half is a LocalLiveView app that runs in the browser on
+  # Popcorn's Wasm BEAM. Its views are plain Elixir, so they're tested natively.
+  offline:
+    name: Offline (LocalLiveView)
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
@@ -77,22 +84,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install JS dependencies
-        run: pnpm install
-        working-directory: .
+      - name: Setup LocalLiveView
+        uses: ./.github/actions/setup-llv
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
@@ -104,22 +97,12 @@ jobs:
       - name: Install Hex dependencies
         run: mix deps.get
 
-      # Builds the native AtomVM binary the tests run on. Cached by the action
-      # across runs (keyed on the FissionVM commit). The test_helper points
-      # :atomvm_unix_runtime_path at this exact location.
-      - name: Build AtomVM
-        uses: ./.github/actions/build-atomvm
-        with:
-          working-directory: examples/local-lv-compare/local
-          build-mode: debug-unix
-          outdir: test/popcorn_runtime_source/artifacts/unix
-          cmake-opts: "SANITIZER=OFF"
-
       - name: Run tests
         run: mix test
 
-      # The host app is only exercised here, after AtomVM exists: `mix setup`
-      # builds the JS bundle and the Wasm bundle, neither of which is committed.
+      # The host app is only exercised here, where the Wasm runtime is built:
+      # `mix setup` builds the JS bundle and packages the local views, neither of
+      # which is committed.
       - name: Verify setup and phx.server
         uses: ./.github/actions/verify-llv-app
         with:

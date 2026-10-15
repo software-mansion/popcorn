@@ -12,6 +12,10 @@ on:
       - "examples/local-lv-kanban/**"
       - "local-live-view/**"
       - ".github/workflows/local_lv_kanban_e2e_test.yml"
+      - ".github/actions/setup-llv/action.yml"
+      - "popcorn/elixir/**"
+      - "popcorn/js/**"
+      - "popcorn/patches/**"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
 
@@ -58,22 +62,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install JS dependencies
-        run: pnpm install
-        working-directory: .
+      - name: Setup LocalLiveView
+        uses: ./.github/actions/setup-llv
 
       - name: Restore dependencies cache
         uses: actions/cache@v4
