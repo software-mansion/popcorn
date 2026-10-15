@@ -76,6 +76,21 @@ defmodule Popcorn.PackagerTest do
     assert %{"runtimeVariant" => "core", "entrypoint" => "popcorn"} = output_manifest
   end
 
+  @tag :tmp_dir
+  test "build/1: starting an entrypoint requires Popcorn", %{tmp_dir: tmp_dir} do
+    ebin_dir = Path.join(tmp_dir, "build/app/ebin")
+    File.mkdir_p!(ebin_dir)
+    app = {:application, :app, [vsn: ~c"0.1.0", modules: [], applications: [:kernel, :stdlib]]}
+    File.write!(Path.join(ebin_dir, "app.app"), :io_lib.format(~c"~p.~n", [app]))
+
+    assert {:error, %{code: "missing_boot_app", app: "popcorn"}} =
+             Packager.build(
+               build_path: Path.join(tmp_dir, "build"),
+               out_dir: Path.join(tmp_dir, "out"),
+               app: "app"
+             )
+  end
+
   defp read_archive(path) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
     Map.new(entries, fn {name, contents} -> {to_string(name), contents} end)

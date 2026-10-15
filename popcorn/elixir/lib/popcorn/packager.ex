@@ -34,6 +34,10 @@ defmodule Popcorn.Packager do
   # All of them should be in elixir's transitive dependency closure
   @base_apps ["elixir"]
 
+  # The VM starts the entrypoint with Popcorn.Boot, from Popcorn's application
+  @boot_app "popcorn"
+  @boot_function {Popcorn.Boot, :start, 1}
+
   @type options :: [
           {:root_dir, Path.t()}
           | {:build_path, Path.t()}
@@ -593,7 +597,7 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: preserved_modules,
+        keep: [@boot_function | preserved_modules],
         leave: preserved_modules
       )
 
@@ -685,7 +689,11 @@ defmodule Popcorn.Packager do
   # doesn't need a stub application just to depend on one.
   defp entrypoint_roots(all_apps_info, entrypoint)
        when is_map_key(all_apps_info, entrypoint) do
-    {:ok, [entrypoint | @base_apps]}
+    if is_map_key(all_apps_info, @boot_app) do
+      {:ok, [entrypoint, @boot_app | @base_apps]}
+    else
+      err(:missing_boot_app, @boot_app)
+    end
   end
 
   defp entrypoint_roots(_all_apps_info, entrypoint),
@@ -858,6 +866,10 @@ defmodule Popcorn.Packager do
     "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
   end
 
+  def format_error(%{code: "missing_boot_app", app: app}) do
+    "Starting the entrypoint requires the #{app} application, which is not available."
+  end
+
   def format_error(%{code: "treeshake_failed", message: message}), do: message
 
   def format_error(%{code: "missing_runtime_resource", path: path}) do
@@ -905,6 +917,10 @@ defmodule Popcorn.Packager do
 
   defp err(:unknown_preserved_apps, apps) do
     {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:missing_boot_app, app) do
+    {:error, %{code: "missing_boot_app", app: app}}
   end
 
   defp err(:treeshake_failed, message) do

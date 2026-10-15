@@ -23,10 +23,9 @@ const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
 const MANIFEST_NAME = "manifest.json";
-const ENTRYPOINT_READY_EXPR =
-  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}})';
-const ENTRYPOINT_FAILED_EXPR =
-  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_failed">>}})';
+// Starts the entrypoint and sends `boot_ready` or `boot_failed`, see
+// Popcorn.Boot in the Elixir package
+const BOOT_MODULE = "Elixir.Popcorn.Boot";
 
 // https://www.erlang.org/doc/apps/erts/inet_cfg.html
 const INETRC_PATH = "/etc/inetrc";
@@ -265,10 +264,7 @@ function buildArgs({
   }
 
   if (entrypoint !== null) {
-    args.push(
-      "-eval",
-      `case application:ensure_all_started(${entrypoint}) of {ok, _} -> ${ENTRYPOINT_READY_EXPR}; _ -> ${ENTRYPOINT_FAILED_EXPR}, erlang:halt(1) end.`,
-    );
+    args.push("-run", BOOT_MODULE, "start", entrypoint);
   }
 
   for (const arg of extra) {
