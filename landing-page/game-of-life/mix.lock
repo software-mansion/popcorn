@@ -1,4 +1,5 @@
 %{
   "brotli": {:hex, :brotli, "0.3.3", "904098c11e08a81768a358514c89468a1ef98ce2303bb865431c28fbd534d1da", [:rebar3], [], "hexpm", "3aa6658786bfe97b2aee2710e1bdac6b5125dce0c6299b95842163d7541c7f2f"},
+  "file_system": {:hex, :file_system, "1.1.1", "31864f4685b0148f25bd3fbef2b1228457c0c89024ad67f7a81a3ffbc0bbad3a", [:mix], [], "hexpm", "7a15ff97dfe526aeefb090a7a9d3d03aa907e100e262a0f8f7746b78f8f87a5d"},
   "jason": {:hex, :jason, "1.4.5", "2e3a008590b0b8d7388c20293e9dcc9cf3e5d642fd2a114e4cbbb52e595d940a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0 or ~> 3.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "b0c823996102bcd0239b3c2444eb00409b72f6a140c1950bc8b457d836b30684"},
 }

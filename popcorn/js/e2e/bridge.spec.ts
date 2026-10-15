@@ -150,7 +150,7 @@ test.describe("ETF", () => {
 
 test.describe("events", () => {
   test("bytes and integers", async ({ otp, page }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
       true = register(term_receiver, self()),
       ok = wasm:send(#{bridge_ready => true}),
@@ -176,7 +176,7 @@ test.describe("events", () => {
       const bytes = new DataView(storage.buffer, 1, 3);
       return [bytes, integer, 42n];
     }, LARGE_INTEGER);
-    const sent = await otp.send("term_receiver", payload);
+    const sent = await otp.trySend("term_receiver", payload);
     assert(sent.ok);
     await payload.dispose();
 
@@ -201,7 +201,7 @@ test.describe("events", () => {
   });
 
   test("native containers", async ({ otp, page }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
       true = register(term_receiver, self()),
       ok = wasm:send(#{bridge_ready => true}),
@@ -235,7 +235,7 @@ test.describe("events", () => {
       const map = new Map([["key", 42]]);
       return [date, set, map, Symbol.for("ok")];
     });
-    const sent = await otp.send("term_receiver", payload);
+    const sent = await otp.trySend("term_receiver", payload);
     assert(sent.ok);
     await payload.dispose();
     expect(await otp.waitForEvent("containers")).toEqual({ containers: true });
@@ -268,7 +268,7 @@ test.describe("events", () => {
     const unknown = await page.evaluateHandle(() =>
       Symbol("popcorn_unknown_symbol_atom"),
     );
-    const result = await otp.send("term_receiver", unknown);
+    const result = await otp.trySend("term_receiver", unknown);
     assert(!result.ok);
     assert.equal(result.error.t, "bridge:unserializable");
     await unknown.dispose();

@@ -1,4 +1,5 @@
 %{
+  "brotli": {:hex, :brotli, "0.3.3", "904098c11e08a81768a358514c89468a1ef98ce2303bb865431c28fbd534d1da", [:rebar3], [], "hexpm", "3aa6658786bfe97b2aee2710e1bdac6b5125dce0c6299b95842163d7541c7f2f"},
   "decimal": {:hex, :decimal, "3.1.1", "430d87b04011ce6cbd4fd205be758311a81f87d552d40904abd00f015935b1d0", [:mix], [], "hexpm", "c5f25f2ced74a0587d03e6023f595db8e924c9d3922c8c8ffd9edfc4498cf1f6"},
   "ecto": {:hex, :ecto, "3.14.2", "99db28a864293a789c970651de711e3cae184291e0e7ea1166c54055ac41c1f3", [:mix], [{:decimal, "~> 3.0", [hex: :decimal, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: true]}, {:telemetry, "~> 0.4 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "25d60b8c816a07d19d85b80bdf60978bd8b102209dda198d768cd7c6745339a6"},
   "ex_ast": {:hex, :ex_ast, "0.13.1", "b3d80ec163733176f63662ac44d2511445c224f6b5e4e3ce01f5eff83c4a5993", [:mix], [{:jason, "~> 1.4", [hex: :jason, repo: "hexpm", optional: false]}, {:sourceror, "~> 1.7", [hex: :sourceror, repo: "hexpm", optional: false]}], "hexpm", "bd15f68cde5ec945b859bd67416f26cf5499f1aef9b067eb2163ed244c7e703a"},

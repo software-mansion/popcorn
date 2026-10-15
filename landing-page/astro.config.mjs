@@ -1,7 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import { execFile } from "node:child_process";
-import { copyFile, mkdir } from "node:fs/promises";
+import { cp, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -12,9 +12,7 @@ const run = promisify(execFile);
 const gameOfLifeRoot = fileURLToPath(
   new URL("./game-of-life", import.meta.url),
 );
-const pongRoot = fileURLToPath(
-  new URL("./pong", import.meta.url),
-);
+const pongRoot = fileURLToPath(new URL("./pong", import.meta.url));
 const publicRoot = fileURLToPath(new URL("./public", import.meta.url));
 
 function compileGameOfLife() {
@@ -41,27 +39,14 @@ function compilePong() {
           cwd: pongRoot,
         });
 
-        const runtimeRoot = `${pongRoot}/priv/static/assets/js`;
-        await mkdir(`${publicRoot}/_astro`, { recursive: true });
-        await mkdir(`${publicRoot}/wasm`, { recursive: true });
-        await Promise.all([
-          copyFile(
-            `${runtimeRoot}/AtomVM.mjs`,
-            `${publicRoot}/_astro/AtomVM.mjs`,
-          ),
-          copyFile(
-            `${runtimeRoot}/AtomVM.wasm`,
-            `${publicRoot}/_astro/AtomVM.wasm`,
-          ),
-          copyFile(
-            `${runtimeRoot}/iframe.mjs`,
-            `${publicRoot}/_astro/iframe.mjs`,
-          ),
-          copyFile(
-            `${runtimeRoot}/wasm/bundle.avm`,
-            `${publicRoot}/wasm/local_pong.avm`,
-          ),
-        ]);
+        await mkdir(publicRoot, { recursive: true });
+        await cp(
+          `${pongRoot}/priv/static/assets/js/popcorn`,
+          `${publicRoot}/pong`,
+          {
+            recursive: true,
+          },
+        );
       },
     },
   };
@@ -78,6 +63,17 @@ export default defineConfig({
     chromeDevtoolsWorkspace: true,
   },
   vite: {
+    resolve: {
+      alias: {
+        // Let Vite resolve Popcorn's worker relative to its package.
+        local_live_view: fileURLToPath(
+          new URL(
+            "../local-live-view/assets/local_live_view/index.ts",
+            import.meta.url,
+          ),
+        ),
+      },
+    },
     plugins: [
       popcorn({
         rootDir: gameOfLifeRoot,

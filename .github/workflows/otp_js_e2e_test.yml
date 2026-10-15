@@ -83,6 +83,10 @@ jobs:
           elixir-version: "1.20.4"
           otp-version: *host_otp
 
+      - name: Typecheck e2e tests
+        run: pnpm lint:e2e
+        working-directory: popcorn/js
+
       - name: Run e2e tests
         run: pnpm e2e
         working-directory: popcorn/js
