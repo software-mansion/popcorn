@@ -6,3 +6,8 @@ config :popcorn,
   exclude_priv: ["static", phoenix: "templates", local_live_view: "*"],
   # Removes the code the local views don't use
   treeshake: []
+
+if config_env() == :prod do
+  # Smaller, but too slow for the watcher to rebuild with on every change
+  config :popcorn, brotli_effort: :max
+end
