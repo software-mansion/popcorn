@@ -119,6 +119,75 @@ defmodule Popcorn.Packager do
     :win32reg
   ]
 
+  # Tree-shaking leaves kernel and stdlib modules by default, but these are
+  # tree-shaken like others, as Popcorn uses little or nothing of them: it has
+  # no shell, networking or distribution. Careful when adding: the calls in
+  # left modules are followed only from functions that tree-shaking finds
+  # reachable, which misses the ones running in kernel processes, like
+  # prim_tty's calls to io_ansi.
+  @shakable_stdlib [
+    # shell and tooling
+    :argparse,
+    :c,
+    :erl_abstract_code,
+    :erl_debugger,
+    :erl_expand_records,
+    :escript,
+    :man_docs,
+    :otp_internal,
+    :seq_trace,
+    :shell_default,
+    :shell_docs,
+    :shell_docs_markdown,
+    :trace,
+    # networking and distribution
+    :auth,
+    :erl_ddll,
+    :erpc,
+    :gen_sctp,
+    :inet6_sctp,
+    :inet6_tcp,
+    :inet6_tcp_dist,
+    :inet6_udp,
+    :inet_dns_tsig,
+    :inet_epmd_dist,
+    :inet_epmd_socket,
+    :inet_gethost_native,
+    :inet_hosts,
+    :inet_parse,
+    :inet_res,
+    :inet_sctp,
+    :inet_tcp,
+    :inet_tcp_dist,
+    :kernel_config,
+    :local_tcp,
+    :local_udp,
+    :net_adm,
+    :peer,
+    :pg2,
+    :pool,
+    :slave,
+    # storage and logging backends
+    :dets_server,
+    :dets_sup,
+    :error_logger_file_h,
+    :error_logger_tty_h,
+    :log_mf_h,
+    :logger_disk_log_h,
+    :logger_handler,
+    :wrap_log_reader,
+    :zstd,
+    # data structures and others
+    :array,
+    :dict,
+    :digraph,
+    :digraph_utils,
+    :erl_reply,
+    :gen_fsm,
+    :graph,
+    :random
+  ]
+
   defp strip_tarball(path, out_dir) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
 
@@ -767,6 +836,7 @@ defmodule Popcorn.Packager do
         output_dir: output_dir,
         keep: [@boot_function | kept(staged_apps) ++ preserved_modules ++ keep],
         leave: preserved_modules,
+        shake: @shakable_stdlib,
         drop: drop
       )
 
