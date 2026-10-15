@@ -36,7 +36,12 @@ defmodule Treeshake.ReachabilityTest do
     app_file = Path.join(input, "reachability.app")
     File.cp!(Path.join(@fixture, "reachability.app"), app_file)
 
-    Treeshake.run(ebin_files: [app_file | beams], output_dir: output)
+    stats =
+      Treeshake.run(
+        ebin_files: [app_file | beams],
+        output_dir: output,
+        keep: [%{referenced_modules_defining: {:schema_marker, 0}}]
+      )
 
     assert functions(output, :app_callbacks) == [prep_stop: 1, start: 2, stop: 1]
     assert functions(output, :callbacks_stop_dependency) == [stop: 0]
@@ -64,6 +69,12 @@ defmodule Treeshake.ReachabilityTest do
     assert {:__generated__, 0} in generated_impl
     assert {:run, 0} in generated_impl
     refute {:unused, 0} in generated_impl
+
+    # Kept whole for defining schema_marker/0 once referenced, though nothing
+    # calls it, and removed if not referenced
+    assert functions(output, :schema_like) == [other: 0, schema_marker: 0]
+    assert :unreferenced_schema_like in stats.modules_removed
+    assert :not_schema_like in stats.modules_removed
   end
 
   defp functions(output, module) do
