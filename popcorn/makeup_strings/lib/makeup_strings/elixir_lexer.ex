@@ -3,7 +3,7 @@ defmodule MakeupStrings.ElixirLexer do
   Highlights configured string arguments with another registered Makeup lexer.
 
   Each configured MFA uses its arity as the maximum call arity. For example,
-  `{Popcorn.Wasm, :run_js, 3}` matches `run_js/1`, `run_js/2`, and `run_js/3`.
+  `{Popcorn.JS, :run, 3}` matches `run/1`, `run/2`, and `run/3`.
   Piped values count as the first argument.
   """
 

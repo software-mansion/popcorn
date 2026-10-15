@@ -54,7 +54,7 @@ sequenceDiagram
     IF->>WM: Initialize Wasm module
     WM->>AVM: Start AtomVM runtime
     AVM->>EA: Load and start application
-    EA->>AVM: Wasm.send_elixir_ready()
+    EA->>AVM: JS.send_elixir_ready()
     AVM->>WM: Elixir ready signal
     WM->>IF: Runtime initialized
     IF->>MW: Ready for communication

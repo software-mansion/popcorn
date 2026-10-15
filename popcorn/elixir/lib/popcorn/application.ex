@@ -17,7 +17,7 @@ defmodule Popcorn.Application do
     require Logger
 
     defp install_req_adapter do
-      if Popcorn.Wasm.available?() and Code.ensure_loaded?(Req) do
+      if Popcorn.JS.available?() and Code.ensure_loaded?(Req) do
         opts = Application.get_env(:req, :default_options, [])
 
         if not Keyword.has_key?(opts, :adapter) do

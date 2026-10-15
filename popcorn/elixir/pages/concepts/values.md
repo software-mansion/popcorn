@@ -56,7 +56,7 @@ PID handles are only usable in the VM instance and boot that created them.
 Some JavaScript values cannot become BEAM terms. Examples include DOM nodes,
 abort controllers, and library objects.
 
-Return `new TrackedValue(value, cleanup)` from `run_js` to create an opaque
+Return `new TrackedValue(value, cleanup)` from `run` to create an opaque
 handle. Keep the handle in BEAM state while you need the JavaScript value.
 
 Popcorn runs `cleanup` after the handle is released or the virtual machine

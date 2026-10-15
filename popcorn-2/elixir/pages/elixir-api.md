@@ -3,7 +3,7 @@ title: Elixir API
 description: Reference of APIs available in Elixir
 ---
 
-`Popcorn.Wasm` module handles communication with JS and provides APIs for running JavaScript code from Elixir.
+`Popcorn.JS` module handles communication with JS and provides APIs for running JavaScript code from Elixir.
 
 ## Types
 
@@ -29,8 +29,8 @@ Events sent during startup (before `Popcorn.init()` resolves on the JS side) are
 **Example:**
 
 ```elixir
-Popcorn.Wasm.send_event("processing_finished", %{id: 123})
-Popcorn.Wasm.send_event("simple_event")
+Popcorn.JS.send_event("processing_finished", %{id: 123})
+Popcorn.JS.send_event("simple_event")
 ```
 
 ### `ready(name \\ nil)`
@@ -49,10 +49,10 @@ Optionally registers the calling process as the default receiver under `name`, w
 
 ```elixir
 # Without default receiver
-Popcorn.Wasm.ready()
+Popcorn.JS.ready()
 
 # With default receiver
-Popcorn.Wasm.ready(:main)
+Popcorn.JS.ready(:main)
 ```
 
 **Notes:**
@@ -73,7 +73,7 @@ Sets the default receiver process for JS calls/casts. Registers the calling proc
 **Example:**
 
 ```elixir
-Popcorn.Wasm.set_default_receiver(:main)
+Popcorn.JS.set_default_receiver(:main)
 ```
 
 ### `handle_message!(raw_message, handler)`
@@ -106,7 +106,7 @@ Popcorn expects handler to return one of the following:
 **Example**
 
 ```elixir
-Popcorn.Wasm.handle_message!(raw_msg, fn
+Popcorn.JS.handle_message!(raw_msg, fn
   {:wasm_call, data} -> {:resolve, "success", data}
   {:wasm_cast, data} -> :ok
   {:wasm_event, :click, event_data, custom} -> handle_click(event_data)
@@ -123,7 +123,7 @@ Guard that returns true if argument is a message from JS side.
 
 ## Running JS
 
-### `run_js(function, args, opts)`
+### `run(function, args, opts)`
 
 Runs JS code in the Wasm iframe context and returns tracked objects. Also comes as raising variation that returns results directly.
 
@@ -152,7 +152,7 @@ JS function should return either single value, array of values or nothing. See n
 **Example**
 
 ```elixir
-Popcorn.Wasm.run_js("""
+Popcorn.JS.run("""
 ({ args }) => {
   const element = document.getElementById(args.id);
   return [element];
@@ -164,7 +164,7 @@ Popcorn.Wasm.run_js("""
 **Notes:**
 
 - `window` and `document` are shadowed to reference parent window for DOM access. If you need to use window from iframe, use `iframeWindow` property.
-- If you plan to return multiple objects, you should use `return: :refs` or `return: :values` instead of calling `run_js` in a loop. This makes performance penalty of invoking JS and serialization/deserialization smaller.
+- If you plan to return multiple objects, you should use `return: :refs` or `return: :values` instead of calling `run` in a loop. This makes performance penalty of invoking JS and serialization/deserialization smaller.
 - `wasm` argument passed to JS function is a emscripten's instantiated wasm module.
   It does not have same crash and timeout resiliency as `Popcorn` object. This matters when calling `wasm.call()` which may hang the runtime if used improperly.
 
@@ -201,7 +201,7 @@ Registers event listener for DOM element. Events are sent as `:wasm_event` messa
 **Example**
 
 ```elixir
-{:ok, cleanup_ref} = Popcorn.Wasm.register_event_listener(:click, [
+{:ok, cleanup_ref} = Popcorn.JS.register_event_listener(:click, [
   target_node: button_ref,
   event_receiver: "click_handler",
   event_keys: [:clientX, :clientY],

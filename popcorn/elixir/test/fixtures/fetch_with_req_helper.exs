@@ -4,7 +4,7 @@ Logger.configure(level: :warning)
 assert Code.ensure_loaded?(Req)
 assert :ok = Application.load(:req)
 Code.compile_string("defmodule :wasm do\n  def run_js(_, _, _), do: nil\nend")
-assert Popcorn.Wasm.available?()
+assert Popcorn.JS.available?()
 
 for opts <- [[receive_timeout: 1_000], [adapter: CustomAdapter, receive_timeout: 1_000]] do
   Application.put_env(:req, :default_options, opts)

@@ -21,7 +21,7 @@ defmodule BurritoLive do
 
   def mount(_params, _session, socket) do
     if connected?(socket) do
-      Popcorn.Wasm.run_js("""
+      Popcorn.JS.run("""
       () => window.dispatchEvent(new CustomEvent("llv:ready"))
       """)
     end

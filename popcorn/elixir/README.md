@@ -17,7 +17,7 @@ Browser restrictions still apply to the VM, including limits on operating-system
 ## APIs
 
 - [JavaScript API](JSLib.Popcorn.html): start and stop the VM, send messages, and connect terminal input and output.
-- `Popcorn.Wasm`: send messages to JavaScript and call JavaScript functions from Elixir.
+- `Popcorn.JS`: send messages to JavaScript and call JavaScript functions from Elixir.
 - `Popcorn.Proxy`: connect JavaScript calls and casts to your application's GenServers.
 - `Popcorn.Fetch`: send HTTP requests through the browser, directly or with Req.
 

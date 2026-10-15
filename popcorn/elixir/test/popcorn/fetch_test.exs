@@ -2,7 +2,7 @@ defmodule Popcorn.FetchTest do
   use ExUnit.Case, async: false
 
   alias Popcorn.Fetch
-  alias Popcorn.Wasm.FakeBridge
+  alias Popcorn.JS.FakeBridge
 
   # Not UTF-8: catches any path that routes bytes through a JS string.
   @binary <<255, 0, 65, 254>>

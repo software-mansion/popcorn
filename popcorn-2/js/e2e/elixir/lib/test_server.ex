@@ -1,7 +1,7 @@
 defmodule TestServer do
   use GenServer
-  import Popcorn.Wasm, only: [is_wasm_message: 1]
-  alias Popcorn.Wasm
+  import Popcorn.JS, only: [is_wasm_message: 1]
+  alias Popcorn.JS
 
   @process_name :main
 
@@ -11,13 +11,13 @@ defmodule TestServer do
 
   @impl GenServer
   def init(_args) do
-    Wasm.ready(@process_name)
+    JS.ready(@process_name)
     {:ok, nil}
   end
 
   @impl GenServer
   def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = Wasm.handle_message!(raw_msg, &handle_wasm(&1, state))
+    new_state = JS.handle_message!(raw_msg, &handle_wasm(&1, state))
     {:noreply, new_state}
   end
 
@@ -36,7 +36,7 @@ defmodule TestServer do
   end
 
   defp handle_wasm({:wasm_call, %{"action" => "send_event", "name" => name, "payload" => payload}}, state) do
-    Wasm.send_event(name, payload)
+    JS.send_event(name, payload)
     {:resolve, %{"sent" => true}, state}
   end
 

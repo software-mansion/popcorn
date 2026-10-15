@@ -1,7 +1,7 @@
-defmodule Popcorn.Wasm.FakeBridge do
+defmodule Popcorn.JS.FakeBridge do
   @moduledoc false
   # Stands in for the runtime's `:wasm` module, which only exists in the
-  # browser, so `Popcorn.Wasm` can be tested on the host. Raises what the real
+  # browser, so `Popcorn.JS` can be tested on the host. Raises what the real
   # one raises. See `wasm.erl`.
   #
   # `Popcorn.Fetch`'s JavaScript is not executed; instead a canned response set

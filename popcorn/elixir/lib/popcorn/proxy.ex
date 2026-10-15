@@ -13,7 +13,7 @@ defmodule Popcorn.Proxy do
   - Targets can be registered names or PID handles from the same VM.
   - On non-Wasm environments it returns `:ignore` from `start_link/2`.
 
-  See `Popcorn.Wasm` for value conversions.
+  See `Popcorn.JS` for value conversions.
 
   ## Example
 
@@ -71,7 +71,7 @@ defmodule Popcorn.Proxy do
 
   use GenServer
 
-  alias Popcorn.Wasm
+  alias Popcorn.JS
 
   @doc """
   Starts a proxy linked to the current process.
@@ -84,7 +84,7 @@ defmodule Popcorn.Proxy do
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
-    if Wasm.available?() do
+    if JS.available?() do
       {name, opts} = Keyword.pop(opts, :name, @default_name)
       GenServer.start_link(__MODULE__, opts, name: name)
     else
@@ -198,7 +198,7 @@ defmodule Popcorn.Proxy do
   end
 
   defp reply(id, payload) do
-    Wasm.send(%{_popcorn: %{t: :proxy, id: id, payload: payload}})
+    JS.send(%{_popcorn: %{t: :proxy, id: id, payload: payload}})
   end
 
   defp whereis(pid) when is_pid(pid), do: if(Process.alive?(pid), do: pid)

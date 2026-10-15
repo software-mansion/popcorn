@@ -12,7 +12,7 @@ The guide uses Vite, but the Rollup and esbuild plugins use the same options.
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AtomVM runs in a hidden iframe.                                | The Erlang/OTP BEAM runs in a Web Worker.                                                                                                                     |
 | `mix popcorn.cook` creates one `.avm` bundle.                  | `mix popcorn.cook` packages application to set of tarballs.                                                                                                   |
-| The application calls `Popcorn.Wasm.ready/1`.                  | OTP starts the application through its normal application callback. You can use `Popcorn.Wasm.await_ready/1` to wait for JavaScript initialization to finish. |
+| The application calls `Popcorn.Wasm.ready/1`.                  | OTP starts the application through its normal application callback. You can use `Popcorn.JS.await_ready/1` to wait for JavaScript initialization to finish. |
 | `cast()` and `calls()` are plain messages, processed manually. | JavaScript can use normal GenServer calls and casts.                                                                                                          |
 | JavaScript methods can throw on errors.                        | Bridge operations throw; `try*` variants return typed result objects.                                                                               |
 
@@ -48,6 +48,13 @@ Then get the dependencies and compile the application:
 mix deps.get
 mix compile
 ```
+
+## Rename the Elixir JavaScript API
+
+Replace `Popcorn.Wasm` with `Popcorn.JS` in module references, aliases, and imports.
+Rename `run_js/3` and `run_js!/3` calls to `run/3` and `run!/3`.
+For example, replace `alias Popcorn.Wasm` and `Wasm.run_js/3` with
+`alias Popcorn.JS` and `JS.run/3`.
 
 ## Use normal OTP application startup
 
@@ -268,7 +275,7 @@ The process receives this message:
 {:wasm, %{"action" => "refresh"}}
 ```
 
-Match the tuple directly or use `Popcorn.Wasm.is_message/1` in a guard.
+Match the tuple directly or use `Popcorn.JS.is_message/1` in a guard.
 This operation does not use `Popcorn.Proxy`.
 
 ## Update events sent to JavaScript
@@ -290,7 +297,7 @@ popcorn.onMessage((eventName, payload) => {
 Popcorn 1.0 sends one value:
 
 ```elixir
-Popcorn.Wasm.send(%{event: "counter_updated", count: count})
+Popcorn.JS.send(%{event: "counter_updated", count: count})
 ```
 
 The JavaScript handler receives that value:
@@ -326,7 +333,7 @@ Popcorn.Wasm.run_js(
 Popcorn 1.0 passes the arguments and bridge actions separately:
 
 ```elixir
-Popcorn.Wasm.run_js(
+Popcorn.JS.run(
   """
   ({selector, text}, {send, call, cast}) => {
     document.querySelector(selector).textContent = text;
@@ -342,26 +349,26 @@ Popcorn.Wasm.run_js(
 - The function no longer receives `wasm` or `iframeWindow`.
   Use the `send`, `call`, and `cast` actions to contact BEAM processes.
 - The non-raising function returns `{:ok, value}` or `{:error, reason}`.
-  Use `run_js!/3` when a JavaScript failure must raise an exception.
+  Use `run!/3` when a JavaScript failure must raise an exception.
 - The current bridge evaluates JavaScript source in the page.
   The page Content Security Policy must permit `unsafe-eval`.
 
 ## Replace tracked objects
 
 Popcorn 0.3 used `%Popcorn.TrackedObject{}` and separate value lookup functions.
-Popcorn 1.0 uses an opaque `Popcorn.Wasm.tracked_value()` handle.
+Popcorn 1.0 uses an opaque `Popcorn.JS.tracked_value()` handle.
 
 Create the handle in the JavaScript function:
 
 ```elixir
 element =
-  Popcorn.Wasm.run_js!(
+  Popcorn.JS.run!(
     """
     () => new TrackedValue(document.querySelector("#status"))
     """
   )
 
-Popcorn.Wasm.run_js!(
+Popcorn.JS.run!(
   "({element}) => element.replaceChildren()",
   %{element: element}
 )
@@ -380,7 +387,7 @@ Remove calls to these Popcorn 0.3 functions:
 - `Popcorn.Wasm.register_event_listener/2`
 - `Popcorn.Wasm.unregister_event_listener/1`
 
-Use `run_js/3` to add browser event listeners.
+Use `run/3` to add browser event listeners.
 Use the supplied `send` action inside the listener.
 
 ## Review values across the bridge

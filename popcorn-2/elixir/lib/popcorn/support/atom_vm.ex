@@ -353,15 +353,15 @@ defmodule Popcorn.Support.AtomVM do
     quote location: :keep do
       defmodule RunExpr do
         @moduledoc false
-        alias Popcorn.Wasm
+        alias Popcorn.JS
 
-        @compile autoload: false, no_warn_undefined: [:atomvm, Wasm]
+        @compile autoload: false, no_warn_undefined: [:atomvm, JS]
 
         def start() do
-          Wasm.ready(:main)
+          JS.ready(:main)
 
           receive do
-            wasm_msg -> Wasm.handle_message!(wasm_msg, &handle_wasm_msg/1)
+            wasm_msg -> JS.handle_message!(wasm_msg, &handle_wasm_msg/1)
           end
 
           :ok

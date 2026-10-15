@@ -8,7 +8,7 @@ root = Path.expand("../..", __DIR__)
   Code.with_diagnostics(fn ->
     Enum.flat_map(
       [
-        "lib/popcorn/wasm.ex",
+        "lib/popcorn/js.ex",
         "lib/popcorn/fetch.ex",
         "lib/popcorn/proxy.ex",
         "lib/popcorn/application.ex",
@@ -35,7 +35,7 @@ for {module, beam} <- modules, module in [Popcorn.Fetch, Popcorn.Application] do
          end)
 end
 
-alias Popcorn.Wasm.FakeBridge
+alias Popcorn.JS.FakeBridge
 Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
 
 request = %{method: "POST", url: "/echo", body: <<255, 0, 65, 254>>}
@@ -56,7 +56,7 @@ assert Popcorn.Fetch.request(request, timeout: 0) == {:error, :timeout}
 assert FakeBridge.fetch_aborted?()
 
 Code.compile_string("defmodule :wasm do\n  def run_js(_, _, _), do: nil\nend")
-assert Popcorn.Wasm.available?()
+assert Popcorn.JS.available?()
 assert {:ok, supervisor} = Popcorn.Application.start(:normal, [])
 assert is_pid(Process.whereis(:popcorn_proxy))
 assert Application.get_env(:req, :default_options) == nil
