@@ -52,8 +52,9 @@ mix compile
 ## Rename the Elixir JavaScript API
 
 Replace `Popcorn.Wasm` with `Popcorn.JS` in module references, aliases, and imports.
+Rename `run_js/3` and `run_js!/3` calls to `run/3` and `run!/3`.
 For example, replace `alias Popcorn.Wasm` and `Wasm.run_js/3` with
-`alias Popcorn.JS` and `JS.run_js/3`.
+`alias Popcorn.JS` and `JS.run/3`.
 
 ## Use normal OTP application startup
 
@@ -328,7 +329,7 @@ Popcorn.Wasm.run_js(
 Popcorn 1.0 passes the arguments and bridge actions separately:
 
 ```elixir
-Popcorn.JS.run_js(
+Popcorn.JS.run(
   """
   ({selector, text}, {send, call, cast}) => {
     document.querySelector(selector).textContent = text;
@@ -344,7 +345,7 @@ Popcorn.JS.run_js(
 - The function no longer receives `wasm` or `iframeWindow`.
   Use the `send`, `call`, and `cast` actions to contact BEAM processes.
 - The non-raising function returns `{:ok, value}` or `{:error, reason}`.
-  Use `run_js!/3` when a JavaScript failure must raise an exception.
+  Use `run!/3` when a JavaScript failure must raise an exception.
 - The current bridge evaluates JavaScript source in the page.
   The page Content Security Policy must permit `unsafe-eval`.
 
@@ -357,13 +358,13 @@ Create the handle in the JavaScript function:
 
 ```elixir
 element =
-  Popcorn.JS.run_js!(
+  Popcorn.JS.run!(
     """
     () => new TrackedValue(document.querySelector("#status"))
     """
   )
 
-Popcorn.JS.run_js!(
+Popcorn.JS.run!(
   "({element}) => element.replaceChildren()",
   %{element: element}
 )
@@ -382,7 +383,7 @@ Remove calls to these Popcorn 0.3 functions:
 - `Popcorn.Wasm.register_event_listener/2`
 - `Popcorn.Wasm.unregister_event_listener/1`
 
-Use `run_js/3` to add browser event listeners.
+Use `run/3` to add browser event listeners.
 Use the supplied `send` action inside the listener.
 
 ## Review values across the bridge

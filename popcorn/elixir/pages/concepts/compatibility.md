@@ -16,7 +16,7 @@ Unsupported. All NIFs are statically linked to the VM at compilation time. This 
 
 ### `SharedArrayBuffer` and JavaScript evaluation
 
-The shared buffer is required for Popcorn to function. We also evaluate JavaScript as strings when running `JS.run_js/3`.
+The shared buffer is required for Popcorn to function. We also evaluate JavaScript as strings when running `JS.run/3`.
 
 You need to have the following headers set:
 

@@ -12,7 +12,7 @@ defmodule HelloPopcorn do
     IO.puts("Hello console!")
 
     {:ok, _} =
-      Popcorn.JS.run_js("""
+      Popcorn.JS.run("""
       () => {
         document.body.innerHTML = "Hello from Wasm!";
       }

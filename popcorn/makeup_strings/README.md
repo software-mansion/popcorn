@@ -25,17 +25,17 @@ arguments contain that language:
 config :makeup_strings,
   languages: [
     javascript: [
-      {Popcorn.JS, :run_js, 3},
-      {Popcorn.JS, :run_js!, 3}
+      {Popcorn.JS, :run, 3},
+      {Popcorn.JS, :run!, 3}
     ]
   ]
 ```
 
 The configured arity is the maximum call arity, so the example matches calls
-to `run_js/1`, `run_js/2`, and `run_js/3`. Every direct argument that is a
+to `run/1`, `run/2`, and `run/3`. Every direct argument that is a
 complete non-interpolated string or heredoc is highlighted. Strings nested in
 maps or other expressions remain ordinary Elixir strings. Standard aliases
-such as `alias Popcorn.JS` followed by `JS.run_js/1` are resolved.
+such as `alias Popcorn.JS` followed by `JS.run/1` are resolved.
 
 `makeup_strings` registers its composite lexer as `elixir` and `iex`. Language
 names must already exist in the Makeup registry; for example,
@@ -45,12 +45,12 @@ Strings and heredocs piped directly into a configured call are also highlighted,
 on the same line or across lines:
 
 ```elixir
-"console.log(1)" |> Popcorn.JS.run_js()
+"console.log(1)" |> Popcorn.JS.run()
 
 """
 console.log(1);
 """
-|> Popcorn.JS.run_js!(%{})
+|> Popcorn.JS.run!(%{})
 ```
 
 The piped value counts as the first argument for the configured arity limit.

@@ -39,62 +39,62 @@ defmodule Popcorn.JSTest do
     end
   end
 
-  describe "run_js/3" do
+  describe "run/3" do
     setup :use_fake_bridge
 
     test "wraps the bridge result in :ok and forwards args and opts" do
       assert {:ok, %{"args" => %{n: 1}, "opts" => [timeout: 10]}} =
-               JS.run_js("f", %{n: 1}, timeout: 10)
+               JS.run("f", %{n: 1}, timeout: 10)
     end
 
     test "translates a bridge timeout" do
-      assert JS.run_js("f", %{mode: :timeout}) == {:error, :timeout}
+      assert JS.run("f", %{mode: :timeout}) == {:error, :timeout}
     end
 
     test "translates a JS exception" do
-      assert JS.run_js("f", %{mode: :js_error}) == {:error, {:js, "TypeError: x"}}
+      assert JS.run("f", %{mode: :js_error}) == {:error, {:js, "TypeError: x"}}
     end
 
     test "lets other errors propagate untranslated" do
-      assert_raise ArgumentError, fn -> JS.run_js("f", %{mode: :badarg}) end
-      assert_raise RuntimeError, "boom", fn -> JS.run_js("f", %{mode: :raise}) end
+      assert_raise ArgumentError, fn -> JS.run("f", %{mode: :badarg}) end
+      assert_raise RuntimeError, "boom", fn -> JS.run("f", %{mode: :raise}) end
     end
 
     test "rejects invalid arguments loudly" do
-      assert_raise FunctionClauseError, fn -> JS.run_js("f", :not_a_map) end
-      assert_raise FunctionClauseError, fn -> JS.run_js(:not_a_binary, %{}) end
+      assert_raise FunctionClauseError, fn -> JS.run("f", :not_a_map) end
+      assert_raise FunctionClauseError, fn -> JS.run(:not_a_binary, %{}) end
     end
   end
 
-  describe "run_js!/3" do
+  describe "run!/3" do
     setup :use_fake_bridge
 
     test "returns the result directly" do
-      assert %{"args" => %{n: 1}} = JS.run_js!("f", %{n: 1})
+      assert %{"args" => %{n: 1}} = JS.run!("f", %{n: 1})
     end
 
     test "raises Popcorn.JS.Error on a timeout" do
       assert_raise JS.Error, "JS didn't reply in time", fn ->
-        JS.run_js!("f", %{mode: :timeout})
+        JS.run!("f", %{mode: :timeout})
       end
     end
 
     test "raises Popcorn.JS.Error on a JS exception" do
       assert_raise JS.Error, "JS raised: 'TypeError: x'", fn ->
-        JS.run_js!("f", %{mode: :js_error})
+        JS.run!("f", %{mode: :js_error})
       end
     end
 
-    test "carries the reason run_js/3 would have returned" do
-      e = assert_raise JS.Error, fn -> JS.run_js!("f", %{mode: :js_error}) end
+    test "carries the reason run/3 would have returned" do
+      e = assert_raise JS.Error, fn -> JS.run!("f", %{mode: :js_error}) end
       assert e.reason == {:js, "TypeError: x"}
-      assert JS.run_js("f", %{mode: :js_error}) == {:error, e.reason}
+      assert JS.run("f", %{mode: :js_error}) == {:error, e.reason}
     end
 
     test "is rescuable by name" do
       result =
         try do
-          JS.run_js!("f", %{mode: :timeout})
+          JS.run!("f", %{mode: :timeout})
         rescue
           e in JS.Error -> e.reason
         end
@@ -103,8 +103,8 @@ defmodule Popcorn.JSTest do
     end
 
     test "lets other errors propagate untranslated" do
-      assert_raise ArgumentError, fn -> JS.run_js!("f", %{mode: :badarg}) end
-      assert_raise RuntimeError, "boom", fn -> JS.run_js!("f", %{mode: :raise}) end
+      assert_raise ArgumentError, fn -> JS.run!("f", %{mode: :badarg}) end
+      assert_raise RuntimeError, "boom", fn -> JS.run!("f", %{mode: :raise}) end
     end
   end
 
@@ -127,8 +127,8 @@ defmodule Popcorn.JSTest do
   describe "host fallback" do
     test "uses a no-op mock" do
       assert :ok = JS.await_ready(timeout: 10)
-      assert {:ok, nil} = JS.run_js("f", %{n: 1})
-      assert is_nil(JS.run_js!("f", %{n: 1}))
+      assert {:ok, nil} = JS.run("f", %{n: 1})
+      assert is_nil(JS.run!("f", %{n: 1}))
       assert :ok = JS.send(%{hello: "js"})
     end
   end

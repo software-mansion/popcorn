@@ -26,7 +26,7 @@ Use `beam.otpAssetsRoot` if you want to run it on subpage. The value must end wi
 
 ## Configure the Content Security Policy
 
-`Popcorn.JS.run_js/3` currently evaluates JavaScript source. The page Content
+`Popcorn.JS.run/3` currently evaluates JavaScript source. The page Content
 Security Policy must permit `unsafe-eval`. Popcorn initialization will fail if it's not allowed.
 
 ## Sample nginx config for hosting Popcorn applications

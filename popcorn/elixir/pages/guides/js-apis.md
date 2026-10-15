@@ -37,7 +37,7 @@ See ["Interacting with terminal"](terminal.md) to learn more.
 
 Elixir can send events to the JavaScript via `Popcorn.JS.send/1`. To receive them, we need to register [`onEvent(event)`](`JSLib.Popcorn.onEvent/1`) handler.
 
-We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.JS.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
+We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.JS.run/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
 
 Additionally, we have [`async popcorn.cast(pid, payload, opts)`](`JSLib.Popcorn.cast/3`) and [`async popcorn.call(pid, payload, opts)`](`JSLib.Popcorn.call/3`). They're used to communicate with GenServers.
 All `cast()`s and `call()`s are going through internal `Popcorn.Proxy` which keeps tabs of timeouts and routes the messages to correct processes.
@@ -59,7 +59,7 @@ Use `Popcorn.JS.send/1` to send the events from the Elixir to JavaScript. They w
 
 ### Running JS scripts in Elixir
 
-`Popcorn.JS.run_js/3` and `Popcorn.JS.run_js!/3` can be used to do that. First argument is a string with JavaScript source, second is a map of arguments passed to that source.
+`Popcorn.JS.run/3` and `Popcorn.JS.run!/3` can be used to do that. First argument is a string with JavaScript source, second is a map of arguments passed to that source.
 
 Example:
 
@@ -74,7 +74,7 @@ Example:
   return pid;
 }
 """
-|> Popcorn.JS.run_js!(%{node: node, pid: self(), event: event})
+|> Popcorn.JS.run!(%{node: node, pid: self(), event: event})
 ```
 
 You can see that JavaScript source is a function that takes two arguments and returns a value.
@@ -86,7 +86,7 @@ The first argument is the deserialized map of arguments and second is a map of a
 
 Actions perform the same thing as [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`) and others, mentioned earlier.
 
-> One thing to be mindful of is to not `call()` the process that runs `run_js/3`. It will deadlock.
+> One thing to be mindful of is to not `call()` the process that runs `run/3`. It will deadlock.
 
 The return value will be returned back to the Elixir (subject to [value conversions](concepts/values.md)).
 

@@ -1,8 +1,8 @@
 defmodule Popcorn.JS.Error do
   @moduledoc """
-  Raised by `Popcorn.JS.run_js!/3` when JavaScript fails or the reply times out.
+  Raised by `Popcorn.JS.run!/3` when JavaScript fails or the reply times out.
 
-  The `:reason` field contains the reason from the `{:error, reason}` result of `Popcorn.JS.run_js/3`.
+  The `:reason` field contains the reason from the `{:error, reason}` result of `Popcorn.JS.run/3`.
   """
 
   @type t :: %__MODULE__{reason: :timeout | {:js, term()}}
@@ -38,7 +38,7 @@ defmodule Popcorn.JS do
 
   ## Values
 
-  Messages and `run_js/3` arguments and results are converted between Elixir and JavaScript.
+  Messages and `run/3` arguments and results are converted between Elixir and JavaScript.
   See [Sharing values across languages](values.md) for supported types and conversions.
   Use a `t:tracked_value/0` to keep a JavaScript value's identity.
 
@@ -57,7 +57,7 @@ defmodule Popcorn.JS do
 
   Return `new TrackedValue(value, cleanup)` from JavaScript function to create a handle.
   Cleanup function has `() => void` signature.
-  Pass the handle in `run_js/3` arguments to access the original value.
+  Pass the handle in `run/3` arguments to access the original value.
 
   The runtime calls `cleanup` function after BEAM garbage collection releases the handle, or when the VM stops.
 
@@ -72,7 +72,7 @@ defmodule Popcorn.JS do
   """
   @type message :: {:wasm, payload :: term()}
 
-  @type run_js_opts :: [{:timeout, timeout()}]
+  @type run_opts :: [{:timeout, timeout()}]
 
   @doc """
   Matches a `t:message/0` sent from JavaScript.
@@ -101,7 +101,7 @@ defmodule Popcorn.JS do
 
   def run do
     with :ok <- Popcorn.JS.await_ready(),
-         {:ok, _value} <- Popcorn.JS.run_js("() => initializeBrowser()") do
+         {:ok, _value} <- Popcorn.JS.run("() => initializeBrowser()") do
       :ok
     end
   end
@@ -117,7 +117,7 @@ defmodule Popcorn.JS do
 
 
   """
-  @spec await_ready(run_js_opts()) :: :ok | {:error, :timeout}
+  @spec await_ready(run_opts()) :: :ok | {:error, :timeout}
   def await_ready(opts \\ []) when is_list(opts) do
     bridge().await_ready(opts)
   catch
@@ -143,7 +143,7 @@ defmodule Popcorn.JS do
 
   Notes:
   - Calls during application startup run before `popcorn.boot()` resolves.
-  - Do not await a `call` to the process that executes `run_js/3`. It will cause deadlocks.
+  - Do not await a `call` to the process that executes `run/3`. It will cause deadlocks.
 
   ## Options
 
@@ -152,20 +152,20 @@ defmodule Popcorn.JS do
   ## Examples
 
   ```elixir
-  Popcorn.JS.run_js("({n}) => n + 1", %{n: 1})
+  Popcorn.JS.run("({n}) => n + 1", %{n: 1})
   #=> {:ok, 2}
   ```
 
   Use a `t:tracked_value/0` for values such as DOM elements:
 
   ```elixir
-  {:ok, element} = Popcorn.JS.run_js("() => new TrackedValue(document.body)")
-  Popcorn.JS.run_js!("({element}) => { element.textContent = 'Ready'; }", %{element: element})
+  {:ok, element} = Popcorn.JS.run("() => new TrackedValue(document.body)")
+  Popcorn.JS.run!("({element}) => { element.textContent = 'Ready'; }", %{element: element})
   ```
   """
-  @spec run_js(String.t(), map(), run_js_opts()) ::
+  @spec run(String.t(), map(), run_opts()) ::
           {:ok, term()} | {:error, :timeout | {:js, term()}}
-  def run_js(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
+  def run(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
     {:ok, bridge().run_js(code, args, opts)}
   catch
     # Bridge own errors. `rescue` normalizes into structs which we *don't* want.
@@ -174,11 +174,11 @@ defmodule Popcorn.JS do
   end
 
   @doc """
-  See run_js/3.
+  See run/3.
   """
-  @spec run_js!(String.t(), map(), run_js_opts()) :: term()
-  def run_js!(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
-    case run_js(code, args, opts) do
+  @spec run!(String.t(), map(), run_opts()) :: term()
+  def run!(code, args \\ %{}, opts \\ []) when is_binary(code) and is_map(args) do
+    case run(code, args, opts) do
       {:ok, value} -> value
       {:error, reason} -> raise Popcorn.JS.Error, reason: reason
     end

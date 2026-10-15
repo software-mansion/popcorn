@@ -72,7 +72,7 @@ alias Popcorn.JS
 
 def set_html do
   with :ok <- JS.await_ready() do
-    JS.run_js!("""
+    JS.run!("""
       () => {
         const status = document.querySelector("#status");
 

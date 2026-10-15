@@ -140,7 +140,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp start_timer(ms, receiver) do
-    JS.run_js!(
+    JS.run!(
       """
       (args, {send}) => {
         const id = setInterval(
@@ -163,7 +163,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp stop_timer(timer_ref) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         args.timer.dispose();
@@ -186,7 +186,7 @@ defmodule GameOfLife.Ui do
         {id, visible?} -> ["#" <> to_string(id), visible?]
       end)
 
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         for (let [id, isVisible] of args.visibility) {
@@ -204,7 +204,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp init_grid(size) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         const root = document.querySelector("#grid-root");
@@ -227,7 +227,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp mount_at_root(html) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         document.querySelector("#root").innerHTML = args.html;
@@ -238,7 +238,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp set_alive_cells(coords) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         const alive = new Set(args.alive_coords.map(([x, y]) => `${x},${y}`));
@@ -256,7 +256,7 @@ defmodule GameOfLife.Ui do
   # Returns a tracked handle; listeners are removed when the handle is
   # garbage-collected on the BEAM side, so it's kept in the state.
   defp register_click_listeners(selectors, receiver) do
-    JS.run_js!(
+    JS.run!(
       """
       (args, {cast}) => {
         const { selectors, event_name, event_receiver } = args;

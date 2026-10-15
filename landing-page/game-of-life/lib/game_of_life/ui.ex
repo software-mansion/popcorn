@@ -214,7 +214,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp start_timer(ms, receiver) do
-    JS.run_js!(
+    JS.run!(
       """
       (args, {send}) => {
         const id = setInterval(() => send(args.receiver, "tick"), args.ms);
@@ -227,7 +227,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp stop_timer(timer_ref) do
-    JS.run_js!("(args) => args.timer.dispose()", %{timer: timer_ref})
+    JS.run!("(args) => args.timer.dispose()", %{timer: timer_ref})
   end
 
   defp grid_to_alive_list(grid) do
@@ -240,7 +240,7 @@ defmodule GameOfLife.Ui do
   defp born_cells(alive, previous), do: alive -- previous
 
   defp update_controls(root_id, running?) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         const root = document.getElementById(args.root_id);
@@ -253,7 +253,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp init_grid(rows, cols, root_id) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         const grid = document.getElementById(`${args.root_id}-grid`);
@@ -278,14 +278,14 @@ defmodule GameOfLife.Ui do
   end
 
   defp mount_at_root(html, root_id) do
-    JS.run_js!("(args) => document.getElementById(args.root_id).innerHTML = args.html", %{
+    JS.run!("(args) => document.getElementById(args.root_id).innerHTML = args.html", %{
       html: html,
       root_id: root_id
     })
   end
 
   defp set_alive_cells(state) do
-    JS.run_js!(
+    JS.run!(
       """
       (args) => {
         const root = document.getElementById(args.snapshot.rootId);
@@ -305,7 +305,7 @@ defmodule GameOfLife.Ui do
   end
 
   defp register_click_listeners(root_id, selectors, receiver) do
-    JS.run_js!(
+    JS.run!(
       """
       (args, {cast}) => {
         const root = document.getElementById(args.root_id);

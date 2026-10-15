@@ -123,7 +123,7 @@ Guard that returns true if argument is a message from JS side.
 
 ## Running JS
 
-### `run_js(function, args, opts)`
+### `run(function, args, opts)`
 
 Runs JS code in the Wasm iframe context and returns tracked objects. Also comes as raising variation that returns results directly.
 
@@ -152,7 +152,7 @@ JS function should return either single value, array of values or nothing. See n
 **Example**
 
 ```elixir
-Popcorn.JS.run_js("""
+Popcorn.JS.run("""
 ({ args }) => {
   const element = document.getElementById(args.id);
   return [element];
@@ -164,7 +164,7 @@ Popcorn.JS.run_js("""
 **Notes:**
 
 - `window` and `document` are shadowed to reference parent window for DOM access. If you need to use window from iframe, use `iframeWindow` property.
-- If you plan to return multiple objects, you should use `return: :refs` or `return: :values` instead of calling `run_js` in a loop. This makes performance penalty of invoking JS and serialization/deserialization smaller.
+- If you plan to return multiple objects, you should use `return: :refs` or `return: :values` instead of calling `run` in a loop. This makes performance penalty of invoking JS and serialization/deserialization smaller.
 - `wasm` argument passed to JS function is a emscripten's instantiated wasm module.
   It does not have same crash and timeout resiliency as `Popcorn` object. This matters when calling `wasm.call()` which may hang the runtime if used improperly.
 

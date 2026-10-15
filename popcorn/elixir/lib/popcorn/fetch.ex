@@ -62,7 +62,7 @@ defmodule Popcorn.Fetch do
 
   - `:timeout` - the response exceeded the timeout. The adapter aborts the browser request.
   - `{:fetch, message}` - the browser reported a network or fetch failure.
-  - `{:bridge, reason}` - JavaScript execution failed. See `Popcorn.JS.run_js/3`.
+  - `{:bridge, reason}` - JavaScript execution failed. See `Popcorn.JS.run/3`.
   """
   @type error :: :timeout | {:fetch, String.t()} | {:bridge, term()}
 
@@ -687,7 +687,7 @@ defmodule Popcorn.Fetch do
       }
       |> put_body(Map.get(req, :body))
 
-    case JS.run_js(@start_js, args) do
+    case JS.run(@start_js, args) do
       {:ok, controller} -> {:ok, %{id: id, target: target, controller: controller}}
       {:error, reason} -> {:error, {:bridge, reason}}
     end
@@ -754,7 +754,7 @@ defmodule Popcorn.Fetch do
   defp hint(message), do: message
 
   defp cancel(handle) do
-    JS.run_js(@abort_js, %{controller: handle.controller})
+    JS.run(@abort_js, %{controller: handle.controller})
     flush_bridge(handle.id)
     :ok
   end

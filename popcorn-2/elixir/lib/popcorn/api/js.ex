@@ -5,7 +5,7 @@ defmodule Popcorn.TrackedObject do
   Tracked objects are registered in the VM to keep a reference to JS value.
   If there is no reference to tracked object, corresponding JS value is removed.
 
-  See `Popcorn.JS.run_js/3` for more details.
+  See `Popcorn.JS.run/3` for more details.
   """
   @type t :: %__MODULE__{ref: term()}
   defstruct ref: nil
@@ -60,14 +60,14 @@ defmodule Popcorn.JS do
   @type message_handler :: (wasm_message() -> handler_result())
 
   @typedoc """
-  See `run_js/2` docs.
+  See `run/2` docs.
   """
   @type js_function() :: String.t()
 
   # TODO: remove args
-  @type run_js_opts() :: [{:return, :ref | :value} | {:args, map()}]
+  @type run_opts() :: [{:return, :ref | :value} | {:args, map()}]
 
-  @type run_js_return() :: TrackedObject.t() | term()
+  @type run_return() :: TrackedObject.t() | term()
   @type result(t) :: {:ok, t} | {:error, term()}
 
   @type register_event_listener_opts() :: [
@@ -141,7 +141,7 @@ defmodule Popcorn.JS do
   Returns list of `TrackedObject` (or values directly, see `return`) for each value in an array returned from JS function.
 
   ## Options
-  - `return`: an atom controlling if `run_js` should return tracked objects list or deserialized return value.
+  - `return`: an atom controlling if `run` should return tracked objects list or deserialized return value.
     Possible values: `:ref`, `refs`, `:value`, `:values`. Default: `:ref`
 
   Passing args and returning values introduces overhead related to serializing and deserializing.
@@ -159,12 +159,12 @@ defmodule Popcorn.JS do
   `wasm` argument passed to JS function is a emscripten's instantiated wasm module.
   It does not have same crash and timeout resiliency as `Popcorn` object. This matters when calling `wasm.call()` which may hang the runtime if used improperly.
 
-  `run_js` executes code in iframe context which normally would use `window` (implicitly and explicitly) from iframe.
+  `run` executes code in iframe context which normally would use `window` (implicitly and explicitly) from iframe.
   Typically, `window` is used to interact with main browser window context. Popcorn shadows `window` variable for that reason.
 
   ## Example
   ```
-  Popcorn.JS.run_js(\"""
+  Popcorn.JS.run(\"""
   ({ args }) => {
     const n = args.n;
     return [n-1, n, n-1];
@@ -174,10 +174,10 @@ defmodule Popcorn.JS do
   #=> {:ok, [%TrackedObject{}, %TrackedObject{}, %TrackedObject{}]}
   ```
   """
-  @spec run_js(js_function()) :: result(run_js_return())
-  @spec run_js(js_function(), map()) :: result(run_js_return())
-  @spec run_js(js_function(), map(), run_js_opts()) :: result(run_js_return())
-  def run_js(function, args \\ %{}, opts \\ []) do
+  @spec run(js_function()) :: result(run_return())
+  @spec run(js_function(), map()) :: result(run_return())
+  @spec run(js_function(), map(), run_opts()) :: result(run_return())
+  def run(function, args \\ %{}, opts \\ []) do
     %{return: return_type} = opts_to_map(opts, return: :ref)
 
     with {:ok, wrapped_js_fn} <- with_wrapper(function, args),
@@ -201,11 +201,11 @@ defmodule Popcorn.JS do
     e -> {:error, e}
   end
 
-  @spec run_js!(js_function()) :: result(run_js_return())
-  @spec run_js!(js_function(), map()) :: result(run_js_return())
-  @spec run_js!(js_function(), map(), run_js_opts()) :: result(run_js_return())
-  def run_js!(function, args \\ %{}, opts \\ []) do
-    {:ok, tracked} = run_js(function, args, opts)
+  @spec run!(js_function()) :: result(run_return())
+  @spec run!(js_function(), map()) :: result(run_return())
+  @spec run!(js_function(), map(), run_opts()) :: result(run_return())
+  def run!(function, args \\ %{}, opts \\ []) do
+    {:ok, tracked} = run(function, args, opts)
     tracked
   end
 
@@ -250,7 +250,7 @@ defmodule Popcorn.JS do
       wasm.sendEvent(args.eventName, args.payload)
     }
     """
-    |> run_js(%{eventName: event_name, payload: payload}, return: :ref)
+    |> run(%{eventName: event_name, payload: payload}, return: :ref)
 
     :ok
   end
@@ -305,7 +305,7 @@ defmodule Popcorn.JS do
   To unregister listener, use returned ref with `unregister_event_listener/1`
   """
   @spec register_event_listener(atom(), register_event_listener_opts()) ::
-          result(run_js_return())
+          result(run_return())
   def register_event_listener(event_name, opts) do
     %{
       event_keys: event_keys,
@@ -339,7 +339,7 @@ defmodule Popcorn.JS do
       return [new TrackedValue({key: key, value: cleanupFn})];
     }
     """
-    |> run_js(
+    |> run(
       %{
         event_name: event_name,
         target_node: target_node,
@@ -360,7 +360,7 @@ defmodule Popcorn.JS do
       args.cleanupFn();
     }
     """
-    |> run_js(%{cleanupFn: ref})
+    |> run(%{cleanupFn: ref})
   end
 
   @doc false
@@ -372,9 +372,9 @@ defmodule Popcorn.JS do
       # JS objects to code created outside of the Popcorn's iframe,
       # checks like `value instanceof Array` work as expected.
       # Therefore, we also stub `Array` and `Object`, so that
-      # `args.key instanceof Array` also works inside `run_js`.
+      # `args.key instanceof Array` also works inside `run`.
       # This unfortunately makes literals not work: `[] instanceof Array`
-      # and `{} instanceof Object` inside `run_js` returns `false`.
+      # and `{} instanceof Object` inside `run` returns `false`.
       code = """
       (Module) => {
         const iframeWindow = globalThis.window;
