@@ -8,6 +8,7 @@ config :popcorn,
   treeshake: []
 
 if config_env() == :prod do
-  # Smaller, but too slow for the watcher to rebuild with on every change
-  config :popcorn, brotli_effort: :max
+  # Smaller, but too slow for the watcher to rebuild with on every change, and
+  # stack traces show no line numbers
+  config :popcorn, brotli_effort: :max, treeshake: [line_info: false]
 end
