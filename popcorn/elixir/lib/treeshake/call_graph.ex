@@ -54,6 +54,11 @@ defmodule Treeshake.CallGraph do
       end)
       |> Enum.group_by(& &1.behaviour, & &1.module)
 
+    {kept_if_referenced, keep} =
+      Enum.split_with(keep, &match?(%{referenced_modules_defining: _fun_arity}, &1))
+
+    kept_if_referenced = Enum.map(kept_if_referenced, & &1.referenced_modules_defining)
+
     keep =
       keep
       |> Enum.flat_map(fn
@@ -75,19 +80,24 @@ defmodule Treeshake.CallGraph do
       referenced_modules: MapSet.new(@protocol_built_in_types)
     }
 
-    Graph.bfs(keep, bfs_acc, &visit(&1, &2, module_index, protocols_impls)).graph
+    Graph.bfs(keep, bfs_acc, &visit(&1, &2, module_index, protocols_impls, kept_if_referenced)).graph
   end
 
-  defp visit({m, f, a} = mfa, acc, module_index, protocols_impls) do
-    if function_info = get_in(module_index[m].public_functions[{f, a}]) do
-      do_visit(mfa, function_info, acc, module_index, protocols_impls)
-    else
-      # {[], acc}
-      do_visit(mfa, %{calls: [], potential_modules: []}, acc, module_index, protocols_impls)
-    end
+  defp visit({m, f, a} = mfa, acc, module_index, protocols_impls, kept_if_referenced) do
+    function_info =
+      get_in(module_index[m].public_functions[{f, a}]) || %{calls: [], potential_modules: []}
+
+    do_visit(mfa, function_info, acc, module_index, protocols_impls, kept_if_referenced)
   end
 
-  defp do_visit({_m, f, a} = mfa, function_info, acc, module_index, protocols_impls) do
+  defp do_visit(
+         {_m, f, a} = mfa,
+         function_info,
+         acc,
+         module_index,
+         protocols_impls,
+         kept_if_referenced
+       ) do
     %{
       graph: graph,
       protocol_calls: acc_protocol_calls,
@@ -116,11 +126,12 @@ defmodule Treeshake.CallGraph do
     behaviour_calls = find_behaviour_calls(referenced_modules_info, module_index)
     child_spec_calls = find_child_spec_calls(referenced_modules_info)
     generated_funs = find_generated_funs(referenced_modules_info)
+    kept_calls = find_kept_if_referenced(referenced_modules_info, kept_if_referenced)
 
     calls = Enum.flat_map(function_info.calls, &expand_module_call(&1, module_index))
 
     all_calls =
-      (calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
+      (calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs ++ kept_calls)
       |> Enum.reject(&(&1 == mfa))
 
     {protocol_entries, acc_protocol_calls} =
@@ -196,6 +207,15 @@ defmodule Treeshake.CallGraph do
       |> Enum.reject(fn {f, _a} -> f == :__struct__ end)
       |> Enum.map(fn {f, a} -> {info.module, f, a} end)
     end)
+  end
+
+  # A referenced module defining any of the functions is kept whole, see
+  # Treeshake's `keep` option
+  defp find_kept_if_referenced(referenced_modules_info, fun_arities) do
+    for info <- referenced_modules_info,
+        Enum.any?(fun_arities, &Map.has_key?(info.public_functions, &1)),
+        {{f, a}, _info} <- info.public_functions,
+        do: {info.module, f, a}
   end
 
   # A protocol callback implementation impl_mod.fun is included when both conditions are met:

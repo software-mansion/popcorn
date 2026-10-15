@@ -66,7 +66,11 @@ defmodule Treeshake do
     }
   }
 
-  @type keep_entry :: mfa() | module() | %{behaviour_impls: module()}
+  @type keep_entry ::
+          mfa()
+          | module()
+          | %{behaviour_impls: module()}
+          | %{referenced_modules_defining: {atom(), non_neg_integer()}}
 
   @type run_option ::
           {:ebin_files, [Path.t()]}
@@ -154,7 +158,9 @@ defmodule Treeshake do
   all default to an empty list.
   - `keep` - List of public functions that must not be removed along with all code
     they rely on. Passing a module means 'all functions from this module', passing
-    `%{benaviour_impls: behaviour}` means 'all modules implementing this behaviour'.
+    `%{behaviour_impls: behaviour}` means 'all modules implementing this behaviour',
+    and passing `%{referenced_modules_defining: {fun, arity}}` means 'all modules
+    defining this public function, once a reachable function references them'.
     Applications' callbacks are automatically added to this list.
   - `drop` - List of modules to be removed regardless of the tree-shaking results
   - `leave` - List of modules that must not be changed or removed, but without
