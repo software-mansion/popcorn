@@ -81,9 +81,12 @@ defmodule Popcorn.PackagerTest do
       assert "core" = report.runtimeVariant
       assert %{"popcorn" => _app} = report.apps
 
-      for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
-        assert File.regular?(Path.join(out_dir, file))
+      for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"],
+          variant <- ["", ".gz", ".br"] do
+        assert File.regular?(Path.join(out_dir, file <> variant))
       end
+
+      assert "beam.wasm" = out_dir |> Path.join("beam.wasm.gz") |> File.read!() |> :zlib.gunzip()
 
       manifest = read_manifest(out_dir)
       assert Map.keys(manifest["bundles"]) |> Enum.sort() == ["app", "deps", "stdlib"]

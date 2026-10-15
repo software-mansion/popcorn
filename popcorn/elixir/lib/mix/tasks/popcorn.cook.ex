@@ -73,7 +73,8 @@ defmodule Mix.Tasks.Popcorn.Cook do
   three archives: `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`.
 
   They contain selected OTP/Elixir built-ins, user applications, and remaining
-  dependencies respectively. Archives also have `.gz` and `.br` copies.
+  dependencies respectively. All output artifacts also have `.gz` and `.br`
+  variants.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.
