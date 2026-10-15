@@ -7,7 +7,7 @@ Popcorn has multiple ways to communicate with Elixir from JavaScript.
 > The main philosophy of the API is that exceptions aren't meant to be caught — exceptions signify misconfiguration, mistake in using the APIs, or bug in the Popcorn.
 >
 > For errors that can be handled, we return `{ok: true | false, data, error}` result object.
-> All API functions have non-prefix variation (which throws the result if it's an error) and `try` prefixed variation which returns mentioned result object. For example, [`Popcorn.init()`](`JSLib.Popcorn.init/1`) and [`Popcorn.tryInit()`](`JSLib.Popcorn.tryInit/1`). [List of errors](`t:JSLib.popcorn_errors/0`).
+> API methods throw or reject on failure. Only `send`, `call`, and `cast` have `try` prefixed variants (`trySend`, `tryCall`, and `tryCast`) that return result objects. [List of errors](`t:JSLib.popcorn_errors/0`).
 >
 > Use former if you don't expect errors and latter if you can handle them in some way (e.g. retry the operation on timeout).
 

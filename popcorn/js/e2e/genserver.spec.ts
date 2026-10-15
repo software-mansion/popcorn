@@ -93,6 +93,9 @@ test("throwing APIs", async ({ page }) => {
       const cast = await popcorn.cast("counter", ["add", 4]);
       const updated = await popcorn.call("counter", "get");
       const send = await popcorn.send("controller", {});
+      const overflow = await failure(() =>
+        popcorn.writeStdin(new Uint8Array(64 * 1024 + 1)),
+      );
       const stdin = popcorn.writeStdin("x");
       const resize = popcorn.resizeTty(80, 24);
       const missing = await failure(() =>
@@ -129,6 +132,7 @@ test("throwing APIs", async ({ page }) => {
           (value) => value === undefined,
         ),
         missing,
+        overflow,
         invalidInput,
         invalidOptions,
         closed,
@@ -159,6 +163,13 @@ test("throwing APIs", async ({ page }) => {
     missing: {
       name: "PopcornError",
       cause: { t: "genserver:noproc", data: { target: "missing" } },
+    },
+    overflow: {
+      name: "PopcornError",
+      cause: {
+        t: "stdio:overflow",
+        data: { capacityBytes: 65536, attemptedBytes: 65537 },
+      },
     },
     invalidInput: {
       name: "PopcornError",

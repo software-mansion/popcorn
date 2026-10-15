@@ -1,4 +1,4 @@
-import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
+import { schedulers, type PopcornError, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 const FETCH_URL = "/assets/otp/manifest.json";
@@ -212,17 +212,16 @@ test.describe("boot", () => {
     const result = await page.evaluate(async () => {
       const events: unknown[] = [];
       let booted = false;
-      const boot = await window.Popcorn.tryInit({
+      const boot = await window.Popcorn.init({
         beam: {
           env: { POPCORN_STARTUP_EVENT: "bridge" },
         },
         onEvent: (event) => events.push({ event, beforeBoot: !booted }),
       });
       booted = true;
-      if (!boot.ok) throw boot.error;
-      boot.data.deinit();
+      boot.deinit();
       return {
-        boot: boot.ok,
+        boot: true,
         events,
       };
     });
@@ -275,14 +274,11 @@ test.describe("boot", () => {
 
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn();
-      const boot = await popcorn.tryBoot();
+      await popcorn.boot();
       popcorn.deinit();
-      if (!boot.ok) return false;
 
-      const init = await window.Popcorn.tryInit();
-      if (!init.ok) return false;
-
-      init.data.deinit();
+      const init = await window.Popcorn.init();
+      init.deinit();
       return true;
     });
 
@@ -359,7 +355,10 @@ test.describe("boot", () => {
         beam: { otpAssetsRoot: "/missing/otp/" },
         onError: (event) => errors.push(event),
       });
-      const result = await popcorn.tryBoot();
+      const result = await popcorn.boot().then(
+        () => ({ ok: true as const, data: null }),
+        (error: PopcornError) => ({ ok: false as const, error }),
+      );
       if (result.ok) {
         return { errors, boot: { ok: true, data: null } };
       }
@@ -387,7 +386,10 @@ test.describe("boot", () => {
         timeoutsMs: { boot: 30_000 },
       });
       const startMs = performance.now();
-      const boot = await popcorn.tryBoot();
+      const boot = await popcorn.boot().then(
+        () => ({ ok: true as const, data: null }),
+        (error: PopcornError) => ({ ok: false as const, error }),
+      );
       const elapsedMs = performance.now() - startMs;
       if (boot.ok) {
         return { elapsedMs, boot: { ok: true, data: null } };
@@ -506,7 +508,7 @@ test.describe("lifecycle", () => {
       const command = async (
         popcorn: {
           onEvent: (handler: (event: unknown) => void) => () => void;
-          tryWriteStdin: (chunk: Uint8Array) => { ok: boolean };
+          writeStdin: (chunk: Uint8Array) => void;
         },
         value: number,
       ) =>
@@ -515,8 +517,7 @@ test.describe("lifecycle", () => {
             unsubscribe();
             resolve(event);
           });
-          const write = popcorn.tryWriteStdin(new Uint8Array([value]));
-          if (!write.ok) throw new Error("stdin command failed");
+          popcorn.writeStdin(new Uint8Array([value]));
         });
 
       // Default text decodes split UTF-8, uses 80×24 and no shell.
@@ -527,7 +528,7 @@ test.describe("lifecycle", () => {
         onStdout: (chunk) => stdout.push(chunk),
         onStderr: (chunk) => stderr.push(chunk),
       });
-      await text.tryBoot();
+      await text.boot();
       const defaultSize = await command(text, 2);
       const ctrlD = await command(text, 4);
       text.deinit();
@@ -535,7 +536,7 @@ test.describe("lifecycle", () => {
       // init infers byte callbacks and forwards custom size; tty keeps the shell.
       const rawStdout: number[][] = [];
       const rawStderr: number[][] = [];
-      const init = await window.Popcorn.tryInit({
+      const init = await window.Popcorn.init({
         workerUrl: "/output-worker.mjs",
         tty: {
           size: { columns: 100, rows: 30 },
@@ -544,8 +545,7 @@ test.describe("lifecycle", () => {
         onStdout: (chunk) => rawStdout.push(Array.from(chunk)),
         onStderr: (chunk) => rawStderr.push(Array.from(chunk)),
       });
-      if (!init.ok) throw init.error;
-      const bytes = init.data;
+      const bytes = init;
       const customSize = await command(bytes, 2);
       bytes.deinit();
 
@@ -555,11 +555,11 @@ test.describe("lifecycle", () => {
         workerUrl: "/output-worker.mjs",
         onStdout: (chunk) => rebootStdout.push(chunk),
       });
-      await reboot.tryBoot();
+      await reboot.boot();
       rebootStdout.length = 0;
       await command(reboot, 0);
       reboot.deinit();
-      await reboot.tryBoot();
+      await reboot.boot();
       rebootStdout.length = 0;
       await command(reboot, 1);
       reboot.deinit();
@@ -600,9 +600,8 @@ test.describe("lifecycle", () => {
 
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const init = await window.Popcorn.tryInit({});
-      if (!init.ok) return { ok: false, error: init.error.serialize() };
-      init.data.deinit();
+      const init = await window.Popcorn.init({});
+      init.deinit();
       return { ok: true };
     });
 
@@ -636,9 +635,9 @@ test.describe("lifecycle", () => {
             }
           });
         });
-        const result = await popcorn.tryBoot();
+        await popcorn.boot();
         await ready;
-        return result.ok;
+        return true;
       };
 
       const first = await boot();

@@ -157,7 +157,7 @@ const popcorn = await Popcorn.init({
 });
 ```
 
-Use `Popcorn.tryInit()` when you need a result object instead.
+Initialization rejects on failure. Only `send`, `call`, and `cast` have `try` variants that return result objects.
 
 Remove these old initialization options:
 

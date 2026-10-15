@@ -13,6 +13,7 @@ import type {
   PopcornEvent,
   OtpErrorPayload,
   Pid,
+  PopcornError,
   SerializedError,
   tuple,
 } from "@swmansion/popcorn";
@@ -258,15 +259,21 @@ function createOtp(id: string): Otp {
         this.recordEvent(event);
       });
 
-      const boot = await this.popcornHandle.tryBoot();
-      if (boot.ok) return { ok: true, data: null };
-
-      const result: BootResult = {
-        ok: false,
-        error: boot.error.serialize(),
-      };
-      this.deinit();
-      return result;
+      try {
+        await this.popcornHandle.boot();
+        return { ok: true, data: null };
+      } catch (error) {
+        check(
+          error instanceof Error && "serialize" in error,
+          "Expected PopcornError",
+        );
+        const result: BootResult = {
+          ok: false,
+          error: (error as PopcornError).serialize(),
+        };
+        this.deinit();
+        return result;
+      }
     }
 
     public async trySend(

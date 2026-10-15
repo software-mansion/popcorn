@@ -19,8 +19,11 @@ You may only queue up to 64kB until you get `stdio:overflow` error from the meth
 
 ```typescript
 terminal.onData((data) => {
-  const result = popcorn.tryWriteStdin(data);
-  if (!result.ok) console.error(result.error);
+  try {
+    popcorn.writeStdin(data);
+  } catch (error) {
+    console.error(error);
+  }
 });
 ```
 

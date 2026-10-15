@@ -68,8 +68,8 @@ vm.deinit();
 `popcorn.call()` to call a supervised GenServer from JavaScript.
 Use `popcorn.onEvent()` to receive events from BEAM processes.
 
-These methods reject on failure. Use `Popcorn.tryInit()` and
-`popcorn.tryCall()` to handle expected failures as `Result` objects.
+Methods throw or reject on failure. Only `send`, `call`, and `cast` also have
+`trySend`, `tryCall`, and `tryCast` variants that return `Result` objects.
 
 Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on
 phones/tablets or 2 GiB on desktop. Device detection uses the browser's user

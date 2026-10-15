@@ -325,30 +325,16 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * @returns The instance. Rejects on failure.
    *
    * @see {@link PopcornOpts}
-   * @see {@link tryInit} for a result instead of throwing on expected failures.
    */
   public static async init<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output> = {},
   ): Promise<Popcorn<Output>> {
-    return unwrap(await Popcorn.tryInit(opts));
-  }
-
-  /** See {@link init}. */
-  public static async tryInit<Output extends TtyOutput = "text">(
-    opts: PopcornOpts<Output> = {},
-  ): Promise<Result<Popcorn<Output>>> {
     if (!canEval()) {
-      return { ok: false, error: err("runtime:eval-unavailable", {}) };
+      throw err("runtime:eval-unavailable", {});
     }
 
     const popcorn = new Popcorn(opts);
-    const result = await popcorn.tryBoot();
-
-    if (!result.ok) {
-      return result;
-    }
-
-    return { ok: true, data: popcorn };
+    return await popcorn.boot();
   }
 
   /**
@@ -366,26 +352,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * popcorn.onEvent((message) => console.log(message));
    * await popcorn.boot();
    * ```
-   *
-   * @see {@link tryBoot} for a result instead of throwing on expected failures.
    */
   public async boot(): Promise<Popcorn<Output>> {
-    return unwrap(await this.tryBoot());
-  }
-
-  /** See {@link boot}. */
-  public async tryBoot(): Promise<Result<Popcorn<Output>>> {
-    if (this.state.status === "booted") {
-      return { ok: true, data: this };
-    }
-
-    if (this.state.status === "booting") {
-      // TODO(jgonet): make it easier to construct check() errors without throwing
-      const error = err("internal:check", {
-        detail: "Boot already in progress",
-      });
-      return { ok: false, error };
-    }
+    if (this.state.status === "booted") return this;
+    check(this.state.status !== "booting", "Boot already in progress");
 
     const reboot = this.state.status === "closed";
     if (reboot) {
@@ -398,7 +368,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     check(this.readyWaiters.length === 0);
     this.state = { status: "booting" };
 
-    return await new Promise<Result<Popcorn<Output>>>((resolve) => {
+    return await new Promise<Popcorn<Output>>((resolve, reject) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
 
       const settle = (result: Result<Popcorn<Output>>) => {
@@ -408,7 +378,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         if (!result.ok) {
           this.deinit();
         }
-        resolve(result);
+        if (result.ok) resolve(result.data);
+        else reject(result.error);
       };
       this.settleBoot = settle;
 
@@ -472,18 +443,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Throws `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
    * An overflow leaves the queue unchanged.
-   *
-   * @see {@link tryWriteStdin} for a result instead of throwing on expected failures.
    */
   public writeStdin(chunk: string | Uint8Array): void {
-    unwrap(this.tryWriteStdin(chunk));
-  }
-
-  /** See {@link writeStdin}. */
-  public tryWriteStdin(chunk: string | Uint8Array): Result<null> {
-    if (this.state.status === "closed") {
-      return { ok: false, error: this.state.error };
-    }
+    if (this.state.status === "closed") throw this.state.error;
     check(this.state.status === "booted");
 
     const bytes = toBytes(chunk);
@@ -495,14 +457,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         capacityBytes: STDIN_QUEUE_CAPACITY_BYTES,
         attemptedBytes,
       });
-      return { ok: false, error };
+      throw error;
     }
 
     this.io.stdin.reservedBytes = attemptedBytes;
     const event = { type: "popcorn:stdin", payload: { chunk: bytes } } as const;
     toVm(this.vmWorker, event, [bytes.buffer]);
-
-    return { ok: true, data: null };
   }
 
   /**
@@ -511,18 +471,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Each dimension must be between 1 and 65,535.
    *
    * Throws on failure.
-   *
-   * @see {@link tryResizeTty} for a result instead of throwing on expected failures.
    */
   public resizeTty(columns: number, rows: number): void {
-    unwrap(this.tryResizeTty(columns, rows));
-  }
-
-  /** See {@link resizeTty}. */
-  public tryResizeTty(columns: number, rows: number): Result<null> {
-    if (this.state.status === "closed") {
-      return { ok: false, error: this.state.error };
-    }
+    if (this.state.status === "closed") throw this.state.error;
     check(this.state.status === "booted");
     check(isValidTtySize({ columns, rows }));
 
@@ -530,7 +481,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       type: "popcorn:tty-resize",
       payload: { columns, rows },
     });
-    return { ok: true, data: null };
   }
 
   /**
