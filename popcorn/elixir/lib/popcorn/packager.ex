@@ -47,6 +47,7 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
+          | {:exclude_priv, [String.t()]}
           | {:treeshake, false | treeshake_options()}
           | {:static_dir, Path.t()}
         ]
@@ -59,6 +60,7 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
+          exclude_priv: [String.t()],
           treeshake: false | treeshake_options()
         }
 
@@ -67,6 +69,10 @@ defmodule Popcorn.Packager do
           keep: [module() | mfa()],
           drop: [module()]
         ]
+
+  # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
+  # runtime, which has its NIFs linked in.
+  @native_libraries "*/priv/**/*.{so,dylib,dll}"
 
   # Tree-shaking keeps these, as they're only called dynamically: LocalLiveView
   # views, which it looks up by name, and referenced Ecto schemas, whose
@@ -164,6 +170,7 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        exclude_priv: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
@@ -193,6 +200,7 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 exclude_priv: options[:exclude_priv],
                  treeshake: options[:treeshake]
                }),
              {:ok, installed} <-
@@ -223,12 +231,15 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      exclude_priv: exclude_priv,
       treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
+    staging_dir = Path.join(out_dir, "staging")
 
-    with {:ok, project_apps} <- get_apps_info(build_path),
+    with :ok <- validate_priv_patterns(exclude_priv),
+         {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
          variant = runtime_variant || required_runtime(apps_info),
@@ -236,7 +247,8 @@ defmodule Popcorn.Packager do
          :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
-         staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info),
+         remove_priv_files(staging_dir, [@native_libraries | exclude_priv]),
          :ok <- patch_apps(staged_apps),
          staged_apps = remove_build_tools(staged_apps),
          {:ok, staged_apps, treeshake_report} <-
@@ -466,6 +478,38 @@ defmodule Popcorn.Packager do
     |> Map.new()
   end
 
+  # Patterns are relative to the staging directory: `<app>/priv/...`. The files
+  # and directories they match are removed, along with directories left empty.
+  defp remove_priv_files(staging_dir, patterns) do
+    patterns
+    |> Enum.flat_map(&Path.wildcard(Path.join(staging_dir, &1), match_dot: true))
+    |> Enum.each(fn path ->
+      [app, "priv" | _] = path |> Path.relative_to(staging_dir) |> Path.split()
+      File.rm_rf!(path)
+      remove_if_empty(Path.dirname(path), Path.join([staging_dir, app, "priv"]))
+    end)
+  end
+
+  defp validate_priv_patterns(patterns) do
+    case Enum.reject(patterns, &priv_pattern?/1) do
+      [] -> :ok
+      invalid -> err(:bad_priv_patterns, invalid)
+    end
+  end
+
+  defp priv_pattern?(pattern) do
+    case Path.split(pattern) do
+      [_app, "priv" | rest] -> ".." not in rest
+      _other -> false
+    end
+  end
+
+  defp remove_if_empty(dir, priv_dir) do
+    if File.rmdir(dir) == :ok and dir != priv_dir do
+      remove_if_empty(Path.dirname(dir), priv_dir)
+    end
+  end
+
   # we patch only selected modules from OTP, see patches/
   defp patch_apps(staged_apps) do
     [@patches_dir, "*", "*.erl"]
@@ -499,6 +543,9 @@ defmodule Popcorn.Packager do
         Enum.each(build_tools, fn module ->
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
+
+        # The JS and the Wasm runtimes, which the output already has
+        File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
 
         replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
     end
@@ -988,6 +1035,11 @@ defmodule Popcorn.Packager do
     "Starting the entrypoint requires the #{app} application, which is not available."
   end
 
+  def format_error(%{code: "bad_priv_patterns", patterns: patterns}) do
+    "Patterns of priv files to leave out must be within applications' priv " <>
+      "directories, like phoenix/priv/static: #{Enum.join(patterns, ", ")}."
+  end
+
   def format_error(%{code: "unknown_kept_modules", modules: modules}) do
     "Modules to keep are not packaged: #{Enum.map_join(modules, ", ", &inspect/1)}."
   end
@@ -1043,6 +1095,10 @@ defmodule Popcorn.Packager do
 
   defp err(:missing_boot_app, app) do
     {:error, %{code: "missing_boot_app", app: app}}
+  end
+
+  defp err(:bad_priv_patterns, patterns) do
+    {:error, %{code: "bad_priv_patterns", patterns: patterns}}
   end
 
   defp err(:unknown_kept_modules, modules) do

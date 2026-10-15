@@ -31,6 +31,13 @@ export type Options = {
   brotliEffort?: "standard" | "max";
   /** Removes nonessential BEAM chunks. Defaults to `true`. */
   strip?: boolean;
+  /**
+   * Files in applications' `priv` directories to leave out, as glob patterns
+   * like `"phoenix/priv/static"` or `"phoenix_live_view/priv/static/*.map"`,
+   * where the application can be `*`. A matched directory is left out with
+   * its contents.
+   */
+  excludePriv?: string[];
   /** Controls removal of unreachable modules and functions. Defaults to `none`. */
   treeshake?: TreeshakeOptions;
 };
@@ -76,6 +83,9 @@ export async function popcorn(options: Options): Promise<Prepared> {
     args.push("--brotli-effort", options.brotliEffort);
   }
   if (options.strip === false) args.push("--no-strip");
+  for (const pattern of options.excludePriv ?? []) {
+    args.push("--exclude-priv", pattern);
+  }
   if (options.treeshake !== undefined) {
     args.push("--treeshake");
     for (const app of options.treeshake.preservedApps ?? []) {

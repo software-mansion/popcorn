@@ -54,6 +54,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `--extra-app NAME` | Includes an application and its required dependencies. Can be repeated. |
   | `--runtime-variant NAME` | Selects `core` or `crypto` instead of automatic runtime selection. |
   | `--no-strip` | Keeps BEAM debug and documentation chunks. The task strips these by default. |
+  | `--exclude-priv PATTERN` | Leaves out `priv` files matching a glob pattern, like `phoenix/priv/static`. Can be repeated. |
   | `--treeshake` | Removes unreachable modules and functions. Experimental. Disabled by default. |
   | `--preserved-app NAME` | Preserves an application's code during tree-shaking. Requires `--treeshake`. Can be repeated. |
   | `--keep ENTRY` | Keeps a module (`MyApp.Plugin`, `:my_module`) or function (`MyApp.Plugin.run/1`), with the code it relies on, during tree-shaking. Requires `--treeshake`. Can be repeated. |
@@ -94,7 +95,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
   runtime. The `otp/` directory contains `manifest.json`, the boot script, and
   application archives. Each archive includes the application's `ebin` and
-  `priv` directories, if present. Archives also have `.gz` and `.br` copies.
+  `priv` directories, if present, without native libraries (`.so`, `.dylib`
+  and `.dll` files), which the runtime can't load: the NIFs it supports, like
+  `crypto`'s, are linked into it. Archives also have `.gz` and `.br` copies.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.
@@ -118,6 +121,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
     runtime_variant: :string,
     brotli_effort: :string,
     strip: :boolean,
+    exclude_priv: [:string, :keep],
     treeshake: :boolean,
     preserved_app: [:string, :keep],
     keep: [:string, :keep],
@@ -158,6 +162,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       runtime_variant: options[:runtime_variant],
       brotli_effort: brotli_effort(options[:brotli_effort]),
       strip: Keyword.get(options, :strip, true),
+      exclude_priv: Keyword.get_values(options, :exclude_priv),
       treeshake:
         if(options[:treeshake],
           do: [preserved_apps: preserved_apps, keep: keep, drop: drop],
