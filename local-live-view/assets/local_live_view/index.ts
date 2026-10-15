@@ -42,7 +42,7 @@ class PopcornClient {
     if (!popcorn) {
       result = { ok: false, error: new Error("LLV: popcorn call before runtime was ready") };
     } else {
-      const reply = await popcorn.call(DISPATCHER_PROCESS_REF, message, {
+      const reply = await popcorn.tryCall(DISPATCHER_PROCESS_REF, message, {
         timeoutMs: DEFAULT_CALL_TIMEOUT_MS,
       });
       // The dispatcher replies with :ok, {:ok, data} or {:error, reason},
@@ -221,8 +221,7 @@ export class LLVEngine {
     const assetsUrl = new URL(this.config.assetsUrl ?? "popcorn/", import.meta.url);
     const popcorn = new Popcorn({ workerUrl: new URL("worker.mjs", assetsUrl) });
     popcorn.onEvent((event) => this.handleEvent(event));
-    const result = await popcorn.boot();
-    if (!result.ok) throw result.error;
+    await popcorn.boot();
     this.pop.attach(popcorn);
   }
 

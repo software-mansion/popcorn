@@ -16,6 +16,7 @@
     "baseUrl": ".",
     "paths": {
       "@swmansion/popcorn": ["../src/index.ts"],
+      "@swmansion/popcorn/vite": ["../plugins/vite.ts"],
     },
   },
   "include": ["**/*.ts"],

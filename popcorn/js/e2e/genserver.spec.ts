@@ -31,7 +31,7 @@ test.describe("genserver", () => {
   });
 
   test("values and serialization", async ({ otp, page }) => {
-    const boot = await otp.boot(evalOpts(STOPPABLE_GEN_SERVER));
+    const boot = await otp.tryBoot(evalOpts(STOPPABLE_GEN_SERVER));
     assert(boot.ok);
     await otp.waitForEvent("genserver_ready");
     const request = await page.evaluateHandle(() => [
@@ -41,7 +41,7 @@ test.describe("genserver", () => {
         date: new Date(1704067200123),
       },
     ]);
-    const result = await otp.call("counter", request);
+    const result = await otp.tryCall("counter", request);
     assert(result.ok);
     const received = result.data as { integer: bigint; date: Date };
     expect(received.integer).toBe(9007199254740993n);
@@ -54,13 +54,13 @@ test.describe("genserver", () => {
       "improper",
       "submillisecond",
     ]) {
-      const reply = await otp.call("counter", request);
+      const reply = await otp.tryCall("counter", request);
       expect(reply).toEqual({
         ok: false,
         error: { t: "genserver:unserializable", data: {} },
       });
     }
-    expect(await otp.call("counter", "get")).toEqual({
+    expect(await otp.tryCall("counter", "get")).toEqual({
       ok: true,
       data: 0,
     });

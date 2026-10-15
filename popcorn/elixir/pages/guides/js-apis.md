@@ -39,7 +39,7 @@ Elixir can send events to the JavaScript via `Popcorn.Wasm.send/1`. To receive t
 
 We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.Wasm.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
 
-Additionally, we have [`async popcorn.genserver.cast(pid, payload, opts)`](`JSLib.Popcorn.Genserver.cast/3`) and [`async popcorn.genserver.call(pid, payload, opts)`](`JSLib.Popcorn.Genserver.call/3`). They're used to communicate with GenServers.
+Additionally, we have [`async popcorn.cast(pid, payload, opts)`](`JSLib.Popcorn.cast/3`) and [`async popcorn.call(pid, payload, opts)`](`JSLib.Popcorn.call/3`). They're used to communicate with GenServers.
 All `cast()`s and `call()`s are going through internal `Popcorn.Proxy` which keeps tabs of timeouts and routes the messages to correct processes.
 
 Messages sent to the Elixir will convert the JavaScript types to the Elixir ones. Popcorn provides [`atom()`](`JSLib.atom/1`) (`a()` alias) and [`tuple()`](`JSLib.tuple/3`) (`t()` alias) helpers to create native Elixir types.

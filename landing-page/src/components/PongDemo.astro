@@ -93,7 +93,7 @@
       }
 
       async function start() {
-        status.textContent = "Booting AtomVM and LocalLiveView";
+        status.textContent = "Booting BEAM and LocalLiveView";
         const [{ Socket }, { LiveSocket }, { LLVEngine }] = await Promise.all([
           import("phoenix"),
           import("phoenix_live_view"),
@@ -101,7 +101,7 @@
         ]);
         const liveSocket = new LiveSocket("/live", Socket, { params: {} });
         const engine = LLVEngine.create(liveSocket, {
-          bundlePaths: ["/wasm/local_pong.avm"],
+          assetsUrl: "/pong/",
         });
         liveSocket.connect();
         engine.connect();
