@@ -115,6 +115,13 @@ defmodule Popcorn.Packager do
     :rpc,
     :gen_udp_socket,
     :dist_util,
+    :dist_ac,
+    :erl_boot_server,
+    :erl_distribution,
+    :erl_epmd,
+    :global_group,
+    :erl_compile,
+    :erl_compile_server,
     :win32reg
   ]
 
