@@ -98,11 +98,10 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
   runtime. The `otp/` directory contains `manifest.json`, the boot script, and
-  application archives. Each archive includes the application's `ebin` and
-  `priv` directories, if present, without native libraries (`.so`, `.dylib`
-  and `.dll` files), which the runtime can't load: the NIFs it supports, like
-  `crypto`'s, are linked into it. The archives and the runtime files also have
-  `.gz` and `.br` copies.
+  `lib.tar`, an archive of the applications' `ebin` and `priv` directories.
+  It leaves out native libraries (`.so`, `.dylib` and `.dll` files), which the
+  runtime can't load: the NIFs it supports, like `crypto`'s, are linked into
+  it. The archive and the runtime files also have `.gz` and `.br` copies.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.

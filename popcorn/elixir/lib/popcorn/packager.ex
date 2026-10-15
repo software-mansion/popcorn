@@ -17,6 +17,7 @@ defmodule Popcorn.Packager do
   }
 
   @boot_name "bin/vm.boot"
+  @archive_name "lib.tar"
   @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
@@ -195,7 +196,7 @@ defmodule Popcorn.Packager do
     :random
   ]
 
-  defp strip_tarball(path, out_dir) do
+  defp strip_archive(path) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
 
     stripped =
@@ -203,10 +204,9 @@ defmodule Popcorn.Packager do
       |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
       |> Enum.map(&strip_beam/1)
 
-    output = Path.join(out_dir, Path.basename(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
 
-    :ok = :erl_tar.create(to_charlist(output), stripped, opts)
+    :ok = :erl_tar.create(to_charlist(path), stripped, opts)
   end
 
   defp beam?(path), do: Path.extname(path) == ".beam"
@@ -336,14 +336,12 @@ defmodule Popcorn.Packager do
       File.mkdir_p!(out_dir)
 
       packed_apps =
-        staged_apps
-        |> async_stream(fn {app, info} ->
-          version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
-          tar_path = create_tarball(out_dir, app, info.ebin_dir)
-
-          {app, %{tar: tar_path, version: version}}
+        Map.new(staged_apps, fn {app, info} ->
+          {app, %{version: info.props |> Keyword.get(:vsn, ~c"") |> to_string()}}
         end)
-        |> Map.new()
+
+      archive_path = create_archive(out_dir, staged_apps)
+      if strip, do: strip_archive(archive_path)
 
       diagnostics =
         staged_apps
@@ -361,17 +359,11 @@ defmodule Popcorn.Packager do
 
       manifest_path = Path.join(out_dir, "manifest.json")
 
-      packed_tar_paths =
-        packed_apps
-        |> Map.values()
-        |> Enum.map(&Path.expand(Path.join(out_dir, &1.tar)))
-
-      tar_paths = maybe_strip_tarballs(packed_tar_paths, strip, out_dir)
-
       manifest = %{
         entrypoint: entrypoint_app,
         runtimeVariant: variant,
         apps: packed_apps,
+        archive: @archive_name,
         notes: diagnostics,
         toolchain: toolchain,
         vm: %{boot: @boot_name, version: vm_version}
@@ -385,7 +377,7 @@ defmodule Popcorn.Packager do
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
         bootPath: Path.expand(boot_path),
-        tarPaths: tar_paths,
+        archivePath: Path.expand(archive_path),
         apps: packed_apps,
         notes: diagnostics,
         toolchain: toolchain,
@@ -409,28 +401,21 @@ defmodule Popcorn.Packager do
 
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join(out_dir, "otp/bin/vm.boot")
-      lib_dir = Path.join(out_dir, "otp/lib")
+      archive_path = Path.join(out_dir, "otp/#{@archive_name}")
 
       File.mkdir_p!(Path.dirname(manifest_path))
       File.mkdir_p!(Path.dirname(boot_path))
-      File.mkdir_p!(lib_dir)
       File.cp!(report.manifestPath, manifest_path)
       File.cp!(report.bootPath, boot_path)
-
-      tar_paths =
-        Enum.map(report.tarPaths, fn source ->
-          target = Path.join(lib_dir, Path.basename(source))
-          File.cp!(source, target)
-          compress(target, brotli_effort)
-          Path.expand(target)
-        end)
+      File.cp!(report.archivePath, archive_path)
+      compress(archive_path, brotli_effort)
 
       {:ok,
        %{
          report
          | manifestPath: Path.expand(manifest_path),
            bootPath: Path.expand(boot_path),
-           tarPaths: tar_paths
+           archivePath: Path.expand(archive_path)
        }}
     end
   end
@@ -646,15 +631,6 @@ defmodule Popcorn.Packager do
     enumerable
     |> Task.async_stream(fun, timeout: :infinity)
     |> Enum.map(fn {:ok, result} -> result end)
-  end
-
-  defp maybe_strip_tarballs(paths, false, _out_dir), do: paths
-
-  defp maybe_strip_tarballs(paths, true, out_dir) do
-    Enum.map(paths, fn path ->
-      :ok = strip_tarball(path, out_dir)
-      Path.expand(Path.join(out_dir, Path.basename(path)))
-    end)
   end
 
   defp get_apps_info(root_dir) do
@@ -982,25 +958,26 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, app, ebin_dir) do
-    tar = "lib/#{app}.tar"
-    tar_path = Path.join(outdir, tar)
-    tar_path_c = to_charlist(tar_path)
-    app_dir = Path.dirname(ebin_dir)
-    priv_dir = Path.join(app_dir, "priv")
-    entries = [{~c"lib/#{app}/ebin", to_charlist(ebin_dir)}]
+  # One archive for all applications compresses better than one each, as
+  # they have a lot in common, like the names of modules and functions.
+  defp create_archive(out_dir, staged_apps) do
+    path = Path.join(out_dir, @archive_name)
 
     entries =
-      if File.dir?(priv_dir) do
-        [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | entries]
-      else
-        entries
-      end
+      staged_apps
+      |> Enum.sort()
+      |> Enum.flat_map(fn {app, info} ->
+        priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
+        ebin = [{~c"lib/#{app}/ebin", to_charlist(info.ebin_dir)}]
 
-    File.mkdir_p!(Path.dirname(tar_path))
-    :ok = :erl_tar.create(tar_path_c, entries, [])
+        if File.dir?(priv_dir),
+          do: [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | ebin],
+          else: ebin
+      end)
 
-    tar
+    :ok = :erl_tar.create(to_charlist(path), entries, [])
+
+    path
   end
 
   defp loaded_dynamic_nifs(_app, ebin_dir) do

@@ -66,18 +66,21 @@ defmodule Popcorn.PackagerTest do
     assert "beam.wasm" = out_dir |> Path.join("beam.wasm.gz") |> File.read!() |> :zlib.gunzip()
 
     assert File.regular?(Path.join(out_dir, "otp/bin/vm.boot"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.gz"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.br"))
 
-    archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
+    for variant <- ["", ".gz", ".br"] do
+      assert File.regular?(Path.join(out_dir, "otp/lib.tar" <> variant))
+    end
+
+    # One archive has all applications
+    archive = out_dir |> Path.join("otp/lib.tar") |> read_archive()
+    assert Map.has_key?(archive, "lib/kernel/ebin/kernel.app")
     assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Wasm.beam")
     assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
     refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
 
     # Native libraries are left out, along with directories they leave empty
     {:ok, entries} =
-      out_dir |> Path.join("otp/lib/popcorn.tar") |> to_charlist() |> :erl_tar.table()
+      out_dir |> Path.join("otp/lib.tar") |> to_charlist() |> :erl_tar.table()
 
     entries = Enum.map(entries, &to_string/1)
     refute "lib/popcorn/priv/nested/native.so" in entries
@@ -99,6 +102,9 @@ defmodule Popcorn.PackagerTest do
 
     output_manifest = out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
     assert %{"runtimeVariant" => "core", "entrypoint" => "popcorn"} = output_manifest
+
+    assert %{"archive" => "lib.tar", "apps" => %{"popcorn" => %{"version" => _}}} =
+             output_manifest
   end
 
   @tag :tmp_dir

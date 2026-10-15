@@ -90,7 +90,7 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 Vite sets these headers for development and preview. Configure your production server separately.
-Serve `.wasm` as `application/wasm`. The package emits `.gz` and Brotli `.br` variants of the tar files and the runtime files (`beam.wasm` and the JavaScript); serve them for requests of the uncompressed files, with `Content-Encoding: gzip` or `br`. Brotli uses standard effort by default. Set `brotliEffort: "max"` for maximum compression in release builds.
+Serve `.wasm` as `application/wasm`. The package emits `.gz` and Brotli `.br` variants of the applications' tar file and the runtime files (`beam.wasm` and the JavaScript); serve them for requests of the uncompressed files, with `Content-Encoding: gzip` or `br`. Brotli uses standard effort by default. Set `brotliEffort: "max"` for maximum compression in release builds.
 
 The JavaScript bridge currently requires a Content Security Policy that permits `unsafe-eval`.
 See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.5/) for interoperability details.
