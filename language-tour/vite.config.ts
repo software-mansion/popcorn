@@ -33,7 +33,7 @@ export default defineConfig({
       rehypePlugins: [[rehypeHighlight, { languages: { elixir } }]]
     }),
     svgr(),
-    popcorn({ rootDir: "./elixir_tour", app: "elixir_tour" }),
+    popcorn({ rootDir: "./elixir_tour" }),
     cookOnChange()
   ],
   server: {

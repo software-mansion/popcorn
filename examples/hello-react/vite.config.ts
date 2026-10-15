@@ -11,6 +11,6 @@ export default defineConfig({
       },
     }),
 
-    popcorn({ rootDir: "./ex_app", app: "ex_app" }),
+    popcorn({ rootDir: "./ex_app" }),
   ],
 });

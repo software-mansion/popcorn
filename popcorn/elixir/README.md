@@ -34,7 +34,7 @@ end
 Install the matching JavaScript package with `npm install @swmansion/popcorn@next`.
 The npm package includes both `core` and `crypto` runtime variants.
 The bundler plugin selects one from your application's dependencies.
-Use `runtimeVariant` to override the selection. Both variants use this Hex package.
+Use `config :popcorn, runtime_variant: :crypto` to override the selection. Both variants use this Hex package.
 
 Fetch your application dependencies with `mix deps.get` before building its JavaScript assets.
 The bundler plugin invokes `mix popcorn.cook`, which compiles and packages your application and its standard-library dependencies.
@@ -47,8 +47,11 @@ bundler:
 mix popcorn.cook --out-dir public/out
 ```
 
-The task uses the current Mix application by default. Use `--no-app` to package
-the base runtime without an entrypoint.
+The task uses the current Mix application by default. Set
+`config :popcorn, app: nil` in `config/config.exs` to package the base runtime
+without an entrypoint. Configure all cooking settings there; `--out-dir` is the
+only CLI option and cannot be set in application config. The JS plugins use the
+same configuration. See `mix help popcorn.cook` for the available settings.
 
 Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.5/introduction.html).
 Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.5/first-application.html).
