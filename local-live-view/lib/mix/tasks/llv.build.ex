@@ -12,7 +12,8 @@ defmodule Mix.Tasks.Llv.Build do
        is built.
     2. Fetches the dependencies of the local project and packages it with
        `mix popcorn.cook` into `priv/static/assets/js/popcorn/`, along with
-       the Popcorn runtime. LocalLiveView's JS loads it from there: the
+       the Popcorn runtime, with the options in the local project's
+       `config/config.exs`. LocalLiveView's JS loads it from there: the
        `popcorn/` directory next to the `app.js` bundle.
 
   ## Usage

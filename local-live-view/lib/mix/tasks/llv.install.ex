@@ -24,7 +24,8 @@ defmodule Mix.Tasks.Llv.Install do
     * Configure esbuild to output ESM format
     * Add the LocalLiveView watcher to your endpoint config in `config/dev.exs`
     * Add `mix llv.build` to your setup alias
-    * Generate a `local/` project with a sample HelloLocal local live view
+    * Generate a `local/` project with a sample HelloLocal local live view, and
+      its `config/config.exs` with Popcorn's options for packaging it
     * Generate a HelloLocalLive LiveView that renders it and route it at `/hello_local`
 
   `mix setup` will then run `mix llv.build` which builds the Wasm runtime from `local/`
@@ -465,6 +466,7 @@ defmodule Mix.Tasks.Llv.Install do
       igniter
       |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_dep: llv_dep_from_local())
       |> copy_template("#{@local_project_dir}/.formatter.exs", "formatter.exs")
+      |> copy_template("#{@local_project_dir}/config/config.exs", "config.exs")
       |> copy_template("#{@local_project_dir}/lib/local/application.ex", "application.ex")
       |> copy_template("#{@local_project_dir}/lib/hello_local.ex", "hello_local.ex")
     end
