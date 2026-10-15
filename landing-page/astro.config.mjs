@@ -77,8 +77,6 @@ export default defineConfig({
     plugins: [
       popcorn({
         rootDir: gameOfLifeRoot,
-        app: "game_of_life",
-        extraApps: ["iex", "logger"],
       }),
       tailwindcss(),
     ],

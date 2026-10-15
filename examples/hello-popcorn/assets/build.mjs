@@ -17,5 +17,5 @@ await esbuild.build({
   format: "esm",
   sourcemap: true,
   outfile: resolve(outDir, "index.js"),
-  plugins: [popcorn({ rootDir, app: "hello_popcorn" })],
+  plugins: [popcorn({ rootDir })],
 });

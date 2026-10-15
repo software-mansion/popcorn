@@ -99,7 +99,7 @@ Delete the Popcorn 0.3 output configuration:
 config :popcorn, out_dir: "dist/wasm"
 ```
 
-Configure the bundler plugin with the Mix project and OTP application:
+Configure the bundler plugin with the Mix project:
 
 ```typescript
 import { defineConfig } from "vite";
@@ -115,26 +115,30 @@ export default defineConfig({
 ```
 
 Set `rootDir` to the Mix project directory.
-The plugin uses the current Mix application by default. Set `app` only to
-select another application.
+The cook task uses the current Mix application by default. Set
+`config :popcorn, app: :other_app` in `config/config.exs` to select another application.
 
 The plugin runs `mix popcorn.cook`, which compiles the project before packaging
 the active Mix environment and target.
 It packages the application, its dependencies, and the boot file.
 
-Remove the old `treeshake` and `extra_beams` build options. See `mix popcorn.cook` to check current treeshake options. Treeshaking is disabled by default.
-The new `strip` option removes nonessential BEAM chunks but does not remove functions.
+Remove the old `extra_beams` option. Configure cooking in `config/config.exs`,
+including applications that dependency analysis cannot find:
 
-Use `extraApps` for applications that dependency analysis cannot find:
+```elixir
+import Config
 
-```typescript
-popcorn({
-  rootDir: "../",
-  extraApps: ["eex"],
-});
+config :popcorn,
+  extra_apps: [:eex],
+  treeshake: [preserved_apps: [:eex]]
 ```
 
-Use `app: null` when the runtime must not start an application.
+Treeshaking is disabled by default. The `strip` setting defaults to `true` and
+removes nonessential BEAM chunks without removing functions.
+Use `app: nil` when the runtime must not start an application.
+
+`mix popcorn.cook` accepts only `--out-dir`; JS plugins accept only `rootDir`.
+Output location belongs to the invocation. See `mix help popcorn.cook` for all settings.
 
 ## Update JavaScript startup
 

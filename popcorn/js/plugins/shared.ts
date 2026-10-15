@@ -16,27 +16,8 @@ type RuntimeVariant = "core" | "crypto";
  * compiles the project before packaging it.
  */
 export type Options = {
-  /** Runtime variant override. */
-  runtimeVariant?: RuntimeVariant;
-  /** Mix project directory. */
+  /** Mix project directory. Cooking options belong in its config/config.exs. */
   rootDir: string;
-  /**
-   * OTP application to start after VM boot.
-   * Defaults to the current Mix application.
-   */
-  app?: string | null;
-  /** Additional applications to package with their dependencies. */
-  extraApps?: string[];
-  /** Brotli compression effort. Defaults to `standard`. */
-  brotliEffort?: "standard" | "max";
-  /** Removes nonessential BEAM chunks. Defaults to `true`. */
-  strip?: boolean;
-  /** Controls removal of unreachable modules and functions. Defaults to `none`. */
-  treeshake?: TreeshakeOptions;
-};
-
-export type TreeshakeOptions = {
-  preservedApps?: string[];
 };
 
 export type Prepared = {
@@ -53,24 +34,6 @@ type CookedManifest = {
 export async function popcorn(options: Options): Promise<Prepared> {
   const dir = await mkdtemp(`${tmpdir()}/popcorn-otp-`);
   const args = ["popcorn.cook", "--out-dir", dir];
-
-  if (options.app === null) args.push("--no-app");
-  else if (options.app !== undefined) args.push("--app", options.app);
-
-  for (const app of options.extraApps ?? []) args.push("--extra-app", app);
-  if (options.runtimeVariant !== undefined) {
-    args.push("--runtime-variant", options.runtimeVariant);
-  }
-  if (options.brotliEffort !== undefined) {
-    args.push("--brotli-effort", options.brotliEffort);
-  }
-  if (options.strip === false) args.push("--no-strip");
-  if (options.treeshake !== undefined) {
-    args.push("--treeshake");
-    for (const app of options.treeshake.preservedApps ?? []) {
-      args.push("--preserved-app", app);
-    }
-  }
 
   try {
     await execFileAsync("mix", args, {

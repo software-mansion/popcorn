@@ -17,5 +17,5 @@ await esbuild.build({
   format: "esm",
   sourcemap: true,
   outfile: "../dist/index.js",
-  plugins: [popcorn({ rootDir: "..", app: "eval_in_wasm" })],
+  plugins: [popcorn({ rootDir: ".." })],
 });

@@ -21,5 +21,5 @@ await esbuild.build({
   format: "esm",
   sourcemap: true,
   outfile: resolve(outDir, "index.js"),
-  plugins: [popcorn({ rootDir, app: "iex", extraApps: ["logger"] })],
+  plugins: [popcorn({ rootDir })],
 });

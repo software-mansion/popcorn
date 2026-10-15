@@ -37,8 +37,20 @@ export default defineConfig({
 ```
 
 Set `rootDir` to the Mix project directory. The current Mix application is the
-default entrypoint. Set `app` to select another OTP application explicitly.
-Use `app: null` to package the base runtime without starting an application.
+default entrypoint. Configure cooking in the Mix project's `config/config.exs`:
+
+```elixir
+import Config
+
+config :popcorn,
+  extra_apps: [:eex],
+  treeshake: [preserved_apps: [:eex]]
+```
+
+Set `app: :other_app` to select another OTP application, or `app: nil` to
+package the base runtime without starting an application. Cooking settings
+belong exclusively to Elixir config; the JS plugins accept only `rootDir`.
+See `mix help popcorn.cook` for all settings.
 
 The npm package contains two variants:
 
@@ -47,8 +59,8 @@ The npm package contains two variants:
 
 The plugin emits only the selected variant. The browser does not download both.
 Both variants share one JavaScript API and one Hex package.
-The plugin selects `crypto` when the application's dependencies or `extraApps` require it; otherwise it selects `core`.
-Set `runtimeVariant: "core"` or `runtimeVariant: "crypto"` to override this choice.
+The cook task selects `crypto` when the application's dependencies or configured `extra_apps` require it; otherwise it selects `core`.
+Set `runtime_variant: :core` or `runtime_variant: :crypto` in Elixir config to override this choice.
 An explicit `"core"` selection produces a build error if the application requires crypto.
 
 Rollup and esbuild plugins accept the same options through `@swmansion/popcorn/rollup` and `@swmansion/popcorn/esbuild`.
@@ -91,7 +103,7 @@ Cross-Origin-Embedder-Policy: require-corp
 
 Vite sets these headers for development and preview. Configure your production server separately.
 Serve `.wasm` as `application/wasm`. Serve compressed `.tar.gz` files with `Content-Encoding: gzip` for `.tar` requests.
-The package also emits uncompressed tar files and Brotli variants. Brotli uses standard effort by default. Set `brotliEffort: "max"` for maximum compression in release builds.
+The package also emits uncompressed tar files and Brotli variants. Brotli uses standard effort by default. Set `config :popcorn, brotli_effort: :max` in `config/config.exs` for maximum compression in release builds.
 
 The JavaScript bridge currently requires a Content Security Policy that permits `unsafe-eval`.
 See the [versioned Elixir API](https://popcorn.hexdocs.pm/0.4.0-next.5/) for interoperability details.
