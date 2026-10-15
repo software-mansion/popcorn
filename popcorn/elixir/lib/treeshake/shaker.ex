@@ -102,6 +102,16 @@ defmodule Treeshake.Shaker do
   defp do_shake(path, reachable_mods_funs, module_index, stub_removed_functions) do
     module_info = Map.fetch!(module_index, beam_module(path))
 
+    if module_info.undeclared_nifs do
+      # Loading NIFs fails unless every NIF in the library has a function in
+      # the module. They're not declared with `-nifs`, so all are kept.
+      {File.read!(path), []}
+    else
+      shake_module(path, module_info, reachable_mods_funs, stub_removed_functions)
+    end
+  end
+
+  defp shake_module(path, module_info, reachable_mods_funs, stub_removed_functions) do
     reachable_funs = @keep_funs ++ Map.fetch!(reachable_mods_funs, module_info.module)
     reachable_mapset = MapSet.new(reachable_funs)
 
@@ -110,8 +120,12 @@ defmodule Treeshake.Shaker do
         if Enum.any?(called_by, &(&1 in reachable_mapset)), do: [fun], else: []
       end)
 
+    # The compiler removes private functions nothing calls, which a private NIF
+    # is when the functions calling it are removed. They're exported instead,
+    # as loading NIFs fails unless all of them are there.
     Treeshake.Utils.BeamRewriter.keep_funs(path, reachable_funs ++ reachable_privs,
-      stub_removed_public: stub_removed_functions
+      stub_removed_public: stub_removed_functions,
+      export: module_info.nifs
     )
   end
 
