@@ -12,86 +12,37 @@
 
 **Popcorn runs Elixir and Erlang applications in the browser on a BEAM virtual machine compiled to WebAssembly.**
 
-Please report issues and discuss large contributions before you start work.
-
-### Release channels
-
-The stable 0.3 release uses [AtomVM](https://github.com/atomvm/AtomVM).
-
-The 0.4 prerelease uses the BEAM virtual machine from Erlang/OTP, compiled to
-WebAssembly. It runs compiled BEAM code in a Web Worker and supports standard
-OTP processes, message passing, and supervision.
-
-Use the [Popcorn 0.4 setup guide](popcorn/js/README.md) for the prerelease. The
-stable npm channel remains on Popcorn 0.3 until the 0.4 release.
+Your application runs on the user's device, with OTP processes, message passing,
+and supervision. JavaScript and Elixir communicate through Popcorn's APIs.
 
 ## Documentation
 
-The stable documentation is available at <https://hexdocs.pm/popcorn>.
+- [Popcorn 1.0 documentation](https://hexdocs.pm/popcorn/): installation, tutorials, guides, and API reference.
+- [JavaScript package](popcorn/js/README.md): bundler setup and JavaScript usage.
+- [Elixir package](popcorn/elixir/README.md): application setup and packaging.
+- [LocalLiveView](local-live-view/README.md): Phoenix LiveView running in the browser.
 
-The versioned 0.4 prerelease documentation is available at
-<https://popcorn.hexdocs.pm/0.4.0-next.6/>.
+Popcorn 1.0 is a prerelease based on Erlang/OTP. The stable npm channel still
+uses Popcorn 0.3 and AtomVM; see the [0.3 documentation](https://hexdocs.pm/popcorn).
 
 ## Examples
 
-The examples are hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com), and the source code is in the `examples/` directory.
+Try the demos at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples)
+and browse their [source code](examples/). The
+[Elixir language tour](https://elixir-language-tour.swmansion.com/) also runs on Popcorn.
 
-See also third-party examples:
-
-- Running Popcorn on iOS (WebView based): https://github.com/u9g/uno-royale
-- A collection of local Live View demos: https://petermm.github.io/popcorn_live_view/
-
-## Repository Structure
-
-- **`popcorn-2/`** - Popcorn 0.3 implementation based on AtomVM.
-- **`popcorn/`** - Popcorn 0.4 implementation based on Erlang/OTP.
-- **`examples/`** - Example projects showcasing Popcorn features, hosted at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples). Examples use development version of Popcorn.
-- **`landing-page/`** - Popcorn [landing page](https://popcorn.swmansion.com/).
-- **`language-tour/`** - Interactive [Elixir language tour](https://elixir-language-tour.swmansion.com/) running purely in the browser.
-- **`local-live-view/`** - Experimental client-side LiveView implementation.
-- **`scripts/`** - Shell scripts for development, testing, and CI tasks.
-- **`docker/`** - Dockerfiles and nginx configs for CI and deployment.
+Community projects include [Popcorn on iOS](https://github.com/u9g/uno-royale)
+and [LocalLiveView demos](https://petermm.github.io/popcorn_live_view/).
 
 ## Development
 
-We use [`mise`](https://mise.jdx.dev) to manage tool versions and run tasks. [Install it](https://mise.jdx.dev/installing-mise.html), then:
+We use [mise](https://mise.jdx.dev) to manage tools and tasks. See
+[mise.toml](mise.toml) for tool versions and available tasks, and
+[scripts/](scripts/) for development, testing, and build scripts.
+The [Hello Popcorn example](examples/hello-popcorn/README.md) includes local build and run instructions.
 
-```shell
-mise install
-mise run dev
-```
-
-This installs all dependencies (Elixir, Node, pnpm) and starts the JS library in watch mode.
-
-To develop with an example or project:
-
-```shell
-mise run dev --example hello-popcorn
-mise run dev --project landing-page
-mise run dev --project language-tour
-```
-
-Run `scripts/dev.sh --help` to see all available examples and projects.
-
-### Testing
-
-```shell
-mise run test            # Elixir unix tests (default)
-mise run test --wasm     # Elixir wasm tests
-mise run test --js       # JS tests
-```
-
-The required runtime build depends on the package that you change. See the
-package documentation for its toolchain and native build requirements.
-
-### Other tasks
-
-```shell
-mise run clean           # Clean build artifacts
-mise run clean --all     # Clean everything including examples
-```
-
-All tasks are thin wrappers around `scripts/*.sh` — you can run those directly.
+Please report [issues](https://github.com/software-mansion/popcorn/issues) and
+discuss large contributions before you start work.
 
 ## Authors
 
@@ -102,5 +53,7 @@ Since 2012 [Software Mansion](https://swmansion.com/) is a software agency with 
 Copyright 2025, [Software Mansion](https://swmansion.com/)
 
 [![Software Mansion](https://logo.swmansion.com/logo?color=white&variant=desktop&width=200&tag=membrane-github)](https://swmansion.com/)
+
+## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE)

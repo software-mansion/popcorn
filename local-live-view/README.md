@@ -2,7 +2,7 @@
 
 **LocalLiveView is a library for running Phoenix LiveView state in the browser, powered by [Popcorn](https://hexdocs.pm/popcorn).**
 
-LocalLiveView compiles your Elixir modules to WebAssembly and runs them via Popcorn directly in the browser. You get zero-latency UI and offline capability while using the same Phoenix LiveView API you already know.
+LocalLiveView compiles your Elixir modules to BEAM bytecode and runs them via Popcorn directly in the browser. You get zero-latency UI and offline capability while using the same Phoenix LiveView API you already know.
 
 ## Documentation
 

@@ -1,17 +1,17 @@
 # Installation
 
-This guide installs the Popcorn 1.0 in a new Mix application.
+This guide installs Popcorn 1.0 in a new Mix application.
 
-We have separate guide for ["JavaScript-first applications"](hello-js.md) (e.g. using Vite).
-If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://local-live-view.hexdocs.pm/) documentation.
+We have a separate guide for ["JavaScript-first applications"](hello-js.md) (e.g. using Vite).
+If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://hexdocs.pm/local_live_view/) documentation.
 
 ## Requirements
 
 - Elixir 1.19 or later
-- OTP 29 or later
+- OTP 29 (match the selected runtime release)
 - `make` (Brotli library NIF), `inotify-tools` (Linux, for `popcorn.dev` FS watching)
 
-These are versions that Popcorn uses for its VM. Try to match it. You can read more about Popcorn versioning in VM
+Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v1.0.0-next.0/mise.toml) for this release. Your local toolchain must be compatible with the one used to build the VM. See ["Compatibility and limits"](compatibility.md#compatibility) for details.
 
 ## Initialization
 
@@ -28,7 +28,7 @@ Add Popcorn to `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:popcorn, "0.4.0"}
+    {:popcorn, "1.0.0-next.0"}
   ]
 end
 ```
@@ -46,4 +46,4 @@ That's it!
 
 Now you need an HTML page and some JavaScript. Continue with
 ["Hello World"](hello-world.md) for a minimal guide. To learn the
-APIs and see Popcorn beyond bare-bones application, build the ["Hello counters"](hello-counters.md) example.
+APIs and see Popcorn beyond a bare-bones application, build the ["Hello counters"](hello-counters.md) example.

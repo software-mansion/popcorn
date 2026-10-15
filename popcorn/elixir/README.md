@@ -16,10 +16,10 @@ Browser restrictions still apply to the VM, including limits on operating-system
 
 ## APIs
 
-- [JavaScript API](JSLib.Popcorn.html): start and stop the VM, send messages, and connect terminal input and output.
-- `Popcorn.JS`: send messages to JavaScript and call JavaScript functions from Elixir.
-- `Popcorn.Proxy`: connect JavaScript calls and casts to your application's GenServers.
-- `Popcorn.Fetch`: send HTTP requests through the browser, directly or with Req.
+- [JavaScript API](https://hexdocs.pm/popcorn/JSLib.Popcorn.html): start and stop the VM, send messages, and connect terminal input and output.
+- [Elixir JavaScript API](https://hexdocs.pm/popcorn/Popcorn.JS.html): send messages to JavaScript and call JavaScript functions from Elixir.
+- [GenServer proxy](https://hexdocs.pm/popcorn/Popcorn.Proxy.html): connect JavaScript calls and casts to your application's GenServers.
+- [HTTP API](https://hexdocs.pm/popcorn/Popcorn.Fetch.html): send HTTP requests through the browser, directly or with Req.
 
 ## Installation
 
@@ -27,7 +27,7 @@ Add the Elixir package to your Mix dependencies:
 
 ```elixir
 defp deps do
-  [{:popcorn, "0.4.0-next.6"}]
+  [{:popcorn, "1.0.0-next.0"}]
 end
 ```
 
@@ -38,7 +38,7 @@ Use `config :popcorn, runtime_variant: :crypto` to override the selection. Both 
 
 Fetch your application dependencies with `mix deps.get` before building its JavaScript assets.
 The bundler plugin invokes `mix popcorn.cook`, which compiles and packages your application and its standard-library dependencies.
-Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.6/mise.toml) for this release.
+Use the toolchain in [mise.toml](https://github.com/software-mansion/popcorn/blob/main/mise.toml) for this release.
 
 You can also prepare the complete browser asset directory without a JavaScript
 bundler:
@@ -53,9 +53,9 @@ without an entrypoint. Configure all cooking settings there; `--out-dir` is the
 only CLI option and cannot be set in application config. The JS plugins use the
 same configuration. See `mix help popcorn.cook` for the available settings.
 
-Start with the [versioned introduction](https://popcorn.hexdocs.pm/0.4.0-next.6/introduction.html).
-Then use the [first application tutorial](https://popcorn.hexdocs.pm/0.4.0-next.6/first-application.html).
+Start with the [introduction](https://hexdocs.pm/popcorn/about.html).
+Then use the [first application tutorial](https://hexdocs.pm/popcorn/hello-world.html).
 
-The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/v0.4.0-next.6/popcorn/js/README.md)
-contains a short package reference. The versioned documentation contains the
+The [JavaScript setup guide](https://github.com/software-mansion/popcorn/blob/main/popcorn/js/README.md)
+contains a short package reference. The documentation contains the
 complete Elixir and JavaScript API reference.

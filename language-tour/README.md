@@ -46,9 +46,9 @@ The Elixir Language Tour Guide is a platform that provides:
 
 - **`src/utils/content/`**: Content processing utilities that build navigation trees, generate routes dynamically, and load MDX modules at runtime.
 
-- **`elixir_tour/`**: Mix project that compiles Elixir code to WebAssembly using [Popcorn](https://popcorn.swmansion.com/).
+- **`elixir_tour/`**: Mix project that compiles Elixir code to BEAM bytecode for the WebAssembly runtime using [Popcorn](https://popcorn.swmansion.com/).
 
-- **`public/wasm/`**: Generated directory (gitignored) containing WebAssembly binaries and runtime created during the build process.
+- **`dist/assets/`**: Generated directory containing the WebAssembly runtime and packaged application assets created during the production build.
 
 ---
 
@@ -59,7 +59,7 @@ The Elixir Language Tour Guide is a platform that provides:
 - **Node.js**: 22.x or higher
 - **pnpm**: latest
 - **Mix**: Elixir build tool (for building WebAssembly)
-- **Elixir**: 1.17
+- **Elixir**: 1.19 or later, with the OTP version pinned in the repository's [mise.toml](../mise.toml)
 
 ### Usage
 
@@ -133,8 +133,8 @@ IO.puts("Example code")
 
 - **Chapter directories**: Use numbered prefixes (e.g., `1-basic-types/`, `2-data-structures/`)
 - **File naming**: Use kebab-case (e.g., `pattern-matching.mdx`)
-- **Frontmatter**: Include `order` property for sorting purpose
-- **Code blocks**: Use `<EditorCode>` for interactive examples which appear in code editor.
+- **Frontmatter**: Include `order` property for sorting
+- **Code blocks**: Use `<EditorCode>` for interactive examples which appear in the code editor.
 
 ### MDX Processing Pipeline
 
@@ -171,6 +171,6 @@ initSentry(); // Called in main.tsx
    - Tag: `code-exception`
    - Includes code and error message
 
-2. **AtomVM Crashes**: WebAssembly runtime crashes
+2. **VM Crashes**: WebAssembly runtime crashes
    - Tag: `atomvm-crash`
    - Includes code, stdout, stderr

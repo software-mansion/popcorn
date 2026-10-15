@@ -3,7 +3,7 @@
 Runs the real Elixir IEx user driver on Popcorn's OTP/BEAM WebAssembly runtime
 and renders it with [`ghostty-web`](https://github.com/coder/ghostty-web).
 
-There is no Elixir project here. `assets/build.mjs` names `:iex` as the
+The Mix project uses `config/config.exs` to name `:iex` as the
 entrypoint and `:logger` as an extra app, so both are packed straight out of
 the local Elixir installation. The shell is started through emulator arguments
 that mirror the native `iex` launcher:

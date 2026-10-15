@@ -60,7 +60,7 @@ end
 
 ### 2. Create the Mirror module
 
-On the server side, create `lib/mirror/my_live.ex`:
+On the server side, create `lib/mirror/my_local.ex`:
 
 ```elixir
 defmodule Mirror.MyLocal do
@@ -79,7 +79,7 @@ The module must be named `Mirror.<ViewName>` — the view name is the last part 
 
 - `local_assigns` — a map of the synced assigns (keys are strings)
 - `mirror_assigns` — the mirror's current state (what was returned from the previous `handle_sync` call)
-- `params` - a map containing its mirror_id (mirror_id is a composition of parent LV socket id and a LLV dom element id which are assembled via `LocalLiveView.Component.mirror_id/2` function)
+- `params` — a map containing `:mirror_id`, composed from the parent LiveView socket ID and the LocalLiveView DOM element ID by `LocalLiveView.Component.mirror_id/2`
 
 It must return `{:ok, new_mirror_assigns}`.
 
@@ -92,7 +92,7 @@ defmodule Mirror.MyLocal do
   use LocalLiveView.Mirror
 
   @impl true
-  def handle_sync(local_assigns, _mirror_assigns) do
+  def handle_sync(local_assigns, _mirror_assigns, _params) do
     Phoenix.PubSub.broadcast(
       MyApp.PubSub,
       "llv_mirror:MyLocal",
@@ -126,7 +126,7 @@ end
 `handle_sync/3` can return different assigns than it received — this is useful when you want the mirror to store derived or enriched state:
 
 ```elixir
-def handle_sync(%{"count" => count} = local_assigns, mirror_assigns) do
+def handle_sync(%{"count" => _count} = local_assigns, mirror_assigns, _params) do
   enriched = Map.put(local_assigns, "total_increments", Map.get(mirror_assigns, "total_increments", 0) + 1)
   {:ok, enriched}
 end

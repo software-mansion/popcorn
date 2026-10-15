@@ -50,7 +50,7 @@ Then generate docs normally:
 ```bash
 mix deps.get
 mix docs
-mix popdoc.server # to serve the docs locally. It's needed for CORS headers.
+mix popdoc.server # to serve the docs locally. It's needed for cross-origin isolation headers.
 ```
 
-`popdoc: [coi_serviceworker: true]` is useful for docs hosting when you cannot control response headers directly (i.e. Github pages, Hexdocs). For production deployments, leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers from the web server.
+`popdoc: [coi_serviceworker: true]` is useful for docs hosting when you cannot control response headers directly (i.e. GitHub Pages, HexDocs). For production deployments, leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers from the web server.
