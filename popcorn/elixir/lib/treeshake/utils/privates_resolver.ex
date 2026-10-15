@@ -9,7 +9,7 @@ defmodule Treeshake.Utils.PrivatesResolver do
   alias Treeshake.Utils.Graph
   alias Treeshake.Utils.BeamAnalyzer
 
-  @type public_function_info :: %{calls: [mfa()], potential_modules: [module()]}
+  @type public_function_info :: %{calls: [mfa() | module()], potential_modules: [module()]}
 
   @type name_arity :: {atom(), non_neg_integer()}
 
@@ -45,8 +45,10 @@ defmodule Treeshake.Utils.PrivatesResolver do
             all_fns
             |> Enum.flat_map(& &1.calls)
             |> Enum.map(&resolve_local(&1, module))
-            |> Enum.reject(fn {m, name, arity} ->
-              m == module and Map.has_key?(priv_index, {name, arity})
+            |> Enum.reject(fn
+              {m, name, arity} -> m == module and Map.has_key?(priv_index, {name, arity})
+              # A hardcoded call to a whole module
+              _module -> false
             end)
             |> Enum.uniq(),
           potential_modules: all_fns |> Enum.flat_map(& &1.potential_modules) |> Enum.uniq()

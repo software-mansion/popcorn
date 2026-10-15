@@ -117,8 +117,10 @@ defmodule Treeshake.CallGraph do
     child_spec_calls = find_child_spec_calls(referenced_modules_info)
     generated_funs = find_generated_funs(referenced_modules_info)
 
+    calls = Enum.flat_map(function_info.calls, &expand_module_call(&1, module_index))
+
     all_calls =
-      (function_info.calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
+      (calls ++ behaviour_calls ++ child_spec_calls ++ generated_funs)
       |> Enum.reject(&(&1 == mfa))
 
     {protocol_entries, acc_protocol_calls} =
@@ -143,6 +145,17 @@ defmodule Treeshake.CallGraph do
     }
 
     {all_calls ++ Enum.flat_map(protocol_entries, &value/1), acc}
+  end
+
+  # A hardcoded call to a whole module calls all its public functions, if it's
+  # there
+  defp expand_module_call({_m, _f, _a} = mfa, _module_index), do: [mfa]
+
+  defp expand_module_call(module, module_index) do
+    case module_index[module] do
+      nil -> []
+      info -> Enum.map(info.public_functions, fn {{f, a}, _info} -> {module, f, a} end)
+    end
   end
 
   defp find_behaviour_calls(referenced_modules_info, module_index) do
