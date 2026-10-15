@@ -34,6 +34,7 @@ defmodule LocalLvKanbanWeb.Endpoint do
     at: "/",
     from: :local_lv_kanban,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: LocalLvKanbanWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 
