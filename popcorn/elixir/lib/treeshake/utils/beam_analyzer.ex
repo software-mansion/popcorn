@@ -19,11 +19,12 @@ defmodule Treeshake.Utils.BeamAnalyzer do
           behaviour_impls: [module()],
           protocol_impl: {protocol :: module(), type :: module()} | nil,
           # :unknown when the module calls load_nif/2 but doesn't declare NIFs
-          nifs: [{atom(), non_neg_integer()}] | :unknown
+          nifs: [{atom(), non_neg_integer()}] | :unknown,
+          macro_generated: [{atom(), non_neg_integer()}]
         }
 
-  @spec analyze(module(), core_ast :: term()) :: module_info()
-  def analyze(module, core) do
+  @spec analyze(module(), core_ast :: term(), elixir_definitions :: [tuple()]) :: module_info()
+  def analyze(module, core, elixir_definitions) do
     exports = collect_exports(core)
     callbacks = collect_callbacks(core)
     protocol_impl = collect_protocol_impl(core)
@@ -64,7 +65,8 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       abstraction: abstraction,
       behaviour_impls: behaviours,
       protocol_impl: protocol_impl,
-      nifs: nifs
+      nifs: nifs,
+      macro_generated: macro_generated_functions(module, elixir_definitions)
     }
   end
 
@@ -95,6 +97,21 @@ defmodule Treeshake.Utils.BeamAnalyzer do
         []
     end)
   end
+
+  # Functions injected into the module by macros defined in other modules.
+  defp macro_generated_functions(module, elixir_definitions) do
+    for {{name, arity}, kind, meta, _clauses} <- elixir_definitions,
+        context = Keyword.get(meta, :context),
+        is_atom(context) and context != module do
+      beam_name_arity(kind, name, arity)
+    end
+  end
+
+  # Macros are compiled to MACRO-prefixed functions with an extra env argument.
+  defp beam_name_arity(kind, name, arity) when kind in [:defmacro, :defmacrop],
+    do: {:"MACRO-#{name}", arity + 1}
+
+  defp beam_name_arity(_kind, name, arity), do: {name, arity}
 
   defp collect_on_load({:c_module, _, _, _, attrs, _}) do
     Enum.flat_map(attrs, fn
