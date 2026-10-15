@@ -202,6 +202,9 @@ defmodule Treeshake do
   doesn't impact reachability of their functions. See 'Modules left by default'
   for more details.
 
+  The tree-shaken modules' functions made of many clauses mapping integers to
+  constants, like Unicode tables, are also compacted, see `Treeshake.TableCompactor`.
+
   ## Accepted options
 
   - `ebin_files` - List of `.beam` and `.app` files to be tree-shaked. The beam files

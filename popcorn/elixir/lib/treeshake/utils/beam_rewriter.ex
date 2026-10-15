@@ -8,8 +8,11 @@ defmodule Treeshake.Utils.BeamRewriter do
   # - `stub_removed_public` - replaces removed public functions with stubs
   #   raising an error
   # - `export` - functions to export, if they're kept
+  # - `compact_tables` - compacts the kept functions, see Treeshake.TableCompactor
   @spec keep_funs(Path.t(), [function_arity], [
-          {:stub_removed_public, boolean()} | {:export, [function_arity]}
+          {:stub_removed_public, boolean()}
+          | {:export, [function_arity]}
+          | {:compact_tables, boolean()}
         ]) :: {binary(), [function_arity]}
         when function_arity: {atom(), non_neg_integer()}
   def keep_funs(beam_path, functions, opts \\ []) do
@@ -55,6 +58,11 @@ defmodule Treeshake.Utils.BeamRewriter do
     new_attrs = filter_attrs(attrs, to_keep)
 
     new_core = {:c_module, anno, name, exports, new_attrs, new_defs}
+
+    new_core =
+      if Keyword.get(opts, :compact_tables, false),
+        do: new_core |> Treeshake.TableCompactor.compact() |> elem(0),
+        else: new_core
 
     {compile!(module, new_core, beam_path), removed}
   end

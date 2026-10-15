@@ -181,6 +181,10 @@ defmodule Popcorn.PackagerTest do
       # The boot script has the applications' specs
       refute Enum.any?(Map.keys(user_archive) ++ Map.keys(archive), &(Path.extname(&1) == ".app"))
 
+      # Only tree-shaking compacts tables
+      stdlib = read_archive(bundle_path(out_dir, "stdlib"))
+      refute compacted?(stdlib, "lib/stdlib/ebin/unicode_util.beam")
+
       assert %{"runtimeVariant" => "core", "entrypoint" => "user_app"} = manifest
     end
 
@@ -289,6 +293,13 @@ defmodule Popcorn.PackagerTest do
   defp read_archive(path) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
     Map.new(entries, fn {name, contents} -> {to_string(name), contents} end)
+  end
+
+  # Whether a module has tables compacted, which it looks up with
+  # popcorn_table_lookup
+  defp compacted?(archive, path) do
+    {:ok, {_module, [atoms: atoms]}} = archive |> Map.fetch!(path) |> :beam_lib.chunks([:atoms])
+    Enum.any?(atoms, &match?({_index, :popcorn_table_lookup}, &1))
   end
 
   defp build_tool?(module) do

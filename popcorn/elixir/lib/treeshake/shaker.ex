@@ -127,7 +127,8 @@ defmodule Treeshake.Shaker do
 
     Treeshake.Utils.BeamRewriter.keep_funs(path, reachable_funs ++ reachable_privs,
       stub_removed_public: stub_removed_functions,
-      export: export
+      export: export,
+      compact_tables: true
     )
   end
 
