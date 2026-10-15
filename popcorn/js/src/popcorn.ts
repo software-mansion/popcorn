@@ -1,4 +1,4 @@
-import { PopcornError, err, type Result } from "./errors";
+import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
   readWorkerEvent,
@@ -140,11 +140,14 @@ type PopcornState =
   | { status: "booted" }
   | { status: "closed"; error: PopcornError<"vm:exited"> };
 type PendingSend = (result: Result<null>) => void;
-type SendFn = (
+type TrySendFn = (
   target: string | Pid,
   payload?: AnyValue,
 ) => Promise<Result<null>>;
-type RunJsActions = { send: SendFn } & GenServer;
+type RunJsActions = {
+  send: (target: string | Pid, payload?: AnyValue) => Promise<void>;
+  trySend: TrySendFn;
+} & GenServer;
 type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
 
 type CallOpts = { timeoutMs?: number; proxy?: string };
@@ -163,7 +166,7 @@ type ProxyReply =
         | { kind: "unserializable" }
         | { kind: "timeout" };
     };
-export type GenServer = Pick<Popcorn, "call" | "cast">;
+export type GenServer = Pick<Popcorn, "call" | "cast" | "tryCall" | "tryCast">;
 
 function createPidClass() {
   return class {
@@ -203,6 +206,24 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private trackedKeySeq = 0;
   private io = createIoState();
   private vmReady = false;
+
+  /** Calls a GenServer and returns its reply. See {@link tryCall} for a result instead of throwing. */
+  public async call(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: CallOpts,
+  ): Promise<AnyValue> {
+    return unwrap(await this.tryCall(target, request, opts));
+  }
+
+  /** Sends a cast through the proxy. See {@link tryCast} for a result instead of throwing. */
+  public async cast(
+    target: string | Pid,
+    request?: AnyValue,
+    opts?: { proxy?: string },
+  ): Promise<void> {
+    unwrap(await this.tryCast(target, request, opts));
+  }
 
   private readonly TrackedValue = class {
     public constructor(
@@ -301,25 +322,19 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Use `opts.onEvent` to receive messages sent during startup.
    *
-   * @returns Ok tuple or `runtime:eval-unavailable` if the page blocks JavaScript evaluation.
+   * @returns The instance. Rejects on failure.
    *
    * @see {@link PopcornOpts}
    */
   public static async init<Output extends TtyOutput = "text">(
     opts: PopcornOpts<Output> = {},
-  ): Promise<Result<Popcorn<Output>>> {
+  ): Promise<Popcorn<Output>> {
     if (!canEval()) {
-      return { ok: false, error: err("runtime:eval-unavailable", {}) };
+      throw err("runtime:eval-unavailable", {});
     }
 
     const popcorn = new Popcorn(opts);
-    const result = await popcorn.boot();
-
-    if (!result.ok) {
-      return result;
-    }
-
-    return { ok: true, data: popcorn };
+    return await popcorn.boot();
   }
 
   /**
@@ -329,28 +344,18 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * After shutdown, starts a fresh VM with the original options.
    *
-   * @returns Ok tuple with `this` if boot completes or error tuple.
+   * @returns This instance. Rejects on failure.
    *
    * @example
    * ```ts
    * const popcorn = new Popcorn({});
    * popcorn.onEvent((message) => console.log(message));
-   * const result = await popcorn.boot();
-   * if (!result.ok) throw result.error;
+   * await popcorn.boot();
    * ```
    */
-  public async boot(): Promise<Result<Popcorn<Output>>> {
-    if (this.state.status === "booted") {
-      return { ok: true, data: this };
-    }
-
-    if (this.state.status === "booting") {
-      // TODO(jgonet): make it easier to construct check() errors without throwing
-      const error = err("internal:check", {
-        detail: "Boot already in progress",
-      });
-      return { ok: false, error };
-    }
+  public async boot(): Promise<Popcorn<Output>> {
+    if (this.state.status === "booted") return this;
+    check(this.state.status !== "booting", "Boot already in progress");
 
     const reboot = this.state.status === "closed";
     if (reboot) {
@@ -363,7 +368,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     check(this.readyWaiters.length === 0);
     this.state = { status: "booting" };
 
-    return await new Promise<Result<Popcorn<Output>>>((resolve) => {
+    return await new Promise<Popcorn<Output>>((resolve, reject) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
 
       const settle = (result: Result<Popcorn<Output>>) => {
@@ -373,7 +378,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         if (!result.ok) {
           this.deinit();
         }
-        resolve(result);
+        if (result.ok) resolve(result.data);
+        else reject(result.error);
       };
       this.settleBoot = settle;
 
@@ -435,13 +441,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    *
    * Encodes strings as UTF-8 and copies byte arrays. Does not append a newline.
    *
-   * Returns `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
+   * Throws `stdio:overflow` if the chunk exceeds the remaining 64 KiB queue capacity.
    * An overflow leaves the queue unchanged.
    */
-  public writeStdin(chunk: string | Uint8Array): Result<null> {
-    if (this.state.status === "closed") {
-      return { ok: false, error: this.state.error };
-    }
+  public writeStdin(chunk: string | Uint8Array): void {
+    if (this.state.status === "closed") throw this.state.error;
     check(this.state.status === "booted");
 
     const bytes = toBytes(chunk);
@@ -453,25 +457,23 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         capacityBytes: STDIN_QUEUE_CAPACITY_BYTES,
         attemptedBytes,
       });
-      return { ok: false, error };
+      throw error;
     }
 
     this.io.stdin.reservedBytes = attemptedBytes;
     const event = { type: "popcorn:stdin", payload: { chunk: bytes } } as const;
     toVm(this.vmWorker, event, [bytes.buffer]);
-
-    return { ok: true, data: null };
   }
 
   /**
    * Sends new terminal dimensions to a booted VM.
    *
    * Each dimension must be between 1 and 65,535.
+   *
+   * Throws on failure.
    */
-  public resizeTty(columns: number, rows: number): Result<null> {
-    if (this.state.status === "closed") {
-      return { ok: false, error: this.state.error };
-    }
+  public resizeTty(columns: number, rows: number): void {
+    if (this.state.status === "closed") throw this.state.error;
     check(this.state.status === "booted");
     check(isValidTtySize({ columns, rows }));
 
@@ -479,7 +481,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       type: "popcorn:tty-resize",
       payload: { columns, rows },
     });
-    return { ok: true, data: null };
   }
 
   /**
@@ -489,21 +490,30 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * A send timeout does not cancel delivery.
    * Uses the value conversions in {@link AnyValue}. An omitted, `null`, or `undefined` payload becomes an empty map.
    *
-   * @returns Ok tuple or `bridge:not-started` before boot and `vm:exited` after shutdown.
+   * @returns Rejects on failure.
    *
    * @example
    * Send an Erlang `{ok, <<"value">>}` tuple to a registered `receiver` process.
    *
    * ```ts
-   * const result = await popcorn.send("receiver", tuple(atom("ok"), "value"));
-   * if (!result.ok) throw result.error;
+   * await popcorn.send("receiver", tuple(atom("ok"), "value"));
    * ```
    *
    * @see {@link AnyValue}
    * @see {@link atom}
    * @see {@link tuple}
+   *
+   * @see {@link trySend} for a result instead of throwing on expected failures.
    */
   public async send(
+    rawTarget: string | Pid,
+    payload?: AnyValue,
+  ): Promise<void> {
+    unwrap(await this.trySend(rawTarget, payload));
+  }
+
+  /** See {@link send}. */
+  public async trySend(
     rawTarget: string | Pid,
     payload?: AnyValue,
   ): Promise<Result<null>> {
@@ -700,7 +710,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * GenServer failures use `genserver:noproc`, `genserver:exit`, or `genserver:unserializable`.
    * A call timeout does not cancel server work.
    */
-  public async call(
+  public async tryCall(
     rawTarget: string | Pid,
     request?: AnyValue,
     opts?: CallOpts,
@@ -763,10 +773,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
    * Sends a cast through the proxy.
    *
    * Success confirms delivery to the proxy
-   * @see {@link call}
+   * @see {@link tryCall}
    * @param opts - `proxy` allows to select another registered proxy.
    */
-  public async cast(
+  public async tryCast(
     rawTarget: string | Pid,
     request?: AnyValue,
     opts?: { proxy?: string },
@@ -807,9 +817,19 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const args = this.reviveHandles(request.args);
       check(this.vmReady);
       const actions: RunJsActions = {
-        send: (target, payload) => this.sendBridge(target, payload),
-        call: (target, payload, opts) => this.callBridge(target, payload, opts),
-        cast: (target, payload, opts) => this.castBridge(target, payload, opts),
+        send: async (target, payload) => {
+          unwrap(await this.sendBridge(target, payload));
+        },
+        call: async (target, payload, opts) =>
+          unwrap(await this.callBridge(target, payload, opts)),
+        cast: async (target, payload, opts) => {
+          unwrap(await this.castBridge(target, payload, opts));
+        },
+        trySend: (target, payload) => this.sendBridge(target, payload),
+        tryCall: (target, payload, opts) =>
+          this.callBridge(target, payload, opts),
+        tryCast: (target, payload, opts) =>
+          this.castBridge(target, payload, opts),
       };
       const result = await fn(args, actions);
       const value = request.return === "ref" ? this.asRef(result) : result;

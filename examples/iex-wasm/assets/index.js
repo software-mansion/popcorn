@@ -47,7 +47,7 @@ terminalElement.addEventListener("touchstart", focusTerminal, {
 
 terminal.writeln("\x1b[90mBooting BEAM and starting the shell…\x1b[0m");
 
-const result = await Popcorn.init({
+const popcorn = await Popcorn.init({
   beam: {
     env: { TERM: "xterm-256color" },
     extraArgs: SHELL_ARGS[LANGUAGE],
@@ -58,15 +58,12 @@ const result = await Popcorn.init({
   onError: (error) => {
     terminal.writeln(`\r\n\x1b[31mVM error: ${JSON.stringify(error)}\x1b[0m`);
   },
+}).catch((error) => {
+  status.textContent = "BEAM failed to boot";
+  terminal.writeln(`\r\n\x1b[31m${error.message}\x1b[0m`);
+  throw error;
 });
 
-if (!result.ok) {
-  status.textContent = "BEAM failed to boot";
-  terminal.writeln(`\r\n\x1b[31m${result.error.message}\x1b[0m`);
-  throw result.error;
-}
-
-const popcorn = result.data;
 status.textContent = "BEAM booted · interactive shell ready";
 globalThis.iexWasm = { popcorn, terminal };
 focusTerminal();
@@ -76,13 +73,15 @@ fitAddon.fit();
 popcorn.resizeTty(terminal.cols, terminal.rows);
 
 terminal.onData((data) => {
-  const input = popcorn.writeStdin(data);
-  if (!input.ok) status.textContent = input.error.message;
+  try {
+    popcorn.writeStdin(data);
+  } catch (error) {
+    status.textContent = error.message;
+  }
 });
 
 terminal.onResize(({ cols, rows }) => {
-  const resize = popcorn.resizeTty(cols, rows);
-  if (!resize.ok) status.textContent = resize.error.message;
+  popcorn.resizeTty(cols, rows);
 });
 
 document.documentElement.dataset.popcornReady = "true";

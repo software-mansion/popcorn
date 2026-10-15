@@ -13,6 +13,7 @@ import type {
   PopcornEvent,
   OtpErrorPayload,
   Pid,
+  PopcornError,
   SerializedError,
   tuple,
 } from "@swmansion/popcorn";
@@ -38,14 +39,14 @@ type Otp = {
   events: PopcornEvent[];
   errors: OtpErrorPayload[];
   waitForError(): Promise<OtpErrorPayload>;
-  boot(options: InitOptions): Promise<BootResult>;
-  send(target: string | Pid, payload?: unknown): Promise<BootResult>;
-  call(
+  tryBoot(options: InitOptions): Promise<BootResult>;
+  trySend(target: string | Pid, payload?: unknown): Promise<BootResult>;
+  tryCall(
     target: string | Pid,
     request?: unknown,
     options?: CallOptions,
   ): Promise<Result<unknown>>;
-  cast(target: string | Pid, request?: unknown): Promise<BootResult>;
+  tryCast(target: string | Pid, request?: unknown): Promise<BootResult>;
   waitForEvent(name: string): Promise<PopcornEvent>;
   eventValue(name: string): unknown;
   deinit(): void;
@@ -90,21 +91,21 @@ export const test = base.extend<Fixtures>({
 export class OtpHandle {
   public readonly events = new Set<PopcornEvent>();
   public readonly errors: OtpErrorPayload[] = [];
-  public readonly call = async (
+  public readonly tryCall = async (
     target: string | JSHandle<Pid>,
     request?: unknown,
     options?: CallOptions,
   ): Promise<Result<unknown>> =>
     await this.otp.evaluate(
-      (otp, args) => otp.call(args.target, args.request, args.options),
+      (otp, args) => otp.tryCall(args.target, args.request, args.options),
       { target, request, options },
     );
-  public readonly cast = async (
+  public readonly tryCast = async (
     target: string | JSHandle<Pid>,
     request?: unknown,
   ): Promise<BootResult> =>
     await this.otp.evaluate(
-      (otp, args) => otp.cast(args.target, args.request),
+      (otp, args) => otp.tryCast(args.target, args.request),
       { target, request },
     );
   private otpHandle: JSHandle<Otp> | null;
@@ -121,21 +122,21 @@ export class OtpHandle {
     return new OtpHandle(id, otp);
   }
 
-  public async boot(options: InitOptions): Promise<BootResult> {
+  public async tryBoot(options: InitOptions): Promise<BootResult> {
     const result = await this.otp.evaluate(
-      (otp, initOptions) => otp.boot(initOptions),
+      (otp, initOptions) => otp.tryBoot(initOptions),
       options,
     );
     await this.syncState();
     return result;
   }
 
-  public async send(
+  public async trySend(
     target: string | JSHandle<Pid>,
     payload?: unknown,
   ): Promise<BootResult> {
     const result = await this.otp.evaluate(
-      (otp, args) => otp.send(args.target, args.payload),
+      (otp, args) => otp.trySend(args.target, args.payload),
       { target, payload },
     );
     await this.syncState();
@@ -228,20 +229,20 @@ function createOtp(id: string): Otp {
     public readonly id = id;
     public readonly events: PopcornEvent[] = [];
     public readonly errors: OtpErrorPayload[] = [];
-    public readonly call = async (
+    public readonly tryCall = async (
       target: string | Pid,
       request?: unknown,
       options?: CallOptions,
     ): Promise<Result<unknown>> => {
-      const result = await this.popcorn.call(target, request, options);
+      const result = await this.popcorn.tryCall(target, request, options);
       if (result.ok) return result;
       return { ok: false, error: result.error.serialize() };
     };
-    public readonly cast = async (
+    public readonly tryCast = async (
       target: string | Pid,
       request?: unknown,
     ): Promise<BootResult> => {
-      const result = await this.popcorn.cast(target, request);
+      const result = await this.popcorn.tryCast(target, request);
       if (result.ok) return result;
       return { ok: false, error: result.error.serialize() };
     };
@@ -250,7 +251,7 @@ function createOtp(id: string): Otp {
     private errorWaiter: ((error: OtpErrorPayload) => void) | null = null;
     private readonly eventWaiters = new Map<string, Array<EventWaiter>>();
 
-    public async boot(options: InitOptions): Promise<BootResult> {
+    public async tryBoot(options: InitOptions): Promise<BootResult> {
       check(this.popcornHandle === null, "OTP is already booted");
 
       this.popcornHandle = new window.Popcorn(this.withLogHandlers(options));
@@ -258,22 +259,28 @@ function createOtp(id: string): Otp {
         this.recordEvent(event);
       });
 
-      const boot = await this.popcornHandle.boot();
-      if (boot.ok) return { ok: true, data: null };
-
-      const result: BootResult = {
-        ok: false,
-        error: boot.error.serialize(),
-      };
-      this.deinit();
-      return result;
+      try {
+        await this.popcornHandle.boot();
+        return { ok: true, data: null };
+      } catch (error) {
+        check(
+          error instanceof Error && "serialize" in error,
+          "Expected PopcornError",
+        );
+        const result: BootResult = {
+          ok: false,
+          error: (error as PopcornError).serialize(),
+        };
+        this.deinit();
+        return result;
+      }
     }
 
-    public async send(
+    public async trySend(
       target: string | Pid,
       payload?: unknown,
     ): Promise<BootResult> {
-      const result = await this.popcorn.send(target, payload);
+      const result = await this.popcorn.trySend(target, payload);
       if (result.ok) return { ok: true, data: null };
       return { ok: false, error: result.error.serialize() };
     }

@@ -44,12 +44,10 @@ const Elements = {
 };
 
 async function setup() {
-  const result = await Popcorn.init({
+  const popcorn = await Popcorn.init({
     onStdout: (text) => displayLog(text, { isError: false }),
     onStderr: (text) => displayLog(text, { isError: true }),
   });
-  if (!result.ok) throw result.error;
-  const popcorn = result.data;
 
   Elements.exampleButtons.forEach((button) => {
     button.onclick = () => {
@@ -109,11 +107,10 @@ async function sendEvalRequest(popcorn, code) {
       timeoutMs: 10_000,
     });
     const durationMs = performance.now() - start;
-    if (!result.ok) throw result.error;
-    if (result.data.error) throw new Error(result.data.error);
+    if (result.error) throw new Error(result.error);
     Elements.stateDisplay.textContent = "Done.";
     Elements.timeDisplay.textContent = `${durationMs.toFixed(3)} ms`;
-    Elements.resultDisplay.textContent = result.data.value;
+    Elements.resultDisplay.textContent = result.value;
   } catch (error) {
     Elements.stateDisplay.textContent = "Evaluation error!";
     Elements.timeDisplay.textContent = "";

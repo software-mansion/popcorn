@@ -1,4 +1,4 @@
-import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
+import { schedulers, type PopcornError, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 
 const FETCH_URL = "/assets/otp/manifest.json";
@@ -96,7 +96,7 @@ test.describe("boot", () => {
         `,
         ];
       }
-      const boot = await otp.boot({
+      const boot = await otp.tryBoot({
         beam: { maxMemory: device.maxMemory, extraArgs },
       });
       assert(boot.ok);
@@ -133,7 +133,7 @@ test.describe("boot", () => {
         expect(growth.before).toBeGreaterThan(64 * 1024 * 1024);
         expect(growth.bytes).toBe(device.maximum * 65536);
         expect(growth.capped).toBe(true);
-        assert((await otp.send("memory_probe", true)).ok);
+        assert((await otp.trySend("memory_probe", true)).ok);
         expect(await otp.waitForEvent("memory_kept")).toEqual({
           memory_kept: 80 * 1024 * 1024,
         });
@@ -172,7 +172,7 @@ test.describe("boot", () => {
   });
 
   test("apps and eval", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         {ok, _} = application:ensure_all_started(elixir),
         {ok, _} = application:ensure_all_started(logger),
@@ -195,7 +195,7 @@ test.describe("boot", () => {
   });
 
   test("PAX module path", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         42 = test_entrypoint_module_with_a_name_long_enough_for_a_posix_pax_extended_tar_header_and_cannot_fit_in_ustar_name:answer(),
         ok = wasm:send(#{pax_module => loaded}).
@@ -219,10 +219,9 @@ test.describe("boot", () => {
         onEvent: (event) => events.push({ event, beforeBoot: !booted }),
       });
       booted = true;
-      if (!boot.ok) throw boot.error;
-      boot.data.deinit();
+      boot.deinit();
       return {
-        boot: boot.ok,
+        boot: true,
         events,
       };
     });
@@ -238,7 +237,7 @@ test.describe("boot", () => {
   });
 
   test("readiness", async ({ otp }) => {
-    const boot = await otp.boot({
+    const boot = await otp.tryBoot({
       beam: { env: { POPCORN_STARTUP_EVENT: "await_ready" } },
     });
     assert(boot.ok);
@@ -246,14 +245,14 @@ test.describe("boot", () => {
     expect(await otp.waitForEvent("async_ready")).toEqual({
       async_ready: true,
     });
-    assert((await otp.send("await_ready_task", {})).ok);
+    assert((await otp.trySend("await_ready_task", {})).ok);
     expect(await otp.waitForEvent("after_boot")).toEqual({
       after_boot: true,
     });
   });
 
   test("readiness timeout", async ({ otp }) => {
-    const boot = await otp.boot({
+    const boot = await otp.tryBoot({
       beam: { env: { POPCORN_STARTUP_EVENT: "await_ready_timeout" } },
     });
     assert(boot.ok);
@@ -275,14 +274,11 @@ test.describe("boot", () => {
 
     const result = await page.evaluate(async () => {
       const popcorn = new window.Popcorn();
-      const boot = await popcorn.boot();
+      await popcorn.boot();
       popcorn.deinit();
-      if (!boot.ok) return false;
 
       const init = await window.Popcorn.init();
-      if (!init.ok) return false;
-
-      init.data.deinit();
+      init.deinit();
       return true;
     });
 
@@ -291,7 +287,7 @@ test.describe("boot", () => {
 
   test("entrypoint failure", async ({ createOtp }) => {
     const otp = await createOtp();
-    const boot = await otp.boot({
+    const boot = await otp.tryBoot({
       beam: {
         env: { POPCORN_STARTUP_EVENT: "fail" },
       },
@@ -305,7 +301,7 @@ test.describe("boot", () => {
 
   test("kernel failure", async ({ otp }) => {
     test.setTimeout(10_000);
-    const boot = await otp.boot({
+    const boot = await otp.tryBoot({
       beam: { extraArgs: ["-user", "missing_user"] },
       timeoutsMs: { boot: 30_000, appStartup: 30_000 },
     });
@@ -319,7 +315,7 @@ test.describe("boot", () => {
   });
 
   test("schedulers", async ({ otp }) => {
-    const boot = await otp.boot({
+    const boot = await otp.tryBoot({
       beam: {
         emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
         extraArgs: [
@@ -345,7 +341,7 @@ test.describe("boot", () => {
 
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
-    const timeout = await timedOut.boot({
+    const timeout = await timedOut.tryBoot({
       timeoutsMs: { boot: 0 },
     });
     expect(timeout).toEqual({
@@ -359,7 +355,10 @@ test.describe("boot", () => {
         beam: { otpAssetsRoot: "/missing/otp/" },
         onError: (event) => errors.push(event),
       });
-      const result = await popcorn.boot();
+      const result = await popcorn.boot().then(
+        () => ({ ok: true as const, data: null }),
+        (error: PopcornError) => ({ ok: false as const, error }),
+      );
       if (result.ok) {
         return { errors, boot: { ok: true, data: null } };
       }
@@ -387,7 +386,10 @@ test.describe("boot", () => {
         timeoutsMs: { boot: 30_000 },
       });
       const startMs = performance.now();
-      const boot = await popcorn.boot();
+      const boot = await popcorn.boot().then(
+        () => ({ ok: true as const, data: null }),
+        (error: PopcornError) => ({ ok: false as const, error }),
+      );
       const elapsedMs = performance.now() - startMs;
       if (boot.ok) {
         return { elapsedMs, boot: { ok: true, data: null } };
@@ -418,7 +420,7 @@ test.describe("runtime", () => {
       ["erlang:halt(7)", { kind: "exit", data: 7 }],
     ] as const) {
       const otp = await createOtp();
-      const boot = await otp.boot(evalOpts(`
+      const boot = await otp.tryBoot(evalOpts(`
         true = register(shutdown_test, self()),
         wasm:send(#{shutdown_ready => true}),
         receive {wasm, _} -> ${expression} end.
@@ -426,11 +428,11 @@ test.describe("runtime", () => {
       assert(boot.ok);
       await otp.waitForEvent("shutdown_ready");
 
-      const sent = await otp.send("shutdown_test", true);
+      const sent = await otp.trySend("shutdown_test", true);
       assert(sent.ok);
       expect(await otp.waitForError()).toEqual(error);
       expect(otp.errors).toEqual([error]);
-      expect(await otp.send("shutdown_test", true)).toEqual({
+      expect(await otp.trySend("shutdown_test", true)).toEqual({
         ok: false,
         error: { t: "vm:exited", data: { reason: error.kind, data: error.data } },
       });
@@ -438,7 +440,7 @@ test.describe("runtime", () => {
   });
 
   test("spawning OS processes don't kill the VM", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         Ticker = spawn(fun Tick() ->
           receive
@@ -506,7 +508,7 @@ test.describe("lifecycle", () => {
       const command = async (
         popcorn: {
           onEvent: (handler: (event: unknown) => void) => () => void;
-          writeStdin: (chunk: Uint8Array) => { ok: boolean };
+          writeStdin: (chunk: Uint8Array) => void;
         },
         value: number,
       ) =>
@@ -515,8 +517,7 @@ test.describe("lifecycle", () => {
             unsubscribe();
             resolve(event);
           });
-          const write = popcorn.writeStdin(new Uint8Array([value]));
-          if (!write.ok) throw new Error("stdin command failed");
+          popcorn.writeStdin(new Uint8Array([value]));
         });
 
       // Default text decodes split UTF-8, uses 80×24 and no shell.
@@ -544,8 +545,7 @@ test.describe("lifecycle", () => {
         onStdout: (chunk) => rawStdout.push(Array.from(chunk)),
         onStderr: (chunk) => rawStderr.push(Array.from(chunk)),
       });
-      if (!init.ok) throw init.error;
-      const bytes = init.data;
+      const bytes = init;
       const customSize = await command(bytes, 2);
       bytes.deinit();
 
@@ -601,8 +601,7 @@ test.describe("lifecycle", () => {
   test("init", async ({ page }) => {
     const result = await page.evaluate(async () => {
       const init = await window.Popcorn.init({});
-      if (!init.ok) return { ok: false, error: init.error.serialize() };
-      init.data.deinit();
+      init.deinit();
       return { ok: true };
     });
 
@@ -636,9 +635,9 @@ test.describe("lifecycle", () => {
             }
           });
         });
-        const result = await popcorn.boot();
+        await popcorn.boot();
         await ready;
-        return result.ok;
+        return true;
       };
 
       const first = await boot();
@@ -660,7 +659,7 @@ test.describe("lifecycle", () => {
 
 test.describe("fetch", () => {
   test("requests", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         {ok, Response} = 'Elixir.Popcorn.Fetch':request(#{
           method => <<"GET">>,
@@ -698,7 +697,7 @@ test.describe("fetch", () => {
   });
 
   test("blocked request", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         Result = 'Elixir.Popcorn.Fetch':request(#{
           method => <<"GET">>,
@@ -723,7 +722,7 @@ test.describe("fetch", () => {
       "requires OTP assets that provide ssl",
     );
 
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
         {ok, DefaultOptions} = application:get_env(req, default_options),
         'Elixir.Popcorn.Fetch' = proplists:get_value(adapter, DefaultOptions),

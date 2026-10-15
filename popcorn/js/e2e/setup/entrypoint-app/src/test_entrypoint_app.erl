@@ -37,7 +37,7 @@ idle() ->
 startup_event("bridge") ->
     ok = wasm:send(#{startup_send => true}),
     42 = wasm:run_js(
-        <<"async (_args, {send}) => { const result = await send('startup_listener', {startup_action: true}); if (!result.ok) throw result.error; return 42; }">>,
+        <<"async (_args, {trySend}) => { const result = await trySend('startup_listener', {startup_action: true}); if (!result.ok) throw result.error; return 42; }">>,
         #{}
     ),
     ok = wasm:send(#{startup_run_js => 42});

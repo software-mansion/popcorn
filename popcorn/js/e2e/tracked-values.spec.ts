@@ -18,7 +18,7 @@ declare global {
 
 test.describe("tracked values", () => {
   test("identity", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           Tracked = wasm:run_js(
             <<"() => new TrackedValue({n: 1})">>,
@@ -62,7 +62,7 @@ test.describe("tracked values", () => {
   test("final send", async ({ otp, page }) => {
     await addHooks(page);
     const count = 8;
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           spawn(fun() ->
             lists:foreach(fun(I) ->
@@ -92,7 +92,7 @@ test.describe("tracked values", () => {
 
   test("async argument", async ({ otp, page }) => {
     await addHooks(page);
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           register(controller, self()),
           Runner = spawn(fun() ->
@@ -134,7 +134,7 @@ test.describe("tracked values", () => {
 
     await otp.waitForEvent("runner_ready");
     await page.waitForFunction(() => globalThis.popcorn.runJs.isPaused());
-    assert((await otp.send("controller", { collect: true })).ok);
+    assert((await otp.trySend("controller", { collect: true })).ok);
     await otp.waitForEvent("runner_collected");
     await expect
       .poll(() => cleanups(page), { timeout: 500, intervals: [50] })
@@ -165,7 +165,7 @@ test.describe("tracked values", () => {
       };
     });
 
-    const closedBoot = closed.boot(
+    const closedBoot = closed.tryBoot(
       evalOpts(`
           spawn(fun() ->
             H = wasm:run_js(
@@ -180,7 +180,7 @@ test.describe("tracked values", () => {
           end).
         `),
     );
-    const liveBoot = live.boot(
+    const liveBoot = live.tryBoot(
       evalOpts(`
           true = register(controller, self()),
           H = wasm:run_js(
@@ -200,7 +200,7 @@ test.describe("tracked values", () => {
 
     await closed.dispose();
     await expect.poll(() => cleanupCalls).toBe(1);
-    assert((await live.send("controller", {})).ok);
+    assert((await live.trySend("controller", {})).ok);
     expect(await live.waitForEvent("id")).toEqual({ id: "B" });
     expect(cleanupCalls).toBe(1);
   });

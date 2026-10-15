@@ -1,6 +1,6 @@
 /**
  * An operation result. Check `ok` before accessing `data` or `error`.
- * Expected failures use the error branch. Invalid usage can still throw.
+ * Expected failures from `try*` methods use the error branch. Invalid usage can still throw.
  */
 export type Result<T, E extends Tag = Tag> =
   | { ok: true; data: T }
@@ -289,4 +289,9 @@ function check(ok: boolean, msg?: string): asserts ok {
   if (!ok) {
     throw err("internal:check", { detail: msg });
   }
+}
+
+export function unwrap<T>(result: Result<T>): T {
+  if (!result.ok) throw result.error;
+  return result.data;
 }

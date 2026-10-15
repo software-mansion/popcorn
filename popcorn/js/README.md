@@ -59,10 +59,7 @@ Use ESM output with those bundlers.
 ```ts
 import { Popcorn } from "@swmansion/popcorn";
 
-const result = await Popcorn.init();
-if (!result.ok) throw result.error;
-
-const vm = result.data;
+const vm = await Popcorn.init();
 // Stop the runtime when the application no longer needs it.
 vm.deinit();
 ```
@@ -70,6 +67,9 @@ vm.deinit();
 `Popcorn.init()` waits for the OTP application tree to start. Use
 `popcorn.call()` to call a supervised GenServer from JavaScript.
 Use `popcorn.onEvent()` to receive events from BEAM processes.
+
+Methods throw or reject on failure. Only `send`, `call`, and `cast` also have
+`trySend`, `tryCall`, and `tryCast` variants that return `Result` objects.
 
 Each VM starts with 64 MiB of Wasm linear memory and can grow to 256 MiB on
 phones/tablets or 2 GiB on desktop. Device detection uses the browser's user

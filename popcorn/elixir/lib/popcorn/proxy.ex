@@ -49,8 +49,7 @@ defmodule Popcorn.Proxy do
 
   ```js
   const result = await popcorn.call("counter", ["add", 1]);
-  if (!result.ok) throw result.error;
-  console.log(result.data); // 1
+  console.log(result); // 1
 
   await popcorn.cast("counter", "reset");
   ```

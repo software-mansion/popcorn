@@ -4,12 +4,10 @@ import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
 
-const result = await Popcorn.init({
+await Popcorn.init({
   onStdout: console.log,
   onStderr: console.warn,
 });
-
-if (!result.ok) throw result.error;
 
 function App() {
   const [count, setCount] = useState(0);

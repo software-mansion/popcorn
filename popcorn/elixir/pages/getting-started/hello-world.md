@@ -42,8 +42,7 @@ Now, HTML template in `public/index.html`:
     <script type="module">
       import { Popcorn } from "./out/index.mjs";
 
-      const { ok, data, error } = await Popcorn.init();
-      if (!ok) throw error;
+      await Popcorn.init();
     </script>
   </body>
 </html>

@@ -3,12 +3,12 @@ import { assert, evalOpts, expect, test } from "./helpers";
 
 test.describe("pid", () => {
   test("delayed send", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           true = register(controller, self()),
           wasm:run_js(
-            <<"(args, {send}) => {
-              setTimeout(() => send('controller', {delayed: true}), 10);
+            <<"(args, {trySend}) => {
+              setTimeout(() => trySend('controller', {delayed: true}), 10);
               return null;
             }">>,
             #{}
@@ -25,7 +25,7 @@ test.describe("pid", () => {
   });
 
   test("round trip", async ({ otp }) => {
-    const boot = await otp.boot(
+    const boot = await otp.tryBoot(
       evalOpts(`
           Self = self(),
           Self = wasm:run_js(<<"({target}) => target">>, #{target => Self}),
@@ -35,8 +35,8 @@ test.describe("pid", () => {
               #{target => Self}
             ),
           wasm:run_js(
-            <<"(args, {send}) => {
-              send(args.target, {forwarded: args.target});
+            <<"(args, {trySend}) => {
+              trySend(args.target, {forwarded: args.target});
               return null;
             }">>,
             #{target => Self}
@@ -55,13 +55,13 @@ test.describe("pid", () => {
   });
 
   test("invalid", async ({ createOtp, otp }) => {
-    const deadBoot = await otp.boot(
+    const deadBoot = await otp.tryBoot(
       evalOpts(`
           Dead = spawn(fun() -> ok end),
           Ref = erlang:monitor(process, Dead),
           receive {'DOWN', Ref, process, Dead, _} -> ok end,
           Ok = wasm:run_js(
-            <<"(args, {send}) => send(args.target, {}).then(result => result.ok)">>,
+            <<"(args, {trySend}) => trySend(args.target, {}).then(result => result.ok)">>,
             #{target => Dead}
           ),
           ok = wasm:send(#{dead => Ok}).
@@ -76,22 +76,22 @@ test.describe("pid", () => {
     `);
     const [owner, foreign] = await Promise.all([createOtp(), createOtp()]);
     const [ownerBoot, foreignBoot] = await Promise.all([
-      owner.boot(pidOpts),
-      foreign.boot(pidOpts),
+      owner.tryBoot(pidOpts),
+      foreign.tryBoot(pidOpts),
     ]);
     assert(ownerBoot.ok);
     assert(foreignBoot.ok);
     const pid = await owner.eventValueHandle<Pid>("pid");
 
-    assert((await owner.send(pid, {})).ok);
-    expect(await foreign.send(pid, {})).toEqual({
+    assert((await owner.trySend(pid, {})).ok);
+    expect(await foreign.trySend(pid, {})).toEqual({
       ok: false,
       error: { t: "bridge:invalid-target", data: {} },
     });
 
     await owner.deinit();
-    assert((await owner.boot(pidOpts)).ok);
-    expect(await owner.send(pid, {})).toEqual({
+    assert((await owner.tryBoot(pidOpts)).ok);
+    expect(await owner.trySend(pid, {})).toEqual({
       ok: false,
       error: { t: "bridge:invalid-target", data: {} },
     });

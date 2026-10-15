@@ -2,14 +2,12 @@
 
 Popcorn has multiple ways to communicate with Elixir from JavaScript.
 
-<!-- TODO: link tryInit() -->
-
 > #### Philosophy {: .neutral}
 >
 > The main philosophy of the API is that exceptions aren't meant to be caught — exceptions signify misconfiguration, mistake in using the APIs, or bug in the Popcorn.
 >
 > For errors that can be handled, we return `{ok: true | false, data, error}` result object.
-> All API functions have non-prefix variation (which throws the result if it's an error) and `try` prefixed variation which returns mentioned result object. For example, [`Popcorn.init()`](`JSLib.Popcorn.init/1`) and `Popcorn.tryInit()`. [List of errors](`t:JSLib.popcorn_errors/0`).
+> API methods throw or reject on failure. Only `send`, `call`, and `cast` have `try` prefixed variants (`trySend`, `tryCall`, and `tryCast`) that return result objects. [List of errors](`t:JSLib.popcorn_errors/0`).
 >
 > Use former if you don't expect errors and latter if you can handle them in some way (e.g. retry the operation on timeout).
 
@@ -41,7 +39,7 @@ Elixir can send events to the JavaScript via `Popcorn.Wasm.send/1`. To receive t
 
 We can also send events back using [`async popcorn.send(pid, payload)`](`JSLib.Popcorn.send/2`). `pid` can be either a named process or PID handle. The PID handle can be obtained by either sending it from Elixir in an event or passing it through `Popcorn.Wasm.run_js/3`. Elixir process receives them in the mailbox, in `{:wasm, payload}` shape.
 
-Additionally, we have [`async popcorn.cast(pid, payload, opts)`](`JSLib.Popcorn.Genserver.cast/3`) and [`async popcorn.call(pid, payload, opts)`](`JSLib.Popcorn.Genserver.call/3`). They're used to communicate with GenServers.
+Additionally, we have [`async popcorn.genserver.cast(pid, payload, opts)`](`JSLib.Popcorn.Genserver.cast/3`) and [`async popcorn.genserver.call(pid, payload, opts)`](`JSLib.Popcorn.Genserver.call/3`). They're used to communicate with GenServers.
 All `cast()`s and `call()`s are going through internal `Popcorn.Proxy` which keeps tabs of timeouts and routes the messages to correct processes.
 
 Messages sent to the Elixir will convert the JavaScript types to the Elixir ones. Popcorn provides [`atom()`](`JSLib.atom/1`) (`a()` alias) and [`tuple()`](`JSLib.tuple/3`) (`t()` alias) helpers to create native Elixir types.

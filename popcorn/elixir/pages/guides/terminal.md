@@ -5,7 +5,7 @@ By default, Popcorn start the VM with `-noshell`. If you need any tty features, 
 In both modes, you can use `onStdout` and `onStderr` to receive stdout and stderr from the VM. By default, this comes as strings but can be configured (`tty: {output: "bytes"}`) to return `Uint8Array`s.
 
 ```typescript
-const result = await Popcorn.init({
+const popcorn = await Popcorn.init({
   onStdout: (text) => terminal.write(text),
   onStderr: (text) => terminal.write(text),
 });
@@ -19,8 +19,11 @@ You may only queue up to 64kB until you get `stdio:overflow` error from the meth
 
 ```typescript
 terminal.onData((data) => {
-  const result = popcorn.writeStdin(data);
-  if (!result.ok) console.error(result.error);
+  try {
+    popcorn.writeStdin(data);
+  } catch (error) {
+    console.error(error);
+  }
 });
 ```
 
@@ -29,8 +32,7 @@ terminal.onData((data) => {
 Send the current terminal dimensions after you resize it in the JavaScript:
 
 ```typescript
-const result = popcorn.resizeTty(terminal.cols, terminal.rows);
-if (!result.ok) throw result.error;
+popcorn.resizeTty(terminal.cols, terminal.rows);
 ```
 
 See `examples/iex-wasm` for a complete Ghostty Web integration.
