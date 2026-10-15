@@ -90,6 +90,10 @@ defmodule Mix.Tasks.Popcorn.Cook do
   `:erl_eval` and `:erl_lint`, and to evaluate Elixir code, also preserve
   `elixir`. Evaluated code can only call functions that are packaged.
 
+  Tree-shaking leaves Erlang's `kernel` and `stdlib` as they are, except for
+  modules of the shell, networking and distribution, which it removes when
+  they're unreachable, like other code.
+
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly

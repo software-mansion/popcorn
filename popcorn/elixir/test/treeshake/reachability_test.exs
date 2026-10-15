@@ -3,42 +3,25 @@ defmodule Treeshake.ReachabilityTest do
 
   @fixture Path.expand("../fixtures/treeshake_reachability", __DIR__)
 
+  setup_all do
+    input = Path.join(["tmp", inspect(__MODULE__), "input"])
+    File.rm_rf!(input)
+
+    %{ebin_files: compile_fixture(input)}
+  end
+
   # Only start/2 of the application module is reached directly, the rest
   # through the other callbacks, on_load functions and struct building.
   @tag :tmp_dir
   test "application callbacks, on_load functions, NIF modules and structs", %{
-    tmp_dir: tmp_dir
+    tmp_dir: tmp_dir,
+    ebin_files: ebin_files
   } do
-    input = Path.join(tmp_dir, "input")
     output = Path.join(tmp_dir, "output")
-    File.mkdir_p!(input)
-
-    beams =
-      for source <- Path.wildcard(Path.join(@fixture, "*.erl")) do
-        {:ok, _module} =
-          :compile.file(to_charlist(source), [:debug_info, outdir: to_charlist(input)])
-
-        Path.join(input, Path.basename(source, ".erl") <> ".beam")
-      end
-
-    # Treeshaking reads the abstract code from debug info, which `mix test`
-    # turns off
-    debug_info = Code.get_compiler_option(:debug_info)
-    Code.put_compiler_option(:debug_info, true)
-
-    {:ok, _modules, _warnings} =
-      Kernel.ParallelCompiler.compile_to_path(Path.wildcard(Path.join(@fixture, "*.ex")), input)
-
-    Code.put_compiler_option(:debug_info, debug_info)
-
-    beams = beams ++ Path.wildcard(Path.join(input, "Elixir.*.beam"))
-
-    app_file = Path.join(input, "reachability.app")
-    File.cp!(Path.join(@fixture, "reachability.app"), app_file)
 
     stats =
       Treeshake.run(
-        ebin_files: [app_file | beams],
+        ebin_files: ebin_files,
         output_dir: output,
         keep: [%{referenced_modules_defining: {:schema_marker, 0}}]
       )
@@ -58,6 +41,9 @@ defmodule Treeshake.ReachabilityTest do
 
     assert functions(output, :on_load_dependency) == [init: 0, path: 0]
 
+    # Spawned with erlang:spawn_opt/4 and erlang:spawn_monitor/3
+    assert functions(output, :spawner) == [monitor_loop: 0, opt_loop: 0, start: 0]
+
     # Kernel.struct!/2 calls __struct__/1 of its module, Kernel.struct/2
     # __struct__/0
     assert functions(output, :struct_module) == [__struct__: 1]
@@ -75,6 +61,55 @@ defmodule Treeshake.ReachabilityTest do
     assert functions(output, :schema_like) == [other: 0, schema_marker: 0]
     assert :unreferenced_schema_like in stats.modules_removed
     assert :not_schema_like in stats.modules_removed
+  end
+
+  # Kernel and stdlib modules are left by default, even if unreachable
+  @tag :tmp_dir
+  test "tree-shaking modules left by default", %{tmp_dir: tmp_dir, ebin_files: ebin_files} do
+    stdlib = Enum.map([:array, :dict], &to_string(:code.which(&1)))
+    ebin_files = ebin_files ++ stdlib
+
+    left = Treeshake.run(ebin_files: ebin_files, output_dir: Path.join(tmp_dir, "left"))
+    refute :array in left.modules_removed
+
+    shaken =
+      Treeshake.run(
+        ebin_files: ebin_files,
+        output_dir: Path.join(tmp_dir, "shaken"),
+        shake: [:array]
+      )
+
+    assert :array in shaken.modules_removed
+    refute :dict in shaken.modules_removed
+  end
+
+  defp compile_fixture(input) do
+    File.mkdir_p!(input)
+
+    beams =
+      for source <- Path.wildcard(Path.join(@fixture, "*.erl")) do
+        {:ok, _module} =
+          :compile.file(to_charlist(source), [:debug_info, outdir: to_charlist(input)])
+
+        Path.join(input, Path.basename(source, ".erl") <> ".beam")
+      end
+
+    # Treeshaking reads the abstract code from debug info, which `mix test`
+    # turns off
+    debug_info = Code.get_compiler_option(:debug_info)
+    Code.put_compiler_option(:debug_info, true)
+
+    {:ok, _modules, _diagnostics} =
+      Kernel.ParallelCompiler.compile_to_path(Path.wildcard(Path.join(@fixture, "*.ex")), input,
+        return_diagnostics: true
+      )
+
+    Code.put_compiler_option(:debug_info, debug_info)
+
+    app_file = Path.join(input, "reachability.app")
+    File.cp!(Path.join(@fixture, "reachability.app"), app_file)
+
+    [app_file | beams ++ Path.wildcard(Path.join(input, "Elixir.*.beam"))]
   end
 
   defp functions(output, module) do
