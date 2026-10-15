@@ -3,37 +3,107 @@ defmodule Treeshake do
   # Tree-shaker for compiled BEAM code. See `run/1` for details.
 
   @stdlib_apps [:erts, :kernel, :stdlib, :compiler, :elixir, :logger]
+
+  # The modules of these apps are left by default, as tree-shaking can't reason
+  # about many of them: they're used through implicit contracts, like calls from
+  # the VM or from kernel processes.
   @non_treeshakable_apps [:erts, :stdlib, :kernel, :logger]
 
-  @non_treeshakable_exclusions [
+  # The modules of the apps above that tree-shaking can reason about, so they're
+  # tree-shaken like others. Careful when adding: the calls in left modules are
+  # followed only from functions that tree-shaking finds reachable, which misses
+  # the ones running in kernel processes, like prim_tty's calls to io_ansi.
+  @shakable_stdlib [
+    # core libraries
+    :erlang,
+    :lists,
+    :rand,
+    :string,
     :unicode_util,
-    :erl_parse,
+    :uri_string,
+    # parsing and printing code
+    :beam_lib,
     :epp,
+    :erl_parse,
+    :erl_pp,
     :erl_scan,
+    :ms_transform,
+    # shell and tooling
+    :argparse,
+    :c,
+    :edlin_expand,
+    :erl_abstract_code,
+    :erl_debugger,
+    :erl_expand_records,
+    :escript,
+    :man_docs,
+    :otp_internal,
+    :seq_trace,
+    :shell_default,
+    :shell_docs,
+    :shell_docs_markdown,
+    :trace,
+    # networking and distribution
+    :auth,
+    :erl_ddll,
+    :erpc,
+    :gen_sctp,
+    :global,
+    :inet,
+    :inet6_sctp,
+    :inet6_tcp,
+    :inet6_tcp_dist,
+    :inet6_udp,
+    # :inet_db,
+    :inet_dns_tsig,
+    :inet_epmd_dist,
+    :inet_epmd_socket,
+    :inet_gethost_native,
+    :inet_hosts,
+    :inet_parse,
+    :inet_res,
+    :inet_sctp,
+    :inet_tcp,
+    :inet_tcp_dist,
+    :kernel_config,
+    :local_tcp,
+    :local_udp,
+    :net_adm,
+    :net_kernel,
+    :peer,
+    :pg2,
+    :pool,
     :prim_inet,
+    :slave,
+    # storage and logging backends
+    :dets,
+    :dets_server,
+    :dets_sup,
+    :dets_utils,
+    :dets_v9,
+    :disk_log,
+    :erl_tar,
+    :error_logger_file_h,
+    :error_logger_tty_h,
+    :file_sorter,
+    :log_mf_h,
+    :logger_disk_log_h,
+    :logger_handler,
+    :wrap_log_reader,
+    :zip,
+    :zstd,
+    # data structures and others
+    :array,
+    :dict,
+    :digraph,
+    :digraph_utils,
+    :erl_reply,
+    :gen_fsm,
+    :graph,
     :qlc,
     :qlc_pt,
-    :dets_v9,
-    :dets,
-    :sofs,
-    :erl_tar,
-    :file_sorter,
-    :global,
-    :disk_log,
-    :net_kernel,
-    :zip,
-    # :inet_db,
-    :edlin_expand,
-    :dets_utils,
-    :erl_pp,
-    :beam_lib,
-    :ms_transform,
-    :lists,
-    :erlang,
-    :string,
-    :uri_string,
-    :inet,
-    :rand
+    :random,
+    :sofs
   ]
 
   @default_ignore_modules [:prim_eval]
@@ -183,7 +253,7 @@ defmodule Treeshake do
 
   The modules from the following stdlib apps: #{list_atoms.(@non_treeshakable_apps)},
   are left by default, except the following modules:
-  #{list_atoms.(@non_treeshakable_exclusions)}.
+  #{list_atoms.(@shakable_stdlib)}.
 
   ## Returned value
   This function returns a map with the following keys:
@@ -341,7 +411,7 @@ defmodule Treeshake do
       app |> :code.lib_dir() |> Path.join("ebin/*.beam") |> Path.wildcard()
     end)
     |> Enum.map(&beam_module/1)
-    |> then(&(&1 -- @non_treeshakable_exclusions))
+    |> then(&(&1 -- @shakable_stdlib))
   end
 
   defp beam_module(beam_path) do
