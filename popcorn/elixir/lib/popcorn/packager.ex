@@ -327,6 +327,10 @@ defmodule Popcorn.Packager do
     vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
+      for {filename, _source} <- js_files ++ vm_files do
+        compress(Path.join(out_dir, filename), brotli_effort)
+      end
+
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join(out_dir, "otp/bin/vm.boot")
       lib_dir = Path.join(out_dir, "otp/lib")
