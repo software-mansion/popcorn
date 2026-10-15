@@ -37,6 +37,17 @@ export type Options = {
 
 export type TreeshakeOptions = {
   preservedApps?: string[];
+  /**
+   * Modules (`"JSON"`, `":crypto"`) or functions (`"JSON.encode!/1"`) to keep,
+   * along with the code they rely on, for code only called dynamically.
+   */
+  keep?: string[];
+  /**
+   * Modules (`"MyApp.Codegen"`, `":my_module"`) to remove even when they're
+   * reachable, typically ones only used at build time. Some, like the code
+   * evaluator, are removed by default, unless they're in `keep`.
+   */
+  drop?: string[];
 };
 
 export type Prepared = {
@@ -69,6 +80,12 @@ export async function popcorn(options: Options): Promise<Prepared> {
     args.push("--treeshake");
     for (const app of options.treeshake.preservedApps ?? []) {
       args.push("--preserved-app", app);
+    }
+    for (const entry of options.treeshake.keep ?? []) {
+      args.push("--keep", entry);
+    }
+    for (const module of options.treeshake.drop ?? []) {
+      args.push("--drop", module);
     }
   }
 

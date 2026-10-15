@@ -47,7 +47,7 @@ defmodule Popcorn.Packager do
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
-          | {:treeshake, false | [preserved_apps: [String.t()]]}
+          | {:treeshake, false | treeshake_options()}
           | {:static_dir, Path.t()}
         ]
 
@@ -59,8 +59,14 @@ defmodule Popcorn.Packager do
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
-          treeshake: false | [preserved_apps: [String.t()]]
+          treeshake: false | treeshake_options()
         }
+
+  @type treeshake_options :: [
+          preserved_apps: [String.t()],
+          keep: [module() | mfa()],
+          drop: [module()]
+        ]
 
   defp strip_tarball(path, out_dir) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
@@ -560,10 +566,13 @@ defmodule Popcorn.Packager do
 
   defp maybe_treeshake(staged_apps, options, out_dir) do
     preserved_apps = Keyword.fetch!(options, :preserved_apps)
+    keep = Keyword.get(options, :keep, [])
+    drop = Keyword.get(options, :drop, [])
 
     with :ok <- validate_preserved_apps(staged_apps, options),
+         :ok <- validate_keep(staged_apps, keep),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir),
          :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
       report = %{
         preserved_apps: preserved_apps,
@@ -576,6 +585,31 @@ defmodule Popcorn.Packager do
     end
   end
 
+  defp packaged_modules(staged_apps) do
+    staged_apps
+    |> Enum.flat_map(fn {_app, info} -> Keyword.fetch!(info.props, :modules) end)
+    |> MapSet.new()
+  end
+
+  defp validate_keep(staged_apps, keep) do
+    packaged = packaged_modules(staged_apps)
+
+    unknown =
+      keep
+      |> Enum.map(fn
+        {module, _fun, _arity} -> module
+        module -> module
+      end)
+      |> Enum.reject(&MapSet.member?(packaged, &1))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    case unknown do
+      [] -> :ok
+      unknown -> err(:unknown_kept_modules, unknown)
+    end
+  end
+
   defp preserved_modules(staged_apps, preserved_apps) do
     Enum.flat_map(preserved_apps, fn app ->
       staged_apps
@@ -585,7 +619,7 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp run_treeshake(staged_apps, preserved_modules, out_dir) do
+  defp run_treeshake(staged_apps, preserved_modules, keep, drop, out_dir) do
     files =
       Enum.flat_map(staged_apps, fn {_app, info} ->
         info.ebin_dir |> Path.join("*") |> Path.wildcard()
@@ -597,8 +631,9 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: [@boot_function | preserved_modules],
-        leave: preserved_modules
+        keep: [@boot_function | preserved_modules ++ keep],
+        leave: preserved_modules,
+        drop: drop
       )
 
     {:ok, report}
@@ -870,6 +905,10 @@ defmodule Popcorn.Packager do
     "Starting the entrypoint requires the #{app} application, which is not available."
   end
 
+  def format_error(%{code: "unknown_kept_modules", modules: modules}) do
+    "Modules to keep are not packaged: #{Enum.map_join(modules, ", ", &inspect/1)}."
+  end
+
   def format_error(%{code: "treeshake_failed", message: message}), do: message
 
   def format_error(%{code: "missing_runtime_resource", path: path}) do
@@ -921,6 +960,10 @@ defmodule Popcorn.Packager do
 
   defp err(:missing_boot_app, app) do
     {:error, %{code: "missing_boot_app", app: app}}
+  end
+
+  defp err(:unknown_kept_modules, modules) do
+    {:error, %{code: "unknown_kept_modules", modules: modules}}
   end
 
   defp err(:treeshake_failed, message) do

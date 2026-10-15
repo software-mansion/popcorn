@@ -56,6 +56,8 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `--no-strip` | Keeps BEAM debug and documentation chunks. The task strips these by default. |
   | `--treeshake` | Removes unreachable modules and functions. Experimental. Disabled by default. |
   | `--preserved-app NAME` | Preserves an application's code during tree-shaking. Requires `--treeshake`. Can be repeated. |
+  | `--keep ENTRY` | Keeps a module (`MyApp.Plugin`, `:my_module`) or function (`MyApp.Plugin.run/1`), with the code it relies on, during tree-shaking. Requires `--treeshake`. Can be repeated. |
+  | `--drop MODULE` | Removes a module during tree-shaking, even if it's reachable. Requires `--treeshake`. Can be repeated. |
   | `--brotli-effort LEVEL` | Selects `standard` (default) or `max`. `max` compresses more slowly. |
 
   The task selects `crypto` if the package includes `asn1`, `crypto`,
@@ -71,6 +73,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   `--preserved-app` does not add an application to the package.
   Select it through the entrypoint, its dependencies, or `--extra-app` first.
+  For particular modules or functions, use `--keep`.
 
   ## Output
 
@@ -102,7 +105,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
     brotli_effort: :string,
     strip: :boolean,
     treeshake: :boolean,
-    preserved_app: [:string, :keep]
+    preserved_app: [:string, :keep],
+    keep: [:string, :keep],
+    drop: [:string, :keep]
   ]
 
   @doc false
@@ -122,9 +127,12 @@ defmodule Mix.Tasks.Popcorn.Cook do
     end
 
     preserved_apps = Keyword.get_values(options, :preserved_app)
+    keep = options |> Keyword.get_values(:keep) |> Enum.map(&parse_keep/1)
+    drop = options |> Keyword.get_values(:drop) |> Enum.map(&parse_module/1)
 
-    if preserved_apps != [] && !options[:treeshake] do
-      Mix.raise("--preserved-app requires --treeshake")
+    for {option, values} <- [preserved_app: preserved_apps, keep: keep, drop: drop],
+        values != [] and !options[:treeshake] do
+      Mix.raise("--#{String.replace(to_string(option), "_", "-")} requires --treeshake")
     end
 
     packager_options = [
@@ -136,7 +144,11 @@ defmodule Mix.Tasks.Popcorn.Cook do
       runtime_variant: options[:runtime_variant],
       brotli_effort: brotli_effort(options[:brotli_effort]),
       strip: Keyword.get(options, :strip, true),
-      treeshake: if(options[:treeshake], do: [preserved_apps: preserved_apps], else: false)
+      treeshake:
+        if(options[:treeshake],
+          do: [preserved_apps: preserved_apps, keep: keep, drop: drop],
+          else: false
+        )
     ]
 
     case Packager.build(packager_options) do
@@ -157,6 +169,20 @@ defmodule Mix.Tasks.Popcorn.Cook do
       true -> Mix.Project.config() |> Keyword.fetch!(:app) |> to_string()
     end
   end
+
+  # `Module`, `Module.fun/arity`, `:module` or `:module.fun/arity`
+  defp parse_keep(entry) do
+    case Regex.run(~r{^(.+)\.([^./]+)/(\d+)$}, entry) do
+      [_, module, fun, arity] ->
+        {parse_module(module), String.to_atom(fun), String.to_integer(arity)}
+
+      nil ->
+        parse_module(entry)
+    end
+  end
+
+  defp parse_module(":" <> module), do: String.to_atom(module)
+  defp parse_module(module), do: Module.concat([module])
 
   defp brotli_effort(nil), do: :standard
   defp brotli_effort("standard"), do: :standard
