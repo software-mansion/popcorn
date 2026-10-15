@@ -17,8 +17,12 @@ defmodule LocalLiveView.E2E.Server do
     Mix.Task.run("llv.assets")
 
     # Where LocalLiveView's JS loads the runtime from by default: next to app.js
+    args =
+      ["popcorn.cook", "--out-dir", Path.join(@js_dir, "popcorn")] ++
+        Mix.Tasks.Llv.Build.cook_args()
+
     {output, status} =
-      System.cmd("mix", ["popcorn.cook", "--out-dir", Path.join(@js_dir, "popcorn")],
+      System.cmd("mix", args,
         cd: Path.join(@e2e_dir, "local"),
         env: [{"MIX_ENV", "dev"}],
         stderr_to_stdout: true
