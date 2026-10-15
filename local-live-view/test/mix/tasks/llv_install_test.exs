@@ -104,6 +104,7 @@ defmodule Mix.Tasks.Llv.InstallTest do
       installed()
       |> assert_creates("local/mix.exs")
       |> assert_creates("local/.formatter.exs")
+      |> assert_creates("local/config/config.exs")
       |> assert_creates("local/lib/local/application.ex")
       |> assert_creates("local/lib/hello_local.ex")
     end
