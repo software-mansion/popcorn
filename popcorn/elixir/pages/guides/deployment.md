@@ -16,7 +16,24 @@ In development, both `mix popcorn.dev` and the Vite plugin set them.
 ## Set response metadata
 
 1. Serve `.wasm` files with `Content-Type: application/wasm`.
-2. Set `Content-Encoding: gzip` or `Content-Encoding: br` to serve compressed assets. Popcorn generates them automatically. `br` is Brotli compression and works better than Gzip. Compression is configurable in the packager.
+2. Set `Content-Encoding: gzip` or `Content-Encoding: br` to serve compressed assets. Popcorn generates them automatically. `br` is Brotli compression and works better than Gzip. Compression level is configurable in the packager. Set `Vary: Accept-Encoding` when selecting a representation.
+
+## Cache bundles independently
+
+The packager emits three archives: `stdlib.<hash>.tar` for selected Erlang/Elixir
+built-ins, `app.<hash>.tar` for user code, and `deps.<hash>.tar` for dependencies.
+
+Each filename contains the SHA-256 of its final uncompressed contents. The boot
+script also has a content hash in its filename.
+Tree-shaking runs on all applications which means a change in your app may include or drop a module from a standard library and change the hash.
+
+Serve hashed tarballs with:
+
+```http
+Cache-Control: public, max-age=31536000, immutable
+```
+
+This prevent re-requesting them if they didn't change. They're referenced by `manifest.json` which should be checked periodically for using new hashed tarballs.
 
 ## Avoid transforming the output
 
@@ -49,6 +66,11 @@ http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
+    map $uri $popcorn_cache_control {
+        default "no-cache";
+        "~\.[a-f0-9]{64}\.(tar|boot)$" "public, max-age=31536000, immutable";
+    }
+
     server {
         listen 80;
         listen [::]:80;
@@ -62,14 +84,17 @@ http {
         add_header Cross-Origin-Embedder-Policy "require-corp" always;
         add_header Cross-Origin-Resource-Policy "cross-origin" always;
 
+        add_header Cache-Control $popcorn_cache_control;
+
         gzip_static on;
         gzip_vary on;
         gzip_proxied any;
 
-        location ~ \.(wasm|mjs)$ {
+        location ~ \.(wasm|mjs|tar|boot|json)$ {
             types {
                 application/wasm wasm;
                 application/javascript mjs;
+                application/json json;
             }
             try_files $uri =404;
         }
@@ -88,6 +113,6 @@ This example uses gzip; serving `.br` files requires an additional Brotli module
 
 If your application uses client-side routing, replace `try_files $uri $uri/ =404;`
 with `try_files $uri $uri/ /index.html;`. Keep the asset location unchanged so missing
-`.wasm` and `.mjs` files return 404.
+runtime files, manifests, and archives return 404.
 
 Validate the configuration with `nginx -t` before reloading nginx.
