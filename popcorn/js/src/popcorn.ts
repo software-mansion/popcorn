@@ -835,8 +835,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
     } catch (error) {
-      check(error instanceof Error);
-      payload = { ok: false, error: error.toString() };
+      payload = { ok: false, error: String(error) };
     }
 
     const target = { pid: request.replyTo };

@@ -434,6 +434,11 @@ test.describe("run_js", () => {
           catch
             error:{run_js, Message} -> Message
           end,
+          ThrownNonError = try
+            wasm:run_js(<<"() => { throw 'boom' }">>, #{})
+          catch
+            error:{run_js, NonErrorMessage} -> NonErrorMessage
+          end,
           Unserializable = try
             wasm:run_js(<<"() => () => 1">>, #{})
           catch
@@ -447,6 +452,7 @@ test.describe("run_js", () => {
           ok = wasm:send(#{
             timeout => Timeout,
             thrown => Thrown,
+            thrown_non_error => ThrownNonError,
             unserializable => Unserializable,
             invalid => Invalid
           }).
@@ -457,6 +463,7 @@ test.describe("run_js", () => {
     expect(await otp.waitForEvent("timeout")).toEqual({
       timeout: "timeout",
       thrown: "Error: boom",
+      thrown_non_error: "boom",
       unserializable: "unsupported",
       invalid: "invalid_option",
     });
