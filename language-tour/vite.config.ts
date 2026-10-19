@@ -24,6 +24,9 @@ logger.warn = (msg, options) => {
 export default defineConfig({
   base: "/",
   customLogger: logger,
+  resolve: {
+    dedupe: ["@codemirror/state", "@codemirror/view"]
+  },
   plugins: [
     react(),
     tailwindcss(),
