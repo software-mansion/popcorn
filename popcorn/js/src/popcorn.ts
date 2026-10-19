@@ -246,7 +246,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         return;
       case "otp:run_js":
         this.vmReady = true;
-        this.runJs(data.payload);
+        this.runJs(data.payload).catch((error: unknown) => {
+          check(error instanceof Error);
+          const payload = { ok: false, error: error.toString() };
+          this.sendRunJsReply(data.payload, payload);
+          throw error;
+        });
         return;
       case "otp:await-ready":
         this.handleReadyRequest(data.payload.replyTo);
@@ -835,10 +840,17 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const value = request.return === "ref" ? this.asRef(result) : result;
       payload = { ok: true, value: value ?? null };
     } catch (error) {
-      check(error instanceof Error);
+      check(
+        error instanceof Error,
+        `JS.run/3 must throw an Error instance. Received: ${String(error)}`,
+      );
       payload = { ok: false, error: error.toString() };
     }
 
+    this.sendRunJsReply(request, payload);
+  }
+
+  private sendRunJsReply(request: RunJsRequest, payload: AnyValue): void {
     const target = { pid: request.replyTo };
     const tracked: PendingTracked[] = [];
     const command = serializeSendPayload(
