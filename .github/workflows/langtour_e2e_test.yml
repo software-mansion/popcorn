@@ -73,3 +73,13 @@ jobs:
       - name: Run e2e tests
         run: pnpm test
         working-directory: language-tour
+
+      - name: Upload test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-tour-playwright
+          path: |
+            language-tour/playwright-report/
+            language-tour/test-results/
+          retention-days: 7
