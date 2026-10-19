@@ -421,7 +421,8 @@ test.describe("run_js", () => {
     });
   });
 
-  test("errors", async ({ otp }) => {
+  test("errors", async ({ otp, page }) => {
+    const browserError = page.waitForEvent("pageerror");
     const boot = await otp.tryBoot(
       evalOpts(`
           Timeout = try
@@ -433,6 +434,11 @@ test.describe("run_js", () => {
             wasm:run_js(<<"() => { throw new Error('boom') }">>, #{})
           catch
             error:{run_js, Message} -> Message
+          end,
+          Assertion = try
+            wasm:run_js(<<"() => { throw 'boom' }">>, #{}, [{timeout, infinity}])
+          catch
+            error:{run_js, AssertionMessage} -> AssertionMessage
           end,
           Unserializable = try
             wasm:run_js(<<"() => () => 1">>, #{})
@@ -447,6 +453,7 @@ test.describe("run_js", () => {
           ok = wasm:send(#{
             timeout => Timeout,
             thrown => Thrown,
+            assertion => Assertion,
             unserializable => Unserializable,
             invalid => Invalid
           }).
@@ -457,9 +464,14 @@ test.describe("run_js", () => {
     expect(await otp.waitForEvent("timeout")).toEqual({
       timeout: "timeout",
       thrown: "Error: boom",
+      assertion:
+        "PopcornError: Check failed: JS.run/3 must throw an Error instance. Received: boom",
       unserializable: "unsupported",
       invalid: "invalid_option",
     });
+    expect((await browserError).message).toBe(
+      "Check failed: JS.run/3 must throw an Error instance. Received: boom",
+    );
   });
 });
 
