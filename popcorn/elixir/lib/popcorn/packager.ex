@@ -58,20 +58,6 @@ defmodule Popcorn.Packager do
           treeshake: false | [preserved_apps: [String.t()]]
         }
 
-  defp strip_tarball(path, out_dir) do
-    {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
-
-    stripped =
-      entries
-      |> Enum.sort_by(fn {name, _content} -> to_string(name) end)
-      |> Enum.map(&strip_beam/1)
-
-    output = Path.join(out_dir, Path.basename(path))
-    opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
-
-    :ok = :erl_tar.create(to_charlist(output), stripped, opts)
-  end
-
   defp beam?(path), do: Path.extname(path) == ".beam"
 
   # Reimplementation of :beam_lib.strip_files/2.
@@ -176,6 +162,7 @@ defmodule Popcorn.Packager do
     with {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
+         app_bundles = group_apps(apps_info, project_apps, entrypoint_app),
          variant = runtime_variant || required_runtime(apps_info),
          {:ok, manifest} <- read_manifest(Path.join([runtimes_dir, variant, "manifest.json"])),
          :ok <- check_otp_version(toolchain.otp, manifest.version),
@@ -192,14 +179,10 @@ defmodule Popcorn.Packager do
       File.mkdir_p!(out_dir)
 
       packed_apps =
-        staged_apps
-        |> async_stream(fn {app, info} ->
+        Map.new(staged_apps, fn {app, info} ->
           version = Keyword.get(info.props, :vsn, ~c"") |> to_string()
-          tar_path = create_tarball(out_dir, app, info.ebin_dir)
-
-          {app, %{tar: tar_path, version: version}}
+          {app, %{bundle: Map.fetch!(app_bundles, app), version: version}}
         end)
-        |> Map.new()
 
       diagnostics =
         staged_apps
@@ -217,20 +200,24 @@ defmodule Popcorn.Packager do
 
       manifest_path = Path.join(out_dir, "manifest.json")
 
-      packed_tar_paths =
-        packed_apps
-        |> Map.values()
-        |> Enum.map(&Path.expand(Path.join(out_dir, &1.tar)))
+      bundles =
+        Map.new(~w(stdlib app deps), fn group ->
+          in_group? = fn {app, _info} -> app_bundles[app] == group end
+          apps = Enum.filter(staged_apps, in_group?)
+          {group, %{tar: create_tarball(out_dir, group, apps, strip)}}
+        end)
 
-      tar_paths = maybe_strip_tarballs(packed_tar_paths, strip, out_dir)
+      tar_paths =
+        Enum.map(~w(stdlib app deps), &Path.join(out_dir, Map.fetch!(bundles, &1).tar))
 
       manifest = %{
         entrypoint: entrypoint_app,
         runtimeVariant: variant,
         apps: packed_apps,
+        bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{boot: @boot_name, version: vm_version}
+        vm: %{boot: Path.join("bin", Path.basename(boot_path)), version: vm_version}
       }
 
       File.write!(manifest_path, encode_json(manifest))
@@ -243,6 +230,7 @@ defmodule Popcorn.Packager do
         bootPath: Path.expand(boot_path),
         tarPaths: tar_paths,
         apps: packed_apps,
+        bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
         treeshake: treeshake_report
@@ -260,7 +248,7 @@ defmodule Popcorn.Packager do
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
       manifest_path = Path.join(out_dir, "otp/manifest.json")
-      boot_path = Path.join(out_dir, "otp/bin/vm.boot")
+      boot_path = Path.join([out_dir, "otp/bin", Path.basename(report.bootPath)])
       lib_dir = Path.join(out_dir, "otp/lib")
 
       File.mkdir_p!(Path.dirname(manifest_path))
@@ -350,7 +338,7 @@ defmodule Popcorn.Packager do
 
         File.write!(path, :erlang.term_to_binary(boot))
 
-        {:ok, path}
+        {:ok, fingerprint(path)}
 
       missing ->
         err(:unsupported_boot, {boot_path, missing})
@@ -443,15 +431,6 @@ defmodule Popcorn.Packager do
     enumerable
     |> Task.async_stream(fun, timeout: :infinity)
     |> Enum.map(fn {:ok, result} -> result end)
-  end
-
-  defp maybe_strip_tarballs(paths, false, _out_dir), do: paths
-
-  defp maybe_strip_tarballs(paths, true, out_dir) do
-    Enum.map(paths, fn path ->
-      :ok = strip_tarball(path, out_dir)
-      Path.expand(Path.join(out_dir, Path.basename(path)))
-    end)
   end
 
   defp get_apps_info(root_dir) do
@@ -729,25 +708,46 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, app, ebin_dir) do
-    tar = "lib/#{app}.tar"
-    tar_path = Path.join(outdir, tar)
-    tar_path_c = to_charlist(tar_path)
-    app_dir = Path.dirname(ebin_dir)
-    priv_dir = Path.join(app_dir, "priv")
-    entries = [{~c"lib/#{app}/ebin", to_charlist(ebin_dir)}]
+  defp group_apps(apps_info, project_apps, entrypoint) do
+    Map.new(apps_info, fn {app, _info} ->
+      group =
+        case project_apps do
+          %{^app => _} when app == entrypoint -> "app"
+          %{^app => _} -> "deps"
+          _ -> "stdlib"
+        end
+
+      {app, group}
+    end)
+  end
+
+  defp create_tarball(outdir, group, apps, strip) do
+    path = Path.join(outdir, "lib/#{group}.tar")
 
     entries =
-      if File.dir?(priv_dir) do
-        [{~c"lib/#{app}/priv", to_charlist(priv_dir)} | entries]
-      else
-        entries
+      for {app, info} <- Enum.sort(apps),
+          app_dir = Path.dirname(info.ebin_dir),
+          file <- Path.wildcard(Path.join(app_dir, "**"), match_dot: true),
+          File.regular?(file) do
+        entry =
+          {to_charlist(Path.join(["lib", app, Path.relative_to(file, app_dir)])),
+           File.read!(file)}
+
+        if strip, do: strip_beam(entry), else: entry
       end
 
-    File.mkdir_p!(Path.dirname(tar_path))
-    :ok = :erl_tar.create(tar_path_c, entries, [])
+    File.mkdir_p!(Path.dirname(path))
+    opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
+    :ok = :erl_tar.create(to_charlist(path), entries, opts)
 
-    tar
+    Path.join("lib", Path.basename(fingerprint(path)))
+  end
+
+  defp fingerprint(path) do
+    hash = :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+    target = Path.rootname(path) <> ".#{hash}" <> Path.extname(path)
+    File.rename!(path, target)
+    target
   end
 
   defp loaded_dynamic_nifs(_app, ebin_dir) do

@@ -3,8 +3,9 @@ defmodule Popcorn.PackagerTest do
 
   alias Popcorn.Packager
 
-  @tag :tmp_dir
-  test "build/1: complete output", %{tmp_dir: tmp_dir} do
+  @moduletag :tmp_dir
+
+  setup %{tmp_dir: tmp_dir} do
     static_dir = Path.join(tmp_dir, "static")
     runtime_dir = Path.join(static_dir, "runtimes/core")
     build_path = Path.join(tmp_dir, "build/lib")
@@ -36,44 +37,106 @@ defmodule Popcorn.PackagerTest do
 
     File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
 
-    result =
-      Packager.build(
-        build_path: build_path,
-        out_dir: out_dir,
-        app: "popcorn",
-        static_dir: static_dir
+    for app <- [:user_app, :extra_app] do
+      ebin = Path.join([build_path, to_string(app), "ebin"])
+      File.mkdir_p!(ebin)
+      props = [vsn: ~c"1.0", modules: [], applications: [:popcorn]]
+
+      File.write!(
+        Path.join(ebin, "#{app}.app"),
+        :io_lib.format(~c"~tp.~n", [{:application, app, props}])
       )
-
-    assert {:ok, report} = result
-    assert "core" = report.runtimeVariant
-    assert %{"popcorn" => _app} = report.apps
-
-    for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
-      assert File.regular?(Path.join(out_dir, file))
     end
 
-    assert File.regular?(Path.join(out_dir, "otp/bin/vm.boot"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.gz"))
-    assert File.regular?(Path.join(out_dir, "otp/lib/popcorn.tar.br"))
+    {:ok,
+     options: [build_path: build_path, out_dir: out_dir, app: "user_app", static_dir: static_dir],
+     build_path: build_path,
+     out_dir: out_dir}
+  end
 
-    archive = out_dir |> Path.join("otp/lib/popcorn.tar") |> read_archive()
-    assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
-    assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
-    refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
-    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
-    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
-    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
-    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.Shaker.beam")
-    refute Map.has_key?(archive, "lib/popcorn/ebin/treeshake_helper.beam")
-    refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Mix.Tasks.Popcorn.Cook.beam")
+  describe "build/1" do
+    test "complete output", %{options: options, out_dir: out_dir} do
+      options = Keyword.put(options, :extra_apps, ["extra_app"])
 
-    modules = archive |> Map.fetch!("lib/popcorn/ebin/popcorn.app") |> app_modules()
-    assert Popcorn.JS in modules
-    refute Enum.any?(modules, &build_tool?/1)
+      assert {:ok, report} = Packager.build(options)
+      assert "core" = report.runtimeVariant
+      assert %{"popcorn" => _app} = report.apps
 
-    output_manifest = out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
-    assert %{"runtimeVariant" => "core", "entrypoint" => "popcorn"} = output_manifest
+      for file <- ["index.mjs", "worker.mjs", "beam.mjs", "beam.emu.mjs", "beam.wasm"] do
+        assert File.regular?(Path.join(out_dir, file))
+      end
+
+      manifest = read_manifest(out_dir)
+      assert Map.keys(manifest["bundles"]) |> Enum.sort() == ["app", "deps", "stdlib"]
+      assert manifest["apps"]["user_app"]["bundle"] == "app"
+      assert manifest["apps"]["extra_app"]["bundle"] == "deps"
+      assert manifest["apps"]["popcorn"]["bundle"] == "deps"
+      assert manifest["apps"]["elixir"]["bundle"] == "stdlib"
+      assert manifest["apps"]["kernel"]["bundle"] == "stdlib"
+      assert File.regular?(Path.join(out_dir, "otp/" <> manifest["vm"]["boot"]))
+      assert manifest["vm"]["boot"] =~ ~r/^bin\/vm\.[a-f0-9]{64}\.boot$/
+      assert length(report.tarPaths) == 3
+
+      for {group, %{"tar" => tar}} <- manifest["bundles"] do
+        path = Path.join(out_dir, "otp/" <> tar)
+        contents = File.read!(path)
+        hash = :crypto.hash(:sha256, contents) |> Base.encode16(case: :lower)
+        assert tar == "lib/#{group}.#{hash}.tar"
+        assert :zlib.gunzip(File.read!(path <> ".gz")) == contents
+        assert {:ok, ^contents} = :brotli.decode(File.read!(path <> ".br"))
+      end
+
+      user_archive = read_archive(bundle_path(out_dir, "app"))
+      assert Map.has_key?(user_archive, "lib/user_app/ebin/user_app.app")
+      refute Map.has_key?(user_archive, "lib/extra_app/ebin/extra_app.app")
+
+      archive = read_archive(bundle_path(out_dir, "deps"))
+      assert Map.has_key?(archive, "lib/extra_app/ebin/extra_app.app")
+      assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
+      assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
+      refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
+      refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.beam")
+      refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.Packager.BeamPatcher.beam")
+      refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.beam")
+      refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Treeshake.Shaker.beam")
+      refute Map.has_key?(archive, "lib/popcorn/ebin/treeshake_helper.beam")
+      refute Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Mix.Tasks.Popcorn.Cook.beam")
+
+      modules = archive |> Map.fetch!("lib/popcorn/ebin/popcorn.app") |> app_modules()
+      assert Popcorn.JS in modules
+      refute Enum.any?(modules, &build_tool?/1)
+
+      assert %{"runtimeVariant" => "core", "entrypoint" => "user_app"} = manifest
+    end
+
+    test "cache boundaries", %{options: options, build_path: build_path, out_dir: out_dir} do
+      app_file = Path.join(build_path, "user_app/ebin/user_app.app")
+      dep_file = Path.join(build_path, "popcorn/priv/nested/fixture.txt")
+
+      assert {:ok, _report} = Packager.build(options)
+      before = read_manifest(out_dir)
+      File.touch!(app_file, 1_000_000)
+      File.touch!(dep_file, 2_000_000)
+      assert {:ok, _report} = Packager.build(options)
+      assert read_manifest(out_dir) == before
+
+      File.write!(app_file, File.read!(app_file) <> "\n")
+      assert {:ok, _report} = Packager.build(options)
+      after_app = read_manifest(out_dir)
+      refute after_app["bundles"]["app"] == before["bundles"]["app"]
+      assert after_app["bundles"]["deps"] == before["bundles"]["deps"]
+      assert after_app["bundles"]["stdlib"] == before["bundles"]["stdlib"]
+      assert after_app["vm"] == before["vm"]
+    end
+  end
+
+  defp read_manifest(out_dir) do
+    out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
+  end
+
+  defp bundle_path(out_dir, group) do
+    tar = read_manifest(out_dir)["bundles"][group]["tar"]
+    Path.join(out_dir, "otp/" <> tar)
   end
 
   defp read_archive(path) do

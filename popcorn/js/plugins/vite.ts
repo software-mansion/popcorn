@@ -135,6 +135,7 @@ export function popcorn(options: Options): Plugin {
       }
       const content = await readFile(`${filePath}${encoding.suffix}`);
       setContentType(res, filePath);
+      res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Vary", "Accept-Encoding");
       if (encoding.name !== null) {
         res.setHeader("Content-Encoding", encoding.name);

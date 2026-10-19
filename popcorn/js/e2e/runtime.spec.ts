@@ -171,7 +171,16 @@ test.describe("boot", () => {
     ]);
   });
 
-  test("apps and eval", async ({ otp }) => {
+  test("apps and eval", async ({ page, otp }) => {
+    const archives: { url: string; encoding: string | undefined }[] = [];
+    page.on("response", (response) => {
+      if (new URL(response.url()).pathname.endsWith(".tar")) {
+        archives.push({
+          url: response.url(),
+          encoding: response.headers()["content-encoding"],
+        });
+      }
+    });
     const boot = await otp.tryBoot(
       evalOpts(`
         {ok, _} = application:ensure_all_started(elixir),
@@ -186,6 +195,18 @@ test.describe("boot", () => {
       `),
     );
     assert(boot.ok);
+
+    expect(archives).toHaveLength(3);
+    const groups = archives.map(({ url }) => {
+      const filename = new URL(url).pathname.split("/").pop();
+      assert(filename !== undefined);
+      return filename.split(".")[0];
+    });
+    expect(groups.sort()).toEqual(["app", "deps", "stdlib"]);
+    for (const archive of archives) {
+      expect(archive.url).toMatch(/\.[a-f0-9]{64}\.tar$/);
+      expect(["br", "gzip"]).toContain(archive.encoding);
+    }
 
     expect(await otp.waitForEvent("runtime_ready")).toEqual({
       runtime_ready: true,

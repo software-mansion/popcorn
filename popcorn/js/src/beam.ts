@@ -113,7 +113,9 @@ async function boot(
     LINES: String(ttySize.rows),
     ERL_INETRC: INETRC_PATH,
   };
-  let emitError: ((payload: OtpErrorPayload) => void) | null = function (payload) {
+  let emitError: ((payload: OtpErrorPayload) => void) | null = function (
+    payload,
+  ) {
     emitError = null;
     state.isVmReady = false;
     emit({ type: "otp:error", payload });
@@ -289,14 +291,11 @@ function isBridgeMarker(
 
 type BeamManifest = {
   entrypoint: string | null;
-  apps: Record<string, BeamManifestApp>;
+  apps: Record<string, { bundle: string }>;
+  bundles: Record<string, { tar: string }>;
   vm: {
     boot: string;
   };
-};
-
-type BeamManifestApp = {
-  tar: string;
 };
 
 type LoadedFsData = {
@@ -341,19 +340,18 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   }
 
   const loadedTarballs = await Promise.all(
-    appNames.map(async (name): Promise<Result<Uint8Array>> => {
-      const entry = manifest.apps[name];
-      const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
-      const tar = await fetchBinary(tarUrl);
-      if (tar === null) {
-        return {
-          ok: false,
-          error: err("beam:missing-tarball", { name, all: appNames }),
-        };
-      }
+    Object.entries(manifest.bundles).map(
+      async ([name, entry]): Promise<Result<Uint8Array>> => {
+        const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
+        const tar = await fetchBinary(tarUrl);
+        if (tar !== null) {
+          return { ok: true, data: tar };
+        }
 
-      return { ok: true, data: tar };
-    }),
+        const all = Object.keys(manifest.bundles);
+        return { ok: false, error: err("beam:missing-tarball", { name, all }) };
+      },
+    ),
   );
 
   const tarballs: Uint8Array[] = [];
