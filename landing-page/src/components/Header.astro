@@ -88,48 +88,53 @@ const navLinks = [
   </nav>
 
   <div
-    id="mobile-navigation"
-    class="fixed top-14 right-0 left-0 h-0 transition-[height] duration-500 ease-in-out motion-reduce:transition-none md:hidden"
-    aria-hidden="true"
-    data-mobile-menu
+    class="pointer-events-none fixed top-14 right-0 left-0 h-[calc(100dvh-3.5rem)] overflow-hidden md:hidden"
   >
-    <div class="relative h-full overflow-hidden">
-      <StripedBackground />
-
-      <div class="relative flex flex-col gap-13 px-6 pt-20">
-        {
-          navLinks.map(({ number, label, href, external }) => (
-            <a
-              class="text-ink flex items-baseline gap-3.5"
-              href={href}
-              target={external ? "_blank" : undefined}
-              rel={external ? "noreferrer" : undefined}
-              tabindex="-1"
-              data-menu-link
-            >
-              <span class="font-label text-orange w-6 shrink-0 text-xs tracking-widest">
-                {number}
-              </span>
-              <span class="font-display text-5xl leading-none font-semibold tracking-tight">
-                {label}
-              </span>
-              {external && (
-                <span class="text-orange text-2xl" aria-hidden="true">
-                  ↗
-                </span>
-              )}
-            </a>
-          ))
-        }
-      </div>
-    </div>
-
     <div
-      class="relative h-0 opacity-0 transition-opacity duration-100"
+      id="mobile-navigation"
+      class="h-full -translate-y-full transition-transform duration-500 ease-in-out motion-reduce:transition-none"
       aria-hidden="true"
-      data-menu-scallops
+      inert
+      data-mobile-menu
     >
-      <StripedBackground edgeOnly />
+      <div class="relative h-full overflow-hidden">
+        <StripedBackground />
+
+        <div class="relative flex flex-col gap-13 px-6 pt-20">
+          {
+            navLinks.map(({ number, label, href, external }) => (
+              <a
+                class="text-ink flex items-baseline gap-3.5"
+                href={href}
+                target={external ? "_blank" : undefined}
+                rel={external ? "noreferrer" : undefined}
+                tabindex="-1"
+                data-menu-link
+              >
+                <span class="font-label text-orange w-6 shrink-0 text-xs tracking-widest">
+                  {number}
+                </span>
+                <span class="font-display text-5xl leading-none font-semibold tracking-tight">
+                  {label}
+                </span>
+                {external && (
+                  <span class="text-orange text-2xl" aria-hidden="true">
+                    ↗
+                  </span>
+                )}
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      <div
+        class="relative h-0 opacity-0 transition-opacity duration-100"
+        aria-hidden="true"
+        data-menu-scallops
+      >
+        <StripedBackground edgeOnly />
+      </div>
     </div>
   </div>
 </header>
@@ -192,8 +197,10 @@ const navLinks = [
       button.ariaExpanded = String(open);
       button.ariaLabel = open ? "Close navigation" : "Open navigation";
       menu.ariaHidden = String(!open);
-      menu.classList.toggle("h-[calc(100dvh-3.5rem)]", open);
-      menu.classList.toggle("h-0", !open);
+      menu.inert = !open;
+      menu.classList.toggle("translate-y-0", open);
+      menu.classList.toggle("-translate-y-full", !open);
+      menu.classList.toggle("pointer-events-auto", open);
       openIcon.classList.toggle("hidden", open);
       closeIcon.classList.toggle("hidden", !open);
       if (open) scallops.classList.remove("opacity-0");
@@ -217,7 +224,7 @@ const navLinks = [
 
     button.addEventListener("click", toggleMenu);
     menu.addEventListener("transitionend", (event) => {
-      if (event.propertyName !== "height") return;
+      if (event.target !== menu || event.propertyName !== "translate") return;
       if (button.ariaExpanded === "false") scallops.classList.add("opacity-0");
     });
     for (const link of links) {
