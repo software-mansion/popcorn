@@ -8,7 +8,7 @@ name: LocalLiveView Build & test
 on:
   push:
     branches: ["**"]
-    paths: &llv_paths
+    paths:
       - "local-live-view/**"
       - "examples/local-lv-thermostat/**"
       - "examples/local-lv-compare/**"
@@ -25,9 +25,6 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
       - ".npmrc"
-
-  pull_request:
-    paths: *llv_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
