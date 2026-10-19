@@ -17,6 +17,8 @@ defmodule Popcorn.Packager do
   @brotli_block_bytes 1024 * 1024
 
   @patches_dir Path.expand("../../patches", __DIR__)
+  # Applied only when tree-shaking
+  @treeshake_patches_dir Path.join(@patches_dir, "treeshake")
 
   # To run, Beam needs following apps:
   # - kernel
@@ -244,7 +246,7 @@ defmodule Popcorn.Packager do
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          staged_apps = stage_apps(staging_dir, apps_info),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
-         :ok <- patch_apps(staged_apps),
+         :ok <- patch_apps(staged_apps, @patches_dir),
          staged_apps =
            staged_apps |> remove_build_tools() |> add_config(config) |> configure_kernel(),
          {:ok, staged_apps, treeshake_report} <-
@@ -529,8 +531,8 @@ defmodule Popcorn.Packager do
   end
 
   # we patch only selected modules from OTP, see patches/
-  defp patch_apps(staged_apps) do
-    [@patches_dir, "*", "*.erl"]
+  defp patch_apps(staged_apps, patches_dir) do
+    [patches_dir, "*", "*.erl"]
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
@@ -696,6 +698,7 @@ defmodule Popcorn.Packager do
 
     with :ok <- validate_preserved_apps(staged_apps, options),
          :ok <- validate_keep(staged_apps, keep),
+         :ok <- patch_apps(staged_apps, @treeshake_patches_dir),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
          drop = dropped_modules(drop, keep, preserved_modules),
          {:ok, stats} <-

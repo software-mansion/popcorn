@@ -220,6 +220,45 @@ defmodule Popcorn.PackagerTest do
       refute line_numbers?(stdlib, "lib/kernel/ebin/application_controller.beam")
     end
 
+    # Tree-shaking leaves out unicode_util's database, while inspecting atoms
+    # checks if they're normalized
+    test "tree-shaking the Unicode character database", %{options: options, out_dir: out_dir} do
+      options = Keyword.put(options, :treeshake, preserved_apps: [])
+      assert {:ok, _report} = Packager.build(options)
+
+      archive = read_archive(bundle_path(out_dir, "stdlib"))
+      assert compacted?(archive, "lib/stdlib/ebin/unicode_util.beam")
+
+      # The packaged modules that normalize replace the loaded ones, so in
+      # another VM, which stops with the test
+      paths = Enum.flat_map(:code.get_path(), &[~c"-pa", &1])
+      {:ok, peer, _node} = :peer.start_link(%{connection: :standard_io, args: paths})
+
+      for {module, path} <- [
+            unicode: "lib/stdlib/ebin/unicode.beam",
+            unicode_util: "lib/stdlib/ebin/unicode_util.beam",
+            "Elixir.String.Tokenizer": "lib/elixir/ebin/Elixir.String.Tokenizer.beam"
+          ] do
+        :peer.call(peer, :code, :unstick_mod, [module])
+        beam = Map.fetch!(archive, path)
+        {:module, ^module} = :peer.call(peer, :code, :load_binary, [module, ~c"", beam])
+      end
+
+      inspect = &:peer.call(peer, Kernel, :inspect, [&1])
+      normalize = &:peer.call(peer, String, :normalize, [&1, &2])
+
+      assert inspect.(:hello) == ":hello"
+      assert inspect.(:ówka) == ":ówka"
+      # Telling if it's normalized needs the database, so it's quoted
+      assert inspect.(:żółw) == ~s(:"żółw")
+      assert inspect.(żółw: 1) == ~s(["żółw": 1])
+
+      assert normalize.("ówka\r\n", :nfc) == "ówka\r\n"
+
+      error = assert_raise UndefinedFunctionError, fn -> normalize.("żółw", :nfc) end
+      assert {error.module, error.function} == {:unicode_util, :nfc}
+    end
+
     test "leaving out priv files of applications that aren't packaged", %{options: options} do
       options = Keyword.put(options, :exclude_priv, phoneix: "static")
 
