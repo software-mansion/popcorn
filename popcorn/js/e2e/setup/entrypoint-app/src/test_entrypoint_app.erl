@@ -35,6 +35,10 @@ idle() ->
     end.
 
 startup_event("bridge") ->
+    {ok, 42} = application:get_env(test_entrypoint, answer),
+    {ok, warning} = application:get_env(logger, level),
+    undefined = application:get_env(popcorn, strip),
+    ok = wasm:send(#{configured_answer => 42}),
     ok = wasm:send(#{startup_send => true}),
     42 = wasm:run_js(
         <<"async (_args, {trySend}) => { const result = await trySend('startup_listener', {startup_action: true}); if (!result.ok) throw result.error; return 42; }">>,
