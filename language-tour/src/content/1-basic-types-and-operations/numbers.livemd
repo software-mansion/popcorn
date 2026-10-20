@@ -54,7 +54,7 @@ Exponential notation:
 1.0e-10
 ```
 
-Normally, integers can be arbitrarily big and they never overflow (or underflow). However, the AtomVM runtime which we're using in the browser only supports integers up to 64 bits and overflow raises an error. Floats are always stored on 64 bits and overflow raises an error.
+Integers can be arbitrarily big and do not overflow or underflow. Floats are stored on 64 bits and overflow raises an error.
 
 Now that we understand number types, let's explore arithmetic operations.
 

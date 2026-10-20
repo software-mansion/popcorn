@@ -14,10 +14,6 @@ description = "Start dev mode"
 run = "scripts/test.sh"
 description = "Run tests"
 
-[tasks.build-vm]
-run = "scripts/build-atomvm.sh"
-description = "Build AtomVM"
-
 [tasks.build-openssl]
 run = "scripts/build-openssl.sh"
 description = "Build OpenSSL for Wasm"

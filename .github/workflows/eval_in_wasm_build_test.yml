@@ -89,8 +89,10 @@ jobs:
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
 
-      - name: Build
+      - name: Build browser assets
         run: mix build
+        env:
+          MIX_ENV: prod
 
       - name: Run tests
         run: mix test --no-start

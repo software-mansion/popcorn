@@ -12,37 +12,33 @@ Usage: $0 [OPTIONS] [path]
 Run tests.
 
 Options:
-  --unix              Run Elixir tests with unix target (default)
-  --wasm              Run Elixir tests with wasm target
+  (no flag)           Run Popcorn Elixir tests
   --js                Run popcorn JS e2e tests
   --popdoc            Run popdoc e2e tests
   -h                  Show this help
 
 Examples:
-  $0                          # Run unix Elixir tests
-  $0 --wasm                   # Run wasm Elixir tests
+  $0                          # Run Popcorn Elixir tests
   $0 --js                     # Run popcorn JS e2e tests
   $0 --popdoc                 # Run popdoc e2e tests
   $0 test/some_test.exs       # Run specific test file
-  $0 --wasm test/some_test.exs
 EOF
     exit 0
 }
 
 main() {
-    local MODE="unix"
-    local TEST_PATH=""
+    local MODE="elixir"
+    local TEST_PATH=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help) usage ;;
-            --unix) MODE="unix"; shift ;;
-            --wasm) MODE="wasm"; shift ;;
             --js) MODE="js"; shift ;;
             --popdoc) MODE="popdoc"; shift ;;
+            --*) error "Unknown option: $1" ;;
             *)
-                if [[ -z "${TEST_PATH}" ]]; then
-                    TEST_PATH="$1"
+                if [[ ${#TEST_PATH[@]} -eq 0 ]]; then
+                    TEST_PATH=("$1")
                 else
                     error "Unknown argument: $1"
                 fi
@@ -51,33 +47,26 @@ main() {
         esac
     done
 
-    local elixir_dir="${PROJECT_ROOT}/popcorn-2/elixir"
+    local elixir_dir="${PROJECT_ROOT}/popcorn/elixir"
     case "${MODE}" in
-        unix)
-            log "Running Elixir tests (unix target)"
+        elixir)
+            log "Running Popcorn Elixir tests"
             install_elixir_deps "${elixir_dir}" "Elixir deps"
             cd "${elixir_dir}"
-            mix test ${TEST_PATH}
-            ;;
-        wasm)
-            log "Running Elixir tests (wasm target)"
-            install_elixir_deps "${elixir_dir}" "Elixir deps"
-            install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
-            cd "${elixir_dir}"
-            TARGET=wasm mix test ${TEST_PATH}
+            mix test "${TEST_PATH[@]}"
             ;;
         js)
             log "Running JS e2e tests"
-            install_pnpm_workspace_deps "${PROJECT_ROOT}/popcorn-2" "Popcorn 2 pnpm workspace deps"
-            cd "${PROJECT_ROOT}/popcorn-2/js"
-            pnpm test:e2e ${TEST_PATH}
+            install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
+            cd "${PROJECT_ROOT}/popcorn/js"
+            pnpm e2e "${TEST_PATH[@]}"
             ;;
         popdoc)
             log "Running popdoc e2e tests"
             install_elixir_deps "${PROJECT_ROOT}/popdoc/e2e/fixture" "popdoc fixture deps"
             install_pnpm_workspace_deps "${PROJECT_ROOT}" "pnpm workspace deps"
             cd "${PROJECT_ROOT}/popdoc/e2e"
-            pnpm test:e2e ${TEST_PATH}
+            pnpm test:e2e "${TEST_PATH[@]}"
             ;;
     esac
 

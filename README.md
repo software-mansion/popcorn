@@ -22,9 +22,6 @@ and supervision. JavaScript and Elixir communicate through Popcorn's APIs.
 - [Elixir package](popcorn/elixir/README.md): application setup and packaging.
 - [LocalLiveView](local-live-view/README.md): Phoenix LiveView running in the browser.
 
-Popcorn 1.0 is a prerelease based on Erlang/OTP. The stable npm channel still
-uses Popcorn 0.3 and AtomVM; see the [0.3 documentation](https://hexdocs.pm/popcorn).
-
 ## Examples
 
 Try the demos at [popcorn.swmansion.com](https://popcorn.swmansion.com/#examples)
