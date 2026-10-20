@@ -94,83 +94,83 @@ async function boot(
     createModule,
     emit,
   } = opts;
-  const loadedFsData = await loadFsData(otpAssetsRoot);
-  if (!loadedFsData.ok) {
-    return { ok: false, error: loadedFsData.error };
-  }
-
-  const fsData = loadedFsData.data;
-  const { vmReady, handleVmReady } = vm;
-  const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
-
-  const runtimeEnv = {
-    ...env,
-    BINDIR: "/bin",
-    EMU: "beam",
-    HOME: DEFAULT_HOME_DIR,
-    USER: DEFAULT_USER,
-    LOGNAME: DEFAULT_USER,
-    COLUMNS: String(ttySize.columns),
-    LINES: String(ttySize.rows),
-    ERL_INETRC: INETRC_PATH,
-  };
-  let emitError: ((payload: OtpErrorPayload) => void) | null = function (
-    payload,
-  ) {
-    emitError = null;
-    state.isVmReady = false;
-    emit({ type: "otp:error", payload });
-  };
-  const moduleConfig: Partial<EmscriptenModule> = {
-    print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
-    printErr: (text) =>
-      emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
-    onExit: (code) => emitError?.({ kind: "exit", data: code }),
-    onAbort: (text) => emitError?.({ kind: "abort", data: text }),
-    onBeamMessage: (text) => {
-      if (emitError === null) {
-        return;
-      }
-      const event = deserializeBridgeMessage(text);
-      if (event === null) return;
-      if (event.type === "otp:error") {
-        emitError(event.payload);
-        return;
-      }
-      if (handleVmReady(event)) return;
-      if (handleAppReady(event)) return;
-
-      emit(event);
-    },
-    onError: (text) => emitError?.({ kind: "error", data: text }),
-    onStdinConsumed: (size) =>
-      emit({ type: "otp:stdin-consumed", payload: size }),
-    onTrackedValueDelete: (key) =>
-      emit({ type: "otp:tracked-value-delete", payload: key }),
-    onTtyChunk: (fd, chunk) =>
-      emit({
-        type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
-        payload: chunk,
-      }),
-    arguments: buildArgs({
-      appNames: fsData.appNames,
-      entrypoint: fsData.entrypoint,
-      noshell,
-      emulator: emulatorArgs ?? [],
-      extra: extraArgs ?? [],
-    }),
-    preRun: [
-      (mod) => {
-        state.module = mod;
-      },
-      (mod) => {
-        Object.assign(mod.ENV, runtimeEnv);
-        initFs({ module: mod, fsData });
-      },
-    ],
-  };
-
   try {
+    const loadedFsData = await loadFsData(otpAssetsRoot);
+    if (!loadedFsData.ok) {
+      return { ok: false, error: loadedFsData.error };
+    }
+
+    const fsData = loadedFsData.data;
+    const { vmReady, handleVmReady } = vm;
+    const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
+
+    const runtimeEnv = {
+      ...env,
+      BINDIR: "/bin",
+      EMU: "beam",
+      HOME: DEFAULT_HOME_DIR,
+      USER: DEFAULT_USER,
+      LOGNAME: DEFAULT_USER,
+      COLUMNS: String(ttySize.columns),
+      LINES: String(ttySize.rows),
+      ERL_INETRC: INETRC_PATH,
+    };
+    let emitError: ((payload: OtpErrorPayload) => void) | null = function (
+      payload,
+    ) {
+      emitError = null;
+      state.isVmReady = false;
+      emit({ type: "otp:error", payload });
+    };
+    const moduleConfig: Partial<EmscriptenModule> = {
+      print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
+      printErr: (text) =>
+        emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
+      onExit: (code) => emitError?.({ kind: "exit", data: code }),
+      onAbort: (text) => emitError?.({ kind: "abort", data: text }),
+      onBeamMessage: (text) => {
+        if (emitError === null) {
+          return;
+        }
+        const event = deserializeBridgeMessage(text);
+        if (event === null) return;
+        if (event.type === "otp:error") {
+          emitError(event.payload);
+          return;
+        }
+        if (handleVmReady(event)) return;
+        if (handleAppReady(event)) return;
+
+        emit(event);
+      },
+      onError: (text) => emitError?.({ kind: "error", data: text }),
+      onStdinConsumed: (size) =>
+        emit({ type: "otp:stdin-consumed", payload: size }),
+      onTrackedValueDelete: (key) =>
+        emit({ type: "otp:tracked-value-delete", payload: key }),
+      onTtyChunk: (fd, chunk) =>
+        emit({
+          type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
+          payload: chunk,
+        }),
+      arguments: buildArgs({
+        appNames: fsData.appNames,
+        entrypoint: fsData.entrypoint,
+        noshell,
+        emulator: emulatorArgs ?? [],
+        extra: extraArgs ?? [],
+      }),
+      preRun: [
+        (mod) => {
+          state.module = mod;
+        },
+        (mod) => {
+          Object.assign(mod.ENV, runtimeEnv);
+          initFs({ module: mod, fsData });
+        },
+      ],
+    };
+
     if (opts.maxMemoryBytes !== undefined) {
       moduleConfig.wasmMemory = new WebAssembly.Memory({
         initial: 1024,

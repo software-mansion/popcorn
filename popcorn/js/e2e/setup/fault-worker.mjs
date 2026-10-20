@@ -1,9 +1,16 @@
-// Test double for the VM worker. On boot it emits an otp:error and then goes
-// silent — never sending popcorn:boot-end or popcorn:boot-fail — to reproduce a
-// runtime fault that occurs mid-boot. This exercises Popcorn's path where the
-// boot must be failed by the error itself rather than stalling to its timeout.
+const native = new URL(self.location.href).searchParams.get("native");
+if (native === "boot") throw new Error("native boot failure");
+
+// Default mode aborts during boot without sending a completion message.
 self.onmessage = (event) => {
   const data = event.data;
+  if (native === "runtime") {
+    if (data.type === "popcorn:boot") {
+      self.postMessage({ type: "popcorn:boot-end", payload: {} });
+      return;
+    }
+    throw new Error("native runtime failure");
+  }
   if (data && data.type === "popcorn:boot") {
     self.postMessage({
       type: "otp:error",

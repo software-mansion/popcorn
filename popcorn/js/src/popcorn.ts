@@ -312,6 +312,15 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.spawnWorker();
   }
 
+  private readonly onWorkerError = (event: ErrorEvent) => {
+    const payload = { kind: "error", data: event.message } as const;
+    try {
+      (this.opts.onError ?? defaultOnError)(payload);
+    } finally {
+      this.deinit(exitReason(payload));
+    }
+  };
+
   private spawnWorker(): void {
     this.vmWorker = this.opts.workerUrl
       ? new Worker(this.opts.workerUrl, { type: "module" })
@@ -320,6 +329,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           type: "module",
         });
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
+    this.vmWorker.addEventListener("error", this.onWorkerError);
   }
 
   /**
@@ -629,6 +639,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.pendingCalls.clear();
     this.clearTrackedValues();
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
+    this.vmWorker.removeEventListener("error", this.onWorkerError);
     this.vmWorker.terminate();
     // we keep onEvent() callbacks across reboots
   }

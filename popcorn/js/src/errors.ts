@@ -153,81 +153,98 @@ function message(error: SerializedError): string {
     case "runtime:eval-unavailable":
       return "JS eval is unavailable; run_js requires a Content-Security-Policy that allows 'unsafe-eval'";
     default:
-      unreachable();
+      unreachable(error);
   }
 }
 
 function parse(value: unknown): SerializedError {
   check(objectWithKeys(value, ["t", "data"]));
-  switch (value.t) {
+  const tag = value.t as Tag;
+  switch (tag) {
     case "timeout:init":
     case "timeout:send":
+    case "timeout:call":
       check(isTimeoutData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "worker:load":
       check(isWorkerLoadData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "vm:exited":
       check(isVmExitedData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "bridge:not-started":
       check(isEmptyData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "bridge:invalid-target":
       check(isEmptyData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "bridge:unserializable":
       check(isUnserializableData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "bridge:listener-not-found":
       check(isListenerNotFoundData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
+    case "genserver:noproc":
+      check(
+        objectWithKeys(value.data, ["target"]) &&
+          typeof value.data.target === "string",
+      );
+      return { t: tag, data: { target: value.data.target } };
+    case "genserver:exit":
+      check(
+        objectWithKeys(value.data, ["reason"]) &&
+          typeof value.data.reason === "string",
+      );
+      return { t: tag, data: { reason: value.data.reason } };
+    case "genserver:unserializable":
+      check(isEmptyData(value.data));
+      return { t: tag, data: value.data };
     case "stdio:overflow":
       check(isStdioOverflowData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "beam:missing-boot-script":
     case "beam:missing-manifest":
       check(isUrlData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "beam:missing-tarball":
       check(isMissingTarballData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "internal:check":
       check(isInternalCheckData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     case "internal:unreachable":
     case "runtime:eval-unavailable":
       check(isEmptyData(value.data));
-      return { t: value.t, data: value.data };
+      return { t: tag, data: value.data };
     default:
-      unreachable();
+      unreachable(tag);
   }
 }
 
 function isTimeoutData(value: unknown): value is PopcornErrors["timeout:init"] {
-  return objectWithKeys(value, ["timeoutMs"]) !== null;
+  return objectWithKeys(value, ["timeoutMs"]);
 }
 
 function isWorkerLoadData(
   value: unknown,
 ): value is PopcornErrors["worker:load"] {
-  return objectWithKeys(value, ["message"]) !== null;
+  return objectWithKeys(value, ["message"]);
 }
 
 function isVmExitedData(value: unknown): value is PopcornErrors["vm:exited"] {
-  return objectWithKeys(value, ["reason"]) !== null;
+  return objectWithKeys(value, ["reason"]);
 }
 
 function isListenerNotFoundData(
   value: unknown,
 ): value is PopcornErrors["bridge:listener-not-found"] {
-  return objectWithKeys(value, ["targetName"]) !== null;
+  return objectWithKeys(value, ["targetName"]);
 }
 
 function isStdioOverflowData(
   value: unknown,
 ): value is PopcornErrors["stdio:overflow"] {
-  return objectWithKeys(value, ["capacityBytes", "attemptedBytes"]) !== null;
+  return objectWithKeys(value, ["capacityBytes", "attemptedBytes"]);
 }
 
 function isUnserializableData(
@@ -254,23 +271,23 @@ export function isUnserializableReason(
 function isUrlData(
   value: unknown,
 ): value is PopcornErrors["beam:missing-boot-script"] {
-  return objectWithKeys(value, ["url"]) !== null;
+  return objectWithKeys(value, ["url"]);
 }
 
 function isMissingTarballData(
   value: unknown,
 ): value is PopcornErrors["beam:missing-tarball"] {
-  return objectWithKeys(value, ["name", "all"]) !== null;
+  return objectWithKeys(value, ["name", "all"]);
 }
 
 function isInternalCheckData(
   value: unknown,
 ): value is PopcornErrors["internal:check"] {
-  return objectWithKeys(value, []) !== null;
+  return objectWithKeys(value, []);
 }
 
 function isEmptyData(value: unknown): value is EmptyData {
-  return objectWithKeys(value, []) !== null;
+  return objectWithKeys(value, []);
 }
 
 function objectWithKeys<K extends string>(
@@ -281,7 +298,7 @@ function objectWithKeys<K extends string>(
   return isObject && keys.every((key) => Object.hasOwn(value, key));
 }
 
-function unreachable(): never {
+function unreachable(_value: never): never {
   throw err("internal:unreachable", {});
 }
 
