@@ -445,6 +445,8 @@ defmodule Popcorn.Packager do
     get_app_path = fn {_name, info} -> info.app_path end
     duplicated? = fn {_name, paths} -> match?([_, _ | _], paths) end
 
+    # Mix dependencies can use app: false and expose no .app; packaging currently
+    # includes only OTP applications.
     apps =
       root_dir
       |> Path.join("*/ebin/*.app")
@@ -489,7 +491,8 @@ defmodule Popcorn.Packager do
     end
 
     with {:ok, roots} <- root_apps(all_apps_info, extra_apps, entrypoint),
-         {:ok, selected_apps} <- reduce_while_ok(roots, MapSet.new(), gather_from_root) do
+         {:ok, selected_apps} <-
+           reduce_while_ok(Map.keys(project_apps) ++ roots, MapSet.new(), gather_from_root) do
       all_apps_info
       |> Map.filter(fn {app, _info} -> MapSet.member?(selected_apps, app) end)
       |> Enum.sort()

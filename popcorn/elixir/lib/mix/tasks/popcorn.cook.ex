@@ -50,10 +50,11 @@ defmodule Mix.Tasks.Popcorn.Cook do
   Popcorn starts the entrypoint when the browser virtual machine boots.
   Extra applications enter the package but do not become entrypoints.
 
-  The package includes required dependencies from each application's `.app`
-  file, including `included_applications`. It excludes optional applications
-  unless you select them explicitly. The package always includes the Elixir
-  runtime and its required dependencies.
+  The package includes **all** compiled applications in the current
+  environment's build directory, including `runtime: false` and transitive Mix
+  dependencies. Mix libraries with no `.app` file (`app: false`) are not
+  packaged. The package always includes the Elixir runtime and its required
+  dependencies.
 
   The task selects `crypto` if the package includes `asn1`, `crypto`,
   `public_key`, or `ssl`. Otherwise, it selects `core`.
