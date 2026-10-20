@@ -76,8 +76,8 @@ test.describe("genserver", () => {
     ).toEqual({
       ok: false,
       error: {
-        t: "timeout:call",
-        data: { timeoutMs: 0 },
+        t: "timeout",
+        data: { operation: "call", timeoutMs: 0 },
       },
     });
     expect(await otp.tryCall("missing", "get")).toEqual({
@@ -189,7 +189,7 @@ test("throwing APIs", async ({ page }) => {
   };
   const timeout = {
     name: "PopcornError",
-    cause: { t: "timeout:init", data: { timeoutMs: 0 } },
+    cause: { t: "timeout", data: { operation: "init", timeoutMs: 0 } },
   };
   expect(result).toEqual({
     sameInstance: true,
@@ -208,12 +208,12 @@ test("throwing APIs", async ({ page }) => {
       },
     },
     invalidInput: {
-      name: "PopcornError",
-      cause: { t: "internal:check", data: { detail: undefined } },
+      name: "Error",
+      cause: undefined,
     },
     invalidOptions: {
-      name: "PopcornError",
-      cause: { t: "internal:check", data: { detail: undefined } },
+      name: "Error",
+      cause: undefined,
     },
     closed,
     closedCast: closed,

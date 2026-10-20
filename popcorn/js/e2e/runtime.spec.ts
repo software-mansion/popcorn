@@ -11,11 +11,12 @@ type MemoryProbe = {
 test.describe("errors", () => {
   test("round trip", () => {
     const errors: SerializedError[] = [
-      { t: "timeout:send", data: { timeoutMs: 1 } },
-      { t: "timeout:call", data: { timeoutMs: 1 } },
+      { t: "timeout", data: { operation: "send", timeoutMs: 1 } },
+      { t: "timeout", data: { operation: "call", timeoutMs: 1 } },
       { t: "genserver:noproc", data: { target: "missing" } },
       { t: "genserver:exit", data: { reason: "shutdown" } },
       { t: "genserver:unserializable", data: {} },
+      { t: "asset:load", data: { kind: "tarball", url: "/app.tar" } },
     ];
 
     for (const serialized of errors) {
@@ -26,8 +27,8 @@ test.describe("errors", () => {
       expect(restored.serialize()).toEqual(serialized);
     }
 
-    expect(() => PopcornError.deserialize({ t: "timeout:call", data: {} }))
-      .toThrow(PopcornError);
+    expect(() => PopcornError.deserialize({ t: "timeout", data: {} }))
+      .toThrow(Error);
   });
 });
 
@@ -174,23 +175,18 @@ test.describe("boot", () => {
           return null;
         } catch (error) {
           if (!(error instanceof Error)) throw error;
-          return error.cause;
+          return { name: error.name, message: error.message };
         }
       }),
     );
     expect(invalid).toEqual([
       {
-        t: "internal:check",
-        data: {
-          detail: 'maxMemory must use M or G, such as "256M" or "2G"',
-        },
+        name: "Error",
+        message: 'maxMemory must use M or G, such as "256M" or "2G"',
       },
       ...Array(2).fill({
-        t: "internal:check",
-        data: {
-          detail:
-            "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
-        },
+        name: "Error",
+        message: "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
       }),
     ]);
   });
@@ -389,7 +385,7 @@ test.describe("boot", () => {
     const timedOut = await createOtp();
     expect(await timedOut.tryBoot({ timeoutsMs: { boot: 0 } })).toEqual({
       ok: false,
-      error: { t: "timeout:init", data: { timeoutMs: 0 } },
+      error: { t: "timeout", data: { operation: "init", timeoutMs: 0 } },
     });
 
     const missing = await createOtp();
@@ -399,8 +395,8 @@ test.describe("boot", () => {
     expect(missingBoot).toEqual({
       ok: false,
       error: {
-        t: "beam:missing-manifest",
-        data: { url: "/missing/otp/manifest.json" },
+        t: "asset:load",
+        data: { kind: "manifest", url: "/missing/otp/manifest.json" },
       },
     });
     expect(missing.errors).toEqual([]);
@@ -412,9 +408,58 @@ test.describe("boot", () => {
     });
     expect(rejectedBoot).toEqual({
       ok: false,
-      error: { t: "worker:load", data: { message: "Failed to fetch" } },
+      error: {
+        t: "asset:load",
+        data: { kind: "manifest", url: "/rejected/manifest.json" },
+      },
     });
     expect(rejected.errors).toEqual([]);
+
+    for (const kind of ["manifest-entry", "boot-script", "tarball"]) {
+      await page.route("**/asset-errors/**", (route) => {
+        if (route.request().url().endsWith("manifest.json")) {
+          return route.fulfill({
+            json: {
+              vm: { boot: "start.boot", config: "sys.config" },
+              apps: kind === "manifest-entry"
+                ? {}
+                : {
+                    kernel: { bundle: "core" },
+                    stdlib: { bundle: "core" },
+                    compiler: { bundle: "core" },
+                  },
+              bundles: { core: { tar: "kernel.tar" } },
+            },
+          });
+        }
+        if (route.request().url().endsWith("sys.config")) {
+          return route.fulfill({ body: "[]." });
+        }
+        if (kind === "tarball" && route.request().url().endsWith("start.boot")) {
+          return route.fulfill({ body: "" });
+        }
+        return route.fulfill({ status: 404 });
+      });
+      const asset = await createOtp();
+      const result = await asset.tryBoot({
+        beam: { otpAssetsRoot: "/asset-errors/" },
+      });
+      const data = kind === "manifest-entry"
+        ? {
+            kind,
+            url: "/asset-errors/manifest.json",
+            name: "kernel",
+            available: [],
+          }
+        : {
+            kind,
+            url: kind === "boot-script"
+              ? "/asset-errors/start.boot"
+              : "/asset-errors/kernel.tar",
+          };
+      expect(result).toEqual({ ok: false, error: { t: "asset:load", data } });
+      await page.unroute("**/asset-errors/**");
+    }
   });
 
   test("native runtime error", async ({ page }) => {

@@ -1,3 +1,5 @@
+import { check, unreachable } from "./utils";
+
 /**
  * An operation result. Check `ok` before accessing `data` or `error`.
  * Expected failures from `try*` methods use the error branch. Invalid usage can still throw.
@@ -12,9 +14,7 @@ export type Result<T, E extends Tag = Tag> =
 type Tag = keyof PopcornErrors;
 /** Error tags and their structured details. Match tags instead of message text. */
 export type PopcornErrors = {
-  "timeout:init": { timeoutMs: number };
-  "timeout:send": { timeoutMs: number };
-  "timeout:call": { timeoutMs: number };
+  timeout: { operation: "init" | "send" | "call"; timeoutMs: number };
   "worker:load": { message: string };
   "vm:exited": VmExitedData;
   "bridge:not-started": EmptyData;
@@ -25,11 +25,9 @@ export type PopcornErrors = {
   "genserver:exit": { reason: string };
   "genserver:unserializable": EmptyData;
   "stdio:overflow": { capacityBytes: number; attemptedBytes: number };
-  "beam:missing-boot-script": { url: string };
-  "beam:missing-manifest": { url: string };
-  "beam:missing-tarball": { name: string; all: string[] };
-  "internal:check": { detail?: string };
-  "internal:unreachable": EmptyData;
+  "asset:load":
+    | { kind: "manifest" | "boot-script" | "tarball"; url: string }
+    | { kind: "manifest-entry"; url: string; name: string; available: string[] };
   "runtime:eval-unavailable": EmptyData;
 };
 
@@ -112,12 +110,8 @@ export class PopcornError<T extends Tag = Tag> extends Error {
 function message<T extends Tag>(error: SerializedError<T>): string;
 function message(error: SerializedError): string {
   switch (error.t) {
-    case "timeout:init":
-      return `Init timed out after ${error.data.timeoutMs}ms`;
-    case "timeout:send":
-      return `Send timed out after ${error.data.timeoutMs}ms`;
-    case "timeout:call":
-      return `Call timed out after ${error.data.timeoutMs}ms`;
+    case "timeout":
+      return `${error.data.operation} timed out after ${error.data.timeoutMs}ms`;
     case "worker:load":
       return error.data.message;
     case "vm:exited":
@@ -138,18 +132,10 @@ function message(error: SerializedError): string {
       return "Genserver reply can't be serialized to JSON";
     case "stdio:overflow":
       return `Stdin chunk exceeds the ${error.data.capacityBytes} byte queue capacity`;
-    case "beam:missing-boot-script":
-      return `Missing boot script: '${error.data.url}'`;
-    case "beam:missing-manifest":
-      return `Missing tarball manifest: '${error.data.url}'`;
-    case "beam:missing-tarball":
-      return `Missing tarball: '${error.data.name}'. Available tarballs: ${error.data.all.join(", ")}`;
-    case "internal:check":
-      return error.data.detail === undefined
-        ? "Check failed"
-        : `Check failed: ${error.data.detail}`;
-    case "internal:unreachable":
-      return "Entered unreachable code";
+    case "asset:load":
+      return error.data.kind === "manifest-entry"
+        ? `Missing manifest entry: '${error.data.name}' in '${error.data.url}'. Available entries: ${error.data.available.join(", ")}`
+        : `Failed to load ${error.data.kind}: '${error.data.url}'`;
     case "runtime:eval-unavailable":
       return "JS eval is unavailable; run_js requires a Content-Security-Policy that allows 'unsafe-eval'";
     default:
@@ -161,9 +147,7 @@ function parse(value: unknown): SerializedError {
   check(objectWithKeys(value, ["t", "data"]));
   const tag = value.t as Tag;
   switch (tag) {
-    case "timeout:init":
-    case "timeout:send":
-    case "timeout:call":
+    case "timeout":
       check(isTimeoutData(value.data));
       return { t: tag, data: value.data };
     case "worker:load":
@@ -202,17 +186,9 @@ function parse(value: unknown): SerializedError {
     case "stdio:overflow":
       check(isStdioOverflowData(value.data));
       return { t: tag, data: value.data };
-    case "beam:missing-boot-script":
-    case "beam:missing-manifest":
-      check(isUrlData(value.data));
+    case "asset:load":
+      check(isAssetLoadData(value.data));
       return { t: tag, data: value.data };
-    case "beam:missing-tarball":
-      check(isMissingTarballData(value.data));
-      return { t: tag, data: value.data };
-    case "internal:check":
-      check(isInternalCheckData(value.data));
-      return { t: tag, data: value.data };
-    case "internal:unreachable":
     case "runtime:eval-unavailable":
       check(isEmptyData(value.data));
       return { t: tag, data: value.data };
@@ -221,8 +197,14 @@ function parse(value: unknown): SerializedError {
   }
 }
 
-function isTimeoutData(value: unknown): value is PopcornErrors["timeout:init"] {
-  return objectWithKeys(value, ["timeoutMs"]);
+function isTimeoutData(value: unknown): value is PopcornErrors["timeout"] {
+  return (
+    objectWithKeys(value, ["operation", "timeoutMs"]) &&
+    (value.operation === "init" ||
+      value.operation === "send" ||
+      value.operation === "call") &&
+    typeof value.timeoutMs === "number"
+  );
 }
 
 function isWorkerLoadData(
@@ -268,22 +250,25 @@ export function isUnserializableReason(
   );
 }
 
-function isUrlData(
-  value: unknown,
-): value is PopcornErrors["beam:missing-boot-script"] {
-  return objectWithKeys(value, ["url"]);
-}
-
-function isMissingTarballData(
-  value: unknown,
-): value is PopcornErrors["beam:missing-tarball"] {
-  return objectWithKeys(value, ["name", "all"]);
-}
-
-function isInternalCheckData(
-  value: unknown,
-): value is PopcornErrors["internal:check"] {
-  return objectWithKeys(value, []);
+function isAssetLoadData(value: unknown): value is PopcornErrors["asset:load"] {
+  if (!objectWithKeys(value, ["kind", "url"]) || typeof value.url !== "string") {
+    return false;
+  }
+  switch (value.kind) {
+    case "manifest":
+    case "boot-script":
+    case "tarball":
+      return true;
+    case "manifest-entry":
+      return (
+        objectWithKeys(value, ["name", "available"]) &&
+        typeof value.name === "string" &&
+        Array.isArray(value.available) &&
+        value.available.every((name) => typeof name === "string")
+      );
+    default:
+      return false;
+  }
 }
 
 function isEmptyData(value: unknown): value is EmptyData {
@@ -296,16 +281,6 @@ function objectWithKeys<K extends string>(
 ): value is Record<K, unknown> {
   const isObject = value !== null && typeof value === "object";
   return isObject && keys.every((key) => Object.hasOwn(value, key));
-}
-
-function unreachable(_value: never): never {
-  throw err("internal:unreachable", {});
-}
-
-function check(ok: boolean, msg?: string): asserts ok {
-  if (!ok) {
-    throw err("internal:check", { detail: msg });
-  }
 }
 
 export function unwrap<T>(result: Result<T>): T {

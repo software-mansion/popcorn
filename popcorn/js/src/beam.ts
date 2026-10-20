@@ -327,7 +327,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   if (manifest === null) {
     return {
       ok: false,
-      error: err("beam:missing-manifest", { url: manifestUrl }),
+      error: err("asset:load", { kind: "manifest", url: manifestUrl }),
     };
   }
 
@@ -336,7 +336,12 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     if (!Object.hasOwn(manifest.apps, name)) {
       return {
         ok: false,
-        error: err("beam:missing-tarball", { name, all: appNames }),
+        error: err("asset:load", {
+          kind: "manifest-entry",
+          url: manifestUrl,
+          name,
+          available: appNames,
+        }),
       };
     }
   }
@@ -347,16 +352,18 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     fetchBinary(bootUrl),
     fetchBinary(configUrl),
     Promise.all(
-      Object.entries(manifest.bundles).map(
-        async ([name, entry]): Promise<Result<Uint8Array>> => {
+      Object.values(manifest.bundles).map(
+        async (entry): Promise<Result<Uint8Array>> => {
           const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
           const tar = await fetchBinary(tarUrl);
           if (tar !== null) {
             return { ok: true, data: tar };
           }
 
-          const all = Object.keys(manifest.bundles);
-          return { ok: false, error: err("beam:missing-tarball", { name, all }) };
+          return {
+            ok: false,
+            error: err("asset:load", { kind: "tarball", url: tarUrl }),
+          };
         },
       ),
     ),
@@ -365,7 +372,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   if (bootFile === null) {
     return {
       ok: false,
-      error: err("beam:missing-boot-script", { url: bootUrl }),
+      error: err("asset:load", { kind: "boot-script", url: bootUrl }),
     };
   }
   check(configFile !== null, `Missing application config: ${configUrl}`);

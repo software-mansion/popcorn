@@ -400,7 +400,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
       const startPhase = (timeoutMs: number) =>
         setTimeout(() => {
-          const error = err("timeout:init", { timeoutMs });
+          const error = err("timeout", { operation: "init", timeoutMs });
           settle({ ok: false, error });
         }, timeoutMs);
 
@@ -575,7 +575,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const timer = setTimeout(() => {
         const wasMessageStale = this.pendingSends.delete(requestId);
         if (wasMessageStale) {
-          resolve({ ok: false, error: err("timeout:send", { timeoutMs }) });
+          resolve({
+            ok: false,
+            error: err("timeout", { operation: "send", timeoutMs }),
+          });
         }
       }, timeoutMs);
 
@@ -710,7 +713,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       case "timeout":
         return {
           ok: false,
-          error: err("timeout:call", { timeoutMs: pending.timeoutMs }),
+          error: err("timeout", {
+            operation: "call",
+            timeoutMs: pending.timeoutMs,
+          }),
         };
       default:
         unreachable();
@@ -754,7 +760,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const timer = setTimeout(() => {
         const isUnresolved = this.pendingCalls.delete(id);
         if (isUnresolved) {
-          resolve({ ok: false, error: err("timeout:call", { timeoutMs }) });
+          resolve({
+            ok: false,
+            error: err("timeout", { operation: "call", timeoutMs }),
+          });
         }
       }, timeoutMs);
 
