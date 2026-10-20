@@ -8,7 +8,7 @@ name: local-lv-compare - Test
 on:
   push:
     branches: ["**"]
-    paths: &llv_paths
+    paths:
       - "examples/local-lv-compare/**"
       - "local-live-view/**"
       - "popcorn/elixir/**"
@@ -20,9 +20,6 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
       - ".npmrc"
-
-  pull_request:
-    paths: *llv_paths
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
