@@ -1,8 +1,5 @@
-defmodule PopdocWasm do
+defmodule Popdoc.Evaluator do
   use GenServer
-
-  import Popcorn.JS, only: [is_wasm_message: 1]
-  alias Popcorn.JS
 
   @process_name :main
   @ellipsis_sentinel :__popdoc_ellipsis__
@@ -14,22 +11,12 @@ defmodule PopdocWasm do
 
   @impl true
   def init(_args) do
-    JS.ready(@process_name)
-    # TODO: needed?
     :application.set_env(:elixir, :ansi_enabled, false)
     {:ok, %{sessions: %{}}}
   end
 
   @impl true
-  def handle_info(raw_msg, state) when is_wasm_message(raw_msg) do
-    new_state = JS.handle_message!(raw_msg, &handle_wasm(&1, state))
-    {:noreply, new_state}
-  end
-
-  @impl true
-  def handle_info(_msg, state), do: {:noreply, state}
-
-  defp handle_wasm({:wasm_call, ["parse_elixir", code, block_id]}, state) do
+  def handle_call(["parse_elixir", code, block_id], _from, state) do
     case parse(code) do
       {:ok, exprs} ->
         expressions =
@@ -46,14 +33,17 @@ defmodule PopdocWasm do
 
         session = %{exprs: exprs, binding: [], env: fresh_env()}
         new_state = put_in(state.sessions[block_id], session)
-        {:resolve, %{expressions: expressions}, new_state}
+        data = %{ok: true, data: %{expressions: expressions}}
+        {:reply, data, new_state}
 
       {:error, message} ->
-        {:reject, message, state}
+        data = %{ok: false, error: %{message: message}}
+        {:reply, data, state}
     end
   end
 
-  defp handle_wasm({:wasm_call, ["eval_one", block_id, index]}, state) when index >= 0 do
+  @impl true
+  def handle_call(["eval_one", block_id, index], _from, state) when index >= 0 do
     with {:ok, session} <- Map.fetch(state.sessions, block_id),
          {_source, quoted} <- Enum.at(session.exprs, index) do
       case eval_quoted(quoted, session.binding, session.env) do
@@ -61,22 +51,24 @@ defmodule PopdocWasm do
           bindings = diff_binding(session.binding, new_binding)
           updated = %{session | binding: new_binding, env: new_env}
           new_state = put_in(state.sessions[block_id], updated)
-          {:resolve, %{index: index, result: result, bindings: bindings}, new_state}
+
+          data = %{ok: true, data: %{index: index, result: result, bindings: bindings}}
+          {:reply, data, new_state}
 
         {:error, error_map} ->
-          {:resolve, %{index: index, error: error_map}, state}
+          data = %{ok: true, data: %{index: index, error: error_map}}
+          {:reply, data, state}
       end
     else
-      :error -> {:reject, "no active session for block #{inspect(block_id)}", state}
-      nil -> {:reject, "no expression at index #{index}", state}
+      :error ->
+        data = %{ok: false, error: %{message: "no active session for block #{inspect(block_id)}"}}
+        {:reply, data, state}
+
+      nil ->
+        data = %{ok: false, error: %{message: "no expression at index #{index}"}}
+        {:reply, data, state}
     end
   end
-
-  defp handle_wasm({:wasm_call, message}, state) do
-    {:reject, "unknown wasm call: #{inspect(message)}", state}
-  end
-
-  defp handle_wasm({:wasm_cast, _message}, state), do: state
 
   defp diff_binding(old, new) do
     old_map = Map.new(old)

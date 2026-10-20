@@ -2,32 +2,12 @@ import { Popcorn } from "@swmansion/popcorn";
 import { runCode } from "./eval.js";
 import { instantiate, TPL_BLOCK } from "./templates.js";
 
-const BUNDLES_SEL = 'meta[name="popcorn-user-bundle"]';
 const EVAL_BLOCK_SEL = "pre.popcorn-eval code";
 
 let popcornInstance = null;
 
 export function getPopcorn() {
   return popcornInstance;
-}
-
-async function initPopcorn() {
-  const bundlePaths = ["./bundle.avm"];
-  try {
-    // TODO: maybe simplify by making `consumer.avm` mandatory
-    const userBundles = document.querySelectorAll(BUNDLES_SEL);
-    for (const bundleMeta of userBundles) {
-      bundlePaths.push(bundleMeta.content);
-    }
-
-    return Popcorn.init({
-      debug: true,
-      bundlePaths: [...new Set(bundlePaths)],
-    });
-  } catch (e) {
-    console.error("Failed to initialize Popcorn runtime:", e);
-    throw e;
-  }
 }
 
 function decorateBlocks() {
@@ -67,7 +47,7 @@ function addClickHandlers(blocks) {
 
 window.addEventListener("exdoc:loaded", async () => {
   const blocks = decorateBlocks();
-  popcornInstance = await initPopcorn();
+  popcornInstance = await Popcorn.init();
   window.popcorn = popcornInstance;
   addClickHandlers(blocks);
 });

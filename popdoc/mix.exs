@@ -8,7 +8,7 @@ defmodule Popdoc.MixProject do
     [
       app: :popdoc,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.19",
       start_permanent: false,
       name: "Popdoc",
       description: "ExDoc extension for interactive Elixir code evaluation, using Popcorn.",
@@ -19,7 +19,7 @@ defmodule Popdoc.MixProject do
   end
 
   def application do
-    []
+    [extra_applications: [:logger], mod: {Popdoc.Application, []}]
   end
 
   defp package do
@@ -34,7 +34,7 @@ defmodule Popdoc.MixProject do
   defp deps do
     [
       {:ex_doc, ">= 0.34.0 and < 1.0.0", optional: true, runtime: false, warn_if_outdated: true},
-      {:atomvm_packbeam, "~> 0.8.2", runtime: false}
+      {:popcorn, "== 0.4.0-next.9"}
     ]
   end
 end

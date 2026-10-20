@@ -27,38 +27,27 @@ env:
 jobs:
   e2e:
     name: Popdoc E2E tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup toolchain
-        uses: ./.github/actions/setup-toolchain
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Elixir and Erlang
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          # Node 24.16.0 broke the zip extraction (and subsequently, Playwright).
-          # See https://github.com/nodejs/node/issues/63487.
+          elixir-version: "1.20.4"
+          otp-version: "29.0.6"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
           node-version: "24.15.0"
-          cache: "pnpm"
-          cache-dependency-path: |
-            pnpm-lock.yaml
-            popcorn-2/pnpm-lock.yaml
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install JS dependencies
-        run: pnpm install
-
-      - name: Install Popcorn 2 JS dependencies
-        run: pnpm --dir popcorn-2 install --frozen-lockfile
-
-      - name: Build popcorn JS package
-        run: pnpm build:prod
-        working-directory: popcorn-2/js
+        run: pnpm install --frozen-lockfile
 
       - name: Fetch Elixir dependencies
         run: mix deps.get
