@@ -391,6 +391,12 @@ defmodule Treeshake.Utils.BeamAnalyzer do
        when is_atom(m) and is_atom(f) and is_list(args),
        do: [{m, f, length(args)}]
 
+  # NimbleOptions' custom validators in option schemas, which it calls with
+  # the value followed by the arguments
+  defp collect_literal_atoms({:custom, m, f, args})
+       when is_atom(m) and is_atom(f) and is_list(args),
+       do: [{m, f, length(args) + 1}]
+
   defp collect_literal_atoms(tuple) when is_tuple(tuple) do
     tuple |> Tuple.to_list() |> Enum.flat_map(&collect_literal_atoms/1)
   end
