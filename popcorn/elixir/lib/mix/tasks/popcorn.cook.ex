@@ -47,7 +47,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
   Use application names, such as `:my_app`, rather than module names.
-  Application names and runtime variants also accept strings.
+  Runtime variants also accept strings.
   Popcorn starts the entrypoint when the browser virtual machine boots.
   Extra applications enter the package but do not become entrypoints.
 
@@ -109,13 +109,12 @@ defmodule Mix.Tasks.Popcorn.Cook do
       root_dir: File.cwd!(),
       build_path: Path.join(Mix.Project.build_path(), "lib"),
       out_dir: Keyword.get(options, :out_dir, "public/out"),
-      app:
-        app_name(Application.get_env(:popcorn, :app, Keyword.fetch!(Mix.Project.config(), :app))),
-      extra_apps: Enum.map(Application.get_env(:popcorn, :extra_apps, []), &to_string/1),
-      runtime_variant: app_name(Application.get_env(:popcorn, :runtime_variant)),
+      app: Application.get_env(:popcorn, :app, Keyword.fetch!(Mix.Project.config(), :app)),
+      extra_apps: Application.get_env(:popcorn, :extra_apps, []),
+      runtime_variant: runtime_variant(Application.get_env(:popcorn, :runtime_variant)),
       brotli_effort: Application.get_env(:popcorn, :brotli_effort, :standard),
       strip: Application.get_env(:popcorn, :strip, true),
-      exclude_priv: exclude_priv_options(Application.get_env(:popcorn, :exclude_priv, [])),
+      exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
       treeshake: treeshake_options(Application.get_env(:popcorn, :treeshake, false))
     ]
 
@@ -130,19 +129,12 @@ defmodule Mix.Tasks.Popcorn.Cook do
     end
   end
 
-  defp app_name(nil), do: nil
-  defp app_name(name), do: to_string(name)
-
-  defp exclude_priv_options(patterns) do
-    Enum.map(patterns, fn
-      {app, pattern} -> {to_string(app), pattern}
-      pattern -> pattern
-    end)
-  end
+  defp runtime_variant(nil), do: nil
+  defp runtime_variant(variant), do: to_string(variant)
 
   defp treeshake_options(false), do: false
 
   defp treeshake_options(options) when is_list(options) do
-    Keyword.update(options, :preserved_apps, [], &Enum.map(&1, fn app -> to_string(app) end))
+    Keyword.put_new(options, :preserved_apps, [])
   end
 end

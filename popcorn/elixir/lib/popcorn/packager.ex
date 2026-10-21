@@ -9,12 +9,7 @@ defmodule Popcorn.Packager do
   @retained_chunks :beam_lib.significant_chunks() -- [~c"Type"]
   # Applications that only work when the emulator was built with the matching
   # native support. The runtime manifest declares what the build provides.
-  @app_capabilities %{
-    "asn1" => "crypto",
-    "crypto" => "crypto",
-    "public_key" => "crypto",
-    "ssl" => "crypto"
-  }
+  @app_capabilities %{asn1: "crypto", crypto: "crypto", public_key: "crypto", ssl: "crypto"}
 
   @boot_name "bin/vm.boot"
   @runtime_files ~w(beam.emu.mjs beam.wasm)
@@ -32,32 +27,32 @@ defmodule Popcorn.Packager do
   # - elixir
   #
   # All of them should be in elixir's transitive dependency closure
-  @base_apps ["elixir"]
+  @base_apps [:elixir]
 
   @type options :: [
           {:root_dir, Path.t()}
           | {:build_path, Path.t()}
           | {:out_dir, Path.t()}
-          | {:app, String.t() | nil}
-          | {:extra_apps, [String.t()]}
+          | {:app, atom() | nil}
+          | {:extra_apps, [atom()]}
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
-          | {:exclude_priv, [String.t() | {String.t(), String.t()}]}
-          | {:treeshake, false | [preserved_apps: [String.t()]]}
+          | {:exclude_priv, [String.t() | {atom(), String.t()}]}
+          | {:treeshake, false | [preserved_apps: [atom()]]}
           | {:static_dir, Path.t()}
         ]
 
   @type pack_options :: %{
           build_path: Path.t(),
-          entrypoint_app: String.t() | nil,
-          extra_apps: [String.t()],
+          entrypoint_app: atom() | nil,
+          extra_apps: [atom()],
           out_dir: Path.t(),
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
-          exclude_priv: [String.t() | {String.t(), String.t()}],
-          treeshake: false | [preserved_apps: [String.t()]]
+          exclude_priv: [String.t() | {atom(), String.t()}],
+          treeshake: false | [preserved_apps: [atom()]]
         }
 
   # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
@@ -379,14 +374,15 @@ defmodule Popcorn.Packager do
   defp stage_apps(staging_dir, apps_info) do
     apps_info
     |> async_stream(fn {app, info} ->
-      ebin_dir = Path.join([staging_dir, app, "ebin"])
+      app_dir = Path.join(staging_dir, "#{app}")
+      ebin_dir = Path.join(app_dir, "ebin")
       priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
 
-      File.mkdir_p!(Path.dirname(ebin_dir))
+      File.mkdir_p!(app_dir)
       File.cp_r!(info.ebin_dir, ebin_dir)
 
       if File.dir?(priv_dir) do
-        File.cp_r!(priv_dir, Path.join([staging_dir, app, "priv"]), dereference_symlinks: true)
+        File.cp_r!(priv_dir, Path.join(app_dir, "priv"), dereference_symlinks: true)
       end
 
       {app, %{info | ebin_dir: ebin_dir}}
@@ -425,7 +421,7 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
-      app = patch_path |> Path.dirname() |> Path.basename()
+      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
       ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
       beam_path = Path.join(ebin_dir, name)
@@ -439,7 +435,7 @@ defmodule Popcorn.Packager do
   end
 
   defp remove_build_tools(staged_apps) do
-    case Map.fetch(staged_apps, "popcorn") do
+    case Map.fetch(staged_apps, :popcorn) do
       :error ->
         staged_apps
 
@@ -456,7 +452,7 @@ defmodule Popcorn.Packager do
         # The JS and the Wasm runtimes, which the output already has
         File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
 
-        replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
+        replace_app_modules(staged_apps, %{popcorn: runtime_modules})
     end
   end
 
@@ -482,7 +478,7 @@ defmodule Popcorn.Packager do
       {:ok, [{:application, name, props}]} = :file.consult(app_path)
       dir = Path.dirname(app_path)
 
-      {to_string(name), %{props: props, ebin_dir: dir, app_path: app_path}}
+      {name, %{props: props, ebin_dir: dir, app_path: app_path}}
     end
 
     get_name = fn {name, _info} -> name end
@@ -692,7 +688,7 @@ defmodule Popcorn.Packager do
       info = Map.fetch!(apps, app)
       props = Keyword.put(info.props, :modules, modules)
       app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
-      application = {:application, String.to_existing_atom(app), props}
+      application = {:application, app, props}
 
       File.write!(app_path, :io_lib.format(~c"~tp.~n", [application]))
       Map.put(apps, app, %{info | app_path: app_path, props: props})
@@ -777,7 +773,7 @@ defmodule Popcorn.Packager do
           file <- Path.wildcard(Path.join(app_dir, "**"), match_dot: true),
           File.regular?(file) do
         entry =
-          {to_charlist(Path.join(["lib", app, Path.relative_to(file, app_dir)])),
+          {to_charlist(Path.join(["lib", "#{app}", Path.relative_to(file, app_dir)])),
            File.read!(file)}
 
         if strip, do: strip_beam(entry), else: entry
@@ -884,7 +880,7 @@ defmodule Popcorn.Packager do
 
     MapSet.union(applications, included)
     |> MapSet.difference(optional)
-    |> Enum.map(&to_string/1)
+    |> MapSet.to_list()
   end
 
   @spec format_error(map()) :: String.t()

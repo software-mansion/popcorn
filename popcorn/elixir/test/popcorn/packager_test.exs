@@ -51,7 +51,7 @@ defmodule Popcorn.PackagerTest do
     end
 
     {:ok,
-     options: [build_path: build_path, out_dir: out_dir, app: "user_app", static_dir: static_dir],
+     options: [build_path: build_path, out_dir: out_dir, app: :user_app, static_dir: static_dir],
      build_path: build_path,
      out_dir: out_dir}
   end
@@ -73,13 +73,13 @@ defmodule Popcorn.PackagerTest do
 
       options =
         Keyword.merge(options,
-          extra_apps: ["extra_app"],
-          exclude_priv: [{"popcorn", "docs"}, "nested/*.tmp"]
+          extra_apps: [:extra_app],
+          exclude_priv: [{:popcorn, "docs"}, "nested/*.tmp"]
         )
 
       assert {:ok, report} = Packager.build(options)
       assert "core" = report.runtimeVariant
-      assert %{"popcorn" => _app} = report.apps
+      assert %{popcorn: _app} = report.apps
 
       for file <- ["index.mjs", "worker.mjs", "beam.emu.mjs", "beam.wasm"],
           variant <- ["", ".gz", ".br"] do
@@ -160,7 +160,7 @@ defmodule Popcorn.PackagerTest do
     end
 
     test "leaving out priv files of applications that aren't packaged", %{options: options} do
-      options = Keyword.put(options, :exclude_priv, [{"phoneix", "static"}])
+      options = Keyword.put(options, :exclude_priv, phoneix: "static")
 
       assert capture_io(:stderr, fn -> assert {:ok, _report} = Packager.build(options) end) =~
                "exclude_priv names applications that aren't packaged: phoneix"
