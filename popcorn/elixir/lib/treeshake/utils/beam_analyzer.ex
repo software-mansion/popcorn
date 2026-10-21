@@ -7,7 +7,7 @@ defmodule Treeshake.Utils.BeamAnalyzer do
           name: atom(),
           arity: non_neg_integer(),
           public: boolean(),
-          calls: [mfa() | {nil, atom(), non_neg_integer()}],
+          calls: [mfa() | {nil, atom(), non_neg_integer()} | {module(), atom(), :any}],
           potential_modules: [module()]
         }
 
@@ -391,8 +391,18 @@ defmodule Treeshake.Utils.BeamAnalyzer do
        when is_atom(m) and is_atom(f) and is_list(args),
        do: [{m, f, length(args)}]
 
+  # Treats neighbouring atoms in a tuple as a module and function.
+  # Pairs are left out: they're mostly keyword list entries, or
+  # tables which name functions without calling them.
   defp collect_literal_atoms(tuple) when is_tuple(tuple) do
-    tuple |> Tuple.to_list() |> Enum.flat_map(&collect_literal_atoms/1)
+    elements = Tuple.to_list(tuple)
+
+    functions =
+      for [m, f] <- Enum.chunk_every(elements, 2, 1, :discard),
+          tuple_size(tuple) > 2 and is_atom(m) and is_atom(f),
+          do: {m, f, :any}
+
+    functions ++ Enum.flat_map(elements, &collect_literal_atoms/1)
   end
 
   # External function reference stored as a literal, e.g. &Logger.default_formatter/0

@@ -164,6 +164,13 @@ defmodule Treeshake.CallGraph do
     {all_calls ++ Enum.flat_map(protocol_entries, &value/1), acc}
   end
 
+  defp expand_module_call({m, f, :any}, module_index) do
+    case module_index[m] do
+      nil -> []
+      info -> for {{^f, a}, _info} <- info.public_functions, do: {m, f, a}
+    end
+  end
+
   defp expand_module_call({_m, _f, _a} = mfa, _module_index), do: [mfa]
 
   defp expand_module_call(module, module_index) do
