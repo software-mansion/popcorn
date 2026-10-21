@@ -465,12 +465,12 @@ test.describe("run_js", () => {
       timeout: "timeout",
       thrown: "Error: boom",
       assertion:
-        "PopcornError: Check failed: JS.run/3 must throw an Error instance. Received: boom",
+        "Error: JS.run/3 must throw an Error instance. Received: boom",
       unserializable: "unsupported",
       invalid: "invalid_option",
     });
     expect((await browserError).message).toBe(
-      "Check failed: JS.run/3 must throw an Error instance. Received: boom",
+      "JS.run/3 must throw an Error instance. Received: boom",
     );
   });
 });
@@ -514,7 +514,7 @@ test.describe("send", () => {
     assert((await timedOut.tryBoot(bootOpts)).ok);
     expect(await timedOut.trySend("any-target", {})).toEqual({
       ok: false,
-      error: { t: "timeout:send", data: { timeoutMs: 0 } },
+      error: { t: "timeout", data: { operation: "send", timeoutMs: 0 } },
     });
   });
 });

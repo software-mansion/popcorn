@@ -94,83 +94,83 @@ async function boot(
     createModule,
     emit,
   } = opts;
-  const loadedFsData = await loadFsData(otpAssetsRoot);
-  if (!loadedFsData.ok) {
-    return { ok: false, error: loadedFsData.error };
-  }
-
-  const fsData = loadedFsData.data;
-  const { vmReady, handleVmReady } = vm;
-  const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
-
-  const runtimeEnv = {
-    ...env,
-    BINDIR: "/bin",
-    EMU: "beam",
-    HOME: DEFAULT_HOME_DIR,
-    USER: DEFAULT_USER,
-    LOGNAME: DEFAULT_USER,
-    COLUMNS: String(ttySize.columns),
-    LINES: String(ttySize.rows),
-    ERL_INETRC: INETRC_PATH,
-  };
-  let emitError: ((payload: OtpErrorPayload) => void) | null = function (
-    payload,
-  ) {
-    emitError = null;
-    state.isVmReady = false;
-    emit({ type: "otp:error", payload });
-  };
-  const moduleConfig: Partial<EmscriptenModule> = {
-    print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
-    printErr: (text) =>
-      emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
-    onExit: (code) => emitError?.({ kind: "exit", data: code }),
-    onAbort: (text) => emitError?.({ kind: "abort", data: text }),
-    onBeamMessage: (text) => {
-      if (emitError === null) {
-        return;
-      }
-      const event = deserializeBridgeMessage(text);
-      if (event === null) return;
-      if (event.type === "otp:error") {
-        emitError(event.payload);
-        return;
-      }
-      if (handleVmReady(event)) return;
-      if (handleAppReady(event)) return;
-
-      emit(event);
-    },
-    onError: (text) => emitError?.({ kind: "error", data: text }),
-    onStdinConsumed: (size) =>
-      emit({ type: "otp:stdin-consumed", payload: size }),
-    onTrackedValueDelete: (key) =>
-      emit({ type: "otp:tracked-value-delete", payload: key }),
-    onTtyChunk: (fd, chunk) =>
-      emit({
-        type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
-        payload: chunk,
-      }),
-    arguments: buildArgs({
-      appNames: fsData.appNames,
-      entrypoint: fsData.entrypoint,
-      noshell,
-      emulator: emulatorArgs ?? [],
-      extra: extraArgs ?? [],
-    }),
-    preRun: [
-      (mod) => {
-        state.module = mod;
-      },
-      (mod) => {
-        Object.assign(mod.ENV, runtimeEnv);
-        initFs({ module: mod, fsData });
-      },
-    ],
-  };
-
   try {
+    const loadedFsData = await loadFsData(otpAssetsRoot);
+    if (!loadedFsData.ok) {
+      return { ok: false, error: loadedFsData.error };
+    }
+
+    const fsData = loadedFsData.data;
+    const { vmReady, handleVmReady } = vm;
+    const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
+
+    const runtimeEnv = {
+      ...env,
+      BINDIR: "/bin",
+      EMU: "beam",
+      HOME: DEFAULT_HOME_DIR,
+      USER: DEFAULT_USER,
+      LOGNAME: DEFAULT_USER,
+      COLUMNS: String(ttySize.columns),
+      LINES: String(ttySize.rows),
+      ERL_INETRC: INETRC_PATH,
+    };
+    let emitError: ((payload: OtpErrorPayload) => void) | null = function (
+      payload,
+    ) {
+      emitError = null;
+      state.isVmReady = false;
+      emit({ type: "otp:error", payload });
+    };
+    const moduleConfig: Partial<EmscriptenModule> = {
+      print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
+      printErr: (text) =>
+        emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
+      onExit: (code) => emitError?.({ kind: "exit", data: code }),
+      onAbort: (text) => emitError?.({ kind: "abort", data: text }),
+      onBeamMessage: (text) => {
+        if (emitError === null) {
+          return;
+        }
+        const event = deserializeBridgeMessage(text);
+        if (event === null) return;
+        if (event.type === "otp:error") {
+          emitError(event.payload);
+          return;
+        }
+        if (handleVmReady(event)) return;
+        if (handleAppReady(event)) return;
+
+        emit(event);
+      },
+      onError: (text) => emitError?.({ kind: "error", data: text }),
+      onStdinConsumed: (size) =>
+        emit({ type: "otp:stdin-consumed", payload: size }),
+      onTrackedValueDelete: (key) =>
+        emit({ type: "otp:tracked-value-delete", payload: key }),
+      onTtyChunk: (fd, chunk) =>
+        emit({
+          type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
+          payload: chunk,
+        }),
+      arguments: buildArgs({
+        appNames: fsData.appNames,
+        entrypoint: fsData.entrypoint,
+        noshell,
+        emulator: emulatorArgs ?? [],
+        extra: extraArgs ?? [],
+      }),
+      preRun: [
+        (mod) => {
+          state.module = mod;
+        },
+        (mod) => {
+          Object.assign(mod.ENV, runtimeEnv);
+          initFs({ module: mod, fsData });
+        },
+      ],
+    };
+
     if (opts.maxMemoryBytes !== undefined) {
       moduleConfig.wasmMemory = new WebAssembly.Memory({
         initial: 1024,
@@ -327,7 +327,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   if (manifest === null) {
     return {
       ok: false,
-      error: err("beam:missing-manifest", { url: manifestUrl }),
+      error: err("asset:load", { kind: "manifest", url: manifestUrl }),
     };
   }
 
@@ -336,7 +336,12 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     if (!Object.hasOwn(manifest.apps, name)) {
       return {
         ok: false,
-        error: err("beam:missing-tarball", { name, all: appNames }),
+        error: err("asset:load", {
+          kind: "manifest-entry",
+          url: manifestUrl,
+          name,
+          available: appNames,
+        }),
       };
     }
   }
@@ -347,16 +352,18 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     fetchBinary(bootUrl),
     fetchBinary(configUrl),
     Promise.all(
-      Object.entries(manifest.bundles).map(
-        async ([name, entry]): Promise<Result<Uint8Array>> => {
+      Object.values(manifest.bundles).map(
+        async (entry): Promise<Result<Uint8Array>> => {
           const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
           const tar = await fetchBinary(tarUrl);
           if (tar !== null) {
             return { ok: true, data: tar };
           }
 
-          const all = Object.keys(manifest.bundles);
-          return { ok: false, error: err("beam:missing-tarball", { name, all }) };
+          return {
+            ok: false,
+            error: err("asset:load", { kind: "tarball", url: tarUrl }),
+          };
         },
       ),
     ),
@@ -365,7 +372,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   if (bootFile === null) {
     return {
       ok: false,
-      error: err("beam:missing-boot-script", { url: bootUrl }),
+      error: err("asset:load", { kind: "boot-script", url: bootUrl }),
     };
   }
   check(configFile !== null, `Missing application config: ${configUrl}`);

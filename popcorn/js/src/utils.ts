@@ -1,5 +1,3 @@
-import { err } from "./errors";
-
 export function dirname(path: string): string {
   const idx = path.lastIndexOf("/");
   if (idx <= 0) return "/";
@@ -7,15 +5,19 @@ export function dirname(path: string): string {
 }
 
 export async function fetchBinary(url: string): Promise<Uint8Array | null> {
-  const response = await fetch(url);
-  if (response.ok !== true) return null;
-  return new Uint8Array(await response.arrayBuffer());
+  try {
+    const response = await fetch(url);
+    if (response.ok !== true) return null;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchJson<T>(url: string): Promise<T | null> {
-  const response = await fetch(url);
-  if (response.ok !== true) return null;
   try {
+    const response = await fetch(url);
+    if (response.ok !== true) return null;
     return await response.json();
   } catch {
     return null;
@@ -32,11 +34,11 @@ export function base64ToBytes(b64: string): Uint8Array {
 }
 
 export function check(ok: boolean, msg?: string): asserts ok {
-  if (!ok) throw err("internal:check", { detail: msg });
+  if (!ok) throw new Error(msg ?? "Check failed");
 }
 
-export function unreachable(): never {
-  throw err("internal:unreachable", {});
+export function unreachable(_value?: never): never {
+  throw new Error("Entered unreachable code");
 }
 
 export function objectWithKeys<K extends string>(

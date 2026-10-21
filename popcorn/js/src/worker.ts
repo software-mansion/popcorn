@@ -6,7 +6,20 @@ import { check, unreachable } from "./utils";
 
 let instance: Beam | null = null;
 
-self.onmessage = async (event: MessageEvent<unknown>) => {
+self.onmessage = (event: MessageEvent<unknown>) => {
+  void dispatch(event).catch((error: unknown) => {
+    console.error(error);
+    toMain({
+      type: "otp:error",
+      payload: {
+        kind: "error",
+        data: error instanceof Error ? error.message : String(error),
+      },
+    });
+  });
+};
+
+async function dispatch(event: MessageEvent<unknown>): Promise<void> {
   const data = readMainEvent(event.data);
 
   switch (data.type) {
@@ -75,4 +88,4 @@ self.onmessage = async (event: MessageEvent<unknown>) => {
     default:
       unreachable();
   }
-};
+}

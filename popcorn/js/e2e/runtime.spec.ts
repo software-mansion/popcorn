@@ -1,11 +1,36 @@
-import { schedulers, type PopcornError, type PopcornOpts } from "@swmansion/popcorn";
+import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
+import { PopcornError, type SerializedError } from "../src/errors";
 
 const FETCH_URL = "/assets/otp/manifest.json";
 type MemoryProbe = {
   descriptor: WebAssembly.MemoryDescriptor;
   memory: WebAssembly.Memory;
 };
+
+test.describe("errors", () => {
+  test("round trip", () => {
+    const errors: SerializedError[] = [
+      { t: "timeout", data: { operation: "send", timeoutMs: 1 } },
+      { t: "timeout", data: { operation: "call", timeoutMs: 1 } },
+      { t: "genserver:noproc", data: { target: "missing" } },
+      { t: "genserver:exit", data: { reason: "shutdown" } },
+      { t: "genserver:unserializable", data: {} },
+      { t: "asset:load", data: { kind: "tarball", url: "/app.tar" } },
+    ];
+
+    for (const serialized of errors) {
+      const original = new PopcornError(serialized);
+      const restored = PopcornError.deserialize(
+        structuredClone(original.serialize()),
+      );
+      expect(restored.serialize()).toEqual(serialized);
+    }
+
+    expect(() => PopcornError.deserialize({ t: "timeout", data: {} }))
+      .toThrow(Error);
+  });
+});
 
 test.describe("boot", () => {
   test("memory limits", async ({ page, createOtp }) => {
@@ -150,23 +175,18 @@ test.describe("boot", () => {
           return null;
         } catch (error) {
           if (!(error instanceof Error)) throw error;
-          return error.cause;
+          return { name: error.name, message: error.message };
         }
       }),
     );
     expect(invalid).toEqual([
       {
-        t: "internal:check",
-        data: {
-          detail: 'maxMemory must use M or G, such as "256M" or "2G"',
-        },
+        name: "Error",
+        message: 'maxMemory must use M or G, such as "256M" or "2G"',
       },
       ...Array(2).fill({
-        t: "internal:check",
-        data: {
-          detail:
-            "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
-        },
+        name: "Error",
+        message: "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
       }),
     ]);
   });
@@ -363,70 +383,163 @@ test.describe("boot", () => {
 
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
-    const timeout = await timedOut.tryBoot({
-      timeoutsMs: { boot: 0 },
-    });
-    expect(timeout).toEqual({
+    expect(await timedOut.tryBoot({ timeoutsMs: { boot: 0 } })).toEqual({
       ok: false,
-      error: { t: "timeout:init", data: { timeoutMs: 0 } },
+      error: { t: "timeout", data: { operation: "init", timeoutMs: 0 } },
     });
 
-    const missing = await page.evaluate(async () => {
-      const errors: unknown[] = [];
-      const popcorn = new window.Popcorn({
-        beam: { otpAssetsRoot: "/missing/otp/" },
-        onError: (event) => errors.push(event),
-      });
-      const result = await popcorn.boot().then(
-        () => ({ ok: true as const, data: null }),
-        (error: PopcornError) => ({ ok: false as const, error }),
-      );
-      if (result.ok) {
-        return { errors, boot: { ok: true, data: null } };
-      }
-      return {
-        errors,
-        boot: { ok: false, error: result.error.serialize() },
-      };
+    const missing = await createOtp();
+    const missingBoot = await missing.tryBoot({
+      beam: { otpAssetsRoot: "/missing/otp/" },
     });
-    expect(missing).toEqual({
-      errors: [],
-      boot: {
-        ok: false,
-        error: {
-          t: "beam:missing-manifest",
-          data: { url: "/missing/otp/manifest.json" },
-        },
+    expect(missingBoot).toEqual({
+      ok: false,
+      error: {
+        t: "asset:load",
+        data: { kind: "manifest", url: "/missing/otp/manifest.json" },
       },
+    });
+    expect(missing.errors).toEqual([]);
+
+    await page.route("**/rejected/manifest.json", (route) => route.abort());
+    const rejected = await createOtp();
+    const rejectedBoot = await rejected.tryBoot({
+      beam: { otpAssetsRoot: "/rejected/" },
+    });
+    expect(rejectedBoot).toEqual({
+      ok: false,
+      error: {
+        t: "asset:load",
+        data: { kind: "manifest", url: "/rejected/manifest.json" },
+      },
+    });
+    expect(rejected.errors).toEqual([]);
+
+    for (const kind of ["manifest-entry", "boot-script", "tarball"]) {
+      await page.route("**/asset-errors/**", (route) => {
+        if (route.request().url().endsWith("manifest.json")) {
+          return route.fulfill({
+            json: {
+              vm: { boot: "start.boot", config: "sys.config" },
+              apps: kind === "manifest-entry"
+                ? {}
+                : {
+                    kernel: { bundle: "core" },
+                    stdlib: { bundle: "core" },
+                    compiler: { bundle: "core" },
+                  },
+              bundles: { core: { tar: "kernel.tar" } },
+            },
+          });
+        }
+        if (route.request().url().endsWith("sys.config")) {
+          return route.fulfill({ body: "[]." });
+        }
+        if (kind === "tarball" && route.request().url().endsWith("start.boot")) {
+          return route.fulfill({ body: "" });
+        }
+        return route.fulfill({ status: 404 });
+      });
+      const asset = await createOtp();
+      const result = await asset.tryBoot({
+        beam: { otpAssetsRoot: "/asset-errors/" },
+      });
+      const data = kind === "manifest-entry"
+        ? {
+            kind,
+            url: "/asset-errors/manifest.json",
+            name: "kernel",
+            available: [],
+          }
+        : {
+            kind,
+            url: kind === "boot-script"
+              ? "/asset-errors/start.boot"
+              : "/asset-errors/kernel.tar",
+          };
+      expect(result).toEqual({ ok: false, error: { t: "asset:load", data } });
+      await page.unroute("**/asset-errors/**");
+    }
+  });
+
+  test("native runtime error", async ({ page }) => {
+    test.setTimeout(5_000);
+    const result = await page.evaluate(async () => {
+      const errors: unknown[] = [];
+      const popcorn = await window.Popcorn.init({
+        workerUrl: "/fault-worker.mjs?native=runtime",
+        timeoutsMs: { send: 30_000 },
+        onError: (error) => errors.push(error),
+      });
+      try {
+        const pending = await Promise.all([
+          popcorn.trySend("receiver", {}),
+          popcorn.tryCall("receiver", {}, { timeoutMs: 30_000 }),
+        ]);
+        return {
+          errors,
+          pending: pending.map((result) => {
+            if (result.ok) throw new Error("Expected worker failure");
+            return result.error.serialize();
+          }),
+        };
+      } finally {
+        popcorn.deinit();
+      }
+    });
+
+    const diagnostic = expect.stringContaining("native runtime failure");
+    const failure = { t: "vm:exited", data: { reason: "error", data: diagnostic } };
+    expect(result.pending).toEqual([failure, failure]);
+    expect(result.errors).toEqual([{ kind: "error", data: diagnostic }]);
+  });
+
+  test("worker dispatcher rejection", async ({ page }) => {
+    const started = page.waitForEvent("worker");
+    const instance = await page.evaluateHandle(() => new window.Popcorn());
+    const url = (await started).url();
+    await instance.evaluate((popcorn) => popcorn.deinit());
+    await instance.dispose();
+    const result = await page.evaluate(async (url) => {
+      const worker = new Worker(url, { type: "module" });
+      try {
+        return await new Promise((resolve) => {
+          worker.onmessage = (event) => resolve(event.data);
+          worker.postMessage({
+            type: "popcorn:stdin",
+            payload: { chunk: new Uint8Array([1]) },
+          });
+        });
+      } finally {
+        worker.terminate();
+      }
+    }, url);
+    expect(result).toEqual({
+      type: "otp:error",
+      payload: { kind: "error", data: "Check failed" },
     });
   });
 
-  test("worker exit", async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const popcorn = new window.Popcorn({
-        workerUrl: "/fault-worker.mjs",
-        timeoutsMs: { boot: 30_000 },
+  test("worker boot errors", async ({ createOtp }) => {
+    test.setTimeout(5_000);
+    for (const [workerUrl, diagnostic] of [
+      ["/fault-worker.mjs", { kind: "abort", data: "boom" }],
+      [
+        "/fault-worker.mjs?native=boot",
+        { kind: "error", data: expect.stringContaining("native boot failure") },
+      ],
+    ] as const) {
+      const otp = await createOtp();
+      const boot = await otp.tryBoot({ workerUrl, timeoutsMs: { boot: 30_000 } });
+      expect(boot).toEqual({
+        ok: false,
+        error: {
+          t: "vm:exited",
+          data: { reason: diagnostic.kind, data: diagnostic.data },
+        },
       });
-      const startMs = performance.now();
-      const boot = await popcorn.boot().then(
-        () => ({ ok: true as const, data: null }),
-        (error: PopcornError) => ({ ok: false as const, error }),
-      );
-      const elapsedMs = performance.now() - startMs;
-      if (boot.ok) {
-        return { elapsedMs, boot: { ok: true, data: null } };
-      }
-      return {
-        elapsedMs,
-        boot: { ok: false, error: boot.error.serialize() },
-      };
-    });
-
-    expect(result.boot).toEqual({
-      ok: false,
-      error: { t: "vm:exited", data: { reason: "abort", data: "boom" } },
-    });
-    expect(result.elapsedMs).toBeLessThan(5_000);
+      expect(otp.errors).toEqual([diagnostic]);
+    }
   });
 });
 

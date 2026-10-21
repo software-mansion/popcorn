@@ -312,6 +312,15 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.spawnWorker();
   }
 
+  private readonly onWorkerError = (event: ErrorEvent) => {
+    const payload = { kind: "error", data: event.message } as const;
+    try {
+      (this.opts.onError ?? defaultOnError)(payload);
+    } finally {
+      this.deinit(exitReason(payload));
+    }
+  };
+
   private spawnWorker(): void {
     this.vmWorker = this.opts.workerUrl
       ? new Worker(this.opts.workerUrl, { type: "module" })
@@ -320,6 +329,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           type: "module",
         });
     this.vmWorker.addEventListener("message", this.onWorkerMessage);
+    this.vmWorker.addEventListener("error", this.onWorkerError);
   }
 
   /**
@@ -390,7 +400,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
       const startPhase = (timeoutMs: number) =>
         setTimeout(() => {
-          const error = err("timeout:init", { timeoutMs });
+          const error = err("timeout", { operation: "init", timeoutMs });
           settle({ ok: false, error });
         }, timeoutMs);
 
@@ -565,7 +575,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const timer = setTimeout(() => {
         const wasMessageStale = this.pendingSends.delete(requestId);
         if (wasMessageStale) {
-          resolve({ ok: false, error: err("timeout:send", { timeoutMs }) });
+          resolve({
+            ok: false,
+            error: err("timeout", { operation: "send", timeoutMs }),
+          });
         }
       }, timeoutMs);
 
@@ -629,6 +642,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.pendingCalls.clear();
     this.clearTrackedValues();
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
+    this.vmWorker.removeEventListener("error", this.onWorkerError);
     this.vmWorker.terminate();
     // we keep onEvent() callbacks across reboots
   }
@@ -699,7 +713,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       case "timeout":
         return {
           ok: false,
-          error: err("timeout:call", { timeoutMs: pending.timeoutMs }),
+          error: err("timeout", {
+            operation: "call",
+            timeoutMs: pending.timeoutMs,
+          }),
         };
       default:
         unreachable();
@@ -743,7 +760,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       const timer = setTimeout(() => {
         const isUnresolved = this.pendingCalls.delete(id);
         if (isUnresolved) {
-          resolve({ ok: false, error: err("timeout:call", { timeoutMs }) });
+          resolve({
+            ok: false,
+            error: err("timeout", { operation: "call", timeoutMs }),
+          });
         }
       }, timeoutMs);
 
