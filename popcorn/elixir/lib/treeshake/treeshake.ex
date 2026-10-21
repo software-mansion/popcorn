@@ -111,6 +111,9 @@ defmodule Treeshake do
   @hardcoded %{
     calls: %{
       Supervisor => [{Supervisor.Default, :init, 1}],
+      # DynamicSupervisor calls back the module it starts, and Task.Supervisor
+      # doesn't declare the behaviour
+      Task.Supervisor => [{Task.Supervisor, :init, 1}],
       {:elixir_config, :identifier_tokenizer, 0} => [{String.Tokenizer, :tokenize, 1}],
       # The translators from the :logger app's environment
       Logger.Utils => [{Logger.Translator, :translate, 4}],
