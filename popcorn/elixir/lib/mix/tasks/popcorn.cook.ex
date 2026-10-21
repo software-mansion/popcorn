@@ -60,6 +60,12 @@ defmodule Mix.Tasks.Popcorn.Cook do
   `public_key`, or `ssl`. Otherwise, it selects `core`.
   An explicit `core` selection fails if an application requires crypto support.
 
+  Popcorn includes application config in the assets. `runtime.exs` is not evaluated.
+
+  > #### Secrets {: .warning }
+  >
+  > Don't store secrets in your Popcorn app's config. It will be readable by the browser.
+
   Tree-shaking can remove code reached only through dynamic calls or evaluation.
   Use `preserved_apps` for such applications. Preservation does not add an
   application to the package; select it through the entrypoint, its dependencies,
@@ -68,7 +74,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
-  runtime. The `otp/` directory contains `manifest.json`, the boot script, and
+  runtime. The `otp/` directory contains `manifest.json`, the boot script, config, and
   three archives: `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`.
 
   They contain selected OTP/Elixir built-ins, user applications, and remaining
