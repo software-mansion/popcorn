@@ -24,11 +24,13 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
 
       - name: Check versions align
         if: github.ref_type == 'tag' || inputs.tag
@@ -39,23 +41,21 @@ jobs:
           package-json: local-live-view/package.json
           mix-exs: local-live-view/mix.exs
 
-      # Same image as the popcorn releases: it installs the JS workspace and
-      # builds AtomVM from FissionVM, so the runtime files vendored into
-      # priv/static/ are the production ones.
-      - name: Build Docker image
-        run: docker build -t popcorn-builder -f docker/release.Dockerfile --build-arg GIT_REF=${{ inputs.tag || github.ref_name }} .
+      - name: Setup BEAM runtime and workspace
+        uses: ./.github/actions/setup-llv
+        with:
+          build-mode: release
 
-      # LLV_RELEASE makes mix.exs depend on the published :popcorn instead of
-      # the in-repo path dep, which cannot be packaged.
       - name: Publish to Hex
+        working-directory: local-live-view
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
-          DRY_RUN_FLAG: ${{ inputs.dry_run && '--dry-run' || '' }}
+          LLV_RELEASE: "1"
+          DRY_RUN: ${{ inputs.dry_run || false }}
         run: |
-          docker run --rm -e HEX_API_KEY -e LLV_RELEASE=1 \
-            popcorn-builder \
-            sh -c "cd /build/popcorn/local-live-view \
-              && mix deps.get \
-              && mix compile \
-              && mix hex.publish package --yes $DRY_RUN_FLAG \
-              && MIX_ENV=dev mix hex.publish docs --yes $DRY_RUN_FLAG"
+          mix deps.get
+          mix compile
+          flags=()
+          if [[ "$DRY_RUN" == "true" ]]; then flags=(--dry-run); fi
+          mix hex.publish package --yes "${flags[@]}"
+          MIX_ENV=dev mix hex.publish docs --yes "${flags[@]}"

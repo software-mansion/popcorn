@@ -8,7 +8,7 @@ on:
     paths:
       - "landing-page/**"
       - "popcorn/js/**"
-      - "patches/otp/**"
+      - "popcorn/patches/**"
       - "scripts/_common.sh"
       - "scripts/build-beam.sh"
       - "scripts/patch-beam.sh"

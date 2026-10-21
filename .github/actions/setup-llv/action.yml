@@ -3,6 +3,11 @@ description: >-
   Build the OTP/BEAM Wasm runtime and Popcorn's JS package, and install the
   toolchain and JS dependencies for LocalLiveView and its examples
 
+inputs:
+  build-mode:
+    description: BEAM Wasm build mode
+    default: debug
+
 runs:
   using: composite
   steps:
@@ -10,7 +15,7 @@ runs:
       uses: ./.github/actions/build-otp-wasm
       with:
         host-otp-version: "29.0.6"
-        build-mode: debug
+        build-mode: ${{ inputs.build-mode }}
         with-crypto: "true"
 
     - name: Set up Elixir

@@ -3,7 +3,7 @@ FROM ubuntu:noble
 ENV ERLANG_VERSION="29.0.6"
 ENV ELIXIR_VERSION="1.20.4-otp-29"
 ENV NODE_VERSION="22"
-ENV EMSDK_VERSION="4.0.8"
+ENV EMSDK_VERSION="6.0.2"
 ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
 ENV CI=true
@@ -17,7 +17,7 @@ ARG COMMIT_REF
 WORKDIR /build/
 RUN mkdir -p popcorn out
 RUN apt-get -y update && \
-    apt-get -y install git curl cmake gperf libmbedtls-dev zlib1g-dev \
+    apt-get -y install git curl zlib1g-dev \
     automake make gcc g++ libssl-dev libncurses-dev \
     default-jre-headless python3 xz-utils gpg wget
 
@@ -40,9 +40,6 @@ RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
     mise install && \
     mix local.rebar --force && \
     mix local.hex -if-missing --force
-RUN mise install erlang@26.0.2 elixir@1.17.3-otp-26 && \
-    mise exec erlang@26.0.2 elixir@1.17.3-otp-26 -- mix local.rebar --force && \
-    mise exec erlang@26.0.2 elixir@1.17.3-otp-26 -- mix local.hex --force
 RUN mise use --global emsdk@"${EMSDK_VERSION}" && mise install
 
 RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn && \

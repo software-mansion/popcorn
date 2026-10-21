@@ -172,5 +172,5 @@ initSentry(); // Called in main.tsx
    - Includes code and error message
 
 2. **VM Crashes**: WebAssembly runtime crashes
-   - Tag: `atomvm-crash`
+   - Tag: `beam-crash`
    - Includes code, stdout, stderr

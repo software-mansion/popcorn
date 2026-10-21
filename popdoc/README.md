@@ -22,7 +22,7 @@ def project do
   [
     app: :my_app,
     version: "0.1.0",
-    elixir: "~> 1.17",
+    elixir: "~> 1.19",
     deps: deps(),
     docs: &docs/0
   ]
@@ -54,3 +54,18 @@ mix popdoc.server # to serve the docs locally. It's needed for cross-origin isol
 ```
 
 `popdoc: [coi_serviceworker: true]` is useful for docs hosting when you cannot control response headers directly (i.e. GitHub Pages, HexDocs). For production deployments, leave it disabled and serve real `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers from the web server.
+
+Popdoc uses the BEAM WebAssembly runtime. When developing in this repository,
+build the JavaScript assets first:
+
+```bash
+pnpm install --frozen-lockfile
+cd popdoc
+mix deps.get
+mix popdoc.build
+```
+
+Consumer documentation packages its application and runtime dependencies with
+the evaluator into a BEAM package under `assets/`. The consumer
+application is available for evaluation but is not started automatically.
+Popdoc pins the same released Popcorn version in its Elixir and JavaScript dependencies.

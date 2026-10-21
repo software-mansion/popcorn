@@ -41,7 +41,7 @@ export function captureCodeException(error: string, code: string) {
 }
 
 export function captureReloadIframe(
-  reason: { source: "heartbeat_lost" | "atomvm"; category: string },
+  reason: { source: "heartbeat_lost" | "beam"; category: string },
   stdout: string,
   stderr: string
 ) {
@@ -142,7 +142,7 @@ export function createLogSink(): LogSink {
         );
       } else {
         captureReloadIframe(
-          { source: "atomvm", category: "atomvm-crash" },
+          { source: "beam", category: "beam-crash" },
           stdoutJoined,
           stderrJoined
         );

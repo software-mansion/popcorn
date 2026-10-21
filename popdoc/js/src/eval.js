@@ -66,12 +66,14 @@ export async function runCode(block) {
   }, PENDING_DELAY_MS);
 
   const deadline = performance.now() + EVAL_TIMEOUT_MS;
-  const remaining = () => Math.max(0, deadline - performance.now());
+  const remaining = () => Math.max(0, Math.ceil(deadline - performance.now()));
   const startedAt = performance.now();
 
-  const parsed = await popcorn.call(["parse_elixir", code, blockId], {
+  const parseReply = await popcorn.tryCall("main", ["parse_elixir", code, blockId], {
     timeoutMs: remaining(),
   });
+
+  const parsed = parseReply.ok ? parseReply.data : parseReply;
 
   clearTimeout(pendingTimer);
   output.classList.remove("popdoc-output-pending");
@@ -119,9 +121,10 @@ export async function runCode(block) {
     }
 
     const stopLogCapture = startLogCapture();
-    const step = await popcorn.call(["eval_one", blockId, i], {
+    const stepReply = await popcorn.tryCall("main", ["eval_one", blockId, i], {
       timeoutMs: budget,
     });
+    const step = stepReply.ok ? stepReply.data : stepReply;
     const logs = stopLogCapture();
 
     if (!step.ok) {
@@ -287,12 +290,14 @@ export function startLogCapture() {
   const stdoutListener = (message) => stdout.push(message);
   const stderrListener = (message) => stderr.push(message);
 
-  popcorn.registerLogListener(stdoutListener, "stdout");
-  popcorn.registerLogListener(stderrListener, "stderr");
+  const previousStdout = popcorn.onStdout;
+  const previousStderr = popcorn.onStderr;
+  popcorn.onStdout = stdoutListener;
+  popcorn.onStderr = stderrListener;
 
   return () => {
-    popcorn.unregisterLogListener(stdoutListener, "stdout");
-    popcorn.unregisterLogListener(stderrListener, "stderr");
+    popcorn.onStdout = previousStdout;
+    popcorn.onStderr = previousStderr;
     return { stdout, stderr };
   };
 }

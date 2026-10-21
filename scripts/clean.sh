@@ -12,12 +12,12 @@ Usage: $0 [OPTIONS]
 Clean build artifacts.
 
 Options:
-  --all               Clean everything (elixir, JS, AtomVM, examples)
-  --atomvm            Clean AtomVM artifacts only
+  --all               Clean everything (Elixir, JS, BEAM runtime, examples)
+  --runtime           Clean BEAM runtime artifacts only
   --example <name>    Clean a specific example
   -h, --help          Show this help
 
-Default (no flags): cleans elixir/_build, elixir/deps, js/dist
+Default (no flags): cleans Popcorn Elixir dependencies and JS output
 
 Available examples:
 $(list_examples)
@@ -26,7 +26,7 @@ EOF
 }
 
 clean_dir() {
-    if [[ -d "$1" ]]; then
+    if [[ -d "$1" || -L "$1" ]]; then
         log "Removing $1"
         rm -rf "$1"
     fi
@@ -34,23 +34,21 @@ clean_dir() {
 
 clean_elixir() {
     log "Cleaning Elixir build artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/_build"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/deps"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/popcorn_runtime_source/artifacts"
+    clean_dir "${PROJECT_ROOT}/popcorn/elixir/_build"
+    clean_dir "${PROJECT_ROOT}/popcorn/elixir/deps"
 }
 
-clean_atomvm() {
-    log "Cleaning AtomVM artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn-2/elixir/popcorn_runtime_source/artifacts"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/js/assets"
+clean_runtime() {
+    log "Cleaning BEAM runtime artifacts..."
+    clean_dir "${PROJECT_ROOT}/popcorn/out"
 }
 
 clean_js() {
     log "Cleaning JS build artifacts..."
-    clean_dir "${PROJECT_ROOT}/popcorn-2/js/dist"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/js/assets"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/js/node_modules"
-    clean_dir "${PROJECT_ROOT}/popcorn-2/node_modules"
+    clean_dir "${PROJECT_ROOT}/popcorn/out/js"
+    clean_dir "${PROJECT_ROOT}/popcorn/js/dist"
+    clean_dir "${PROJECT_ROOT}/popcorn/elixir/priv/static"
+    clean_dir "${PROJECT_ROOT}/popcorn/js/node_modules"
     clean_dir "${PROJECT_ROOT}/node_modules"
 }
 
@@ -98,7 +96,7 @@ main() {
         case "$1" in
             -h|--help) usage ;;
             --all) MODE="all"; shift ;;
-            --atomvm) MODE="atomvm"; shift ;;
+            --runtime) MODE="runtime"; shift ;;
             --example)
                 MODE="example"
                 EXAMPLE_NAME="$2"
@@ -116,11 +114,11 @@ main() {
         all)
             clean_elixir
             clean_js
-            clean_atomvm
+            clean_runtime
             clean_all_examples
             ;;
-        atomvm)
-            clean_atomvm
+        runtime)
+            clean_runtime
             ;;
         example)
             clean_example "${EXAMPLE_NAME}"
