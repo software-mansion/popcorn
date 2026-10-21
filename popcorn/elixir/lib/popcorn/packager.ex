@@ -29,6 +29,9 @@ defmodule Popcorn.Packager do
   # All of them should be in elixir's transitive dependency closure
   @base_apps [:elixir]
 
+  @boot_app :popcorn
+  @boot_functions [{Popcorn.Boot, :start, 0}, {Popcorn.Boot, :start, 1}]
+
   @type options :: [
           {:root_dir, Path.t()}
           | {:build_path, Path.t()}
@@ -173,13 +176,13 @@ defmodule Popcorn.Packager do
          {:ok, manifest} <- read_manifest(Path.join([runtimes_dir, variant, "manifest.json"])),
          :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
-         {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
          staged_apps = stage_apps(staging_dir, apps_info),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
-         staged_apps = remove_build_tools(staged_apps),
+         staged_apps = staged_apps |> remove_build_tools() |> configure_kernel(),
          {:ok, staged_apps, treeshake_report} <-
-           maybe_treeshake(staged_apps, treeshake, out_dir) do
+           maybe_treeshake(staged_apps, treeshake, out_dir),
+         {:ok, boot_path} <- create_boot(out_dir, staged_apps, manifest.preloaded) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
@@ -211,7 +214,8 @@ defmodule Popcorn.Packager do
         Map.new(~w(stdlib app deps), fn group ->
           in_group? = fn {app, _info} -> app_bundles[app] == group end
           apps = Enum.filter(staged_apps, in_group?)
-          {group, %{tar: create_tarball(out_dir, group, apps, strip)}}
+          files = if group == "app", do: [{@boot_name, boot_path}], else: []
+          {group, %{tar: create_tarball(out_dir, group, apps, files, strip)}}
         end)
 
       tar_paths =
@@ -224,7 +228,7 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{boot: Path.join("bin", Path.basename(boot_path)), version: vm_version}
+        vm: %{version: vm_version}
       }
 
       File.write!(manifest_path, encode_json(manifest))
@@ -234,7 +238,6 @@ defmodule Popcorn.Packager do
         runtimeVariant: variant,
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
-        bootPath: Path.expand(boot_path),
         tarPaths: tar_paths,
         apps: packed_apps,
         bundles: bundles,
@@ -259,14 +262,11 @@ defmodule Popcorn.Packager do
       end
 
       manifest_path = Path.join(out_dir, "otp/manifest.json")
-      boot_path = Path.join([out_dir, "otp/bin", Path.basename(report.bootPath)])
       lib_dir = Path.join(out_dir, "otp/lib")
 
       File.mkdir_p!(Path.dirname(manifest_path))
-      File.mkdir_p!(Path.dirname(boot_path))
       File.mkdir_p!(lib_dir)
       File.cp!(report.manifestPath, manifest_path)
-      File.cp!(report.bootPath, boot_path)
 
       tar_paths =
         Enum.map(report.tarPaths, fn source ->
@@ -280,7 +280,6 @@ defmodule Popcorn.Packager do
        %{
          report
          | manifestPath: Path.expand(manifest_path),
-           bootPath: Path.expand(boot_path),
            tarPaths: tar_paths
        }}
     end
@@ -330,30 +329,64 @@ defmodule Popcorn.Packager do
   defp brotli_quality(:standard), do: 9
   defp brotli_quality(:max), do: 11
 
-  defp create_boot(out_dir, otp_root, runtime_preloaded) do
-    boot_path = Path.join([Path.dirname(otp_root), "bin", "no_dot_erlang.boot"])
-    {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
+  # The boot script is made like a release's, with the applications' specs,
+  # which systools reads from .app files. They're all loaded from their specs,
+  # as reading .app files at boot would need the Erlang parser, so the package
+  # has none. Only kernel and stdlib are started.
+  defp create_boot(out_dir, staged_apps, runtime_preloaded) do
+    boot_path = Path.join(out_dir, @boot_name)
+    rel_path = Path.join(out_dir, Path.basename(@boot_name, ".boot"))
 
-    preloaded =
-      Enum.flat_map(commands, fn
-        {:preLoaded, modules} -> Enum.map(modules, &to_string/1)
-        _ -> []
-      end)
+    for {app, info} <- staged_apps do
+      File.write!(app_file(app, info), consultable({:application, app, info.props}))
+    end
+
+    apps =
+      for {app, info} <- Enum.sort(staged_apps) do
+        vsn = Keyword.fetch!(info.props, :vsn)
+        if app in [:kernel, :stdlib], do: {app, vsn}, else: {app, vsn, :load}
+      end
+
+    release = {:release, {~c"popcorn", ~c"1"}, {:erts, :erlang.system_info(:version)}, apps}
+    File.write!(rel_path <> ".rel", consultable(release))
+    File.mkdir_p!(Path.dirname(boot_path))
+
+    options = [
+      :silent,
+      :no_dot_erlang,
+      :no_warn_sasl,
+      path: Enum.map(staged_apps, fn {_app, info} -> to_charlist(info.ebin_dir) end),
+      outdir: to_charlist(Path.dirname(boot_path))
+    ]
+
+    with {:ok, _module, _warnings} <- :systools.make_script(to_charlist(rel_path), options),
+         {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term(),
+         :ok <- check_preloaded(boot_path, commands, runtime_preloaded) do
+      commands = Enum.map(commands, &drop_app_versions/1)
+      File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
+      {:ok, boot_path}
+    else
+      {:error, module, reason} -> err(:boot_script_failed, module.format_error(reason))
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp check_preloaded(boot_path, commands, runtime_preloaded) do
+    preloaded = for {:preLoaded, modules} <- commands, module <- modules, do: to_string(module)
 
     case preloaded -- runtime_preloaded do
-      [] ->
-        boot = {:script, id, Enum.map(commands, &drop_app_versions/1)}
-        path = Path.join(out_dir, @boot_name)
-
-        File.mkdir_p!(Path.dirname(path))
-
-        File.write!(path, :erlang.term_to_binary(boot))
-
-        {:ok, fingerprint(path)}
-
-      missing ->
-        err(:unsupported_boot, {boot_path, missing})
+      [] -> :ok
+      missing -> err(:unsupported_boot, {boot_path, missing})
     end
+  end
+
+  # The runtime has no distribution. It's configured in kernel's spec, as the
+  # `-kernel start_distribution false` arguments would need the Erlang parser.
+  defp configure_kernel(staged_apps) do
+    update_in(staged_apps[:kernel].props, fn props ->
+      env = props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, false)
+      Keyword.put(props, :env, env)
+    end)
   end
 
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
@@ -581,8 +614,9 @@ defmodule Popcorn.Packager do
 
     with :ok <- validate_preserved_apps(staged_apps, options),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
-         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir) do
+      staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
+
       report = %{
         preserved_apps: preserved_apps,
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
@@ -616,7 +650,7 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: preserved_modules,
+        keep: @boot_functions ++ preserved_modules,
         leave: preserved_modules
       )
 
@@ -628,11 +662,12 @@ defmodule Popcorn.Packager do
   defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
     preserved = MapSet.new(preserved_apps)
 
-    staged_apps
-    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
-    |> replace_beams(output_dir)
+    shaken_apps =
+      staged_apps
+      |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+      |> replace_beams(output_dir)
 
-    :ok
+    Map.merge(staged_apps, shaken_apps)
   end
 
   defp replace_beams(staged_apps, output_dir) do
@@ -654,17 +689,8 @@ defmodule Popcorn.Packager do
           end
         end)
 
-      replacement_info = %{info | ebin_dir: replacement_dir}
-
-      updated_info =
-        %{app => replacement_info}
-        |> replace_app_modules(%{app => Enum.sort(surviving)})
-        |> Map.fetch!(app)
-
       replace_directory(info.ebin_dir, replacement_dir)
-
-      app_path = Path.join(info.ebin_dir, Path.basename(updated_info.app_path))
-      {app, %{updated_info | app_path: app_path, ebin_dir: info.ebin_dir}}
+      {app, put_in(info.props[:modules], Enum.sort(surviving))}
     end)
   end
 
@@ -685,14 +711,15 @@ defmodule Popcorn.Packager do
 
   defp replace_app_modules(staged_apps, app_modules) do
     Enum.reduce(app_modules, staged_apps, fn {app, modules}, apps ->
-      info = Map.fetch!(apps, app)
-      props = Keyword.put(info.props, :modules, modules)
-      app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
-      application = {:application, app, props}
-
-      File.write!(app_path, :io_lib.format(~c"~tp.~n", [application]))
-      Map.put(apps, app, %{info | app_path: app_path, props: props})
+      put_in(apps[app].props[:modules], modules)
     end)
+  end
+
+  defp app_file(app, info), do: Path.join(info.ebin_dir, "#{app}.app")
+
+  # Saves a term in a format readable by file:consult/1
+  defp consultable(term) do
+    IO.chardata_to_string(:io_lib.format(~c"~tp.~n", [term]))
   end
 
   defp root_apps(all_apps_info, extra_apps, entrypoint) do
@@ -702,14 +729,17 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp entrypoint_roots(_all_apps_info, nil), do: {:ok, @base_apps}
+  defp entrypoint_roots(all_apps_info, _entrypoint)
+       when not is_map_key(all_apps_info, @boot_app),
+       do: err(:missing_boot_app, @boot_app)
+
+  defp entrypoint_roots(_all_apps_info, nil), do: {:ok, [@boot_app | @base_apps]}
 
   # The entrypoint may be a builtin app, so a project with no code of its own
   # doesn't need a stub application just to depend on one.
   defp entrypoint_roots(all_apps_info, entrypoint)
-       when is_map_key(all_apps_info, entrypoint) do
-    {:ok, [entrypoint | @base_apps]}
-  end
+       when is_map_key(all_apps_info, entrypoint),
+       do: {:ok, [entrypoint, @boot_app | @base_apps]}
 
   defp entrypoint_roots(_all_apps_info, entrypoint),
     do: err(:missing_entrypoint, entrypoint)
@@ -764,20 +794,23 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, group, apps, strip) do
+  defp create_tarball(outdir, group, apps, files, strip) do
     path = Path.join(outdir, "lib/#{group}.tar")
 
-    entries =
+    app_entries =
       for {app, info} <- Enum.sort(apps),
           app_dir = Path.dirname(info.ebin_dir),
           file <- Path.wildcard(Path.join(app_dir, "**"), match_dot: true),
-          File.regular?(file) do
+          File.regular?(file) and file != app_file(app, info) do
         entry =
           {to_charlist(Path.join(["lib", "#{app}", Path.relative_to(file, app_dir)])),
            File.read!(file)}
 
         if strip, do: strip_beam(entry), else: entry
       end
+
+    entries =
+      app_entries ++ for({name, source} <- files, do: {to_charlist(name), File.read!(source)})
 
     File.mkdir_p!(Path.dirname(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
@@ -902,6 +935,14 @@ defmodule Popcorn.Packager do
     "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
   end
 
+  def format_error(%{code: "missing_boot_app", app: app}) do
+    "Booting requires the #{app} application, which is not available."
+  end
+
+  def format_error(%{code: "boot_script_failed", message: message}) do
+    "Making the boot script failed: #{message}"
+  end
+
   def format_error(%{code: "treeshake_failed", message: message}), do: message
 
   def format_error(%{code: "missing_runtime_resource", path: path}) do
@@ -949,6 +990,14 @@ defmodule Popcorn.Packager do
 
   defp err(:unknown_preserved_apps, apps) do
     {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:missing_boot_app, app) do
+    {:error, %{code: "missing_boot_app", app: app}}
+  end
+
+  defp err(:boot_script_failed, message) do
+    {:error, %{code: "boot_script_failed", message: to_string(message)}}
   end
 
   defp err(:treeshake_failed, message) do

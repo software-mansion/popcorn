@@ -26,7 +26,7 @@ export type PopcornErrors = {
   "genserver:unserializable": EmptyData;
   "stdio:overflow": { capacityBytes: number; attemptedBytes: number };
   "asset:load":
-    | { kind: "manifest" | "boot-script" | "tarball"; url: string }
+    | { kind: "manifest" | "tarball"; url: string }
     | { kind: "manifest-entry"; url: string; name: string; available: string[] };
   "runtime:eval-unavailable": EmptyData;
 };
@@ -256,7 +256,6 @@ function isAssetLoadData(value: unknown): value is PopcornErrors["asset:load"] {
   }
   switch (value.kind) {
     case "manifest":
-    case "boot-script":
     case "tarball":
       return true;
     case "manifest-entry":

@@ -54,8 +54,8 @@ defmodule Mix.Tasks.Popcorn.Cook do
   The package includes **all** compiled applications in the current
   environment's build directory, including `runtime: false` and transitive Mix
   dependencies. Mix libraries with no `.app` file (`app: false`) are not
-  packaged. The package always includes the Elixir runtime and its required
-  dependencies.
+  packaged. The package always includes the Elixir runtime, Popcorn's
+  application, which boots the VM, and their required dependencies.
 
   The task selects `crypto` if the package includes `asn1`, `crypto`,
   `public_key`, or `ssl`. Otherwise, it selects `core`.
@@ -69,12 +69,10 @@ defmodule Mix.Tasks.Popcorn.Cook do
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
-  runtime. The `otp/` directory contains `manifest.json`, the boot script, and
-  three archives: `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`.
-
-  They contain selected OTP/Elixir built-ins, user applications, and remaining
-  dependencies respectively. All output artifacts also have `.gz` and `.br`
-  variants.
+  runtime. The `otp/` directory contains `manifest.json` and three archives:
+  `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`. They contain
+  selected OTP/Elixir built-ins, user applications, and remaining dependencies
+  respectively. All output artifacts also have `.gz` and `.br` variants.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.
