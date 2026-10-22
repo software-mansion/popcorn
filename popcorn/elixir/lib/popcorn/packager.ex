@@ -177,7 +177,6 @@ defmodule Popcorn.Packager do
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
       File.mkdir_p!(out_dir)
-      config_path = create_config(out_dir, staged_apps)
 
       packed_apps =
         Map.new(staged_apps, fn {app, info} ->
@@ -218,11 +217,7 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{
-          boot: Path.join("bin", Path.basename(boot_path)),
-          config: Path.basename(config_path),
-          version: vm_version
-        }
+        vm: %{boot: Path.join("bin", Path.basename(boot_path)), version: vm_version}
       }
 
       File.write!(manifest_path, encode_json(manifest))
@@ -233,7 +228,6 @@ defmodule Popcorn.Packager do
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
         bootPath: Path.expand(boot_path),
-        configPath: Path.expand(config_path),
         tarPaths: tar_paths,
         apps: packed_apps,
         bundles: bundles,
@@ -246,25 +240,6 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp create_config(out_dir, apps) do
-    app_names = apps |> Map.keys() |> Enum.map(&String.to_existing_atom/1)
-
-    config =
-      Mix.Tasks.Loadconfig.read_compile()
-      |> Keyword.take(app_names)
-      |> Keyword.delete(:popcorn)
-
-    contents =
-      case Mix.Utils.consultable(config) do
-        {:ok, contents} -> contents
-        {:error, term, reason} -> Mix.raise("Cannot export config #{inspect(term)}: #{reason}")
-      end
-
-    path = Path.join(out_dir, "sys.config")
-    File.write!(path, [contents, ".\n"])
-    fingerprint(path)
-  end
-
   defp install_output(report, static_dir, out_dir, brotli_effort) do
     variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
 
@@ -274,7 +249,6 @@ defmodule Popcorn.Packager do
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
       manifest_path = Path.join(out_dir, "otp/manifest.json")
       boot_path = Path.join([out_dir, "otp/bin", Path.basename(report.bootPath)])
-      config_path = Path.join([out_dir, "otp", Path.basename(report.configPath)])
       lib_dir = Path.join(out_dir, "otp/lib")
 
       File.mkdir_p!(Path.dirname(manifest_path))
@@ -282,7 +256,6 @@ defmodule Popcorn.Packager do
       File.mkdir_p!(lib_dir)
       File.cp!(report.manifestPath, manifest_path)
       File.cp!(report.bootPath, boot_path)
-      File.cp!(report.configPath, config_path)
 
       tar_paths =
         Enum.map(report.tarPaths, fn source ->
@@ -297,7 +270,6 @@ defmodule Popcorn.Packager do
          report
          | manifestPath: Path.expand(manifest_path),
            bootPath: Path.expand(boot_path),
-           configPath: Path.expand(config_path),
            tarPaths: tar_paths
        }}
     end

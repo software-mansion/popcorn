@@ -270,7 +270,6 @@ test.describe("boot", () => {
     expect(result).toEqual({
       boot: true,
       events: expect.arrayContaining([
-        { event: { configured_answer: 42 }, beforeBoot: true },
         { event: { startup_send: true }, beforeBoot: true },
         { event: { startup_action: true }, beforeBoot: true },
         { event: { startup_run_js: 42 }, beforeBoot: true },
@@ -420,7 +419,7 @@ test.describe("boot", () => {
         if (route.request().url().endsWith("manifest.json")) {
           return route.fulfill({
             json: {
-              vm: { boot: "start.boot", config: "sys.config" },
+              vm: { boot: "start.boot" },
               apps: kind === "manifest-entry"
                 ? {}
                 : {
@@ -431,9 +430,6 @@ test.describe("boot", () => {
               bundles: { core: { tar: "kernel.tar" } },
             },
           });
-        }
-        if (route.request().url().endsWith("sys.config")) {
-          return route.fulfill({ body: "[]." });
         }
         if (kind === "tarball" && route.request().url().endsWith("start.boot")) {
           return route.fulfill({ body: "" });

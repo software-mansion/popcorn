@@ -22,7 +22,6 @@ const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
 const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
-const CONFIG_PATH = "/etc/sys.config";
 const MANIFEST_NAME = "manifest.json";
 const ENTRYPOINT_READY_EXPR =
   'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}})';
@@ -254,15 +253,7 @@ function buildArgs({
   emulator,
   extra,
 }: BuildArgsArgs): string[] {
-  const args = [
-    ...emulator,
-    "--",
-    ...BASE_ARGS,
-    "-boot",
-    BOOT_NAME,
-    "-config",
-    CONFIG_PATH,
-  ];
+  const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (noshell) args.push("-noshell");
 
@@ -304,7 +295,6 @@ type BeamManifest = {
   bundles: Record<string, { tar: string }>;
   vm: {
     boot: string;
-    config: string;
   };
 };
 
@@ -312,7 +302,6 @@ type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
   bootFile: Uint8Array;
-  configFile: Uint8Array;
   tarballs: Uint8Array[];
 };
 
@@ -347,10 +336,8 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
   }
 
   const bootUrl = resolveAssetsPath(assetsRoot, manifest.vm.boot);
-  const configUrl = resolveAssetsPath(assetsRoot, manifest.vm.config);
-  const [bootFile, configFile, loadedTarballs] = await Promise.all([
+  const [bootFile, loadedTarballs] = await Promise.all([
     fetchBinary(bootUrl),
-    fetchBinary(configUrl),
     Promise.all(
       Object.values(manifest.bundles).map(
         async (entry): Promise<Result<Uint8Array>> => {
@@ -375,7 +362,6 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
       error: err("asset:load", { kind: "boot-script", url: bootUrl }),
     };
   }
-  check(configFile !== null, `Missing application config: ${configUrl}`);
 
   const tarballs: Uint8Array[] = [];
   for (const tarball of loadedTarballs) {
@@ -392,7 +378,6 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
       appNames,
       entrypoint: manifest.entrypoint ?? null,
       bootFile,
-      configFile,
       tarballs,
     },
   };
@@ -408,7 +393,6 @@ function initFs({ module, fsData }: InitFsArgs): void {
   }
 
   writeFile(BOOT_PATH, fsData.bootFile);
-  writeFile(CONFIG_PATH, fsData.configFile);
   writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {

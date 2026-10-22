@@ -75,10 +75,6 @@ defmodule Popcorn.PackagerTest do
       assert manifest["apps"]["kernel"]["bundle"] == "stdlib"
       assert File.regular?(Path.join(out_dir, "otp/" <> manifest["vm"]["boot"]))
       assert manifest["vm"]["boot"] =~ ~r/^bin\/vm\.[a-f0-9]{64}\.boot$/
-      config_path = Path.join(out_dir, "otp/" <> manifest["vm"]["config"])
-      assert report.configPath == config_path
-      assert manifest["vm"]["config"] =~ ~r/^sys\.[a-f0-9]{64}\.config$/
-      assert {:ok, [[]]} = :file.consult(to_charlist(config_path))
       assert length(report.tarPaths) == 3
 
       for {group, %{"tar" => tar}} <- manifest["bundles"] do
