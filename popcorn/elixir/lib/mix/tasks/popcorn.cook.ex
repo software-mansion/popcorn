@@ -64,7 +64,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   >
   > Don't store secrets in your Popcorn app's config. It will be readable by the browser.
 
-  The task selects `crypto` if the package includes `asn1`, `crypto`,
+  The task selects `crypto` VM variant if the package includes `asn1`, `crypto`,
   `public_key`, or `ssl`. Otherwise, it selects `core`.
   An explicit `core` selection fails if an application requires crypto support.
 
