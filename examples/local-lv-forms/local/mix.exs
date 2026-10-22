@@ -18,8 +18,12 @@ defmodule Local.MixProject do
     [default_target: :wasm]
   end
 
+  # The local views use Ecto changesets for their forms, which need no
+  # processes, so Ecto and Phoenix.Ecto are included applications: loaded
+  # (and packaged by Popcorn), but not started.
   def application do
-    [extra_applications: [:logger]] ++ app_mod(Mix.target())
+    [extra_applications: [:logger], included_applications: [:ecto, :phoenix_ecto]] ++
+      app_mod(Mix.target())
   end
 
   defp app_mod(:host), do: []
@@ -28,6 +32,8 @@ defmodule Local.MixProject do
   defp deps do
     [
       {:gettext, "~> 1.0"},
+      {:ecto, "~> 3.12", runtime: false},
+      {:phoenix_ecto, "~> 4.6", runtime: false},
       {:local_live_view, path: "../../../local-live-view"}
     ]
   end
