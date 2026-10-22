@@ -472,7 +472,7 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
-      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_atom()
+      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_existing_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
       ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
       beam_path = Path.join(ebin_dir, name)
