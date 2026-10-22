@@ -136,12 +136,11 @@ defmodule Mix.Tasks.Popcorn.Cook do
   end
 
   defp project_config do
-    config_path = Mix.Project.config()[:config_path]
-
-    if config_path != nil and File.regular?(config_path) do
-      Config.Reader.read!(config_path, env: Mix.env(), target: Mix.target())
+    with path when is_binary(path) <- Mix.Project.config()[:config_path],
+         true <- File.regular?(path) do
+      Config.Reader.read!(path, env: Mix.env(), target: Mix.target())
     else
-      []
+      _not_found -> []
     end
   end
 
