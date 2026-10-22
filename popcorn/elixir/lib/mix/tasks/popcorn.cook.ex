@@ -57,6 +57,13 @@ defmodule Mix.Tasks.Popcorn.Cook do
   packaged. The package always includes the Elixir runtime, Popcorn's
   application, which boots the VM, and their required dependencies.
 
+  The package includes the applications' config, in the boot script, which the
+  browser can read. `runtime.exs` is not evaluated.
+
+  > #### Secrets {: .warning }
+  >
+  > Don't store secrets in your Popcorn app's config. It will be readable by the browser.
+
   The task selects `crypto` if the package includes `asn1`, `crypto`,
   `public_key`, or `ssl`. Otherwise, it selects `core`.
   An explicit `core` selection fails if an application requires crypto support.
@@ -113,6 +120,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       brotli_effort: Application.get_env(:popcorn, :brotli_effort, :standard),
       strip: Application.get_env(:popcorn, :strip, true),
       exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
+      config: project_config(),
       treeshake: treeshake_options(Application.get_env(:popcorn, :treeshake, false))
     ]
 
@@ -124,6 +132,16 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
       {:error, error} ->
         Mix.raise(Packager.format_error(error))
+    end
+  end
+
+  defp project_config do
+    config_path = Mix.Project.config()[:config_path]
+
+    if config_path != nil and File.regular?(config_path) do
+      Config.Reader.read!(config_path, env: Mix.env(), target: Mix.target())
+    else
+      []
     end
   end
 

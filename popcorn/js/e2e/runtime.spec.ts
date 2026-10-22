@@ -270,6 +270,7 @@ test.describe("boot", () => {
     expect(result).toEqual({
       boot: true,
       events: expect.arrayContaining([
+        { event: { configured_answer: 42 }, beforeBoot: true },
         { event: { startup_send: true }, beforeBoot: true },
         { event: { startup_action: true }, beforeBoot: true },
         { event: { startup_run_js: 42 }, beforeBoot: true },

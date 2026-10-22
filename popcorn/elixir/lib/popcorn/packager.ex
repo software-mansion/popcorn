@@ -42,6 +42,7 @@ defmodule Popcorn.Packager do
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
           | {:exclude_priv, [String.t() | {atom(), String.t()}]}
+          | {:config, keyword()}
           | {:treeshake, false | [preserved_apps: [atom()]]}
           | {:static_dir, Path.t()}
         ]
@@ -55,6 +56,7 @@ defmodule Popcorn.Packager do
           runtime_variant: String.t() | nil,
           strip: boolean(),
           exclude_priv: [String.t() | {atom(), String.t()}],
+          config: keyword(),
           treeshake: false | [preserved_apps: [atom()]]
         }
 
@@ -101,6 +103,7 @@ defmodule Popcorn.Packager do
         brotli_effort: :standard,
         strip: true,
         exclude_priv: [],
+        config: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
@@ -131,6 +134,7 @@ defmodule Popcorn.Packager do
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
                  exclude_priv: options[:exclude_priv],
+                 config: options[:config],
                  treeshake: options[:treeshake]
                }),
              {:ok, installed} <-
@@ -162,6 +166,7 @@ defmodule Popcorn.Packager do
       runtime_variant: runtime_variant,
       strip: strip,
       exclude_priv: exclude_priv,
+      config: config,
       treeshake: treeshake
     } = args
 
@@ -179,7 +184,8 @@ defmodule Popcorn.Packager do
          staged_apps = stage_apps(staging_dir, apps_info),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
-         staged_apps = staged_apps |> remove_build_tools() |> configure_kernel(),
+         staged_apps =
+           staged_apps |> remove_build_tools() |> add_config(config) |> configure_kernel(),
          {:ok, staged_apps, treeshake_report} <-
            maybe_treeshake(staged_apps, treeshake, out_dir),
          {:ok, boot_path} <- create_boot(out_dir, staged_apps, manifest.preloaded) do
@@ -378,6 +384,18 @@ defmodule Popcorn.Packager do
       [] -> :ok
       missing -> err(:unsupported_boot, {boot_path, missing})
     end
+  end
+
+  # The applications' config goes into their specs, overriding their .app files'
+  # env like sys.config would, as reading sys.config at boot needs the Erlang
+  # parser. Popcorn's own config is for packaging.
+  defp add_config(staged_apps, config) do
+    config
+    |> Keyword.delete(:popcorn)
+    |> Keyword.take(Map.keys(staged_apps))
+    |> Enum.reduce(staged_apps, fn {app, app_config}, apps ->
+      update_in(apps[app].props[:env], &Keyword.merge(&1 || [], app_config))
+    end)
   end
 
   # The runtime has no distribution. It's configured in kernel's spec, as the

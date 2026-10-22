@@ -219,6 +219,24 @@ defmodule Popcorn.PackagerTest do
       assert {:ok, %{apps: %{sasl: _app}}} = Packager.build(options)
     end
 
+    test "config", %{options: options, out_dir: out_dir} do
+      config = [
+        user_app: [answer: 42],
+        logger: [level: :warning],
+        popcorn: [strip: true],
+        not_packaged: [key: :value]
+      ]
+
+      assert {:ok, _report} = Packager.build(Keyword.put(options, :config, config))
+
+      # In the boot script, which loads the applications from their specs
+      specs = boot_specs(out_dir)
+      assert specs.user_app[:env][:answer] == 42
+      assert specs.logger[:env][:level] == :warning
+      refute Keyword.has_key?(specs.popcorn[:env], :strip)
+      refute Map.has_key?(specs, :not_packaged)
+    end
+
     test "without an entrypoint", %{options: options} do
       assert {:ok, report} = Packager.build(Keyword.put(options, :app, nil))
       assert %{popcorn: _app} = report.apps
@@ -257,6 +275,15 @@ defmodule Popcorn.PackagerTest do
   defp bundle_path(out_dir, group) do
     tar = read_manifest(out_dir)["bundles"][group]["tar"]
     Path.join(out_dir, "otp/" <> tar)
+  end
+
+  defp boot_specs(out_dir) do
+    archive = read_archive(bundle_path(out_dir, "app"))
+    {:script, _id, commands} = archive |> Map.fetch!("bin/vm.boot") |> :erlang.binary_to_term()
+
+    for {:apply, {:application, :load, [{:application, app, props}]}} <- commands,
+        into: %{},
+        do: {app, props}
   end
 
   defp read_archive(path) do
