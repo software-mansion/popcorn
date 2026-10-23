@@ -42,7 +42,7 @@ defmodule Popcorn.PackagerTest do
       }
     }
 
-    File.write!(Path.join(runtime_dir, "manifest.json"), :json.encode(manifest))
+    File.write!(Path.join(runtime_dir, "manifest.json"), JSON.encode!(manifest))
 
     for app <- [:user_app, :extra_app] do
       ebin = Path.join([build_path, to_string(app), "ebin"])
@@ -237,10 +237,12 @@ defmodule Popcorn.PackagerTest do
       refute Map.has_key?(specs, :not_packaged)
     end
 
-    test "without an entrypoint", %{options: options} do
+    test "without an entrypoint", %{options: options, out_dir: out_dir} do
       assert {:ok, report} = Packager.build(Keyword.put(options, :app, nil))
       assert %{popcorn: _app} = report.apps
       assert report.entrypoint == nil
+      # JSON's null, which the JS reads as no entrypoint
+      assert read_manifest(out_dir)["entrypoint"] == nil
     end
 
     test "booting requires Popcorn", %{tmp_dir: tmp_dir} do
@@ -269,7 +271,7 @@ defmodule Popcorn.PackagerTest do
   end
 
   defp read_manifest(out_dir) do
-    out_dir |> Path.join("otp/manifest.json") |> File.read!() |> :json.decode()
+    out_dir |> Path.join("otp/manifest.json") |> File.read!() |> JSON.decode!()
   end
 
   defp bundle_path(out_dir, group) do

@@ -6,6 +6,7 @@ assets/
 # Test artifacts
 playwright-report/
 test-results/
+e2e/setup/public/
 
 # Node
 node_modules/

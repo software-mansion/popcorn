@@ -1,6 +1,6 @@
 -module(test_entrypoint_app).
 -behaviour(application).
--export([start/2, stop/1]).
+-export([start/2, stop/1, report_no_entrypoint/0]).
 
 start(_Type, _Args) ->
     start(os:getenv("POPCORN_STARTUP_EVENT")).
@@ -25,6 +25,13 @@ start(Event) ->
 
 stop(_State) ->
     ok.
+
+%% Run with -run in the package without an entrypoint, where the application is
+%% loaded, with its config, but not started
+report_no_entrypoint() ->
+    Started = lists:keymember(test_entrypoint, 1, application:which_applications()),
+    {ok, Answer} = application:get_env(test_entrypoint, answer),
+    ok = wasm:send(#{no_entrypoint => #{started => Started, configured_answer => Answer}}).
 
 idle() ->
     receive
