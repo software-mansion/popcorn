@@ -6,9 +6,11 @@ import CopyIcon from "./CopyIcon.astro";
 <div
   class="outline-ink bg-cream flex w-full items-center justify-between rounded-xl py-1 pr-1 pl-4 outline-1 -outline-offset-1 outline-dashed"
 >
-  <code class="flex items-center gap-3 font-mono text-sm leading-6">
+  <code class="flex items-center gap-3 font-mono text-sm leading-[normal]">
     <span class="text-orange text-2xl font-light" aria-hidden="true">›</span>
-    <span data-install-command>{'{:popcorn, "~> 1.0"}'}</span>
+    <span class="translate-y-px" data-install-command
+      >{'{:popcorn, "~> 1.0"}'}</span
+    >
   </code>
 
   <button
