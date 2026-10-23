@@ -46,6 +46,13 @@ defmodule Mix.Tasks.Llv.InstallTest do
       + |    |> put_resp_header("cross-origin-opener-policy", "same-origin")
       """)
     end
+
+    test "serves Brotli-compressed static files like gzip ones" do
+      installed()
+      |> assert_has_patch(@endpoint_path, """
+      + |    brotli: not code_reloading?
+      """)
+    end
   end
 
   describe "inject_web_module" do
@@ -104,6 +111,7 @@ defmodule Mix.Tasks.Llv.InstallTest do
       installed()
       |> assert_creates("local/mix.exs")
       |> assert_creates("local/.formatter.exs")
+      |> assert_creates("local/config/config.exs")
       |> assert_creates("local/lib/local/application.ex")
       |> assert_creates("local/lib/hello_local.ex")
     end

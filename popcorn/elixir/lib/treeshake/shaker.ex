@@ -20,14 +20,15 @@ defmodule Treeshake.Shaker do
   def shake(opts, call_graph, module_index) do
     leave = MapSet.new(opts.leave)
     stub_removed_functions = Map.get(opts, :stub_removed_functions, false)
+    line_info = Map.get(opts, :line_info, true)
     output_dir = Map.get(opts, :output_dir)
 
     ebin_files = prepare_ebin_files(opts, output_dir)
 
-    beams =
+    {left, beams} =
       ebin_files
       |> Enum.filter(&(Path.extname(&1) == ".beam"))
-      |> Enum.reject(&(beam_module(&1) in leave))
+      |> Enum.split_with(&(beam_module(&1) in leave))
 
     reachable_mods_funs =
       call_graph
@@ -42,11 +43,20 @@ defmodule Treeshake.Shaker do
     modules_shaked =
       process_async(to_shake, fn path ->
         {shaked, modules_shaked} =
-          do_shake(path, reachable_mods_funs, module_index, stub_removed_functions)
+          do_shake(path, reachable_mods_funs, module_index, stub_removed_functions, line_info)
 
         unless opts.dry_run, do: File.write!(path, shaked)
         {beam_module(path), modules_shaked}
       end)
+
+    # Left modules aren't recompiled, so they only lose their Line chunks
+    unless line_info or opts.dry_run do
+      left
+      |> Task.async_stream(&File.write!(&1, &1 |> File.read!() |> without_line_chunk()),
+        timeout: 30_000
+      )
+      |> Stream.run()
+    end
 
     handle_to_remove(to_remove, opts)
 
@@ -85,7 +95,12 @@ defmodule Treeshake.Shaker do
 
   defp stub_remove_functions(to_remove, opts) do
     process_async(to_remove, fn path ->
-      {shaked, _modules_shaked} = BeamRewriter.keep_funs(path, [], stub_removed_public: true)
+      {shaked, _modules_shaked} =
+        BeamRewriter.keep_funs(path, [],
+          stub_removed_public: true,
+          line_info: Map.get(opts, :line_info, true)
+        )
+
       unless opts.dry_run, do: File.write!(path, shaked)
     end)
   end
@@ -99,9 +114,20 @@ defmodule Treeshake.Shaker do
     end
   end
 
-  defp do_shake(path, reachable_mods_funs, module_index, stub_removed_functions) do
+  defp do_shake(path, reachable_mods_funs, module_index, stub_removed_functions, line_info) do
     module_info = Map.fetch!(module_index, beam_module(path))
 
+    if module_info.nifs == :unknown do
+      # Loading NIFs fails unless every NIF in the library has a function in
+      # the module. They're not declared with `-nifs`, so all are kept.
+      beam = File.read!(path)
+      {if(line_info, do: beam, else: without_line_chunk(beam)), []}
+    else
+      shake_module(path, module_info, reachable_mods_funs, stub_removed_functions, line_info)
+    end
+  end
+
+  defp shake_module(path, module_info, reachable_mods_funs, stub_removed_functions, line_info) do
     reachable_funs = @keep_funs ++ Map.fetch!(reachable_mods_funs, module_info.module)
     reachable_mapset = MapSet.new(reachable_funs)
 
@@ -110,9 +136,23 @@ defmodule Treeshake.Shaker do
         if Enum.any?(called_by, &(&1 in reachable_mapset)), do: [fun], else: []
       end)
 
+    # The compiler removes private functions nothing calls. No NIF functions
+    # can be removed, otherwise the module fails to load, so we just make
+    # all NIFs public ¯\_(ツ)_/¯
+    export = module_info.nifs
+
     Treeshake.Utils.BeamRewriter.keep_funs(path, reachable_funs ++ reachable_privs,
-      stub_removed_public: stub_removed_functions
+      stub_removed_public: stub_removed_functions,
+      export: export,
+      compact_tables: true,
+      line_info: line_info
     )
+  end
+
+  defp without_line_chunk(beam) do
+    {:ok, _module, chunks} = :beam_lib.all_chunks(beam)
+    {:ok, beam} = chunks |> List.keydelete(~c"Line", 0) |> :beam_lib.build_module()
+    beam
   end
 
   defp beam_module(beam_path) do

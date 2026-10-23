@@ -19,7 +19,8 @@ defmodule Treeshake.ModuleIndex do
 
   defp build_entry(path, hardcoded, ignore_funs) do
     {module, core} = Treeshake.Utils.BeamReader.read_core!(path)
-    info = Treeshake.Utils.BeamAnalyzer.analyze(module, core)
+    definitions = Treeshake.Utils.BeamReader.read_elixir_definitions(path)
+    info = Treeshake.Utils.BeamAnalyzer.analyze(module, core, definitions)
 
     info =
       info
@@ -31,11 +32,14 @@ defmodule Treeshake.ModuleIndex do
     {info.module, info}
   end
 
+  # Hardcoded calls are made by a function, or by all functions of a module
   defp add_hardcoded_calls(functions, module, hardcoded) do
-    case Map.fetch(hardcoded.calls, module) do
-      {:ok, calls} -> Enum.map(functions, &%{&1 | calls: calls ++ &1.calls})
-      :error -> functions
-    end
+    module_calls = Map.get(hardcoded.calls, module, [])
+
+    Enum.map(functions, fn function ->
+      calls = Map.get(hardcoded.calls, {module, function.name, function.arity}, [])
+      %{function | calls: module_calls ++ calls ++ function.calls}
+    end)
   end
 
   defp add_hardcoded_behaviour_impls(behaviour_impls, module, hardcoded) do

@@ -9,6 +9,13 @@ defmodule LocalLiveView.Application do
       Application.put_env(:phoenix, :json_library, JSON)
     end
 
+    # Phoenix warns about an endpoint without configuration in the application
+    # environment, though it gets its configuration below, as the defaults
+    # that the environment overrides
+    if Application.get_env(:local_live_view, LocalLiveView.Endpoint) == nil do
+      Application.put_env(:local_live_view, LocalLiveView.Endpoint, [])
+    end
+
     children = [
       {LocalLiveView.Endpoint, endpoint_config()},
       LocalLiveView.Dispatcher

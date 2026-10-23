@@ -73,6 +73,39 @@ defmodule Mix.Tasks.Popcorn.Cook do
   application to the package; select it through the entrypoint, its dependencies,
   or `extra_apps` first. Use `treeshake: []` to enable without preserving apps.
 
+  For particular modules or functions, use `keep`, which keeps them with the
+  code they rely on. `drop` removes modules even if they're reachable,
+  typically ones only used at build time:
+
+  ```elixir
+  config :popcorn,
+    treeshake: [keep: [MyApp.Plugin, {MyApp.Codec, :decode, 1}], drop: [MyApp.Codegen]]
+  ```
+
+  `line_info: false` leaves out BEAM line numbers, which saves about 7% of the
+  compressed archive, but stack traces show no line numbers.
+
+  Some code reached dynamically is kept by default. That includes the
+  functions that a library's macros, like `use`, generate in a module
+  implementing the library's behaviour, like `__live__/0` of LiveComponents,
+  Ecto schemas once they're referenced, and LocalLiveView's views.
+
+  Conversely, some reachable code that's only used to compile, evaluate or
+  format code, by a shell, or in distribution, is removed by default:
+  Erlang's parser, code evaluator and linter, Elixir's parser and code
+  formatter, the shell's line editing, and modules for distribution and a few
+  storage formats. Calling a function of a removed module raises
+  `UndefinedFunctionError`, so keep the ones an application needs. To
+  evaluate Erlang code, keep `:erl_eval`, `:erl_lint`, `:erl_parse` and
+  `:eval_bits`, and to evaluate Elixir code, also preserve `elixir`. Evaluated
+  code can only call functions that are packaged. Configuring applications
+  through VM arguments, like `-kernel shell_history enabled`, needs
+  `:erl_parse` too.
+
+  Tree-shaking leaves Erlang's `kernel` and `stdlib` as they are, except for
+  modules of the shell, networking and distribution, which it removes when
+  they're unreachable, like other code.
+
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly

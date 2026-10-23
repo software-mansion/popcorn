@@ -161,6 +161,7 @@ defmodule Popcorn.PackagerTest do
       archive = read_archive(bundle_path(out_dir, "deps"))
       assert Map.has_key?(archive, "lib/extra_app/priv/data.txt")
       assert Map.has_key?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
+      assert line_numbers?(archive, "lib/popcorn/ebin/Elixir.Popcorn.JS.beam")
       assert "from priv" = Map.fetch!(archive, "lib/popcorn/priv/nested/fixture.txt")
       refute Enum.any?(Map.keys(archive), &String.starts_with?(&1, "lib/popcorn/priv/static"))
 
@@ -180,6 +181,10 @@ defmodule Popcorn.PackagerTest do
 
       # The boot script has the applications' specs
       refute Enum.any?(Map.keys(user_archive) ++ Map.keys(archive), &(Path.extname(&1) == ".app"))
+
+      # Only tree-shaking compacts tables
+      stdlib = read_archive(bundle_path(out_dir, "stdlib"))
+      refute compacted?(stdlib, "lib/stdlib/ebin/unicode_util.beam")
 
       assert %{"runtimeVariant" => "core", "entrypoint" => "user_app"} = manifest
     end
@@ -202,6 +207,56 @@ defmodule Popcorn.PackagerTest do
       assert after_app["bundles"]["deps"] == before["bundles"]["deps"]
       assert after_app["bundles"]["stdlib"] == before["bundles"]["stdlib"]
       assert after_app["vm"] == before["vm"]
+    end
+
+    test "leaving out line numbers", %{options: options, out_dir: out_dir} do
+      options = Keyword.put(options, :treeshake, preserved_apps: [], line_info: false)
+      assert {:ok, _report} = Packager.build(options)
+
+      # Tree-shaken and recompiled, and left as it is
+      deps = read_archive(bundle_path(out_dir, "deps"))
+      refute line_numbers?(deps, "lib/popcorn/ebin/Elixir.Popcorn.Boot.beam")
+      stdlib = read_archive(bundle_path(out_dir, "stdlib"))
+      refute line_numbers?(stdlib, "lib/kernel/ebin/application_controller.beam")
+    end
+
+    # Tree-shaking leaves out unicode_util's database, while inspecting atoms
+    # checks if they're normalized
+    test "tree-shaking the Unicode character database", %{options: options, out_dir: out_dir} do
+      options = Keyword.put(options, :treeshake, preserved_apps: [])
+      assert {:ok, _report} = Packager.build(options)
+
+      archive = read_archive(bundle_path(out_dir, "stdlib"))
+      assert compacted?(archive, "lib/stdlib/ebin/unicode_util.beam")
+
+      # The packaged modules that normalize replace the loaded ones, so in
+      # another VM, which stops with the test
+      paths = Enum.flat_map(:code.get_path(), &[~c"-pa", &1])
+      {:ok, peer, _node} = :peer.start_link(%{connection: :standard_io, args: paths})
+
+      for {module, path} <- [
+            unicode: "lib/stdlib/ebin/unicode.beam",
+            unicode_util: "lib/stdlib/ebin/unicode_util.beam",
+            "Elixir.String.Tokenizer": "lib/elixir/ebin/Elixir.String.Tokenizer.beam"
+          ] do
+        :peer.call(peer, :code, :unstick_mod, [module])
+        beam = Map.fetch!(archive, path)
+        {:module, ^module} = :peer.call(peer, :code, :load_binary, [module, ~c"", beam])
+      end
+
+      inspect = &:peer.call(peer, Kernel, :inspect, [&1])
+      normalize = &:peer.call(peer, String, :normalize, [&1, &2])
+
+      assert inspect.(:hello) == ":hello"
+      assert inspect.(:ówka) == ":ówka"
+      # Telling if it's normalized needs the database, so it's quoted
+      assert inspect.(:żółw) == ~s(:"żółw")
+      assert inspect.(żółw: 1) == ~s(["żółw": 1])
+
+      assert normalize.("ówka\r\n", :nfc) == "ówka\r\n"
+
+      error = assert_raise UndefinedFunctionError, fn -> normalize.("żółw", :nfc) end
+      assert {error.module, error.function} == {:unicode_util, :nfc}
     end
 
     test "leaving out priv files of applications that aren't packaged", %{options: options} do
@@ -291,6 +346,25 @@ defmodule Popcorn.PackagerTest do
   defp read_archive(path) do
     {:ok, entries} = :erl_tar.extract(to_charlist(path), [:memory])
     Map.new(entries, fn {name, contents} -> {to_string(name), contents} end)
+  end
+
+  # Whether a module has line numbers, which the Line chunk counts. Modules
+  # compiled without them have one too, with no line instructions.
+  defp line_numbers?(archive, path) do
+    case archive |> Map.fetch!(path) |> :beam_lib.chunks([~c"Line"]) do
+      {:ok, {_module, [{~c"Line", <<_version::32, _flags::32, instructions::32, _::binary>>}]}} ->
+        instructions > 0
+
+      {:error, :beam_lib, {:missing_chunk, _beam, _chunk}} ->
+        false
+    end
+  end
+
+  # Whether a module has tables compacted, which it looks up with
+  # popcorn_table_lookup
+  defp compacted?(archive, path) do
+    {:ok, {_module, [atoms: atoms]}} = archive |> Map.fetch!(path) |> :beam_lib.chunks([:atoms])
+    Enum.any?(atoms, &match?({_index, :popcorn_table_lookup}, &1))
   end
 
   defp build_tool?(module) do

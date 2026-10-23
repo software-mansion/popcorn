@@ -80,23 +80,22 @@ defmodule LocalLiveView.MixProject do
       # For the e2e tests' app, see test/e2e/README.md
       {:bandit, "~> 1.5", runtime: false, only: :test},
       {:esbuild, "~> 0.8", runtime: false, only: :test},
-      # Popcorn packages and starts the applications the local project
-      # depends on at runtime, so the ones local views use in the browser
-      # can't be `runtime: false`.
-      {:phoenix, "~> 1.8.4"},
-      {:phoenix_live_view, "~> 1.1"},
+      # Starting OTP apps of Phoenix and LiveView is not needed for LLV
+      {:phoenix, "~> 1.8.4", runtime: Mix.target() != :wasm},
+      {:phoenix_live_view, "~> 1.1", runtime: Mix.target() != :wasm},
       {:phoenix_html, "~> 4.1"},
-      {:phoenix_ecto, "~> 4.6"},
-      {:ecto, "~> 3.12"},
-      {:plug, "~> 1.14"},
+      {:plug, "~> 1.14", runtime: Mix.target() != :wasm},
       # plug_crypto is needed in runtime for signing LV tokens
       {:plug_crypto, "~> 2.0"},
-      {:tailwind, "~> 0.3", runtime: false},
-      {:telemetry, "~> 0.4.3 or ~> 1.0"},
-      # For LocalLiveView.Watcher, which runs on the host only
-      {:file_system, "~> 1.0", runtime: Mix.target() != :wasm}
-    ]
+      {:telemetry, "~> 0.4.3 or ~> 1.0"}
+    ] ++ host_deps(Mix.target())
   end
+
+  # For LocalLiveView.Watcher, which runs on the host only. Left out for Wasm,
+  # rather than limited with `targets:`, which Mix rejects, as Popcorn depends on
+  # file_system on all targets. This way, Wasm builds get it only from Popcorn.
+  defp host_deps(:wasm), do: []
+  defp host_deps(_target), do: [{:file_system, "~> 1.0"}]
 
   @popcorn_source Path.expand("../popcorn/elixir", __DIR__)
 
