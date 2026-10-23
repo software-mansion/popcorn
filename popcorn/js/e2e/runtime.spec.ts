@@ -415,12 +415,11 @@ test.describe("boot", () => {
     });
     expect(rejected.errors).toEqual([]);
 
-    for (const kind of ["manifest-entry", "boot-script", "tarball"]) {
+    for (const kind of ["manifest-entry", "tarball"]) {
       await page.route("**/asset-errors/**", (route) => {
         if (route.request().url().endsWith("manifest.json")) {
           return route.fulfill({
             json: {
-              vm: { boot: "start.boot", config: "sys.config" },
               apps: kind === "manifest-entry"
                 ? {}
                 : {
@@ -431,12 +430,6 @@ test.describe("boot", () => {
               bundles: { core: { tar: "kernel.tar" } },
             },
           });
-        }
-        if (route.request().url().endsWith("sys.config")) {
-          return route.fulfill({ body: "[]." });
-        }
-        if (kind === "tarball" && route.request().url().endsWith("start.boot")) {
-          return route.fulfill({ body: "" });
         }
         return route.fulfill({ status: 404 });
       });
@@ -451,12 +444,7 @@ test.describe("boot", () => {
             name: "kernel",
             available: [],
           }
-        : {
-            kind,
-            url: kind === "boot-script"
-              ? "/asset-errors/start.boot"
-              : "/asset-errors/kernel.tar",
-          };
+        : { kind, url: "/asset-errors/kernel.tar" };
       expect(result).toEqual({ ok: false, error: { t: "asset:load", data } });
       await page.unroute("**/asset-errors/**");
     }

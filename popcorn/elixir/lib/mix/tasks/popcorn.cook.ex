@@ -42,29 +42,31 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `extra_apps` | Additional applications to include with their required dependencies. Default: `[]`. |
   | `runtime_variant` | Selects `:core` or `:crypto` instead of automatic runtime selection. |
   | `strip` | Removes BEAM debug and documentation chunks. Default: `true`. |
+  | `exclude_priv` | Leaves out `priv` files matching glob patterns, which are relative to `priv`: `{app, pattern}` in one application's, like `{:phoenix, "templates"}`, and a bare pattern in every application's, like `"static/*.map"`. A matched directory is left out with its contents. Default: `[]`. |
   | `treeshake` | Removes unreachable modules and functions. Experimental. Default: `false`. Set `[preserved_apps: [...]]` to enable. |
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
   Use application names, such as `:my_app`, rather than module names.
-  Application names and runtime variants also accept strings.
+  Runtime variants also accept strings.
   Popcorn starts the entrypoint when the browser virtual machine boots.
   Extra applications enter the package but do not become entrypoints.
 
   The package includes **all** compiled applications in the current
   environment's build directory, including `runtime: false` and transitive Mix
   dependencies. Mix libraries with no `.app` file (`app: false`) are not
-  packaged. The package always includes the Elixir runtime and its required
-  dependencies.
+  packaged. The package always includes the Elixir runtime, Popcorn's
+  application, which boots the VM, and their required dependencies.
 
-  The task selects `crypto` if the package includes `asn1`, `crypto`,
-  `public_key`, or `ssl`. Otherwise, it selects `core`.
-  An explicit `core` selection fails if an application requires crypto support.
-
-  Popcorn includes application config in the assets. `runtime.exs` is not evaluated.
+  The package includes the applications' config, in the boot script, which the
+  browser can read. `runtime.exs` is not evaluated.
 
   > #### Secrets {: .warning }
   >
   > Don't store secrets in your Popcorn app's config. It will be readable by the browser.
+
+  The task selects `crypto` VM variant if the package includes `asn1`, `crypto`,
+  `public_key`, or `ssl`. Otherwise, it selects `core`.
+  An explicit `core` selection fails if an application requires crypto support.
 
   Tree-shaking can remove code reached only through dynamic calls or evaluation.
   Use `preserved_apps` for such applications. Preservation does not add an
@@ -74,11 +76,10 @@ defmodule Mix.Tasks.Popcorn.Cook do
   ## Output
 
   The output contains the browser API (`index.mjs`), workers, and WebAssembly
-  runtime. The `otp/` directory contains `manifest.json`, the boot script, config, and
-  three archives: `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`.
-
-  They contain selected OTP/Elixir built-ins, user applications, and remaining
-  dependencies respectively. Archives also have `.gz` and `.br` copies.
+  runtime. The `otp/` directory contains `manifest.json` and three archives:
+  `stdlib.<hash>.tar`, `app.<hash>.tar`, and `deps.<hash>.tar`. They contain
+  selected OTP/Elixir built-ins, user applications, and remaining dependencies
+  respectively. All output artifacts also have `.gz` and `.br` variants.
 
   Serve the complete output directory. Keep its generated layout.
   Import `Popcorn` from the generated `index.mjs` to use the package.
@@ -113,12 +114,13 @@ defmodule Mix.Tasks.Popcorn.Cook do
       root_dir: File.cwd!(),
       build_path: Path.join(Mix.Project.build_path(), "lib"),
       out_dir: Keyword.get(options, :out_dir, "public/out"),
-      app:
-        app_name(Application.get_env(:popcorn, :app, Keyword.fetch!(Mix.Project.config(), :app))),
-      extra_apps: Enum.map(Application.get_env(:popcorn, :extra_apps, []), &to_string/1),
-      runtime_variant: app_name(Application.get_env(:popcorn, :runtime_variant)),
+      app: Application.get_env(:popcorn, :app, Keyword.fetch!(Mix.Project.config(), :app)),
+      extra_apps: Application.get_env(:popcorn, :extra_apps, []),
+      runtime_variant: runtime_variant(Application.get_env(:popcorn, :runtime_variant)),
       brotli_effort: Application.get_env(:popcorn, :brotli_effort, :standard),
       strip: Application.get_env(:popcorn, :strip, true),
+      exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
+      config: project_config(),
       treeshake: treeshake_options(Application.get_env(:popcorn, :treeshake, false))
     ]
 
@@ -133,12 +135,21 @@ defmodule Mix.Tasks.Popcorn.Cook do
     end
   end
 
-  defp app_name(nil), do: nil
-  defp app_name(name), do: to_string(name)
+  defp project_config do
+    with path when is_binary(path) <- Mix.Project.config()[:config_path],
+         true <- File.regular?(path) do
+      Config.Reader.read!(path, env: Mix.env(), target: Mix.target())
+    else
+      _not_found -> []
+    end
+  end
+
+  defp runtime_variant(nil), do: nil
+  defp runtime_variant(variant), do: to_string(variant)
 
   defp treeshake_options(false), do: false
 
   defp treeshake_options(options) when is_list(options) do
-    Keyword.update(options, :preserved_apps, [], &Enum.map(&1, fn app -> to_string(app) end))
+    Keyword.put_new(options, :preserved_apps, [])
   end
 end

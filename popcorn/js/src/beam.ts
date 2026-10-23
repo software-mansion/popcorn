@@ -21,20 +21,8 @@ const DEFAULT_USER = "web_user";
 const DEFAULT_HOME_DIR = "/home/web_user";
 const FS_DIRS = ["/bin", "/lib", "/etc", "/tmp", "/home", DEFAULT_HOME_DIR];
 const BOOT_NAME = "vm";
-const BOOT_PATH = `/bin/${BOOT_NAME}.boot`;
-const CONFIG_PATH = "/etc/sys.config";
 const MANIFEST_NAME = "manifest.json";
-const ENTRYPOINT_READY_EXPR =
-  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_ready">>}})';
-const ENTRYPOINT_FAILED_EXPR =
-  'wasm:send(#{<<"_popcorn">> => #{<<"t">> => <<"boot_failed">>}})';
-
-// https://www.erlang.org/doc/apps/erts/inet_cfg.html
-const INETRC_PATH = "/etc/inetrc";
-// lookup types: `native | file | dns`
-// We need `file` lookup to avoid spawning
-// /bin/inet_gethost which is not available
-const INETRC = "{lookup, [file]}.\n";
+const BOOT_MODULE = "Elixir.Popcorn.Boot";
 
 const STDOUT_FD = 1;
 const UTF8 = new TextEncoder();
@@ -47,9 +35,6 @@ const BASE_ARGS = [
   "erl",
   "-home",
   DEFAULT_HOME_DIR,
-  "-kernel",
-  "start_distribution",
-  "false",
 ];
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
@@ -102,7 +87,7 @@ async function boot(
 
     const fsData = loadedFsData.data;
     const { vmReady, handleVmReady } = vm;
-    const { appReady, handleAppReady } = trackAppReady(fsData.entrypoint);
+    const { bootReady, handleBootReady } = trackBootReady();
 
     const runtimeEnv = {
       ...env,
@@ -113,7 +98,6 @@ async function boot(
       LOGNAME: DEFAULT_USER,
       COLUMNS: String(ttySize.columns),
       LINES: String(ttySize.rows),
-      ERL_INETRC: INETRC_PATH,
     };
     let emitError: ((payload: OtpErrorPayload) => void) | null = function (
       payload,
@@ -139,7 +123,7 @@ async function boot(
           return;
         }
         if (handleVmReady(event)) return;
-        if (handleAppReady(event)) return;
+        if (handleBootReady(event)) return;
 
         emit(event);
       },
@@ -178,7 +162,7 @@ async function boot(
         shared: true,
       });
     }
-    const ready = Promise.all([vmReady, appReady]);
+    const ready = Promise.all([vmReady, bootReady]);
     const module = await createModule(moduleConfig);
     check(state.module === module);
     await ready;
@@ -206,19 +190,16 @@ function trackVmReady(state: BeamState) {
   return { vmReady, handleVmReady };
 }
 
-function trackAppReady(entrypoint: string | null) {
+function trackBootReady() {
   let resolve = () => {};
   let reject = (_error: PopcornError) => {};
 
-  let appReady = Promise.resolve();
-  if (entrypoint !== null) {
-    appReady = new Promise<void>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-  }
+  const bootReady = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
 
-  const handleAppReady = (event: BeamMessage): boolean => {
+  const handleBootReady = (event: BeamMessage): boolean => {
     if (isBridgeMarker(event, "boot_ready")) {
       resolve();
       return true;
@@ -230,7 +211,7 @@ function trackAppReady(entrypoint: string | null) {
     return false;
   };
 
-  return { appReady, handleAppReady };
+  return { bootReady, handleBootReady };
 }
 
 function toPopcornError(error: unknown): PopcornError {
@@ -254,15 +235,7 @@ function buildArgs({
   emulator,
   extra,
 }: BuildArgsArgs): string[] {
-  const args = [
-    ...emulator,
-    "--",
-    ...BASE_ARGS,
-    "-boot",
-    BOOT_NAME,
-    "-config",
-    CONFIG_PATH,
-  ];
+  const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
 
   if (noshell) args.push("-noshell");
 
@@ -275,12 +248,8 @@ function buildArgs({
     args.push("-pa", `/lib/${app}/ebin`);
   }
 
-  if (entrypoint !== null) {
-    args.push(
-      "-eval",
-      `case application:ensure_all_started(${entrypoint}) of {ok, _} -> ${ENTRYPOINT_READY_EXPR}; _ -> ${ENTRYPOINT_FAILED_EXPR}, erlang:halt(1) end.`,
-    );
-  }
+  args.push("-run", BOOT_MODULE, "start");
+  if (entrypoint !== null) args.push(entrypoint);
 
   for (const arg of extra) {
     args.push(arg);
@@ -302,17 +271,11 @@ type BeamManifest = {
   entrypoint: string | null;
   apps: Record<string, { bundle: string }>;
   bundles: Record<string, { tar: string }>;
-  vm: {
-    boot: string;
-    config: string;
-  };
 };
 
 type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
-  bootFile: Uint8Array;
-  configFile: Uint8Array;
   tarballs: Uint8Array[];
 };
 
@@ -346,36 +309,22 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     }
   }
 
-  const bootUrl = resolveAssetsPath(assetsRoot, manifest.vm.boot);
-  const configUrl = resolveAssetsPath(assetsRoot, manifest.vm.config);
-  const [bootFile, configFile, loadedTarballs] = await Promise.all([
-    fetchBinary(bootUrl),
-    fetchBinary(configUrl),
-    Promise.all(
-      Object.values(manifest.bundles).map(
-        async (entry): Promise<Result<Uint8Array>> => {
-          const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
-          const tar = await fetchBinary(tarUrl);
-          if (tar !== null) {
-            return { ok: true, data: tar };
-          }
+  const loadedTarballs = await Promise.all(
+    Object.values(manifest.bundles).map(
+      async (entry): Promise<Result<Uint8Array>> => {
+        const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
+        const tar = await fetchBinary(tarUrl);
+        if (tar !== null) {
+          return { ok: true, data: tar };
+        }
 
-          return {
-            ok: false,
-            error: err("asset:load", { kind: "tarball", url: tarUrl }),
-          };
-        },
-      ),
+        return {
+          ok: false,
+          error: err("asset:load", { kind: "tarball", url: tarUrl }),
+        };
+      },
     ),
-  ]);
-
-  if (bootFile === null) {
-    return {
-      ok: false,
-      error: err("asset:load", { kind: "boot-script", url: bootUrl }),
-    };
-  }
-  check(configFile !== null, `Missing application config: ${configUrl}`);
+  );
 
   const tarballs: Uint8Array[] = [];
   for (const tarball of loadedTarballs) {
@@ -391,8 +340,6 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     data: {
       appNames,
       entrypoint: manifest.entrypoint ?? null,
-      bootFile,
-      configFile,
       tarballs,
     },
   };
@@ -406,10 +353,6 @@ function initFs({ module, fsData }: InitFsArgs): void {
   for (const dir of FS_DIRS) {
     module.FS_mkdirTree(dir);
   }
-
-  writeFile(BOOT_PATH, fsData.bootFile);
-  writeFile(CONFIG_PATH, fsData.configFile);
-  writeFile(INETRC_PATH, UTF8.encode(INETRC));
 
   const createDir = (dirPath: string) => {
     module.FS_mkdirTree(dirPath);

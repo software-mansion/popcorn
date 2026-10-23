@@ -9,15 +9,10 @@ defmodule Popcorn.Packager do
   @retained_chunks :beam_lib.significant_chunks() -- [~c"Type"]
   # Applications that only work when the emulator was built with the matching
   # native support. The runtime manifest declares what the build provides.
-  @app_capabilities %{
-    "asn1" => "crypto",
-    "crypto" => "crypto",
-    "public_key" => "crypto",
-    "ssl" => "crypto"
-  }
+  @app_capabilities %{asn1: "crypto", crypto: "crypto", public_key: "crypto", ssl: "crypto"}
 
   @boot_name "bin/vm.boot"
-  @runtime_files ~w(beam.mjs beam.emu.mjs beam.wasm)
+  @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
 
@@ -32,31 +27,43 @@ defmodule Popcorn.Packager do
   # - elixir
   #
   # All of them should be in elixir's transitive dependency closure
-  @base_apps ["elixir"]
+  @base_apps [:elixir]
+
+  @boot_app :popcorn
+  @boot_functions [{Popcorn.Boot, :start, 0}, {Popcorn.Boot, :start, 1}]
 
   @type options :: [
           {:root_dir, Path.t()}
           | {:build_path, Path.t()}
           | {:out_dir, Path.t()}
-          | {:app, String.t() | nil}
-          | {:extra_apps, [String.t()]}
+          | {:app, atom() | nil}
+          | {:extra_apps, [atom()]}
           | {:runtime_variant, String.t() | nil}
           | {:brotli_effort, :standard | :max}
           | {:strip, boolean()}
-          | {:treeshake, false | [preserved_apps: [String.t()]]}
+          | {:exclude_priv, [String.t() | {atom(), String.t()}]}
+          | {:config, keyword()}
+          | {:treeshake, false | [preserved_apps: [atom()]]}
           | {:static_dir, Path.t()}
         ]
 
   @type pack_options :: %{
           build_path: Path.t(),
-          entrypoint_app: String.t() | nil,
-          extra_apps: [String.t()],
+          entrypoint_app: atom() | nil,
+          extra_apps: [atom()],
           out_dir: Path.t(),
           runtimes_dir: Path.t(),
           runtime_variant: String.t() | nil,
           strip: boolean(),
-          treeshake: false | [preserved_apps: [String.t()]]
+          exclude_priv: [String.t() | {atom(), String.t()}],
+          config: keyword(),
+          treeshake: false | [preserved_apps: [atom()]]
         }
+
+  # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
+  # runtime, which has its NIFs linked in. Dialyzer's PLT files, which some
+  # packages ship, are only read by Dialyzer.
+  @excluded_priv ["**/*.{so,dylib,dll}", "**/*.plt"]
 
   defp beam?(path), do: Path.extname(path) == ".beam"
 
@@ -95,6 +102,8 @@ defmodule Popcorn.Packager do
         runtime_variant: nil,
         brotli_effort: :standard,
         strip: true,
+        exclude_priv: [],
+        config: [],
         treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
@@ -124,6 +133,8 @@ defmodule Popcorn.Packager do
                  runtimes_dir: Path.join(static_dir, "runtimes"),
                  runtime_variant: options[:runtime_variant],
                  strip: options[:strip],
+                 exclude_priv: options[:exclude_priv],
+                 config: options[:config],
                  treeshake: options[:treeshake]
                }),
              {:ok, installed} <-
@@ -154,10 +165,13 @@ defmodule Popcorn.Packager do
       runtimes_dir: runtimes_dir,
       runtime_variant: runtime_variant,
       strip: strip,
+      exclude_priv: exclude_priv,
+      config: config,
       treeshake: treeshake
     } = args
 
     toolchain = fetch_toolchain_info()
+    staging_dir = Path.join(out_dir, "staging")
 
     with {:ok, project_apps} <- get_apps_info(build_path),
          {:ok, builtin_apps} <- get_builtin_apps(toolchain),
@@ -167,17 +181,18 @@ defmodule Popcorn.Packager do
          {:ok, manifest} <- read_manifest(Path.join([runtimes_dir, variant, "manifest.json"])),
          :ok <- check_otp_version(toolchain.otp, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
-         {:ok, boot_path} <- create_boot(out_dir, toolchain.otp_root, manifest.preloaded),
-         staged_apps = stage_apps(Path.join(out_dir, "staging"), apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info),
+         remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
-         staged_apps = remove_build_tools(staged_apps),
+         staged_apps =
+           staged_apps |> remove_build_tools() |> add_config(config) |> configure_kernel(),
          {:ok, staged_apps, treeshake_report} <-
-           maybe_treeshake(staged_apps, treeshake, out_dir) do
+           maybe_treeshake(staged_apps, treeshake, out_dir),
+         {:ok, boot_path} <- create_boot(out_dir, staged_apps, manifest.preloaded) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
 
       File.mkdir_p!(out_dir)
-      config_path = create_config(out_dir, staged_apps)
 
       packed_apps =
         Map.new(staged_apps, fn {app, info} ->
@@ -205,7 +220,8 @@ defmodule Popcorn.Packager do
         Map.new(~w(stdlib app deps), fn group ->
           in_group? = fn {app, _info} -> app_bundles[app] == group end
           apps = Enum.filter(staged_apps, in_group?)
-          {group, %{tar: create_tarball(out_dir, group, apps, strip)}}
+          extra_files = if group == "app", do: [{@boot_name, boot_path}], else: []
+          {group, %{tar: create_tarball(out_dir, group, apps, extra_files, strip)}}
         end)
 
       tar_paths =
@@ -218,11 +234,7 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{
-          boot: Path.join("bin", Path.basename(boot_path)),
-          config: Path.basename(config_path),
-          version: vm_version
-        }
+        vm: %{version: vm_version}
       }
 
       File.write!(manifest_path, encode_json(manifest))
@@ -232,8 +244,6 @@ defmodule Popcorn.Packager do
         runtimeVariant: variant,
         entrypoint: entrypoint_app,
         manifestPath: Path.expand(manifest_path),
-        bootPath: Path.expand(boot_path),
-        configPath: Path.expand(config_path),
         tarPaths: tar_paths,
         apps: packed_apps,
         bundles: bundles,
@@ -246,25 +256,6 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp create_config(out_dir, apps) do
-    app_names = apps |> Map.keys() |> Enum.map(&String.to_existing_atom/1)
-
-    config =
-      Mix.Tasks.Loadconfig.read_compile()
-      |> Keyword.take(app_names)
-      |> Keyword.delete(:popcorn)
-
-    contents =
-      case Mix.Utils.consultable(config) do
-        {:ok, contents} -> contents
-        {:error, term, reason} -> Mix.raise("Cannot export config #{inspect(term)}: #{reason}")
-      end
-
-    path = Path.join(out_dir, "sys.config")
-    File.write!(path, [contents, ".\n"])
-    fingerprint(path)
-  end
-
   defp install_output(report, static_dir, out_dir, brotli_effort) do
     variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
 
@@ -272,17 +263,16 @@ defmodule Popcorn.Packager do
     vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
+      for {filename, _source} <- js_files ++ vm_files do
+        compress(Path.join(out_dir, filename), brotli_effort)
+      end
+
       manifest_path = Path.join(out_dir, "otp/manifest.json")
-      boot_path = Path.join([out_dir, "otp/bin", Path.basename(report.bootPath)])
-      config_path = Path.join([out_dir, "otp", Path.basename(report.configPath)])
       lib_dir = Path.join(out_dir, "otp/lib")
 
       File.mkdir_p!(Path.dirname(manifest_path))
-      File.mkdir_p!(Path.dirname(boot_path))
       File.mkdir_p!(lib_dir)
       File.cp!(report.manifestPath, manifest_path)
-      File.cp!(report.bootPath, boot_path)
-      File.cp!(report.configPath, config_path)
 
       tar_paths =
         Enum.map(report.tarPaths, fn source ->
@@ -296,8 +286,6 @@ defmodule Popcorn.Packager do
        %{
          report
          | manifestPath: Path.expand(manifest_path),
-           bootPath: Path.expand(boot_path),
-           configPath: Path.expand(config_path),
            tarPaths: tar_paths
        }}
     end
@@ -347,30 +335,69 @@ defmodule Popcorn.Packager do
   defp brotli_quality(:standard), do: 9
   defp brotli_quality(:max), do: 11
 
-  defp create_boot(out_dir, otp_root, runtime_preloaded) do
-    boot_path = Path.join([Path.dirname(otp_root), "bin", "no_dot_erlang.boot"])
-    {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term()
+  defp create_boot(out_dir, staged_apps, runtime_preloaded) do
+    boot_path = Path.join(out_dir, @boot_name)
+    rel_path = Path.join(out_dir, Path.basename(@boot_name, ".boot"))
 
-    preloaded =
-      Enum.flat_map(commands, fn
-        {:preLoaded, modules} -> Enum.map(modules, &to_string/1)
-        _ -> []
-      end)
+    for {app, info} <- staged_apps do
+      File.write!(app_file(app, info), consultable({:application, app, info.props}))
+    end
+
+    apps =
+      for {app, info} <- Enum.sort(staged_apps) do
+        vsn = Keyword.fetch!(info.props, :vsn)
+        if app in [:kernel, :stdlib], do: {app, vsn}, else: {app, vsn, :load}
+      end
+
+    release = {:release, {~c"popcorn", ~c"1"}, {:erts, :erlang.system_info(:version)}, apps}
+    File.write!(rel_path <> ".rel", consultable(release))
+    File.mkdir_p!(Path.dirname(boot_path))
+
+    options = [
+      :silent,
+      :no_dot_erlang,
+      :no_warn_sasl,
+      path: Enum.map(staged_apps, fn {_app, info} -> to_charlist(info.ebin_dir) end),
+      outdir: to_charlist(Path.dirname(boot_path))
+    ]
+
+    with {:ok, _module, _warnings} <- :systools.make_script(to_charlist(rel_path), options),
+         {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term(),
+         :ok <- check_preloaded(boot_path, commands, runtime_preloaded) do
+      commands = Enum.map(commands, &drop_app_versions/1)
+      File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
+      {:ok, boot_path}
+    else
+      {:error, module, reason} -> err(:boot_script_failed, module.format_error(reason))
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp check_preloaded(boot_path, commands, runtime_preloaded) do
+    preloaded = for {:preLoaded, modules} <- commands, module <- modules, do: to_string(module)
 
     case preloaded -- runtime_preloaded do
-      [] ->
-        boot = {:script, id, Enum.map(commands, &drop_app_versions/1)}
-        path = Path.join(out_dir, @boot_name)
-
-        File.mkdir_p!(Path.dirname(path))
-
-        File.write!(path, :erlang.term_to_binary(boot))
-
-        {:ok, fingerprint(path)}
-
-      missing ->
-        err(:unsupported_boot, {boot_path, missing})
+      [] -> :ok
+      missing -> err(:unsupported_boot, {boot_path, missing})
     end
+  end
+
+  defp add_config(staged_apps, config) do
+    config
+    |> Keyword.delete(:popcorn)
+    |> Keyword.take(Map.keys(staged_apps))
+    |> Enum.reduce(staged_apps, fn {app, app_config}, apps ->
+      update_in(apps[app].props[:env], &Keyword.merge(&1 || [], app_config))
+    end)
+  end
+
+  # The runtime has no distribution. It's configured in kernel's spec, as the
+  # `-kernel start_distribution false` arguments would need the Erlang parser.
+  defp configure_kernel(staged_apps) do
+    update_in(staged_apps[:kernel].props, fn props ->
+      env = props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, false)
+      Keyword.put(props, :env, env)
+    end)
   end
 
   # `$ROOT/lib/kernel-10.5/ebin` -> `$ROOT/lib/kernel/ebin`
@@ -391,19 +418,45 @@ defmodule Popcorn.Packager do
   defp stage_apps(staging_dir, apps_info) do
     apps_info
     |> async_stream(fn {app, info} ->
-      ebin_dir = Path.join([staging_dir, app, "ebin"])
+      app_dir = Path.join(staging_dir, "#{app}")
+      ebin_dir = Path.join(app_dir, "ebin")
       priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
 
-      File.mkdir_p!(Path.dirname(ebin_dir))
+      File.mkdir_p!(app_dir)
       File.cp_r!(info.ebin_dir, ebin_dir)
 
       if File.dir?(priv_dir) do
-        File.cp_r!(priv_dir, Path.join([staging_dir, app, "priv"]), dereference_symlinks: true)
+        File.cp_r!(priv_dir, Path.join(app_dir, "priv"), dereference_symlinks: true)
       end
 
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  defp remove_priv_files(staged_apps, patterns) do
+    {app_patterns, shared_patterns} = Enum.split_with(patterns, &is_tuple/1)
+    app_patterns = Enum.group_by(app_patterns, &elem(&1, 0), &elem(&1, 1))
+    unknown_apps = Map.keys(app_patterns) -- Map.keys(staged_apps)
+
+    if unknown_apps != [] do
+      apps = Enum.join(unknown_apps, ", ")
+      warn("exclude_priv names applications that aren't packaged: #{apps}")
+    end
+
+    for {app, info} <- staged_apps,
+        priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv"),
+        pattern <- shared_patterns ++ Map.get(app_patterns, app, []),
+        path <- Path.wildcard(Path.join(priv_dir, pattern), match_dot: true) do
+      File.rm_rf!(path)
+      remove_if_empty(Path.dirname(path), priv_dir)
+    end
+  end
+
+  defp remove_if_empty(dir, priv_dir) do
+    if File.rmdir(dir) == :ok and dir != priv_dir do
+      remove_if_empty(Path.dirname(dir), priv_dir)
+    end
   end
 
   # we patch only selected modules from OTP, see patches/
@@ -412,7 +465,7 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
-      app = patch_path |> Path.dirname() |> Path.basename()
+      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_existing_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
       ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
       beam_path = Path.join(ebin_dir, name)
@@ -426,7 +479,7 @@ defmodule Popcorn.Packager do
   end
 
   defp remove_build_tools(staged_apps) do
-    case Map.fetch(staged_apps, "popcorn") do
+    case Map.fetch(staged_apps, :popcorn) do
       :error ->
         staged_apps
 
@@ -440,7 +493,9 @@ defmodule Popcorn.Packager do
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
 
-        replace_app_modules(staged_apps, %{"popcorn" => runtime_modules})
+        File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
+
+        replace_app_modules(staged_apps, %{popcorn: runtime_modules})
     end
   end
 
@@ -466,7 +521,7 @@ defmodule Popcorn.Packager do
       {:ok, [{:application, name, props}]} = :file.consult(app_path)
       dir = Path.dirname(app_path)
 
-      {to_string(name), %{props: props, ebin_dir: dir, app_path: app_path}}
+      {name, %{props: props, ebin_dir: dir, app_path: app_path}}
     end
 
     get_name = fn {name, _info} -> name end
@@ -569,8 +624,9 @@ defmodule Popcorn.Packager do
 
     with :ok <- validate_preserved_apps(staged_apps, options),
          preserved_modules = preserved_modules(staged_apps, preserved_apps),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir),
-         :ok <- install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir) do
+         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir) do
+      staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
+
       report = %{
         preserved_apps: preserved_apps,
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
@@ -604,7 +660,7 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: preserved_modules,
+        keep: @boot_functions ++ preserved_modules,
         leave: preserved_modules
       )
 
@@ -616,11 +672,12 @@ defmodule Popcorn.Packager do
   defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
     preserved = MapSet.new(preserved_apps)
 
-    staged_apps
-    |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
-    |> replace_beams(output_dir)
+    shaken_apps =
+      staged_apps
+      |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
+      |> replace_beams(output_dir)
 
-    :ok
+    Map.merge(staged_apps, shaken_apps)
   end
 
   defp replace_beams(staged_apps, output_dir) do
@@ -642,17 +699,8 @@ defmodule Popcorn.Packager do
           end
         end)
 
-      replacement_info = %{info | ebin_dir: replacement_dir}
-
-      updated_info =
-        %{app => replacement_info}
-        |> replace_app_modules(%{app => Enum.sort(surviving)})
-        |> Map.fetch!(app)
-
       replace_directory(info.ebin_dir, replacement_dir)
-
-      app_path = Path.join(info.ebin_dir, Path.basename(updated_info.app_path))
-      {app, %{updated_info | app_path: app_path, ebin_dir: info.ebin_dir}}
+      {app, put_in(info.props[:modules], Enum.sort(surviving))}
     end)
   end
 
@@ -673,14 +721,15 @@ defmodule Popcorn.Packager do
 
   defp replace_app_modules(staged_apps, app_modules) do
     Enum.reduce(app_modules, staged_apps, fn {app, modules}, apps ->
-      info = Map.fetch!(apps, app)
-      props = Keyword.put(info.props, :modules, modules)
-      app_path = Path.join(info.ebin_dir, Path.basename(info.app_path))
-      application = {:application, String.to_existing_atom(app), props}
-
-      File.write!(app_path, :io_lib.format(~c"~tp.~n", [application]))
-      Map.put(apps, app, %{info | app_path: app_path, props: props})
+      put_in(apps[app].props[:modules], modules)
     end)
+  end
+
+  defp app_file(app, info), do: Path.join(info.ebin_dir, "#{app}.app")
+
+  # Saves a term in a format readable by file:consult/1
+  defp consultable(term) do
+    IO.chardata_to_string(:io_lib.format(~c"~tp.~n", [term]))
   end
 
   defp root_apps(all_apps_info, extra_apps, entrypoint) do
@@ -690,14 +739,17 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp entrypoint_roots(_all_apps_info, nil), do: {:ok, @base_apps}
+  defp entrypoint_roots(all_apps_info, _entrypoint)
+       when not is_map_key(all_apps_info, @boot_app),
+       do: err(:missing_boot_app, @boot_app)
+
+  defp entrypoint_roots(_all_apps_info, nil), do: {:ok, [@boot_app | @base_apps]}
 
   # The entrypoint may be a builtin app, so a project with no code of its own
   # doesn't need a stub application just to depend on one.
   defp entrypoint_roots(all_apps_info, entrypoint)
-       when is_map_key(all_apps_info, entrypoint) do
-    {:ok, [entrypoint | @base_apps]}
-  end
+       when is_map_key(all_apps_info, entrypoint),
+       do: {:ok, [entrypoint, @boot_app | @base_apps]}
 
   defp entrypoint_roots(_all_apps_info, entrypoint),
     do: err(:missing_entrypoint, entrypoint)
@@ -752,20 +804,24 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, group, apps, strip) do
+  defp create_tarball(outdir, group, apps, extra_files, strip) do
     path = Path.join(outdir, "lib/#{group}.tar")
 
-    entries =
+    app_entries =
       for {app, info} <- Enum.sort(apps),
           app_dir = Path.dirname(info.ebin_dir),
           file <- Path.wildcard(Path.join(app_dir, "**"), match_dot: true),
-          File.regular?(file) do
+          File.regular?(file) and file != app_file(app, info) do
         entry =
-          {to_charlist(Path.join(["lib", app, Path.relative_to(file, app_dir)])),
+          {to_charlist(Path.join(["lib", "#{app}", Path.relative_to(file, app_dir)])),
            File.read!(file)}
 
         if strip, do: strip_beam(entry), else: entry
       end
+
+    entries =
+      app_entries ++
+        for({name, source} <- extra_files, do: {to_charlist(name), File.read!(source)})
 
     File.mkdir_p!(Path.dirname(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
@@ -868,7 +924,7 @@ defmodule Popcorn.Packager do
 
     MapSet.union(applications, included)
     |> MapSet.difference(optional)
-    |> Enum.map(&to_string/1)
+    |> MapSet.to_list()
   end
 
   @spec format_error(map()) :: String.t()
@@ -888,6 +944,14 @@ defmodule Popcorn.Packager do
 
   def format_error(%{code: "unknown_preserved_apps", apps: apps}) do
     "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
+  end
+
+  def format_error(%{code: "missing_boot_app", app: app}) do
+    "Booting requires the #{app} application, which is not available."
+  end
+
+  def format_error(%{code: "boot_script_failed", message: message}) do
+    "Making the boot script failed: #{message}"
   end
 
   def format_error(%{code: "treeshake_failed", message: message}), do: message
@@ -937,6 +1001,14 @@ defmodule Popcorn.Packager do
 
   defp err(:unknown_preserved_apps, apps) do
     {:error, %{code: "unknown_preserved_apps", apps: apps}}
+  end
+
+  defp err(:missing_boot_app, app) do
+    {:error, %{code: "missing_boot_app", app: app}}
+  end
+
+  defp err(:boot_script_failed, message) do
+    {:error, %{code: "boot_script_failed", message: to_string(message)}}
   end
 
   defp err(:treeshake_failed, message) do

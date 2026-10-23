@@ -32,7 +32,7 @@ export default [
       file: "../out/js/worker.mjs",
       format: "esm",
     },
-    external: ["./beam.mjs"],
+    external: ["./beam.emu.mjs"],
     cache: false,
     plugins: [
       typescript({ tsconfig: "./tsconfig.json", outputToFilesystem: true }),
