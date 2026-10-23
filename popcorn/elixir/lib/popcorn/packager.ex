@@ -220,8 +220,8 @@ defmodule Popcorn.Packager do
         Map.new(~w(stdlib app deps), fn group ->
           in_group? = fn {app, _info} -> app_bundles[app] == group end
           apps = Enum.filter(staged_apps, in_group?)
-          files = if group == "app", do: [{@boot_name, boot_path}], else: []
-          {group, %{tar: create_tarball(out_dir, group, apps, files, strip)}}
+          extra_files = if group == "app", do: [{@boot_name, boot_path}], else: []
+          {group, %{tar: create_tarball(out_dir, group, apps, extra_files, strip)}}
         end)
 
       tar_paths =
@@ -335,10 +335,6 @@ defmodule Popcorn.Packager do
   defp brotli_quality(:standard), do: 9
   defp brotli_quality(:max), do: 11
 
-  # The boot script is made like a release's, with the applications' specs,
-  # which systools reads from .app files. They're all loaded from their specs,
-  # as reading .app files at boot would need the Erlang parser, so the package
-  # has none. Only kernel and stdlib are started.
   defp create_boot(out_dir, staged_apps, runtime_preloaded) do
     boot_path = Path.join(out_dir, @boot_name)
     rel_path = Path.join(out_dir, Path.basename(@boot_name, ".boot"))
@@ -386,9 +382,6 @@ defmodule Popcorn.Packager do
     end
   end
 
-  # The applications' config goes into their specs, overriding their .app files'
-  # env like sys.config would, as reading sys.config at boot needs the Erlang
-  # parser. Popcorn's own config is for packaging.
   defp add_config(staged_apps, config) do
     config
     |> Keyword.delete(:popcorn)
@@ -500,7 +493,6 @@ defmodule Popcorn.Packager do
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
 
-        # The JS and the Wasm runtimes, which the output already has
         File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "priv/static"))
 
         replace_app_modules(staged_apps, %{popcorn: runtime_modules})
@@ -812,7 +804,7 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  defp create_tarball(outdir, group, apps, files, strip) do
+  defp create_tarball(outdir, group, apps, extra_files, strip) do
     path = Path.join(outdir, "lib/#{group}.tar")
 
     app_entries =
@@ -828,7 +820,8 @@ defmodule Popcorn.Packager do
       end
 
     entries =
-      app_entries ++ for({name, source} <- files, do: {to_charlist(name), File.read!(source)})
+      app_entries ++
+        for({name, source} <- extra_files, do: {to_charlist(name), File.read!(source)})
 
     File.mkdir_p!(Path.dirname(path))
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
