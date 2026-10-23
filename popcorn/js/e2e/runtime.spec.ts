@@ -327,6 +327,21 @@ test.describe("boot", () => {
     expect(result).toBe(true);
   });
 
+  test("no entrypoint", async ({ otp }) => {
+    // The fixture, cooked with `app: nil` by the global setup
+    const boot = await otp.tryBoot({
+      beam: {
+        otpAssetsRoot: "/no-entrypoint/otp/",
+        extraArgs: ["-run", "test_entrypoint_app", "report_no_entrypoint"],
+      },
+    });
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("no_entrypoint")).toEqual({
+      no_entrypoint: { started: false, configured_answer: 42 },
+    });
+  });
+
   test("entrypoint failure", async ({ createOtp }) => {
     const otp = await createOtp();
     const boot = await otp.tryBoot({

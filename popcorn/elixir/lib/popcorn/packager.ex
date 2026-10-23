@@ -237,7 +237,7 @@ defmodule Popcorn.Packager do
         vm: %{version: vm_version}
       }
 
-      File.write!(manifest_path, encode_json(manifest))
+      File.write!(manifest_path, JSON.encode!(manifest))
 
       result = %{
         ok: true,
@@ -558,7 +558,7 @@ defmodule Popcorn.Packager do
 
   defp read_manifest(manifest_path) do
     with {:ok, json} <- File.read(manifest_path),
-         {:ok, %{"vm" => vm}} <- decode_json(json),
+         {:ok, %{"vm" => vm}} <- JSON.decode(json),
          %{"version" => version, "preloaded" => preloaded, "capabilities" => capabilities} <- vm do
       {:ok, %{version: version, preloaded: preloaded, capabilities: capabilities}}
     else
@@ -1017,15 +1017,5 @@ defmodule Popcorn.Packager do
 
   defp err(:missing_runtime_resource, {path, reason}) do
     {:error, %{code: "missing_runtime_resource", path: path, reason: to_string(reason)}}
-  end
-
-  defp encode_json(term) do
-    term |> :json.encode() |> IO.iodata_to_binary()
-  end
-
-  defp decode_json(json) do
-    {:ok, :json.decode(json)}
-  rescue
-    _ -> :error
   end
 end
