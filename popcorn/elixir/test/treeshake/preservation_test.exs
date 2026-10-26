@@ -24,8 +24,8 @@ defmodule Treeshake.PreservationTest do
       Treeshake.run(
         ebin_files: files,
         output_dir: output,
-        keep: [:preserved],
-        leave: [:preserved]
+        keep: [mod: :preserved],
+        leave: [mod: :preserved]
       )
 
     assert File.read!(Path.join(output, "preserved.beam")) == original
@@ -36,5 +36,15 @@ defmodule Treeshake.PreservationTest do
 
     assert {:used, 0} in exports
     refute {:unused, 0} in exports
+  end
+
+  test "options take keyword entries" do
+    assert_raise ArgumentError, ~r/invalid :keep entry :lists/, fn ->
+      Treeshake.config(ebin_files: [], keep: [:lists])
+    end
+
+    assert_raise ArgumentError, ~r/invalid :leave entry \{:mfa, /, fn ->
+      Treeshake.config(ebin_files: [], leave: [mfa: {:lists, :map, 2}])
+    end
   end
 end

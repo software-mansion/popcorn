@@ -57,14 +57,17 @@ defmodule Treeshake.CallGraph do
     keep =
       keep
       |> Enum.flat_map(fn
-        %{behaviour_impls: behaviour} -> Map.get(behaviour_impls, behaviour, [])
-        entry -> [entry]
+        {:behaviour_impls, behaviour} ->
+          behaviour_impls |> Map.get(behaviour, []) |> Enum.map(&{:mod, &1})
+
+        entry ->
+          [entry]
       end)
       |> Enum.flat_map(fn
-        {m, f, a} ->
-          [{m, f, a}]
+        {:mfa, mfa} ->
+          [mfa]
 
-        m when is_atom(m) ->
+        {:mod, m} ->
           Map.fetch!(module_index, m).public_functions
           |> Enum.map(fn {{f, a}, _info} -> {m, f, a} end)
       end)

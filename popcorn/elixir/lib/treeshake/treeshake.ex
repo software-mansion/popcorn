@@ -36,7 +36,7 @@ defmodule Treeshake do
     :rand
   ]
 
-  @default_ignore_modules [:prim_eval]
+  @default_ignore [mod: :prim_eval]
 
   @hardcoded %{
     calls: %{
@@ -47,7 +47,7 @@ defmodule Treeshake do
     }
   }
 
-  @type keep_entry :: mfa() | module() | %{behaviour_impls: module()}
+  @type keep_entry :: {:mod, module()} | {:mfa, mfa()} | {:behaviour_impls, module()}
 
   @type run_option ::
           {:ebin_files, [Path.t()]}
@@ -59,9 +59,9 @@ defmodule Treeshake do
           | {:stub_removed_modules, boolean()}
           | {:verbose, boolean()}
           | {:keep, [keep_entry()]}
-          | {:drop, [module()]}
-          | {:leave, [module()]}
-          | {:ignore, [module() | mfa()]}
+          | {:drop, [{:mod, module()}]}
+          | {:leave, [{:mod, module()}]}
+          | {:ignore, [{:mod, module()} | {:mfa, mfa()}]}
 
   @type stats :: %{
           modules_removed: [module()],
@@ -129,16 +129,19 @@ defmodule Treeshake do
   ### Manual adjustment of tree-shaking
 
   Additionally, the following options configure the tree-shaking behavior. They
-  all default to an empty list.
-  - `keep` - List of public functions that must not be removed along with all code
-    they rely on. Passing a module means 'all functions from this module', passing
-    `%{benaviour_impls: behaviour}` means 'all modules implementing this behaviour'.
+  all take keyword lists and default to an empty list.
+  - `keep` - What must not be removed, along with all code it relies on:
+    `mod: module` means 'all public functions of this module',
+    `mfa: {module, fun, arity}` means 'this public function',
+    and `behaviour_impls: behaviour` means 'all modules implementing this behaviour'.
     Applications' `start/2` functions are automatically added to this list.
-  - `drop` - List of modules to be removed regardless of the tree-shaking results
-  - `leave` - List of modules that must not be changed or removed, but without
-    affecting the tree-shaking process. It means that the code they rely on may
+  - `drop` - Modules to be removed regardless of the tree-shaking results, as
+    `mod: module` entries.
+  - `leave` - Modules that must not be changed or removed, as `mod: module` entries,
+    but without affecting the tree-shaking process. It means that the code they rely on may
     still be removed unless added to `keep` or `leave`.
-  - `ignore` - List of modules or functions that are not analyzed by the tree-shaker.
+  - `ignore` - Modules or functions that are not analyzed by the tree-shaker, as
+    `mod: module` and `mfa: {module, fun, arity}` entries.
     It means they can be tree-shaked as usual, but the code they rely on may be
     tree-shaked even if they're kept, as it is unknown to the tree-shaker.
     This option accepts also private functions. Note that if an ignored function
@@ -231,6 +234,11 @@ defmodule Treeshake do
       raise "Either :ebin_files or :project option must be provided"
     end
 
+    validate_entries!(opts, :keep, [:mod, :mfa, :behaviour_impls])
+    validate_entries!(opts, :drop, [:mod])
+    validate_entries!(opts, :leave, [:mod])
+    validate_entries!(opts, :ignore, [:mod, :mfa])
+
     opts =
       opts
       |> Keyword.put_new(:verbose, false)
@@ -238,10 +246,11 @@ defmodule Treeshake do
       |> Keyword.put_new(:stub_removed_functions, false)
       |> Keyword.put_new(:stub_removed_modules, false)
       |> Keyword.put_new(:drop, [])
-      |> keyword_concat_default(:ignore, @default_ignore_modules)
+      |> keyword_concat_default(:ignore, @default_ignore)
 
-    default_leave = non_treeshakable_stdlib_modules()
-    opts = keyword_concat_default(opts, :leave, default_leave -- opts[:drop])
+    dropped = for {:mod, module} <- opts[:drop], do: module
+    default_leave = for module <- non_treeshakable_stdlib_modules() -- dropped, do: {:mod, module}
+    opts = keyword_concat_default(opts, :leave, default_leave)
 
     {project, opts} = Keyword.pop(opts, :project)
 
@@ -287,7 +296,7 @@ defmodule Treeshake do
       with {:ok, [{:application, _name, attrs}]} <-
              :file.consult(String.to_charlist(app_file)),
            {mod, _args} <- Keyword.get(attrs, :mod) do
-        [{mod, :start, 2}]
+        [mfa: {mod, :start, 2}]
       else
         _not_found -> []
       end
@@ -322,6 +331,31 @@ defmodule Treeshake do
   defp filter_ext(paths, ext) do
     Enum.filter(paths, fn path -> Path.extname(path) == ext end)
   end
+
+  @entry_kinds %{
+    mod: "mod: module",
+    mfa: "mfa: {module, fun, arity}",
+    behaviour_impls: "behaviour_impls: behaviour"
+  }
+
+  defp validate_entries!(opts, option, kinds) do
+    for entry <- Keyword.get(opts, option, []), not valid_entry?(entry, kinds) do
+      expected = Enum.map_join(kinds, ", ", &Map.fetch!(@entry_kinds, &1))
+
+      raise ArgumentError,
+            "invalid #{inspect(option)} entry #{inspect(entry)}, expected #{expected}"
+    end
+  end
+
+  defp valid_entry?({:mod, module}, kinds), do: :mod in kinds and is_atom(module)
+
+  defp valid_entry?({:mfa, {module, fun, arity}}, kinds),
+    do: :mfa in kinds and is_atom(module) and is_atom(fun) and is_integer(arity) and arity >= 0
+
+  defp valid_entry?({:behaviour_impls, behaviour}, kinds),
+    do: :behaviour_impls in kinds and is_atom(behaviour)
+
+  defp valid_entry?(_entry, _kinds), do: false
 
   defp keyword_concat_default(kw, key, default) do
     Keyword.update(kw, key, default, &(&1 ++ default))

@@ -18,7 +18,7 @@ defmodule Treeshake.Shaker do
 
   @spec shake(map, Treeshake.CallGraph.t(), Treeshake.ModuleIndex.t()) :: Treeshake.stats()
   def shake(opts, call_graph, module_index) do
-    leave = MapSet.new(opts.leave)
+    leave = MapSet.new(opts.leave, fn {:mod, module} -> module end)
     stub_removed_functions = Map.get(opts, :stub_removed_functions, false)
     output_dir = Map.get(opts, :output_dir)
 

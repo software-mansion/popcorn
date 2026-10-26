@@ -7,9 +7,10 @@ defmodule Treeshake.ModuleIndex do
   @type t :: %{module() => PrivatesResolver.module_info()}
 
   def build(opts, hardcoded) do
-    {ignore_modules, ignore_funs} = Enum.split_with(opts.ignore, &is_atom/1)
-    skip_modules = MapSet.new(ignore_modules ++ opts.drop)
-    ignore_funs = MapSet.new(ignore_funs)
+    ignore_modules = for {:mod, module} <- opts.ignore, do: module
+    dropped_modules = for {:mod, module} <- opts.drop, do: module
+    skip_modules = MapSet.new(ignore_modules ++ dropped_modules)
+    ignore_funs = MapSet.new(for {:mfa, mfa} <- opts.ignore, do: mfa)
 
     opts.ebin_files
     |> Enum.filter(&(Path.extname(&1) == ".beam"))

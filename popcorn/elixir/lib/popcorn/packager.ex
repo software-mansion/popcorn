@@ -30,7 +30,7 @@ defmodule Popcorn.Packager do
   @base_apps [:elixir]
 
   @boot_app :popcorn
-  @boot_functions [{Popcorn.Boot, :start, 0}, {Popcorn.Boot, :start, 1}]
+  @boot_functions [mfa: {Popcorn.Boot, :start, 0}, mfa: {Popcorn.Boot, :start, 1}]
 
   @type options :: [
           {:root_dir, Path.t()}
@@ -655,13 +655,14 @@ defmodule Popcorn.Packager do
       end)
 
     output_dir = Path.join(out_dir, "treeshaken")
+    preserved = for module <- preserved_modules, do: {:mod, module}
 
     report =
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: @boot_functions ++ preserved_modules,
-        leave: preserved_modules
+        keep: @boot_functions ++ preserved,
+        leave: preserved
       )
 
     {:ok, report}
