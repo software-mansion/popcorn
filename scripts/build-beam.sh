@@ -140,11 +140,14 @@ patch_otp() {
 run_autoconf() {
     local beam_dir="$1"
     local stamp="${beam_dir}/.stamp-autoconf"
+    local hash_paths=(
+        "${beam_dir}/erts/configure.ac"
+        "${beam_dir}/make/autoconf"
+        "${beam_dir}/erts/configure"
+    )
 
     local current_hash
-    current_hash=$(hash_inputs \
-        "${beam_dir}/erts/configure.ac" \
-        "${beam_dir}/make/autoconf")
+    current_hash=$(hash_inputs "${hash_paths[@]}")
 
     if [[ -f "${stamp}" ]] && [[ "$(cat "${stamp}")" == "${current_hash}" ]]; then
         log "Autoconf up to date, skipping."
@@ -166,7 +169,7 @@ run_autoconf() {
             -m "Popcorn-Build-Artifact: configure"
     fi
 
-    echo "${current_hash}" > "${stamp}"
+    hash_inputs "${hash_paths[@]}" > "${stamp}"
     success "Autoconf done."
 }
 

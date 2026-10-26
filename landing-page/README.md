@@ -4,10 +4,20 @@ Built with [Astro](https://astro.build).
 
 ## Usage
 
-From the repository root:
+Build both Wasm runtime variants and the JavaScript package before starting the
+site for the first time. Pong uses LocalLiveView, which requires the crypto
+variant. Run these commands from the repository root with Emscripten available:
 
 ```bash
 pnpm install
+mise run build-otp debug
+mise run build-otp-with-crypto debug
+pnpm -F ./popcorn/js build
+```
+
+From the repository root:
+
+```bash
 mise run dev --project landing-page
 ```
 
