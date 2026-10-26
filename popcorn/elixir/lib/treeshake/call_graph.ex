@@ -67,9 +67,12 @@ defmodule Treeshake.CallGraph do
         {:mfa, mfa} ->
           [mfa]
 
+        # Ignored if it's not there
         {:mod, m} ->
-          Map.fetch!(module_index, m).public_functions
-          |> Enum.map(fn {{f, a}, _info} -> {m, f, a} end)
+          case module_index[m] do
+            nil -> []
+            info -> Enum.map(info.public_functions, fn {{f, a}, _info} -> {m, f, a} end)
+          end
       end)
 
     bfs_acc = %{

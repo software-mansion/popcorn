@@ -47,4 +47,10 @@ defmodule Treeshake.PreservationTest do
       Treeshake.config(ebin_files: [], leave: [mfa: {:lists, :map, 2}])
     end
   end
+
+  @tag :tmp_dir
+  test "kept modules that aren't there are ignored", %{tmp_dir: tmp_dir} do
+    stats = Treeshake.run(ebin_files: [], output_dir: tmp_dir, keep: [mod: :not_there])
+    assert stats.modules_removed == []
+  end
 end
