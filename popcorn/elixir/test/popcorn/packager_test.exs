@@ -204,6 +204,31 @@ defmodule Popcorn.PackagerTest do
       assert after_app["vm"] == before["vm"]
     end
 
+    test "the treeshake option is true, false or options", %{options: options} do
+      for treeshake <- [:yes, [:keep], %{keep: []}] do
+        assert_raise ArgumentError, ~r/true, false or a keyword list of options/, fn ->
+          Packager.build(Keyword.put(options, :treeshake, treeshake))
+        end
+      end
+
+      assert_raise ArgumentError, ~r/unknown keys \[:enable\]/, fn ->
+        Packager.build(Keyword.put(options, :treeshake, enable: true))
+      end
+
+      assert {:ok, %{treeshake: nil}} = Packager.build(Keyword.put(options, :treeshake, false))
+
+      assert {:ok, %{treeshake: %{modules_removed: [_ | _]}}} =
+               Packager.build(Keyword.put(options, :treeshake, true))
+    end
+
+    test "keeping modules that aren't packaged", %{options: options} do
+      keep = [mod: NotPackaged, mfa: {:not_packaged, :run, 0}, mod: Popcorn.Boot]
+      options = Keyword.put(options, :treeshake, keep: keep)
+
+      assert capture_io(:stderr, fn -> assert {:ok, _report} = Packager.build(options) end) =~
+               "keep names modules that aren't packaged: NotPackaged, :not_packaged\n"
+    end
+
     test "leaving out priv files of applications that aren't packaged", %{options: options} do
       options = Keyword.put(options, :exclude_priv, phoneix: "static")
 

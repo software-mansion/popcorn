@@ -18,13 +18,15 @@ defmodule Mix.Tasks.Llv.Install do
   This task will:
 
     * Add the LocalLiveView socket and COOP/COEP headers to your endpoint
+    * Serve Brotli-compressed static files outside development, like gzip ones
     * Import `LocalLiveView.Component` in your web module html_helpers
     * Change app.js script tag to `type="module"`
     * Set up the JS bridge in `assets/js/app.js`
     * Configure esbuild to output ESM format
     * Add the LocalLiveView watcher to your endpoint config in `config/dev.exs`
     * Add `mix llv.build` to your setup alias
-    * Generate a `local/` project with a sample HelloLocal local live view
+    * Generate a `local/` project with a sample HelloLocal local live view, and
+      its `config/config.exs` with Popcorn's options for packaging it
     * Generate a HelloLocalLive LiveView that renders it and route it at `/hello_local`
 
   `mix setup` will then run `mix llv.build` which builds the Wasm runtime from `local/`
@@ -77,6 +79,8 @@ defmodule Mix.Tasks.Llv.Install do
     if module_source_contains?(zipper, "llv_socket") do
       {:ok, zipper}
     else
+      zipper = serve_brotli(zipper)
+
       with {:ok, use_zipper} <- Igniter.Code.Function.move_to_function_call(zipper, :use, [1, 2]) do
         zipper = add_wasm_security_headers(use_zipper)
         add_llv_socket(zipper)
@@ -85,6 +89,28 @@ defmodule Mix.Tasks.Llv.Install do
           {:warning,
            "Could not find use Phoenix.Endpoint. Add LLV socket and Wasm security headers manually."}
       end
+    end
+  end
+
+  # The local project's bundle has Brotli-compressed variants, smaller than the
+  # gzip ones Plug.Static serves by default. Like those, they're only served
+  # outside development.
+  defp serve_brotli(zipper) do
+    result =
+      Igniter.Code.Common.within(zipper, fn zipper ->
+        is_static = &Igniter.Code.Function.argument_equals?(&1, 0, Plug.Static)
+
+        with {:ok, plug} <-
+               Igniter.Code.Function.move_to_function_call(zipper, :plug, 2, is_static) do
+          Igniter.Code.Function.update_nth_argument(plug, 1, fn opts ->
+            Igniter.Code.Keyword.set_keyword_key(opts, :brotli, quote(do: not code_reloading?))
+          end)
+        end
+      end)
+
+    case result do
+      {:ok, zipper} -> zipper
+      _not_found -> zipper
     end
   end
 
@@ -465,6 +491,7 @@ defmodule Mix.Tasks.Llv.Install do
       igniter
       |> copy_template("#{@local_project_dir}/mix.exs", "mix.exs", llv_dep: llv_dep_from_local())
       |> copy_template("#{@local_project_dir}/.formatter.exs", "formatter.exs")
+      |> copy_template("#{@local_project_dir}/config/config.exs", "config.exs")
       |> copy_template("#{@local_project_dir}/lib/local/application.ex", "application.ex")
       |> copy_template("#{@local_project_dir}/lib/hello_local.ex", "hello_local.ex")
     end

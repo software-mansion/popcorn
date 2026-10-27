@@ -30,7 +30,7 @@ defmodule Popcorn.Packager do
   @base_apps [:elixir]
 
   @boot_app :popcorn
-  @boot_functions [{Popcorn.Boot, :start, 0}, {Popcorn.Boot, :start, 1}]
+  @boot_functions [mfa: {Popcorn.Boot, :start, 0}, mfa: {Popcorn.Boot, :start, 1}]
 
   @type options :: [
           {:root_dir, Path.t()}
@@ -43,7 +43,7 @@ defmodule Popcorn.Packager do
           | {:strip, boolean()}
           | {:exclude_priv, [String.t() | {atom(), String.t()}]}
           | {:config, keyword()}
-          | {:treeshake, false | [preserved_apps: [atom()]]}
+          | {:treeshake, treeshake_options()}
           | {:static_dir, Path.t()}
         ]
 
@@ -57,13 +57,77 @@ defmodule Popcorn.Packager do
           strip: boolean(),
           exclude_priv: [String.t() | {atom(), String.t()}],
           config: keyword(),
-          treeshake: false | [preserved_apps: [atom()]]
+          treeshake: treeshake_options()
         }
+
+  # True or the options turn tree-shaking on, false off
+  @type treeshake_options :: boolean() | [keep: [Treeshake.keep_entry()]]
 
   # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
   # runtime, which has its NIFs linked in. Dialyzer's PLT files, which some
   # packages ship, are only read by Dialyzer.
   @excluded_priv ["**/*.{so,dylib,dll}", "**/*.plt"]
+
+  # Tree-shaking keeps these, as they're only called dynamically: LocalLiveView
+  # views, which it looks up by name, and referenced Ecto schemas, whose
+  # generated functions Ecto calls. Generated functions of modules implementing
+  # behaviours, like LiveComponents, are kept anyway.
+  @kept_always [
+    # Modules below are used by Popcorn for term <-> JS conversion
+    mod: DateTime,
+    mod: Calendar.ISO,
+    mod: MapSet,
+    # Local views are looked up by name (string) and called dynamically
+    behaviour_impls: LocalLiveView,
+    # Ecto schemas
+    referenced_modules_defining: {:__changeset__, 0}
+  ]
+
+  # Tree-shaking removes these unless they're kept: they're reachable, but
+  # only used to compile, evaluate or format code, by a shell or in
+  # distribution.
+  @dropped_by_default [
+    Code.Formatter,
+    :elixir_parser,
+    :elixir_tokenizer,
+    :erl_lint,
+    :erl_eval,
+    :erl_parse,
+    :eval_bits,
+    :prim_inet,
+    :qlc,
+    :qlc_pt,
+    :dets_v9,
+    :dets,
+    :sofs,
+    :erl_tar,
+    :file_sorter,
+    :global,
+    :disk_log,
+    :disk_log_1,
+    :zip,
+    :shell,
+    :edlin_expand,
+    :edlin_type_suggestion,
+    :edlin_context,
+    :dets_utils,
+    :gen_tcp_socket,
+    :socket,
+    :prim_socket,
+    :inet_dns,
+    :net,
+    :rpc,
+    :gen_udp_socket,
+    :dist_util,
+    :dist_ac,
+    :erl_boot_server,
+    :erl_distribution,
+    :erl_epmd,
+    :global_group,
+    :erl_compile,
+    :erl_compile_server,
+    :win32reg
+  ]
 
   defp beam?(path), do: Path.extname(path) == ".beam"
 
@@ -108,6 +172,7 @@ defmodule Popcorn.Packager do
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
 
+    treeshake = validate_treeshake!(options[:treeshake])
     root_dir = Path.expand(options[:root_dir])
 
     build_path =
@@ -135,7 +200,7 @@ defmodule Popcorn.Packager do
                  strip: options[:strip],
                  exclude_priv: options[:exclude_priv],
                  config: options[:config],
-                 treeshake: options[:treeshake]
+                 treeshake: treeshake
                }),
              {:ok, installed} <-
                install_output(report, static_dir, out_dir, options[:brotli_effort]) do
@@ -364,7 +429,8 @@ defmodule Popcorn.Packager do
     with {:ok, _module, _warnings} <- :systools.make_script(to_charlist(rel_path), options),
          {:script, id, commands} = boot_path |> File.read!() |> :erlang.binary_to_term(),
          :ok <- check_preloaded(boot_path, commands, runtime_preloaded) do
-      commands = Enum.map(commands, &drop_app_versions/1)
+      packaged = packaged_modules(staged_apps)
+      commands = Enum.map(commands, &(&1 |> drop_app_versions() |> drop_unpackaged(packaged)))
       File.write!(boot_path, :erlang.term_to_binary({:script, id, commands}))
       {:ok, boot_path}
     else
@@ -372,6 +438,11 @@ defmodule Popcorn.Packager do
       {:error, _reason} = error -> error
     end
   end
+
+  defp drop_unpackaged({:primLoad, modules}, packaged),
+    do: {:primLoad, Enum.filter(modules, &MapSet.member?(packaged, &1))}
+
+  defp drop_unpackaged(command, _packaged), do: command
 
   defp check_preloaded(boot_path, commands, runtime_preloaded) do
     preloaded = for {:preLoaded, modules} <- commands, module <- modules, do: to_string(module)
@@ -602,33 +673,32 @@ defmodule Popcorn.Packager do
     if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
-  defp validate_preserved_apps(apps_info, treeshake) do
-    selected = MapSet.new(apps_info, fn {name, _info} -> name end)
+  defp validate_treeshake!(enable) when is_boolean(enable), do: enable
 
-    unknown =
-      treeshake
-      |> Keyword.fetch!(:preserved_apps)
-      |> Enum.reject(&MapSet.member?(selected, &1))
-      |> Enum.sort()
-
-    case unknown do
-      [] -> :ok
-      unknown -> err(:unknown_preserved_apps, unknown)
+  defp validate_treeshake!(options) do
+    if Keyword.keyword?(options) do
+      Keyword.validate!(options, keep: [])
+    else
+      raise ArgumentError,
+            "expected the treeshake option to be true, false or a keyword list of options, " <>
+              "got: #{inspect(options)}"
     end
   end
 
   defp maybe_treeshake(staged_apps, false, _out_dir), do: {:ok, staged_apps, nil}
+  defp maybe_treeshake(staged_apps, true, out_dir), do: treeshake(staged_apps, [], out_dir)
 
-  defp maybe_treeshake(staged_apps, options, out_dir) do
-    preserved_apps = Keyword.fetch!(options, :preserved_apps)
+  defp maybe_treeshake(staged_apps, options, out_dir),
+    do: treeshake(staged_apps, options[:keep], out_dir)
 
-    with :ok <- validate_preserved_apps(staged_apps, options),
-         preserved_modules = preserved_modules(staged_apps, preserved_apps),
-         {:ok, stats} <- run_treeshake(staged_apps, preserved_modules, out_dir) do
-      staged_apps = install_treeshaken_beams(staged_apps, preserved_apps, stats.output_dir)
+  defp treeshake(staged_apps, keep, out_dir) do
+    warn_unknown_kept(staged_apps, keep)
+    drop = dropped_modules(keep)
+
+    with {:ok, stats} <- run_treeshake(staged_apps, keep, drop, out_dir) do
+      staged_apps = replace_beams(staged_apps, stats.output_dir)
 
       report = %{
-        preserved_apps: preserved_apps,
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
         modules_shaken:
           stats.modules_shaked |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
@@ -638,17 +708,40 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp preserved_modules(staged_apps, preserved_apps) do
-    [DateTime, Calendar.ISO, MapSet] ++
-      Enum.flat_map(preserved_apps, fn app ->
-        staged_apps
-        |> Map.fetch!(app)
-        |> Map.fetch!(:props)
-        |> Keyword.fetch!(:modules)
-      end)
+  defp packaged_modules(staged_apps) do
+    staged_apps
+    |> Enum.flat_map(fn {_app, info} -> Keyword.fetch!(info.props, :modules) end)
+    |> MapSet.new()
   end
 
-  defp run_treeshake(staged_apps, preserved_modules, out_dir) do
+  defp dropped_modules(keep) do
+    for module <- @dropped_by_default -- kept_modules(keep), do: {:mod, module}
+  end
+
+  defp kept_modules(keep) do
+    Enum.flat_map(keep, fn
+      {:mod, module} -> [module]
+      {:mfa, {module, _fun, _arity}} -> [module]
+      _entry -> []
+    end)
+  end
+
+  defp warn_unknown_kept(staged_apps, keep) do
+    packaged = packaged_modules(staged_apps)
+
+    unknown =
+      keep
+      |> kept_modules()
+      |> Enum.reject(&MapSet.member?(packaged, &1))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    if unknown != [] do
+      warn("keep names modules that aren't packaged: #{Enum.map_join(unknown, ", ", &inspect/1)}")
+    end
+  end
+
+  defp run_treeshake(staged_apps, keep, drop, out_dir) do
     files =
       Enum.flat_map(staged_apps, fn {_app, info} ->
         info.ebin_dir |> Path.join("*") |> Path.wildcard()
@@ -660,24 +753,13 @@ defmodule Popcorn.Packager do
       Treeshake.run(
         ebin_files: files,
         output_dir: output_dir,
-        keep: @boot_functions ++ preserved_modules,
-        leave: preserved_modules
+        keep: @boot_functions ++ @kept_always ++ keep,
+        drop: drop
       )
 
     {:ok, report}
   rescue
     error -> err(:treeshake_failed, Exception.message(error))
-  end
-
-  defp install_treeshaken_beams(staged_apps, preserved_apps, output_dir) do
-    preserved = MapSet.new(preserved_apps)
-
-    shaken_apps =
-      staged_apps
-      |> Enum.reject(fn {app, _info} -> MapSet.member?(preserved, app) end)
-      |> replace_beams(output_dir)
-
-    Map.merge(staged_apps, shaken_apps)
   end
 
   defp replace_beams(staged_apps, output_dir) do
@@ -942,10 +1024,6 @@ defmodule Popcorn.Packager do
     "Extra applications not found: #{Enum.join(apps, ", ")}."
   end
 
-  def format_error(%{code: "unknown_preserved_apps", apps: apps}) do
-    "Preserved applications are not selected for packaging: #{Enum.join(apps, ", ")}."
-  end
-
   def format_error(%{code: "missing_boot_app", app: app}) do
     "Booting requires the #{app} application, which is not available."
   end
@@ -997,10 +1075,6 @@ defmodule Popcorn.Packager do
 
   defp err(:dynamic_nifs_loading, {app, beams}) do
     {:error, %{code: "dynamic_nifs_loading", app: app, beams: beams}}
-  end
-
-  defp err(:unknown_preserved_apps, apps) do
-    {:error, %{code: "unknown_preserved_apps", apps: apps}}
   end
 
   defp err(:missing_boot_app, app) do

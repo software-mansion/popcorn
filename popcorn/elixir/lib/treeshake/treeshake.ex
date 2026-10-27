@@ -3,51 +3,143 @@ defmodule Treeshake do
   # Tree-shaker for compiled BEAM code. See `run/1` for details.
 
   @stdlib_apps [:erts, :kernel, :stdlib, :compiler, :elixir, :logger]
+
+  # The modules of these apps are left by default, as tree-shaking can't reason
+  # about many of them: they're used through implicit contracts, like calls from
+  # the VM or from kernel processes.
   @non_treeshakable_apps [:erts, :stdlib, :kernel, :logger]
 
-  @non_treeshakable_exclusions [
+  # The modules of the apps above that tree-shaking can reason about, so they're
+  # tree-shaken like others. Careful when adding: the calls in left modules are
+  # followed only from functions that tree-shaking finds reachable, which misses
+  # the ones running in kernel processes, like prim_tty's calls to io_ansi.
+  @shakable_stdlib [
+    # core libraries
+    :erlang,
+    :lists,
+    :rand,
+    :string,
     :unicode_util,
-    :erl_parse,
+    :uri_string,
+    # parsing and printing code
+    :beam_lib,
     :epp,
+    :erl_parse,
+    :erl_pp,
     :erl_scan,
+    :ms_transform,
+    # shell and tooling
+    :argparse,
+    :c,
+    :edlin_expand,
+    :erl_abstract_code,
+    :erl_debugger,
+    :erl_expand_records,
+    :escript,
+    :man_docs,
+    :otp_internal,
+    :seq_trace,
+    :shell_default,
+    :shell_docs,
+    :shell_docs_markdown,
+    :trace,
+    # networking and distribution
+    :auth,
+    :erl_ddll,
+    :erpc,
+    :gen_sctp,
+    :global,
+    :inet,
+    :inet6_sctp,
+    :inet6_tcp,
+    :inet6_tcp_dist,
+    :inet6_udp,
+    # :inet_db,
+    :inet_dns_tsig,
+    :inet_epmd_dist,
+    :inet_epmd_socket,
+    :inet_gethost_native,
+    :inet_hosts,
+    :inet_parse,
+    :inet_res,
+    :inet_sctp,
+    :inet_tcp,
+    :inet_tcp_dist,
+    :kernel_config,
+    :local_tcp,
+    :local_udp,
+    :net_adm,
+    :net_kernel,
+    :peer,
+    :pg2,
+    :pool,
     :prim_inet,
+    :slave,
+    # storage and logging backends
+    :dets,
+    :dets_server,
+    :dets_sup,
+    :dets_utils,
+    :dets_v9,
+    :disk_log,
+    :erl_tar,
+    :error_logger_file_h,
+    :error_logger_tty_h,
+    :file_sorter,
+    :log_mf_h,
+    :logger_disk_log_h,
+    :logger_handler,
+    :wrap_log_reader,
+    :zip,
+    :zstd,
+    # data structures and others
+    :array,
+    :dict,
+    :digraph,
+    :digraph_utils,
+    :erl_reply,
+    :gen_fsm,
+    :graph,
     :qlc,
     :qlc_pt,
-    :dets_v9,
-    :dets,
-    :sofs,
-    :erl_tar,
-    :file_sorter,
-    :global,
-    :disk_log,
-    :net_kernel,
-    :zip,
-    # :inet_db,
-    :edlin_expand,
-    :dets_utils,
-    :erl_pp,
-    :beam_lib,
-    :ms_transform,
-    :lists,
-    :erlang,
-    :string,
-    :uri_string,
-    :inet,
-    :rand
+    :random,
+    :sofs
   ]
 
-  @default_ignore_modules [:prim_eval]
+  @default_ignore [mod: :prim_eval]
 
   @hardcoded %{
     calls: %{
-      Supervisor => [{Supervisor.Default, :init, 1}]
+      Supervisor => [{Supervisor.Default, :init, 1}],
+      # DynamicSupervisor calls back the module it starts, and Task.Supervisor
+      # doesn't declare the behaviour
+      Task.Supervisor => [{Task.Supervisor, :init, 1}],
+      {:elixir_config, :identifier_tokenizer, 0} => [{String.Tokenizer, :tokenize, 1}],
+      # The translators from the :logger app's environment
+      Logger.Utils => [{Logger.Translator, :translate, 4}],
+      # The formatter of the default handler, called by :logger
+      Logger.App => [{Logger.Formatter, :format, 2}],
+      # The backend stored in a persistent term (telemetry 1.4)
+      :telemetry_handler_table => [:telemetry_ets, :telemetry_pt],
+      # When it's JSON
+      {Phoenix, :json_library, 0} => [JSON],
+      # `form[field]`: Phoenix.HTML.Form implements Access without declaring
+      # the behaviour
+      Access => [Phoenix.HTML.Form],
+      # Through the form's Phoenix.HTML.FormData implementation, bypassing
+      # the protocol
+      Phoenix.HTML.Form => [Phoenix.HTML.FormData]
     },
     behaviour_impls: %{
       :application_controller => [:gen_server]
     }
   }
 
-  @type keep_entry :: mfa() | module() | %{behaviour_impls: module()}
+  @type keep_entry ::
+          {:mod, module()}
+          | {:mfa, mfa()}
+          | {:behaviour_impls, module()}
+          | {:referenced_modules_defining, {atom(), non_neg_integer()}}
 
   @type run_option ::
           {:ebin_files, [Path.t()]}
@@ -59,9 +151,9 @@ defmodule Treeshake do
           | {:stub_removed_modules, boolean()}
           | {:verbose, boolean()}
           | {:keep, [keep_entry()]}
-          | {:drop, [module()]}
-          | {:leave, [module()]}
-          | {:ignore, [module() | mfa()]}
+          | {:drop, [{:mod, module()}]}
+          | {:leave, [{:mod, module()}]}
+          | {:ignore, [{:mod, module()} | {:mfa, mfa()}]}
 
   @type stats :: %{
           modules_removed: [module()],
@@ -85,12 +177,14 @@ defmodule Treeshake do
   The removal is done by tree-shaking on the function level: reachable functions
   are found and all others are removed. The following functions are considered
   reachable:
-  - `start/2` functions of applications
+  - callbacks of applications' modules (`start/2`, `stop/1`, etc.)
   - functions called or captured (`&Module.fun/arity`) by a reachable function
   - functions referenced as a hard-coded module-function-arity (MFA) tuple
     or module-function-arguments tuple in a reachable function
   - callback implementations of behaviours, if their module is referenced
     in a reachable function
+  - macro-generated functions in modules implementing behaviours, if the module
+    is referenced in a reachable function
   - callback implementations of protocols, if their module is referenced
     and the protocol function is called in a reachable function
 
@@ -129,16 +223,21 @@ defmodule Treeshake do
   ### Manual adjustment of tree-shaking
 
   Additionally, the following options configure the tree-shaking behavior. They
-  all default to an empty list.
-  - `keep` - List of public functions that must not be removed along with all code
-    they rely on. Passing a module means 'all functions from this module', passing
-    `%{benaviour_impls: behaviour}` means 'all modules implementing this behaviour'.
-    Applications' `start/2` functions are automatically added to this list.
-  - `drop` - List of modules to be removed regardless of the tree-shaking results
-  - `leave` - List of modules that must not be changed or removed, but without
-    affecting the tree-shaking process. It means that the code they rely on may
+  all take keyword lists and default to an empty list.
+  - `keep` - What must not be removed, along with all code it relies on:
+    `mod: module` means 'all public functions of this module',
+    `mfa: {module, fun, arity}` means 'this public function',
+    `behaviour_impls: behaviour` means 'all modules implementing this behaviour',
+    and `referenced_modules_defining: {fun, arity}` means 'all modules defining this
+    public function, once a reachable function references them'.
+    Applications' callbacks are automatically added to this list.
+  - `drop` - Modules to be removed regardless of the tree-shaking results, as
+    `mod: module` entries.
+  - `leave` - Modules that must not be changed or removed, as `mod: module` entries,
+    but without affecting the tree-shaking process. It means that the code they rely on may
     still be removed unless added to `keep` or `leave`.
-  - `ignore` - List of modules or functions that are not analyzed by the tree-shaker.
+  - `ignore` - Modules or functions that are not analyzed by the tree-shaker, as
+    `mod: module` and `mfa: {module, fun, arity}` entries.
     It means they can be tree-shaked as usual, but the code they rely on may be
     tree-shaked even if they're kept, as it is unknown to the tree-shaker.
     This option accepts also private functions. Note that if an ignored function
@@ -155,7 +254,7 @@ defmodule Treeshake do
 
   The modules from the following stdlib apps: #{list_atoms.(@non_treeshakable_apps)},
   are left by default, except the following modules:
-  #{list_atoms.(@non_treeshakable_exclusions)}.
+  #{list_atoms.(@shakable_stdlib)}.
 
   ## Returned value
   This function returns a map with the following keys:
@@ -231,6 +330,11 @@ defmodule Treeshake do
       raise "Either :ebin_files or :project option must be provided"
     end
 
+    validate_entries!(opts, :keep, [:mod, :mfa, :behaviour_impls, :referenced_modules_defining])
+    validate_entries!(opts, :drop, [:mod])
+    validate_entries!(opts, :leave, [:mod])
+    validate_entries!(opts, :ignore, [:mod, :mfa])
+
     opts =
       opts
       |> Keyword.put_new(:verbose, false)
@@ -238,10 +342,11 @@ defmodule Treeshake do
       |> Keyword.put_new(:stub_removed_functions, false)
       |> Keyword.put_new(:stub_removed_modules, false)
       |> Keyword.put_new(:drop, [])
-      |> keyword_concat_default(:ignore, @default_ignore_modules)
+      |> keyword_concat_default(:ignore, @default_ignore)
 
-    default_leave = non_treeshakable_stdlib_modules()
-    opts = keyword_concat_default(opts, :leave, default_leave -- opts[:drop])
+    dropped = for {:mod, module} <- opts[:drop], do: module
+    default_leave = for module <- non_treeshakable_stdlib_modules() -- dropped, do: {:mod, module}
+    opts = keyword_concat_default(opts, :leave, default_leave)
 
     {project, opts} = Keyword.pop(opts, :project)
 
@@ -287,7 +392,13 @@ defmodule Treeshake do
       with {:ok, [{:application, _name, attrs}]} <-
              :file.consult(String.to_charlist(app_file)),
            {mod, _args} <- Keyword.get(attrs, :mod) do
-        [{mod, :start, 2}]
+        # The application callbacks, optional ones included
+        [
+          mfa: {mod, :start, 2},
+          mfa: {mod, :stop, 1},
+          mfa: {mod, :prep_stop, 1},
+          mfa: {mod, :config_change, 3}
+        ]
       else
         _not_found -> []
       end
@@ -312,7 +423,7 @@ defmodule Treeshake do
       app |> :code.lib_dir() |> Path.join("ebin/*.beam") |> Path.wildcard()
     end)
     |> Enum.map(&beam_module/1)
-    |> then(&(&1 -- @non_treeshakable_exclusions))
+    |> then(&(&1 -- @shakable_stdlib))
   end
 
   defp beam_module(beam_path) do
@@ -322,6 +433,36 @@ defmodule Treeshake do
   defp filter_ext(paths, ext) do
     Enum.filter(paths, fn path -> Path.extname(path) == ext end)
   end
+
+  @entry_kinds %{
+    mod: "mod: module",
+    mfa: "mfa: {module, fun, arity}",
+    behaviour_impls: "behaviour_impls: behaviour",
+    referenced_modules_defining: "referenced_modules_defining: {fun, arity}"
+  }
+
+  defp validate_entries!(opts, option, kinds) do
+    for entry <- Keyword.get(opts, option, []), not valid_entry?(entry, kinds) do
+      expected = Enum.map_join(kinds, ", ", &Map.fetch!(@entry_kinds, &1))
+
+      raise ArgumentError,
+            "invalid #{inspect(option)} entry #{inspect(entry)}, expected #{expected}"
+    end
+  end
+
+  defp valid_entry?({:mod, module}, kinds), do: :mod in kinds and is_atom(module)
+
+  defp valid_entry?({:mfa, {module, fun, arity}}, kinds),
+    do: :mfa in kinds and is_atom(module) and is_atom(fun) and is_integer(arity) and arity >= 0
+
+  defp valid_entry?({:behaviour_impls, behaviour}, kinds),
+    do: :behaviour_impls in kinds and is_atom(behaviour)
+
+  defp valid_entry?({:referenced_modules_defining, {fun, arity}}, kinds),
+    do:
+      :referenced_modules_defining in kinds and is_atom(fun) and is_integer(arity) and arity >= 0
+
+  defp valid_entry?(_entry, _kinds), do: false
 
   defp keyword_concat_default(kw, key, default) do
     Keyword.update(kw, key, default, &(&1 ++ default))

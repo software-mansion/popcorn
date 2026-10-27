@@ -136,8 +136,7 @@ including applications that dependency analysis cannot find:
 import Config
 
 config :popcorn,
-  extra_apps: [:eex],
-  treeshake: [preserved_apps: [:eex]]
+  extra_apps: [:eex]
 ```
 
 Treeshaking is disabled by default. The `strip` setting defaults to `true` and

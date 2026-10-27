@@ -9,7 +9,7 @@ defmodule Treeshake.Utils.PrivatesResolver do
   alias Treeshake.Utils.Graph
   alias Treeshake.Utils.BeamAnalyzer
 
-  @type public_function_info :: %{calls: [mfa()], potential_modules: [module()]}
+  @type public_function_info :: %{calls: [mfa() | module()], potential_modules: [module()]}
 
   @type name_arity :: {atom(), non_neg_integer()}
 
@@ -19,7 +19,9 @@ defmodule Treeshake.Utils.PrivatesResolver do
           private_functions: %{name_arity() => [name_arity()]},
           abstraction: {:behaviour | :protocol, [name_arity()]} | nil,
           behaviour_impls: [module()],
-          protocol_impl: {module(), module()} | nil
+          protocol_impl: {module(), module()} | nil,
+          nifs: [name_arity()] | :unknown,
+          macro_generated: [name_arity()]
         }
 
   @spec resolve(BeamAnalyzer.module_info()) :: module_info()
@@ -42,8 +44,9 @@ defmodule Treeshake.Utils.PrivatesResolver do
             all_fns
             |> Enum.flat_map(& &1.calls)
             |> Enum.map(&resolve_local(&1, module))
-            |> Enum.reject(fn {m, name, arity} ->
-              m == module and Map.has_key?(priv_index, {name, arity})
+            |> Enum.reject(fn
+              {m, name, arity} -> m == module and Map.has_key?(priv_index, {name, arity})
+              _module -> false
             end)
             |> Enum.uniq(),
           potential_modules: all_fns |> Enum.flat_map(& &1.potential_modules) |> Enum.uniq()
@@ -70,7 +73,15 @@ defmodule Treeshake.Utils.PrivatesResolver do
       public_functions: expanded_pub,
       private_functions: expanded_priv
     }
-    |> Map.merge(Map.take(module_info, [:abstraction, :behaviour_impls, :protocol_impl]))
+    |> Map.merge(
+      Map.take(module_info, [
+        :abstraction,
+        :behaviour_impls,
+        :protocol_impl,
+        :nifs,
+        :macro_generated
+      ])
+    )
   end
 
   defp resolve_local({nil, name, arity}, module), do: {module, name, arity}

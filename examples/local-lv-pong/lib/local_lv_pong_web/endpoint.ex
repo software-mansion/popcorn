@@ -34,6 +34,7 @@ defmodule LocalLvPongWeb.Endpoint do
     at: "/",
     from: :local_lv_pong,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: LocalLvPongWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 

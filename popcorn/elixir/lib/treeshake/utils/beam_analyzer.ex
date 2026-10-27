@@ -7,7 +7,7 @@ defmodule Treeshake.Utils.BeamAnalyzer do
           name: atom(),
           arity: non_neg_integer(),
           public: boolean(),
-          calls: [mfa() | {nil, atom(), non_neg_integer()}],
+          calls: [mfa() | {nil, atom(), non_neg_integer()} | {module(), atom(), :any}],
           potential_modules: [module()]
         }
 
@@ -17,11 +17,14 @@ defmodule Treeshake.Utils.BeamAnalyzer do
           abstraction:
             {:behaviour | :protocol, [{callback :: atom(), arity :: non_neg_integer()}]} | nil,
           behaviour_impls: [module()],
-          protocol_impl: {protocol :: module(), type :: module()} | nil
+          protocol_impl: {protocol :: module(), type :: module()} | nil,
+          # :unknown when the module calls load_nif/2 but doesn't declare NIFs
+          nifs: [{atom(), non_neg_integer()}] | :unknown,
+          macro_generated: [{atom(), non_neg_integer()}]
         }
 
-  @spec analyze(module(), core_ast :: term()) :: module_info()
-  def analyze(module, core) do
+  @spec analyze(module(), core_ast :: term(), elixir_definitions :: [tuple()]) :: module_info()
+  def analyze(module, core, elixir_definitions) do
     exports = collect_exports(core)
     callbacks = collect_callbacks(core)
     protocol_impl = collect_protocol_impl(core)
@@ -36,7 +39,18 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       end
 
     is_protocol = protocol_definition?(core)
-    functions = collect_functions(core, exports)
+    declared_nifs = collect_nifs(core)
+
+    functions =
+      core
+      |> collect_functions(exports)
+      |> add_nif_calls(declared_nifs)
+      |> add_on_load_calls(collect_on_load(core))
+
+    nifs =
+      if declared_nifs == [] and Enum.any?(functions, &loads_nifs?/1),
+        do: :unknown,
+        else: declared_nifs
 
     abstraction =
       cond do
@@ -50,7 +64,9 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       functions: functions,
       abstraction: abstraction,
       behaviour_impls: behaviours,
-      protocol_impl: protocol_impl
+      protocol_impl: protocol_impl,
+      nifs: nifs,
+      macro_generated: macro_generated_functions(module, elixir_definitions)
     }
   end
 
@@ -80,6 +96,56 @@ defmodule Treeshake.Utils.BeamAnalyzer do
       _ ->
         []
     end)
+  end
+
+  # Functions injected into the module by macros defined in other modules.
+  defp macro_generated_functions(module, elixir_definitions) do
+    for {{name, arity}, kind, meta, _clauses} <- elixir_definitions,
+        context = Keyword.get(meta, :context),
+        is_atom(context) and context != module do
+      beam_name_arity(kind, name, arity)
+    end
+  end
+
+  # Macros are compiled to MACRO-prefixed functions with an extra env argument.
+  defp beam_name_arity(kind, name, arity) when kind in [:defmacro, :defmacrop],
+    do: {:"MACRO-#{name}", arity + 1}
+
+  defp beam_name_arity(_kind, name, arity), do: {name, arity}
+
+  defp collect_on_load({:c_module, _, _, _, attrs, _}) do
+    Enum.flat_map(attrs, fn
+      {{:c_literal, _, :on_load}, {:c_literal, _, funs}} when is_list(funs) -> funs
+      _ -> []
+    end)
+  end
+
+  # Functions declared with `-nifs`, whose bodies the compiler starts with
+  # a nif_start primop
+  defp collect_nifs({:c_module, _, _, _, _, defs}) do
+    for {{:c_var, _, name_arity}, {:c_fun, _, _, body}} <- defs,
+        match?({:c_seq, _, {:c_primop, _, {:c_literal, _, :nif_start}, []}, _}, body),
+        do: name_arity
+  end
+
+  # Loading NIFs fails unless every NIF in the library has a function in the
+  # module, so they're considered called by the function loading them.
+  defp add_nif_calls(functions, []), do: functions
+
+  defp add_nif_calls(functions, nifs) do
+    calls = Enum.map(nifs, fn {name, arity} -> {nil, name, arity} end)
+    Enum.map(functions, &if(loads_nifs?(&1), do: %{&1 | calls: calls ++ &1.calls}, else: &1))
+  end
+
+  defp loads_nifs?(function), do: {:erlang, :load_nif, 2} in function.calls
+
+  # The on_load function, which typically loads NIFs, runs whenever the module
+  # is loaded, so it's considered called by every public function.
+  defp add_on_load_calls(functions, []), do: functions
+
+  defp add_on_load_calls(functions, on_load) do
+    calls = Enum.map(on_load, fn {name, arity} -> {nil, name, arity} end)
+    Enum.map(functions, &if(&1.public, do: %{&1 | calls: calls ++ &1.calls}, else: &1))
   end
 
   # Elixir protocol implementations do not use a :protocol_impl attribute.
@@ -178,39 +244,10 @@ defmodule Treeshake.Utils.BeamAnalyzer do
   defp collect_calls([head | tail]), do: collect_calls(head) ++ collect_calls(tail)
   defp collect_calls([]), do: []
 
-  # Functions of the form remote_mod:fun(M, F, Args, ...) where M and F are atom
-  # literals and Args is the argument list — extract as a static call to M:F/arity.
-  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:apply/3,
-  # erlang:spawn_opt/4, proc_lib:start*/3-5, proc_lib:spawn*/3-5, etc.
-  @mfa_callers %{
-    erlang: [:spawn, :spawn_link, :apply],
-    proc_lib: [:start, :start_link, :start_monitor, :spawn, :spawn_link, :spawn_opt, :spawn_mon]
-  }
-
-  defp collect_calls(
-         {:c_call, _, {:c_literal, _, mod}, {:c_literal, _, fun},
-          [{:c_literal, _, m}, {:c_literal, _, f}, args_expr | rest] = all_args}
-       )
-       when is_atom(m) and is_atom(f) and is_map_key(@mfa_callers, mod) do
-    funs = Map.fetch!(@mfa_callers, mod)
-
-    if fun in funs do
-      own =
-        case count_list(args_expr) do
-          {:ok, arity} -> [{m, f, arity}]
-          :error -> []
-        end
-
-      [{mod, fun, length(all_args)}] ++ own ++ collect_calls(args_expr) ++ collect_calls(rest)
-    else
-      [{mod, fun, length(all_args)}] ++ collect_calls(all_args)
-    end
-  end
-
   # Remote call: Mod.fun(args)
   defp collect_calls({:c_call, _, {:c_literal, _, mod}, {:c_literal, _, fun}, args})
        when is_atom(mod) and is_atom(fun) do
-    [{mod, fun, length(args)}] ++ collect_calls(args)
+    [{mod, fun, length(args)}] ++ collect_special_calls(mod, fun, args)
   end
 
   # Remote call through variable/expression
@@ -293,6 +330,44 @@ defmodule Treeshake.Utils.BeamAnalyzer do
 
   defp collect_calls(_), do: []
 
+  # Functions of the form remote_mod:fun(M, F, Args, ...) where M and F are atom
+  # literals and Args is the argument list — extract as a static call to M:F/arity.
+  # Covers erlang:spawn/3, erlang:spawn_link/3, erlang:spawn_monitor/3, erlang:apply/3,
+  # erlang:spawn_opt/4, proc_lib:start*/3-5, proc_lib:spawn*/3-5, etc.
+  @mfa_callers %{
+    erlang: [:spawn, :spawn_link, :spawn_monitor, :spawn_opt, :apply],
+    proc_lib: [:start, :start_link, :start_monitor, :spawn, :spawn_link, :spawn_opt, :spawn_mon]
+  }
+
+  defp collect_special_calls(
+         mod,
+         fun,
+         [{:c_literal, _, m}, {:c_literal, _, f}, args_expr | rest] = all_args
+       )
+       when is_atom(m) and is_atom(f) and is_map_key(@mfa_callers, mod) do
+    funs = Map.fetch!(@mfa_callers, mod)
+
+    with true <- fun in funs,
+         {:ok, arity} <- count_list(args_expr) do
+      [{m, f, arity}] ++
+        collect_calls(args_expr) ++ collect_calls(rest)
+    else
+      _other -> collect_calls(all_args)
+    end
+  end
+
+  # Kernel.struct!(Mod, fields) and Kernel.struct(Mod, fields), which build
+  # the struct with Mod.__struct__/1 and Mod.__struct__/0, respectively.
+  @struct_builders %{:struct! => {:__struct__, 1}, :struct => {:__struct__, 0}}
+
+  defp collect_special_calls(Kernel, fun, [{:c_literal, _, m} | _] = args)
+       when is_map_key(@struct_builders, fun) and is_atom(m) do
+    {f, a} = Map.fetch!(@struct_builders, fun)
+    [{m, f, a}] ++ collect_calls(args)
+  end
+
+  defp collect_special_calls(_mod, _fun, args), do: collect_calls(args)
+
   defp collect_literal_atoms(atom) when is_atom(atom), do: [atom]
 
   defp collect_literal_atoms([head | tail]),
@@ -316,8 +391,18 @@ defmodule Treeshake.Utils.BeamAnalyzer do
        when is_atom(m) and is_atom(f) and is_list(args),
        do: [{m, f, length(args)}]
 
+  # Treats neighbouring atoms in a tuple as a module and function.
+  # Pairs are left out: they're mostly keyword list entries, or
+  # tables which name functions without calling them.
   defp collect_literal_atoms(tuple) when is_tuple(tuple) do
-    tuple |> Tuple.to_list() |> Enum.flat_map(&collect_literal_atoms/1)
+    elements = Tuple.to_list(tuple)
+
+    functions =
+      for [m, f] <- Enum.chunk_every(elements, 2, 1, :discard),
+          tuple_size(tuple) > 2 and is_atom(m) and is_atom(f),
+          do: {m, f, :any}
+
+    functions ++ Enum.flat_map(elements, &collect_literal_atoms/1)
   end
 
   # External function reference stored as a literal, e.g. &Logger.default_formatter/0

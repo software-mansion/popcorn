@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   config :popcorn,
     extra_apps: [:eex],
-    treeshake: [preserved_apps: [:eex]]
+    treeshake: true
   ```
 
   | Setting | Behavior |
@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `runtime_variant` | Selects `:core` or `:crypto` instead of automatic runtime selection. |
   | `strip` | Removes BEAM debug and documentation chunks. Default: `true`. |
   | `exclude_priv` | Leaves out `priv` files matching glob patterns, which are relative to `priv`: `{app, pattern}` in one application's, like `{:phoenix, "templates"}`, and a bare pattern in every application's, like `"static/*.map"`. A matched directory is left out with its contents. Default: `[]`. |
-  | `treeshake` | Removes unreachable modules and functions. Experimental. Default: `false`. Set `[preserved_apps: [...]]` to enable. |
+  | `treeshake` | (Experimental) Removes unreachable modules and functions. Set to `true` or a keyword list of options to enable. See [Tree-shaking](#module-tree-shaking) below for details. Default: `false`. |
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
   Use application names, such as `:my_app`, rather than module names.
@@ -68,10 +68,42 @@ defmodule Mix.Tasks.Popcorn.Cook do
   `public_key`, or `ssl`. Otherwise, it selects `core`.
   An explicit `core` selection fails if an application requires crypto support.
 
-  Tree-shaking can remove code reached only through dynamic calls or evaluation.
-  Use `preserved_apps` for such applications. Preservation does not add an
-  application to the package; select it through the entrypoint, its dependencies,
-  or `extra_apps` first. Use `treeshake: []` to enable without preserving apps.
+  ### Tree-shaking
+
+  > #### Experimental feature {: .warning }
+  >
+  > Tree-shaking is experimental. There may be breaking changes to its behaviour and
+  > configuration, even in minor releases.
+
+  Tree-shaking finds code that nothing calls and removes it from the bundle.
+  It can significantly reduce bundle size, which is important for web apps.
+
+  Due to the dynamic nature of Elixir, it's not possible to detect unused code with
+  full certainty. In particular, if some code is only called through dynamic calls
+  (like `apply/3` on a module known at runtime), it's possible that tree-shaking
+  removes it.
+
+  You can use the `keep` option to prevent given piece of code from being removed,
+  along with all the code it depends on. `keep` accepts a keyword list with the following
+  entries:
+  - `mod: module` - keeps all public functions of a module,
+  - `mfa: {module, fun, arity}` - keeps a given function,
+  - `behaviour_impls: behaviour` - keeps all modules implementing a given behaviour,
+  - `referenced_modules_defining: {fun, arity}` - if a module is referenced in the reachable code,
+    keeps it as a whole as long as it defines a given function
+
+  For example:
+
+  ```elixir
+  config :popcorn,
+    treeshake: [keep: [mod: MyApp.Plugin, mfa: {MyApp.Codec, :decode, 1}]]
+  ```
+
+  `keep` can be also used to work-around a bug in the tree-shaker. In such case, please
+  open an issue in Popcorn.
+
+  Tree-shaking doesn't work for use cases involving code compilation and evaluation.
+  The compiler and evaluator code is dropped by default.
 
   ## Output
 
@@ -121,7 +153,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       strip: Application.get_env(:popcorn, :strip, true),
       exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
       config: project_config(),
-      treeshake: treeshake_options(Application.get_env(:popcorn, :treeshake, false))
+      treeshake: Application.get_env(:popcorn, :treeshake, false)
     ]
 
     case Packager.build(packager_options) do
@@ -146,10 +178,4 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   defp runtime_variant(nil), do: nil
   defp runtime_variant(variant), do: to_string(variant)
-
-  defp treeshake_options(false), do: false
-
-  defp treeshake_options(options) when is_list(options) do
-    Keyword.put_new(options, :preserved_apps, [])
-  end
 end

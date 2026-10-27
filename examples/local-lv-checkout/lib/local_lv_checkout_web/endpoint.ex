@@ -34,6 +34,7 @@ defmodule LocalLvCheckoutWeb.Endpoint do
     at: "/",
     from: :local_lv_checkout,
     gzip: not code_reloading?,
+    brotli: not code_reloading?,
     only: LocalLvCheckoutWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 
