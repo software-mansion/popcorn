@@ -5,4 +5,4 @@ config :popcorn,
   # Web assets, which the host app serves, and generators' templates
   exclude_priv: ["static", phoenix: "templates", local_live_view: "*"],
   # Removes the code the local views don't use
-  treeshake: [enable: true]
+  treeshake: true

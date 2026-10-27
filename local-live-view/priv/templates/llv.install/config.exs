@@ -13,4 +13,4 @@ end
 # Tree-shaking removes the code the local views don't use, which makes the
 # package much smaller, but it's experimental:
 #
-#     config :popcorn, treeshake: [enable: true]
+#     config :popcorn, treeshake: true

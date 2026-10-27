@@ -60,10 +60,8 @@ defmodule Popcorn.Packager do
           treeshake: treeshake_options()
         }
 
-  @type treeshake_options :: [
-          enable: boolean(),
-          keep: [Treeshake.keep_entry()]
-        ]
+  # True or the options turn tree-shaking on, false off
+  @type treeshake_options :: boolean() | [keep: [Treeshake.keep_entry()]]
 
   # Native libraries, like NIFs and port drivers, can't be loaded by the Wasm
   # runtime, which has its NIFs linked in. Dialyzer's PLT files, which some
@@ -170,7 +168,7 @@ defmodule Popcorn.Packager do
         strip: true,
         exclude_priv: [],
         config: [],
-        treeshake: [enable: false],
+        treeshake: false,
         static_dir: Application.app_dir(:popcorn, "priv/static")
       )
 
@@ -675,26 +673,23 @@ defmodule Popcorn.Packager do
     if unsupported == [], do: :ok, else: err(:unsupported_apps, unsupported)
   end
 
+  defp validate_treeshake!(enable) when is_boolean(enable), do: enable
+
   defp validate_treeshake!(options) do
-    with true <- Keyword.keyword?(options),
-         validated = Keyword.validate!(options, [:enable, keep: []]),
-         true <- is_boolean(validated[:enable]) do
-      validated
+    if Keyword.keyword?(options) do
+      Keyword.validate!(options, keep: [])
     else
-      false ->
-        raise ArgumentError,
-              "expected the treeshake option to be a keyword list with `enable: true` or " <>
-                "`enable: false`, got: #{inspect(options)}"
+      raise ArgumentError,
+            "expected the treeshake option to be true, false or a keyword list of options, " <>
+              "got: #{inspect(options)}"
     end
   end
 
-  defp maybe_treeshake(staged_apps, options, out_dir) do
-    if Keyword.fetch!(options, :enable) do
-      treeshake(staged_apps, options[:keep], out_dir)
-    else
-      {:ok, staged_apps, nil}
-    end
-  end
+  defp maybe_treeshake(staged_apps, false, _out_dir), do: {:ok, staged_apps, nil}
+  defp maybe_treeshake(staged_apps, true, out_dir), do: treeshake(staged_apps, [], out_dir)
+
+  defp maybe_treeshake(staged_apps, options, out_dir),
+    do: treeshake(staged_apps, options[:keep], out_dir)
 
   defp treeshake(staged_apps, keep, out_dir) do
     warn_unknown_kept(staged_apps, keep)

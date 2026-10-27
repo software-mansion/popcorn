@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   config :popcorn,
     extra_apps: [:eex],
-    treeshake: [enable: true]
+    treeshake: true
   ```
 
   | Setting | Behavior |
@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `runtime_variant` | Selects `:core` or `:crypto` instead of automatic runtime selection. |
   | `strip` | Removes BEAM debug and documentation chunks. Default: `true`. |
   | `exclude_priv` | Leaves out `priv` files matching glob patterns, which are relative to `priv`: `{app, pattern}` in one application's, like `{:phoenix, "templates"}`, and a bare pattern in every application's, like `"static/*.map"`. A matched directory is left out with its contents. Default: `[]`. |
-  | `treeshake` | Removes unreachable modules and functions. Experimental. Set `[enable: true]` to enable. See [Tree-shaking](#module-tree-shaking) below for details & more options. Default: `[enable: false]`. |
+  | `treeshake` | (Experimental) Removes unreachable modules and functions. Set to `true` or a keyword list of options to enable. See [Tree-shaking](#module-tree-shaking) below for details. Default: `false`. |
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
   Use application names, such as `:my_app`, rather than module names.
@@ -96,7 +96,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   ```elixir
   config :popcorn,
-    treeshake: [enable: true, keep: [mod: MyApp.Plugin, mfa: {MyApp.Codec, :decode, 1}]]
+    treeshake: [keep: [mod: MyApp.Plugin, mfa: {MyApp.Codec, :decode, 1}]]
   ```
 
   `keep` can be also used to work-around a bug in the tree-shaker. In such case, please
@@ -153,7 +153,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
       strip: Application.get_env(:popcorn, :strip, true),
       exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
       config: project_config(),
-      treeshake: Application.get_env(:popcorn, :treeshake, enable: false)
+      treeshake: Application.get_env(:popcorn, :treeshake, false)
     ]
 
     case Packager.build(packager_options) do
