@@ -6,7 +6,7 @@ LocalLiveView brings local-first interactivity to Phoenix applications by runnin
 
 In a standard Phoenix LiveView app, UI state lives on the server. Every interaction travels over the network: user clicks button → server processes event → server sends diff → browser updates DOM. This works great, but it means latency is always in the loop.
 
-LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to BEAM bytecode and executed via [Popcorn](https://popcorn.hexdocs.pm/1.0.0-next.0/about.html), which runs the Erlang virtual machine (BEAM), compiled to WebAssembly, directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
+LocalLiveView moves that state into the browser itself. Your Elixir modules are compiled to BEAM bytecode and executed via [Popcorn](https://popcorn.hexdocs.pm/1.0.0/about.html), which runs the Erlang virtual machine (BEAM), compiled to WebAssembly, directly in the browser. Events are handled locally, renders happen instantly, and the server is only involved when you explicitly want it to be.
 
 The result: **zero-latency UI**, offline capability, and a familiar Elixir/LiveView programming model.
 

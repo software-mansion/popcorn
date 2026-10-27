@@ -7,7 +7,7 @@ defmodule Popdoc.Bundle do
     Mix.Task.run("compile")
     out_dir = Path.join(Mix.Project.build_path(), "popdoc")
 
-    case Popcorn.Packager.build(app: "popdoc", out_dir: out_dir) do
+    case Popcorn.Packager.build(app: :popdoc, out_dir: out_dir) do
       {:ok, _report} -> :ok
       {:error, error} -> Mix.raise(Popcorn.Packager.format_error(error))
     end

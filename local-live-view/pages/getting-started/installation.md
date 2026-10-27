@@ -5,7 +5,7 @@ LocalLiveView is installed into an existing Phoenix project using the `mix llv.i
 ## Prerequisites
 
 - A Phoenix project generated with `mix phx.new`
-- Elixir 1.19 or later, and the Erlang/OTP version required by [Popcorn](https://popcorn.hexdocs.pm/1.0.0-next.0/compatibility.html#compatibility)
+- Elixir 1.19 or later, and the Erlang/OTP version required by [Popcorn](https://popcorn.hexdocs.pm/1.0.0/compatibility.html#compatibility)
 - `:local_live_view` added as a dependency
 - The standard Phoenix esbuild setup for JavaScript assets
 

@@ -11,7 +11,7 @@ If you want to use Popcorn with Phoenix, please see [LocalLiveView](https://hexd
 - OTP 29 (match the selected runtime release)
 - `make` (Brotli library NIF), `inotify-tools` (Linux, for `popcorn.dev` FS watching)
 
-Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v1.0.0-next.0/mise.toml) for this release. Your local toolchain must be compatible with the one used to build the VM. See ["Compatibility and limits"](compatibility.md#compatibility) for details.
+Use the toolchain pinned in [mise.toml](https://github.com/software-mansion/popcorn/blob/v1.0.0/mise.toml) for this release. Your local toolchain must be compatible with the one used to build the VM. See ["Compatibility and limits"](compatibility.md#compatibility) for details.
 
 ## Initialization
 
@@ -28,7 +28,7 @@ Add Popcorn to `mix.exs`:
 ```elixir
 defp deps do
   [
-    {:popcorn, "1.0.0-next.0"}
+    {:popcorn, "1.0.0"}
   ]
 end
 ```
