@@ -34,7 +34,7 @@ defmodule Popdoc.MixProject do
   defp deps do
     [
       {:ex_doc, ">= 0.34.0 and < 1.0.0", optional: true, runtime: false, warn_if_outdated: true},
-      {:popcorn, "== 0.4.0-next.9"}
+      {:popcorn, "== 1.0.0-next.1"}
     ]
   end
 end

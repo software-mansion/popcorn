@@ -455,8 +455,8 @@ importers:
   popdoc/js:
     dependencies:
       '@swmansion/popcorn':
-        specifier: 0.4.0-next.9
-        version: 0.4.0-next.9(esbuild@0.28.0)(rollup@4.63.1)(vite@8.3.4(@types/node@25.9.6)(esbuild@0.28.0)(jiti@2.7.0)(yaml@2.9.1))
+        specifier: 1.0.0-next.1
+        version: 1.0.0-next.1(esbuild@0.28.0)(rollup@4.63.1)(vite@8.3.4(@types/node@25.9.6)(esbuild@0.28.0)(jiti@2.7.0)(yaml@2.9.1))
     devDependencies:
       esbuild:
         specifier: 0.28.0
@@ -1975,8 +1975,8 @@ packages:
     peerDependencies:
       '@svgr/core': '*'
 
-  '@swmansion/popcorn@0.4.0-next.9':
-    resolution: {integrity: sha512-DFe1B7Xqq0uhHA+/DipOe3/D3jil+51daj86RwNGvVpzC30uyFWw0C/Qepa5Dly34ATvnoe3y6ffvvGXwPFgkg==}
+  '@swmansion/popcorn@1.0.0-next.1':
+    resolution: {integrity: sha512-3oaT0X3tGDHX42owoThDj3aehrGAwcIlJcXVbv1YgpygbMKpyNlPAn0xXlESOuS7HDe0NOrzvgs/9nU27wBSRA==}
     peerDependencies:
       esbuild: '>=0.17.0'
       rollup: '>=4.59.0'
@@ -5272,7 +5272,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@swmansion/popcorn@0.4.0-next.9(esbuild@0.28.0)(rollup@4.63.1)(vite@8.3.4(@types/node@25.9.6)(esbuild@0.28.0)(jiti@2.7.0)(yaml@2.9.1))':
+  '@swmansion/popcorn@1.0.0-next.1(esbuild@0.28.0)(rollup@4.63.1)(vite@8.3.4(@types/node@25.9.6)(esbuild@0.28.0)(jiti@2.7.0)(yaml@2.9.1))':
     optionalDependencies:
       esbuild: 0.28.0
       rollup: 4.63.1
