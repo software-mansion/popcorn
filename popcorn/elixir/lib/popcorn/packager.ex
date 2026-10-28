@@ -181,8 +181,10 @@ defmodule Popcorn.Packager do
     out_dir = options |> Keyword.fetch!(:out_dir) |> Path.expand(root_dir)
     static_dir = options |> Keyword.fetch!(:static_dir) |> Path.expand(root_dir)
 
-    tmp_dir_name = "popcorn-packager-#{System.pid()}-#{System.unique_integer([:positive])}"
-    packed_dir = Path.join(System.tmp_dir!(), tmp_dir_name)
+    # Next to the build's applications rather than among them, so that the copies
+    # staged by a concurrent or interrupted build aren't packaged as applications
+    packed_dir_name = "popcorn-packager-#{System.pid()}-#{System.unique_integer([:positive])}"
+    packed_dir = Path.join(Path.dirname(build_path), packed_dir_name)
 
     File.rm_rf!(out_dir)
     File.mkdir_p!(out_dir)

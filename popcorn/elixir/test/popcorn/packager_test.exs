@@ -204,6 +204,36 @@ defmodule Popcorn.PackagerTest do
       assert after_app["vm"] == before["vm"]
     end
 
+    test "copies staged by other builds aren't packaged", %{
+      options: options,
+      build_path: build_path,
+      out_dir: out_dir
+    } do
+      # Like an interrupted or concurrent build leaves next to the applications
+      build_dir = Path.dirname(build_path)
+      staged_app_dir = Path.join(build_dir, "popcorn-packager-0-0/staging/staged_app")
+      File.mkdir_p!(Path.join(staged_app_dir, "ebin"))
+      File.mkdir_p!(Path.join(staged_app_dir, "priv"))
+      File.write!(Path.join(staged_app_dir, "priv/data.txt"), "staged_app's")
+
+      write_app(Path.join(staged_app_dir, "ebin/staged_app.app"), :staged_app,
+        vsn: ~c"1.0",
+        modules: [],
+        applications: [:kernel, :stdlib]
+      )
+
+      assert {:ok, report} = Packager.build(options)
+      refute Map.has_key?(report.apps, :staged_app)
+
+      for group <- ~w(stdlib app deps),
+          entry <- Map.keys(read_archive(bundle_path(out_dir, group))) do
+        refute entry =~ "staged_app"
+      end
+
+      # The build removes its own copies
+      assert Enum.sort(File.ls!(build_dir)) == ["lib", "popcorn-packager-0-0"]
+    end
+
     test "the treeshake option is true, false or options", %{options: options} do
       for treeshake <- [:yes, [:keep], %{keep: []}] do
         assert_raise ArgumentError, ~r/true, false or a keyword list of options/, fn ->
