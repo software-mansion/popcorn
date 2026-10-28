@@ -500,6 +500,13 @@ defmodule Popcorn.Packager do
         File.cp_r!(priv_dir, Path.join(app_dir, "priv"), dereference_symlinks: true)
       end
 
+      # ensure copied app is writable
+      for path <- [app_dir | Path.wildcard(Path.join(app_dir, "**"), match_dot: true)],
+          %File.Stat{type: type, mode: mode} = File.lstat!(path),
+          type != :symlink do
+        File.chmod!(path, Bitwise.bor(mode, 0o200))
+      end
+
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
