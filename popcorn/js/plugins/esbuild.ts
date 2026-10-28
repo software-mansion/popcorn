@@ -41,7 +41,10 @@ export function popcorn(options: Options): Plugin {
 
         assert(outputDir !== undefined, "outdir was not resolved");
         const outDir = outputDir;
-        const prepared = await prepare(options);
+        const prepared = await prepare(
+          options,
+          build.initialOptions.absWorkingDir ?? process.cwd(),
+        );
 
         try {
           await mkdir(outDir, { recursive: true });

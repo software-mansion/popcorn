@@ -38,7 +38,7 @@ export function popcorn(options: Options): Plugin {
     async writeBundle() {
       assert(outputDir !== undefined, "output dir was not resolved");
       const outDir = outputDir;
-      const prepared = await prepare(options);
+      const prepared = await prepare(options, process.cwd());
 
       try {
         await mkdir(outDir, { recursive: true });

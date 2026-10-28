@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -31,8 +30,15 @@ type CookedManifest = {
   notes?: unknown[];
 };
 
-export async function popcorn(options: Options): Promise<Prepared> {
-  const dir = await mkdtemp(`${tmpdir()}/popcorn-otp-`);
+/** Cooks the app into a new directory in the bundler's `projectDir`. */
+export async function popcorn(
+  options: Options,
+  projectDir: string,
+): Promise<Prepared> {
+  // Vite's watcher ignores node_modules, even when it's in the Mix project
+  const cacheDir = resolve(projectDir, "node_modules/.cache/popcorn");
+  await mkdir(cacheDir, { recursive: true });
+  const dir = await mkdtemp(join(cacheDir, "otp-"));
   const args = ["popcorn.cook", "--out-dir", dir];
 
   try {

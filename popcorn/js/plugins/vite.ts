@@ -51,6 +51,7 @@ export function popcorn(options: Options): Plugin {
   let prepared: Prepared | undefined;
   let repacking: Promise<Prepared> | undefined;
   let dirty = false;
+  let projectDir = process.cwd();
   let outDir: string | undefined;
   let assetsDir = "assets";
   let workerDerivedOtpRoot = `/@fs${distDir}/otp/`;
@@ -62,7 +63,7 @@ export function popcorn(options: Options): Plugin {
     if (prepared !== undefined && !dirty) return Promise.resolve(prepared);
     if (repacking === undefined) {
       dirty = false;
-      repacking = prepare(options)
+      repacking = prepare(options, projectDir)
         .then(async (next) => {
           if (prepared !== undefined) {
             await rm(prepared.dir, { recursive: true, force: true });
@@ -171,6 +172,7 @@ export function popcorn(options: Options): Plugin {
 
     configResolved(config: ResolvedConfig) {
       config.server.fs.allow.push(distDir);
+      projectDir = config.root;
       outDir = resolve(config.root, config.build.outDir);
       assetsDir = config.build.assetsDir;
       const servedDistDir = isUnder(config.root, distDir)
@@ -184,7 +186,7 @@ export function popcorn(options: Options): Plugin {
       server.httpServer?.prependListener("request", setIsolationHeaders);
       server.watcher.add(rootDir);
       server.watcher.on("all", (_event, file) => {
-        if (isUnder(rootDir, file)) dirty = true;
+        if (isUnder(rootDir, file) && !isStaging(rootDir, file)) dirty = true;
       });
       server.middlewares.use(serve);
       server.httpServer?.once("close", cleanup);
@@ -234,6 +236,13 @@ function selectEncoding(
 function isUnder(dir: string, file: string): boolean {
   const rel = relative(dir, file);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+// Cooking stages the packed applications in `_build/<env>/popcorn-packager-*`
+function isStaging(rootDir: string, file: string): boolean {
+  return relative(rootDir, file)
+    .split(/[\\/]/)
+    .some((segment) => segment.startsWith("popcorn-packager-"));
 }
 
 function setIsolationHeaders(_req: IncomingMessage, res: Res): void {
