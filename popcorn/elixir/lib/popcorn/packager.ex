@@ -182,7 +182,8 @@ defmodule Popcorn.Packager do
     static_dir = options |> Keyword.fetch!(:static_dir) |> Path.expand(root_dir)
 
     # Next to the build's applications rather than among them, so that the copies
-    # staged by a concurrent or interrupted build aren't packaged as applications
+    # staged by a concurrent or interrupted build aren't packaged as applications.
+    # The Vite plugin's watcher ignores directories with this prefix.
     packed_dir_name = "popcorn-packager-#{System.pid()}-#{System.unique_integer([:positive])}"
     packed_dir = Path.join(Path.dirname(build_path), packed_dir_name)
 
