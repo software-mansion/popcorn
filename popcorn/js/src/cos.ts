@@ -50,8 +50,8 @@ export async function lookupCos(
 
 /**
  * Stores `assets` with `origins: "*"`. Uses the bytes in `loaded` where the
- * caller still has them, and otherwise fetches again, which the HTTP cache
- * usually answers. COS hashes what it receives and rejects a mismatch.
+ * caller still has them, and otherwise reads them from the HTTP cache, which
+ * has them from loading. COS hashes what it receives and rejects a mismatch.
  */
 export async function storeInCos(
   storage: CrossOriginStorageManager,
@@ -62,7 +62,9 @@ export async function storeInCos(
     try {
       let blob = loaded[asset.key];
       if (blob === undefined) {
-        const response = await fetch(asset.url);
+        // A cached copy may already be stale, and revalidating it would cost
+        // another request. COS's hash check catches any wrong bytes.
+        const response = await fetch(asset.url, { cache: "force-cache" });
         if (!response.ok) continue;
         blob = await response.blob();
       }
