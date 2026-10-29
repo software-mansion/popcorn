@@ -629,6 +629,10 @@ main() {
         --outdir "${final_outdir}/otp" \
         --with-crypto "${with_crypto}"
 
+    # The packager compiles these OTP applications instead of taking the host's
+    run escript "${PROJECT_ROOT}/scripts/export-otp-apps.escript" \
+        "${beam_dir}" "${final_outdir}/otp-apps"
+
     copy_artifacts "${beam_dir}" "${final_outdir}" "${with_crypto}"
 
     success "Build completed successfully!"

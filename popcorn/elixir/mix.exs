@@ -36,7 +36,7 @@ defmodule Popcorn.MixProject do
     [
       maintainers: ["Software Mansion"],
       licenses: ["Apache-2.0"],
-      files: ["lib", "patches", "priv/static", "mix.exs", "README.md", "LICENSE"],
+      files: ["lib", "patches", "priv/static", "priv/otp-apps", "mix.exs", "README.md", "LICENSE"],
       links: %{
         "GitHub" => @github,
         "Popcorn website" => "https://popcorn.swmansion.com"
@@ -59,9 +59,14 @@ defmodule Popcorn.MixProject do
   end
 
   defp with_static(fun) do
-    out = Path.expand("../out/js", __DIR__)
-    static = Path.join(__DIR__, "priv/static")
-    stage = Path.join(__DIR__, "_build/hex-static")
+    with_copy("static", "js", fn -> with_copy("otp-apps", "otp-apps", fun) end)
+  end
+
+  # Replaces the priv/<name> link to ../out/<out_name> with a copy of it
+  defp with_copy(name, out_name, fun) do
+    out = Path.expand("../out/#{out_name}", __DIR__)
+    link = Path.join(__DIR__, "priv/#{name}")
+    stage = Path.join(__DIR__, "_build/hex-#{name}")
 
     File.rm_rf!(stage)
 
@@ -69,15 +74,15 @@ defmodule Popcorn.MixProject do
       File.mkdir_p!(Path.dirname(stage))
       File.cp_r!(out, stage, dereference_symlinks: true)
 
-      File.mkdir_p!(Path.dirname(static))
-      File.rm_rf!(static)
-      File.rename!(stage, static)
+      File.mkdir_p!(Path.dirname(link))
+      File.rm_rf!(link)
+      File.rename!(stage, link)
 
       try do
         fun.()
       after
-        File.rm_rf!(static)
-        File.ln_s!("../../out/js", static)
+        File.rm_rf!(link)
+        File.ln_s!("../../out/#{out_name}", link)
       end
     after
       File.rm_rf!(stage)
