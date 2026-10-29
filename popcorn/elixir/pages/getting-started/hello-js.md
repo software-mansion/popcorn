@@ -48,7 +48,7 @@ Enter the Vite project and install its dependencies and Popcorn:
 
 ```bash
 cd eval
-npm install @swmansion/popcorn@1.0.0
+npm install @swmansion/popcorn@1
 ```
 
 We also need an Elixir part of the application. Create a project named `eval_wasm`. For the best results, let's use the same Elixir and Erlang versions as Popcorn uses.
