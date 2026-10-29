@@ -67,6 +67,7 @@
     "@playwright/test": "1.63.0",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
+    "@types/wicg-cross-origin-storage": "^2026.10.1",
     "esbuild": "^0.25.0",
     "rollup": "^4.55.1",
     "tslib": "^2.8.1",
