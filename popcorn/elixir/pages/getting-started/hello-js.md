@@ -72,7 +72,7 @@ Add Popcorn to `eval_wasm/mix.exs`:
 # mix.exs
 defp deps do
   [
-    {:popcorn, "1.0.0"}
+    {:popcorn, "~> 1.0"}
   ]
 end
 ```
