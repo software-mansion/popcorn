@@ -410,18 +410,21 @@ function send(
     };
   }
 
-  const status = module.ccall(
-    "sendVmMessage",
-    "number",
-    ["number", target.argType, "number", "array", "number"],
-    [
-      target.kind,
-      target.value,
-      target.length,
-      message.etf,
-      message.etf.byteLength,
-    ],
-  );
+  // ccall copies array arguments onto the limited Wasm stack.
+  const etfPtr = module._malloc(message.etf.byteLength);
+  check(etfPtr !== 0);
+  let status: unknown;
+  try {
+    module.HEAPU8.set(message.etf, etfPtr);
+    status = module.ccall(
+      "sendVmMessage",
+      "number",
+      ["number", target.argType, "number", "number", "number"],
+      [target.kind, target.value, target.length, etfPtr, message.etf.byteLength],
+    );
+  } finally {
+    module._free(etfPtr);
+  }
 
   if (status === 0) {
     return { ok: true, data: null };

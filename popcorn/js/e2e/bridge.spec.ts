@@ -1,3 +1,4 @@
+import type { Pid } from "@swmansion/popcorn";
 import { a, atom, encode, t, tuple } from "../src/etf";
 import { assert, evalOpts, expect, test } from "./helpers";
 
@@ -149,6 +150,52 @@ test.describe("ETF", () => {
 });
 
 test.describe("events", () => {
+  test("large payloads", async ({ otp, page }) => {
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        true = register(term_receiver, self()),
+        ok = wasm:send(#{receiver => self()}),
+        receive
+          {wasm, Payload} ->
+            Text = maps:get(<<"blob">>, Payload),
+            ok = wasm:send(#{text_valid => Text =:= binary:copy(<<"A">>, 100000)})
+        end,
+        receive
+          {wasm, Binary} ->
+            ok = wasm:send(#{bytes_valid => Binary =:= binary:copy(<<165>>, 1048576)})
+        end,
+        receive
+          {wasm, <<"ping">>} -> ok = wasm:send(#{alive => true})
+        end.
+      `),
+    );
+    assert(boot.ok);
+    const receiver = await otp.eventValueHandle<Pid>("receiver");
+    const payload = { blob: "A".repeat(100_000) };
+    expect(await otp.trySend("no_such_name", payload)).toEqual({
+      ok: false,
+      error: {
+        t: "bridge:listener-not-found",
+        data: { targetName: "no_such_name" },
+      },
+    });
+    expect(await otp.trySend("term_receiver", payload)).toEqual({
+      ok: true,
+      data: null,
+    });
+    expect(await otp.waitForEvent("text_valid")).toEqual({ text_valid: true });
+
+    const bytes = await page.evaluateHandle(() =>
+      new Uint8Array(1024 * 1024).fill(0xa5),
+    );
+    expect(await otp.trySend(receiver, bytes)).toEqual({ ok: true, data: null });
+    await bytes.dispose();
+    expect(await otp.waitForEvent("bytes_valid")).toEqual({ bytes_valid: true });
+    expect(await otp.trySend(receiver, "ping")).toEqual({ ok: true, data: null });
+    expect(await otp.waitForEvent("alive")).toEqual({ alive: true });
+    await receiver.dispose();
+  });
+
   test("bytes and integers", async ({ otp, page }) => {
     const boot = await otp.tryBoot(
       evalOpts(`
