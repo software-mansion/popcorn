@@ -494,15 +494,27 @@ defmodule Popcorn.Packager do
       priv_dir = Path.join(Path.dirname(info.ebin_dir), "priv")
 
       File.mkdir_p!(app_dir)
-      File.cp_r!(info.ebin_dir, ebin_dir)
+      copy_writable!(info.ebin_dir, ebin_dir)
 
       if File.dir?(priv_dir) do
-        File.cp_r!(priv_dir, Path.join(app_dir, "priv"), dereference_symlinks: true)
+        copy_writable!(priv_dir, Path.join(app_dir, "priv"))
       end
 
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  defp copy_writable!(source, destination) do
+    source
+    |> File.cp_r!(destination, dereference_symlinks: true)
+    |> Enum.each(fn path ->
+      %File.Stat{type: type, mode: mode} = File.stat!(path)
+
+      if type == :regular and Bitwise.band(mode, 0o200) == 0 do
+        File.chmod!(path, Bitwise.bor(mode, 0o200))
+      end
+    end)
   end
 
   defp remove_priv_files(staged_apps, patterns) do
