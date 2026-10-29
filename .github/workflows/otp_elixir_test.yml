@@ -5,6 +5,7 @@ on:
     branches: ["**"]
     paths:
       - "popcorn/elixir/**"
+      - "scripts/export-otp-apps.escript"
       - ".github/workflows/otp_elixir_test.yml"
 
 concurrency:
