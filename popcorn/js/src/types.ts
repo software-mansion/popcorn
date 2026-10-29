@@ -23,8 +23,24 @@ export type BeamSendPayload = {
   etf: Uint8Array<ArrayBuffer>;
 };
 
+/**
+ * A file the worker would otherwise fetch, looked up in Cross-Origin Storage
+ * by its hash. `key` is `beam.wasm` or the tarball path from the manifest.
+ */
+export type CosAsset = { key: string; url: string; sha256: string };
+
+/** Files found in Cross-Origin Storage, by `CosAsset.key`. */
+export type CosFiles = Record<string, Blob>;
+
 export type BeamBootOptions = {
   otpAssetsRoot: string;
+  /** Set to `false` to skip Cross-Origin Storage. */
+  crossOriginStorage?: boolean;
+  /**
+   * Looks up files in the page's Cross-Origin Storage, for a worker without
+   * its own. Absent when the page has none either.
+   */
+  lookupCosOnMainThread?: (assets: CosAsset[]) => Promise<CosFiles>;
   /**
    * Emulator flags before `--`.
    *
@@ -82,6 +98,7 @@ export type TtySize = {
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
   wasmMemory?: WebAssembly.Memory;
+  locateFile?: (path: string, prefix: string) => string;
   ENV: Record<string, string>;
   FS_mkdirTree: (path: string) => void;
   FS_createDataFile: (

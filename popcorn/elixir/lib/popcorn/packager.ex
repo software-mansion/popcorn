@@ -286,7 +286,7 @@ defmodule Popcorn.Packager do
           in_group? = fn {app, _info} -> app_bundles[app] == group end
           apps = Enum.filter(staged_apps, in_group?)
           extra_files = if group == "app", do: [{@boot_name, boot_path}], else: []
-          {group, %{tar: create_tarball(out_dir, group, apps, extra_files, strip)}}
+          {group, create_tarball(out_dir, group, apps, extra_files, strip)}
         end)
 
       tar_paths =
@@ -299,7 +299,9 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{version: vm_version}
+        vm: %{version: vm_version},
+        # Lets the browser find the runtime in Cross-Origin Storage by its hash.
+        runtime: %{sha256: sha256_file(Path.join([runtimes_dir, variant, "beam.wasm"]))}
       }
 
       File.write!(manifest_path, JSON.encode!(manifest))
@@ -921,14 +923,19 @@ defmodule Popcorn.Packager do
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
     :ok = :erl_tar.create(to_charlist(path), entries, opts)
 
-    Path.join("lib", Path.basename(fingerprint(path)))
+    {target, hash} = fingerprint(path)
+    %{tar: Path.join("lib", Path.basename(target)), sha256: hash}
   end
 
   defp fingerprint(path) do
-    hash = :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
+    hash = sha256_file(path)
     target = Path.rootname(path) <> ".#{hash}" <> Path.extname(path)
     File.rename!(path, target)
-    target
+    {target, hash}
+  end
+
+  defp sha256_file(path) do
+    :crypto.hash(:sha256, File.read!(path)) |> Base.encode16(case: :lower)
   end
 
   defp loaded_dynamic_nifs(_app, ebin_dir) do
