@@ -39,13 +39,32 @@ defmodule Popcorn.Packager.BeamPatcher do
     end
   end
 
+  # The `Line` chunk records source file names and survives stripping, so an
+  # absolute patch path would make the packed stdlib differ between machines
+  # and defeat sharing it by hash. Compile with paths like `kernel/prim_tty.erl`.
   defp compile_patch(patch_path) do
-    case :compile.file(to_charlist(patch_path), [:binary, :debug_info, :return_errors, :to_core]) do
-      {:ok, _module, ast} ->
-        {:ok, ast}
+    with {:ok, forms} <- parse_patch(patch_path),
+         {:ok, _module, ast} <-
+           :compile.noenv_forms(forms, [:debug_info, :return_errors, :to_core]) do
+      {:ok, ast}
+    else
+      {:error, errors, _warnings} -> err(:bad_patch, {patch_path, errors})
+      {:error, reason} -> err(:bad_patch, {patch_path, reason})
+    end
+  end
 
-      {:error, errors, _warnings} ->
-        err(:bad_patch, {patch_path, errors})
+  defp parse_patch(patch_path) do
+    relative = patch_path |> Path.split() |> Enum.take(-2) |> Path.join()
+
+    with {:ok, forms} <- :epp.parse_file(to_charlist(patch_path), []) do
+      {:ok,
+       Enum.map(forms, fn
+         {:attribute, anno, :file, {_file, line}} ->
+           {:attribute, anno, :file, {to_charlist(relative), line}}
+
+         form ->
+           form
+       end)}
     end
   end
 
