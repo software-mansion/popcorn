@@ -944,26 +944,7 @@ defmodule Popcorn.Packager do
   end
 
   defp check_otp_version(host_version, runtime_version) do
-    # host: computer this runs on
-    # runtime: vm compiled to wasm
-    host = otp_version(host_version)
-    runtime = otp_version(runtime_version)
-
-    [host_major | _] = host
-    [runtime_major | _] = runtime
-
-    compatible = runtime_major - 2 <= host_major and version_lte?(host, runtime)
-
-    if compatible do
-      if Enum.take(host, 2) != Enum.take(runtime, 2) do
-        warn("""
-        Native OTP #{host_version} differs from Popcorn's OTP #{runtime_version} version.
-        This can cause runtime crashes.
-
-        Consider using matching major and minor OTP version.
-        """)
-      end
-
+    if otp_major(host_version) == otp_major(runtime_version) do
       :ok
     else
       err(:unsupported_otp, {host_version, runtime_version})
@@ -983,19 +964,9 @@ defmodule Popcorn.Packager do
     |> String.trim()
   end
 
-  defp otp_version(version) do
-    version
-    |> to_string()
-    |> String.split("-", parts: 2)
-    |> hd()
-    |> String.split(".")
-    |> Enum.map(&String.to_integer/1)
-  end
-
-  defp version_lte?(left, right) do
-    width = max(length(left), length(right))
-    pad = fn version -> version ++ List.duplicate(0, width - length(version)) end
-    pad.(left) <= pad.(right)
+  defp otp_major(version) do
+    {major, _rest} = version |> to_string() |> Integer.parse()
+    major
   end
 
   defp get_required_apps(props) do
@@ -1030,6 +1001,13 @@ defmodule Popcorn.Packager do
 
   def format_error(%{code: "boot_script_failed", message: message}) do
     "Making the boot script failed: #{message}"
+  end
+
+  def format_error(%{code: "unsupported_otp", host: host, runtime: runtime}) do
+    """
+    Packaging requires OTP #{otp_major(runtime)} on the host, because Popcorn runs on OTP #{runtime}. \
+    The installed OTP is #{host}.\
+    """
   end
 
   def format_error(%{code: "treeshake_failed", message: message}), do: message
