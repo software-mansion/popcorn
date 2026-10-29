@@ -204,6 +204,45 @@ defmodule Popcorn.PackagerTest do
       assert after_app["vm"] == before["vm"]
     end
 
+    test "read-only installations", %{options: options, build_path: build_path} do
+      ebin_dir = Path.join(build_path, "popcorn/ebin")
+      priv_file = Path.join(build_path, "popcorn/priv/nested/fixture.txt")
+
+      for file <- [priv_file | Path.wildcard(Path.join(ebin_dir, "*"))] do
+        File.chmod!(file, 0o444)
+      end
+
+      File.chmod!(ebin_dir, 0o555)
+      on_exit(fn -> File.chmod!(ebin_dir, 0o755) end)
+
+      assert {:ok, %{apps: %{popcorn: _app}}} =
+               Packager.build(Keyword.put(options, :treeshake, true))
+    end
+
+    test "symlinked ebin", %{options: options, build_path: build_path, tmp_dir: tmp_dir} do
+      # Like Mix links the ebin of make deps, relative to the build
+      source_ebin = Path.join(tmp_dir, "deps/linked_app/ebin")
+      File.mkdir_p!(source_ebin)
+
+      write_app(Path.join(source_ebin, "linked_app.app"), :linked_app,
+        description: ~c"linked_app",
+        vsn: ~c"1.0",
+        modules: [],
+        registered: [],
+        applications: [:kernel, :stdlib]
+      )
+
+      source_app = File.read!(Path.join(source_ebin, "linked_app.app"))
+      build_ebin = Path.join(build_path, "linked_app/ebin")
+      File.mkdir_p!(Path.dirname(build_ebin))
+      File.ln_s!(Path.relative_to(source_ebin, Path.dirname(build_ebin), force: true), build_ebin)
+
+      options = Keyword.merge(options, extra_apps: [:linked_app], treeshake: true)
+      assert {:ok, %{apps: %{linked_app: _app}}} = Packager.build(options)
+      assert File.ls!(source_ebin) == ["linked_app.app"]
+      assert File.read!(Path.join(source_ebin, "linked_app.app")) == source_app
+    end
+
     test "the treeshake option is true, false or options", %{options: options} do
       for treeshake <- [:yes, [:keep], %{keep: []}] do
         assert_raise ArgumentError, ~r/true, false or a keyword list of options/, fn ->
