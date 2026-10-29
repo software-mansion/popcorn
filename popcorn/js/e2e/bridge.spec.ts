@@ -155,6 +155,13 @@ test.describe("events", () => {
       evalOpts(`
         true = register(term_receiver, self()),
         ok = wasm:send(#{receiver => self()}),
+        lists:foreach(fun(Size) ->
+          receive
+            {wasm, Boundary} ->
+              true = Boundary =:= binary:copy(<<"B">>, Size)
+          end
+        end, [32762, 32763]),
+        ok = wasm:send(#{boundary_valid => true}),
         receive
           {wasm, Payload} ->
             Text = maps:get(<<"blob">>, Payload),
@@ -171,6 +178,18 @@ test.describe("events", () => {
     );
     assert(boot.ok);
     const receiver = await otp.eventValueHandle<Pid>("receiver");
+    const headerSize = encodePayload("").byteLength;
+    for (const size of [32 * 1024, 32 * 1024 + 1]) {
+      const text = "B".repeat(size - headerSize);
+      assert.equal(encodePayload(text).byteLength, size);
+      expect(await otp.trySend("term_receiver", text)).toEqual({
+        ok: true,
+        data: null,
+      });
+    }
+    expect(await otp.waitForEvent("boundary_valid")).toEqual({
+      boundary_valid: true,
+    });
     const payload = { blob: "A".repeat(100_000) };
     expect(await otp.trySend("no_such_name", payload)).toEqual({
       ok: false,
