@@ -4,9 +4,9 @@ Popcorn uses OTP/BEAM directly which gives a lot of things for free. However, so
 
 ## Compatibility
 
-Popcorn uses fairly new versions of OTP/BEAM but uses applications compiled by the local toolchain. Standard library `.beam`s are taken from your computer but they may depend on VM built-in modules or NIFs.
+Popcorn uses fairly new versions of OTP/BEAM, and your local toolchain compiles the applications it runs. The OTP applications tied to the VM's built-in modules and NIFs, `kernel`, `stdlib`, `compiler`, `crypto` and `asn1`, come with Popcorn as abstract code, from the OTP the VM is built from. Packaging compiles them with your toolchain too, so it must be the VM's major OTP version, like OTP 29, but any release of it works.
 
-Our NIF dependency detection code can catch some incompatibilities caused by a mismatched installation but it's important to know that your standard library code may depend on VM features that were removed in later versions or use new NIFs not available in previous ones.
+Other OTP applications, like `public_key` and `ssl`, are taken from your computer. On a newer release than the VM's, they may call functions that Popcorn's `kernel`, `stdlib` or `crypto` don't have yet.
 
 ## Limits
 

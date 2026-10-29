@@ -40,6 +40,7 @@ runs:
                 scripts/_common.sh \
                 scripts/build-beam.sh \
                 scripts/build-openssl.sh \
+                scripts/export-otp-apps.escript \
                 scripts/patch-beam.sh \
                 scripts/runtime-manifest.sh
             } | hash_files
