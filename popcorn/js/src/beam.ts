@@ -25,6 +25,7 @@ const MANIFEST_NAME = "manifest.json";
 const BOOT_MODULE = "Elixir.Popcorn.Boot";
 
 const STDOUT_FD = 1;
+const MAX_STACK_ETF_BYTES = 32 * 1024;
 const UTF8 = new TextEncoder();
 const BASE_ARGS = [
   "-root",
@@ -410,18 +411,31 @@ function send(
     };
   }
 
-  const status = module.ccall(
-    "sendVmMessage",
-    "number",
-    ["number", target.argType, "number", "array", "number"],
-    [
-      target.kind,
-      target.value,
-      target.length,
-      message.etf,
-      message.etf.byteLength,
-    ],
-  );
+  // ccall copies array arguments onto the limited Wasm stack.
+  const useHeap = message.etf.byteLength > MAX_STACK_ETF_BYTES;
+  let etfPtr = 0;
+  if (useHeap) {
+    etfPtr = module._malloc(message.etf.byteLength);
+    check(etfPtr !== 0);
+  }
+  let status: unknown;
+  try {
+    if (useHeap) module.HEAPU8.set(message.etf, etfPtr);
+    status = module.ccall(
+      "sendVmMessage",
+      "number",
+      ["number", target.argType, "number", useHeap ? "number" : "array", "number"],
+      [
+        target.kind,
+        target.value,
+        target.length,
+        useHeap ? etfPtr : message.etf,
+        message.etf.byteLength,
+      ],
+    );
+  } finally {
+    if (useHeap) module._free(etfPtr);
+  }
 
   if (status === 0) {
     return { ok: true, data: null };

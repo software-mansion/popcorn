@@ -418,7 +418,7 @@ emulator_link_settings() {
     flags+=" -sMAXIMUM_MEMORY=2GB"
     flags+=" -sALLOW_MEMORY_GROWTH=1"
     flags+=" -sINCOMING_MODULE_JS_API=arguments,wasmMemory,preRun,print,printErr,onExit,onAbort,locateFile"
-    flags+=" -sEXPORTED_RUNTIME_METHODS=ENV,ccall,stringToNewUTF8,lengthBytesUTF8,FS_mkdirTree,FS_createDataFile"
+    flags+=" -sEXPORTED_RUNTIME_METHODS=ENV,HEAPU8,ccall,stringToNewUTF8,lengthBytesUTF8,FS_mkdirTree,FS_createDataFile"
     flags+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
     flags+=" -sFORCE_FILESYSTEM=1"
     flags+=" -sEXIT_RUNTIME=1"
