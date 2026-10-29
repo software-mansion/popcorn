@@ -27,7 +27,7 @@ Add the Elixir package to your Mix dependencies:
 
 ```elixir
 defp deps do
-  [{:popcorn, "1.0.0"}]
+  [{:popcorn, "~> 1.0"}]
 end
 ```
 
