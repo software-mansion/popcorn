@@ -215,6 +215,27 @@ test.describe("events", () => {
     await receiver.dispose();
   });
 
+  test("binary patterns", async ({ otp }) => {
+    // No bit syntax may run before the receive.
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        true = register(term_receiver, self()),
+        ok = wasm:send(#{ready => true}),
+        receive
+          {wasm, #{<<"blob">> := Text}} -> ok = wasm:send(#{size => byte_size(Text)})
+        end.
+      `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("ready");
+    const payload = { blob: "A".repeat(100_000) };
+    expect(await otp.trySend("term_receiver", payload)).toEqual({
+      ok: true,
+      data: null,
+    });
+    expect(await otp.waitForEvent("size")).toEqual({ size: 100_000 });
+  });
+
   test("bytes and integers", async ({ otp, page }) => {
     const boot = await otp.tryBoot(
       evalOpts(`

@@ -35,6 +35,13 @@ defmodule Popcorn.Boot do
       [] -> :inet_db.set_lookup([:file])
       lookup -> :inet_db.set_lookup(lookup)
     end
+
+    preload_eval_modules()
+  end
+
+  # https://github.com/erlang/otp/issues/12119
+  defp preload_eval_modules do
+    for module <- [:eval_bits, :records], do: :code.ensure_loaded(module)
   end
 
   defp send_marker(type), do: :wasm.send(%{"_popcorn" => %{"t" => type}})
