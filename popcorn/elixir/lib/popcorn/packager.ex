@@ -1006,7 +1006,7 @@ defmodule Popcorn.Packager do
   def format_error(%{code: "unsupported_otp", host: host, runtime: runtime}) do
     """
     Packaging requires OTP #{otp_major(runtime)} on the host, because Popcorn runs on OTP #{runtime}. \
-    "The installed OTP is #{host}.\
+    The installed OTP is #{host}.\
     """
   end
 
