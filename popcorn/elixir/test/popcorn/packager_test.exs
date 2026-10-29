@@ -7,7 +7,30 @@ defmodule Popcorn.PackagerTest do
 
   @moduletag :tmp_dir
 
-  setup %{tmp_dir: tmp_dir} do
+  @export_script Path.expand("../../../../scripts/export-otp-apps.escript", __DIR__)
+
+  # The host's OTP applications stand in for the ones Popcorn ships, so the
+  # fake runtime's OTP is the host's. They're compiled once, for all tests.
+  setup_all do
+    dir = Path.expand(Path.join("tmp", inspect(__MODULE__)))
+    otp_apps_dir = Path.join(dir, "otp-apps")
+    otp_cache_dir = Path.join(dir, "otp-cache")
+
+    {output, status} =
+      System.cmd("escript", [@export_script, to_string(:code.root_dir()), otp_apps_dir],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, output
+
+    # Installations lack the header these include
+    drop_modules(otp_apps_dir, :kernel, [:gen_tcp_socket, :gen_udp_socket])
+    assert {:ok, _build} = Popcorn.Packager.OtpApps.compile(otp_apps_dir, otp_cache_dir)
+
+    %{otp_apps_dir: otp_apps_dir, otp_cache_dir: otp_cache_dir}
+  end
+
+  setup %{tmp_dir: tmp_dir} = context do
     static_dir = Path.join(tmp_dir, "static")
     runtime_dir = Path.join(static_dir, "runtimes/core")
     build_path = Path.join(tmp_dir, "build/lib")
@@ -61,10 +84,16 @@ defmodule Popcorn.PackagerTest do
       File.write!(Path.join([build_path, to_string(app), "priv/data.txt"]), "#{app}'s")
     end
 
-    {:ok,
-     options: [build_path: build_path, out_dir: out_dir, app: :user_app, static_dir: static_dir],
-     build_path: build_path,
-     out_dir: out_dir}
+    options = [
+      build_path: build_path,
+      out_dir: out_dir,
+      app: :user_app,
+      static_dir: static_dir,
+      otp_apps_dir: context.otp_apps_dir,
+      otp_cache_dir: context.otp_cache_dir
+    ]
+
+    {:ok, options: options, build_path: build_path, out_dir: out_dir}
   end
 
   describe "build/1" do
@@ -270,7 +299,7 @@ defmodule Popcorn.PackagerTest do
       assert read_manifest(out_dir)["entrypoint"] == nil
     end
 
-    test "booting requires Popcorn", %{tmp_dir: tmp_dir} do
+    test "booting requires Popcorn", %{tmp_dir: tmp_dir} = context do
       ebin_dir = Path.join(tmp_dir, "build/app/ebin")
       File.mkdir_p!(ebin_dir)
       app = {:application, :app, [vsn: ~c"0.1.0", modules: [], applications: [:kernel, :stdlib]]}
@@ -281,10 +310,70 @@ defmodule Popcorn.PackagerTest do
                  Packager.build(
                    build_path: Path.join(tmp_dir, "build"),
                    out_dir: Path.join(tmp_dir, "out"),
-                   app: entrypoint
+                   app: entrypoint,
+                   otp_apps_dir: context.otp_apps_dir,
+                   otp_cache_dir: context.otp_cache_dir
                  )
       end
     end
+
+    # Not the host's, which are tied to its emulator
+    test "OTP applications compiled from Popcorn's sources", %{options: options} = context do
+      assert {:ok, _report} = Packager.build(Keyword.put(options, :strip, false))
+      [build] = Path.wildcard(Path.join(context.otp_cache_dir, "*"))
+      archive = read_archive(bundle_path(context.out_dir, "stdlib"))
+
+      for beam <- [
+            "kernel/ebin/code.beam",
+            "stdlib/ebin/lists.beam",
+            "compiler/ebin/compile.beam"
+          ] do
+        assert Map.fetch!(archive, "lib/" <> beam) == File.read!(Path.join(build, beam))
+      end
+    end
+
+    test "the host's OTP release", %{options: options, tmp_dir: tmp_dir} do
+      otp_apps_dir = Path.join(tmp_dir, "otp-apps")
+      File.mkdir_p!(otp_apps_dir)
+      File.write!(Path.join(otp_apps_dir, "OTP_VERSION"), "1.0\n")
+
+      assert {:error, %{code: "unsupported_otp", runtime: "1.0"} = error} =
+               Packager.build(Keyword.put(options, :otp_apps_dir, otp_apps_dir))
+
+      assert Packager.format_error(error) =~
+               ~r/^Packaging requires OTP 1 on the host, .+ OTP 1\.0\./
+    end
+
+    test "the runtime and the OTP applications are built together", %{options: options} do
+      manifest_path = Path.join(options[:static_dir], "runtimes/core/manifest.json")
+      manifest = manifest_path |> File.read!() |> JSON.decode!()
+      File.write!(manifest_path, JSON.encode!(put_in(manifest["vm"]["version"], "0.0.0")))
+
+      assert {:error, %{code: "mismatched_otp_apps", runtime: "0.0.0"}} = Packager.build(options)
+    end
+
+    test "missing OTP applications", %{options: options, tmp_dir: tmp_dir} do
+      missing = Path.join(tmp_dir, "missing")
+
+      assert {:error, %{code: "missing_otp_apps", path: ^missing}} =
+               Packager.build(Keyword.put(options, :otp_apps_dir, missing))
+    end
+  end
+
+  defp drop_modules(otp_apps_dir, app, modules) do
+    entries_path = Path.join(otp_apps_dir, "modules.eterm")
+    {:ok, entries} = :file.consult(to_charlist(entries_path))
+
+    entries =
+      Enum.reject(entries, fn {entry_app, module, _options} ->
+        entry_app == app and module in modules
+      end)
+
+    File.write!(entries_path, Enum.map(entries, &:io_lib.format(~c"~tp.~n", [&1])))
+
+    app_file = Path.join([otp_apps_dir, "lib", "#{app}", "ebin", "#{app}.app"])
+    {:ok, [{:application, ^app, props}]} = :file.consult(to_charlist(app_file))
+    write_app(app_file, app, Keyword.update!(props, :modules, &(&1 -- modules)))
   end
 
   # Like Mix writes them, in UTF-8

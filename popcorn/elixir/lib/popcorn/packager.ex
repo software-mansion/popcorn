@@ -2,8 +2,9 @@ defmodule Popcorn.Packager do
   @moduledoc false
 
   alias Popcorn.Packager.BeamPatcher
+  alias Popcorn.Packager.OtpApps
 
-  @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam", "zstd.beam"])
+  @static_nif_beams MapSet.new(["wasm.beam", "prim_tty.beam"])
 
   # :beam_lib.significant_chunks/0 is undocumented.
   @retained_chunks :beam_lib.significant_chunks() -- [~c"Type"]
@@ -45,10 +46,14 @@ defmodule Popcorn.Packager do
           | {:config, keyword()}
           | {:treeshake, treeshake_options()}
           | {:static_dir, Path.t()}
+          | {:otp_apps_dir, Path.t()}
+          | {:otp_cache_dir, Path.t() | nil}
         ]
 
   @type pack_options :: %{
           build_path: Path.t(),
+          otp_apps_dir: Path.t(),
+          otp_cache_dir: Path.t(),
           entrypoint_app: atom() | nil,
           extra_apps: [atom()],
           out_dir: Path.t(),
@@ -169,7 +174,9 @@ defmodule Popcorn.Packager do
         exclude_priv: [],
         config: [],
         treeshake: false,
-        static_dir: Application.app_dir(:popcorn, "priv/static")
+        static_dir: Application.app_dir(:popcorn, "priv/static"),
+        otp_apps_dir: Application.app_dir(:popcorn, "priv/otp-apps"),
+        otp_cache_dir: nil
       )
 
     treeshake = validate_treeshake!(options[:treeshake])
@@ -180,6 +187,14 @@ defmodule Popcorn.Packager do
 
     out_dir = options |> Keyword.fetch!(:out_dir) |> Path.expand(root_dir)
     static_dir = options |> Keyword.fetch!(:static_dir) |> Path.expand(root_dir)
+    otp_apps_dir = options |> Keyword.fetch!(:otp_apps_dir) |> Path.expand(root_dir)
+
+    # Next to the project's applications, as it's compiled for this host
+    otp_cache_dir =
+      Path.expand(
+        options[:otp_cache_dir] || Path.join(Path.dirname(build_path), "popcorn/otp-apps"),
+        root_dir
+      )
 
     tmp_dir_name = "popcorn-packager-#{System.pid()}-#{System.unique_integer([:positive])}"
     packed_dir = Path.join(System.tmp_dir!(), tmp_dir_name)
@@ -192,6 +207,8 @@ defmodule Popcorn.Packager do
         with {:ok, report} <-
                pack(%{
                  build_path: build_path,
+                 otp_apps_dir: otp_apps_dir,
+                 otp_cache_dir: otp_cache_dir,
                  entrypoint_app: options[:app],
                  extra_apps: options[:extra_apps],
                  out_dir: packed_dir,
@@ -224,6 +241,8 @@ defmodule Popcorn.Packager do
   defp pack(args) do
     %{
       build_path: build_path,
+      otp_apps_dir: otp_apps_dir,
+      otp_cache_dir: otp_cache_dir,
       entrypoint_app: entrypoint_app,
       extra_apps: extra_apps,
       out_dir: out_dir,
@@ -238,13 +257,18 @@ defmodule Popcorn.Packager do
     toolchain = fetch_toolchain_info()
     staging_dir = Path.join(out_dir, "staging")
 
-    with {:ok, project_apps} <- get_apps_info(build_path),
-         {:ok, builtin_apps} <- get_builtin_apps(toolchain),
+    # The host compiles the OTP applications Popcorn ships, so it must be on
+    # their major OTP version
+    with {:ok, otp_apps_version} <- OtpApps.otp_version(otp_apps_dir),
+         :ok <- check_otp_version(toolchain.otp, otp_apps_version),
+         {:ok, project_apps} <- get_apps_info(build_path),
+         {:ok, otp_apps_build} <- OtpApps.compile(otp_apps_dir, otp_cache_dir),
+         {:ok, builtin_apps} <- get_builtin_apps(toolchain, otp_apps_build),
          {:ok, apps_info} <- apps_to_pack(project_apps, builtin_apps, extra_apps, entrypoint_app),
          app_bundles = group_apps(apps_info, project_apps, entrypoint_app),
          variant = runtime_variant || required_runtime(apps_info),
          {:ok, manifest} <- read_manifest(Path.join([runtimes_dir, variant, "manifest.json"])),
-         :ok <- check_otp_version(toolchain.otp, manifest.version),
+         :ok <- check_runtime_otp(otp_apps_version, manifest.version),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
          staged_apps = stage_apps(staging_dir, apps_info),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
@@ -620,10 +644,14 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp get_builtin_apps(toolchain) do
+  # The host's, except the OTP applications Popcorn ships, even the ones the
+  # runtime build left out
+  defp get_builtin_apps(toolchain, otp_apps_build) do
     with {:ok, elixir_apps} <- get_apps_info(toolchain.elixir_root),
-         {:ok, otp_apps} <- get_apps_info(toolchain.otp_root) do
-      {:ok, Map.merge(elixir_apps, otp_apps)}
+         {:ok, host_otp_apps} <- get_apps_info(toolchain.otp_root),
+         {:ok, otp_apps} <- get_apps_info(otp_apps_build) do
+      host_otp_apps = Map.drop(host_otp_apps, OtpApps.apps())
+      {:ok, elixir_apps |> Map.merge(host_otp_apps) |> Map.merge(otp_apps)}
     end
   end
 
@@ -951,6 +979,15 @@ defmodule Popcorn.Packager do
     end
   end
 
+  # The runtime and the OTP applications are built together
+  defp check_runtime_otp(otp_apps_version, runtime_version) do
+    if otp_apps_version == runtime_version do
+      :ok
+    else
+      err(:mismatched_otp_apps, {otp_apps_version, runtime_version})
+    end
+  end
+
   defp warn(msg) do
     IO.puts(:stderr, IO.ANSI.format([:yellow, msg]))
   end
@@ -1004,10 +1041,21 @@ defmodule Popcorn.Packager do
   end
 
   def format_error(%{code: "unsupported_otp", host: host, runtime: runtime}) do
-    """
-    Packaging requires OTP #{otp_major(runtime)} on the host, because Popcorn runs on OTP #{runtime}. \
-    "The installed OTP is #{host}.\
-    """
+    "Packaging requires OTP #{otp_major(runtime)} on the host, because Popcorn runs on " <>
+      "OTP #{runtime}. The installed OTP is #{host}."
+  end
+
+  def format_error(%{code: "missing_otp_apps", path: path}) do
+    "Popcorn's OTP applications aren't in #{path}. Build the Popcorn runtime first."
+  end
+
+  def format_error(%{code: "mismatched_otp_apps", otp_apps: otp_apps, runtime: runtime}) do
+    "Popcorn's OTP applications are from OTP #{otp_apps}, but its runtime is OTP #{runtime}. " <>
+      "Build them together."
+  end
+
+  def format_error(%{code: "otp_compile_failed", errors: errors}) do
+    "Compiling Popcorn's OTP applications failed:\n" <> Enum.join(errors, "\n")
   end
 
   def format_error(%{code: "treeshake_failed", message: message}), do: message
@@ -1037,6 +1085,10 @@ defmodule Popcorn.Packager do
 
   defp err(:unsupported_otp, {host, runtime}) do
     {:error, %{code: "unsupported_otp", host: host, runtime: runtime}}
+  end
+
+  defp err(:mismatched_otp_apps, {otp_apps, runtime}) do
+    {:error, %{code: "mismatched_otp_apps", otp_apps: otp_apps, runtime: runtime}}
   end
 
   defp err(:duplicated_apps, {root_dir, duplicates}) do

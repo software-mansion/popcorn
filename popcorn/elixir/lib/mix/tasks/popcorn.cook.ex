@@ -123,8 +123,9 @@ defmodule Mix.Tasks.Popcorn.Cook do
 
   - If an application is missing, check its name and the current Mix environment
     and target. Fetch project dependencies with `mix deps.get` before cooking.
-  - For `unsupported_otp` or `unsupported_boot`, use an OTP installation that
-    matches the packaged runtime version.
+  - For `unsupported_otp`, use an OTP installation of the runtime's major
+    version, as it compiles the OTP applications Popcorn ships. For
+    `unsupported_boot`, use one that matches the runtime's version.
   """
 
   @switches [out_dir: :string]
