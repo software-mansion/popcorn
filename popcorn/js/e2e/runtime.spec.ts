@@ -39,19 +39,8 @@ test.describe("errors", () => {
 
 test.describe("boot", () => {
   test("cached assets", async ({ page, createOtp }) => {
-    const cache = await installWorkerCache(page);
-    const response = await page.request.get(FETCH_URL);
-    assert(response.ok());
-    const manifest: {
-      vm: { sha256: string };
-      bundles: Record<string, { sha256: string }>;
-    } = await response.json();
-    const hashes = [
-      manifest.vm.sha256,
-      ...Object.values(manifest.bundles).map((bundle) => bundle.sha256),
-    ];
-    assert(hashes.every((hash) => typeof hash === "string"));
-    const expectedHashes = [...new Set(hashes)].sort();
+    const cache = await installAssetCache(page);
+    const expectedHashes = await assetHashes(page);
 
     const first = await createOtp();
     expect(await first.tryBoot({})).toEqual({ ok: true, data: null });
@@ -68,6 +57,38 @@ test.describe("boot", () => {
     expect(await second.tryBoot({})).toEqual({ ok: true, data: null });
     expect(downloads).toEqual([]);
     expect(await cache.hashes()).toEqual(expectedHashes);
+  });
+
+  test("page extension", async ({ page, otp, createOtp }) => {
+    const cache = await installAssetCache(page, "page");
+    const hashes = await assetHashes(page);
+    const downloads: string[] = [];
+    page.on("response", (response) => {
+      if (/\.(wasm|tar)$/.test(new URL(response.url()).pathname))
+        downloads.push(response.url());
+    });
+
+    expect(await otp.tryBoot({})).toEqual({ ok: true, data: null });
+    await expect.poll(cache.hashes).toEqual(hashes);
+    expect(downloads).toHaveLength(hashes.length);
+    await otp.deinit();
+    downloads.length = 0;
+
+    const assetRequests = /\.(wasm|tar)(\?|$)/;
+    await page.route(assetRequests, (route) => route.abort());
+    expect(await otp.tryBoot({})).toEqual({ ok: true, data: null });
+    expect(downloads).toEqual([]);
+    await otp.deinit();
+    await page.unroute(assetRequests);
+
+    const disabled = await createOtp();
+    expect(
+      await disabled.tryBoot({ beam: { crossOriginStorage: false } }),
+    ).toEqual({
+      ok: true,
+      data: null,
+    });
+    expect(downloads).toHaveLength(hashes.length);
   });
 
   test("memory limits", async ({ page, createOtp }) => {
@@ -1143,6 +1164,27 @@ assetTest.describe("assets", () => {
     await expect(new Assets().wasm(asset.url, asset.sha256)).rejects.toBe(
       failure,
     );
+
+    const extension = createAssetEnvironment("absent", bytes);
+    const channel = new MessageChannel();
+    let discarded = false;
+    channel.port2.onmessage = ({ data }) => {
+      if (data.type === "lookup") data.reply.close();
+      else {
+        void data.body.cancel();
+        discarded = true;
+      }
+    };
+    try {
+      expect(await new Assets(true, channel.port1).binary(asset)).toEqual(
+        bytes,
+      );
+      await expect.poll(() => discarded).toBe(true);
+      expect(extension.downloads).toEqual([asset.url]);
+    } finally {
+      channel.port1.close();
+      channel.port2.close();
+    }
   });
 
   assetTest("write failure", async ({ createAssetEnvironment }) => {
@@ -1174,6 +1216,27 @@ assetTest.describe("assets", () => {
           mock.timers.reset();
         }
       });
+    }
+  });
+
+  assetTest("relay disposal", async ({ createAssetEnvironment }) => {
+    createAssetEnvironment();
+    const write = installStalledWrite("write", contents);
+    const relay = Assets.extension();
+    assert(relay);
+    Reflect.deleteProperty(navigator, "crossOriginStorage");
+    try {
+      expect(await new Assets(true, relay.port).binary(asset)).toEqual(
+        contents,
+      );
+      await write.started;
+      relay.close();
+      await expect.poll(() => write.state.canceled).toBe(true);
+      write.resume();
+      await expect.poll(() => write.state.aborted).toBe(true);
+    } finally {
+      write.resume();
+      relay.close();
     }
   });
 });
@@ -1304,15 +1367,20 @@ function installStorage(
   });
 }
 
-async function installWorkerCache(page: Page) {
-  await page.route("**/worker.mjs*", async (route) => {
-    const response = await route.fetch();
-    const source = await response.text();
-    await route.fulfill({
-      response,
-      body: `(${workerStorage.toString()})();\n${source}`,
+async function installAssetCache(
+  page: Page,
+  scope: "worker" | "page" = "worker",
+) {
+  if (scope === "page") await page.evaluate(installBrowserStorage);
+  else
+    await page.route("**/worker.mjs*", async (route) => {
+      const response = await route.fetch();
+      const source = await response.text();
+      await route.fulfill({
+        response,
+        body: `(${installBrowserStorage.toString()})();\n${source}`,
+      });
     });
-  });
   return {
     hashes: () =>
       page.evaluate(async () => {
@@ -1325,8 +1393,9 @@ async function installWorkerCache(page: Page) {
   };
 }
 
-function workerStorage() {
+function installBrowserStorage() {
   Object.defineProperty(navigator, "crossOriginStorage", {
+    configurable: true,
     value: {
       async getFileHandle(
         hash: CrossOriginStorageGetFileHandleHash,
@@ -1355,4 +1424,19 @@ function workerStorage() {
       },
     },
   });
+}
+
+async function assetHashes(page: Page) {
+  const response = await page.request.get(FETCH_URL);
+  assert(response.ok());
+  const manifest: {
+    vm: { sha256: string };
+    bundles: Record<string, { sha256: string }>;
+  } = await response.json();
+  const hashes = [
+    manifest.vm.sha256,
+    ...Object.values(manifest.bundles).map((bundle) => bundle.sha256),
+  ];
+  assert(hashes.every((hash) => typeof hash === "string"));
+  return [...new Set(hashes)].sort();
 }

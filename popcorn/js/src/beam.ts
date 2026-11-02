@@ -84,7 +84,7 @@ async function boot(
     emit,
   } = opts;
   try {
-    const assets = new Assets(opts.crossOriginStorage);
+    const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
     const loadedFsData = await loadFsData(otpAssetsRoot, assets);
     if (!loadedFsData.ok) {
       return { ok: false, error: loadedFsData.error };

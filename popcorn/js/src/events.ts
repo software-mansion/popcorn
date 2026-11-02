@@ -19,6 +19,7 @@ type BootEvent = {
     | "maxMemoryBytes"
     | "ttySize"
     | "noshell"
+    | "extensionPort"
   > & {
     otpAssetsRoot?: string;
     crossOriginStorage?: boolean;

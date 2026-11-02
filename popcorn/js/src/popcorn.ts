@@ -1,3 +1,4 @@
+import { Assets } from "./assets";
 import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
@@ -61,7 +62,7 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
     /**
      * Looks up the runtime and tarballs in Cross-Origin Storage by hash, and
      * stores downloaded responses in the background. Has no effect without
-     * worker `navigator.crossOriginStorage` support. Defaults to `true`.
+     * `navigator.crossOriginStorage` support. Defaults to `true`.
      */
     crossOriginStorage?: boolean;
   };
@@ -211,6 +212,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   public onStderr?: (chunk: OutputChunk<Output>) => void;
 
   private vmWorker!: Worker;
+  private assetsRelay: ReturnType<typeof Assets.extension>;
   private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts<Output>;
   private readonly maxMemoryBytes: number;
@@ -407,6 +409,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.output = resolveOutputHandlers(this.opts, this);
     check(this.readyWaiters.length === 0);
     this.state = { status: "booting" };
+    this.assetsRelay = Assets.extension(this.opts.beam?.crossOriginStorage);
 
     return await new Promise<Popcorn<Output>>((resolve, reject) => {
       const timeoutsMs = { ...DEFAULT_TIMEOUTS_MS, ...this.opts.timeoutsMs };
@@ -464,15 +467,20 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       };
 
       this.vmWorker.addEventListener("message", onBootMessage);
-      toVm(this.vmWorker, {
-        type: "popcorn:boot",
-        payload: {
-          ...this.opts.beam,
-          maxMemoryBytes: this.maxMemoryBytes,
-          ttySize: this.ttySize,
-          noshell: this.opts.tty === undefined,
+      toVm(
+        this.vmWorker,
+        {
+          type: "popcorn:boot",
+          payload: {
+            ...this.opts.beam,
+            maxMemoryBytes: this.maxMemoryBytes,
+            ttySize: this.ttySize,
+            noshell: this.opts.tty === undefined,
+            extensionPort: this.assetsRelay?.port,
+          },
         },
-      });
+        this.assetsRelay ? [this.assetsRelay.port] : [],
+      );
       try {
         this.setupDist();
       } catch (error) {
@@ -690,6 +698,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.vmWorker.removeEventListener("error", this.onWorkerError);
     this.vmWorker.terminate();
+    this.assetsRelay?.close();
+    this.assetsRelay = undefined;
     try {
       this.handleNodeChange(null);
     } finally {

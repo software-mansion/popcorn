@@ -82,6 +82,8 @@ export type BeamBootOptions = {
   otpAssetsRoot: string;
   /** Set to `false` to skip Cross-Origin Storage. */
   crossOriginStorage?: boolean;
+  /** Temporary transport for page-only COS extensions. */
+  extensionPort?: MessagePort;
   /**
    * Emulator flags before `--`.
    *
