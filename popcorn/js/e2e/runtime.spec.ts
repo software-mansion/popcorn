@@ -4,6 +4,7 @@ import { PopcornError, type SerializedError } from "../src/errors";
 import { resolveThreadPoolSize } from "../src/beam";
 import { Assets } from "../src/assets";
 import type { Page } from "@playwright/test";
+import { mock } from "node:test";
 
 const FETCH_URL = "/assets/otp/manifest.json";
 type MemoryProbe = {
@@ -1051,16 +1052,21 @@ test.describe("fetch", () => {
   });
 });
 
-type CacheMode = "available" | "absent" | "denied" | "stalled" | "full";
+type CacheMode =
+  | "available"
+  | "absent"
+  | "denied"
+  | "stalled"
+  | "full"
+  | "unreadable"
+  | "invalid";
 type StorageCall = {
   hash: CrossOriginStorageGetFileHandleHash;
   options: CrossOriginStorageGetFileHandleOptions | undefined;
 };
 
 const assetTest = test.extend<{
-  createAssetEnvironment: (
-    mode?: CacheMode,
-  ) => ReturnType<typeof installAssetEnvironment>;
+  createAssetEnvironment: typeof installAssetEnvironment;
 }>({
   createAssetEnvironment: async ({}, use) => {
     const fetch = globalThis.fetch;
@@ -1068,6 +1074,7 @@ const assetTest = test.extend<{
     try {
       await use(installAssetEnvironment);
     } finally {
+      mock.timers.reset();
       globalThis.fetch = fetch;
       if (navigator) Object.defineProperty(globalThis, "navigator", navigator);
       else Reflect.deleteProperty(globalThis, "navigator");
@@ -1078,15 +1085,15 @@ const assetTest = test.extend<{
 assetTest.describe("assets", () => {
   const asset = { url: "https://example.test/app.tar", sha256: "a".repeat(64) };
   const hash = { algorithm: "SHA-256", value: asset.sha256 };
+  const contents = new TextEncoder().encode("asset contents");
+  const bytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
 
   assetTest("reuse", async ({ createAssetEnvironment }) => {
     const environment = createAssetEnvironment();
-    const first = await new Assets().fetch(asset);
-    expect(await first.text()).toBe("asset contents");
+    expect(await new Assets().binary(asset)).toEqual(contents);
     await expect.poll(() => environment.files.has(asset.sha256)).toBe(true);
 
-    const second = await new Assets().fetch(asset);
-    expect(await second.text()).toBe("asset contents");
+    expect(await new Assets().binary(asset)).toEqual(contents);
     expect(environment.downloads).toEqual([asset.url]);
     expect(environment.files.size).toBe(1);
     expect(environment.calls).toEqual([
@@ -1110,33 +1117,123 @@ assetTest.describe("assets", () => {
       { name: "hashless", asset: { url: asset.url }, bypass: true },
       { name: "denied", mode: "denied" },
       { name: "stalled", mode: "stalled" },
+      { name: "unreadable", mode: "unreadable" },
     ];
 
     for (const scenario of cases) {
       await assetTest.step(scenario.name, async () => {
         const environment = createAssetEnvironment(scenario.mode);
         const loader = new Assets(scenario.enabled);
-        const response = await loader.fetch(scenario.asset ?? asset);
+        const result = await loader.binary(scenario.asset ?? asset);
 
-        expect(await response.text()).toBe("asset contents");
+        expect(result).toEqual(contents);
         expect(environment.downloads).toEqual([asset.url]);
         if (scenario.bypass) expect(environment.calls).toEqual([]);
       });
     }
+
+    const invalid = createAssetEnvironment("invalid", bytes);
+    await new Assets().wasm(asset.url, asset.sha256);
+    expect(invalid.downloads).toEqual([asset.url]);
+
+    const failure = Error("offline");
+    globalThis.fetch = async () => {
+      throw failure;
+    };
+    await expect(new Assets().wasm(asset.url, asset.sha256)).rejects.toBe(
+      failure,
+    );
   });
 
   assetTest("write failure", async ({ createAssetEnvironment }) => {
     const environment = createAssetEnvironment("full");
-    const response = await new Assets().fetch(asset);
+    const result = await new Assets().binary(asset);
     await expect.poll(() => environment.rejectedWrites).toBe(1);
 
-    expect(await response.text()).toBe("asset contents");
+    expect(result).toEqual(contents);
     expect(environment.downloads).toEqual([asset.url]);
     expect(environment.files.size).toBe(0);
   });
+
+  assetTest("write timeout", async ({ createAssetEnvironment }) => {
+    for (const stage of ["open", "write"] as const) {
+      await assetTest.step(stage, async () => {
+        createAssetEnvironment();
+        const write = installStalledWrite(stage, contents);
+        mock.timers.enable({ apis: ["setTimeout"] });
+        try {
+          expect(await new Assets().binary(asset)).toEqual(contents);
+          await write.started;
+          mock.timers.tick(30_000);
+          expect(write.state.canceled).toBe(true);
+          write.resume();
+          mock.timers.reset();
+          await expect.poll(() => write.state.aborted).toBe(true);
+        } finally {
+          write.resume();
+          mock.timers.reset();
+        }
+      });
+    }
+  });
 });
 
-function installAssetEnvironment(mode: CacheMode = "available") {
+function installStalledWrite(
+  stage: "open" | "write",
+  bytes: Uint8Array<ArrayBuffer>,
+) {
+  let resume!: () => void;
+  let start!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    resume = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    start = resolve;
+  });
+  const state = { canceled: false, aborted: false };
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+    },
+    cancel() {
+      state.canceled = true;
+    },
+  });
+  const writable = new WritableStream({
+    write() {
+      if (stage === "write") {
+        start();
+        return blocked;
+      }
+    },
+    abort() {
+      state.aborted = true;
+    },
+  });
+  installStorage(async (_hash, options) => {
+    if (!options?.create) throw Error("miss");
+    return {
+      createWritable: async () => {
+        if (stage === "open") {
+          start();
+          await blocked;
+        }
+        return writable;
+      },
+    };
+  });
+  globalThis.fetch = async () => {
+    const response = new Response(bytes);
+    response.clone = () => new Response(body);
+    return response;
+  };
+  return { state, started, resume };
+}
+
+function installAssetEnvironment(
+  mode: CacheMode = "available",
+  body: BodyInit = "asset contents",
+) {
   const files = new Map<string, File>();
   const calls: StorageCall[] = [];
   const downloads: Parameters<typeof fetch>[0][] = [];
@@ -1166,6 +1263,18 @@ function installAssetEnvironment(mode: CacheMode = "available") {
           },
         };
       }
+      if (mode === "unreadable") {
+        const file = new File([], hash.value);
+        file.stream = () =>
+          new ReadableStream({
+            start(controller) {
+              controller.error(Error("disk read failed"));
+            },
+          });
+        return { getFile: async () => file };
+      }
+      if (mode === "invalid")
+        return { getFile: async () => new File(["invalid wasm"], hash.value) };
       if (mode === "denied")
         throw new DOMException("denied", "NotAllowedError");
       if (mode === "stalled") return new Promise(() => {});
@@ -1174,15 +1283,25 @@ function installAssetEnvironment(mode: CacheMode = "available") {
       return { getFile: async () => file };
     },
   };
-  Object.defineProperty(globalThis, "navigator", {
-    configurable: true,
-    value: mode === "absent" ? {} : { crossOriginStorage: storage },
-  });
+  installStorage(storage.getFileHandle);
+  if (mode === "absent")
+    Reflect.deleteProperty(navigator, "crossOriginStorage");
   globalThis.fetch = async (url) => {
     downloads.push(url);
-    return new Response("asset contents");
+    return new Response(body);
   };
   return environment;
+}
+
+function installStorage(
+  getFileHandle: (
+    ...args: Parameters<CrossOriginStorageManager["getFileHandle"]>
+  ) => Promise<unknown>,
+) {
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { crossOriginStorage: { getFileHandle } },
+  });
 }
 
 async function installWorkerCache(page: Page) {

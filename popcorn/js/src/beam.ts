@@ -112,7 +112,7 @@ async function boot(
       emit({ type: "otp:error", payload });
     };
     const moduleConfig: Partial<EmscriptenModule> = {
-      ...assets.wasm(fsData.wasmSha256),
+      ...(await assets.wasm(opts.wasmUrl, fsData.wasmSha256)),
       print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
       printErr: (text) =>
         emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
@@ -347,16 +347,8 @@ async function loadFsData(
       async (entry): Promise<Result<Uint8Array>> => {
         const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
         try {
-          const response = await assets.fetch({
-            url: tarUrl,
-            sha256: entry.sha256,
-          });
-          if (response.ok) {
-            return {
-              ok: true,
-              data: new Uint8Array(await response.arrayBuffer()),
-            };
-          }
+          const data = await assets.binary({ url: tarUrl, sha256: entry.sha256 });
+          return { ok: true, data };
         } catch {
           // Preserve the asset error for network and body failures.
         }

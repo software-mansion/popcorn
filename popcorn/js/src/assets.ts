@@ -1,6 +1,7 @@
 import type { EmscriptenModule } from "./types";
 
 const LOOKUP_TIMEOUT_MS = 100;
+const WRITE_TIMEOUT_MS = 30_000;
 
 type Asset = { url: string; sha256?: string };
 
@@ -13,36 +14,57 @@ export class Assets {
       enabled && typeof storage?.getFileHandle === "function" ? storage : null;
   }
 
-  async fetch({ url, sha256 }: Asset): Promise<Response> {
-    if (this.storage === null || sha256 === undefined) return fetch(url);
-
-    const hash = { algorithm: "SHA-256", value: sha256 };
-    const file = await lookup(this.storage, hash);
-    if (file !== null) return new Response(file);
-
-    const response = await fetch(url);
-    if (response.ok && response.body !== null)
-      void store(this.storage, hash, response.clone());
-    return response;
+  binary(asset: Asset): Promise<Uint8Array<ArrayBuffer>> {
+    return this.load(
+      asset,
+      async (response) => new Uint8Array(await response.arrayBuffer()),
+    );
   }
 
-  wasm(
+  async wasm(
+    url: string,
     sha256?: string,
-  ): Required<Pick<EmscriptenModule, "instantiateWasmFromUrl">> {
+  ): Promise<Required<Pick<EmscriptenModule, "instantiateWasm">>> {
+    const module = await this.load({ url, sha256 }, (response) =>
+      WebAssembly.compileStreaming(
+        new Response(response.body, {
+          headers: { "Content-Type": "application/wasm" },
+        }),
+      ),
+    );
     return {
-      instantiateWasmFromUrl: async (url, imports) => {
-        const response = await this.fetch({ url, sha256 });
-        if (!response.ok) {
-          throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
-        }
-        return WebAssembly.instantiateStreaming(
-          new Response(response.body, {
-            headers: { "Content-Type": "application/wasm" },
-          }),
-          imports,
-        );
+      instantiateWasm: (imports, receive) => {
+        const instance = new WebAssembly.Instance(module, imports);
+        receive(instance, module);
+        return instance.exports;
       },
     };
+  }
+
+  private async load<T>(
+    asset: Asset,
+    consume: (response: Response) => Promise<T>,
+  ): Promise<T> {
+    const { url, sha256 } = asset;
+    const hash =
+      sha256 === undefined ? null : { algorithm: "SHA-256", value: sha256 };
+    if (this.storage !== null && hash !== null) {
+      const file = await lookup(this.storage, hash);
+      if (file !== null) {
+        try {
+          return await consume(new Response(file));
+        } catch {
+          // A cached file can fail while being read or compiled.
+        }
+      }
+    }
+
+    const response = await fetch(url);
+    if (!response.ok)
+      throw new Error(`Failed to load ${url}: HTTP ${response.status}`);
+    if (this.storage !== null && hash !== null && response.body !== null)
+      void store(this.storage, hash, response.clone().body!);
+    return consume(response);
   }
 }
 
@@ -68,17 +90,43 @@ async function lookup(
 async function store(
   storage: CrossOriginStorageManager,
   hash: CrossOriginStorageGetFileHandleHash,
-  response: Response,
+  body: ReadableStream<Uint8Array<ArrayBuffer>>,
 ): Promise<void> {
+  const reader = body.getReader();
+  let writer: WritableStreamDefaultWriter<Uint8Array<ArrayBuffer>> | undefined;
+  let expired = false;
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+    void writer?.abort().catch(() => {});
+  };
+  const timer = setTimeout(() => {
+    expired = true;
+    cancel();
+  }, WRITE_TIMEOUT_MS);
   try {
     const handle = await storage.getFileHandle(hash, {
       create: true,
       origins: "*",
     });
+    if (expired) return;
     const writable = await handle.createWritable();
-    await response.body!.pipeTo(writable);
+    writer = writable.getWriter();
+    if (expired) {
+      cancel();
+      return;
+    }
+    while (true) {
+      const { value, done } = await reader.read();
+      if (expired) return;
+      if (done) {
+        await writer.close();
+        return;
+      }
+      await writer.write(value);
+    }
   } catch {
-    // Release the clone if storage cannot consume it.
-    void response.body!.cancel().catch(() => {});
+    cancel();
+  } finally {
+    clearTimeout(timer);
   }
 }

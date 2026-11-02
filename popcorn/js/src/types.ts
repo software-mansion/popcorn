@@ -98,6 +98,7 @@ export type BeamBootOptions = {
   ttySize: TtySize;
   noshell: boolean;
   createModule: CreateModuleFn<EmscriptenModule>;
+  wasmUrl: string;
   emit: (event: BeamEvent) => void;
 };
 
@@ -139,10 +140,10 @@ export type TtySize = {
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
   wasmMemory?: WebAssembly.Memory;
-  instantiateWasmFromUrl?: (
-    url: string,
+  instantiateWasm?: (
     imports: WebAssembly.Imports,
-  ) => Promise<WebAssembly.WebAssemblyInstantiatedSource>;
+    receive: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+  ) => WebAssembly.Exports;
   ENV: Record<string, string>;
   FS_mkdirTree: (path: string) => void;
   FS_createDataFile: (
