@@ -6,8 +6,6 @@ import type {
   BeamEvent,
   BeamSendPayload,
   BeamTarget,
-  CosAsset,
-  CosFiles,
 } from "./types";
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
@@ -24,8 +22,6 @@ type BootEvent = {
   > & {
     otpAssetsRoot?: string;
     crossOriginStorage?: boolean;
-    /** Whether the page has COS, for a worker that lacks it. */
-    cosMainThread?: boolean;
   };
 };
 
@@ -71,17 +67,6 @@ type SendEndEvent = {
   payload: SendCompletionPayload;
 };
 
-/** Asks the main thread to look up files in COS for the worker. */
-type CosLookupEvent = {
-  type: "popcorn:cos-lookup";
-  payload: { assets: CosAsset[] };
-};
-
-type CosLookupEndEvent = {
-  type: "popcorn:cos-lookup-end";
-  payload: { files: CosFiles };
-};
-
 type BootEndEvent =
   | { type: "popcorn:boot-vm-ready"; payload: {} }
   | { type: "popcorn:boot-end"; payload: {} }
@@ -92,8 +77,7 @@ export type MainToVmEvent =
   | SendEvent
   | BridgeReplyEvent
   | StdinEvent
-  | TtyResizeEvent
-  | CosLookupEndEvent;
+  | TtyResizeEvent;
 
 /**
  * A decoded BEAM message payload.
@@ -104,7 +88,7 @@ export type PopcornEvent = AnyValue;
 
 type RuntimeEvent = BeamEvent | SendEndEvent;
 
-export type VmToMainEvent = RuntimeEvent | BootEndEvent | CosLookupEvent;
+export type VmToMainEvent = RuntimeEvent | BootEndEvent;
 
 type BridgeEnvelope =
   | {
@@ -137,7 +121,6 @@ export function readMainEvent(value: unknown): MainToVmEvent {
     case "popcorn:tty-resize":
     case "popcorn:send":
     case "popcorn:bridge-reply":
-    case "popcorn:cos-lookup-end":
       return data as MainToVmEvent;
     default:
       unreachable();
@@ -160,7 +143,6 @@ export function readWorkerEvent(value: unknown): VmToMainEvent {
     case "popcorn:boot-end":
     case "popcorn:boot-fail":
     case "popcorn:send-end":
-    case "popcorn:cos-lookup":
       return data as VmToMainEvent;
     case "otp:stdin-consumed":
       check(Number(data.payload) > 0);

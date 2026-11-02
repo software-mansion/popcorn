@@ -4,16 +4,6 @@ export function dirname(path: string): string {
   return path.slice(0, idx);
 }
 
-export async function fetchBinary(url: string): Promise<Uint8Array | null> {
-  try {
-    const response = await fetch(url);
-    if (response.ok !== true) return null;
-    return new Uint8Array(await response.arrayBuffer());
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchJson<T>(url: string): Promise<T | null> {
   try {
     const response = await fetch(url);

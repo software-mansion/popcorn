@@ -1,21 +1,10 @@
 import createModule from "./beam.emu.mjs";
 
 import { start, type Beam } from "./beam";
-import type { CosAsset, CosFiles } from "./types";
 import { readMainEvent, toMain } from "./events";
 import { check, unreachable } from "./utils";
 
 let instance: Beam | null = null;
-let resolveCosLookup: ((files: CosFiles) => void) | null = null;
-
-function lookupCosOnMainThread(assets: CosAsset[]): Promise<CosFiles> {
-  check(resolveCosLookup === null);
-  return new Promise((resolve) => {
-    resolveCosLookup = resolve;
-    toMain({ type: "popcorn:cos-lookup", payload: { assets } });
-  });
-}
-
 self.onmessage = (event: MessageEvent<unknown>) => {
   void dispatch(event).catch((error: unknown) => {
     console.error(error);
@@ -46,9 +35,6 @@ async function dispatch(event: MessageEvent<unknown>): Promise<void> {
         env: data.payload.env,
         maxMemoryBytes: data.payload.maxMemoryBytes,
         crossOriginStorage: data.payload.crossOriginStorage,
-        lookupCosOnMainThread: data.payload.cosMainThread
-          ? lookupCosOnMainThread
-          : undefined,
         ttySize: data.payload.ttySize,
         noshell: data.payload.noshell,
         createModule,
@@ -92,12 +78,6 @@ async function dispatch(event: MessageEvent<unknown>): Promise<void> {
     case "popcorn:stdin": {
       check(instance !== null);
       instance.writeStdin(data.payload.chunk);
-      break;
-    }
-    case "popcorn:cos-lookup-end": {
-      check(resolveCosLookup !== null);
-      resolveCosLookup(data.payload.files);
-      resolveCosLookup = null;
       break;
     }
     case "popcorn:tty-resize": {

@@ -1,4 +1,4 @@
-import { WASM_PATH, crossOriginStorage, lookupCos, storeInCos } from "./cos";
+import { Assets } from "./assets";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
 import { extractTar } from "./tar";
@@ -6,15 +6,12 @@ import type {
   BeamBootOptions,
   BeamSendPayload,
   BeamTarget,
-  CosAsset,
-  CosFiles,
   EmscriptenModule,
   OtpErrorPayload,
 } from "./types";
 import {
   check,
   dirname,
-  fetchBinary,
   fetchJson,
   objectWithKeys,
   unreachable,
@@ -87,7 +84,8 @@ async function boot(
     emit,
   } = opts;
   try {
-    const loadedFsData = await loadFsData(otpAssetsRoot, opts);
+    const assets = new Assets(opts.crossOriginStorage);
+    const loadedFsData = await loadFsData(otpAssetsRoot, assets);
     if (!loadedFsData.ok) {
       return { ok: false, error: loadedFsData.error };
     }
@@ -114,6 +112,7 @@ async function boot(
       emit({ type: "otp:error", payload });
     };
     const moduleConfig: Partial<EmscriptenModule> = {
+      ...assets.wasm(fsData.wasmSha256),
       print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
       printErr: (text) =>
         emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
@@ -163,18 +162,6 @@ async function boot(
       ],
     };
 
-    // Only override `locateFile` on a hit, so bundlers that rewrite the
-    // runtime's own `beam.wasm` URL keep working on a miss.
-    const wasmBlob = fsData.cos.files[WASM_PATH];
-    if (wasmBlob !== undefined) {
-      // `instantiateStreaming()` requires the `application/wasm` type.
-      const wasmUrl = URL.createObjectURL(
-        new Blob([wasmBlob], { type: "application/wasm" }),
-      );
-      moduleConfig.locateFile = (path, prefix) =>
-        path === WASM_PATH ? wasmUrl : prefix + path;
-    }
-
     if (opts.maxMemoryBytes !== undefined) {
       moduleConfig.wasmMemory = new WebAssembly.Memory({
         initial: 1024,
@@ -186,10 +173,6 @@ async function boot(
     const module = await createModule(moduleConfig);
     check(state.module === module);
     await ready;
-
-    // The main thread stores what it looked up itself.
-    const { storage, misses, loaded } = fsData.cos;
-    if (storage !== null) void storeInCos(storage, misses, loaded);
 
     return { ok: true, data: null };
   } catch (error) {
@@ -316,14 +299,14 @@ type BeamManifest = {
   entrypoint: string | null;
   apps: Record<string, { bundle: string }>;
   bundles: Record<string, { tar: string; sha256?: string }>;
-  runtime?: { sha256?: string };
+  vm?: { sha256?: string };
 };
 
 type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
   tarballs: Uint8Array[];
-  cos: CosLookup;
+  wasmSha256?: string;
 };
 
 type InitFsArgs = {
@@ -333,7 +316,7 @@ type InitFsArgs = {
 
 async function loadFsData(
   assetsRoot: string,
-  opts: BeamBootOptions,
+  assets: Assets,
 ): Promise<Result<LoadedFsData>> {
   const manifestUrl = resolveAssetsPath(assetsRoot, MANIFEST_NAME);
   const manifest = await fetchJson<BeamManifest>(manifestUrl);
@@ -359,23 +342,23 @@ async function loadFsData(
     }
   }
 
-  const cos = await lookupAssets(manifest, assetsRoot, opts);
-
   const loadedTarballs = await Promise.all(
     Object.values(manifest.bundles).map(
       async (entry): Promise<Result<Uint8Array>> => {
-        const cached = cos.files[entry.tar];
-        if (cached !== undefined) {
-          return { ok: true, data: new Uint8Array(await cached.arrayBuffer()) };
-        }
-
         const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
-        const tar = await fetchBinary(tarUrl);
-        if (tar !== null) {
-          // Only keep miss bytes around when this context will store them.
-          if (cos.storage !== null)
-            cos.loaded[entry.tar] = new Blob([tar as Uint8Array<ArrayBuffer>]);
-          return { ok: true, data: tar };
+        try {
+          const response = await assets.fetch({
+            url: tarUrl,
+            sha256: entry.sha256,
+          });
+          if (response.ok) {
+            return {
+              ok: true,
+              data: new Uint8Array(await response.arrayBuffer()),
+            };
+          }
+        } catch {
+          // Preserve the asset error for network and body failures.
         }
 
         return {
@@ -401,70 +384,9 @@ async function loadFsData(
       appNames,
       entrypoint: manifest.entrypoint ?? null,
       tarballs,
-      cos,
+      wasmSha256: manifest.vm?.sha256,
     },
   };
-}
-
-type CosLookup = {
-  /** Hits, by `CosAsset.key`. */
-  files: CosFiles;
-  misses: CosAsset[];
-  /** The worker's own COS, or `null` if the main thread did the lookup. */
-  storage: CrossOriginStorageManager | null;
-  /** Miss bytes already in memory, so storing needn't fetch them again. */
-  loaded: CosFiles;
-};
-
-async function lookupAssets(
-  manifest: BeamManifest,
-  assetsRoot: string,
-  opts: BeamBootOptions,
-): Promise<CosLookup> {
-  const storage = crossOriginStorage();
-  const none = { files: {}, misses: [], storage: null, loaded: {} };
-  if (opts.crossOriginStorage === false) return none;
-  if (storage === null && opts.lookupCosOnMainThread === undefined) {
-    return none;
-  }
-
-  const assets = cosAssets(manifest, assetsRoot);
-  if (assets.length === 0) return none;
-
-  let files: CosFiles = {};
-  try {
-    files =
-      storage !== null
-        ? await lookupCos(storage, assets)
-        : await opts.lookupCosOnMainThread!(assets);
-  } catch {
-    // Treat as all misses.
-  }
-  const misses = assets.filter((asset) => !Object.hasOwn(files, asset.key));
-  return { files, misses, storage, loaded: {} };
-}
-
-// Manifests cooked before hashes were recorded yield no assets.
-function cosAssets(manifest: BeamManifest, assetsRoot: string): CosAsset[] {
-  const absolute = (path: string) => new URL(path, self.location.href).href;
-  const assets: CosAsset[] = [];
-  if (manifest.runtime?.sha256 !== undefined) {
-    assets.push({
-      key: WASM_PATH,
-      // Where the runtime's own loader looks: next to the worker.
-      url: new URL(WASM_PATH, import.meta.url).href,
-      sha256: manifest.runtime.sha256,
-    });
-  }
-  for (const bundle of Object.values(manifest.bundles)) {
-    if (bundle.sha256 === undefined) continue;
-    assets.push({
-      key: bundle.tar,
-      url: absolute(resolveAssetsPath(assetsRoot, bundle.tar)),
-      sha256: bundle.sha256,
-    });
-  }
-  return assets;
 }
 
 function initFs({ module, fsData }: InitFsArgs): void {

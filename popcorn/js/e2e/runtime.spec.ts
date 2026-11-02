@@ -2,6 +2,8 @@ import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 import { PopcornError, type SerializedError } from "../src/errors";
 import { resolveThreadPoolSize } from "../src/beam";
+import { Assets } from "../src/assets";
+import type { Page } from "@playwright/test";
 
 const FETCH_URL = "/assets/otp/manifest.json";
 type MemoryProbe = {
@@ -28,12 +30,45 @@ test.describe("errors", () => {
       expect(restored.serialize()).toEqual(serialized);
     }
 
-    expect(() => PopcornError.deserialize({ t: "timeout", data: {} }))
-      .toThrow(Error);
+    expect(() => PopcornError.deserialize({ t: "timeout", data: {} })).toThrow(
+      Error,
+    );
   });
 });
 
 test.describe("boot", () => {
+  test("cached assets", async ({ page, createOtp }) => {
+    const cache = await installWorkerCache(page);
+    const response = await page.request.get(FETCH_URL);
+    assert(response.ok());
+    const manifest: {
+      vm: { sha256: string };
+      bundles: Record<string, { sha256: string }>;
+    } = await response.json();
+    const hashes = [
+      manifest.vm.sha256,
+      ...Object.values(manifest.bundles).map((bundle) => bundle.sha256),
+    ];
+    assert(hashes.every((hash) => typeof hash === "string"));
+    const expectedHashes = [...new Set(hashes)].sort();
+
+    const first = await createOtp();
+    expect(await first.tryBoot({})).toEqual({ ok: true, data: null });
+    await expect.poll(cache.hashes).toEqual(expectedHashes);
+    await first.dispose();
+
+    const downloads: string[] = [];
+    await page.route(/\.(wasm|tar)(\?|$)/, (route) => {
+      downloads.push(route.request().url());
+      return route.abort();
+    });
+
+    const second = await createOtp();
+    expect(await second.tryBoot({})).toEqual({ ok: true, data: null });
+    expect(downloads).toEqual([]);
+    expect(await cache.hashes()).toEqual(expectedHashes);
+  });
+
   test("memory limits", async ({ page, createOtp }) => {
     await page.route("**/worker.mjs*", async (route) => {
       const response = await route.fetch();
@@ -187,7 +222,8 @@ test.describe("boot", () => {
       },
       ...Array(2).fill({
         name: "Error",
-        message: "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
+        message:
+          "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
       }),
     ]);
   });
@@ -364,7 +400,9 @@ test.describe("boot", () => {
       timeoutsMs: { boot: 30_000, appStartup: 30_000 },
     });
 
-    const diagnostic = expect.stringMatching(/Kernel pid terminated.*missing_user/s);
+    const diagnostic = expect.stringMatching(
+      /Kernel pid terminated.*missing_user/s,
+    );
     expect(boot).toEqual({
       ok: false,
       error: { t: "vm:exited", data: { reason: "error", data: diagnostic } },
@@ -462,13 +500,14 @@ test.describe("boot", () => {
         if (route.request().url().endsWith("manifest.json")) {
           return route.fulfill({
             json: {
-              apps: kind === "manifest-entry"
-                ? {}
-                : {
-                    kernel: { bundle: "core" },
-                    stdlib: { bundle: "core" },
-                    compiler: { bundle: "core" },
-                  },
+              apps:
+                kind === "manifest-entry"
+                  ? {}
+                  : {
+                      kernel: { bundle: "core" },
+                      stdlib: { bundle: "core" },
+                      compiler: { bundle: "core" },
+                    },
               bundles: { core: { tar: "kernel.tar" } },
             },
           });
@@ -479,14 +518,15 @@ test.describe("boot", () => {
       const result = await asset.tryBoot({
         beam: { otpAssetsRoot: "/asset-errors/" },
       });
-      const data = kind === "manifest-entry"
-        ? {
-            kind,
-            url: "/asset-errors/manifest.json",
-            name: "kernel",
-            available: [],
-          }
-        : { kind, url: "/asset-errors/kernel.tar" };
+      const data =
+        kind === "manifest-entry"
+          ? {
+              kind,
+              url: "/asset-errors/manifest.json",
+              name: "kernel",
+              available: [],
+            }
+          : { kind, url: "/asset-errors/kernel.tar" };
       expect(result).toEqual({ ok: false, error: { t: "asset:load", data } });
       await page.unroute("**/asset-errors/**");
     }
@@ -519,7 +559,10 @@ test.describe("boot", () => {
     });
 
     const diagnostic = expect.stringContaining("native runtime failure");
-    const failure = { t: "vm:exited", data: { reason: "error", data: diagnostic } };
+    const failure = {
+      t: "vm:exited",
+      data: { reason: "error", data: diagnostic },
+    };
     expect(result.pending).toEqual([failure, failure]);
     expect(result.errors).toEqual([{ kind: "error", data: diagnostic }]);
   });
@@ -560,7 +603,10 @@ test.describe("boot", () => {
       ],
     ] as const) {
       const otp = await createOtp();
-      const boot = await otp.tryBoot({ workerUrl, timeoutsMs: { boot: 30_000 } });
+      const boot = await otp.tryBoot({
+        workerUrl,
+        timeoutsMs: { boot: 30_000 },
+      });
       expect(boot).toEqual({
         ok: false,
         error: {
@@ -585,11 +631,13 @@ test.describe("runtime", () => {
       ["erlang:halt(7)", { kind: "exit", data: 7 }],
     ] as const) {
       const otp = await createOtp();
-      const boot = await otp.tryBoot(evalOpts(`
+      const boot = await otp.tryBoot(
+        evalOpts(`
         true = register(shutdown_test, self()),
         wasm:send(#{shutdown_ready => true}),
         receive {wasm, _} -> ${expression} end.
-      `));
+      `),
+      );
       assert(boot.ok);
       await otp.waitForEvent("shutdown_ready");
 
@@ -599,7 +647,10 @@ test.describe("runtime", () => {
       expect(otp.errors).toEqual([error]);
       expect(await otp.trySend("shutdown_test", true)).toEqual({
         ok: false,
-        error: { t: "vm:exited", data: { reason: error.kind, data: error.data } },
+        error: {
+          t: "vm:exited",
+          data: { reason: error.kind, data: error.data },
+        },
       });
     }
   });
@@ -999,3 +1050,190 @@ test.describe("fetch", () => {
     expect(await otp.waitForEvent("profile_max_sessions")).toEqual({ profile_max_sessions: 2 });
   });
 });
+
+type CacheMode = "available" | "absent" | "denied" | "stalled" | "full";
+type StorageCall = {
+  hash: CrossOriginStorageGetFileHandleHash;
+  options: CrossOriginStorageGetFileHandleOptions | undefined;
+};
+
+const assetTest = test.extend<{
+  createAssetEnvironment: (
+    mode?: CacheMode,
+  ) => ReturnType<typeof installAssetEnvironment>;
+}>({
+  createAssetEnvironment: async ({}, use) => {
+    const fetch = globalThis.fetch;
+    const navigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    try {
+      await use(installAssetEnvironment);
+    } finally {
+      globalThis.fetch = fetch;
+      if (navigator) Object.defineProperty(globalThis, "navigator", navigator);
+      else Reflect.deleteProperty(globalThis, "navigator");
+    }
+  },
+});
+
+assetTest.describe("assets", () => {
+  const asset = { url: "https://example.test/app.tar", sha256: "a".repeat(64) };
+  const hash = { algorithm: "SHA-256", value: asset.sha256 };
+
+  assetTest("reuse", async ({ createAssetEnvironment }) => {
+    const environment = createAssetEnvironment();
+    const first = await new Assets().fetch(asset);
+    expect(await first.text()).toBe("asset contents");
+    await expect.poll(() => environment.files.has(asset.sha256)).toBe(true);
+
+    const second = await new Assets().fetch(asset);
+    expect(await second.text()).toBe("asset contents");
+    expect(environment.downloads).toEqual([asset.url]);
+    expect(environment.files.size).toBe(1);
+    expect(environment.calls).toEqual([
+      { hash, options: undefined },
+      { hash, options: { create: true, origins: "*" } },
+      { hash, options: undefined },
+    ]);
+  });
+
+  assetTest("fallbacks", async ({ createAssetEnvironment }) => {
+    assetTest.setTimeout(5_000);
+    const cases: {
+      name: string;
+      mode?: CacheMode;
+      enabled?: boolean;
+      asset?: { url: string; sha256?: string };
+      bypass?: boolean;
+    }[] = [
+      { name: "unavailable", mode: "absent", bypass: true },
+      { name: "disabled", enabled: false, bypass: true },
+      { name: "hashless", asset: { url: asset.url }, bypass: true },
+      { name: "denied", mode: "denied" },
+      { name: "stalled", mode: "stalled" },
+    ];
+
+    for (const scenario of cases) {
+      await assetTest.step(scenario.name, async () => {
+        const environment = createAssetEnvironment(scenario.mode);
+        const loader = new Assets(scenario.enabled);
+        const response = await loader.fetch(scenario.asset ?? asset);
+
+        expect(await response.text()).toBe("asset contents");
+        expect(environment.downloads).toEqual([asset.url]);
+        if (scenario.bypass) expect(environment.calls).toEqual([]);
+      });
+    }
+  });
+
+  assetTest("write failure", async ({ createAssetEnvironment }) => {
+    const environment = createAssetEnvironment("full");
+    const response = await new Assets().fetch(asset);
+    await expect.poll(() => environment.rejectedWrites).toBe(1);
+
+    expect(await response.text()).toBe("asset contents");
+    expect(environment.downloads).toEqual([asset.url]);
+    expect(environment.files.size).toBe(0);
+  });
+});
+
+function installAssetEnvironment(mode: CacheMode = "available") {
+  const files = new Map<string, File>();
+  const calls: StorageCall[] = [];
+  const downloads: Parameters<typeof fetch>[0][] = [];
+  const environment = { files, calls, downloads, rejectedWrites: 0 };
+  const storage = {
+    async getFileHandle(
+      hash: CrossOriginStorageGetFileHandleHash,
+      options?: CrossOriginStorageGetFileHandleOptions,
+    ) {
+      calls.push({ hash, options });
+      if (options?.create) {
+        if (mode === "full") {
+          environment.rejectedWrites++;
+          throw new DOMException("full", "QuotaExceededError");
+        }
+        return {
+          createWritable: async () => {
+            const chunks: Uint8Array<ArrayBuffer>[] = [];
+            return new WritableStream<Uint8Array<ArrayBuffer>>({
+              write: (chunk) => {
+                chunks.push(chunk);
+              },
+              close: () => {
+                files.set(hash.value, new File(chunks, hash.value));
+              },
+            });
+          },
+        };
+      }
+      if (mode === "denied")
+        throw new DOMException("denied", "NotAllowedError");
+      if (mode === "stalled") return new Promise(() => {});
+      const file = files.get(hash.value);
+      if (file === undefined) throw new DOMException("miss", "NotFoundError");
+      return { getFile: async () => file };
+    },
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: mode === "absent" ? {} : { crossOriginStorage: storage },
+  });
+  globalThis.fetch = async (url) => {
+    downloads.push(url);
+    return new Response("asset contents");
+  };
+  return environment;
+}
+
+async function installWorkerCache(page: Page) {
+  await page.route("**/worker.mjs*", async (route) => {
+    const response = await route.fetch();
+    const source = await response.text();
+    await route.fulfill({
+      response,
+      body: `(${workerStorage.toString()})();\n${source}`,
+    });
+  });
+  return {
+    hashes: () =>
+      page.evaluate(async () => {
+        const cache = await caches.open("popcorn-e2e-cos");
+        const keys = await cache.keys();
+        return keys
+          .map((key) => new URL(key.url).pathname.split("/").pop())
+          .sort();
+      }),
+  };
+}
+
+function workerStorage() {
+  Object.defineProperty(navigator, "crossOriginStorage", {
+    value: {
+      async getFileHandle(
+        hash: CrossOriginStorageGetFileHandleHash,
+        options?: CrossOriginStorageGetFileHandleOptions,
+      ) {
+        const cache = await caches.open("popcorn-e2e-cos");
+        const url = new URL(`/cos-cache/${hash.value}`, location.origin).href;
+        if (!options?.create) {
+          const response = await cache.match(url);
+          if (response === undefined)
+            throw new DOMException("miss", "NotFoundError");
+          const file = new File([await response.blob()], hash.value);
+          return { getFile: async () => file };
+        }
+        return {
+          createWritable: async () => {
+            const chunks: Uint8Array<ArrayBuffer>[] = [];
+            return new WritableStream<Uint8Array<ArrayBuffer>>({
+              write: (chunk) => {
+                chunks.push(chunk);
+              },
+              close: () => cache.put(url, new Response(new Blob(chunks))),
+            });
+          },
+        };
+      },
+    },
+  });
+}

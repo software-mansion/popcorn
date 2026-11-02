@@ -342,9 +342,10 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{version: vm_version},
-        # Lets the browser find the runtime in Cross-Origin Storage by its hash.
-        runtime: %{sha256: sha256_file(Path.join([runtimes_dir, variant, "beam.wasm"]))}
+        vm: %{
+          version: vm_version,
+          sha256: sha256_file(Path.join([runtimes_dir, variant, "beam.wasm"]))
+        }
       }
 
       File.write!(manifest_path, JSON.encode!(manifest))
@@ -995,7 +996,8 @@ defmodule Popcorn.Packager do
     :ok = :erl_tar.create(to_charlist(path), entries, opts)
 
     {target, hash} = fingerprint(path)
-    %{tar: Path.join("lib", Path.basename(target)), sha256: hash}
+    tar = Path.join("lib", Path.basename(target))
+    %{tar: tar, sha256: hash}
   end
 
   defp fingerprint(path) do
