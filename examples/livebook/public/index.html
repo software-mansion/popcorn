@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Livebook in Popcorn</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font: 13px/1.5 system-ui;
+      }
+      #status {
+        padding: 4px 12px;
+        border-bottom: 1px solid #ddd;
+      }
+      iframe {
+        flex: 1;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Starting the VM…</div>
+    <script type="module">
+      // The shell owns the VM and outlives the iframe's navigations. Its Service
+      // Worker sends the iframe's requests here, and its WebSockets are created here.
+      import { Popcorn } from "./out/index.mjs";
+
+      const status = (text) => {
+        document.querySelector("#status").textContent = text;
+        console.log(`[shell] ${text}`);
+      };
+
+      let onStarted;
+      const started = new Promise((resolve) => (onStarted = resolve));
+      const sockets = new Map();
+
+      const t0 = performance.now();
+      const popcorn = await Popcorn.init({
+        onEvent: (event) => {
+          if (event?.livebook) return onStarted(event);
+          const socket = event && sockets.get(event.popcorn_socket);
+          if (!socket) return;
+          if ("close" in event) socket.closed(event.close);
+          else if ("text" in event) socket.onmessage?.({ data: event.text });
+          else socket.onmessage?.({ data: toArrayBuffer(event.binary) });
+        },
+      });
+      status(`VM booted in ${Math.round(performance.now() - t0)} ms, starting Livebook…`);
+
+      // Binary frames that are valid UTF-8 arrive as strings
+      function toArrayBuffer(data) {
+        const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      // Responses built in JavaScript can't set cookies, so the shell keeps them
+      const jar = new Map();
+
+      async function request(method, url, headers = [], body = "") {
+        const target = new URL(url, location.href);
+        const all = headers.filter(([name]) => !["host", "cookie"].includes(name.toLowerCase()));
+        all.push(["host", target.host]);
+        if (jar.size) all.push(["cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; ")]);
+
+        const resp = await popcorn.call(
+          "popcorn_plug",
+          { method, url: target.href, headers: all, body },
+          { timeoutMs: 120_000 },
+        );
+
+        for (const [name, value] of resp.headers ?? []) {
+          if (name !== "set-cookie") continue;
+          const [pair] = value.split(";");
+          const i = pair.indexOf("=");
+          const [key, val] = [pair.slice(0, i).trim(), pair.slice(i + 1).trim()];
+          if (/max-age=0/i.test(value)) jar.delete(key);
+          else jar.set(key, val);
+        }
+        return resp;
+      }
+
+      // A WebSocket whose other end is a socket process in the VM
+      class PopcornWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+
+        constructor(url) {
+          this.url = url;
+          this.readyState = 0;
+          this.bufferedAmount = 0;
+          const target = new URL(url);
+          target.protocol = target.protocol === "wss:" ? "https:" : "http:";
+          const headers = [
+            ["origin", location.origin],
+            ["connection", "Upgrade"],
+            ["upgrade", "websocket"],
+            ["sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="],
+            ["sec-websocket-version", "13"],
+          ];
+          request("GET", target.href, headers).then(
+            (resp) => {
+              if (resp.status !== 101) {
+                console.warn(`[shell] WebSocket ${target.pathname} refused: ${resp.status}`);
+                return this.closed(1006);
+              }
+              this.pid = resp.socket;
+              this.id = resp.id;
+              sockets.set(this.id, this);
+              this.readyState = 1;
+              this.onopen?.({});
+            },
+            (error) => {
+              console.warn(`[shell] WebSocket ${target.pathname} failed: ${error?.message ?? error}`);
+              this.closed(1006);
+            },
+          );
+        }
+
+        send(data) {
+          popcorn.send(this.pid, typeof data === "string" ? { text: data } : { binary: data });
+        }
+
+        close(code) {
+          if (this.readyState === 3) return;
+          if (this.pid) popcorn.send(this.pid, { close: code ?? 1000 });
+          this.closed(code ?? 1000);
+        }
+
+        closed(code) {
+          if (this.readyState === 3) return;
+          this.readyState = 3;
+          sockets.delete(this.id);
+          this.onclose?.({ code, wasClean: code === 1000 });
+        }
+      }
+
+      window.popcornBridge = { WebSocket: PopcornWebSocket, request };
+
+      // Requests from the Service Worker
+      navigator.serviceWorker.addEventListener("message", async (event) => {
+        const req = event.data?.popcornRequest;
+        if (!req) return;
+        const [port] = event.ports;
+        try {
+          const resp = await request(req.method, req.url, req.headers, req.body);
+          port.postMessage({ status: resp.status, headers: resp.headers ?? [], body: resp.body });
+        } catch (error) {
+          port.postMessage({ status: 502, headers: [], body: String(error?.message ?? error) });
+        }
+      });
+      navigator.serviceWorker.startMessages();
+
+      await navigator.serviceWorker.register("/sw.js");
+      await navigator.serviceWorker.ready;
+
+      const event = await started;
+      status(`Livebook started in ${event.ms} ms, as ${event.node}`);
+      window.livebookStarted = event;
+
+      const frame = document.createElement("iframe");
+      frame.src = new URL("/", location.href).href;
+      document.body.append(frame);
+    </script>
+  </body>
+</html>
