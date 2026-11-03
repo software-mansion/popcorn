@@ -1,0 +1,192 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Phoenix in Popcorn spike</title>
+  </head>
+  <body>
+    <pre id="log"></pre>
+    <div id="app"></div>
+
+    <script type="module">
+      import { Popcorn } from "./out/index.mjs";
+      import { Socket } from "./vendor/phoenix.mjs";
+      import { LiveSocket } from "./vendor/phoenix_live_view.esm.js";
+
+      const log = (line) => {
+        document.querySelector("#log").textContent += line + "\n";
+        console.log(line);
+      };
+      const results = (window.spikeResults = []);
+      const check = (name, ok, detail = "") => {
+        results.push({ name, ok, detail });
+        log(`${ok ? "PASS" : "FAIL"} ${name}${detail ? `: ${detail}` : ""}`);
+      };
+
+      const started = performance.now();
+      const popcorn = await Popcorn.init();
+      log(`booted in ${Math.round(performance.now() - started)} ms`);
+
+      // Synthetic responses can't set cookies, so the client keeps the jar
+      const jar = new Map();
+      const cookieHeader = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
+
+      async function request(method, path, { headers = [], body = "" } = {}) {
+        const all = [["host", "localhost"], ["origin", location.origin], ...headers];
+        if (jar.size) all.push(["cookie", cookieHeader()]);
+        const t0 = performance.now();
+        const resp = await popcorn.call(
+          "popcorn_plug",
+          { method, url: path, headers: all, body },
+          { timeoutMs: 60_000 },
+        );
+        resp.ms = Math.round(performance.now() - t0);
+        for (const [name, value] of resp.headers ?? []) {
+          if (name !== "set-cookie") continue;
+          const [pair] = value.split(";");
+          const i = pair.indexOf("=");
+          jar.set(pair.slice(0, i).trim(), pair.slice(i + 1).trim());
+        }
+        return resp;
+      }
+
+      const header = (resp, name) => (resp.headers.find(([n]) => n === name) ?? [])[1];
+      const form = (fields) => new URLSearchParams(fields).toString();
+      const formHeaders = [["content-type", "application/x-www-form-urlencoded"]];
+
+      // Stage 1: HTTP through the endpoint
+      try {
+        const first = await request("GET", "/");
+        check("GET / renders", first.status === 200 && first.body.includes("visits: 1"), `${first.status} in ${first.ms} ms`);
+        check("session cookie set", jar.has("_phx_wasm_key"));
+
+        const second = await request("GET", "/");
+        check("session persists", second.body.includes("visits: 2"), `${second.ms} ms`);
+
+        const token = second.body.match(/name="_csrf_token" value="([^"]+)"/)[1];
+        const echo = await request("POST", "/echo", { headers: formHeaders, body: form({ _csrf_token: token, msg: "hello" }) });
+        check("POST with CSRF token", echo.status === 200 && echo.body === "echo: hello", `${echo.status} ${echo.body}`);
+
+        const forged = await request("POST", "/echo", { headers: formHeaders, body: form({ msg: "x" }) });
+        check("POST without token is rejected", forged.status === 403, `${forged.status}`);
+
+        const redirect = await request("GET", "/redirect");
+        check("redirect", redirect.status === 302 && header(redirect, "location") === "/", `${redirect.status} -> ${header(redirect, "location")}`);
+
+        const missing = await request("GET", "/nope");
+        check("unknown route is 404", missing.status === 404, `${missing.status}`);
+
+        const counter = await request("GET", "/counter");
+        check("LiveView dead render", counter.status === 200 && counter.body.includes("data-phx-session"), `${counter.ms} ms`);
+
+        window.spikeStage1 = { token, counter };
+      } catch (error) {
+        check("stage 1", false, String(error?.message ?? error));
+      }
+
+      // Stage 2: LiveView over Phoenix's own WebSocket transport
+      const sockets = new Map();
+      popcorn.onEvent((event) => {
+        const transport = event && sockets.get(event.popcorn_socket);
+        if (!transport) return;
+        if ("close" in event) transport.closed(event.close);
+        else if ("text" in event) transport.onmessage?.({ data: event.text });
+        else transport.onmessage?.({ data: toArrayBuffer(event.binary) });
+      });
+
+      // Binary frames that are valid UTF-8 arrive as strings
+      function toArrayBuffer(data) {
+        const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      class PopcornTransport {
+        constructor(endPointURL) {
+          this.readyState = 0;
+          const url = new URL(endPointURL);
+          const headers = [
+            ["connection", "Upgrade"],
+            ["upgrade", "websocket"],
+            ["sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="],
+            ["sec-websocket-version", "13"],
+          ];
+          request("GET", url.pathname + url.search, { headers }).then(
+            (resp) => {
+              if (resp.status !== 101) {
+                log(`upgrade failed: ${resp.status} ${resp.body}`);
+                return this.closed(1006);
+              }
+              this.pid = resp.socket;
+              this.id = resp.id;
+              sockets.set(this.id, this);
+              this.readyState = 1;
+              this.onopen?.();
+            },
+            (error) => {
+              log(`upgrade error: ${error?.message ?? error}`);
+              this.closed(1006);
+            },
+          );
+        }
+        send(data) {
+          popcorn.send(this.pid, typeof data === "string" ? { text: data } : { binary: data });
+        }
+        close(code) {
+          if (this.readyState === 3) return;
+          if (this.pid) popcorn.send(this.pid, { close: code ?? 1000 });
+          this.closed(code ?? 1000);
+        }
+        closed(code) {
+          this.readyState = 3;
+          sockets.delete(this.id);
+          this.onclose?.({ code });
+        }
+      }
+
+      if (window.spikeStage1) {
+        try {
+          document.querySelector("#app").innerHTML = window.spikeStage1.counter.body;
+          // LiveView checks that the page's URL routes to the view it joins
+          history.replaceState(null, "", "/counter");
+          const liveSocket = new LiveSocket("/live", Socket, {
+            transport: PopcornTransport,
+            params: { _csrf_token: window.spikeStage1.token },
+          });
+          const t0 = performance.now();
+          liveSocket.connect();
+          const waitFor = (selector, text, ms = 30_000) =>
+            new Promise((resolve, reject) => {
+              const deadline = performance.now() + ms;
+              const tick = () => {
+                const el = document.querySelector(selector);
+                if (el?.textContent.includes(text)) return resolve();
+                if (performance.now() > deadline) return reject(new Error(`timeout: ${selector} ${el?.textContent}`));
+                setTimeout(tick, 20);
+              };
+              tick();
+            });
+
+          await waitFor("#connected", "connected: true");
+          check("LiveView connects", true, `${Math.round(performance.now() - t0)} ms`);
+          check("LiveView sees the session", document.querySelector("#lv-visits").textContent.includes("2"), document.querySelector("#lv-visits").textContent);
+
+          const t1 = performance.now();
+          document.querySelector("#inc").click();
+          await waitFor("#count", "count: 1");
+          check("phx-click round trip", true, `${Math.round(performance.now() - t1)} ms`);
+
+          const t2 = performance.now();
+          for (let i = 0; i < 20; i++) {
+            document.querySelector("#inc").click();
+            await waitFor("#count", `count: ${i + 2}`);
+          }
+          check("20 more clicks", true, `${Math.round((performance.now() - t2) / 20)} ms each`);
+        } catch (error) {
+          check("stage 2", false, String(error?.message ?? error));
+        }
+      }
+
+      window.spikeDone = true;
+    </script>
+  </body>
+</html>

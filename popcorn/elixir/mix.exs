@@ -227,6 +227,9 @@ defmodule Popcorn.MixProject do
       {:brotli, "~> 0.3.3", runtime: false},
       {:file_system, "~> 1.0", runtime: false},
       {:req, "~> 0.5.0 or ~> 0.6.0 or ~> 0.7.0 or == 0.8.0-rc.0", optional: true},
+      {:plug, "~> 1.14", optional: true},
+      # Popcorn.Plug's tests upgrade with it, like Phoenix
+      {:websock_adapter, "~> 0.7.1", only: :test, runtime: false},
       {:exdoc_folds, path: "../exdoc_folds", only: [:dev, :test], runtime: false},
       {:ex_doc, github: "software-mansion-labs/ex_doc", only: [:dev, :test], runtime: false},
       {:makeup_strings, path: "../makeup_strings", only: :dev, runtime: false},
