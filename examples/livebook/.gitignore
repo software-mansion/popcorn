@@ -1,0 +1,13 @@
+/_build/
+/deps/
+erl_crash.dump
+
+# Popcorn's output and the static files copied from Livebook.
+/public/out/
+/public/assets/
+/public/images/
+/public/favicons/
+/public/iframe/
+
+# Screenshot of a failed check.
+/check-failure.png
