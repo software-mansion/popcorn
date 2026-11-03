@@ -43,6 +43,7 @@ defmodule Popcorn.Packager do
           | {:exclude_priv, [String.t() | {atom(), String.t()}]}
           | {:config, keyword()}
           | {:treeshake, treeshake_options()}
+          | {:distribution, boolean()}
           | {:static_dir, Path.t()}
           | {:otp_apps_dir, Path.t()}
           | {:otp_apps_cache, Path.t()}
@@ -60,7 +61,8 @@ defmodule Popcorn.Packager do
           strip: boolean(),
           exclude_priv: [String.t() | {atom(), String.t()}],
           config: keyword(),
-          treeshake: treeshake_options()
+          treeshake: treeshake_options(),
+          distribution: boolean()
         }
 
   # True or the options turn tree-shaking on, false off
@@ -84,6 +86,17 @@ defmodule Popcorn.Packager do
     behaviour_impls: LocalLiveView,
     # Ecto schemas
     referenced_modules_defining: {:__changeset__, 0}
+  ]
+
+  @kept_for_distribution [
+    mod: :popcorn_dist,
+    mod: :erl_distribution,
+    mod: :erl_epmd,
+    mod: :dist_util,
+    mod: :dist_ac,
+    mod: :global,
+    mod: :global_group,
+    mod: :rpc
   ]
 
   # Tree-shaking removes these unless they're kept: they're reachable, but
@@ -172,12 +185,21 @@ defmodule Popcorn.Packager do
         exclude_priv: [],
         config: [],
         treeshake: false,
+        distribution: false,
         static_dir: Application.app_dir(:popcorn, "priv/static"),
         otp_apps_dir: Application.app_dir(:popcorn, "priv/otp-apps"),
         otp_apps_cache: Application.app_dir(:popcorn, "otp-apps")
       )
 
     treeshake = validate_treeshake!(options[:treeshake])
+
+    unless is_boolean(options[:distribution]) do
+      raise ArgumentError, """
+      expected the distribution option to be a boolean, \
+      got: #{inspect(options[:distribution])}\
+      """
+    end
+
     root_dir = Path.expand(options[:root_dir])
 
     build_path =
@@ -209,7 +231,8 @@ defmodule Popcorn.Packager do
                  strip: options[:strip],
                  exclude_priv: options[:exclude_priv],
                  config: options[:config],
-                 treeshake: treeshake
+                 treeshake: treeshake,
+                 distribution: options[:distribution]
                }),
              {:ok, installed} <-
                install_output(report, static_dir, out_dir, options[:brotli_effort]) do
@@ -243,7 +266,8 @@ defmodule Popcorn.Packager do
       strip: strip,
       exclude_priv: exclude_priv,
       config: config,
-      treeshake: treeshake
+      treeshake: treeshake,
+      distribution: distribution
     } = args
 
     toolchain = fetch_toolchain_info()
@@ -263,9 +287,12 @@ defmodule Popcorn.Packager do
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
          staged_apps =
-           staged_apps |> remove_build_tools() |> add_config(config) |> configure_kernel(),
+           staged_apps
+           |> remove_build_tools()
+           |> add_config(config)
+           |> configure_kernel(distribution),
          {:ok, staged_apps, treeshake_report} <-
-           maybe_treeshake(staged_apps, treeshake, out_dir),
+           maybe_treeshake(staged_apps, treeshake, distribution, out_dir),
          {:ok, boot_path} <- create_boot(out_dir, staged_apps) do
       vm_version = manifest.version
       toolchain = Map.take(toolchain, ~w(otp elixir)a)
@@ -471,11 +498,14 @@ defmodule Popcorn.Packager do
     end)
   end
 
-  # The runtime has no distribution. It's configured in kernel's spec, as the
-  # `-kernel start_distribution false` arguments would need the Erlang parser.
-  defp configure_kernel(staged_apps) do
+  # Whether kernel starts distribution's processes. It's configured in
+  # kernel's spec, as the `-kernel start_distribution` arguments would need the
+  # Erlang parser.
+  defp configure_kernel(staged_apps, distribution) do
     update_in(staged_apps[:kernel].props, fn props ->
-      env = props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, false)
+      env =
+        props |> Keyword.get(:env, []) |> Keyword.put(:start_distribution, distribution)
+
       Keyword.put(props, :env, env)
     end)
   end
@@ -709,14 +739,22 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp maybe_treeshake(staged_apps, false, _out_dir), do: {:ok, staged_apps, nil}
-  defp maybe_treeshake(staged_apps, true, out_dir), do: treeshake(staged_apps, [], out_dir)
+  defp maybe_treeshake(staged_apps, false, _distribution, _out_dir),
+    do: {:ok, staged_apps, nil}
 
-  defp maybe_treeshake(staged_apps, options, out_dir),
-    do: treeshake(staged_apps, options[:keep], out_dir)
+  defp maybe_treeshake(staged_apps, options, distribution, out_dir) do
+    keep =
+      case options do
+        true -> []
+        options -> options[:keep]
+      end
 
-  defp treeshake(staged_apps, keep, out_dir) do
+    treeshake(staged_apps, keep, distribution, out_dir)
+  end
+
+  defp treeshake(staged_apps, keep, distribution, out_dir) do
     warn_unknown_kept(staged_apps, keep)
+    keep = if distribution, do: keep ++ @kept_for_distribution, else: keep
     drop = dropped_modules(keep)
 
     with {:ok, stats} <- run_treeshake(staged_apps, keep, drop, out_dir) do

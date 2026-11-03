@@ -15,6 +15,60 @@ declare const pidBrand: unique symbol;
  */
 export type Pid = { readonly [pidBrand]: true };
 
+/**
+ * An event of an Erlang distribution connection between two nodes:
+ *
+ * - `connect` - opens a new connection between two nodes,
+ * - `message` - piece of data for the other end of the connection,
+ * - `disconnect` - removes the connection
+ *
+ * All these events must be forwarded to the other end of the connection.
+ * If they can no longer be forwarded, the connection should be removed
+ * by sending a `disconnect` event to each end, if possible.
+ */
+export type DistConnectionEvent =
+  | { type: "connect"; connection: string; from: string; to: string }
+  | { type: "message"; connection: string; data: Uint8Array }
+  | { type: "disconnect"; connection: string };
+
+/**
+ * Indicates Erlang distribution node change:
+ * - `node_started` - new node is ready to send/receive `DistConnectionEvent`s,
+ * - `node_stopped` - node is terminated or left the cluster - all its connections
+ *                    should be disconnected
+ */
+export type DistNodeEvent = {
+  type: "node_started" | "node_stopped";
+  name: string;
+};
+
+export type DistEndpoint = {
+  /**
+   * Delivers a {@link DistConnectionEvent} from the other end of the
+   * connection, or `disconnect` when the other end is gone.
+   *
+   * Code that can call it can connect to the VM, only the distribution
+   * cookie protects it. It stops delivering when the VM shuts down.
+   */
+  readonly deliver: (event: DistConnectionEvent) => void;
+};
+
+/**
+ * Accepts {@link DistEndpoint} and returns function - a handler for
+ * distribution events sent by the VM.
+ *
+ * The events are the following:
+ * - {@link DistNodeEvent} - tells when a node starts or stops,
+ * - {@link DistConnectionEvent} - should be forwarded between nodes via their
+ *   {@link DistEndpoint}s.
+ *
+ * See documentation for {@link DistEndpoint}, {@link DistNodeEvent}
+ * and {@link DistConnectionEvent} for details.
+ */
+export type DistTransport = (
+  endpoint: DistEndpoint,
+) => (event: DistNodeEvent | DistConnectionEvent) => void;
+
 /** Internal wire target. The public `send` accepts `string | Pid` instead. */
 export type BeamTarget = { name: string } | { pid: Uint8Array };
 
