@@ -44,6 +44,7 @@ defmodule Mix.Tasks.Popcorn.Cook do
   | `strip` | Removes BEAM debug and documentation chunks. Default: `true`. |
   | `exclude_priv` | Leaves out `priv` files matching glob patterns, which are relative to `priv`: `{app, pattern}` in one application's, like `{:phoenix, "templates"}`, and a bare pattern in every application's, like `"static/*.map"`. A matched directory is left out with its contents. Default: `[]`. |
   | `treeshake` | (Experimental) Removes unreachable modules and functions. Set to `true` or a keyword list of options to enable. See [Tree-shaking](#module-tree-shaking) below for details. Default: `false`. |
+  | `distribution` | Enables Erlang distribution. To make Popcorn instance a node, pass `beam: {extraArgs: ["-name", "name@popcorn"]}` to `Popcorn.init` or call `Node.start/1`. Defaults to `false`. |
   | `brotli_effort` | Selects `:standard` (default) or `:max`. `:max` compresses more slowly. |
 
   Use application names, such as `:my_app`, rather than module names.
@@ -153,7 +154,8 @@ defmodule Mix.Tasks.Popcorn.Cook do
       strip: Application.get_env(:popcorn, :strip, true),
       exclude_priv: Application.get_env(:popcorn, :exclude_priv, []),
       config: project_config(),
-      treeshake: Application.get_env(:popcorn, :treeshake, false)
+      treeshake: Application.get_env(:popcorn, :treeshake, false),
+      distribution: Application.get_env(:popcorn, :distribution, false)
     ]
 
     case Packager.build(packager_options) do

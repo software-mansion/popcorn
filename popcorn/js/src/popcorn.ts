@@ -12,6 +12,10 @@ import type {
   BeamBootOptions,
   BeamSendPayload,
   BeamTarget,
+  DistConnectionEvent,
+  DistEndpoint,
+  DistNodeEvent,
+  DistTransport,
   OtpErrorPayload,
   Pid,
   RunJsRequest,
@@ -105,6 +109,14 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
   /** Receives BEAM message payloads, including messages sent during startup. */
   onEvent?: (event: PopcornEvent) => void;
   /**
+   * Transport for connecting VM's Erlang distribution to other nodes.
+   * See {@link DistTransport}.
+   *
+   * To connect nodes within one page, you can use `createDistributionRelay`
+   * instead of implementing a transport manually.
+   */
+  distribution?: DistTransport;
+  /**
    * Module worker URL.
    *
    * Defaults to the worker included with the package.
@@ -127,6 +139,9 @@ const LOG_PREFIX = "[Popcorn]";
 
 const DEFAULT_PROXY_NAME = "popcorn_proxy";
 const DEFAULT_CALL_TIMEOUT_MS = 5_000;
+
+/** The process of the VM's distribution carrier, popcorn_dist. */
+const DIST_ROUTER = "popcorn_dist";
 
 type VmExitReason =
   | { reason: "deinit" }
@@ -198,6 +213,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private requestSeq = 0;
   private settleBoot: ((result: Result<Popcorn<Output>>) => void) | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
+  private distNode: string | null = null;
+  private distHandler:
+    | ((event: DistNodeEvent | DistConnectionEvent) => void)
+    | null = null;
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
   private readonly readyWaiters: Uint8Array[] = [];
@@ -448,6 +467,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           noshell: this.opts.tty === undefined,
         },
       });
+      this.setupDist();
     });
   }
 
@@ -612,6 +632,21 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     };
   }
 
+  private setupDist(): void {
+    const transport = this.opts.distribution;
+    if (transport === undefined) return;
+
+    const worker = this.vmWorker;
+    const endpoint: DistEndpoint = Object.freeze({
+      deliver: (event: DistConnectionEvent) => {
+        const message = serializeSendPayload({ name: DIST_ROUTER }, event);
+        // Send directly to worker, so that stale endpoint doesn't send to new worker
+        if (message.ok) sendBridgeReply(worker, message.data);
+      },
+    });
+    this.distHandler = transport(endpoint);
+  }
+
   /**
    * Stops the worker and completes pending sends and calls with `vm:exited`.
    *
@@ -631,6 +666,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.state = { status: "closed", error };
     this.vmReady = false;
+    this.handleNodeChange(null);
+    this.distHandler = null;
     this.readyWaiters.length = 0;
     for (const resolve of this.pendingSends.values()) {
       resolve({ ok: false, error });
@@ -658,12 +695,25 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
   private emit(event: PopcornEvent): void {
     const popcorn = objectWithKeys(event, ["_popcorn"])?._popcorn;
-    const envelope = objectWithKeys(popcorn, ["t", "id", "payload"]);
+    const envelope = objectWithKeys(popcorn, ["t", "payload"]);
 
     if (envelope !== null) {
-      check(envelope.t === "proxy");
-      this.completeCall(envelope.id as string, envelope.payload);
-      return;
+      switch (envelope.t) {
+        case "proxy": {
+          const call = objectWithKeys(envelope, ["id"]);
+          check(call !== null);
+          this.completeCall(call.id as string, envelope.payload);
+          return;
+        }
+        case "dist":
+          this.emitDistEvent(envelope.payload as DistConnectionEvent);
+          return;
+        case "dist_node":
+          this.handleNodeChange(envelope.payload as string | null);
+          return;
+        default:
+          unreachable();
+      }
     }
 
     if (this.eventHandlers.size === 0) {
@@ -674,6 +724,27 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
     for (const handler of this.eventHandlers) {
       handler(event);
+    }
+  }
+
+  private emitDistEvent(event: DistNodeEvent | DistConnectionEvent): void {
+    if (event.type === "message") {
+      // The VM sends data that is valid UTF-8 as strings
+      const data: unknown = event.data;
+      if (typeof data === "string") event.data = UTF8.encode(data);
+    }
+    this.distHandler?.(event);
+  }
+
+  private handleNodeChange(node: string | null): void {
+    const previous = this.distNode;
+    if (node === previous) return;
+    this.distNode = node;
+    if (previous !== null) {
+      this.emitDistEvent({ type: "node_stopped", name: previous });
+    }
+    if (node !== null) {
+      this.emitDistEvent({ type: "node_started", name: node });
     }
   }
 
@@ -882,7 +953,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       for (const { key, value, cleanup } of tracked) {
         this.trackedValues.set(key, { value, cleanup });
       }
-      this.sendBridgeReply(command.data);
+      sendBridgeReply(this.vmWorker, command.data);
       return;
     }
 
@@ -891,7 +962,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       error: { unserializable: command.error.data.reason },
     });
     check(failure.ok);
-    this.sendBridgeReply(failure.data);
+    sendBridgeReply(this.vmWorker, failure.data);
   }
 
   private handleReadyRequest(replyTo: Uint8Array): void {
@@ -911,20 +982,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private sendReadyReply(replyTo: Uint8Array): void {
     const message = serializeSendPayload({ pid: replyTo }, true);
     check(message.ok);
-    this.sendBridgeReply(message.data);
+    sendBridgeReply(this.vmWorker, message.data);
   }
 
   private asRef(value: unknown): unknown {
     if (value instanceof this.TrackedValue) return value;
     return new this.TrackedValue(value);
-  }
-
-  private sendBridgeReply(message: BeamSendPayload): void {
-    toVm(
-      this.vmWorker,
-      { type: "popcorn:bridge-reply", payload: { message } },
-      [message.etf.buffer],
-    );
   }
 
   private jsWithCurrentEnv(code: string): unknown {
@@ -1079,6 +1142,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.deinit(exitReason(payload));
   }
+}
+
+function sendBridgeReply(worker: Worker, message: BeamSendPayload): void {
+  toVm(worker, { type: "popcorn:bridge-reply", payload: { message } }, [
+    message.etf.buffer,
+  ]);
 }
 
 function resolveMaxMemory(limits: MemoryLimits | undefined): number {
