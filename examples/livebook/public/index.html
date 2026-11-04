@@ -32,7 +32,7 @@
       // Livebook runs in the iframe under a path of its own, /tab/<id>/, whose
       // Service Worker sends the iframe's requests here, through a relay frame:
       // see sw.js. The iframe's WebSockets are created here.
-      import { Popcorn, createDistributionRelay } from "./out/index.mjs";
+      import { Popcorn, createDistributionRelay } from "/out/index.mjs";
 
       const status = (text) => {
         document.querySelector("#status").textContent = text;
@@ -236,7 +236,10 @@
       // The relay frame goes first, as the Service Worker sends Livebook's
       // first page through it
       await addFrame(`${base}/popcorn-relay`, { hidden: true });
-      addFrame(`${base}/`, { id: "livebook" });
+
+      // Livebook's links, like /import?url=…, open in the tab's Livebook
+      const path = location.pathname === "/index.html" ? "/" : location.pathname;
+      addFrame(`${base}${path}${location.search}`, { id: "livebook" });
 
       function addFrame(src, props) {
         const frame = Object.assign(document.createElement("iframe"), props, { src });
