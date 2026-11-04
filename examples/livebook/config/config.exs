@@ -44,6 +44,7 @@ config :livebook,
   iframe_port: 8081,
   # Outputs' iframes load from Livebook's origin, where the Service Worker sends
   # their requests to the VM. Livebook's usual separate origin isolates them.
+  # LivebookWasm.Application puts it, and the endpoint's URL, under the tab's path.
   iframe_url: "/iframe/v6.html",
   default_runtime: runtime,
   default_app_runtime: runtime,

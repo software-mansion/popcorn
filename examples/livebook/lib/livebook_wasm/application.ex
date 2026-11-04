@@ -11,10 +11,23 @@ defmodule LivebookWasm.Application do
 
   defp start_livebook do
     started = System.monotonic_time(:millisecond)
+    put_base_path()
     {:ok, _apps} = Application.ensure_all_started(:livebook)
     plug = {Popcorn.Plug, plug: LivebookWeb.Endpoint}
     {:ok, _pid} = Supervisor.start_child(LivebookWasm.Supervisor, plug)
     ms = System.monotonic_time(:millisecond) - started
     Popcorn.JS.send(%{livebook: "started", ms: ms, node: node()})
+  end
+
+  # Each tab's Livebook is under a path of its own, which the page passes, so
+  # that each tab has a Service Worker of its own: see public/sw.js
+  defp put_base_path do
+    with {:ok, [[path]]} <- :init.get_argument(:livebook_wasm_base_path) do
+      path = List.to_string(path)
+      endpoint = Application.fetch_env!(:livebook, LivebookWeb.Endpoint)
+      url = Keyword.put(endpoint[:url], :path, path)
+      Application.put_env(:livebook, LivebookWeb.Endpoint, Keyword.put(endpoint, :url, url))
+      Application.put_env(:livebook, :iframe_url, path <> "/iframe/v6.html")
+    end
   end
 end

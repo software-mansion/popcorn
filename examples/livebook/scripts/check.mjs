@@ -7,7 +7,8 @@ const { chromium } = require("@playwright/test");
 
 const url = process.argv[2] ?? "http://localhost:4000/";
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
 const logs = [];
 page.on("console", (msg) => {
   logs.push(`[${msg.type()}] ${msg.text()}`);
@@ -31,7 +32,9 @@ const step = async (name, fn) => {
   }
 };
 
-const app = page.frameLocator("iframe");
+const app = page.frameLocator("#livebook");
+// Livebook's paths are under the tab's
+const tabPath = (frame) => new URL(frame.url()).pathname.match(/^\/tab\/[^/]+/)[0];
 const newNotebook = () => app.getByText("New notebook").filter({ visible: true }).first();
 
 try {
@@ -136,6 +139,50 @@ try {
     await frame.getByText("Rendered by Kino.JS").waitFor({ timeout: 120_000 });
   });
 
+  // Each tab runs a Livebook of its own, under a path with a Service Worker of
+  // its own. Only the first tab's VM has its notebook.
+  await step("each tab's requests and navigations go to its own VM", async () => {
+    const other = await context.newPage();
+    other.on("console", (msg) => logs.push(`[other tab] [${msg.type()}] ${msg.text()}`));
+    try {
+      await other.goto(url);
+      await other.waitForFunction(() => window.livebookStarted, null, { timeout: 180_000 });
+      await other.frameLocator("#livebook").locator(".phx-connected").first().waitFor({ timeout: 60_000 });
+
+      // Whether a notebook is under the frame's tab's path
+      const found = (frame, path) =>
+        frame.evaluate(async (path) => {
+          const base = window.LIVEBOOK_BASE_URL_PATH ?? window.parent.LIVEBOOK_BASE_URL_PATH;
+          const resp = await fetch(base + path);
+          return resp.ok && !resp.redirected;
+        }, path);
+
+      const notebook = page.frames().find((frame) => frame.url().includes("/sessions/"));
+      const output = page.frames().find((frame) => frame.url().includes("/iframe/v6.html"));
+      const otherTab = await (await other.$("#livebook")).contentFrame();
+      const path = new URL(notebook.url()).pathname.slice(tabPath(notebook).length);
+
+      const results = {
+        notebook: await found(notebook, path),
+        output: await found(output, path),
+        otherTab: await found(otherTab, path),
+      };
+      if (!results.notebook || !results.output || results.otherTab) {
+        throw new Error(`whether ${path} was found: ${JSON.stringify(results)}`);
+      }
+
+      // The other tab was opened last, which mustn't matter
+      const reloaded = page.waitForEvent("framenavigated", (frame) => frame === notebook);
+      await notebook.evaluate(() => location.reload());
+      await reloaded;
+      await app.locator(".phx-connected [data-el-cell]").first().waitFor({ timeout: 60_000 });
+      if (!notebook.url().endsWith(path)) throw new Error(`reloading went to ${notebook.url()}`);
+      return `${path} reloaded`;
+    } finally {
+      await other.close();
+    }
+  });
+
   await step("installed packages run", () =>
     evaluate(
       `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
@@ -146,7 +193,7 @@ try {
   // Mix.install/2 installs once per VM
   await step("another notebook installs other packages in a VM of its own", async () => {
     const session = page.frames().find((frame) => frame.url().includes("/sessions/"));
-    await session.goto(new URL("/new", url).href);
+    await session.goto(new URL(`${tabPath(session)}/new`, url).href);
     await cell.locator(".cm-content").waitFor({ timeout: 60_000 });
 
     const output = await evaluate(
