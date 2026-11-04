@@ -28,8 +28,10 @@
   <body>
     <div id="status">Starting the VM…</div>
     <script type="module">
-      // The shell owns the VMs and outlives the iframe's navigations. Its Service
-      // Worker sends the iframe's requests here, and its WebSockets are created here.
+      // The shell owns the tab's VMs and outlives the iframe's navigations.
+      // Livebook runs in the iframe under a path of its own, /tab/<id>/, whose
+      // Service Worker sends the iframe's requests here, through a relay frame:
+      // see sw.js. The iframe's WebSockets are created here.
       import { Popcorn, createDistributionRelay } from "./out/index.mjs";
 
       const status = (text) => {
@@ -68,9 +70,45 @@
         }
       }
 
+      // Each page load picks the path, and holds a lock for it while it's open
+      const tab = crypto.randomUUID();
+      const base = `/tab/${tab}`;
+      await new Promise((locked) =>
+        navigator.locks.request(`livebook-tab:${tab}`, () => {
+          locked();
+          return new Promise(() => {});
+        }),
+      );
+      await removeClosedTabs();
+      const workerReady = registerWorker().catch((error) => {
+        status(`The Service Worker didn't start: ${error.message}`);
+        throw error;
+      });
+
+      // The workers of closed tabs, and of the example's earlier versions
+      async function removeClosedTabs() {
+        const { held } = await navigator.locks.query();
+        const open = new Set(held.map((lock) => lock.name));
+        for (const registration of await navigator.serviceWorker.getRegistrations()) {
+          const id = new URL(registration.scope).pathname.match(/^\/tab\/([^/]+)\/$/)?.[1];
+          if (!open.has(`livebook-tab:${id}`)) await registration.unregister();
+        }
+      }
+
+      async function registerWorker() {
+        const registration = await navigator.serviceWorker.register("/sw.js", { scope: `${base}/` });
+        const worker = registration.installing ?? registration.waiting ?? registration.active;
+        while (worker.state !== "activated") {
+          if (worker.state === "redundant") throw new Error("it failed to install");
+          await new Promise((resolve) => worker.addEventListener("statechange", resolve, { once: true }));
+        }
+      }
+
       const t0 = performance.now();
       const popcorn = await Popcorn.init({
         distribution: relay,
+        // Livebook's URLs are under the tab's path, see LivebookWasm.Application
+        beam: { extraArgs: ["-livebook_wasm_base_path", base] },
         onEvent: (event) => {
           if (event?.livebook) return onStarted(event);
           if (event?.livebook_runtime) return handleRuntime(event);
@@ -98,6 +136,8 @@
 
       async function request(method, url, headers = [], body = "") {
         const target = new URL(url, location.href);
+        // Livebook expects the tab's path removed, as a reverse proxy would
+        if (target.pathname.startsWith(`${base}/`)) target.pathname = target.pathname.slice(base.length);
         const all = headers.filter(([name]) => !replaced.includes(name.toLowerCase()));
         all.push(["host", target.host]);
         if (jar.size) all.push(["cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; ")]);
@@ -176,32 +216,33 @@
         }
       }
 
-      window.popcornBridge = { WebSocket: PopcornWebSocket, request };
-
-      // Requests from the Service Worker
-      navigator.serviceWorker.addEventListener("message", async (event) => {
-        const req = event.data?.popcornRequest;
-        if (!req) return;
-        const [port] = event.ports;
+      // Serves the requests that the Service Worker sends to the relay frame
+      async function serve(req) {
         try {
           const resp = await request(req.method, req.url, req.headers, req.body);
-          port.postMessage({ status: resp.status, headers: resp.headers ?? [], body: resp.body });
+          return { status: resp.status, headers: resp.headers ?? [], body: resp.body };
         } catch (error) {
-          port.postMessage({ status: 502, headers: [], body: String(error?.message ?? error) });
+          return { status: 502, headers: [], body: String(error?.message ?? error) };
         }
-      });
-      navigator.serviceWorker.startMessages();
+      }
 
-      await navigator.serviceWorker.register("/sw.js");
-      await navigator.serviceWorker.ready;
+      window.popcornBridge = { WebSocket: PopcornWebSocket, serve };
 
+      await workerReady;
       const event = await started;
       status(`Livebook started in ${event.ms} ms, as ${event.node}`);
       window.livebookStarted = event;
 
-      const frame = document.createElement("iframe");
-      frame.src = new URL("/", location.href).href;
-      document.body.append(frame);
+      // The relay frame goes first, as the Service Worker sends Livebook's
+      // first page through it
+      await addFrame(`${base}/popcorn-relay`, { hidden: true });
+      addFrame(`${base}/`, { id: "livebook" });
+
+      function addFrame(src, props) {
+        const frame = Object.assign(document.createElement("iframe"), props, { src });
+        document.body.append(frame);
+        return new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+      }
     </script>
   </body>
 </html>

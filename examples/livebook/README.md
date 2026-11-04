@@ -25,14 +25,21 @@ Livebook in headless Chromium, creates notebooks and evaluates cells in them.
 ## How it works
 
 - `public/index.html` is a shell page that owns the VMs, so they outlive
-  Livebook's navigations. Livebook runs in an iframe.
+  Livebook's navigations. Livebook runs in an iframe, under a path of the tab's
+  own, `/tab/<id>/`: `LivebookWasm.Application` sets it as Livebook's base path.
 - `public/sw.js`, a Service Worker, sends the iframe's navigations, form posts
   and fetches to the shell, which calls `Popcorn.Plug` in Livebook's VM.
   Livebook's static files load from the network: `mix popcorn.dev` copies them
   to `public/`, and they're left out of the VM's package.
+- Each tab registers the Service Worker for its own path, as a worker that
+  tabs shared couldn't tell which tab a navigation is for. The worker sends the
+  requests through a hidden relay frame under the path, as the shell isn't.
+  Each tab holds a lock for its path, and the shell removes the workers of
+  closed tabs.
 - Service Workers can't intercept WebSockets, so the Service Worker adds
-  `public/popcorn-ws.js` to Livebook's pages, which replaces `WebSocket` with one
-  whose other end is a socket process in the VM.
+  `public/popcorn-frame.js` to Livebook's pages, which replaces `WebSocket` with
+  one whose other end is a socket process in the VM. The script also passes the
+  requests on in the relay frame.
 - Responses built in JavaScript can't set cookies, so the shell keeps them.
 - `Popcorn.Plug` serves the requests with `LivebookWeb.Endpoint`, like the
   Phoenix example.
@@ -42,7 +49,8 @@ Livebook in headless Chromium, creates notebooks and evaluates cells in them.
 - `config/config.exs` has the settings Livebook's config files and
   `Livebook.config_runtime/0` would make, as Popcorn evaluates only this file.
 - Outputs' iframes, like Kino's JavaScript outputs', load from Livebook's
-  origin, so the Service Worker sends their requests to the VM.
+  origin, under the tab's path, so the Service Worker sends their requests to
+  the VM.
 
 ### Notebooks' VMs
 

@@ -1,9 +1,20 @@
-// Sends the Livebook iframe's requests to the VM in the shell page.
+// Sends a tab's Livebook requests to the tab's VM, in the shell page.
 //
-// The shell page (index.html) owns the VM, so it outlives the iframe's
-// navigations. Static files and the shell's own requests go to the network.
+// Each tab registers this worker for a path of its own, /tab/<id>/, where its
+// Livebook runs (see index.html): a worker shared by tabs couldn't tell which
+// tab's VM a navigation is for. So the worker's clients are the tab's frames:
+// a relay frame, which passes the requests to the shell, Livebook's pages and
+// their outputs' iframes.
+//
+// It doesn't call skipWaiting() or clients.claim(): a tab keeps the worker it
+// registered, as an updated one might not fit its page.
 
-const STATIC = ["/assets/", "/images/", "/favicons/", "/iframe/", "/out/", "/notebook_vm/", "/popcorn-ws.js", "/sw.js", "/robots.txt"];
+const SCOPE = new URL(self.registration.scope).pathname;
+const BASE = SCOPE.slice(0, -1);
+const RELAY = `${SCOPE}popcorn-relay`;
+
+// Static files load from the network, without the tab's path
+const STATIC = ["/assets/", "/images/", "/favicons/", "/iframe/", "/out/", "/notebook_vm/", "/popcorn-frame.js", "/robots.txt"];
 
 // Responses built here must keep the iframe cross-origin isolated, like the shell
 const ISOLATION = {
@@ -12,40 +23,55 @@ const ISOLATION = {
   "cross-origin-resource-policy": "same-origin",
 };
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
-
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
-  if (STATIC.some((prefix) => url.pathname.startsWith(prefix))) return;
+  if (url.pathname === RELAY) return event.respondWith(relayPage());
 
-  if (event.request.mode === "navigate") {
-    if (event.request.destination === "iframe") event.respondWith(toVm(event.request));
+  const path = url.pathname.startsWith(SCOPE) ? url.pathname.slice(BASE.length) : url.pathname;
+  if (STATIC.some((prefix) => path.startsWith(prefix))) {
+    if (path !== url.pathname) event.respondWith(fromNetwork(new URL(path + url.search, location.origin)));
     return;
   }
 
-  event.respondWith(
-    self.clients.get(event.clientId).then((client) =>
-      client?.frameType === "nested" ? toVm(event.request) : fetch(event.request),
-    ),
-  );
+  // The rest is Livebook's, also outside the tab's path
+  event.respondWith(toVm(event.request));
 });
 
-async function shell() {
-  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-  return windows.find((client) => client.frameType === "top-level");
+function relayPage() {
+  const html = `<!doctype html><script src="/popcorn-frame.js"></script>`;
+  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", ...ISOLATION } });
+}
+
+// A response of its own, so that pages keep their URL under the tab's path.
+// Its body is decoded already.
+async function fromNetwork(url) {
+  const resp = await fetch(url);
+  const headers = new Headers(resp.headers);
+  headers.delete("content-encoding");
+  headers.delete("content-length");
+  return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
+}
+
+async function findRelay() {
+  const clients = await self.clients.matchAll({ type: "window" });
+  return clients.find((client) => new URL(client.url).pathname === RELAY);
+}
+
+// The script goes first, so that it replaces the page's WebSocket
+function addFrameScript(html) {
+  return html.replace(/<head[^>]*>/i, (head) => `${head}<script src="/popcorn-frame.js"></script>`);
 }
 
 async function toVm(request) {
-  const target = await shell();
-  if (!target) return new Response("Livebook's page isn't open", { status: 503 });
+  const relay = await findRelay();
+  if (!relay) return new Response("Livebook's tab isn't open", { status: 503 });
 
   const reqBody = ["GET", "HEAD"].includes(request.method) ? "" : new Uint8Array(await request.arrayBuffer());
   const channel = new MessageChannel();
   const reply = new Promise((resolve) => (channel.port1.onmessage = (event) => resolve(event.data)));
 
-  target.postMessage(
+  relay.postMessage(
     { popcornRequest: { method: request.method, url: request.url, headers: [...request.headers], body: reqBody } },
     [channel.port2],
   );
@@ -59,10 +85,7 @@ async function toVm(request) {
 
   const nullBody = [101, 204, 205, 304].includes(status) || request.method === "HEAD";
   const html = headers.some(([name, value]) => name === "content-type" && value.startsWith("text/html"));
-  const body =
-    request.mode === "navigate" && html && typeof respBody === "string"
-      ? respBody.replace(/<head[^>]*>/i, (head) => `${head}<script src="/popcorn-ws.js"></script>`)
-      : respBody;
+  const body = request.mode === "navigate" && html && typeof respBody === "string" ? addFrameScript(respBody) : respBody;
 
   return new Response(nullBody ? null : body, {
     status,
