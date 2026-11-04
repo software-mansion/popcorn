@@ -1,11 +1,32 @@
-// Opens Livebook in headless Chromium, creates a notebook and evaluates a cell.
+// Opens Livebook in headless Chromium, creates notebooks and evaluates cells.
+// Hosts public/ with serve.exs, unless given another server's URL.
 // Uses Playwright from popcorn/js. Usage: node scripts/check.mjs [url]
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(new URL("../../../popcorn/js/package.json", import.meta.url));
 const { chromium } = require("@playwright/test");
 
-const url = process.argv[2] ?? "http://localhost:4000/";
+const server = process.argv[2] ? null : await serve();
+const url = process.argv[2] ?? server.url;
+
+// On a free port, which serve.exs prints
+function serve() {
+  const child = spawn("elixir", ["serve.exs", "0"], {
+    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  return new Promise((resolve, reject) => {
+    let printed = "";
+    child.stdout.on("data", (data) => {
+      printed += data;
+      const port = printed.match(/http:\/\/localhost:(\d+)/)?.[1];
+      if (port) resolve({ child, url: `http://localhost:${port}/` });
+    });
+    child.on("exit", (code) => reject(new Error(`serve.exs exited with status ${code}`)));
+  });
+}
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
@@ -222,6 +243,29 @@ try {
     }
     return `${runtimeNode} stopped, now ${output}`;
   });
+
+  // Where livebook.dev's "Run in Livebook" badges send people, with the
+  // example's address as their Livebook's
+  await step("a link opens a notebook from GitHub", async () => {
+    const notebook =
+      "https://github.com/livebook-dev/livebook/blob/main/lib/livebook/notebook/learn/intro_to_livebook.livemd";
+    const linked = await context.newPage();
+    linked.on("console", (msg) => logs.push(`[linked tab] [${msg.type()}] ${msg.text()}`));
+    try {
+      await linked.goto(new URL(`/import?url=${encodeURIComponent(notebook)}`, url).href);
+      await linked.waitForFunction(() => window.livebookStarted, null, { timeout: 180_000 });
+      await linked.waitForFunction(
+        () => document.querySelector("#livebook")?.contentWindow.location.pathname.includes("/sessions/"),
+        null,
+        { timeout: 60_000 },
+      );
+      const app = linked.frameLocator("#livebook");
+      await app.getByText("Welcome to Livebook").first().waitFor({ timeout: 60_000 });
+      return `${await app.locator("[data-el-cell]").count()} cells`;
+    } finally {
+      await linked.close();
+    }
+  });
 } catch {
   console.log("--- browser console ---");
   for (const line of logs.slice(-120)) console.log(line.length > 800 ? line.slice(0, 800) + "…" : line);
@@ -229,4 +273,5 @@ try {
 }
 
 await browser.close();
+server?.child.kill();
 process.exit(ok ? 0 : 1);
