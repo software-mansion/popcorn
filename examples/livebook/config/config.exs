@@ -7,7 +7,8 @@ config :popcorn,
   distribution: true,
   exclude_priv: [{:livebook, "static"}]
 
-embedded = %{__struct__: Livebook.Runtime.Embedded, server_pid: nil}
+# Each notebook runs in a VM of its own, which the page boots
+runtime = %{__struct__: LivebookWasm.Runtime, node: nil, server_pid: nil}
 
 config :livebook, LivebookWeb.Endpoint,
   url: [host: "localhost", path: "/"],
@@ -44,8 +45,8 @@ config :livebook,
   # Outputs' iframes load from Livebook's origin, where the Service Worker sends
   # their requests to the VM. Livebook's usual separate origin isolates them.
   iframe_url: "/iframe/v6.html",
-  default_runtime: embedded,
-  default_app_runtime: embedded,
+  default_runtime: runtime,
+  default_app_runtime: runtime,
   runtime_modules: [Livebook.Runtime.Embedded, Livebook.Runtime.Attached]
 
 config :livebook, Livebook.Apps.Manager, retry_backoff_base_ms: 5_000
