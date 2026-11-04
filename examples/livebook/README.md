@@ -37,11 +37,14 @@ Livebook in headless Chromium, creates a notebook and evaluates cells.
   doesn't run in the browser.
 - `config/config.exs` has the settings Livebook's config files and
   `Livebook.config_runtime/0` would make, as Popcorn evaluates only this file.
+- Kino is a dependency, as notebooks can't `Mix.install/2` it. The iframes of its
+  JavaScript outputs load from Livebook's origin, so the Service Worker sends
+  their requests to the VM.
 
 ## What doesn't work
 
-- Outputs rendered in iframes, like Kino's JavaScript outputs, which Livebook
-  serves from a second port.
+- Isolating outputs' JavaScript: Livebook serves their iframes from a separate
+  origin, which the Service Worker couldn't send to the VM.
 - `Mix.install/2` and other runtimes than the embedded one.
 - Persistence: Livebook's files are in the VM's memory, so a reload loses them.
 - Evaluating right after typing can evaluate the cell's previous source; the

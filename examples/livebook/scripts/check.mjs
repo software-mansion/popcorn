@@ -51,14 +51,19 @@ try {
   // The new notebook's first code cell is the setup cell
   const cell = app.locator("[data-el-cell][data-type='code']").last();
 
-  const evaluate = async (code, expected) => {
+  const output = cell.locator("[data-el-outputs-container]");
+
+  const run = async (code) => {
     await cell.locator(".cm-content").click();
     await page.keyboard.press("ControlOrMeta+A");
     await page.keyboard.type(code);
     // Like a person: Livebook evaluates the source it has synced from the editor
     await page.waitForTimeout(500);
     await page.keyboard.press("ControlOrMeta+Enter");
-    const output = cell.locator("[data-el-outputs-container]");
+  };
+
+  const evaluate = async (code, expected) => {
+    await run(code);
     await output.getByText(expected).filter({ visible: true }).first().waitFor({ timeout: 120_000 });
     return (await output.innerText()).trim();
   };
@@ -68,6 +73,13 @@ try {
   await step("the code runs in the browser's VM", () =>
     evaluate(":erlang.system_info(:system_architecture)", "wasm32"),
   );
+
+  await step("Kino.JS outputs render in their iframes", async () => {
+    await run(`Kino.HTML.new("<p>Rendered by Kino.JS</p>")`);
+    // Livebook keeps outputs' iframes outside the cells, over their placeholders
+    const frame = app.locator("iframe[src*='/iframe/v6.html']").first().contentFrame();
+    await frame.getByText("Rendered by Kino.JS").waitFor({ timeout: 120_000 });
+  });
 } catch {
   console.log("--- browser console ---");
   for (const line of logs.slice(-120)) console.log(line.length > 800 ? line.slice(0, 800) + "…" : line);

@@ -19,11 +19,13 @@ defmodule LivebookWasm.MixProject do
     ]
   end
 
-  # Livebook is started by LivebookWasm.Application, once its stand-ins run
+  # Livebook is started by LivebookWasm.Application, once its stand-ins run.
+  # Notebooks can't Mix.install, so Kino is in the VM for them.
   defp deps do
     [
       {:popcorn, path: "../../popcorn/elixir"},
       {:livebook, "~> 0.19.10", runtime: false},
+      {:kino, "~> 0.18.0"},
       # For Popcorn.Plug's WebSockets. Livebook's Phoenix 1.8.7 requires ~> 0.5.3.
       {:websock_adapter, "~> 0.7.1", override: true}
     ]
@@ -37,6 +39,11 @@ defmodule LivebookWasm.MixProject do
   defp copy_livebook_static(_args) do
     for dir <- ~w(assets images favicons iframe) do
       File.cp_r!(Path.join("deps/livebook/priv/static", dir), Path.join("public", dir))
+    end
+
+    # Livebook serves the outputs' iframe pages only gzipped
+    for path <- Path.wildcard("public/iframe/*.html.gz") do
+      File.write!(Path.rootname(path), path |> File.read!() |> :zlib.gunzip())
     end
   end
 end
