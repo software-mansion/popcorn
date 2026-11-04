@@ -14,8 +14,7 @@ defmodule LivebookWasm.MixProject do
 
   def application do
     [
-      # Mix for Mix.install/2, and Leex and Yecc for the Erlang packages it compiles
-      extra_applications: [:logger, :mix, :parsetools, :ex_unit],
+      extra_applications: [:logger],
       mod: {LivebookWasm.Application, []}
     ]
   end
@@ -31,18 +30,18 @@ defmodule LivebookWasm.MixProject do
   end
 
   defp aliases do
-    ["popcorn.dev": [&copy_livebook_static/1, &copy_hex/1, "popcorn.dev"]]
+    ["popcorn.dev": [&copy_livebook_static/1, &cook_notebook_vm/1, "popcorn.dev"]]
   end
 
-  # Hex is a Mix archive rather than a dependency. Popcorn packages the build's
-  # applications, so it's copied among them for Mix.install/2 in the VM.
-  defp copy_hex(_args) do
-    ebin =
-      Mix.path_for(:archives) |> Path.join("hex-*/hex-*/ebin") |> Path.wildcard() |> Enum.max()
+  # The notebooks' VMs boot a package of their own, which this task doesn't
+  # watch: rerun it after changing notebook_vm/
+  defp cook_notebook_vm(_args) do
+    command = "mix do deps.get + popcorn.cook --out-dir ../public/notebook_vm"
 
-    app_dir = Path.join(Mix.Project.build_path(), "lib/hex")
-    File.mkdir_p!(app_dir)
-    File.cp_r!(ebin, Path.join(app_dir, "ebin"))
+    case Mix.shell().cmd(command, cd: "notebook_vm") do
+      0 -> :ok
+      status -> Mix.raise("Cooking notebook_vm/ failed with status #{status}")
+    end
   end
 
   # The browser loads Livebook's static files from the network, not the VM
