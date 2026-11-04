@@ -28,9 +28,9 @@
   <body>
     <div id="status">Starting the VM…</div>
     <script type="module">
-      // The shell owns the VM and outlives the iframe's navigations. Its Service
+      // The shell owns the VMs and outlives the iframe's navigations. Its Service
       // Worker sends the iframe's requests here, and its WebSockets are created here.
-      import { Popcorn } from "./out/index.mjs";
+      import { Popcorn, createDistributionRelay } from "./out/index.mjs";
 
       const status = (text) => {
         document.querySelector("#status").textContent = text;
@@ -41,10 +41,36 @@
       const started = new Promise((resolve) => (onStarted = resolve));
       const sockets = new Map();
 
+      // Livebook's VM and the notebooks' runtime VMs are Erlang nodes, which
+      // the relay connects
+      const relay = createDistributionRelay();
+      const runtimes = new Map();
+
+      async function handleRuntime({ livebook_runtime: action, node, cookie }) {
+        if (action === "start") {
+          const t0 = performance.now();
+          const role = ["-livebook_wasm_role", "runtime"];
+          const runtime = Popcorn.init({
+            distribution: relay,
+            beam: { extraArgs: ["-name", node, "-setcookie", cookie, ...role] },
+          });
+          runtimes.set(node, runtime);
+          await runtime;
+          console.log(`[shell] Runtime VM ${node} booted in ${Math.round(performance.now() - t0)} ms`);
+        } else if (action === "stop") {
+          const runtime = runtimes.get(node);
+          runtimes.delete(node);
+          (await runtime)?.deinit();
+          console.log(`[shell] Runtime VM ${node} stopped`);
+        }
+      }
+
       const t0 = performance.now();
       const popcorn = await Popcorn.init({
+        distribution: relay,
         onEvent: (event) => {
           if (event?.livebook) return onStarted(event);
+          if (event?.livebook_runtime) return handleRuntime(event);
           const socket = event && sockets.get(event.popcorn_socket);
           if (!socket) return;
           if ("close" in event) socket.closed(event.close);
