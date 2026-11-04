@@ -14,7 +14,8 @@ defmodule LivebookWasm.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      # Mix for Mix.install/2, and Leex and Yecc for the Erlang packages it compiles
+      extra_applications: [:logger, :mix, :parsetools, :ex_unit],
       mod: {LivebookWasm.Application, []}
     ]
   end
@@ -32,7 +33,18 @@ defmodule LivebookWasm.MixProject do
   end
 
   defp aliases do
-    ["popcorn.dev": [&copy_livebook_static/1, "popcorn.dev"]]
+    ["popcorn.dev": [&copy_livebook_static/1, &copy_hex/1, "popcorn.dev"]]
+  end
+
+  # Hex is a Mix archive rather than a dependency. Popcorn packages the build's
+  # applications, so it's copied among them for Mix.install/2 in the VM.
+  defp copy_hex(_args) do
+    ebin =
+      Mix.path_for(:archives) |> Path.join("hex-*/hex-*/ebin") |> Path.wildcard() |> Enum.max()
+
+    app_dir = Path.join(Mix.Project.build_path(), "lib/hex")
+    File.mkdir_p!(app_dir)
+    File.cp_r!(ebin, Path.join(app_dir, "ebin"))
   end
 
   # The browser loads Livebook's static files from the network, not the VM

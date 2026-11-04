@@ -14,7 +14,7 @@ defmodule TestEntrypoint.MixProject do
   def application do
     [
       mod: {:test_entrypoint_app, []},
-      extra_applications: [:elixir]
+      extra_applications: [:elixir, :inets]
     ]
   end
 
