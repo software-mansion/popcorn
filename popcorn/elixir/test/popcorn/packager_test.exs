@@ -364,6 +364,32 @@ defmodule Popcorn.PackagerTest do
       assert {:ok, %{apps: %{sasl: _app}}} = Packager.build(options)
     end
 
+    test "httpc, which makes requests with fetch", %{
+      options: options,
+      build_path: build_path,
+      out_dir: out_dir
+    } do
+      # Applications that aren't packaged aren't patched
+      assert {:ok, report} = Packager.build(options)
+      refute Map.has_key?(report.apps, :inets)
+
+      app_file = Path.join(build_path, "user_app/ebin/user_app.app")
+      {:ok, [{:application, :user_app, props}]} = :file.consult(app_file)
+      write_app(app_file, :user_app, Keyword.update!(props, :applications, &[:inets | &1]))
+      assert {:ok, %{apps: %{inets: %{bundle: bundle}}}} = Packager.build(options)
+
+      httpc = Map.fetch!(read_archive(bundle_path(out_dir, bundle)), "lib/inets/ebin/httpc.beam")
+
+      {:ok, {:httpc, [atoms: atoms, exports: exports]}} =
+        :beam_lib.chunks(httpc, [:atoms, :exports])
+
+      assert Enum.any?(atoms, &match?({_index, Popcorn.Fetch}, &1))
+
+      # The rest of httpc is OTP's, which inets uses
+      {:ok, {:httpc, [exports: original]}} = :beam_lib.chunks(:code.which(:httpc), [:exports])
+      assert Enum.sort(exports) == Enum.sort(original)
+    end
+
     test "config", %{options: options, out_dir: out_dir} do
       config = [
         user_app: [answer: 42],

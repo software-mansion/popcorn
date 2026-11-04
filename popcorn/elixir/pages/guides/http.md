@@ -49,6 +49,14 @@ IO.inspect(response.body)
 An HTTP error status still returns `{:ok, response}`. Network failures and
 timeouts return `{:error, reason}`.
 
+## Erlang's `:httpc`
+
+When an application uses `:inets`, Popcorn patches `:httpc` to make its
+requests with `Popcorn.Fetch`, so libraries that use it, such as Hex, work in
+the browser. Requests can be synchronous or asynchronous, including streamed to
+the receiver, and `:httpc`'s profiles and options work as in OTP. Proxy, socket
+and redirect options don't apply, and the response body is buffered whole.
+
 ## Browser limits
 
 Cross-origin requests need permission from the target server's CORS policy.

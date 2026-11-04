@@ -14,6 +14,7 @@ defmodule LivebookWasm.Application do
 
   defp start_livebook do
     started = System.monotonic_time(:millisecond)
+    LivebookWasm.MixInstall.setup()
     {:ok, _apps} = Application.ensure_all_started(:livebook)
     plug = {Popcorn.Plug, plug: LivebookWeb.Endpoint}
     {:ok, _pid} = Supervisor.start_child(LivebookWasm.Supervisor, plug)
