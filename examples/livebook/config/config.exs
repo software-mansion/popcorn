@@ -41,6 +41,9 @@ config :livebook,
   log_format: :text,
   cookie: :popcorn_livebook,
   iframe_port: 8081,
+  # Outputs' iframes load from Livebook's origin, where the Service Worker sends
+  # their requests to the VM. Livebook's usual separate origin isolates them.
+  iframe_url: "/iframe/v6.html",
   default_runtime: embedded,
   default_app_runtime: embedded,
   runtime_modules: [Livebook.Runtime.Embedded, Livebook.Runtime.Attached]
