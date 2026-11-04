@@ -13,7 +13,10 @@
 %% abstract code, stripped from docs, specs, types and columns. Options
 %% and Chunks allow recompiling the Forms to the same bytecode as original.
 %%
-%% Usage: export-otp-apps.escript OTP_ROOT OUT_DIR
+%% With --keep-docs, the modules keep their docs, in their Docs chunk, and
+%% their specs and types, for packages cooked with `strip: false`.
+%%
+%% Usage: export-otp-apps.escript [--keep-docs] OTP_ROOT OUT_DIR
 
 -mode(compile).
 
@@ -22,7 +25,15 @@
 %% A runtime build without crypto has no crypto or asn1
 -define(REQUIRED_APPS, [kernel, stdlib, compiler]).
 
-main([OtpRoot, OutDir]) ->
+main(["--keep-docs", OtpRoot, OutDir]) ->
+    export(OtpRoot, OutDir, true);
+main([[First | _] = OtpRoot, OutDir]) when First =/= $- ->
+    export(OtpRoot, OutDir, false);
+main(_) ->
+    io:format(standard_error, "Usage: export-otp-apps.escript [--keep-docs] OTP_ROOT OUT_DIR~n", []),
+    halt(1).
+
+export(OtpRoot, OutDir, KeepDocs) ->
     Version = otp_version(OtpRoot),
     Dirs = [{App, Dir} || App <- ?APPS, Dir <- [app_dir(OtpRoot, App)], Dir =/= none],
     Missing = [App || App <- ?APPS, not lists:keymember(App, 1, Dirs)],
@@ -31,8 +42,8 @@ main([OtpRoot, OutDir]) ->
     _ = file:del_dir_r(OutDir),
     ok = filelib:ensure_path(OutDir),
     Apps = [app_spec(App, Dir) || {App, Dir} <- Dirs],
-    Modules = [export_module(App, Dir, Module) || {App, Dir} <- Dirs,
-                                                  Module <- app_modules(App, Apps)],
+    Modules = [export_module(App, Dir, Module, KeepDocs) || {App, Dir} <- Dirs,
+                                                            Module <- app_modules(App, Apps)],
     Export = #{otp_version => Version, apps => Apps, modules => Modules},
     % Deterministic, so that exporting the same tree again changes nothing. One
     % stream compresses what the modules share, like the headers' records.
@@ -41,10 +52,7 @@ main([OtpRoot, OutDir]) ->
                                  enableLongDistanceMatching => true}),
     ok = file:write_file(filename:join(OutDir, "otp-apps.zst"), Compressed),
     io:format("Exported ~b modules of ~s from OTP ~s to ~s~n",
-              [length(Modules), lists:join(", ", [atom_to_list(A) || {A, _} <- Dirs]), Version, OutDir]);
-main(_) ->
-    io:format(standard_error, "Usage: export-otp-apps.escript OTP_ROOT OUT_DIR~n", []),
-    halt(1).
+              [length(Modules), lists:join(", ", [atom_to_list(A) || {A, _} <- Dirs]), Version, OutDir]).
 
 %% A build tree has OTP_VERSION at its root, an installation in releases/
 otp_version(Root) ->
@@ -76,19 +84,31 @@ app_modules(App, Apps) ->
     {application, App, Props} = lists:keyfind(App, 2, Apps),
     proplists:get_value(modules, Props).
 
-export_module(App, Dir, Module) ->
+export_module(App, Dir, Module, KeepDocs) ->
     Beam = filename:join([Dir, "ebin", atom_to_list(Module) ++ ".beam"]),
     case beam_lib:chunks(Beam, [debug_info]) of
         {ok, {Module, [{debug_info, {debug_info_v1, erl_abstract_code, {Forms, Options}}}]}} ->
-            Chunks = [{<<"Meta">>, Meta} || Meta <- [chunk(Beam, "Meta")], Meta =/= none],
+            Names = case KeepDocs of
+                        true -> ["Meta", "Docs"];
+                        false -> ["Meta"]
+                    end,
+            Chunks = [{list_to_binary(Name), Chunk} || Name <- Names,
+                                                       Chunk <- [chunk(Beam, Name)],
+                                                       Chunk =/= none],
             #{app => App,
               module => Module,
-              forms => [code_only(without_columns(F)) || F <- Forms, not metadata(F)],
+              forms => [without_columns(F) || F <- forms(Forms, KeepDocs)],
               options => [O || O <- Options, changes_code(O)],
               chunks => Chunks};
         _ ->
             fail("no abstract code in ~s", [Beam])
     end.
+
+forms(Forms, true) -> [F || F <- Forms, not doc(F)];
+forms(Forms, false) -> [code_only(F) || F <- Forms, not metadata(F)].
+
+doc({attribute, _, Name, _}) -> Name =:= doc orelse Name =:= moduledoc;
+doc(_) -> false.
 
 chunk(Beam, Name) ->
     case beam_lib:chunks(Beam, [Name]) of
