@@ -9,7 +9,10 @@ const url = process.argv[2] ?? "http://localhost:4000/";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const logs = [];
-page.on("console", (msg) => logs.push(`[${msg.type()}] ${msg.text()}`));
+page.on("console", (msg) => {
+  logs.push(`[${msg.type()}] ${msg.text()}`);
+  if (process.env.VERBOSE) console.log(`  [console] ${msg.text().slice(0, 500)}`);
+});
 page.on("pageerror", (err) => logs.push(`[pageerror] ${err.message}`));
 
 let ok = true;
@@ -20,7 +23,10 @@ const step = async (name, fn) => {
     console.log(`PASS ${name} (${Date.now() - t0} ms)${detail ? `: ${detail}` : ""}`);
   } catch (error) {
     ok = false;
-    console.log(`FAIL ${name}: ${String(error.message).split("\n")[0]}`);
+    const message = String(error.message);
+    // A cell's error is worth reading whole, Playwright's call logs aren't
+    const shown = message.startsWith("the cell raised") ? message : message.split("\n")[0];
+    console.log(`FAIL ${name}: ${shown.slice(0, 4000)}`);
     throw error;
   }
 };
@@ -62,9 +68,40 @@ try {
     await page.keyboard.press("ControlOrMeta+Enter");
   };
 
-  const evaluate = async (code, expected) => {
+  const evaluate = async (code, expected, timeout = 120_000) => {
     await run(code);
-    await output.getByText(expected).filter({ visible: true }).first().waitFor({ timeout: 120_000 });
+    const t0 = Date.now();
+    const printed = new Set();
+
+    // Prints the cell's output while it runs, like Mix.install's
+    const progress = setInterval(async () => {
+      const text = await output.innerText().catch(() => "");
+      for (const line of text.split("\n").filter((line) => line.trim())) {
+        if (printed.has(line)) continue;
+        printed.add(line);
+        console.log(`  [${Math.round((Date.now() - t0) / 1000)} s] ${line}`);
+      }
+    }, 5_000);
+
+    const evaluated = output.getByText(expected).filter({ visible: true }).first().waitFor({ timeout });
+
+    // Fails as soon as the cell raises, rather than waiting for the timeout
+    const raised = output
+      .getByText("** (")
+      .first()
+      .waitFor({ timeout })
+      .then(
+        async () => {
+          throw new Error(`the cell raised:\n${await output.innerText()}`);
+        },
+        () => new Promise(() => {}),
+      );
+
+    try {
+      await Promise.race([evaluated, raised]);
+    } finally {
+      clearInterval(progress);
+    }
     return (await output.innerText()).trim();
   };
 
@@ -80,6 +117,22 @@ try {
     const frame = app.locator("iframe[src*='/iframe/v6.html']").first().contentFrame();
     await frame.getByText("Rendered by Kino.JS").waitFor({ timeout: 120_000 });
   });
+
+  // A Mix package and a rebar3-only one, which Livebook doesn't depend on itself
+  await step("Mix.install downloads and compiles packages", () =>
+    evaluate(
+      `Mix.install([{:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}], consolidate_protocols: false)`,
+      ":ok",
+      600_000,
+    ),
+  );
+
+  await step("installed packages run", () =>
+    evaluate(
+      `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
+      `{[["1", "2"]], [1, 2]}`,
+    ),
+  );
 } catch {
   console.log("--- browser console ---");
   for (const line of logs.slice(-120)) console.log(line.length > 800 ? line.slice(0, 800) + "…" : line);
