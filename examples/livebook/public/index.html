@@ -63,9 +63,13 @@
       // Responses built in JavaScript can't set cookies, so the shell keeps them
       const jar = new Map();
 
+      // The shell sets these. The browser doesn't decode responses built in
+      // JavaScript, so the VM mustn't compress them.
+      const replaced = ["host", "cookie", "accept-encoding"];
+
       async function request(method, url, headers = [], body = "") {
         const target = new URL(url, location.href);
-        const all = headers.filter(([name]) => !["host", "cookie"].includes(name.toLowerCase()));
+        const all = headers.filter(([name]) => !replaced.includes(name.toLowerCase()));
         all.push(["host", target.host]);
         if (jar.size) all.push(["cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; ")]);
 
