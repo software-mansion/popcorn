@@ -105,10 +105,27 @@ try {
     return (await output.innerText()).trim();
   };
 
-  await step("a cell evaluates in the embedded runtime", () => evaluate("Enum.sum(1..10)", "55"));
+  // The first evaluation starts the notebook's runtime, in a VM of its own
+  await step("a cell evaluates in the notebook's VM", () => evaluate("Enum.sum(1..10)", "55"));
 
-  await step("the code runs in the browser's VM", () =>
-    evaluate(":erlang.system_info(:system_architecture)", "wasm32"),
+  let runtimeNode;
+  await step("the code runs in a browser VM other than Livebook's", async () => {
+    const output = await evaluate(
+      "{node(), :erlang.system_info(:system_architecture)}",
+      "wasm32-unknown-emscripten",
+    );
+    runtimeNode = output.match(/runtime_\d+@popcorn/)?.[0];
+    if (!runtimeNode) throw new Error(`not the runtime's node: ${output}`);
+    return output;
+  });
+
+  // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on
+  await step("Mix.install downloads and compiles packages", () =>
+    evaluate(
+      `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}])`,
+      ":ok",
+      600_000,
+    ),
   );
 
   await step("Kino.JS outputs render in their iframes", async () => {
@@ -118,21 +135,45 @@ try {
     await frame.getByText("Rendered by Kino.JS").waitFor({ timeout: 120_000 });
   });
 
-  // A Mix package and a rebar3-only one, which Livebook doesn't depend on itself
-  await step("Mix.install downloads and compiles packages", () =>
-    evaluate(
-      `Mix.install([{:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}], consolidate_protocols: false)`,
-      ":ok",
-      600_000,
-    ),
-  );
-
   await step("installed packages run", () =>
     evaluate(
       `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
       `{[["1", "2"]], [1, 2]}`,
     ),
   );
+
+  // Mix.install/2 installs once per VM
+  await step("another notebook installs other packages in a VM of its own", async () => {
+    const session = page.frames().find((frame) => frame.url().includes("/sessions/"));
+    await session.goto(new URL("/new", url).href);
+    await cell.locator(".cm-content").waitFor({ timeout: 60_000 });
+
+    const output = await evaluate(
+      `Mix.install([{:jason, "~> 1.4"}])\n{node(), Jason.encode!(%{installed: true})}`,
+      "@popcorn",
+      600_000,
+    );
+    if (output.includes(runtimeNode)) throw new Error(`the first notebook's VM: ${output}`);
+    if (!output.includes(`{\\"installed\\":true}`)) throw new Error(`no Jason: ${output}`);
+    runtimeNode = output.match(/runtime_\d+@popcorn/)[0];
+    return output.split("\n").at(-1);
+  });
+
+  await step("reconnecting replaces the notebook's VM", async () => {
+    await app.locator("[data-el-runtime-info-toggle]").click();
+    await app.locator("[data-el-runtime-info]").getByRole("button", { name: "Reconnect" }).click();
+
+    // A result that the cell's previous output doesn't have
+    const output = await evaluate("{:reconnected, node()}", ":reconnected");
+    if (output.includes(runtimeNode)) throw new Error(`the same VM: ${output}`);
+
+    const stopped = `Runtime VM ${runtimeNode} stopped`;
+    for (let i = 0; !logs.some((line) => line.includes(stopped)); i++) {
+      if (i > 100) throw new Error(`${runtimeNode} kept running`);
+      await page.waitForTimeout(100);
+    }
+    return `${runtimeNode} stopped, now ${output}`;
+  });
 } catch {
   console.log("--- browser console ---");
   for (const line of logs.slice(-120)) console.log(line.length > 800 ? line.slice(0, 800) + "…" : line);

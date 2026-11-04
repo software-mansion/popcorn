@@ -20,13 +20,11 @@ defmodule LivebookWasm.MixProject do
     ]
   end
 
-  # Livebook is started by LivebookWasm.Application, once its stand-ins run.
-  # Notebooks can't Mix.install, so Kino is in the VM for them.
+  # Livebook is started by LivebookWasm.Application, once its stand-ins run
   defp deps do
     [
       {:popcorn, path: "../../popcorn/elixir"},
       {:livebook, "~> 0.19.10", runtime: false},
-      {:kino, "~> 0.18.0"},
       # For Popcorn.Plug's WebSockets. Livebook's Phoenix 1.8.7 requires ~> 0.5.3.
       {:websock_adapter, "~> 0.7.1", override: true}
     ]
