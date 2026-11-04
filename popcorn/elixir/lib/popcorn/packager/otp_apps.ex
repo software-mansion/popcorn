@@ -95,7 +95,10 @@ defmodule Popcorn.Packager.OtpApps do
         {:ok, {:error, module}} -> [module]
       end)
 
-    if failed == [], do: :ok, else: {:error, Enum.sort(failed)}
+    case failed do
+      [] -> :ok
+      failed -> {:error, Enum.sort(failed)}
+    end
   end
 
   defp compile_module(out_dir, module) do
