@@ -1,7 +1,7 @@
-defmodule LivebookWasm.MixShell do
+defmodule NotebookVM.MixShell do
   @moduledoc """
   Mix's shell in the VM. It compiles rebar3 dependencies with
-  `LivebookWasm.Rebar` when Mix runs rebar3, as the browser can't run OS
+  `NotebookVM.Rebar` when Mix runs rebar3, as the browser can't run OS
   commands.
   """
   @behaviour Mix.Shell
@@ -30,7 +30,7 @@ defmodule LivebookWasm.MixShell do
   @impl true
   def cmd({exec, ["bare", "compile", "--paths", paths]} = command, opts) do
     if exec == System.get_env("MIX_REBAR3") do
-      LivebookWasm.Rebar.compile(Keyword.fetch!(opts, :cd), Map.new(opts[:env] || []), paths)
+      NotebookVM.Rebar.compile(Keyword.fetch!(opts, :cd), Map.new(opts[:env] || []), paths)
     else
       unsupported(command)
     end

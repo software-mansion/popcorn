@@ -1,9 +1,12 @@
 /_build/
 /deps/
+/notebook_vm/_build/
+/notebook_vm/deps/
 erl_crash.dump
 
 # Popcorn's output and the static files copied from Livebook.
 /public/out/
+/public/notebook_vm/
 /public/assets/
 /public/images/
 /public/favicons/

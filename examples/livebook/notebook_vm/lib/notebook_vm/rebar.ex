@@ -1,4 +1,4 @@
-defmodule LivebookWasm.Rebar do
+defmodule NotebookVM.Rebar do
   @moduledoc """
   Compiles a rebar3 dependency in the VM, as `rebar3 bare compile` would.
 
