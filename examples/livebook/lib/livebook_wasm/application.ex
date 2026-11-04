@@ -2,16 +2,10 @@ defmodule LivebookWasm.Application do
   @moduledoc false
   use Application
 
-  # The page boots Livebook's VM, and a VM for each notebook's runtime, with
-  # `-livebook_wasm_role runtime`. See LivebookWasm.Runtime.
+  # The notebooks' VMs boot a package of their own, see notebook_vm/
   @impl true
   def start(_type, _args) do
-    children =
-      case :init.get_argument(:livebook_wasm_role) do
-        {:ok, [[~c"runtime"]]} -> [{Task, &LivebookWasm.MixInstall.setup/0}]
-        _livebook -> [LivebookWasm.Memsup, {Task, &start_livebook/0}]
-      end
-
+    children = [LivebookWasm.Memsup, {Task, &start_livebook/0}]
     Supervisor.start_link(children, strategy: :one_for_one, name: LivebookWasm.Supervisor)
   end
 

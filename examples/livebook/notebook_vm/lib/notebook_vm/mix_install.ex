@@ -1,4 +1,4 @@
-defmodule LivebookWasm.MixInstall do
+defmodule NotebookVM.MixInstall do
   @moduledoc """
   Sets the VM up for `Mix.install/2`.
 
@@ -12,7 +12,7 @@ defmodule LivebookWasm.MixInstall do
 
   def setup do
     {:ok, _apps} = Application.ensure_all_started(:mix)
-    Mix.shell(LivebookWasm.MixShell)
+    Mix.shell(NotebookVM.MixShell)
 
     # Mix runs rebar3 only when it exists, and the shell compiles instead
     rebar3 = Path.join(System.tmp_dir!(), "rebar3")

@@ -3,7 +3,7 @@
 // The shell page (index.html) owns the VM, so it outlives the iframe's
 // navigations. Static files and the shell's own requests go to the network.
 
-const STATIC = ["/assets/", "/images/", "/favicons/", "/iframe/", "/out/", "/popcorn-ws.js", "/sw.js", "/robots.txt"];
+const STATIC = ["/assets/", "/images/", "/favicons/", "/iframe/", "/out/", "/notebook_vm/", "/popcorn-ws.js", "/sw.js", "/robots.txt"];
 
 // Responses built here must keep the iframe cross-origin isolated, like the shell
 const ISOLATION = {
