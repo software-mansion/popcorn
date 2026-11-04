@@ -19,8 +19,15 @@ mix popcorn.dev
 `mix popcorn.dev` also fetches the dependencies of `notebook_vm/`, the package
 of the notebooks' VMs, and cooks it, but only recooks Livebook's on changes.
 
-Open [localhost:4000](http://localhost:4000). `node scripts/check.mjs` opens
-Livebook in headless Chromium, creates notebooks and evaluates cells in them.
+Open [localhost:4000](http://localhost:4000).
+
+`elixir serve.exs` hosts what `mix popcorn.dev` cooked, as a static host would,
+at [localhost:4001](http://localhost:4001). Unlike `mix popcorn.dev`, it serves
+the page for Livebook's links too, like `/import?url=…`.
+
+`node scripts/check.mjs` hosts it the same way, then opens Livebook in headless
+Chromium, creates notebooks and evaluates cells in them. Pass it a URL to check
+another server.
 
 ## How it works
 
@@ -77,6 +84,17 @@ Livebook in headless Chromium, creates notebooks and evaluates cells in them.
   and Yecc files, and `.app.src` files.
 - Hex is a Mix archive, so `notebook_vm/`'s `mix popcorn.cook` copies it among
   the build's applications for Popcorn to package it.
+
+### Opening notebooks from links
+
+- Livebook opens a notebook from a link to `/import?url=<notebook>`. That's
+  where livebook.dev's "Run in Livebook" badges send people, with the Livebook
+  address they set on livebook.dev, which can be this example's.
+- The shell opens a link like that in its iframe, under the tab's path. Its
+  host has to serve the shell's page for the link's path, as `serve.exs` does.
+- Livebook downloads the notebook with Req, which Popcorn makes request with
+  `fetch()`. So the notebook's server has to let other origins fetch, as
+  GitHub's does.
 
 ## What doesn't work
 
