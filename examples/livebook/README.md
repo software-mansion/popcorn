@@ -16,6 +16,9 @@ mix deps.get
 mix popcorn.dev
 ```
 
+`mix popcorn.dev` also fetches the dependencies of `notebook_vm/`, the package
+of the notebooks' VMs, and cooks it, but only recooks Livebook's on changes.
+
 Open [localhost:4000](http://localhost:4000). `node scripts/check.mjs` opens
 Livebook in headless Chromium, creates notebooks and evaluates cells in them.
 
@@ -44,10 +47,13 @@ Livebook in headless Chromium, creates notebooks and evaluates cells in them.
 ### Notebooks' VMs
 
 - `LivebookWasm.Runtime` is the notebooks' runtime. When Livebook connects it,
-  the shell boots a VM with the same package, as a node with its own name. Its
-  `LivebookWasm.Application` only sets `Mix.install/2` up, and Livebook loads
-  its runtime's code into it, as into the standalone runtime's OS process.
-  Disconnecting the runtime shuts the VM down.
+  the shell boots a VM as a node with its own name. Disconnecting the runtime
+  shuts the VM down.
+- The VMs boot the package of `notebook_vm/`, a project of its own, which
+  `mix popcorn.dev` cooks into `public/notebook_vm/`. It has Mix and Hex but
+  none of Livebook's code or dependencies: Livebook loads its runtime's code
+  into the VM, as into the standalone runtime's OS process, and notebooks can
+  install any packages.
 - The shell relays the nodes' distribution with Popcorn's
   `createDistributionRelay()`.
 - The VMs' host differs from Livebook's, so that Livebook sends files rather
@@ -58,11 +64,11 @@ Livebook in headless Chromium, creates notebooks and evaluates cells in them.
 - Hex downloads packages with `:httpc`, which Popcorn makes request with the
   browser's `fetch()`, from jsDelivr's mirror of hex.pm: unlike hex.pm, it lets
   other origins fetch. Hex checks the packages, so a mirror can't alter them.
-- Mix compiles rebar3 packages by running rebar3, so `LivebookWasm.MixShell`
-  compiles them instead, with `LivebookWasm.Rebar`: their Erlang sources, Leex
+- Mix compiles rebar3 packages by running rebar3, so `NotebookVM.MixShell`
+  compiles them instead, with `NotebookVM.Rebar`: their Erlang sources, Leex
   and Yecc files, and `.app.src` files.
-- Hex is a Mix archive, so `mix popcorn.dev` copies it among the build's
-  applications for Popcorn to package it.
+- Hex is a Mix archive, so `notebook_vm/`'s `mix popcorn.cook` copies it among
+  the build's applications for Popcorn to package it.
 
 ## What doesn't work
 

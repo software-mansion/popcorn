@@ -49,10 +49,13 @@
       async function handleRuntime({ livebook_runtime: action, node, cookie }) {
         if (action === "start") {
           const t0 = performance.now();
-          const role = ["-livebook_wasm_role", "runtime"];
           const runtime = Popcorn.init({
             distribution: relay,
-            beam: { extraArgs: ["-name", node, "-setcookie", cookie, ...role] },
+            beam: {
+              // The notebooks' VMs boot a package of their own, see notebook_vm/
+              otpAssetsRoot: "/notebook_vm/otp/",
+              extraArgs: ["-name", node, "-setcookie", cookie],
+            },
           });
           runtimes.set(node, runtime);
           await runtime;

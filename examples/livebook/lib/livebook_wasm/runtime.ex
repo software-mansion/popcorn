@@ -3,9 +3,9 @@ defmodule LivebookWasm.Runtime do
   A Livebook runtime in a VM of its own, which the page boots for each
   notebook, as Livebook's standalone runtime starts an Elixir OS process.
 
-  The VMs are Erlang nodes that the page connects. A runtime VM boots the same
-  package as Livebook's, but only sets up `Mix.install/2`, and Livebook loads
-  its runtime's code into it.
+  The VMs are Erlang nodes that the page connects. A runtime VM boots the
+  package of notebook_vm/, with Mix and Hex but none of Livebook's code, which
+  Livebook loads into it.
   """
 
   defstruct [:node, :server_pid]

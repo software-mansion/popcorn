@@ -116,7 +116,8 @@ try {
     );
     runtimeNode = output.match(/runtime_\d+@popcorn/)?.[0];
     if (!runtimeNode) throw new Error(`not the runtime's node: ${output}`);
-    return output;
+    const booted = logs.find((line) => line.includes(`Runtime VM ${runtimeNode} booted`));
+    return `${output}, ${booted?.match(/booted in \d+ ms/)?.[0]}`;
   });
 
   // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on
