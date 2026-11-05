@@ -19,7 +19,7 @@ It also provides browser-specific alternatives for common tasks. For example, `P
 
 The VM supports the same functionality as a native one. You can use processes, supervision trees, OTP components (e.g. `GenServer`), timers, monitors, and ETS.
 
-Browsers do have their limits, though. We disabled distribution, TCP/UDP sockets, and other features that browsers can't support easily. See ["Compatibility and browser limits"](compatibility.md) to read more.
+Browsers do have their limits, though. We disabled TCP/UDP sockets and other features that browsers can't support easily. See ["Compatibility and browser limits"](compatibility.md) to read more.
 
 ## Where to start
 
