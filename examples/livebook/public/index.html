@@ -239,7 +239,11 @@
 
       // Livebook's links, like /import?url=…, open in the tab's Livebook
       const path = location.pathname === "/index.html" ? "/" : location.pathname;
-      addFrame(`${base}${path}${location.search}`, { id: "livebook" });
+      await addFrame(`${base}${path}${location.search}`, { id: "livebook" });
+
+      // Livebook has opened the link by the time its page loads, so reloading
+      // mustn't open it again
+      history.replaceState(null, "", "/");
 
       function addFrame(src, props) {
         const frame = Object.assign(document.createElement("iframe"), props, { src });
