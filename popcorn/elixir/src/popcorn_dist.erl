@@ -233,13 +233,14 @@ controller_init(Connection) ->
     TickHandler = spawn_opt(?MODULE, tick_handler, [Connection],
                             [link, {priority, max} | ?SPAWN_OPTS]),
     handshake_loop(#{connection => Connection, tick_handler => TickHandler,
-                     supervisor => undefined, received => queue:new(), waiting => undefined}).
+                     supervisor => undefined, buffer => <<>>, waiting => undefined}).
 
-%% dist_util asks for one packet at a time during the handshake
-handshake_loop(State = #{connection := Connection}) ->
+%% dist_util asks for one packet at a time during the handshake, which TCP
+%% distribution frames with 2-byte lengths, as with {packet, 2}
+handshake_loop(State = #{connection := Connection, buffer := Buffer}) ->
     receive
-        {?ROUTER, data, Packet} ->
-            handshake_loop(deliver(State#{received := queue:in(Packet, maps:get(received, State))}));
+        {?ROUTER, data, Data} ->
+            handshake_loop(deliver(State#{buffer := <<Buffer/binary, Data/binary>>}));
 
         {Ref, From, {recv, _Length, Timeout}} ->
             Timer = case Timeout of
@@ -258,7 +259,7 @@ handshake_loop(State = #{connection := Connection}) ->
             end;
 
         {Ref, From, {send, Packet}} ->
-            send_message(Connection, Packet),
+            send_message(Connection, [<<(iolist_size(Packet)):16>>, Packet]),
             From ! {Ref, ok},
             handshake_loop(State);
 
@@ -288,27 +289,25 @@ handshake_loop(State = #{connection := Connection}) ->
             start_traffic(DHandle, State)
     end.
 
-deliver(State = #{waiting := {Ref, From, Timer}, received := Received}) ->
-    case queue:out(Received) of
-        {{value, Packet}, Rest} ->
-            cancel_timer(Timer),
-            From ! {Ref, {ok, binary_to_list(Packet)}},
-            State#{waiting := undefined, received := Rest};
-        {empty, _} ->
-            State
-    end;
+%% Only the packets dist_util asks for, as the ones after the handshake have
+%% 4-byte lengths
+deliver(State = #{waiting := {Ref, From, Timer},
+                  buffer := <<Size:16, Packet:Size/binary, Rest/binary>>}) ->
+    cancel_timer(Timer),
+    From ! {Ref, {ok, binary_to_list(Packet)}},
+    State#{waiting := undefined, buffer := Rest};
 deliver(State) ->
     State.
 
 cancel_timer(undefined) -> ok;
 cancel_timer(Timer) -> erlang:cancel_timer(Timer).
 
-%% Incoming packets go to the input handler from now on: the ones the
-%% controller already has first, then the router's
-start_traffic(DHandle, #{connection := Connection, supervisor := Sup, received := Received}) ->
+%% Incoming data goes to the input handler from now on: what the controller
+%% already has first, then the router's
+start_traffic(DHandle, #{connection := Connection, supervisor := Sup, buffer := Buffer}) ->
     Input = spawn_opt(?MODULE, input_init, [DHandle, Sup], [link | ?SPAWN_OPTS]),
     ok = call_router({route, Connection, Input}),
-    Pending = queue:to_list(Received) ++ flush_data(),
+    Pending = iolist_to_binary([Buffer | flush_data()]),
     ok = erlang:dist_ctrl_input_handler(DHandle, Input),
     Input ! {DHandle, Pending},
     process_flag(priority, normal),
@@ -317,7 +316,7 @@ start_traffic(DHandle, #{connection := Connection, supervisor := Sup, received :
 
 flush_data() ->
     receive
-        {?ROUTER, data, Packet} -> [Packet | flush_data()]
+        {?ROUTER, data, Data} -> [Data | flush_data()]
     after 0 ->
         []
     end.
@@ -338,26 +337,31 @@ send_data(DHandle, Connection) ->
         none ->
             erlang:dist_ctrl_get_data_notification(DHandle);
         Data ->
-            send_message(Connection, Data),
+            send_message(Connection, packet(Data)),
             send_data(DHandle, Connection)
     end.
 
 input_init(DHandle, Sup) ->
     link(Sup),
     receive
-        {DHandle, Pending} ->
-            [put_data(DHandle, Packet) || Packet <- Pending],
-            input_loop(DHandle)
+        {DHandle, Pending} -> input_loop(DHandle, put_packets(DHandle, Pending))
     end.
 
-input_loop(DHandle) ->
+input_loop(DHandle, Buffer) ->
     receive
-        {?ROUTER, data, Packet} ->
-            put_data(DHandle, Packet),
-            input_loop(DHandle);
+        {?ROUTER, data, Data} ->
+            input_loop(DHandle, put_packets(DHandle, <<Buffer/binary, Data/binary>>));
         _Other ->
-            input_loop(DHandle)
+            input_loop(DHandle, Buffer)
     end.
+
+%% The whole packets, which TCP distribution frames with 4-byte lengths after
+%% the handshake, as with {packet, 4}. Empty ones are ticks.
+put_packets(DHandle, <<Size:32, Packet:Size/binary, Rest/binary>>) ->
+    put_data(DHandle, Packet),
+    put_packets(DHandle, Rest);
+put_packets(_DHandle, Rest) ->
+    Rest.
 
 put_data(DHandle, Packet) ->
     try erlang:dist_ctrl_put_data(DHandle, Packet)
@@ -367,7 +371,7 @@ put_data(DHandle, Packet) ->
 %% The connection supervisor asks for a tick when nothing was sent lately
 tick_handler(Connection) ->
     receive
-        tick -> send_message(Connection, <<>>);
+        tick -> send_message(Connection, packet(<<>>));
         _Other -> ok
     end,
     tick_handler(Connection).
@@ -411,6 +415,10 @@ call(Pid, Request) ->
 
 send_message(Connection, Data) ->
     to_js(#{type => message, connection => Connection, data => iolist_to_binary(Data)}).
+
+%% A packet after the handshake, framed as TCP distribution does
+packet(Data) ->
+    [<<(iolist_size(Data)):32>>, Data].
 
 to_js(Event) ->
     wasm:send(#{'_popcorn' => #{t => dist, payload => Event}}).
