@@ -325,6 +325,19 @@ defmodule Popcorn.PackagerTest do
 
         packaged = Enum.filter(distribution_beams, &Map.has_key?(archives, &1))
         assert packaged == if(distribution, do: distribution_beams, else: [])
+
+        # Tree-shaking can't see these called: kernel starts net_kernel from a
+        # child spec, and other nodes run erpc's functions by name
+        if distribution do
+          for {beam, function} <- [
+                {"lib/kernel/ebin/net_kernel.beam", {:start_link, 1}},
+                {"lib/kernel/ebin/net_kernel.beam", {:start, 2}},
+                {"lib/kernel/ebin/erpc.beam", {:execute_call, 4}}
+              ] do
+            {:ok, {_module, [exports: exports]}} = :beam_lib.chunks(archives[beam], [:exports])
+            assert function in exports, "#{beam} doesn't export #{inspect(function)}"
+          end
+        end
       end
     end
 
