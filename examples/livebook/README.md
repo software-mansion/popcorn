@@ -96,6 +96,8 @@ another server.
   address they set on livebook.dev, which can be this example's.
 - The shell opens a link like that in its iframe, under the tab's path. Its
   host has to serve the shell's page for the link's path, as `serve.exs` does.
+  Once Livebook has opened the link, the shell replaces its own URL with `/`,
+  so that reloading doesn't open the link again.
 - Livebook downloads the notebook with Req, which Popcorn makes request with
   `fetch()`. So the notebook's server has to let other origins fetch, as
   GitHub's does.

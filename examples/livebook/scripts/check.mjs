@@ -272,7 +272,10 @@ try {
       );
       const app = linked.frameLocator("#livebook");
       await app.getByText("Welcome to Livebook").first().waitFor({ timeout: 60_000 });
-      return `${await app.locator("[data-el-cell]").count()} cells`;
+
+      // So that reloading doesn't open the link again
+      await linked.waitForFunction(() => location.pathname + location.search === "/", null, { timeout: 10_000 });
+      return `${await app.locator("[data-el-cell]").count()} cells, the page at ${linked.url()}`;
     } finally {
       await linked.close();
     }
