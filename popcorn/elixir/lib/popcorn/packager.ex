@@ -90,6 +90,8 @@ defmodule Popcorn.Packager do
 
   @kept_for_distribution [
     mod: :popcorn_dist,
+    mod: :net_kernel,
+    mod: :erpc,
     mod: :erl_distribution,
     mod: :erl_epmd,
     mod: :dist_util,
