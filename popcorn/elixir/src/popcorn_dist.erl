@@ -14,7 +14,7 @@
 -export([setopts/2, getopts/2]).
 
 %% Internal exports
--export([router_init/0, accept_loop/2, do_accept/6, do_setup/6,
+-export([router_init/0, accept_loop/1, do_accept/6, do_setup/6,
          controller_init/1, input_init/2, tick_handler/1]).
 
 -include_lib("kernel/include/net_address.hrl").
@@ -49,20 +49,22 @@ address() ->
 listen(Name, Host) ->
     Router = start_router(),
     Node = list_to_atom(atom_to_list(Name) ++ "@" ++ Host),
-    announce(Node),
     {ok, {Router, (address())#net_address{address = Node, host = Host}, creation()}}.
 
-%% net_kernel stops
-close(_Router) ->
+%% net_kernel stops: the node no longer accepts connections, until a new
+%% acceptor registers
+close(Router) ->
+    Router ! {acceptor, undefined},
     announce(null).
 
-%% Incoming connections, which the router announces
+%% Incoming connections, which the router announces. The node is announced
+%% only now, once it can accept them, and again when net_kernel restarts the
+%% acceptor.
 accept(Router) ->
-    spawn_opt(?MODULE, accept_loop, [self(), Router], [link, {priority, max}]).
-
-accept_loop(Kernel, Router) ->
-    Router ! {acceptor, self()},
-    accept_loop(Kernel).
+    Acceptor = spawn_opt(?MODULE, accept_loop, [self()], [link, {priority, max}]),
+    Router ! {acceptor, Acceptor},
+    announce(node()),
+    Acceptor.
 
 accept_loop(Kernel) ->
     receive
@@ -70,7 +72,12 @@ accept_loop(Kernel) ->
             Kernel ! {accept, self(), Ctrl, ?FAMILY, ?PROTOCOL},
             receive
                 {Kernel, controller, Pid} ->
-                    call_ctrl(Ctrl, {supervisor, Pid}),
+                    %% The transport may have closed the connection meanwhile,
+                    %% taking the controller down: then the handshake fails at
+                    %% once, rather than waiting for this
+                    try call_ctrl(Ctrl, {supervisor, Pid})
+                    catch exit:{?MODULE, _Reason} -> ok
+                    end,
                     Pid ! {self(), controller};
                 {Kernel, unsupported_protocol} ->
                     exit(unsupported_protocol)
@@ -96,8 +103,19 @@ do_accept(Kernel, AcceptPid, Ctrl, MyNode, Allowed, SetupTime) ->
     end.
 
 %% Outgoing connections: JavaScript opens the connection, or closes it if it
-%% can't reach the node
+%% can't reach the node. The router may not run yet, if the node doesn't
+%% listen (`-dist_listen false`), and net_kernel calls this, as it does
+%% listen/2, so starting it here doesn't race. Such a node is announced only
+%% now, before its first connection, so that JavaScript can close its
+%% connections when the VM exits. Announcing it again changes nothing. A
+%% dynamic name, undefined@Host, isn't the node's: the first handshake gives
+%% the node its name, which the controller announces then.
 setup(Node, Type, MyNode, LongOrShortNames, SetupTime) ->
+    _ = start_router(),
+    case atom_to_list(MyNode) of
+        "undefined@" ++ _ -> ok;
+        _ -> announce(MyNode)
+    end,
     spawn_opt(?MODULE, do_setup, [self(), Node, Type, MyNode, LongOrShortNames, SetupTime],
               dist_util:net_ticker_spawn_options()).
 
@@ -176,12 +194,17 @@ router(State = #{connections := Connections}) ->
 %% Events from the transport
 incoming(#{<<"type">> := <<"connect">>, <<"connection">> := Connection, <<"to">> := To},
          State = #{acceptor := Acceptor, connections := Connections})
-  when is_pid(Acceptor), is_binary(Connection), not is_map_key(Connection, Connections) ->
+  when is_binary(Connection), not is_map_key(Connection, Connections) ->
     case atom_to_binary(node()) of
-        To ->
+        To when is_pid(Acceptor) ->
             Ctrl = spawn_controller(Connection),
             Acceptor ! {incoming, Ctrl},
             watch(Connection, Ctrl, State);
+        %% A node that doesn't listen refuses at once, rather than when the
+        %% connection setup times out
+        To ->
+            to_js(#{type => disconnect, connection => Connection}),
+            State;
         _ ->
             State
     end;
@@ -284,8 +307,10 @@ handshake_loop(State = #{connection := Connection, buffer := Buffer}) ->
             From ! {Ref, ok},
             handshake_loop(State);
 
+        %% The node has its name by now, even a dynamic one
         {Ref, From, {handshake_complete, _Node, DHandle}} ->
             From ! {Ref, ok},
+            announce(node()),
             start_traffic(DHandle, State)
     end.
 

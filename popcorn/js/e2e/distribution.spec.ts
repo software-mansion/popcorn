@@ -176,6 +176,83 @@ test.describe("distribution", () => {
     expect(await a.waitForEvent("down")).toEqual({ down: "b@popcorn" });
   });
 
+  // a only connects out, and is hidden, as nodes that don't listen are. It's
+  // announced with its first connection, so that its VM refuses connections
+  // at once, rather than when their setup times out, and the relay
+  // disconnects its peers when its instance shuts down.
+  test("a node that doesn't listen", async ({ createOtp }) => {
+    const [a, b] = await Promise.all([createOtp(), createOtp()]);
+    const bootB = await b.tryBoot(
+      distOpts(
+        node(
+          "b@popcorn",
+          `
+          ok = wasm:send(#{node_started => node()}),
+          receive {wasm, <<"connect">>} -> ok end,
+          Started = erlang:monotonic_time(millisecond),
+          Connected = net_kernel:connect_node('a@popcorn'),
+          Ms = erlang:monotonic_time(millisecond) - Started,
+          ok = wasm:send(#{refused => #{connected => Connected, fast => Ms < 3000}}),
+          receive {wasm, <<"monitor">>} -> ok end,
+          ok = net_kernel:monitor_nodes(true, [{node_type, all}]),
+          ok = wasm:send(#{monitoring => nodes(connected)}),
+          Down = receive {nodedown, Node, _} -> Node after 10000 -> timeout end,
+          ok = wasm:send(#{down => Down}),
+          receive stop -> ok end.
+          `,
+        ),
+      ),
+    );
+    assert(bootB.ok);
+    const bootA = await a.tryBoot(
+      distOpts(`
+        true = register(dist_test, self()),
+        Opts = #{name_domain => longnames, dist_listen => false},
+        {ok, _} = net_kernel:start('a@popcorn', Opts),
+        ok = wasm:send(#{node_started => node()}),
+        receive {wasm, <<"connect">>} -> ok end,
+        true = net_kernel:connect_node('b@popcorn'),
+        ok = wasm:send(#{connected => nodes(connected)}),
+        receive {wasm, <<"disconnect">>} -> ok end,
+        true = erlang:disconnect_node('b@popcorn'),
+        ok = wasm:send(#{disconnected => nodes(connected)}),
+        receive {wasm, <<"connect">>} -> ok end,
+        true = net_kernel:connect_node('b@popcorn'),
+        ok = wasm:send(#{reconnected => nodes(connected)}),
+        receive stop -> ok end.
+      `),
+    );
+    assert(bootA.ok);
+
+    await Promise.all([
+      a.waitForEvent("node_started"),
+      b.waitForEvent("node_started"),
+    ]);
+    assert((await a.trySend("dist_test", "connect")).ok);
+    expect(await a.waitForEvent("connected")).toEqual({
+      connected: ["b@popcorn"],
+    });
+    assert((await a.trySend("dist_test", "disconnect")).ok);
+    expect(await a.waitForEvent("disconnected")).toEqual({ disconnected: [] });
+
+    assert((await b.trySend("dist_test", "connect")).ok);
+    expect(await b.waitForEvent("refused")).toEqual({
+      refused: { connected: false, fast: true },
+    });
+
+    assert((await a.trySend("dist_test", "connect")).ok);
+    expect(await a.waitForEvent("reconnected")).toEqual({
+      reconnected: ["b@popcorn"],
+    });
+    assert((await b.trySend("dist_test", "monitor")).ok);
+    expect(await b.waitForEvent("monitoring")).toEqual({
+      monitoring: ["a@popcorn"],
+    });
+
+    await a.deinit();
+    expect(await b.waitForEvent("down")).toEqual({ down: "a@popcorn" });
+  });
+
   // Each boot gets a new endpoint, and the relay connects the rebooted node
   // like a new one
   test("the relay connects a node again after its instance reboots", async ({
@@ -266,6 +343,142 @@ test.describe("distribution", () => {
       after: ["b@popcorn", "hello"],
       endpoints: 2,
       distinct: true,
+    });
+  });
+
+  // a gets its name from its first connection, and is announced only then,
+  // so that its next connection doesn't announce a new name, which would
+  // make the relay disconnect the first one
+  test("a node with a dynamic name", async ({ createOtp }) => {
+    const [a, b, c] = await Promise.all([
+      createOtp(),
+      createOtp(),
+      createOtp(),
+    ]);
+    const echo = `
+      Echo = spawn(fun Loop() ->
+                       receive {From, Msg} -> From ! {echo, node(), Msg}, Loop() end
+                   end),
+      true = register(echo, Echo),
+      ok = wasm:send(#{node_started => node()}),
+    `;
+    const bootB = await b.tryBoot(
+      distOpts(
+        node(
+          "b@popcorn",
+          `${echo}
+          receive {wasm, <<"check">>} -> ok end,
+          ok = wasm:send(#{peers => length(nodes(connected))}),
+          receive stop -> ok end.
+          `,
+        ),
+      ),
+    );
+    assert(bootB.ok);
+    const bootC = await c.tryBoot(
+      distOpts(node("c@popcorn", `${echo} receive stop -> ok end.`)),
+    );
+    assert(bootC.ok);
+    const bootA = await a.tryBoot(
+      distOpts(`
+        true = register(dist_test, self()),
+        Opts = #{name_domain => longnames, dist_listen => false},
+        {ok, _} = net_kernel:start('undefined@popcorn', Opts),
+        ok = wasm:send(#{dynamic => node()}),
+        receive {wasm, <<"connect">>} -> ok end,
+        true = net_kernel:connect_node('b@popcorn'),
+        true = net_kernel:connect_node('c@popcorn'),
+        timer:sleep(500),
+        {echo, 'b@popcorn'} ! {self(), hello},
+        Echo = receive {echo, From, Msg} -> [From, Msg] after 5000 -> timeout end,
+        Named = lists:suffix("@popcorn", atom_to_list(node()))
+                    andalso node() =/= 'undefined@popcorn',
+        ok = wasm:send(#{connected => #{named => Named, echo => Echo,
+                                        nodes => lists:sort(nodes(connected))}}),
+        receive stop -> ok end.
+      `),
+    );
+    assert(bootA.ok);
+
+    await Promise.all([
+      a.waitForEvent("dynamic"),
+      b.waitForEvent("node_started"),
+      c.waitForEvent("node_started"),
+    ]);
+    assert((await a.trySend("dist_test", "connect")).ok);
+    expect(await a.waitForEvent("connected")).toEqual({
+      connected: {
+        named: true,
+        echo: ["b@popcorn", "hello"],
+        nodes: ["b@popcorn", "c@popcorn"],
+      },
+    });
+    assert((await b.trySend("dist_test", "check")).ok);
+    expect(await b.waitForEvent("peers")).toEqual({ peers: 1 });
+  });
+
+  // A transport that throws fails the boot when it's set up, and can't stop
+  // the shutdown when it's told that the node stopped
+  test("a transport that throws", async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const failing = new window.Popcorn({
+        distribution: () => {
+          throw new Error("no transport");
+        },
+      });
+      const bootError = await failing.boot().then(
+        () => null,
+        (error: { serialize(): unknown }) => error.serialize(),
+      );
+      const sendAfterBoot = await failing.trySend("dist_test");
+
+      let events = 0;
+      const popcorn = new window.Popcorn({
+        beam: {
+          extraArgs: [
+            "-eval",
+            `{ok, _} = net_kernel:start('a@popcorn', #{name_domain => longnames}),
+             Loop = fun L() -> ok = wasm:send(#{tick => true}), timer:sleep(50), L() end,
+             Loop().`,
+          ],
+        },
+        distribution: () => (event) => {
+          if (event.type === "node_stopped") throw new Error("handler failed");
+        },
+        onEvent: () => {
+          events += 1;
+        },
+      });
+      await popcorn.boot();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      let thrown = null;
+      try {
+        popcorn.deinit();
+      } catch (error) {
+        thrown = String(error);
+      }
+      const eventsAtDeinit = events;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const sendAfterDeinit = await popcorn.trySend("dist_test");
+
+      return {
+        bootError,
+        sendAfterBoot: sendAfterBoot.ok,
+        thrown,
+        eventsAfterDeinit: events - eventsAtDeinit,
+        sendAfterDeinit: sendAfterDeinit.ok,
+      };
+    });
+
+    expect(result).toEqual({
+      bootError: {
+        t: "vm:exited",
+        data: { reason: "error", data: "Error: no transport" },
+      },
+      sendAfterBoot: false,
+      thrown: "Error: handler failed",
+      eventsAfterDeinit: 0,
+      sendAfterDeinit: false,
     });
   });
 
