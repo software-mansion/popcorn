@@ -144,10 +144,11 @@ try {
     return `${output}, ${booted?.match(/booted in \d+ ms/)?.[0]}`;
   });
 
-  // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on
+  // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on,
+  // and Req, with Mint, whose Erlang code includes OTP's headers
   await step("Mix.install downloads and compiles packages", () =>
     evaluate(
-      `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}])`,
+      `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req])`,
       ":ok",
       600_000,
     ),
@@ -208,6 +209,16 @@ try {
     evaluate(
       `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
       `{[["1", "2"]], [1, 2]}`,
+    ),
+  );
+
+  // With Popcorn's adapter, which it installs once Mix.install/2 has started Req.
+  // jsDelivr compresses the JSON, which the browser decompresses.
+  await step("Req requests with the browser's fetch()", () =>
+    evaluate(
+      `resp = Req.get!("https://cdn.jsdelivr.net/npm/vega-datasets@2/data/gapminder.json")\n` +
+        `{Req.default_options()[:adapter], resp.status, is_list(resp.body)}`,
+      "{Popcorn.Fetch, 200, true}",
     ),
   );
 
