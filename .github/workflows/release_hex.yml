@@ -49,6 +49,13 @@ jobs:
           name: runtime-${{ matrix.variant }}
           path: popcorn/out/runtimes/${{ matrix.variant }}
           if-no-files-found: error
+      # The core build may leave crypto out
+      - if: matrix.variant == 'crypto'
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-apps
+          path: popcorn/out/otp-apps
+          if-no-files-found: error
 
   otp-release:
     needs: otp-runtime
@@ -83,6 +90,10 @@ jobs:
         with:
           name: runtime-crypto
           path: popcorn/out/runtimes/crypto
+      - uses: actions/download-artifact@v4
+        with:
+          name: otp-apps
+          path: popcorn/out/otp-apps
       - run: pnpm -F ./popcorn/js build
       - name: Test and build Hex package
         working-directory: popcorn/elixir

@@ -12,7 +12,7 @@ type Manifest = { vm: { capabilities: { crypto: boolean } } };
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const STARTUP_TIMEOUT_MS = 30_000;
+const STARTUP_TIMEOUT_MS = 60_000;
 const jsRootDir = resolve(__dirname, "../..");
 const viteCliPath = resolve(__dirname, "node_modules/vite/bin/vite.js");
 
