@@ -84,6 +84,10 @@ another server.
   and Yecc files, and `.app.src` files.
 - Hex is a Mix archive, so `notebook_vm/`'s `mix popcorn.cook` copies it among
   the build's applications for Popcorn to package it.
+- The notebooks' VMs have OTP's headers, with Popcorn's `include_headers`, for
+  the Erlang code that includes them, like Mint's.
+- Req requests with the browser's `fetch()` too: Popcorn installs its Req
+  adapter once `Mix.install/2` has started Req.
 
 ### Opening notebooks from links
 
