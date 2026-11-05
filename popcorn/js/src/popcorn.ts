@@ -215,8 +215,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private distNode: string | null = null;
   private distHandler:
-    | ((event: DistNodeEvent | DistConnectionEvent) => void)
-    | null = null;
+    ((event: DistNodeEvent | DistConnectionEvent) => void) | null = null;
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
   private readonly readyWaiters: Uint8Array[] = [];
@@ -467,7 +466,12 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           noshell: this.opts.tty === undefined,
         },
       });
-      this.setupDist();
+      try {
+        this.setupDist();
+      } catch (error) {
+        // A transport that fails to set up fails the boot
+        this.deinit({ reason: "error", data: String(error) });
+      }
     });
   }
 
@@ -666,8 +670,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
     this.state = { status: "closed", error };
     this.vmReady = false;
-    this.handleNodeChange(null);
-    this.distHandler = null;
     this.readyWaiters.length = 0;
     for (const resolve of this.pendingSends.values()) {
       resolve({ ok: false, error });
@@ -681,6 +683,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.vmWorker.removeEventListener("message", this.onWorkerMessage);
     this.vmWorker.removeEventListener("error", this.onWorkerError);
     this.vmWorker.terminate();
+    try {
+      this.handleNodeChange(null);
+    } finally {
+      this.distHandler = null;
+    }
     // we keep onEvent() callbacks across reboots
   }
 

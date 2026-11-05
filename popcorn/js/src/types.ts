@@ -55,7 +55,8 @@ export type DistEndpoint = {
 
 /**
  * Accepts {@link DistEndpoint} and returns function - a handler for
- * distribution events sent by the VM.
+ * distribution events sent by the VM. Popcorn calls it each time the VM
+ * boots, with a new endpoint.
  *
  * The events are the following:
  * - {@link DistNodeEvent} - tells when a node starts or stops,
