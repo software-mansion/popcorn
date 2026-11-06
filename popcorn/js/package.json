@@ -1,6 +1,6 @@
 {
   "name": "@swmansion/popcorn",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "JS bindings for BEAM/OTP in WebAssembly",
   "type": "module",
   "license": "Apache-2.0",
