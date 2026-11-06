@@ -396,6 +396,33 @@ test.describe("boot", () => {
     });
   });
 
+  // Each thread is a worker, next to Popcorn's own. The VM starts 5 threads
+  // besides its schedulers, so a pool that fits them starts no others.
+  test("default thread pool", async ({ otp, page }) => {
+    const boot = await otp.tryBoot({
+      beam: {
+        emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
+        extraArgs: ["-eval", "receive stop -> ok end."],
+      },
+    });
+    assert(boot.ok);
+
+    await expect.poll(() => page.workers().length).toBe(1 + 5 + 6);
+  });
+
+  // A bigger pool than the VM needs is started anyway
+  test("thread pool size", async ({ otp, page }) => {
+    const boot = await otp.tryBoot({
+      beam: {
+        threadPoolSize: 12,
+        extraArgs: ["-eval", "receive stop -> ok end."],
+      },
+    });
+    assert(boot.ok);
+
+    await expect.poll(() => page.workers().length).toBe(1 + 12);
+  });
+
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
     expect(await timedOut.tryBoot({ timeoutsMs: { boot: 0 } })).toEqual({
