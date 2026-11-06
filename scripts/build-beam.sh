@@ -410,7 +410,10 @@ run_configure() {
 emulator_link_settings() {
     local mode="$1"
     local flags="-sUSE_PTHREADS=1"
-    flags+=" -sPTHREAD_POOL_SIZE=8"
+    # Popcorn's JavaScript sets the thread pool's size when creating the
+    # module. Quoted, as Closure renames other properties, and in double
+    # quotes, for the shell that runs the link command.
+    flags+=" -sPTHREAD_POOL_SIZE=\"Module['pthreadPoolSize']\""
     flags+=" -sPROXY_TO_PTHREAD=1"
     flags+=" -sENVIRONMENT=worker"
     flags+=" -sEXPORT_ES6=1"

@@ -77,6 +77,7 @@ async function boot(
     env,
     ttySize,
     noshell,
+    threadPoolSize,
     createModule,
     emit,
   } = opts;
@@ -138,6 +139,7 @@ async function boot(
           type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
           payload: chunk,
         }),
+      pthreadPoolSize: threadPoolSize,
       arguments: buildArgs({
         appNames: fsData.appNames,
         entrypoint: fsData.entrypoint,
