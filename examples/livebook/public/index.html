@@ -48,7 +48,7 @@
       const relay = createDistributionRelay();
       const runtimes = new Map();
 
-      async function handleRuntime({ livebook_runtime: action, node, cookie }) {
+      async function handleRuntime({ livebook_runtime: action, node, cookie, pid }) {
         if (action === "start") {
           const t0 = performance.now();
           const runtime = Popcorn.init({
@@ -60,12 +60,20 @@
             },
           });
           runtimes.set(node, runtime);
-          await runtime;
-          console.log(`[shell] Runtime VM ${node} booted in ${Math.round(performance.now() - t0)} ms`);
+          try {
+            await runtime;
+            console.log(`[shell] Runtime VM ${node} booted in ${Math.round(performance.now() - t0)} ms`);
+          } catch (error) {
+            // Livebook would wait for the node until it timed out
+            const message = String(error?.message ?? error);
+            console.warn(`[shell] Runtime VM ${node} didn't boot: ${message}`);
+            runtimes.delete(node);
+            popcorn.send(pid, { error: message });
+          }
         } else if (action === "stop") {
           const runtime = runtimes.get(node);
           runtimes.delete(node);
-          (await runtime)?.deinit();
+          (await runtime?.catch(() => null))?.deinit();
           console.log(`[shell] Runtime VM ${node} stopped`);
         }
       }
