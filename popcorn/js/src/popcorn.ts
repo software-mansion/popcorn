@@ -1,3 +1,4 @@
+import { crossOriginStorage, lookupCos, storeInCos } from "./cos";
 import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
@@ -12,6 +13,7 @@ import type {
   BeamBootOptions,
   BeamSendPayload,
   BeamTarget,
+  CosAsset,
   OtpErrorPayload,
   Pid,
   RunJsRequest,
@@ -54,6 +56,12 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
      * Must end with `/`. Defaults to `otp/` next to the worker.
      */
     otpAssetsRoot?: string;
+    /**
+     * Looks up the runtime and tarballs in Cross-Origin Storage by hash, and
+     * stores them there after boot. Has no effect in browsers without
+     * `navigator.crossOriginStorage`. Defaults to `true`.
+     */
+    crossOriginStorage?: boolean;
   };
   tty?: {
     /** Initial terminal size. Defaults to 80 columns and 24 rows. */
@@ -197,6 +205,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private output: OutputHandlers;
   private requestSeq = 0;
   private settleBoot: ((result: Result<Popcorn<Output>>) => void) | null = null;
+  /** What the main thread looked up for the worker and did not find. */
+  private cosMisses: {
+    storage: CrossOriginStorageManager;
+    assets: CosAsset[];
+  } | null = null;
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
@@ -240,6 +253,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       case "popcorn:boot-vm-ready":
       case "popcorn:boot-end":
       case "popcorn:boot-fail":
+        return;
+      case "popcorn:cos-lookup":
+        void this.answerCosLookup(data.payload.assets);
         return;
       case "otp:message":
         this.emit(this.reviveHandles(data.payload));
@@ -421,6 +437,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
             this.state = { status: "booted" };
             this.flushReadyWaiters();
             settle({ ok: true, data: this });
+            void this.storeCosMisses();
             break;
           case "popcorn:boot-fail": {
             const error = PopcornError.deserialize(data.payload);
@@ -446,9 +463,33 @@ export class Popcorn<Output extends TtyOutput = "text"> {
           maxMemoryBytes: this.maxMemoryBytes,
           ttySize: this.ttySize,
           noshell: this.opts.tty === undefined,
+          cosMainThread:
+            this.opts.beam?.crossOriginStorage !== false &&
+            crossOriginStorage() !== null,
         },
       });
     });
+  }
+
+  // Runs only for a worker without its own COS; see `cos.ts`.
+  private async answerCosLookup(assets: CosAsset[]): Promise<void> {
+    const storage = crossOriginStorage();
+    const files = storage !== null ? await lookupCos(storage, assets) : {};
+    if (storage !== null) {
+      const misses = assets.filter((asset) => !Object.hasOwn(files, asset.key));
+      this.cosMisses = { storage, assets: misses };
+    }
+    toVm(this.vmWorker, {
+      type: "popcorn:cos-lookup-end",
+      payload: { files },
+    });
+  }
+
+  private async storeCosMisses(): Promise<void> {
+    if (this.cosMisses === null) return;
+    const { storage, assets } = this.cosMisses;
+    this.cosMisses = null;
+    await storeInCos(storage, assets);
   }
 
   /**
