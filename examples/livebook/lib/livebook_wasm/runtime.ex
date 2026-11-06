@@ -35,7 +35,9 @@ defmodule LivebookWasm.Runtime do
   # paths with them: each VM has its own file system
   defp do_connect(runtime, caller) do
     node = :"runtime_#{System.unique_integer([:positive])}@popcorn"
-    Popcorn.JS.send(%{livebook_runtime: "start", node: node, cookie: Node.get_cookie()})
+    # The page sends `{:wasm, %{"error" => message}}` here if the VM doesn't boot
+    start = %{livebook_runtime: "start", node: node, cookie: Node.get_cookie(), pid: self()}
+    Popcorn.JS.send(start)
 
     case await_node(node, System.monotonic_time(:millisecond) + @boot_timeout) do
       :ok ->
@@ -66,8 +68,11 @@ defmodule LivebookWasm.Runtime do
         {:error, "the runtime VM didn't start"}
 
       true ->
-        Process.sleep(100)
-        await_node(node, deadline)
+        receive do
+          {:wasm, %{"error" => message}} -> {:error, "the runtime VM didn't start: #{message}"}
+        after
+          100 -> await_node(node, deadline)
+        end
     end
   end
 
