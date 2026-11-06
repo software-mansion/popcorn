@@ -1,6 +1,7 @@
 import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 import { PopcornError, type SerializedError } from "../src/errors";
+import { resolveThreadPoolSize } from "../src/beam";
 
 const FETCH_URL = "/assets/otp/manifest.json";
 type MemoryProbe = {
@@ -394,6 +395,27 @@ test.describe("boot", () => {
       dirty_cpu_schedulers: 2,
       dirty_io_schedulers: 2,
     });
+  });
+
+  // Each thread is a worker, next to Popcorn's own. The VM starts 3 threads
+  // besides its schedulers, async threads and poll threads, and the thread
+  // pool fits them. A pool that's too small would end up with as many
+  // workers, the missing ones started later, so the test checks the pool size
+  // on its own.
+  test("thread pool", async ({ otp, page }) => {
+    const emulatorArgs = [
+      ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
+      ...["-A", "4", "-IOt", "2"],
+    ];
+    const vmThreads = 3 + 6 + 4 + 2;
+    expect(resolveThreadPoolSize(emulatorArgs)).toBe(vmThreads);
+
+    const boot = await otp.tryBoot({
+      beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
+    });
+    assert(boot.ok);
+
+    await expect.poll(() => page.workers().length).toBe(1 + vmThreads);
   });
 
   test("errors", async ({ createOtp, page }) => {

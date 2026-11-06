@@ -410,7 +410,7 @@ run_configure() {
 emulator_link_settings() {
     local mode="$1"
     local flags="-sUSE_PTHREADS=1"
-    flags+=" -sPTHREAD_POOL_SIZE=8"
+    flags+=" -sPTHREAD_POOL_SIZE=\"Module['pthreadPoolSize']\""
     flags+=" -sPROXY_TO_PTHREAD=1"
     flags+=" -sENVIRONMENT=worker"
     flags+=" -sEXPORT_ES6=1"
