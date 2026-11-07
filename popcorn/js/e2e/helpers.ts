@@ -8,6 +8,9 @@ import {
 } from "@playwright/test";
 import type {
   atom,
+  createDistributionRelay,
+  DistConnectionEvent,
+  DistTransport,
   Popcorn,
   PopcornOpts,
   PopcornEvent,
@@ -25,15 +28,21 @@ declare global {
     popcorn: {
       atom: typeof atom;
       tuple: typeof tuple;
+      createDistributionRelay: typeof createDistributionRelay;
     };
+    distTransports?: Map<string, DistTransport>;
   }
 }
 
-type InitOptions = PopcornOpts;
+/** The e2e page's transport for the distribution, as functions can't be
+ * passed to it: the page's relay, or a MessageChannel between two instances,
+ * as a custom transport would */
+export type DistTransportName = "relay" | "channel";
+type InitOptions = PopcornOpts & { transport?: DistTransportName };
 type BootResult = Result<null>;
 type CallOptions = { timeoutMs?: number };
 type EventWaiter = (event: PopcornEvent) => void;
-type OtpFactory = (id?: string) => Promise<OtpHandle>;
+export type OtpFactory = (id?: string) => Promise<OtpHandle>;
 type Otp = {
   id: string;
   events: PopcornEvent[];
@@ -216,6 +225,39 @@ function createOtp(id: string): Otp {
     if (!condition) throw new Error(message);
   }
 
+  // The page has one transport of each kind, which its instances share
+  function distTransport(name: DistTransportName): DistTransport {
+    window.distTransports ??= new Map();
+    let transport = window.distTransports.get(name);
+    if (transport === undefined) {
+      transport =
+        name === "relay"
+          ? window.popcorn.createDistributionRelay()
+          : channelTransport();
+      window.distTransports.set(name, transport);
+    }
+    return transport;
+  }
+
+  // Carries the connection events of two instances over a MessageChannel.
+  // When an instance shuts down, the other one learns it when its ticks stop.
+  function channelTransport(): DistTransport {
+    const { port1, port2 } = new MessageChannel();
+    const free = [port1, port2];
+    return (endpoint) => {
+      const port = free.shift();
+      check(port !== undefined, "A channel connects two instances");
+      port.onmessage = (message: MessageEvent<DistConnectionEvent>) => {
+        endpoint.deliver(message.data);
+      };
+      return (event) => {
+        if (event.type !== "node_started" && event.type !== "node_stopped") {
+          port.postMessage(event);
+        }
+      };
+    };
+  }
+
   function hasKey(
     value: unknown,
     key: string,
@@ -329,9 +371,13 @@ function createOtp(id: string): Otp {
       return `[Popcorn-${this.id}]`;
     }
 
-    private withLogHandlers(options: InitOptions): InitOptions {
+    private withLogHandlers(options: InitOptions): PopcornOpts {
+      const { transport, ...popcornOptions } = options;
       return {
-        ...options,
+        ...popcornOptions,
+        ...(transport === undefined
+          ? {}
+          : { distribution: distTransport(transport) }),
         onStdout: (text) => console.log(`${this.logPrefix} stdout:`, text),
         onStderr: (text) => console.error(`${this.logPrefix} stderr:`, text),
         onError: (event) => {

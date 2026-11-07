@@ -297,6 +297,50 @@ defmodule Popcorn.PackagerTest do
                Packager.build(Keyword.put(options, :treeshake, true))
     end
 
+    # Kernel starts distribution's processes, and tree-shaking keeps its
+    # modules, with the carrier
+    test "distribution", %{options: options, out_dir: out_dir} do
+      assert_raise ArgumentError, ~r/distribution option to be a boolean/, fn ->
+        Packager.build(Keyword.put(options, :distribution, :yes))
+      end
+
+      distribution_beams = [
+        "lib/popcorn/ebin/popcorn_dist.beam",
+        "lib/kernel/ebin/erl_distribution.beam",
+        "lib/kernel/ebin/dist_util.beam",
+        "lib/kernel/ebin/global.beam",
+        "lib/kernel/ebin/rpc.beam"
+      ]
+
+      for distribution <- [false, true] do
+        options = Keyword.merge(options, treeshake: true, distribution: distribution)
+        assert {:ok, _report} = Packager.build(options)
+        assert kernel_spec(out_dir)[:env][:start_distribution] == distribution
+
+        archives =
+          Map.merge(
+            read_archive(bundle_path(out_dir, "stdlib")),
+            read_archive(bundle_path(out_dir, "deps"))
+          )
+
+        packaged = Enum.filter(distribution_beams, &Map.has_key?(archives, &1))
+        assert packaged == if(distribution, do: distribution_beams, else: [])
+
+        # Tree-shaking can't see these called: kernel starts net_kernel from a
+        # child spec, and other nodes run erpc's functions by name
+        if distribution do
+          for {beam, function} <- [
+                {"lib/kernel/ebin/net_kernel.beam", {:start_link, 1}},
+                {"lib/kernel/ebin/net_kernel.beam", {:start, 2}},
+                {"lib/kernel/ebin/erpc.beam", {:execute_call, 4}}
+              ] do
+            {:ok, {_module, [exports: exports]}} = :beam_lib.chunks(archives[beam], [:exports])
+            assert function in exports, "#{beam} doesn't export #{inspect(function)}"
+          end
+        end
+      end
+    end
+
     test "keeping modules that aren't packaged", %{options: options} do
       keep = [mod: NotPackaged, mfa: {:not_packaged, :run, 0}, mod: Popcorn.Boot]
       options = Keyword.put(options, :treeshake, keep: keep)
@@ -520,6 +564,17 @@ defmodule Popcorn.PackagerTest do
     for {:apply, {:application, :load, [{:application, app, props}]}} <- commands,
         into: %{},
         do: {app, props}
+  end
+
+  # application_controller starts with kernel's spec
+  defp kernel_spec(out_dir) do
+    archive = read_archive(bundle_path(out_dir, "app"))
+    {:script, _id, commands} = archive |> Map.fetch!("bin/vm.boot") |> :erlang.binary_to_term()
+
+    [{:application, :kernel, spec}] =
+      for {:kernelProcess, :application_controller, {_m, _f, [spec]}} <- commands, do: spec
+
+    spec
   end
 
   defp read_archive(path) do
