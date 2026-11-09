@@ -29,13 +29,15 @@ the page for Livebook's links too, like `/import?url=…`.
 Chromium, creates notebooks and evaluates cells in them. Pass it a URL to check
 another server.
 
+`mix test` tests `LivebookWasm.Plug` on the host.
+
 ## How it works
 
 - `public/index.html` is a shell page that owns the VMs, so they outlive
   Livebook's navigations. Livebook runs in an iframe, under a path of the tab's
   own, `/tab/<id>/`: `LivebookWasm.Application` sets it as Livebook's base path.
 - `public/sw.js`, a Service Worker, sends the iframe's navigations, form posts
-  and fetches to the shell, which calls `Popcorn.Plug` in Livebook's VM.
+  and fetches to the shell, which calls `LivebookWasm.Plug` in Livebook's VM.
   Livebook's static files load from the network: `mix popcorn.dev` copies them
   to `public/`, and they're left out of the VM's package.
 - Each tab registers the Service Worker for its own path, as a worker that
@@ -48,11 +50,12 @@ another server.
   one whose other end is a socket process in the VM. The script also passes the
   requests on in the relay frame.
 - Responses built in JavaScript can't set cookies, so the shell keeps them.
-- `Popcorn.Plug` serves the requests with `LivebookWeb.Endpoint`, like the
-  Phoenix example.
+- `LivebookWasm.Plug` serves the requests with `LivebookWeb.Endpoint`, as a
+  web server would, but with no network: each request and WebSocket runs in a
+  process of its own, and their responses and frames go to the shell.
 - `LivebookWasm.Application` starts Livebook after its stand-ins, and
-  `Popcorn.Plug` after Livebook: memsup, which Livebook calls for memory usage,
-  doesn't run in the browser.
+  `LivebookWasm.Plug` after Livebook: memsup, which Livebook calls for memory
+  usage, doesn't run in the browser.
 - `config/config.exs` has the settings Livebook's config files and
   `Livebook.config_runtime/0` would make, as Popcorn evaluates only this file.
 - Outputs' iframes, like Kino's JavaScript outputs', load from Livebook's
