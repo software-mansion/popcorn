@@ -1,5 +1,6 @@
 import ExUnit.Assertions
 
+Logger.configure(level: :warning)
 refute Code.ensure_loaded?(Req)
 
 root = Path.expand("../..", __DIR__)
@@ -10,6 +11,7 @@ root = Path.expand("../..", __DIR__)
       [
         "lib/popcorn/js.ex",
         "lib/popcorn/fetch.ex",
+        "lib/popcorn/fetch/req_adapter.ex",
         "lib/popcorn/proxy.ex",
         "lib/popcorn/application.ex",
         "test/support/fake_bridge.ex"
@@ -20,20 +22,7 @@ root = Path.expand("../..", __DIR__)
 
 assert diagnostics == []
 refute Code.ensure_loaded?(Req)
-assert Popcorn.Fetch.__info__(:functions) == [request: 1, request: 2]
-
-for {module, beam} <- modules, module in [Popcorn.Fetch, Popcorn.Application] do
-  assert {:ok, {^module, [atoms: atoms, imports: imports]}} =
-           :beam_lib.chunks(beam, [:atoms, :imports])
-
-  refute Enum.any?(atoms, fn {_index, atom} ->
-           String.starts_with?(to_string(atom), "Elixir.Req")
-         end)
-
-  refute Enum.any?(imports, fn {module, _function, _arity} ->
-           String.starts_with?(to_string(module), "Elixir.Req")
-         end)
-end
+assert Popcorn.Fetch.ReqAdapter in Enum.map(modules, &elem(&1, 0))
 
 alias Popcorn.JS.FakeBridge
 Application.put_env(:popcorn, :wasm_bridge, FakeBridge)
@@ -61,3 +50,10 @@ assert {:ok, supervisor} = Popcorn.Application.start(:normal, [])
 assert is_pid(Process.whereis(:popcorn_proxy))
 assert Application.get_env(:req, :default_options) == nil
 Supervisor.stop(supervisor)
+
+# Req comes later, as from Mix.install/2, whose patch installs the adapter then
+[req_dir] = System.argv()
+Code.prepend_path(Path.join(req_dir, "ebin"))
+assert :ok = Application.load(:req)
+assert :ok = Popcorn.Fetch.install_req_adapter()
+assert Application.get_env(:req, :default_options) == [adapter: Popcorn.Fetch.adapter()]

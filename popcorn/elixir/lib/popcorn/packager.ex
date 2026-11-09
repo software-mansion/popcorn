@@ -291,6 +291,7 @@ defmodule Popcorn.Packager do
          staged_apps =
            staged_apps
            |> remove_build_tools()
+           |> remove_req_adapter()
            |> add_config(config)
            |> configure_kernel(distribution),
          {:ok, staged_apps, treeshake_report} <-
@@ -627,6 +628,26 @@ defmodule Popcorn.Packager do
         end
 
         replace_app_modules(staged_apps, %{popcorn: runtime_modules})
+    end
+  end
+
+  # Req's adapter is of no use without Req, which Mix.install/2 can install
+  defp remove_req_adapter(staged_apps) do
+    case staged_apps do
+      %{req: _} ->
+        staged_apps
+
+      %{mix: _} ->
+        staged_apps
+
+      %{popcorn: info} ->
+        adapter = Popcorn.Fetch.ReqAdapter
+        File.rm!(Path.join(info.ebin_dir, "#{adapter}.beam"))
+        modules = List.delete(Keyword.fetch!(info.props, :modules), adapter)
+        replace_app_modules(staged_apps, %{popcorn: modules})
+
+      %{} ->
+        staged_apps
     end
   end
 
