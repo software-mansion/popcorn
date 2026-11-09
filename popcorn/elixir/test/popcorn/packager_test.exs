@@ -341,6 +341,37 @@ defmodule Popcorn.PackagerTest do
       end
     end
 
+    # For code that the browser compiles, which includes them
+    test "include_headers", %{options: options, build_path: build_path, out_dir: out_dir} do
+      assert_raise ArgumentError, ~r/include_headers option to be a boolean/, fn ->
+        Packager.build(Keyword.put(options, :include_headers, :yes))
+      end
+
+      File.mkdir_p!(Path.join(build_path, "user_app/include"))
+      File.write!(Path.join(build_path, "user_app/include/user_app.hrl"), "-define(ANSWER, 42).")
+      options = Keyword.put(options, :extra_apps, [:public_key])
+
+      headers = [
+        "lib/user_app/include/user_app.hrl",
+        # Popcorn's build of kernel has none, so they're the host's
+        "lib/kernel/include/file.hrl",
+        "lib/public_key/include/public_key.hrl"
+      ]
+
+      for include_headers <- [false, true] do
+        assert {:ok, _report} =
+                 Packager.build(Keyword.put(options, :include_headers, include_headers))
+
+        archives =
+          for bundle <- ["app", "deps", "stdlib"], reduce: %{} do
+            archives -> Map.merge(archives, read_archive(bundle_path(out_dir, bundle)))
+          end
+
+        packaged = Enum.filter(headers, &Map.has_key?(archives, &1))
+        assert packaged == if(include_headers, do: headers, else: [])
+      end
+    end
+
     test "keeping modules that aren't packaged", %{options: options} do
       keep = [mod: NotPackaged, mfa: {:not_packaged, :run, 0}, mod: Popcorn.Boot]
       options = Keyword.put(options, :treeshake, keep: keep)
@@ -362,6 +393,74 @@ defmodule Popcorn.PackagerTest do
       write_app(app_file, :user_app, Keyword.update!(props, :applications, &[:sasl | &1]))
 
       assert {:ok, %{apps: %{sasl: _app}}} = Packager.build(options)
+    end
+
+    test "httpc, which makes requests with fetch", %{
+      options: options,
+      build_path: build_path,
+      out_dir: out_dir
+    } do
+      # Applications that aren't packaged aren't patched
+      assert {:ok, report} = Packager.build(options)
+      refute Map.has_key?(report.apps, :inets)
+
+      app_file = Path.join(build_path, "user_app/ebin/user_app.app")
+      {:ok, [{:application, :user_app, props}]} = :file.consult(app_file)
+      write_app(app_file, :user_app, Keyword.update!(props, :applications, &[:inets | &1]))
+      assert {:ok, %{apps: %{inets: %{bundle: bundle}}}} = Packager.build(options)
+
+      httpc = Map.fetch!(read_archive(bundle_path(out_dir, bundle)), "lib/inets/ebin/httpc.beam")
+
+      {:ok, {:httpc, [atoms: atoms, exports: exports]}} =
+        :beam_lib.chunks(httpc, [:atoms, :exports])
+
+      assert Enum.any?(atoms, &match?({_index, Popcorn.Fetch}, &1))
+
+      # The rest of httpc is OTP's, which inets uses
+      {:ok, {:httpc, [exports: original]}} = :beam_lib.chunks(:code.which(:httpc), [:exports])
+      assert Enum.sort(exports) == Enum.sort(original)
+    end
+
+    # Mix.install/2 can install Req, and then installs the adapter
+    test "Req's adapter, with Req or Mix", %{
+      options: options,
+      build_path: build_path,
+      out_dir: out_dir
+    } do
+      adapter = "lib/popcorn/ebin/Elixir.Popcorn.Fetch.ReqAdapter.beam"
+
+      build = fn options ->
+        assert {:ok, _report} = Packager.build(options)
+
+        archives =
+          for bundle <- ["deps", "stdlib"], reduce: %{} do
+            archives -> Map.merge(archives, read_archive(bundle_path(out_dir, bundle)))
+          end
+
+        packaged = Map.has_key?(archives, adapter)
+        assert packaged == Popcorn.Fetch.ReqAdapter in boot_specs(out_dir).popcorn[:modules]
+        {packaged, archives}
+      end
+
+      assert {false, _archives} = build.(options)
+
+      assert {true, archives} = build.(Keyword.put(options, :extra_apps, [:mix]))
+      mix = Map.fetch!(archives, "lib/mix/ebin/Elixir.Mix.beam")
+      {:ok, {Mix, [atoms: atoms]}} = :beam_lib.chunks(mix, [:atoms])
+      assert Enum.any?(atoms, &match?({_index, Popcorn.Fetch}, &1))
+
+      req_ebin = Path.join(build_path, "req/ebin")
+      File.mkdir_p!(req_ebin)
+
+      write_app(Path.join(req_ebin, "req.app"), :req,
+        description: ~c"req",
+        vsn: ~c"0.8.0",
+        modules: [],
+        registered: [],
+        applications: [:kernel, :stdlib]
+      )
+
+      assert {true, _archives} = build.(options)
     end
 
     test "config", %{options: options, out_dir: out_dir} do

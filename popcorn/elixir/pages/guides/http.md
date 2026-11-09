@@ -9,10 +9,9 @@ browser `fetch()` API. You can use it directly or through Req.
 
 Add Req to the application dependencies. We support Req 0.5 through 0.7 and 0.8.0-rc.0.
 
-The adapter is compiled only when Req is available. If you add Req after
-Popcorn has already compiled, recompile it with `mix deps.compile popcorn --force`.
-
 Popcorn installs its Req adapter when running in the browser. If you already customized the adapter, Popcorn won't install its own.
+Code that installs Req with `Mix.install/2` in the browser gets the adapter too, once `Mix.install/2` has started Req.
+The package has the adapter only when it has Req or Mix.
 
 ```elixir
 response = Req.get!("https://api.example.com/status")
@@ -48,6 +47,14 @@ IO.inspect(response.body)
 
 An HTTP error status still returns `{:ok, response}`. Network failures and
 timeouts return `{:error, reason}`.
+
+## Erlang's `:httpc`
+
+When an application uses `:inets`, Popcorn patches `:httpc` to make its
+requests with `Popcorn.Fetch`, so libraries that use it, such as Hex, work in
+the browser. Requests can be synchronous or asynchronous, including streamed to
+the receiver, and `:httpc`'s profiles and options work as in OTP. Proxy, socket
+and redirect options don't apply, and the response body is buffered whole.
 
 ## Browser limits
 

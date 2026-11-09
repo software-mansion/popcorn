@@ -44,6 +44,7 @@ defmodule Popcorn.Packager do
           | {:config, keyword()}
           | {:treeshake, treeshake_options()}
           | {:distribution, boolean()}
+          | {:include_headers, boolean()}
           | {:static_dir, Path.t()}
           | {:otp_apps_dir, Path.t()}
           | {:otp_apps_cache, Path.t()}
@@ -62,7 +63,8 @@ defmodule Popcorn.Packager do
           exclude_priv: [String.t() | {atom(), String.t()}],
           config: keyword(),
           treeshake: treeshake_options(),
-          distribution: boolean()
+          distribution: boolean(),
+          include_headers: boolean()
         }
 
   # True or the options turn tree-shaking on, false off
@@ -188,6 +190,7 @@ defmodule Popcorn.Packager do
         config: [],
         treeshake: false,
         distribution: false,
+        include_headers: false,
         static_dir: Application.app_dir(:popcorn, "priv/static"),
         otp_apps_dir: Application.app_dir(:popcorn, "priv/otp-apps"),
         otp_apps_cache: Application.app_dir(:popcorn, "otp-apps")
@@ -195,11 +198,9 @@ defmodule Popcorn.Packager do
 
     treeshake = validate_treeshake!(options[:treeshake])
 
-    unless is_boolean(options[:distribution]) do
-      raise ArgumentError, """
-      expected the distribution option to be a boolean, \
-      got: #{inspect(options[:distribution])}\
-      """
+    for key <- [:distribution, :include_headers], not is_boolean(options[key]) do
+      raise ArgumentError,
+            "expected the #{key} option to be a boolean, got: #{inspect(options[key])}"
     end
 
     root_dir = Path.expand(options[:root_dir])
@@ -234,7 +235,8 @@ defmodule Popcorn.Packager do
                  exclude_priv: options[:exclude_priv],
                  config: options[:config],
                  treeshake: treeshake,
-                 distribution: options[:distribution]
+                 distribution: options[:distribution],
+                 include_headers: options[:include_headers]
                }),
              {:ok, installed} <-
                install_output(report, static_dir, out_dir, options[:brotli_effort]) do
@@ -269,7 +271,8 @@ defmodule Popcorn.Packager do
       exclude_priv: exclude_priv,
       config: config,
       treeshake: treeshake,
-      distribution: distribution
+      distribution: distribution,
+      include_headers: include_headers
     } = args
 
     toolchain = fetch_toolchain_info()
@@ -285,12 +288,13 @@ defmodule Popcorn.Packager do
          :ok <- check_runtime_otp(otp_apps.otp_version, manifest.version),
          :ok <- check_otp_apps_crypto(otp_apps.apps, manifest.capabilities),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
-         staged_apps = stage_apps(staging_dir, apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info, include_headers),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
          staged_apps =
            staged_apps
            |> remove_build_tools()
+           |> remove_req_adapter()
            |> add_config(config)
            |> configure_kernel(distribution),
          {:ok, staged_apps, treeshake_report} <-
@@ -527,7 +531,7 @@ defmodule Popcorn.Packager do
   end
 
   # Apps are copied out of the host installation so packing can modify them.
-  defp stage_apps(staging_dir, apps_info) do
+  defp stage_apps(staging_dir, apps_info, include_headers) do
     apps_info
     |> async_stream(fn {app, info} ->
       app_dir = Path.join(staging_dir, "#{app}")
@@ -541,9 +545,27 @@ defmodule Popcorn.Packager do
         copy_writable!(priv_dir, Path.join(app_dir, "priv"))
       end
 
+      if headers = include_headers && include_dir(app, info) do
+        copy_writable!(headers, Path.join(app_dir, "include"))
+      end
+
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  # Popcorn's builds of OTP applications have no headers, unlike the host's
+  # applications of the same release
+  defp include_dir(app, info) do
+    host_dirs =
+      case :code.lib_dir(app) do
+        {:error, :bad_name} -> []
+        dir -> [to_string(dir)]
+      end
+
+    [Path.dirname(info.ebin_dir) | host_dirs]
+    |> Enum.map(&Path.join(&1, "include"))
+    |> Enum.find(&File.dir?/1)
   end
 
   defp copy_writable!(source, destination) do
@@ -589,12 +611,17 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
-      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_existing_atom()
+      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
-      ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
-      beam_path = Path.join(ebin_dir, name)
 
-      BeamPatcher.patch_beam(beam_path, patch_path)
+      # Only the packaged applications are patched, like inets when an app needs it
+      case staged_apps do
+        %{^app => %{ebin_dir: ebin_dir}} ->
+          BeamPatcher.patch_beam(Path.join(ebin_dir, name), patch_path)
+
+        %{} ->
+          :ok
+      end
     end)
     |> case do
       {:ok, _} -> :ok
@@ -622,6 +649,26 @@ defmodule Popcorn.Packager do
         end
 
         replace_app_modules(staged_apps, %{popcorn: runtime_modules})
+    end
+  end
+
+  # Req's adapter is of no use without Req, which Mix.install/2 can install
+  defp remove_req_adapter(staged_apps) do
+    case staged_apps do
+      %{req: _} ->
+        staged_apps
+
+      %{mix: _} ->
+        staged_apps
+
+      %{popcorn: info} ->
+        adapter = Popcorn.Fetch.ReqAdapter
+        File.rm!(Path.join(info.ebin_dir, "#{adapter}.beam"))
+        modules = List.delete(Keyword.fetch!(info.props, :modules), adapter)
+        replace_app_modules(staged_apps, %{popcorn: modules})
+
+      %{} ->
+        staged_apps
     end
   end
 

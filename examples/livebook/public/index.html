@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Livebook in Popcorn</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font: 13px/1.5 system-ui;
+      }
+      #status {
+        padding: 4px 12px;
+        border-bottom: 1px solid #ddd;
+      }
+      iframe {
+        flex: 1;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Starting the VM…</div>
+    <script type="module">
+      // The shell owns the tab's VMs and outlives the iframe's navigations.
+      // Livebook runs in the iframe under a path of its own, /tab/<id>/, whose
+      // Service Worker sends the iframe's requests here, through a relay frame:
+      // see sw.js. The iframe's WebSockets are created here.
+      import { Popcorn, createDistributionRelay } from "/out/index.mjs";
+
+      const status = (text) => {
+        document.querySelector("#status").textContent = text;
+        console.log(`[shell] ${text}`);
+      };
+
+      let onStarted;
+      const started = new Promise((resolve) => (onStarted = resolve));
+      const sockets = new Map();
+
+      // Livebook's VM and the notebooks' runtime VMs are Erlang nodes, which
+      // the relay connects
+      const relay = createDistributionRelay();
+      const runtimes = new Map();
+
+      async function handleRuntime({ livebook_runtime: action, node, cookie, pid }) {
+        if (action === "start") {
+          const t0 = performance.now();
+          const runtime = Popcorn.init({
+            distribution: relay,
+            beam: {
+              // The notebooks' VMs boot a package of their own, see notebook_vm/
+              otpAssetsRoot: "/notebook_vm/otp/",
+              extraArgs: ["-name", node, "-setcookie", cookie],
+            },
+          });
+          runtimes.set(node, runtime);
+          try {
+            await runtime;
+            console.log(`[shell] Runtime VM ${node} booted in ${Math.round(performance.now() - t0)} ms`);
+          } catch (error) {
+            // Livebook would wait for the node until it timed out
+            const message = String(error?.message ?? error);
+            console.warn(`[shell] Runtime VM ${node} didn't boot: ${message}`);
+            runtimes.delete(node);
+            popcorn.send(pid, { error: message });
+          }
+        } else if (action === "stop") {
+          const runtime = runtimes.get(node);
+          runtimes.delete(node);
+          (await runtime?.catch(() => null))?.deinit();
+          console.log(`[shell] Runtime VM ${node} stopped`);
+        }
+      }
+
+      // Each page load picks the path, and holds a lock for it while it's open
+      const tab = crypto.randomUUID();
+      const base = `/tab/${tab}`;
+      await new Promise((locked) =>
+        navigator.locks.request(`livebook-tab:${tab}`, () => {
+          locked();
+          return new Promise(() => {});
+        }),
+      );
+      await removeClosedTabs();
+      const workerReady = registerWorker().catch((error) => {
+        status(`The Service Worker didn't start: ${error.message}`);
+        throw error;
+      });
+
+      // The workers of closed tabs, and of the example's earlier versions
+      async function removeClosedTabs() {
+        const { held } = await navigator.locks.query();
+        const open = new Set(held.map((lock) => lock.name));
+        for (const registration of await navigator.serviceWorker.getRegistrations()) {
+          const id = new URL(registration.scope).pathname.match(/^\/tab\/([^/]+)\/$/)?.[1];
+          if (!open.has(`livebook-tab:${id}`)) await registration.unregister();
+        }
+      }
+
+      async function registerWorker() {
+        const registration = await navigator.serviceWorker.register("/sw.js", { scope: `${base}/` });
+        const worker = registration.installing ?? registration.waiting ?? registration.active;
+        while (worker.state !== "activated") {
+          if (worker.state === "redundant") throw new Error("it failed to install");
+          await new Promise((resolve) => worker.addEventListener("statechange", resolve, { once: true }));
+        }
+      }
+
+      const t0 = performance.now();
+      const popcorn = await Popcorn.init({
+        distribution: relay,
+        // Livebook's URLs are under the tab's path, see LivebookWasm.Application
+        beam: { extraArgs: ["-livebook_wasm_base_path", base] },
+        onEvent: (event) => {
+          if (event?.livebook) return onStarted(event);
+          if (event?.livebook_runtime) return handleRuntime(event);
+          const socket = event && sockets.get(event.popcorn_socket);
+          if (!socket) return;
+          if ("close" in event) socket.closed(event.close);
+          else if ("text" in event) socket.onmessage?.({ data: event.text });
+          else socket.onmessage?.({ data: toArrayBuffer(event.binary) });
+        },
+      });
+      status(`VM booted in ${Math.round(performance.now() - t0)} ms, starting Livebook…`);
+
+      // Binary frames that are valid UTF-8 arrive as strings
+      function toArrayBuffer(data) {
+        const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      // Responses built in JavaScript can't set cookies, so the shell keeps them
+      const jar = new Map();
+
+      // The shell sets these. The browser doesn't decode responses built in
+      // JavaScript, so the VM mustn't compress them.
+      const replaced = ["host", "cookie", "accept-encoding"];
+
+      async function request(method, url, headers = [], body = "") {
+        const target = new URL(url, location.href);
+        // Livebook expects the tab's path removed, as a reverse proxy would
+        if (target.pathname.startsWith(`${base}/`)) target.pathname = target.pathname.slice(base.length);
+        const all = headers.filter(([name]) => !replaced.includes(name.toLowerCase()));
+        all.push(["host", target.host]);
+        if (jar.size) all.push(["cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; ")]);
+
+        const resp = await popcorn.call(
+          "livebook_wasm_plug",
+          { method, url: target.href, headers: all, body },
+          { timeoutMs: 120_000 },
+        );
+
+        for (const [name, value] of resp.headers ?? []) {
+          if (name !== "set-cookie") continue;
+          const [pair] = value.split(";");
+          const i = pair.indexOf("=");
+          const [key, val] = [pair.slice(0, i).trim(), pair.slice(i + 1).trim()];
+          if (/max-age=0/i.test(value)) jar.delete(key);
+          else jar.set(key, val);
+        }
+        return resp;
+      }
+
+      // A WebSocket whose other end is a socket process in the VM
+      class PopcornWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+
+        constructor(url) {
+          this.url = url;
+          this.readyState = 0;
+          this.bufferedAmount = 0;
+          const target = new URL(url);
+          target.protocol = target.protocol === "wss:" ? "https:" : "http:";
+          const headers = [
+            ["origin", location.origin],
+            ["connection", "Upgrade"],
+            ["upgrade", "websocket"],
+            ["sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="],
+            ["sec-websocket-version", "13"],
+          ];
+          request("GET", target.href, headers).then(
+            (resp) => {
+              if (resp.status !== 101) {
+                console.warn(`[shell] WebSocket ${target.pathname} refused: ${resp.status}`);
+                return this.closed(1006);
+              }
+              this.pid = resp.socket;
+              this.id = resp.id;
+              sockets.set(this.id, this);
+              this.readyState = 1;
+              this.onopen?.({});
+            },
+            (error) => {
+              console.warn(`[shell] WebSocket ${target.pathname} failed: ${error?.message ?? error}`);
+              this.closed(1006);
+            },
+          );
+        }
+
+        send(data) {
+          popcorn.send(this.pid, typeof data === "string" ? { text: data } : { binary: data });
+        }
+
+        close(code) {
+          if (this.readyState === 3) return;
+          if (this.pid) popcorn.send(this.pid, { close: code ?? 1000 });
+          this.closed(code ?? 1000);
+        }
+
+        closed(code) {
+          if (this.readyState === 3) return;
+          this.readyState = 3;
+          sockets.delete(this.id);
+          this.onclose?.({ code, wasClean: code === 1000 });
+        }
+      }
+
+      // Serves the requests that the Service Worker sends to the relay frame
+      async function serve(req) {
+        try {
+          const resp = await request(req.method, req.url, req.headers, req.body);
+          return { status: resp.status, headers: resp.headers ?? [], body: resp.body };
+        } catch (error) {
+          return { status: 502, headers: [], body: String(error?.message ?? error) };
+        }
+      }
+
+      window.popcornBridge = { WebSocket: PopcornWebSocket, serve };
+
+      await workerReady;
+      const event = await started;
+      status(`Livebook started in ${event.ms} ms, as ${event.node}`);
+      window.livebookStarted = event;
+
+      // The relay frame goes first, as the Service Worker sends Livebook's
+      // first page through it
+      await addFrame(`${base}/popcorn-relay`, { hidden: true });
+
+      // Livebook's links, like /import?url=…, open in the tab's Livebook
+      const path = location.pathname === "/index.html" ? "/" : location.pathname;
+      await addFrame(`${base}${path}${location.search}`, { id: "livebook" });
+
+      // Livebook has opened the link by the time its page loads, so reloading
+      // mustn't open it again
+      history.replaceState(null, "", "/");
+
+      function addFrame(src, props) {
+        const frame = Object.assign(document.createElement("iframe"), props, { src });
+        document.body.append(frame);
+        return new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+      }
+    </script>
+  </body>
+</html>
