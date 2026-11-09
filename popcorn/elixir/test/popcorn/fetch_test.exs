@@ -64,6 +64,22 @@ defmodule Popcorn.FetchTest do
       assert Base.decode64!(encoded_body) == @binary
     end
 
+    # The browser decompresses bodies, which these headers describe compressed
+    test "leaves out the compressed body's encoding and length" do
+      FakeBridge.stub_fetch(%{
+        status: 200,
+        headers: [
+          {"content-type", "application/json"},
+          {"content-encoding", "gzip"},
+          {"content-length", "3"}
+        ],
+        chunks: [~s({"a":1})]
+      })
+
+      assert {:ok, %{headers: [{"content-type", "application/json"}], body: ~s({"a":1})}} =
+               Fetch.request(%{method: "GET", url: "https://example.test/x"})
+    end
+
     test "omits the body key entirely when there is none" do
       FakeBridge.stub_fetch(%{chunks: []})
 
@@ -189,6 +205,17 @@ defmodule Popcorn.FetchTest do
 
       assert ["x-test", "1"] in FakeBridge.fetch_request().headers
       assert Base.decode64!(encoded_body) == "payload"
+    end
+
+    test "decodes bodies that the browser has decompressed" do
+      FakeBridge.stub_fetch(%{
+        status: 200,
+        headers: [{"content-type", "application/json"}, {"content-encoding", "br"}],
+        chunks: [~s({"a":), ~s(1})]
+      })
+
+      assert %{status: 200, body: %{"a" => 1}} =
+               Req.get!("https://example.test/x", adapter: adapter())
     end
 
     test "returns a TransportError so retry and error steps behave normally" do
