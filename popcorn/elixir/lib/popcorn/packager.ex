@@ -195,7 +195,7 @@ defmodule Popcorn.Packager do
 
     treeshake = validate_treeshake!(options[:treeshake])
 
-    unless is_boolean(options[:distribution]) do
+    if not is_boolean(options[:distribution]) do
       raise ArgumentError, """
       expected the distribution option to be a boolean, \
       got: #{inspect(options[:distribution])}\
