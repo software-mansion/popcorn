@@ -30,7 +30,7 @@ defmodule Popcorn.Fetch do
 
   - Cross-origin requests need permission from the target server's CORS policy.
   - The browser follows redirects. Req's `:max_redirects` and `:redirect_log_level` options do not control those redirects.
-  - The browser decompresses responses. Req's `:raw` option cannot preserve compressed response bytes.
+  - The browser decompresses responses. Responses leave out the `content-encoding` and `content-length` headers of compressed bodies, and Req's `:raw` option cannot preserve compressed response bytes.
   - The browser controls restricted headers, such as `Host` and `Cookie`.
   """
 
@@ -733,7 +733,8 @@ defmodule Popcorn.Fetch do
   end
 
   defp decode(%{"event" => "status", "status" => status, "headers" => headers}) do
-    {:head, status, Enum.map(headers, fn [name, value] -> {name, value} end)}
+    headers = Enum.map(headers, fn [name, value] -> {name, value} end)
+    {:head, status, decompressed(headers)}
   end
 
   defp decode(%{"event" => "chunk", "data" => data}), do: {:chunk, Base.decode64!(data)}
@@ -752,6 +753,16 @@ defmodule Popcorn.Fetch do
   end
 
   defp hint(message), do: message
+
+  # The browser decompresses bodies, which these headers describe compressed. Req
+  # wouldn't decode a body that they say is compressed.
+  defp decompressed(headers) do
+    if List.keymember?(headers, "content-encoding", 0) do
+      Enum.reject(headers, fn {name, _value} -> name in ["content-encoding", "content-length"] end)
+    else
+      headers
+    end
+  end
 
   defp cancel(handle) do
     JS.run(@abort_js, %{controller: handle.controller})
