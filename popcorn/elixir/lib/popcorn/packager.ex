@@ -44,6 +44,7 @@ defmodule Popcorn.Packager do
           | {:config, keyword()}
           | {:treeshake, treeshake_options()}
           | {:distribution, boolean()}
+          | {:include_headers, boolean()}
           | {:static_dir, Path.t()}
           | {:otp_apps_dir, Path.t()}
           | {:otp_apps_cache, Path.t()}
@@ -62,7 +63,8 @@ defmodule Popcorn.Packager do
           exclude_priv: [String.t() | {atom(), String.t()}],
           config: keyword(),
           treeshake: treeshake_options(),
-          distribution: boolean()
+          distribution: boolean(),
+          include_headers: boolean()
         }
 
   # True or the options turn tree-shaking on, false off
@@ -188,6 +190,7 @@ defmodule Popcorn.Packager do
         config: [],
         treeshake: false,
         distribution: false,
+        include_headers: false,
         static_dir: Application.app_dir(:popcorn, "priv/static"),
         otp_apps_dir: Application.app_dir(:popcorn, "priv/otp-apps"),
         otp_apps_cache: Application.app_dir(:popcorn, "otp-apps")
@@ -199,6 +202,13 @@ defmodule Popcorn.Packager do
       raise ArgumentError, """
       expected the distribution option to be a boolean, \
       got: #{inspect(options[:distribution])}\
+      """
+    end
+
+    unless is_boolean(options[:include_headers]) do
+      raise ArgumentError, """
+      expected the include_headers option to be a boolean, \
+      got: #{inspect(options[:include_headers])}\
       """
     end
 
@@ -234,7 +244,8 @@ defmodule Popcorn.Packager do
                  exclude_priv: options[:exclude_priv],
                  config: options[:config],
                  treeshake: treeshake,
-                 distribution: options[:distribution]
+                 distribution: options[:distribution],
+                 include_headers: options[:include_headers]
                }),
              {:ok, installed} <-
                install_output(report, static_dir, out_dir, options[:brotli_effort]) do
@@ -269,7 +280,8 @@ defmodule Popcorn.Packager do
       exclude_priv: exclude_priv,
       config: config,
       treeshake: treeshake,
-      distribution: distribution
+      distribution: distribution,
+      include_headers: include_headers
     } = args
 
     toolchain = fetch_toolchain_info()
@@ -285,7 +297,7 @@ defmodule Popcorn.Packager do
          :ok <- check_runtime_otp(otp_apps.otp_version, manifest.version),
          :ok <- check_otp_apps_crypto(otp_apps.apps, manifest.capabilities),
          :ok <- check_capabilities(apps_info, manifest.capabilities),
-         staged_apps = stage_apps(staging_dir, apps_info),
+         staged_apps = stage_apps(staging_dir, apps_info, include_headers),
          remove_priv_files(staged_apps, @excluded_priv ++ exclude_priv),
          :ok <- patch_apps(staged_apps),
          staged_apps =
@@ -527,7 +539,7 @@ defmodule Popcorn.Packager do
   end
 
   # Apps are copied out of the host installation so packing can modify them.
-  defp stage_apps(staging_dir, apps_info) do
+  defp stage_apps(staging_dir, apps_info, include_headers) do
     apps_info
     |> async_stream(fn {app, info} ->
       app_dir = Path.join(staging_dir, "#{app}")
@@ -541,9 +553,27 @@ defmodule Popcorn.Packager do
         copy_writable!(priv_dir, Path.join(app_dir, "priv"))
       end
 
+      if headers = include_headers && include_dir(app, info) do
+        copy_writable!(headers, Path.join(app_dir, "include"))
+      end
+
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  # Popcorn's builds of OTP applications have no headers, unlike the host's
+  # applications of the same release
+  defp include_dir(app, info) do
+    host_dirs =
+      case :code.lib_dir(app) do
+        {:error, :bad_name} -> []
+        dir -> [to_string(dir)]
+      end
+
+    [Path.dirname(info.ebin_dir) | host_dirs]
+    |> Enum.map(&Path.join(&1, "include"))
+    |> Enum.find(&File.dir?/1)
   end
 
   defp copy_writable!(source, destination) do
