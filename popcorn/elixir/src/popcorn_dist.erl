@@ -51,19 +51,19 @@ listen(Name, Host) ->
     Node = list_to_atom(atom_to_list(Name) ++ "@" ++ Host),
     {ok, {Router, (address())#net_address{address = Node, host = Host}, creation()}}.
 
-%% net_kernel stops: the node no longer accepts connections, until a new
-%% acceptor registers
-close(Router) ->
-    Router ! {acceptor, undefined},
-    announce(null).
+%% net_kernel stops, or failed to set the node name while starting, before
+%% anything was announced. The router learns that distribution stopped from
+%% net_kernel going down, as net_kernel doesn't call this for a node that
+%% doesn't listen.
+close(_Router) ->
+    ok.
 
 %% Incoming connections, which the router announces. The node is announced
 %% only now, once it can accept them, and again when net_kernel restarts the
-%% acceptor.
+%% acceptor. net_kernel calls this, so self() is net_kernel.
 accept(Router) ->
     Acceptor = spawn_opt(?MODULE, accept_loop, [self()], [link, {priority, max}]),
-    Router ! {acceptor, Acceptor},
-    announce(node()),
+    Router ! {accepting, self(), node(), Acceptor},
     Acceptor.
 
 accept_loop(Kernel) ->
@@ -109,13 +109,10 @@ do_accept(Kernel, AcceptPid, Ctrl, MyNode, Allowed, SetupTime) ->
 %% now, before its first connection, so that JavaScript can close its
 %% connections when the VM exits. Announcing it again changes nothing. A
 %% dynamic name, undefined@Host, isn't the node's: the first handshake gives
-%% the node its name, which the controller announces then.
+%% the node its name, which the router announces then.
 setup(Node, Type, MyNode, LongOrShortNames, SetupTime) ->
-    _ = start_router(),
-    case atom_to_list(MyNode) of
-        "undefined@" ++ _ -> ok;
-        _ -> announce(MyNode)
-    end,
+    Router = start_router(),
+    Router ! {connecting, self(), MyNode},
     spawn_opt(?MODULE, do_setup, [self(), Node, Type, MyNode, LongOrShortNames, SetupTime],
               dist_util:net_ticker_spawn_options()).
 
@@ -162,12 +159,28 @@ start_router() ->
 
 router_init() ->
     process_flag(trap_exit, true),
-    router(#{acceptor => undefined, connections => #{}}).
+    router(#{kernel => undefined, acceptor => undefined, connections => #{}}).
 
-router(State = #{connections := Connections}) ->
+router(State) ->
     receive
-        {acceptor, Pid} ->
-            router(State#{acceptor := Pid});
+        %% The router announces the node, so that the announcements keep their
+        %% order, and it watches net_kernel, which runs the node
+        {accepting, Kernel, Node, Acceptor} ->
+            State1 = watch_kernel(Kernel, State),
+            announce_node(Node),
+            router(State1#{acceptor := Acceptor});
+
+        {connecting, Kernel, Node} ->
+            State1 = watch_kernel(Kernel, State),
+            announce_node(Node),
+            router(State1);
+
+        {named, Node} ->
+            case State of
+                #{kernel := {_, _}} -> announce_node(Node);
+                #{} -> ok
+            end,
+            router(State);
 
         {wasm, Event} ->
             router(incoming(Event, State));
@@ -177,22 +190,29 @@ router(State = #{connections := Connections}) ->
             From ! {Ref, ok},
             router(watch(Connection, Ctrl, Reader, State));
 
-        %% The connection is down, which the other end learns from JavaScript.
-        %% The reader is linked to the controller, unless the controller died
-        %% before it could link.
         {'DOWN', Ref, process, _Pid, _Reason} ->
-            case [C || C := #{ref := R} <- Connections, R =:= Ref] of
-                [Connection] ->
-                    #{Connection := #{reader := Reader}} = Connections,
-                    exit(Reader, connection_closed),
-                    to_js(#{type => disconnect, connection => Connection}),
-                    router(State#{connections := maps:remove(Connection, Connections)});
-                [] ->
-                    router(State)
-            end;
+            router(down(Ref, State));
 
         _Other ->
             router(State)
+    end.
+
+%% Distribution stopped, as net_kernel stopped
+down(Ref, State = #{kernel := {_Kernel, Ref}}) ->
+    announce(null),
+    State#{kernel := undefined, acceptor := undefined};
+%% A connection is down, which the other end learns from JavaScript. The
+%% reader is linked to the controller, unless the controller died before it
+%% could link.
+down(Ref, State = #{connections := Connections}) ->
+    case [C || C := #{ref := R} <- Connections, R =:= Ref] of
+        [Connection] ->
+            #{Connection := #{reader := Reader}} = Connections,
+            exit(Reader, connection_closed),
+            to_js(#{type => disconnect, connection => Connection}),
+            State#{connections := maps:remove(Connection, Connections)};
+        [] ->
+            State
     end.
 
 %% Events from the transport
@@ -231,6 +251,27 @@ incoming(#{<<"type">> := <<"disconnect">>, <<"connection">> := Connection},
     end;
 incoming(_Event, State) ->
     State.
+
+%% A new net_kernel has no acceptor until it registers one. It can only start
+%% once the previous one stopped, even if the router hasn't seen that yet.
+watch_kernel(Kernel, State = #{kernel := {Kernel, _Ref}}) ->
+    State;
+watch_kernel(Kernel, State = #{kernel := Previous}) ->
+    case Previous of
+        {_, PreviousRef} ->
+            demonitor(PreviousRef, [flush]),
+            announce(null);
+        undefined ->
+            ok
+    end,
+    State#{kernel := {Kernel, monitor(process, Kernel)}, acceptor := undefined}.
+
+%% A dynamic name, undefined@Host, isn't the node's
+announce_node(Node) ->
+    case atom_to_list(Node) of
+        "undefined@" ++ _ -> ok;
+        _ -> announce(Node)
+    end.
 
 watch(Connection, Ctrl, Reader, State = #{connections := Connections}) ->
     Entry = #{ctrl => Ctrl, reader => Reader, ref => monitor(process, Ctrl)},
@@ -299,7 +340,7 @@ handshake_loop(State = #{connection := Connection, reader := Reader}) ->
         %% The node has its name by now, even a dynamic one
         {Ref, From, {handshake_complete, _Node, DHandle}} ->
             From ! {Ref, ok},
-            announce(node()),
+            ?ROUTER ! {named, node()},
             ok = erlang:dist_ctrl_input_handler(DHandle, Reader),
             Reader ! {handshake_complete, DHandle},
             %% As in gen_tcp_dist: no longer at max priority, as it sends all
@@ -358,7 +399,8 @@ handshake_reader(State = #{buffer := Buffer}) ->
                     handshake_reader(State)
             end;
 
-        %% The rest of the data, after what it has, goes to the VM
+        %% From now on the data goes to the VM: what the reader has first,
+        %% then what arrives
         {handshake_complete, DHandle} ->
             process_flag(priority, normal),
             input_loop(DHandle, put_packets(DHandle, Buffer))
