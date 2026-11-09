@@ -544,6 +544,54 @@ test.describe("run_js", () => {
     });
   });
 
+  // Binaries other than short strings are sent after the message's JSON
+  test("attached binaries", async ({ otp }) => {
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        Bytes = binary:copy(<<0, 165, 255>>, 349525),
+        Text = binary:copy(<<"é"/utf8>>, 50000),
+        Code = <<"// ", (binary:copy(<<"padding ">>, 200))/binary, "\\n",
+                 "({bytes, text, small, nested, marker}) => ({",
+                 "  bytes: [bytes instanceof Uint8Array, bytes.length, bytes.buffer.byteLength,",
+                 "          bytes[0], bytes[1], bytes[2], bytes[bytes.length - 1]],",
+                 "  text: [typeof text, text.length, text[0]],",
+                 "  small: [small instanceof Uint8Array, ...small],",
+                 "  nested: [nested.list[0].length, nested.tuple[1].length, nested.map.bytes.length],",
+                 "  marker,",
+                 "  echo: bytes",
+                 "})">>,
+        Result = wasm:run_js(Code, #{
+          bytes => Bytes,
+          text => Text,
+          small => <<0, 255>>,
+          nested => #{list => [Bytes], tuple => {1, Text}, map => #{bytes => Bytes}},
+          marker => #{<<"popcorn_value">> => [<<"binary_attachment">>, 0]}
+        }),
+        {Echo, Checks} = maps:take(<<"echo">>, Result),
+        ok = wasm:send(Checks#{<<"echoed">> => Echo =:= Bytes}),
+        ok = wasm:send(#{event_bytes => Bytes}).
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("bytes")).toEqual({
+      bytes: [true, 1048575, 1048575, 0, 165, 255, 255],
+      text: ["string", 50000, "é"],
+      small: [true, 0, 255],
+      nested: [1048575, 50000, 1048575],
+      marker: { popcorn_value: ["binary_attachment", 0] },
+      echoed: true,
+    });
+    const event = await otp.eventValueHandle<Uint8Array>("event_bytes");
+    expect(
+      await event.evaluate((bytes) => [
+        bytes instanceof Uint8Array,
+        bytes.length,
+      ]),
+    ).toEqual([true, 1048575]);
+    await event.dispose();
+  });
+
   test("errors", async ({ otp, page }) => {
     const browserError = page.waitForEvent("pageerror");
     const boot = await otp.tryBoot(

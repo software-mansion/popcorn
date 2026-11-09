@@ -175,44 +175,126 @@ function isNameTarget(
   return Object.hasOwn(target, "name");
 }
 
-export function deserializeBridgeMessage(
-  text: string,
-): Extract<
+type BridgeEvent = Extract<
   BeamEvent,
   { type: "otp:message" | "otp:error" | "otp:run_js" | "otp:await-ready" }
-> | null {
+>;
+
+const TEXT = new TextDecoder();
+
+// The buffers of binaries attached to events from the VM, which toMain()
+// transfers rather than copies
+const attachedBuffers = new WeakMap<object, ArrayBuffer[]>();
+
+/**
+ * Reads a message from the VM: JSON, or JSON with binaries attached to it,
+ * which it refers to by their index. Those messages are bytes: a 0 byte, the
+ * JSON and each attachment, after their sizes as 32-bit little-endian
+ * integers. See `wasm.erl`.
+ */
+export function deserializeBridgeMessage(
+  message: string | Uint8Array,
+): BridgeEvent | null {
   try {
-    const parsed = JSON.parse(text) as unknown;
+    const { json, attachments } = readMessage(message);
+    const parsed = resolveAttachments(JSON.parse(json), attachments);
     if (!isBridgeEnvelope(parsed)) return null;
 
-    switch (parsed.type) {
-      case "vm_message":
-        return { type: "otp:message", payload: parsed.data };
-      case "vm_error":
-        return {
-          type: "otp:error",
-          payload: { kind: "error", data: parsed.data },
-        };
-      case "run_js":
-        return {
-          type: "otp:run_js",
-          payload: {
-            code: parsed.code,
-            args: parsed.args,
-            replyTo: base64ToBytes(parsed.reply_to),
-            return: parsed.return,
-          },
-        };
-      case "await_ready":
-        return {
-          type: "otp:await-ready",
-          payload: { replyTo: base64ToBytes(parsed.reply_to) },
-        };
-      default:
-        return null;
+    const event = bridgeEvent(parsed);
+    if (event !== null && attachments.length > 0) {
+      attachedBuffers.set(
+        event,
+        attachments.map((attachment) => attachment.buffer),
+      );
     }
+    return event;
   } catch {
     return null;
+  }
+}
+
+function readMessage(message: string | Uint8Array): {
+  json: string;
+  attachments: Uint8Array<ArrayBuffer>[];
+} {
+  if (typeof message === "string") return { json: message, attachments: [] };
+
+  check(message[0] === 0);
+  const view = new DataView(
+    message.buffer,
+    message.byteOffset,
+    message.byteLength,
+  );
+  const jsonSize = view.getUint32(1, true);
+  const json = TEXT.decode(message.subarray(5, 5 + jsonSize));
+  const attachments = [];
+  let offset = 5 + jsonSize;
+  while (offset < message.byteLength) {
+    const size = view.getUint32(offset, true);
+    check(offset + 4 + size <= message.byteLength);
+    // A copy of its own, as a view of the message would expose the rest of it
+    attachments.push(message.slice(offset + 4, offset + 4 + size));
+    offset += 4 + size;
+  }
+  return { json, attachments };
+}
+
+// Replaces the markers of attachments with their bytes, or text for strings
+function resolveAttachments(
+  value: unknown,
+  attachments: Uint8Array<ArrayBuffer>[],
+): unknown {
+  if (attachments.length === 0) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveAttachments(item, attachments));
+  }
+  const object = objectWithKeys(value, []);
+  if (object === null) return value;
+
+  const marker = objectWithKeys(value, ["popcorn_value"]);
+  if (marker !== null && Object.keys(marker).length === 1) {
+    const [tag, index] = marker.popcorn_value as unknown[];
+    if (tag === "binary_attachment" || tag === "string_attachment") {
+      check(typeof index === "number");
+      const attachment = attachments[index];
+      check(attachment !== undefined);
+      return tag === "binary_attachment" ? attachment : TEXT.decode(attachment);
+    }
+  }
+
+  const entries = Object.entries(object).map(([key, item]) => [
+    key,
+    resolveAttachments(item, attachments),
+  ]);
+  return Object.fromEntries(entries);
+}
+
+function bridgeEvent(parsed: BridgeEnvelope): BridgeEvent | null {
+  switch (parsed.type) {
+    case "vm_message":
+      return { type: "otp:message", payload: parsed.data };
+    case "vm_error":
+      return {
+        type: "otp:error",
+        payload: { kind: "error", data: parsed.data },
+      };
+    case "run_js":
+      return {
+        type: "otp:run_js",
+        payload: {
+          code: parsed.code,
+          args: parsed.args,
+          replyTo: base64ToBytes(parsed.reply_to),
+          return: parsed.return,
+        },
+      };
+    case "await_ready":
+      return {
+        type: "otp:await-ready",
+        payload: { replyTo: base64ToBytes(parsed.reply_to) },
+      };
+    default:
+      return null;
   }
 }
 
@@ -231,6 +313,8 @@ export function toMain(event: VmToMainEvent): void {
 }
 
 function getTransferables(event: VmToMainEvent): Transferable[] {
+  const attached = attachedBuffers.get(event);
+  if (attached !== undefined) return attached;
   const isTtyEvent = event.type === "otp:stdout" || event.type === "otp:stderr";
   if (!isTtyEvent) return [];
   check(event.payload.buffer instanceof ArrayBuffer);

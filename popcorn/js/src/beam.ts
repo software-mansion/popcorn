@@ -118,11 +118,11 @@ async function boot(
         emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
       onExit: (code) => emitError?.({ kind: "exit", data: code }),
       onAbort: (text) => emitError?.({ kind: "abort", data: text }),
-      onBeamMessage: (text) => {
+      onBeamMessage: (message) => {
         if (emitError === null) {
           return;
         }
-        const event = deserializeBridgeMessage(text);
+        const event = deserializeBridgeMessage(message);
         if (event === null) return;
         if (event.type === "otp:error") {
           emitError(event.payload);

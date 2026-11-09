@@ -101,7 +101,10 @@ export function encode(
 
 class Encoder {
   private readonly ancestors = new Set<object>();
-  private readonly output: number[] = [];
+  // Grows as needed. Binaries are copied into it whole, which a number[]
+  // would take a push per byte for.
+  private output = new Uint8Array(256);
+  private length = 0;
   private readonly buffer = new ArrayBuffer(8);
   private readonly view = new DataView(this.buffer);
 
@@ -110,7 +113,7 @@ class Encoder {
   encode(value: unknown): Uint8Array<ArrayBuffer> {
     this.byte(VERSION);
     this.value(value);
-    return new Uint8Array(this.output);
+    return this.output.slice(0, this.length);
   }
 
   private value(value: unknown): void {
@@ -316,10 +319,17 @@ class Encoder {
     this.entries(entries, value);
   }
 
-  private termBytes(value: unknown): number[] {
-    const start = this.output.length;
+  private termBytes(value: unknown): Uint8Array {
+    const start = this.length;
     this.value(value);
-    return this.output.splice(start);
+    return this.takeFrom(start);
+  }
+
+  // Removes the output from `start` on, and returns it
+  private takeFrom(start: number): Uint8Array {
+    const bytes = this.output.slice(start, this.length);
+    this.length = start;
+    return bytes;
   }
 
   private mapBytes(
@@ -343,14 +353,14 @@ class Encoder {
       }
       unique.push(entry);
     }
-    const start = this.output.length;
+    const start = this.length;
     this.byte(MAP_EXT);
     this.uint32(unique.length);
     for (const entry of unique) {
       this.bytes(entry.key);
       this.bytes(entry.value);
     }
-    return new Uint8Array(this.output.splice(start));
+    return this.takeFrom(start);
   }
 
   private entries(
@@ -382,14 +392,30 @@ class Encoder {
     this.bytes(bytes);
   }
 
+  private reserve(size: number): void {
+    if (this.length + size <= this.output.length) return;
+    const output = new Uint8Array(
+      Math.max(this.output.length * 2, this.length + size),
+    );
+    output.set(this.output.subarray(0, this.length));
+    this.output = output;
+  }
+
   private byte(value: number): void {
-    this.output.push(value);
+    this.reserve(1);
+    this.output[this.length++] = value;
   }
 
   private bytes(values: ArrayLike<number>): void {
-    for (let index = 0; index < values.length; index++) {
-      this.output.push(values[index]);
+    this.reserve(values.length);
+    if (values instanceof Uint8Array) {
+      this.output.set(values, this.length);
+    } else {
+      for (let index = 0; index < values.length; index++) {
+        this.output[this.length + index] = values[index];
+      }
     }
+    this.length += values.length;
   }
 
   private uint32(value: number): void {
@@ -417,7 +443,7 @@ function err(reason: UnserializableReason, part: unknown): TypeError {
   return new TypeError(reason, { cause: part });
 }
 
-function compareBytes(a: number[], b: number[], start = 0): number {
+function compareBytes(a: Uint8Array, b: Uint8Array, start = 0): number {
   const length = Math.min(a.length, b.length);
   for (let i = start; i < length; i++) {
     if (a[i] !== b[i]) return a[i] - b[i];
@@ -425,7 +451,7 @@ function compareBytes(a: number[], b: number[], start = 0): number {
   return a.length - b.length;
 }
 
-function compareKeys(left: number[], right: number[]): number {
+function compareKeys(left: Uint8Array, right: Uint8Array): number {
   const leftTag = left[0];
   const rightTag = right[0];
   const binaryKeys = leftTag === BINARY_EXT && rightTag === BINARY_EXT;

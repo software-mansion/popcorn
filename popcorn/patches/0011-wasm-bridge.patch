@@ -122,10 +122,10 @@ index 0000000000000000000000000000000000000000..3a03cf66dc36e38eeeb7142bb0817c4b
 +});
 diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc08c15a0cb
+index 0000000000000000000000000000000000000000..a1fef47aa8000097a5367ae7065cfdfeaf9dc0c3
 --- /dev/null
 +++ b/erts/emulator/js_bridge/js_bridge.js
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,46 @@
 +mergeInto(LibraryManager.library, {
 +  js_bridge_on_from_beam_async__proxy: 'async',
 +  js_bridge_on_from_beam_async__sig: 'vii',
@@ -133,7 +133,11 @@ index 0000000000000000000000000000000000000000..80870eaa00f0d8e57f8987457378adc0
 +    var envelope;
 +
 +    try {
-+      envelope = UTF8ToString(data, len);
++      // A message with binaries attached starts with a 0 byte, and isn't
++      // text, see wasm.erl
++      envelope = len > 0 && HEAPU8[data] === 0
++        ? HEAPU8.slice(data, data + len)
++        : UTF8ToString(data, len);
 +    } finally {
 +      _free(data);
 +    }
@@ -1179,10 +1183,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7945981e2
+index 0000000000000000000000000000000000000000..96675501b7b30008e6480f44225594e64c2fc040
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,242 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1216,12 +1220,18 @@ index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
++%% The binaries that encode_arg/2 attaches to the message it encodes
++-define(ATTACHMENTS, '$wasm_attachments').
++
++%% Shorter strings are cheaper to send in the JSON than attached
++-define(MIN_ATTACHED_STRING, 1024).
++
 +%% Accepts more than a json:encode_value(): pids, bytes/1, tuples and
 +%% `{'__wasm_tracked_value__', _}` handles are encoded by encode_arg/2.
 +-spec send(term()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
++    ok = send_raw(encode(Envelope)),
 +    ?MODULE:keep_alive(Envelope),
 +    ok.
 +
@@ -1239,7 +1249,7 @@ index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7
 +    ReplyTo = base64:encode(term_to_binary({self(), Token})),
 +    Envelope = #{type => run_js, code => Code, args => Args,
 +                 reply_to => ReplyTo, return => Return},
-+    ok = send_raw(iolist_to_binary(json:encode(Envelope, fun encode_arg/2))),
++    ok = send_raw(encode(Envelope)),
 +    Reply = receive
 +                {wasm, {Token, Payload}} -> Payload
 +            after Timeout ->
@@ -1307,12 +1317,37 @@ index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7
 +unserializable_reason(<<"non-finite-float">>) -> non_finite_float;
 +unserializable_reason(<<"unsupported">>) -> unsupported.
 +
++%% Binaries other than short strings are attached after the JSON rather than
++%% encoded in it, as base64 or escaped strings, which takes long in Erlang. A
++%% message with attachments starts with a 0 byte, which JSON never does,
++%% followed by the JSON and each attachment, each after its size in bytes, as a
++%% 32-bit little-endian integer.
++encode(Envelope) ->
++    put(?ATTACHMENTS, {0, []}),
++    try json:encode(Envelope, fun encode_arg/2) of
++        Json ->
++            case get(?ATTACHMENTS) of
++                {0, []} ->
++                    Json;
++                {_, Attachments} ->
++                    [<<0, (iolist_size(Json)):32/little>>, Json
++                     | [[<<(byte_size(A)):32/little>>, A] || A <- lists:reverse(Attachments)]]
++            end
++    after
++        erase(?ATTACHMENTS)
++    end.
++
++attach(Tag, Binary, Encoder) ->
++    {Count, Attachments} = get(?ATTACHMENTS),
++    put(?ATTACHMENTS, {Count + 1, [Binary | Attachments]}),
++    value_tag(Tag, Count, Encoder).
++
 +encode_arg(nil, Encoder) ->
 +    json:encode_value(null, Encoder);
 +encode_arg({'__wasm_tracked_value__', Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
 +encode_arg({'__wasm_bytes__', Binary}, Encoder) when is_binary(Binary) ->
-+    value_tag(binary, base64:encode(Binary), Encoder);
++    attach(binary_attachment, Binary, Encoder);
 +encode_arg(Pid, Encoder) when is_pid(Pid) ->
 +    json:encode_value(#{popcorn_pid => base64:encode(term_to_binary(Pid))}, Encoder);
 +encode_arg(Integer, Encoder) when is_integer(Integer),
@@ -1320,8 +1355,9 @@ index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7
 +    value_tag(integer, integer_to_binary(Integer), Encoder);
 +encode_arg(Binary, Encoder) when is_binary(Binary) ->
 +    case unicode:characters_to_binary(Binary, utf8, utf8) of
-+        Binary -> json:encode_binary(Binary);
-+        _ -> value_tag(binary, base64:encode(Binary), Encoder)
++        Binary when byte_size(Binary) < ?MIN_ATTACHED_STRING -> json:encode_binary(Binary);
++        Binary -> attach(string_attachment, Binary, Encoder);
++        _ -> attach(binary_attachment, Binary, Encoder)
 +    end;
 +encode_arg(#{'__struct__' := 'Elixir.DateTime'} = DateTime, Encoder) ->
 +    #{calendar := Calendar, microsecond := {Microsecond, _}} = DateTime,

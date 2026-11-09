@@ -475,6 +475,8 @@ build_beam() {
     local link_settings="${extra_emcc_link_flags} ${make_settings}"
     if [[ "${clock_library}" -nt "${wasm_bin_dir}/beam.emu" ]] ||
         [[ "${mailbox_library}" -nt "${wasm_bin_dir}/beam.emu" ]] ||
+        [[ "${js_bridge_dir}/beam-bridge.pre.js" -nt "${wasm_bin_dir}/beam.emu" ]] ||
+        [[ "${js_bridge_dir}/js_bridge.js" -nt "${wasm_bin_dir}/beam.emu" ]] ||
         [[ "$(cat "${link_stamp}" 2>/dev/null)" != "${link_settings}" ]]; then
         rm -f "${wasm_bin_dir}/beam.emu" "${wasm_bin_dir}/beam.smp"
     fi
