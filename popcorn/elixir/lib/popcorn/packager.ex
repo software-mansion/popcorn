@@ -290,7 +290,7 @@ defmodule Popcorn.Packager do
          :ok <- patch_apps(staged_apps),
          staged_apps =
            staged_apps
-           |> remove_build_tools()
+           |> drop_unused_modules()
            |> add_config(config)
            |> configure_kernel(distribution),
          {:ok, staged_apps, treeshake_report} <-
@@ -589,12 +589,16 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
-      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_existing_atom()
+      app = patch_path |> Path.dirname() |> Path.basename() |> String.to_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
-      ebin_dir = Map.fetch!(staged_apps, app).ebin_dir
-      beam_path = Path.join(ebin_dir, name)
 
-      BeamPatcher.patch_beam(beam_path, patch_path)
+      case staged_apps do
+        %{^app => %{ebin_dir: ebin_dir}} ->
+          BeamPatcher.patch_beam(Path.join(ebin_dir, name), patch_path)
+
+        %{} ->
+          :ok
+      end
     end)
     |> case do
       {:ok, _} -> :ok
@@ -602,18 +606,18 @@ defmodule Popcorn.Packager do
     end
   end
 
-  defp remove_build_tools(staged_apps) do
+  defp drop_unused_modules(staged_apps) do
     case Map.fetch(staged_apps, :popcorn) do
       :error ->
         staged_apps
 
       {:ok, info} ->
-        {build_tools, runtime_modules} =
+        {drop, keep} =
           info.props
           |> Keyword.fetch!(:modules)
-          |> Enum.split_with(&build_tool?/1)
+          |> Enum.split_with(&drop_module?(&1, staged_apps))
 
-        Enum.each(build_tools, fn module ->
+        Enum.each(drop, fn module ->
           File.rm!(Path.join(info.ebin_dir, "#{module}.beam"))
         end)
 
@@ -621,19 +625,29 @@ defmodule Popcorn.Packager do
           File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), dir))
         end
 
-        replace_app_modules(staged_apps, %{popcorn: runtime_modules})
+        replace_app_modules(staged_apps, %{popcorn: keep})
     end
   end
 
-  defp build_tool?(module) do
-    name = Atom.to_string(module)
+  defp drop_module?(module, staged_apps) do
+    name_string = Atom.to_string(module)
 
-    String.starts_with?(name <> ".", [
-      "Elixir.Popcorn.Packager.",
-      "Elixir.Treeshake.",
-      "treeshake_helper.",
-      "Elixir.Mix.Tasks.Popcorn."
-    ])
+    cond do
+      # Build tools
+      String.starts_with?(name_string <> ".", [
+        "Elixir.Popcorn.Packager.",
+        "Elixir.Treeshake.",
+        "treeshake_helper.",
+        "Elixir.Mix.Tasks.Popcorn."
+      ]) ->
+        true
+
+      module == Popcorn.Fetch.HTTPC ->
+        not Map.has_key?(staged_apps, :inets)
+
+      true ->
+        false
+    end
   end
 
   defp async_stream(enumerable, fun) do
