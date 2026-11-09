@@ -341,6 +341,37 @@ defmodule Popcorn.PackagerTest do
       end
     end
 
+    # For code that the browser compiles, which includes them
+    test "include_headers", %{options: options, build_path: build_path, out_dir: out_dir} do
+      assert_raise ArgumentError, ~r/include_headers option to be a boolean/, fn ->
+        Packager.build(Keyword.put(options, :include_headers, :yes))
+      end
+
+      File.mkdir_p!(Path.join(build_path, "user_app/include"))
+      File.write!(Path.join(build_path, "user_app/include/user_app.hrl"), "-define(ANSWER, 42).")
+      options = Keyword.put(options, :extra_apps, [:public_key])
+
+      headers = [
+        "lib/user_app/include/user_app.hrl",
+        # Popcorn's build of kernel has none, so they're the host's
+        "lib/kernel/include/file.hrl",
+        "lib/public_key/include/public_key.hrl"
+      ]
+
+      for include_headers <- [false, true] do
+        assert {:ok, _report} =
+                 Packager.build(Keyword.put(options, :include_headers, include_headers))
+
+        archives =
+          for bundle <- ["app", "deps", "stdlib"], reduce: %{} do
+            archives -> Map.merge(archives, read_archive(bundle_path(out_dir, bundle)))
+          end
+
+        packaged = Enum.filter(headers, &Map.has_key?(archives, &1))
+        assert packaged == if(include_headers, do: headers, else: [])
+      end
+    end
+
     test "keeping modules that aren't packaged", %{options: options} do
       keep = [mod: NotPackaged, mfa: {:not_packaged, :run, 0}, mod: Popcorn.Boot]
       options = Keyword.put(options, :treeshake, keep: keep)
