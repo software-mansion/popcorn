@@ -24,7 +24,7 @@ export function createDistributionRelay(): DistTransport {
 
   const otherEnd = (endpoint: DistEndpoint, connection: string) => {
     const ends = connections.get(connection);
-    if (ends === undefined) return undefined;
+    if (ends === undefined) return null;
     return ends[0] === endpoint ? ends[1] : ends[0];
   };
 

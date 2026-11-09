@@ -346,6 +346,56 @@ test.describe("distribution", () => {
     });
   });
 
+  // net_kernel doesn't tell the carrier when a node that doesn't listen
+  // stops, so the carrier watches net_kernel. The relay then forgets the
+  // node, and refuses connections to it at once, rather than when their setup
+  // times out.
+  test("a node that doesn't listen stops", async ({ createOtp }) => {
+    const [a, b] = await Promise.all([createOtp(), createOtp()]);
+    const bootB = await b.tryBoot(
+      distOpts(
+        node(
+          "b@popcorn",
+          `
+          ok = wasm:send(#{node_started => node()}),
+          receive {wasm, <<"connect">>} -> ok end,
+          Started = erlang:monotonic_time(millisecond),
+          Connected = net_kernel:connect_node('a@popcorn'),
+          Ms = erlang:monotonic_time(millisecond) - Started,
+          ok = wasm:send(#{refused => #{connected => Connected, fast => Ms < 3000}}),
+          receive stop -> ok end.
+          `,
+        ),
+      ),
+    );
+    assert(bootB.ok);
+    const bootA = await a.tryBoot(
+      distOpts(`
+        true = register(dist_test, self()),
+        Opts = #{name_domain => longnames, dist_listen => false},
+        {ok, _} = net_kernel:start('a@popcorn', Opts),
+        ok = wasm:send(#{ready => node()}),
+        receive {wasm, <<"connect">>} -> ok end,
+        true = net_kernel:connect_node('b@popcorn'),
+        ok = net_kernel:stop(),
+        ok = wasm:send(#{stopped => true}),
+        receive stop -> ok end.
+      `),
+    );
+    assert(bootA.ok);
+
+    await Promise.all([
+      a.waitForEvent("ready"),
+      b.waitForEvent("node_started"),
+    ]);
+    assert((await a.trySend("dist_test", "connect")).ok);
+    expect(await a.waitForEvent("stopped")).toEqual({ stopped: true });
+    assert((await b.trySend("dist_test", "connect")).ok);
+    expect(await b.waitForEvent("refused")).toEqual({
+      refused: { connected: false, fast: true },
+    });
+  });
+
   // a gets its name from its first connection, and is announced only then,
   // so that its next connection doesn't announce a new name, which would
   // make the relay disconnect the first one
