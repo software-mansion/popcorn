@@ -14,8 +14,8 @@
 -export([setopts/2, getopts/2]).
 
 %% Internal exports
--export([router_init/0, accept_loop/1, do_accept/6, do_setup/6,
-         controller_init/1, input_init/2, tick_handler/1]).
+-export([router_init/0, accept_loop/1, do_accept/6, do_setup/6, controller_init/2,
+         reader_init/0]).
 
 -include_lib("kernel/include/net_address.hrl").
 -include_lib("kernel/include/dist.hrl").
@@ -122,9 +122,9 @@ setup(Node, Type, MyNode, LongOrShortNames, SetupTime) ->
 do_setup(Kernel, Node, Type, MyNode, _LongOrShortNames, SetupTime) ->
     Timer = dist_util:start_timer(SetupTime),
     Connection = new_connection(),
-    Ctrl = spawn_controller(Connection),
+    {Ctrl, Reader} = spawn_connection(Connection),
     call_ctrl(Ctrl, {supervisor, self()}),
-    ok = call_router({route, Connection, Ctrl}),
+    ok = call_router({route, Connection, Ctrl, Reader}),
     to_js(#{type => connect, connection => Connection,
             from => atom_to_binary(MyNode), to => atom_to_binary(Node)}),
     HSData = (hs_data(Ctrl))#hs_data{kernel_pid = Kernel,
@@ -143,7 +143,7 @@ getopts(_Router, _Opts) -> {ok, []}.
 
 %% ------------------------------------------------------------------
 %% Router: the endpoint JavaScript sends to, which dispatches the events of
-%% each connection to the process handling it
+%% each connection to the processes handling it
 %% ------------------------------------------------------------------
 
 start_router() ->
@@ -172,15 +172,19 @@ router(State = #{connections := Connections}) ->
         {wasm, Event} ->
             router(incoming(Event, State));
 
-        %% A connection's events go to its controller, then its input handler
-        {Ref, From, {route, Connection, Pid}} ->
+        %% A connection's data goes to its reader
+        {Ref, From, {route, Connection, Ctrl, Reader}} ->
             From ! {Ref, ok},
-            router(watch(Connection, Pid, unwatch(Connection, State)));
+            router(watch(Connection, Ctrl, Reader, State));
 
-        %% The connection is down, which the other end learns from JavaScript
+        %% The connection is down, which the other end learns from JavaScript.
+        %% The reader is linked to the controller, unless the controller died
+        %% before it could link.
         {'DOWN', Ref, process, _Pid, _Reason} ->
             case [C || C := #{ref := R} <- Connections, R =:= Ref] of
                 [Connection] ->
+                    #{Connection := #{reader := Reader}} = Connections,
+                    exit(Reader, connection_closed),
                     to_js(#{type => disconnect, connection => Connection}),
                     router(State#{connections := maps:remove(Connection, Connections)});
                 [] ->
@@ -197,9 +201,9 @@ incoming(#{<<"type">> := <<"connect">>, <<"connection">> := Connection, <<"to">>
   when is_binary(Connection), not is_map_key(Connection, Connections) ->
     case atom_to_binary(node()) of
         To when is_pid(Acceptor) ->
-            Ctrl = spawn_controller(Connection),
+            {Ctrl, Reader} = spawn_connection(Connection),
             Acceptor ! {incoming, Ctrl},
-            watch(Connection, Ctrl, State);
+            watch(Connection, Ctrl, Reader, State);
         %% A node that doesn't listen refuses at once, rather than when the
         %% connection setup times out
         To ->
@@ -211,15 +215,16 @@ incoming(#{<<"type">> := <<"connect">>, <<"connection">> := Connection, <<"to">>
 incoming(#{<<"type">> := <<"message">>, <<"connection">> := Connection, <<"data">> := Data},
          State = #{connections := Connections}) when is_binary(Data) ->
     case Connections of
-        #{Connection := #{pid := Pid}} -> Pid ! {?ROUTER, data, Data};
+        #{Connection := #{reader := Reader}} -> Reader ! {?ROUTER, data, Data};
         #{} -> ok
     end,
     State;
 incoming(#{<<"type">> := <<"disconnect">>, <<"connection">> := Connection},
          State = #{connections := Connections}) ->
     case Connections of
-        #{Connection := #{pid := Pid}} ->
-            exit(Pid, connection_closed),
+        #{Connection := #{ctrl := Ctrl, reader := Reader}} ->
+            exit(Ctrl, connection_closed),
+            exit(Reader, connection_closed),
             unwatch(Connection, State);
         #{} ->
             State
@@ -227,8 +232,8 @@ incoming(#{<<"type">> := <<"disconnect">>, <<"connection">> := Connection},
 incoming(_Event, State) ->
     State.
 
-watch(Connection, Pid, State = #{connections := Connections}) ->
-    Entry = #{pid => Pid, ref => monitor(process, Pid)},
+watch(Connection, Ctrl, Reader, State = #{connections := Connections}) ->
+    Entry = #{ctrl => Ctrl, reader => Reader, ref => monitor(process, Ctrl)},
     State#{connections := Connections#{Connection => Entry}}.
 
 unwatch(Connection, State = #{connections := Connections}) ->
@@ -244,55 +249,39 @@ call_router(Request) ->
     call(whereis(?ROUTER), Request).
 
 %% ------------------------------------------------------------------
-%% Connection processes, as in gen_tcp_dist: the controller during the
-%% handshake, then as the output handler, the input handler and the tick
-%% handler
+%% Connection processes: the controller writes, and the reader reads, so
+%% that neither waits for the other, as in gen_tcp_dist. erts lets only the
+%% controller fetch outgoing data, and another process handle incoming data.
+%% The reader gets all the connection's data, from the start: it serves
+%% dist_util's reads during the handshake, then hands the data to the VM.
 %% ------------------------------------------------------------------
 
-spawn_controller(Connection) ->
-    spawn_opt(?MODULE, controller_init, [Connection], [{priority, max} | ?SPAWN_OPTS]).
+spawn_connection(Connection) ->
+    Reader = spawn_opt(?MODULE, reader_init, [], [{priority, max} | ?SPAWN_OPTS]),
+    Ctrl = spawn_opt(?MODULE, controller_init, [Connection, Reader],
+                     [{priority, max} | ?SPAWN_OPTS]),
+    {Ctrl, Reader}.
 
-controller_init(Connection) ->
-    TickHandler = spawn_opt(?MODULE, tick_handler, [Connection],
-                            [link, {priority, max} | ?SPAWN_OPTS]),
-    handshake_loop(#{connection => Connection, tick_handler => TickHandler,
-                     supervisor => undefined, buffer => <<>>, waiting => undefined}).
+controller_init(Connection, Reader) ->
+    link(Reader),
+    handshake_loop(#{connection => Connection, reader => Reader, supervisor => undefined}).
 
-%% dist_util asks for one packet at a time during the handshake, which TCP
-%% distribution frames with 2-byte lengths, as with {packet, 2}
-handshake_loop(State = #{connection := Connection, buffer := Buffer}) ->
+handshake_loop(State = #{connection := Connection, reader := Reader}) ->
     receive
-        {?ROUTER, data, Data} ->
-            handshake_loop(deliver(State#{buffer := <<Buffer/binary, Data/binary>>}));
-
-        {Ref, From, {recv, _Length, Timeout}} ->
-            Timer = case Timeout of
-                        infinity -> undefined;
-                        _ -> erlang:send_after(Timeout, self(), {recv_timeout, Ref})
-                    end,
-            handshake_loop(deliver(State#{waiting := {Ref, From, Timer}}));
-
-        {recv_timeout, Ref} ->
-            case State of
-                #{waiting := {Ref, From, _Timer}} ->
-                    From ! {Ref, {error, timeout}},
-                    handshake_loop(State#{waiting := undefined});
-                #{} ->
-                    handshake_loop(State)
-            end;
-
+        %% dist_util's packets during the handshake, which TCP distribution
+        %% frames with 2-byte lengths, as with {packet, 2}
         {Ref, From, {send, Packet}} ->
             send_message(Connection, [<<(iolist_size(Packet)):16>>, Packet]),
             From ! {Ref, ok},
             handshake_loop(State);
 
+        {Ref, From, reader} ->
+            From ! {Ref, Reader},
+            handshake_loop(State);
+
         {Ref, From, {supervisor, Pid}} ->
             From ! {Ref, link(Pid)},
             handshake_loop(State#{supervisor := Pid});
-
-        {Ref, From, tick_handler} ->
-            From ! {Ref, maps:get(tick_handler, State)},
-            handshake_loop(State);
 
         {Ref, From, getll} ->
             From ! {Ref, {ok, self()}},
@@ -311,39 +300,13 @@ handshake_loop(State = #{connection := Connection, buffer := Buffer}) ->
         {Ref, From, {handshake_complete, _Node, DHandle}} ->
             From ! {Ref, ok},
             announce(node()),
-            start_traffic(DHandle, State)
-    end.
-
-%% Only the packets dist_util asks for, as the ones after the handshake have
-%% 4-byte lengths
-deliver(State = #{waiting := {Ref, From, Timer},
-                  buffer := <<Size:16, Packet:Size/binary, Rest/binary>>}) ->
-    cancel_timer(Timer),
-    From ! {Ref, {ok, binary_to_list(Packet)}},
-    State#{waiting := undefined, buffer := Rest};
-deliver(State) ->
-    State.
-
-cancel_timer(undefined) -> ok;
-cancel_timer(Timer) -> erlang:cancel_timer(Timer).
-
-%% Incoming data goes to the input handler from now on: what the controller
-%% already has first, then the router's
-start_traffic(DHandle, #{connection := Connection, supervisor := Sup, buffer := Buffer}) ->
-    Input = spawn_opt(?MODULE, input_init, [DHandle, Sup], [link | ?SPAWN_OPTS]),
-    ok = call_router({route, Connection, Input}),
-    Pending = iolist_to_binary([Buffer | flush_data()]),
-    ok = erlang:dist_ctrl_input_handler(DHandle, Input),
-    Input ! {DHandle, Pending},
-    process_flag(priority, normal),
-    erlang:dist_ctrl_get_data_notification(DHandle),
-    output_loop(DHandle, Connection).
-
-flush_data() ->
-    receive
-        {?ROUTER, data, Data} -> [Data | flush_data()]
-    after 0 ->
-        []
+            ok = erlang:dist_ctrl_input_handler(DHandle, Reader),
+            Reader ! {handshake_complete, DHandle},
+            %% As in gen_tcp_dist: no longer at max priority, as it sends all
+            %% the data now
+            process_flag(priority, normal),
+            erlang:dist_ctrl_get_data_notification(DHandle),
+            output_loop(DHandle, Connection)
     end.
 
 output_loop(DHandle, Connection) ->
@@ -352,6 +315,10 @@ output_loop(DHandle, Connection) ->
             try send_data(DHandle, Connection)
             catch _:_ -> death_row()
             end,
+            output_loop(DHandle, Connection);
+        %% The connection supervisor asks for a tick when nothing was sent lately
+        tick ->
+            send_message(Connection, packet(<<>>)),
             output_loop(DHandle, Connection);
         _Other ->
             output_loop(DHandle, Connection)
@@ -366,11 +333,49 @@ send_data(DHandle, Connection) ->
             send_data(DHandle, Connection)
     end.
 
-input_init(DHandle, Sup) ->
-    link(Sup),
+reader_init() ->
+    handshake_reader(#{buffer => <<>>, waiting => undefined}).
+
+%% dist_util asks for one packet at a time during the handshake
+handshake_reader(State = #{buffer := Buffer}) ->
     receive
-        {DHandle, Pending} -> input_loop(DHandle, put_packets(DHandle, Pending))
+        {?ROUTER, data, Data} ->
+            handshake_reader(deliver(State#{buffer := <<Buffer/binary, Data/binary>>}));
+
+        {Ref, From, {recv, _Length, Timeout}} ->
+            Timer = case Timeout of
+                        infinity -> undefined;
+                        _ -> erlang:send_after(Timeout, self(), {recv_timeout, Ref})
+                    end,
+            handshake_reader(deliver(State#{waiting := {Ref, From, Timer}}));
+
+        {recv_timeout, Ref} ->
+            case State of
+                #{waiting := {Ref, From, _Timer}} ->
+                    From ! {Ref, {error, timeout}},
+                    handshake_reader(State#{waiting := undefined});
+                #{} ->
+                    handshake_reader(State)
+            end;
+
+        %% The rest of the data, after what it has, goes to the VM
+        {handshake_complete, DHandle} ->
+            process_flag(priority, normal),
+            input_loop(DHandle, put_packets(DHandle, Buffer))
     end.
+
+%% Only the packets dist_util asks for, with 2-byte lengths, as the ones after
+%% the handshake have 4-byte lengths
+deliver(State = #{waiting := {Ref, From, Timer},
+                  buffer := <<Size:16, Packet:Size/binary, Rest/binary>>}) ->
+    cancel_timer(Timer),
+    From ! {Ref, {ok, binary_to_list(Packet)}},
+    State#{waiting := undefined, buffer := Rest};
+deliver(State) ->
+    State.
+
+cancel_timer(undefined) -> ok;
+cancel_timer(Timer) -> erlang:cancel_timer(Timer).
 
 input_loop(DHandle, Buffer) ->
     receive
@@ -393,15 +398,7 @@ put_data(DHandle, Packet) ->
     catch _:_ -> death_row()
     end.
 
-%% The connection supervisor asks for a tick when nothing was sent lately
-tick_handler(Connection) ->
-    receive
-        tick -> send_message(Connection, packet(<<>>));
-        _Other -> ok
-    end,
-    tick_handler(Connection).
-
-%% As in gen_tcp_dist: wait to be taken down with the other processes
+%% As in gen_tcp_dist: wait to be taken down with the connection supervisor
 death_row() ->
     receive after 5000 -> exit(connection_closed) end.
 
@@ -409,10 +406,12 @@ death_row() ->
 %% Helpers
 %% ------------------------------------------------------------------
 
+%% Reads go to the reader. Asking the controller for it also fails the
+%% handshake at once, if the controller is gone.
 hs_data(Ctrl) ->
-    TickHandler = call_ctrl(Ctrl, tick_handler),
+    Reader = call_ctrl(Ctrl, reader),
     #hs_data{f_send = fun(C, Packet) -> call_ctrl(C, {send, Packet}) end,
-             f_recv = fun(C, Length, Timeout) -> call_ctrl(C, {recv, Length, Timeout}) end,
+             f_recv = fun(_C, Length, Timeout) -> call(Reader, {recv, Length, Timeout}) end,
              f_setopts_pre_nodeup = fun(C) -> call_ctrl(C, pre_nodeup) end,
              f_setopts_post_nodeup = fun(C) -> call_ctrl(C, post_nodeup) end,
              f_getll = fun(C) -> call_ctrl(C, getll) end,
@@ -420,7 +419,7 @@ hs_data(Ctrl) ->
                                             call_ctrl(C, {handshake_complete, Node, DHandle})
                                     end,
              f_address = fun(C, Node) -> call_ctrl(C, {address, Node}) end,
-             mf_tick = fun(C) when C =:= Ctrl -> TickHandler ! tick end,
+             mf_tick = fun(C) -> C ! tick end,
              mf_setopts = fun(_C, _Opts) -> ok end,
              mf_getopts = fun(_C, _Opts) -> {ok, []} end}.
 
