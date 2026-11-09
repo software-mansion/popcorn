@@ -38,7 +38,7 @@ Popcorn doesn't support spawning OS processes. The VM machinery for starting tho
 
 ### Distribution
 
-Popcorn provides JS API to connect different instances with Erlang distribution. It has to be enabled with `distribution` config option.Browsers can't open TCP connections, so connecting to nodes outside the browser would require a relay server, which Popcorn doesn't provide. Erlang distribution doesn't have security features and you can only connect to nodes you trust.
+Popcorn provides a JS API for connecting different instances via Erlang distribution. It must be enabled with the distribution config option. Browsers can’t open TCP connections, so connecting to nodes outside the browser would require a relay server, which Popcorn doesn’t provide. All nodes connected via distribution must be trusted: neither Erlang nor Popcorn guards against malicious nodes.
 
 ## Memory
 
