@@ -923,4 +923,52 @@ test.describe("fetch", () => {
       adapter_preserved: true,
     });
   });
+
+  test("httpc requests with fetch", async ({ otp }) => {
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        {ok, _} = application:ensure_all_started(inets),
+        {ok, {{_, GetStatus, _}, GetHeaders, GetBody}} =
+          httpc:request(get, {"/req/get", []}, [], [{body_format, binary}]),
+        {ok, {PostStatus, PostBody}} = httpc:request(
+          post, {"/req/post", [], "text/plain", "posted through httpc"}, [], [{full_result, false}]
+        ),
+        ok = wasm:send(#{
+          get_status => GetStatus,
+          get_fixture => list_to_binary(proplists:get_value("x-popcorn-fixture", GetHeaders)),
+          get_body => GetBody,
+          post_status => PostStatus,
+          post_body => list_to_binary(PostBody)
+        }),
+
+        {ok, Ref} = httpc:request(get, {"/req/get", []}, [], [{sync, false}, {stream, {self, once}}]),
+        Pid = receive {http, {Ref, stream_start, _Headers, StreamPid}} -> StreamPid end,
+        Collect = fun Collect(Parts) ->
+          ok = httpc:stream_next(Pid),
+          receive
+            {http, {Ref, stream, Part}} -> Collect([Part | Parts]);
+            {http, {Ref, stream_end, _}} -> iolist_to_binary(lists:reverse(Parts))
+          end
+        end,
+        ok = wasm:send(#{streamed => Collect([])}),
+
+        {ok, _Profile} = inets:start(httpc, [{profile, e2e}]),
+        ok = httpc:set_options([{max_sessions, 2}], e2e),
+        {ok, [{max_sessions, MaxSessions}]} = httpc:get_options([max_sessions], e2e),
+        ok = inets:stop(httpc, e2e),
+        ok = wasm:send(#{profile_max_sessions => MaxSessions}).
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("get_status")).toEqual({
+      get_status: 206,
+      get_fixture: "get",
+      get_body: "browser-stream",
+      post_status: 201,
+      post_body: "posted through httpc",
+    });
+    expect(await otp.waitForEvent("streamed")).toEqual({ streamed: "browser-stream" });
+    expect(await otp.waitForEvent("profile_max_sessions")).toEqual({ profile_max_sessions: 2 });
+  });
 });

@@ -28,7 +28,7 @@ Content-Security-Policy: script-src 'unsafe-eval'
 
 ### TCP/UDP sockets
 
-Browsers don't allow applications to create raw sockets so `:gen_tcp` and `:gen_udp` won't work.
+Browsers don't allow applications to create raw sockets so `:gen_tcp` and `:gen_udp` won't work. For HTTP, use [`Popcorn.Fetch`, `Req` or `:httpc`](http.md), which make requests with the browser's `fetch()`.
 
 We're tracking alternatives in https://github.com/software-mansion/popcorn/issues/789.
 
