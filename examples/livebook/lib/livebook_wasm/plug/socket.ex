@@ -1,7 +1,7 @@
-defmodule Popcorn.Plug.Socket do
+defmodule LivebookWasm.Plug.Socket do
   @moduledoc false
   # Drives a WebSock handler whose other end is JavaScript, as a web server's
-  # WebSocket connection process does for a client. See Popcorn.Plug.
+  # WebSocket connection process does for a client. See LivebookWasm.Plug.
 
   # The idle timeout when the upgrade doesn't set one, as in Bandit
   @default_timeout 60_000
