@@ -24,13 +24,18 @@ defmodule LivebookWasm.MixProject do
     [
       {:popcorn, path: "../../popcorn/elixir"},
       {:livebook, "~> 0.19.10", runtime: false},
-      # For Popcorn.Plug's WebSockets. Livebook's Phoenix 1.8.7 requires ~> 0.5.3.
+      # Supports LivebookWasm.Plug's WebSockets from 0.7.1. Livebook's Phoenix
+      # 1.8.7 requires ~> 0.5.3.
       {:websock_adapter, "~> 0.7.1", override: true}
     ]
   end
 
   defp aliases do
-    ["popcorn.dev": [&copy_livebook_static/1, &cook_notebook_vm/1, "popcorn.dev"]]
+    [
+      "popcorn.dev": [&copy_livebook_static/1, &cook_notebook_vm/1, "popcorn.dev"],
+      # The application starts Livebook, which the tests don't need
+      test: "test --no-start"
+    ]
   end
 
   # The notebooks' VMs boot a package of their own, which this task doesn't

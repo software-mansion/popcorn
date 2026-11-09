@@ -1,4 +1,4 @@
-defmodule Popcorn.PlugTest do
+defmodule LivebookWasm.PlugTest do
   # Sockets push to JavaScript through the bridge, which is global
   use ExUnit.Case, async: false
 
@@ -8,7 +8,7 @@ defmodule Popcorn.PlugTest do
     @moduledoc false
     # Hands what Elixir sends to JavaScript to the test process
     def send(message) do
-      Kernel.send(Application.fetch_env!(:popcorn, :plug_test_pid), {:js, message})
+      Kernel.send(Application.fetch_env!(:livebook_wasm, :plug_test_pid), {:js, message})
       :ok
     end
   end
@@ -112,15 +112,15 @@ defmodule Popcorn.PlugTest do
 
   setup context do
     Application.put_env(:popcorn, :wasm_bridge, Bridge)
-    Application.put_env(:popcorn, :plug_test_pid, self())
+    Application.put_env(:livebook_wasm, :plug_test_pid, self())
 
     on_exit(fn ->
       Application.delete_env(:popcorn, :wasm_bridge)
-      Application.delete_env(:popcorn, :plug_test_pid)
+      Application.delete_env(:livebook_wasm, :plug_test_pid)
     end)
 
     name = :"#{__MODULE__}.#{context.test}"
-    start_supervised!({Popcorn.Plug, plug: {Router, self()}, name: name})
+    start_supervised!({LivebookWasm.Plug, plug: {Router, self()}, name: name})
     {:ok, name: name}
   end
 

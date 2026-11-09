@@ -151,7 +151,7 @@
         if (jar.size) all.push(["cookie", [...jar].map(([k, v]) => `${k}=${v}`).join("; ")]);
 
         const resp = await popcorn.call(
-          "popcorn_plug",
+          "livebook_wasm_plug",
           { method, url: target.href, headers: all, body },
           { timeoutMs: 120_000 },
         );
