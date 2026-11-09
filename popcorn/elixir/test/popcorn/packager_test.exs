@@ -390,6 +390,48 @@ defmodule Popcorn.PackagerTest do
       assert Enum.sort(exports) == Enum.sort(original)
     end
 
+    # Mix.install/2 can install Req, and then installs the adapter
+    test "Req's adapter, with Req or Mix", %{
+      options: options,
+      build_path: build_path,
+      out_dir: out_dir
+    } do
+      adapter = "lib/popcorn/ebin/Elixir.Popcorn.Fetch.ReqAdapter.beam"
+
+      build = fn options ->
+        assert {:ok, _report} = Packager.build(options)
+
+        archives =
+          for bundle <- ["deps", "stdlib"], reduce: %{} do
+            archives -> Map.merge(archives, read_archive(bundle_path(out_dir, bundle)))
+          end
+
+        packaged = Map.has_key?(archives, adapter)
+        assert packaged == Popcorn.Fetch.ReqAdapter in boot_specs(out_dir).popcorn[:modules]
+        {packaged, archives}
+      end
+
+      assert {false, _archives} = build.(options)
+
+      assert {true, archives} = build.(Keyword.put(options, :extra_apps, [:mix]))
+      mix = Map.fetch!(archives, "lib/mix/ebin/Elixir.Mix.beam")
+      {:ok, {Mix, [atoms: atoms]}} = :beam_lib.chunks(mix, [:atoms])
+      assert Enum.any?(atoms, &match?({_index, Popcorn.Fetch}, &1))
+
+      req_ebin = Path.join(build_path, "req/ebin")
+      File.mkdir_p!(req_ebin)
+
+      write_app(Path.join(req_ebin, "req.app"), :req,
+        description: ~c"req",
+        vsn: ~c"0.8.0",
+        modules: [],
+        registered: [],
+        applications: [:kernel, :stdlib]
+      )
+
+      assert {true, _archives} = build.(options)
+    end
+
     test "config", %{options: options, out_dir: out_dir} do
       config = [
         user_app: [answer: 42],
