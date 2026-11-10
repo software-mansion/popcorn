@@ -10,6 +10,7 @@ root = Path.expand("../..", __DIR__)
       [
         "lib/popcorn/js.ex",
         "lib/popcorn/fetch.ex",
+        "lib/popcorn/fetch/req.ex",
         "lib/popcorn/proxy.ex",
         "lib/popcorn/application.ex",
         "test/support/fake_bridge.ex"
@@ -20,6 +21,7 @@ root = Path.expand("../..", __DIR__)
 
 assert diagnostics == []
 refute Code.ensure_loaded?(Req)
+refute List.keymember?(modules, Popcorn.Fetch.Req, 0)
 
 assert Popcorn.Fetch.__info__(:functions) == [
          close: 1,

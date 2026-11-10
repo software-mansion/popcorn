@@ -863,7 +863,7 @@ test.describe("fetch", () => {
     const boot = await otp.tryBoot(
       evalOpts(`
         {ok, DefaultOptions} = application:get_env(req, default_options),
-        'Elixir.Popcorn.Fetch' = proplists:get_value(adapter, DefaultOptions),
+        'Elixir.Popcorn.Fetch.Req' = proplists:get_value(adapter, DefaultOptions),
         {ok, _} = application:ensure_all_started(req),
         {ok, GetResponse, GetChunks} = 'Elixir.Req':stream(
           <<"/req/get">>,
