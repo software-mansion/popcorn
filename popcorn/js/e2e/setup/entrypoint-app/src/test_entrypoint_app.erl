@@ -54,6 +54,11 @@ startup_event("bridge") ->
     ok = wasm:send(#{startup_run_js => 42});
 startup_event("fail") ->
     error(startup_failed);
+%% The node connects to a@popcorn before the boot ends, so the handshake needs
+%% messages from it during the boot
+startup_event("dist_connect") ->
+    Connected = net_kernel:connect_node('a@popcorn'),
+    ok = wasm:send(#{startup_connected => Connected});
 startup_event("await_ready_timeout") ->
     {error, timeout} = 'Elixir.Popcorn.JS':await_ready([{timeout, 0}]),
     ok = wasm:send(#{await_ready_timeout => true});

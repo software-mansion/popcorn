@@ -36,6 +36,9 @@ const BASE_ARGS = [
   "erl",
   "-home",
   DEFAULT_HOME_DIR,
+  "-proto_dist",
+  "popcorn",
+  "-no_epmd",
 ];
 
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
@@ -424,7 +427,13 @@ function send(
     status = module.ccall(
       "sendVmMessage",
       "number",
-      ["number", target.argType, "number", useHeap ? "number" : "array", "number"],
+      [
+        "number",
+        target.argType,
+        "number",
+        useHeap ? "number" : "array",
+        "number",
+      ],
       [
         target.kind,
         target.value,
