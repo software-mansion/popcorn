@@ -5,8 +5,6 @@ defmodule Popcorn.Fetch.HTTPC do
 
   @compile {:no_warn_undefined, :httpd_util}
 
-  @part_size 65_536
-
   def request(method, request, http_options, options, _profile) do
     with {:ok, args} <- fetch_args(method, request) do
       timeout = Keyword.get(http_options, :timeout, :infinity)
@@ -62,26 +60,15 @@ defmodule Popcorn.Fetch.HTTPC do
     for {name, value} <- headers, do: {IO.iodata_to_binary(name), IO.iodata_to_binary(value)}
   end
 
-  defp fetch(args, timeout) do
-    with {:ok, %{status: status, headers: headers, body: body}} <-
-           Popcorn.Fetch.request(args, timeout: timeout) do
-      {:ok, status, response_headers(headers), body}
-    end
-  end
-
-  defp response_headers(headers) do
-    for {name, value} <- headers,
-        do: {:erlang.binary_to_list(name), :erlang.binary_to_list(value)}
-  end
-
   defp respond_sync(args, timeout, options) do
-    with {:ok, status, headers, body} <- fetch(args, timeout) do
+    with {:ok, status, headers, conn} <- open(args, timeout) do
       file = Keyword.get(options, :stream)
 
       if is_list(file) and status in [200, 206] do
-        save(file, body)
+        save(file, conn)
       else
-        {:ok, result(status, headers, body, options)}
+        with {:ok, body} <- Popcorn.Fetch.read_body(conn, :infinity),
+             do: {:ok, result(status, headers, body, options)}
       end
     end
   end
@@ -102,11 +89,22 @@ defmodule Popcorn.Fetch.HTTPC do
           deliver: receiver(Keyword.get(options, :receiver, owner))
         }
 
-        respond(async, fetch(args, timeout))
+        respond(async, open(args, timeout))
       end)
 
     receive do
       {^start_ref, id} -> {:ok, id}
+    end
+  end
+
+  defp open(args, timeout) do
+    with {:ok, conn} <- Popcorn.Fetch.start(args, timeout: timeout),
+         {:head, status, headers} <- Popcorn.Fetch.next(conn, :infinity) do
+      headers =
+        for {name, value} <- headers,
+            do: {:erlang.binary_to_list(name), :erlang.binary_to_list(value)}
+
+      {:ok, status, headers, conn}
     end
   end
 
@@ -118,58 +116,96 @@ defmodule Popcorn.Fetch.HTTPC do
   end
 
   # httpc streams only 200 and 206 responses
-  defp respond(%{stream: :self} = async, {:ok, status, headers, body})
+  defp respond(%{stream: :self} = async, {:ok, status, headers, conn})
        when status in [200, 206] do
     async.deliver.({async.id, :stream_start, headers})
-    stream(async, headers, body)
+    stream(async, headers, conn)
   end
 
-  defp respond(%{stream: {:self, :once}} = async, {:ok, status, headers, body})
+  defp respond(%{stream: {:self, :once}} = async, {:ok, status, headers, conn})
        when status in [200, 206] do
     async.deliver.({async.id, :stream_start, headers, self()})
-    stream(async, headers, body)
+    stream(async, headers, conn)
   end
 
-  defp respond(%{stream: file} = async, {:ok, status, _headers, body})
+  defp respond(%{stream: file} = async, {:ok, status, _headers, conn})
        when is_list(file) and status in [200, 206] do
-    reply = with {:ok, saved} <- save(file, body), do: saved
+    reply = with {:ok, saved} <- save(file, conn), do: saved
     async.deliver.({async.id, reply})
   end
 
-  defp respond(async, {:ok, status, headers, body}) do
-    async.deliver.({async.id, result(status, headers, body, async.options)})
+  defp respond(async, {:ok, status, headers, conn}) do
+    reply =
+      with {:ok, body} <- Popcorn.Fetch.read_body(conn, :infinity),
+           do: result(status, headers, body, async.options)
+
+    async.deliver.({async.id, reply})
   end
 
   defp respond(async, {:error, _reason} = error) do
     async.deliver.({async.id, error})
   end
 
-  defp stream(async, headers, body) do
-    if async.stream == {:self, :once}, do: await_next(async.id)
+  # The parts as they arrive
+  defp stream(async, headers, conn) do
+    await_next(async)
 
-    case body do
-      "" ->
+    case Popcorn.Fetch.next(conn, :infinity) do
+      {:data, part} ->
+        async.deliver.({async.id, :stream, part})
+        stream(async, headers, conn)
+
+      :done ->
         async.deliver.({async.id, :stream_end, headers})
 
-      <<part::binary-size(@part_size), rest::binary>> ->
-        async.deliver.({async.id, :stream, part})
-        stream(async, headers, rest)
-
-      part ->
-        async.deliver.({async.id, :stream, part})
-        stream(async, headers, "")
+      {:error, _reason} = error ->
+        async.deliver.({async.id, error})
     end
   end
 
-  defp await_next(monitor) do
+  # With {self, once}, each message waits for httpc:stream_next/1
+  defp await_next(%{stream: {:self, :once}, id: monitor}) do
     receive do
       {__MODULE__, :stream_next} -> :ok
       {:DOWN, ^monitor, :process, _pid, _reason} -> exit(:normal)
     end
   end
 
-  defp save(file, body) do
-    with :ok <- File.write(file, body), do: {:ok, :saved_to_file}
+  defp await_next(_async), do: :ok
+
+  # The parts as they arrive
+  defp save(file, conn) do
+    case File.open(file, [:write, :binary], &write(&1, conn)) do
+      {:ok, :ok} ->
+        {:ok, :saved_to_file}
+
+      {:ok, error} ->
+        error
+
+      error ->
+        Popcorn.Fetch.close(conn)
+        error
+    end
+  end
+
+  defp write(device, conn) do
+    case Popcorn.Fetch.next(conn, :infinity) do
+      {:data, data} ->
+        case IO.binwrite(device, data) do
+          :ok ->
+            write(device, conn)
+
+          error ->
+            Popcorn.Fetch.close(conn)
+            error
+        end
+
+      :done ->
+        :ok
+
+      {:error, _reason} = error ->
+        error
+    end
   end
 
   defp result(status, headers, body, options) do

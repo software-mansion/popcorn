@@ -20,7 +20,15 @@ root = Path.expand("../..", __DIR__)
 
 assert diagnostics == []
 refute Code.ensure_loaded?(Req)
-assert Popcorn.Fetch.__info__(:functions) == [request: 1, request: 2]
+
+assert Popcorn.Fetch.__info__(:functions) == [
+         close: 1,
+         next: 2,
+         read_body: 2,
+         request: 1,
+         request: 2,
+         start: 2
+       ]
 
 for {module, beam} <- modules, module in [Popcorn.Fetch, Popcorn.Application] do
   assert {:ok, {^module, [atoms: atoms, imports: imports]}} =
