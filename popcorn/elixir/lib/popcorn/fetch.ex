@@ -70,7 +70,6 @@ defmodule Popcorn.Fetch do
   @start_js """
   (args, { send }) => {
     const CHUNK = 2 ** 14;
-    const ITER_MAX = 1000;
 
     async function reply(message) {
       return send(args.target, {
@@ -118,7 +117,7 @@ defmodule Popcorn.Fetch do
 
         if (response.body !== null) {
           const reader = response.body.getReader();
-          for (let i = 0; i < ITER_MAX; i++) {
+          while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             await sendChunks(value);
@@ -156,17 +155,79 @@ defmodule Popcorn.Fetch do
   """
   @spec request(request(), [{:timeout, timeout()}]) :: {:ok, response()} | {:error, error()}
   def request(req, opts \\ []) when is_map(req) and is_list(opts) do
-    headers = Enum.map(Map.get(req, :headers, []), fn {name, value} -> [name, value] end)
-    req = req |> Map.take([:method, :url, :body]) |> Map.put(:headers, headers)
-
-    timeout = Keyword.get(opts, :timeout, @default_timeout)
-    wait = {:total, deadline(timeout)}
-
-    with {:ok, handle} <- start(req, self()),
-         {:ok, status, headers} <- collect_head(handle, wait),
-         {:ok, body} <- collect_body(handle, wait) do
+    with {:ok, conn} <- start(req, opts),
+         {:head, status, headers} <- next(conn, :infinity),
+         {:ok, body} <- read_body(conn, :infinity) do
       {:ok, %{status: status, headers: headers, body: body}}
     end
+  end
+
+  # The internal API, which request/2, the Req adapter and Popcorn.Fetch.HTTPC are
+  # built on. start/2 starts a request, next/2 reads its events and close/1 stops
+  # it early. The request's events go to its target process, so only the target
+  # can read them.
+
+  # Starts a request, whose events go to `:target`, the caller by default. The
+  # `:timeout` bounds the whole response.
+  @doc false
+  def start(req, opts) when is_map(req) and is_list(opts) do
+    id = System.unique_integer([:positive])
+    headers = Enum.map(Map.get(req, :headers, []), fn {name, value} -> [name, value] end)
+
+    args =
+      %{
+        popcorn_fetch: id,
+        target: Keyword.get(opts, :target, self()),
+        method: req.method,
+        url: req.url,
+        headers: headers
+      }
+      |> put_body(Map.get(req, :body))
+
+    case JS.run(@start_js, args) do
+      {:ok, controller} ->
+        deadline = deadline(Keyword.get(opts, :timeout, @default_timeout))
+        {:ok, %{id: id, controller: controller, deadline: deadline}}
+
+      {:error, reason} ->
+        {:error, {:bridge, reason}}
+    end
+  end
+
+  # The request's next event: `{:head, status, headers}`, then `{:data, chunk}` for
+  # each chunk of the body, until `:done` or `{:error, reason}`, which end the
+  # request. The `timeout` bounds the wait for this event, within the request's.
+  @doc false
+  def next(conn, timeout) do
+    id = conn.id
+
+    receive do
+      {:wasm, %{"popcorn_fetch" => ^id} = message} -> decode(message)
+    after
+      wait(conn.deadline, timeout) ->
+        close(conn)
+        {:error, :timeout}
+    end
+  end
+
+  # The rest of the body, read to its end
+  @doc false
+  def read_body(conn, timeout), do: read_rest(conn, timeout, [])
+
+  defp read_rest(conn, timeout, acc) do
+    case next(conn, timeout) do
+      {:data, data} -> read_rest(conn, timeout, [acc | data])
+      :done -> {:ok, IO.iodata_to_binary(acc)}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  # Stops the request, unless it's over, and drops its events on their way
+  @doc false
+  def close(conn) do
+    JS.run(@abort_js, %{controller: conn.controller})
+    flush_bridge(conn.id)
+    :ok
   end
 
   if Code.ensure_loaded?(Req) do
@@ -200,14 +261,10 @@ defmodule Popcorn.Fetch do
     end
 
     defp legacy_run(request, body) do
-      method = request.method |> to_string() |> String.upcase()
-
-      headers = Enum.map(request_headers(request), fn {name, value} -> [name, value] end)
-
       req = %{
-        method: method,
+        method: request.method |> to_string() |> String.upcase(),
         url: URI.to_string(request.url),
-        headers: headers,
+        headers: request_headers(request),
         body: body
       }
 
@@ -219,57 +276,45 @@ defmodule Popcorn.Fetch do
       end
     end
 
+    # Req's timeout bounds each event, rather than the whole response
     defp legacy_run_into(request, req, into, timeout) do
-      wait = {:each, timeout}
-
-      with {:ok, handle} <- start(req, self()),
-           {:ok, status, headers} <- collect_head(handle, wait) do
+      with {:ok, conn} <- start(req, timeout: :infinity),
+           {:head, status, headers} <- next(conn, timeout) do
         response = Req.Response.new(status: status, headers: headers)
 
         case into do
-          nil -> legacy_into_body(request, response, handle, wait)
-          fun when is_function(fun, 2) -> legacy_into_fun(request, response, handle, wait, fun)
-          collectable -> legacy_into_collectable(request, response, handle, wait, collectable)
+          nil -> legacy_into_body(request, response, conn, timeout)
+          fun when is_function(fun, 2) -> legacy_into_fun(request, response, conn, timeout, fun)
+          collectable -> legacy_into_collectable(request, response, conn, timeout, collectable)
         end
       else
         {:error, reason} -> legacy_transport_error(request, reason)
       end
     end
 
-    defp legacy_into_body(request, response, handle, wait) do
-      case collect_body(handle, wait) do
+    defp legacy_into_body(request, response, conn, timeout) do
+      case read_body(conn, timeout) do
         {:ok, body} -> {request, %{response | body: body}}
         {:error, reason} -> legacy_transport_error(request, reason)
       end
     end
 
-    defp legacy_into_fun(request, response, handle, wait, fun) do
-      result =
-        handle
-        |> body_stream(wait)
-        |> Enum.reduce_while({:ok, {request, response}}, legacy_wrapped_reducer(fun))
-
-      case result do
+    defp legacy_into_fun(request, response, conn, timeout, fun) do
+      case legacy_read_into(conn, timeout, fun, {request, response}) do
         {:ok, acc} -> acc
         {:error, reason, {request, _response}} -> legacy_transport_error(request, reason)
       end
     end
 
-    defp legacy_into_collectable(request, response, handle, wait, collectable) do
+    defp legacy_into_collectable(request, response, conn, timeout, collectable) do
       collectable = if response.status == 200, do: collectable, else: ""
       {acc, collector} = Collectable.into(collectable)
 
       fun = fn {:data, data}, {request, {acc, response}} ->
-        acc = collector.(acc, {:cont, data})
-        {:cont, {request, {acc, response}}}
+        {:cont, {request, {collector.(acc, {:cont, data}), response}}}
       end
 
-      result =
-        handle
-        |> body_stream(wait)
-        |> Enum.reduce_while({:ok, {request, {acc, response}}}, legacy_wrapped_reducer(fun))
-
-      case result do
+      case legacy_read_into(conn, timeout, fun, {request, {acc, response}}) do
         {:ok, {request, {acc, response}}} ->
           {request, %{response | body: collector.(acc, :done)}}
 
@@ -279,44 +324,42 @@ defmodule Popcorn.Fetch do
       end
     end
 
-    defp legacy_wrapped_reducer(fun) do
-      fn
-        {:data, _data} = event, {:ok, acc} ->
+    # Hands the body's chunks to `fun`, until it halts or the body ends
+    defp legacy_read_into(conn, timeout, fun, acc) do
+      case next(conn, timeout) do
+        {:data, _data} = event ->
           case fun.(event, acc) do
             {:cont, acc} ->
-              {:cont, {:ok, acc}}
+              legacy_read_into(conn, timeout, fun, acc)
 
             {:halt, acc} ->
-              {:halt, {:ok, acc}}
+              close(conn)
+              {:ok, acc}
 
             other ->
-              raise ArgumentError,
-                    "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
+              close(conn)
+              raise ArgumentError, "expected {:cont, acc} or {:halt, acc}, got: #{inspect(other)}"
           end
 
-        {:error, reason}, {:ok, acc} ->
-          {:halt, {:error, reason, acc}}
+        :done ->
+          {:ok, acc}
+
+        {:error, reason} ->
+          {:error, reason, acc}
       end
     end
 
     defp legacy_run_into_self(request, req, timeout) do
       ref = make_ref()
-      owner = self()
-      {relay, monitor} = spawn_monitor(fn -> relay(owner, ref, timeout) end)
 
-      result =
-        with {:ok, handle} <- start(req, relay),
-             {:ok, status, headers} <- await_head(ref, relay, monitor, handle) do
-          async = async_body(owner, ref, relay, handle)
+      case start_relay(req, ref, timeout) do
+        {:ok, status, headers, relay} ->
+          async = async_body(self(), ref, relay)
           {request, Req.Response.new(status: status, headers: headers, body: async)}
-        else
-          {:error, reason} ->
-            send(relay, :cancel)
-            legacy_transport_error(request, reason)
-        end
 
-      Process.demonitor(monitor, [:flush])
-      result
+        {:error, reason} ->
+          legacy_transport_error(request, reason)
+      end
     end
 
     if Code.ensure_loaded?(Req.Adapter) do
@@ -340,17 +383,10 @@ defmodule Popcorn.Fetch do
     end
 
     defp stream(request, response, body, acc, fun, state) do
-      method = request.method |> to_string() |> String.upcase()
-
-      headers =
-        request.headers
-        |> Req.Fields.get_list()
-        |> Enum.map(fn {name, value} -> [name, value] end)
-
       req = %{
-        method: method,
+        method: request.method |> to_string() |> String.upcase(),
         url: URI.to_string(request.url),
-        headers: headers,
+        headers: Req.Fields.get_list(request.headers),
         body: body
       }
 
@@ -362,11 +398,10 @@ defmodule Popcorn.Fetch do
       end
     end
 
+    # Req's timeout bounds each event, rather than the whole response
     defp stream_response(response, req, acc, fun, state, timeout) do
-      wait = {:each, timeout}
-
-      with {:ok, handle} <- start(req, self()),
-           {:ok, status, headers} <- collect_head(handle, wait) do
+      with {:ok, conn} <- start(req, timeout: :infinity),
+           {:head, status, headers} <- next(conn, timeout) do
         response = %{response | status: status}
 
         case fun.({:status, status}, response, acc, state) do
@@ -376,23 +411,23 @@ defmodule Popcorn.Fetch do
 
             case fun.({:headers, headers}, response, acc, state) do
               {:ok, response, acc, state} ->
-                stream_body(response, acc, fun, state, handle, wait)
+                stream_body(response, acc, fun, state, conn, timeout)
 
               {:halt, _, _, _} = result ->
-                cancel(handle)
+                close(conn)
                 result
 
               {{:error, _exception}, _, _, _} = result ->
-                cancel(handle)
+                close(conn)
                 result
             end
 
           {:halt, _, _, _} = result ->
-            cancel(handle)
+            close(conn)
             result
 
           {{:error, _exception}, _, _, _} = result ->
-            cancel(handle)
+            close(conn)
             result
         end
       else
@@ -400,35 +435,35 @@ defmodule Popcorn.Fetch do
       end
     end
 
-    defp stream_body(response, acc, fun, state, handle, wait) do
-      handle
-      |> body_stream(wait)
-      |> Enum.reduce_while({:ok, response, acc, state}, fn
-        {:data, data}, {:ok, response, acc, state} ->
+    defp stream_body(response, acc, fun, state, conn, timeout) do
+      case next(conn, timeout) do
+        {:data, data} ->
           case fun.({:data, data}, response, acc, state) do
             {:ok, response, acc, state} ->
-              {:cont, {:ok, response, acc, state}}
+              stream_body(response, acc, fun, state, conn, timeout)
 
-            {:halt, response, acc, state} ->
-              {:halt, {:halt, response, acc, state}}
+            {:halt, _, _, _} = result ->
+              close(conn)
+              result
 
             {{:error, _exception}, _, _, _} = result ->
-              {:halt, result}
+              close(conn)
+              result
           end
 
-        {:error, reason}, {:ok, response, acc, state} ->
-          {:halt, transport_error(response, acc, state, reason)}
-      end)
+        :done ->
+          {:ok, response, acc, state}
+
+        {:error, reason} ->
+          transport_error(response, acc, state, reason)
+      end
     end
 
     defp stream_into_self(response, req, acc, fun, state, timeout) do
       ref = make_ref()
-      owner = self()
-      {relay, monitor} = spawn_monitor(fn -> relay(owner, ref, timeout) end)
 
-      result =
-        with {:ok, handle} <- start(req, relay),
-             {:ok, status, headers} <- await_head(ref, relay, monitor, handle) do
+      case start_relay(req, ref, timeout) do
+        {:ok, status, headers, relay} ->
           response = %{response | status: status}
 
           case fun.({:status, status}, response, acc, state) do
@@ -438,110 +473,107 @@ defmodule Popcorn.Fetch do
 
               case fun.({:headers, headers}, response, acc, state) do
                 {:ok, response, acc, state} ->
-                  async = async_body(owner, ref, relay, handle)
-                  {:ok, %{response | body: async}, acc, state}
+                  {:ok, %{response | body: async_body(self(), ref, relay)}, acc, state}
 
                 {:halt, _, _, _} = result ->
-                  cancel_async(relay, handle)
+                  stop_relay(relay, ref)
                   result
 
                 {{:error, _exception}, _, _, _} = result ->
-                  cancel_async(relay, handle)
+                  stop_relay(relay, ref)
                   result
               end
 
             {:halt, _, _, _} = result ->
-              cancel_async(relay, handle)
+              stop_relay(relay, ref)
               result
 
             {{:error, _exception}, _, _, _} = result ->
-              cancel_async(relay, handle)
+              stop_relay(relay, ref)
               result
           end
-        else
-          {:error, reason} ->
-            send(relay, :cancel)
-            transport_error(response, acc, state, reason)
+
+        {:error, reason} ->
+          transport_error(response, acc, state, reason)
+      end
+    end
+
+    # Req's `:self` responses arrive as messages to the caller, which a relay
+    # process sends as it reads the request's events
+    defp start_relay(req, ref, timeout) do
+      owner = self()
+
+      {pid, monitor} =
+        spawn_monitor(fn ->
+          receive do
+            {^ref, conn} -> relay(owner, ref, conn, timeout)
+          end
+        end)
+
+      result =
+        case start(req, target: pid, timeout: :infinity) do
+          {:ok, conn} ->
+            send(pid, {ref, conn})
+            relay = %{pid: pid, conn: conn}
+
+            with {:ok, status, headers} <- await_head(ref, relay, monitor) do
+              {:ok, status, headers, relay}
+            end
+
+          {:error, _reason} = error ->
+            Process.exit(pid, :kill)
+            error
         end
 
       Process.demonitor(monitor, [:flush])
       result
     end
 
-    defp cancel_async(relay, handle) do
-      send(relay, :cancel)
-      cancel(handle)
-    end
-
-    defp await_head(ref, relay, monitor, handle) do
+    defp await_head(ref, relay, monitor) do
       receive do
         {^ref, {:head, status, headers}} ->
           {:ok, status, headers}
 
         {^ref, {:error, reason}} ->
-          cancel(handle)
           {:error, reason}
 
         # The relay bounds its own wait, so this only fires if it crashed.
-        {:DOWN, ^monitor, :process, ^relay, reason} ->
-          cancel(handle)
+        {:DOWN, ^monitor, :process, _pid, reason} ->
+          close(relay.conn)
           {:error, {:relay_down, reason}}
       end
     end
 
-    defp async_body(owner, ref, relay, handle) do
-      stream_fun = fn ref, message ->
-        case parse_message(ref, message) do
-          {:error, _} = error ->
-            cancel(handle)
-            error
+    # Req's timeout bounds each event, and the request ends with `:done` or an error
+    defp relay(owner, ref, conn, timeout) do
+      event = next(conn, timeout)
+      send(owner, {ref, event})
 
-          result ->
-            result
-        end
+      case event do
+        {:head, _status, _headers} -> relay(owner, ref, conn, timeout)
+        {:data, _data} -> relay(owner, ref, conn, timeout)
+        _end -> :ok
       end
+    end
 
+    defp stop_relay(relay, ref) do
+      Process.exit(relay.pid, :kill)
+      close(relay.conn)
+      flush(ref)
+    end
+
+    defp async_body(owner, ref, relay) do
       cancel_fun = fn ref ->
-        send(relay, :cancel)
-        cancel(handle)
-        flush(ref)
+        stop_relay(relay, ref)
         :ok
       end
 
       struct!(Req.Response.Async,
         pid: owner,
         ref: ref,
-        stream_fun: stream_fun,
+        stream_fun: &parse_message/2,
         cancel_fun: cancel_fun
       )
-    end
-
-    # Used for bridge -> `Req.Response.Async` translation.
-    # The timeout is per message.
-    defp relay(owner, ref, timeout) do
-      receive do
-        {:wasm, %{"popcorn_fetch" => _} = message} ->
-          case decode(message) do
-            {:head, status, headers} ->
-              send(owner, {ref, {:head, status, headers}})
-              relay(owner, ref, timeout)
-
-            {:chunk, data} ->
-              send(owner, {ref, {:data, data}})
-              relay(owner, ref, timeout)
-
-            :done ->
-              send(owner, {ref, :done})
-
-            {:error, reason} ->
-              send(owner, {ref, {:error, reason}})
-          end
-
-        :cancel ->
-          :ok
-      after
-        timeout -> send(owner, {ref, {:error, :timeout}})
-      end
     end
 
     defp parse_message(ref, {ref, {:data, data}}), do: {:ok, [data: data]}
@@ -657,87 +689,15 @@ defmodule Popcorn.Fetch do
     end
   end
 
-  defp body_stream(handle, wait) do
-    Stream.resource(
-      fn -> %{handle: handle, wait: wait, completed: false} end,
-      fn state ->
-        case recv(state.handle, state.wait) do
-          {:chunk, data} -> {[{:data, data}], state}
-          :done -> {:halt, %{state | completed: true}}
-          {:error, reason} -> {[{:error, reason}], state}
-        end
-      end,
-      fn
-        %{completed: true} -> :ok
-        state -> cancel(state.handle)
-      end
-    )
-  end
-
-  defp start(req, target) do
-    id = System.unique_integer([:positive])
-
-    args =
-      %{
-        popcorn_fetch: id,
-        target: target,
-        method: req.method,
-        url: req.url,
-        headers: Map.get(req, :headers, [])
-      }
-      |> put_body(Map.get(req, :body))
-
-    case JS.run(@start_js, args) do
-      {:ok, controller} -> {:ok, %{id: id, target: target, controller: controller}}
-      {:error, reason} -> {:error, {:bridge, reason}}
-    end
-  end
-
   defp put_body(args, nil), do: args
   defp put_body(args, body), do: Map.put(args, :body, Base.encode64(body))
-
-  defp collect_head(handle, wait) do
-    case recv(handle, wait) do
-      {:head, status, headers} ->
-        {:ok, status, headers}
-
-      {:error, reason} ->
-        cancel(handle)
-        {:error, reason}
-    end
-  end
-
-  defp collect_body(handle, wait) do
-    result =
-      handle
-      |> body_stream(wait)
-      |> Enum.reduce_while({:ok, []}, fn
-        {:data, data}, {:ok, acc} -> {:cont, {:ok, [data | acc]}}
-        {:error, reason}, {:ok, _acc} -> {:halt, {:error, reason}}
-      end)
-
-    case result do
-      {:ok, chunks} -> {:ok, chunks |> Enum.reverse() |> IO.iodata_to_binary()}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp recv(handle, wait) do
-    id = handle.id
-
-    receive do
-      {:wasm, %{"popcorn_fetch" => ^id} = message} -> decode(message)
-    after
-      wait_timeout(wait) -> {:error, :timeout}
-    end
-  end
 
   defp decode(%{"event" => "status", "status" => status, "headers" => headers}) do
     headers = Enum.map(headers, fn [name, value] -> {name, value} end)
     {:head, status, decompressed(headers)}
   end
 
-  defp decode(%{"event" => "chunk", "data" => data}), do: {:chunk, Base.decode64!(data)}
+  defp decode(%{"event" => "chunk", "data" => data}), do: {:data, Base.decode64!(data)}
   defp decode(%{"event" => "done"}), do: :done
   defp decode(%{"event" => "error", "error" => message}), do: {:error, {:fetch, hint(message)}}
 
@@ -764,12 +724,6 @@ defmodule Popcorn.Fetch do
     end
   end
 
-  defp cancel(handle) do
-    JS.run(@abort_js, %{controller: handle.controller})
-    flush_bridge(handle.id)
-    :ok
-  end
-
   defp flush_bridge(id) do
     receive do
       {:wasm, %{"popcorn_fetch" => ^id}} -> flush_bridge(id)
@@ -781,10 +735,11 @@ defmodule Popcorn.Fetch do
   defp deadline(:infinity), do: :infinity
   defp deadline(timeout), do: System.monotonic_time(:millisecond) + timeout
 
-  defp wait_timeout({:each, timeout}), do: timeout
-  defp wait_timeout({:total, :infinity}), do: :infinity
+  # The wait for an event: its own timeout, within the request's deadline
+  defp wait(:infinity, timeout), do: timeout
 
-  defp wait_timeout({:total, deadline}) do
-    max(0, deadline - System.monotonic_time(:millisecond))
+  defp wait(deadline, timeout) do
+    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+    if timeout == :infinity, do: remaining, else: min(remaining, timeout)
   end
 end

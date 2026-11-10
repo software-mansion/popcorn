@@ -22,11 +22,13 @@ defmodule Popcorn.JS.FakeBridge do
   def run_js(_code, %{popcorn_fetch: id} = args, _opts) do
     Process.put(:fetch_request, args)
     Enum.each(events(id), &Kernel.send(args.target, {:wasm, &1}))
-    {:wasm_tracked_value, make_ref()}
+    {:wasm_tracked_value, {self(), make_ref()}}
   end
 
-  def run_js(_code, %{controller: {:wasm_tracked_value, _}}, _opts) do
-    Process.put(:fetch_aborted, true)
+  # Any process can abort a fetch, such as the relay of Req's `:self` mode, so
+  # the process that started it learns it from a message
+  def run_js(_code, %{controller: {:wasm_tracked_value, {starter, _ref}}}, _opts) do
+    Kernel.send(starter, {__MODULE__, :fetch_aborted})
     nil
   end
 
@@ -48,8 +50,16 @@ defmodule Popcorn.JS.FakeBridge do
   @doc "The args the last fetch was started with."
   def fetch_request, do: Process.get(:fetch_request)
 
-  @doc "Whether the last fetch was aborted."
-  def fetch_aborted?, do: Process.get(:fetch_aborted, false)
+  @doc "Whether a fetch that this process started was aborted, by any process."
+  def fetch_aborted? do
+    receive do
+      {__MODULE__, :fetch_aborted} ->
+        Process.put(:fetch_aborted, true)
+        fetch_aborted?()
+    after
+      0 -> Process.get(:fetch_aborted, false)
+    end
+  end
 
   defp events(id) do
     response = Process.get(:fetch_response) || raise "no fetch stubbed, call stub_fetch/1"
