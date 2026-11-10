@@ -3,7 +3,7 @@
 # Send HTTP requests
 
 Use `Popcorn.Fetch` when Elixir code needs HTTP in the browser. It uses the
-browser `fetch()` API. You can use it directly or through Req.
+browser `fetch()` API. You can use it directly, through `Req` or via `:httpc`.
 
 ## Using `Req`
 
@@ -48,6 +48,10 @@ IO.inspect(response.body)
 
 An HTTP error status still returns `{:ok, response}`. Network failures and
 timeouts return `{:error, reason}`.
+
+## Using `:httpc`
+
+`:httpc` support is there mostly for comparibility with existing libs, such as Hex. Popcorn patches `:httpc` and routes requests to `Popcorn.Fetch`. It should work normally, except that browser handles things like cookies or TLS, so respective options to `:httpc` are ignored.
 
 ## Browser limits
 
