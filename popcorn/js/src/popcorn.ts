@@ -58,6 +58,15 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
      * Must end with `/`. Defaults to `otp/` next to the worker.
      */
     otpAssetsRoot?: string;
+    /**
+     * Threads the runtime starts before the VM, so that the VM's threads
+     * start at once. Others start later, when the VM creates them. Booting
+     * waits for all of them to load.
+     *
+     * Defaults to enough for the schedulers in `emulatorArgs` and the VM's
+     * other threads.
+     */
+    threadPoolSize?: number;
   };
   tty?: {
     /** Initial terminal size. Defaults to 80 columns and 24 rows. */
@@ -208,6 +217,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private state: PopcornState = { status: "created" };
   private readonly opts: PopcornOpts<Output>;
   private readonly maxMemoryBytes: number;
+  private readonly threadPoolSize: number;
   private readonly ttySize: TtySize;
   private output: OutputHandlers;
   private requestSeq = 0;
@@ -312,16 +322,16 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         opts.beam.otpAssetsRoot.endsWith("/"),
       "otpAssetsRoot must end with a slash",
     );
-    const { maxMemory, ...beam } = opts.beam ?? {};
+    const { maxMemory, threadPoolSize, ...beam } = opts.beam ?? {};
     this.maxMemoryBytes = resolveMaxMemory(maxMemory);
-    this.opts = {
-      ...opts,
-      beam: {
-        ...beam,
-        emulatorArgs:
-          beam.emulatorArgs ?? schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
-      },
-    };
+    const emulatorArgs =
+      beam.emulatorArgs ?? schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 });
+    this.threadPoolSize = threadPoolSize ?? defaultThreadPoolSize(emulatorArgs);
+    check(
+      Number.isSafeInteger(this.threadPoolSize) && this.threadPoolSize >= 0,
+      "threadPoolSize must be a non-negative integer",
+    );
+    this.opts = { ...opts, beam: { ...beam, emulatorArgs } };
     this.ttySize = { ...ttySize };
     this.onStdout = opts.onStdout;
     this.onStderr = opts.onStderr;
@@ -462,6 +472,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         payload: {
           ...this.opts.beam,
           maxMemoryBytes: this.maxMemoryBytes,
+          threadPoolSize: this.threadPoolSize,
           ttySize: this.ttySize,
           noshell: this.opts.tty === undefined,
         },
@@ -1206,6 +1217,26 @@ export function schedulers(opts: SchedulerOptions): string[] {
   check(dirtyIo > 0);
 
   return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
+}
+
+// The VM's threads besides its schedulers: the main thread, the aux thread,
+// the system message dispatcher, the poll thread and an async thread
+const VM_THREADS = 5;
+
+// The BEAM's defaults: a scheduler per core, as many dirty CPU schedulers,
+// and 10 dirty I/O ones
+function defaultThreadPoolSize(emulatorArgs: string[]): number {
+  const count = (flag: string, fallback: number) => {
+    const index = emulatorArgs.findLastIndex(
+      (arg) => arg === `-${flag}` || arg === `+${flag}`,
+    );
+    const value = index === -1 ? NaN : parseInt(emulatorArgs[index + 1]);
+    return Number.isNaN(value) ? fallback : value;
+  };
+  const base = count("S", navigator.hardwareConcurrency || 1);
+  const dirtyCpu = count("SDcpu", base);
+  const dirtyIo = count("SDio", 10);
+  return VM_THREADS + base + dirtyCpu + dirtyIo;
 }
 
 function isValidTtySize({ columns, rows }: TtySize): boolean {

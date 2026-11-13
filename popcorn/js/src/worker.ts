@@ -35,6 +35,7 @@ async function dispatch(event: MessageEvent<unknown>): Promise<void> {
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,
         maxMemoryBytes: data.payload.maxMemoryBytes,
+        threadPoolSize: data.payload.threadPoolSize,
         ttySize: data.payload.ttySize,
         noshell: data.payload.noshell,
         createModule,

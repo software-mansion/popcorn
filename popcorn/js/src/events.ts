@@ -17,6 +17,7 @@ type BootEvent = {
     | "extraArgs"
     | "env"
     | "maxMemoryBytes"
+    | "threadPoolSize"
     | "ttySize"
     | "noshell"
   > & { otpAssetsRoot?: string };
