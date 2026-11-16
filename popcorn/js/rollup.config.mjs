@@ -1,5 +1,6 @@
 import { mkdir, rm, symlink } from "node:fs/promises";
 import typescript from "@rollup/plugin-typescript";
+import { dts } from "rollup-plugin-dts";
 
 export default [
   {
@@ -60,4 +61,14 @@ export default [
       }),
     ],
   },
+  ...["index", "plugins/vite", "plugins/rollup", "plugins/esbuild"].map(
+    (entry) => ({
+      input: entry === "index" ? "src/index.ts" : `${entry}.ts`,
+      output: {
+        file: `../out/js/${entry}.d.ts`,
+        format: "esm",
+      },
+      plugins: [dts()],
+    }),
+  ),
 ];
