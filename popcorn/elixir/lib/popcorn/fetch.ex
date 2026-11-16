@@ -164,8 +164,7 @@ defmodule Popcorn.Fetch do
 
   # The internal API, which request/2, the Req adapter and Popcorn.Fetch.HTTPC are
   # built on. start/2 starts a request, next/2 reads its events and close/1 stops
-  # it early. The request's events go to its target process, so only the target
-  # can read them.
+  # it early.
 
   # Starts a request, whose events go to `:target`, the caller by default. The
   # `:timeout` bounds the whole response.
