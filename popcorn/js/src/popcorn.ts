@@ -1,12 +1,12 @@
-import { PopcornError, err, unwrap, type Result } from "./errors";
-import { RawTerm, atom, tuple, type Mapper } from "./etf";
+import { PopcornError, err, unwrap, type Result } from "./errors.js";
+import { RawTerm, atom, tuple, type Mapper } from "./etf.js";
 import {
   readWorkerEvent,
   serializeSendPayload,
   toVm,
   type PopcornEvent,
   type SendCompletionPayload,
-} from "./events";
+} from "./events.js";
 import type {
   AnyValue,
   BeamBootOptions,
@@ -20,8 +20,8 @@ import type {
   Pid,
   RunJsRequest,
   TtySize,
-} from "./types";
-import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
+} from "./types.js";
+import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils.js";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };

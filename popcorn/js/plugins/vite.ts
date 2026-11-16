@@ -8,7 +8,7 @@ import {
   runtimeDirectory,
   type Options,
   type Prepared,
-} from "./shared";
+} from "./shared.js";
 
 /** Headers required by the threaded WebAssembly runtime. */
 export const crossOriginIsolationHeaders = {

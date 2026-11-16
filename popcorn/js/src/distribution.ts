@@ -1,4 +1,4 @@
-import type { DistEndpoint, DistTransport } from "./types";
+import type { DistEndpoint, DistTransport } from "./types.js";
 
 /**
  * Transport that you can pass as `distribution` option to multiple Popcorn

@@ -1,10 +1,10 @@
-export { PopcornError } from "./errors";
+export { PopcornError } from "./errors.js";
 
-export { a, atom, t, tuple } from "./etf";
-export { Popcorn, schedulers } from "./popcorn";
-export { createDistributionRelay } from "./distribution";
-export type { PopcornOpts, SchedulerOptions, GenServer } from "./popcorn";
-export type { PopcornEvent } from "./events";
+export { a, atom, t, tuple } from "./etf.js";
+export { Popcorn, schedulers } from "./popcorn.js";
+export { createDistributionRelay } from "./distribution.js";
+export type { PopcornOpts, SchedulerOptions, GenServer } from "./popcorn.js";
+export type { PopcornEvent } from "./events.js";
 export type {
   AnyValue,
   DistConnectionEvent,
@@ -14,5 +14,5 @@ export type {
   Pid,
   OtpErrorPayload,
   TtySize,
-} from "./types";
-export type { PopcornErrors, Result, SerializedError } from "./errors";
+} from "./types.js";
+export type { PopcornErrors, Result, SerializedError } from "./errors.js";

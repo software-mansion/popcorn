@@ -1,4 +1,4 @@
-import { check, unreachable } from "./utils";
+import { check, unreachable } from "./utils.js";
 
 /**
  * An operation result. Check `ok` before accessing `data` or `error`.

@@ -1,13 +1,13 @@
-import { type Result, type SerializedError } from "./errors";
-import { encode, type Mapper } from "./etf";
+import { type Result, type SerializedError } from "./errors.js";
+import { encode, type Mapper } from "./etf.js";
 import type {
   AnyValue,
   BeamBootOptions,
   BeamEvent,
   BeamSendPayload,
   BeamTarget,
-} from "./types";
-import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
+} from "./types.js";
+import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils.js";
 
 type BootEvent = {
   type: "popcorn:boot";

@@ -1,7 +1,7 @@
 import { cp, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Plugin } from "esbuild";
-import { popcorn as prepare, type Options } from "./shared";
+import { popcorn as prepare, type Options } from "./shared.js";
 
 /**
  * Copies the worker, VM runtime, and `otp/` assets into the output directory after a successful esbuild build.

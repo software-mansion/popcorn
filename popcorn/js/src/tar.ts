@@ -1,4 +1,4 @@
-import { check } from "./utils";
+import { check } from "./utils.js";
 
 // Tar format constants.
 const T = {

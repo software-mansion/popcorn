@@ -3,8 +3,8 @@ import {
   isUnserializableReason,
   type Result,
   type UnserializableReason,
-} from "./errors";
-import { check } from "./utils";
+} from "./errors.js";
+import { check } from "./utils.js";
 
 const VERSION = 0x83;
 const NEW_FLOAT_EXT = 0x46;

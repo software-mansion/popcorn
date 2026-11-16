@@ -1,13 +1,13 @@
-import { PopcornError, err, isErr, type Result } from "./errors";
-import { deserializeBridgeMessage } from "./events";
-import { extractTar } from "./tar";
+import { PopcornError, err, isErr, type Result } from "./errors.js";
+import { deserializeBridgeMessage } from "./events.js";
+import { extractTar } from "./tar.js";
 import type {
   BeamBootOptions,
   BeamSendPayload,
   BeamTarget,
   EmscriptenModule,
   OtpErrorPayload,
-} from "./types";
+} from "./types.js";
 import {
   check,
   dirname,
@@ -15,7 +15,7 @@ import {
   fetchJson,
   objectWithKeys,
   unreachable,
-} from "./utils";
+} from "./utils.js";
 
 const DEFAULT_USER = "web_user";
 const DEFAULT_HOME_DIR = "/home/web_user";

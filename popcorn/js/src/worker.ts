@@ -1,8 +1,8 @@
 import createModule from "./beam.emu.mjs";
 
-import { start, type Beam } from "./beam";
-import { readMainEvent, toMain } from "./events";
-import { check, unreachable } from "./utils";
+import { start, type Beam } from "./beam.js";
+import { readMainEvent, toMain } from "./events.js";
+import { check, unreachable } from "./utils.js";
 
 let instance: Beam | null = null;
 
