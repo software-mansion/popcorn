@@ -13,9 +13,10 @@ defmodule Popcorn.FetchTest do
   end
 
   describe "compilation" do
-    test "omits Req without losing plain Fetch" do
+    test "compiles without Req, and installs the adapter once Req is there" do
       fixture = Path.expand("../fixtures/fetch_without_req_helper.exs", __DIR__)
-      {output, status} = System.cmd("elixir", [fixture], stderr_to_stdout: true)
+      req_dir = to_string(:code.lib_dir(:req))
+      {output, status} = System.cmd("elixir", [fixture, req_dir], stderr_to_stdout: true)
 
       assert status == 0, output
       assert output == ""

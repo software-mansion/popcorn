@@ -647,6 +647,9 @@ defmodule Popcorn.Packager do
       module == Popcorn.Fetch.HTTPC ->
         not Map.has_key?(staged_apps, :inets)
 
+      module == Popcorn.Fetch.Req ->
+        not Map.has_key?(staged_apps, :req) and not Map.has_key?(staged_apps, :mix)
+
       true ->
         false
     end

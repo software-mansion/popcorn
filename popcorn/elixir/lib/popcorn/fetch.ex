@@ -4,9 +4,8 @@ defmodule Popcorn.Fetch do
 
   ## Using Req
 
-  Req is optional. The adapter is compiled only when Req is available.
-  If your application includes Req, Popcorn installs this adapter when it starts inside the Popcorn runtime.
-  If you add Req later, recompile Popcorn with `mix deps.compile popcorn --force`.
+  Req is optional. Popcorn bundles a Req adapter if your application depends
+  on either Req or Mix (as Req may then be installed later with `Mix.install/2`).
   Popcorn preserves any adapter in Req's `:default_options` configuration.
   The adapter supports Req versions from `0.5.0` through `0.8.0-rc.0`.
 
@@ -35,6 +34,8 @@ defmodule Popcorn.Fetch do
   """
 
   alias Popcorn.JS
+
+  require Logger
 
   @default_timeout 30_000
 
@@ -229,17 +230,32 @@ defmodule Popcorn.Fetch do
     :ok
   end
 
-  if Code.ensure_loaded?(Req) do
-    @doc "Returns the adapter value for the installed Req version."
-    def adapter do
-      version = :req |> Application.spec(:vsn) |> to_string()
+  @compile {:no_warn_undefined, Popcorn.Fetch.Req}
 
-      if Version.match?(version, ">= 0.7.0") do
-        Popcorn.Fetch.Req
-      else
-        &Popcorn.Fetch.Req.run/1
-      end
+  @doc "Returns the adapter value for the installed Req version."
+  def adapter do
+    version = :req |> Application.spec(:vsn) |> to_string()
+
+    if Version.match?(version, ">= 0.7.0") do
+      Popcorn.Fetch.Req
+    else
+      &Popcorn.Fetch.Req.run/1
     end
+  end
+
+  @doc false
+  @spec install_req_adapter() :: :ok
+  def install_req_adapter do
+    with true <- JS.available?(),
+         true <- Code.ensure_loaded?(Req),
+         true <- Code.ensure_loaded?(Popcorn.Fetch.Req),
+         opts = Application.get_env(:req, :default_options, []),
+         false <- Keyword.has_key?(opts, :adapter) do
+      Application.put_env(:req, :default_options, Keyword.put(opts, :adapter, adapter()))
+      Logger.debug("using Popcorn.Fetch as Req's adapter")
+    end
+
+    :ok
   end
 
   defp put_body(args, nil), do: args
