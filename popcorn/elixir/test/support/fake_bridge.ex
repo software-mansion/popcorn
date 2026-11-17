@@ -22,12 +22,12 @@ defmodule Popcorn.JS.FakeBridge do
   def run_js(_code, %{popcorn_fetch: id} = args, _opts) do
     Process.put(:fetch_request, args)
     Enum.each(events(id), &Kernel.send(args.target, {:wasm, &1}))
-    {:wasm_tracked_value, {self(), make_ref()}}
+    {:__wasm_tracked_value__, {self(), make_ref()}}
   end
 
   # Any process can abort a fetch, such as the relay of Req's `:self` mode, so
   # the process that started it learns it from a message
-  def run_js(_code, %{controller: {:wasm_tracked_value, {starter, _ref}}}, _opts) do
+  def run_js(_code, %{controller: {:__wasm_tracked_value__, {starter, _ref}}}, _opts) do
     Kernel.send(starter, {__MODULE__, :fetch_aborted})
     nil
   end

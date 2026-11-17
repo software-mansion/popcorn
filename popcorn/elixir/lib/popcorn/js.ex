@@ -67,7 +67,7 @@ defmodule Popcorn.JS do
   Garbage collection does not guarantee prompt cleanup.
   For time-sensitive resources, call an idempotent cleanup function explicitly. This ensures you can call it yourself or it can be called by Popcorn.
   """
-  @opaque tracked_value :: {:wasm_tracked_value, reference()}
+  @opaque tracked_value :: {:__wasm_tracked_value__, reference()}
 
   @typedoc """
   A binary that JavaScript receives as a `Uint8Array`. See `bytes/1`.

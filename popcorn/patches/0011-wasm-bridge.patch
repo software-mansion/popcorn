@@ -1179,7 +1179,7 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..411934df27a285560fa779141c01c32c5449baa0
+index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7945981e2
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
 @@ -0,0 +1,210 @@
@@ -1216,8 +1216,8 @@ index 0000000000000000000000000000000000000000..411934df27a285560fa779141c01c32c
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
-+%% Accepts more than a json:encode_value(): pids, `{wasm_tracked_value, _}` handles,
-+%% bytes/1 and tuples are encoded by encode_arg/2.
++%% Accepts more than a json:encode_value(): pids, bytes/1, tuples and
++%% `{'__wasm_tracked_value__', _}` handles are encoded by encode_arg/2.
 +-spec send(term()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
@@ -1226,7 +1226,7 @@ index 0000000000000000000000000000000000000000..411934df27a285560fa779141c01c32c
 +    ok.
 +
 +%% Returns the decoded result, which may contain pids and, in `ref` mode, a
-+%% `{wasm_tracked_value, _}` handle — so not strictly a json:decode_value().
++%% `{'__wasm_tracked_value__', _}` handle — so not strictly a json:decode_value().
 +-spec run_js(binary(), map()) -> term().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
 +    run_js(Code, Args, []).
@@ -1309,7 +1309,7 @@ index 0000000000000000000000000000000000000000..411934df27a285560fa779141c01c32c
 +
 +encode_arg(nil, Encoder) ->
 +    json:encode_value(null, Encoder);
-+encode_arg({wasm_tracked_value, Resource}, Encoder) ->
++encode_arg({'__wasm_tracked_value__', Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
 +encode_arg({'__wasm_bytes__', Binary}, Encoder) when is_binary(Binary) ->
 +    value_tag(binary, base64:encode(Binary), Encoder);
@@ -1373,7 +1373,7 @@ index 0000000000000000000000000000000000000000..411934df27a285560fa779141c01c32c
 +
 +revive_refs(#{<<"popcorn_ref">> := Key} = Marker)
 +  when is_integer(Key), map_size(Marker) =:= 1 ->
-+    {wasm_tracked_value, materialize_ref(Key)};
++    {'__wasm_tracked_value__', materialize_ref(Key)};
 +revive_refs(Map) when is_map(Map) ->
 +    maps:map(fun(_K, V) -> revive_refs(V) end, Map);
 +revive_refs(List) when is_list(List) ->
