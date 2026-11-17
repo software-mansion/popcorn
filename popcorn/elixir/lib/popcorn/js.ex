@@ -24,6 +24,7 @@ defmodule Popcorn.JS.Mock do
   def await_ready(_opts), do: :ok
   def run_js(_code, _args, _opts), do: nil
   def send(_message), do: :ok
+  def bytes(binary), do: {:__wasm_bytes__, binary}
 end
 
 defmodule Popcorn.JS do
@@ -40,7 +41,8 @@ defmodule Popcorn.JS do
 
   Messages and `run/3` arguments and results are converted between Elixir and JavaScript.
   See [Sharing values across languages](values.md) for supported types and conversions.
-  Use a `t:tracked_value/0` to keep a JavaScript value's identity.
+  Use a `t:tracked_value/0` to keep a JavaScript value's identity, and `bytes/1` to send a
+  binary as bytes.
 
   ## Outside the browser
 
@@ -66,6 +68,11 @@ defmodule Popcorn.JS do
   For time-sensitive resources, call an idempotent cleanup function explicitly. This ensures you can call it yourself or it can be called by Popcorn.
   """
   @opaque tracked_value :: {:wasm_tracked_value, reference()}
+
+  @typedoc """
+  A binary that JavaScript receives as a `Uint8Array`. See `bytes/1`.
+  """
+  @opaque bytes :: {:__wasm_bytes__, binary()}
 
   @typedoc """
   A JavaScript message with a payload decoded into Elixir terms.
@@ -182,6 +189,21 @@ defmodule Popcorn.JS do
       {:ok, value} -> value
       {:error, reason} -> raise Popcorn.JS.Error, reason: reason
     end
+  end
+
+  @doc """
+  Marks a binary to reach JavaScript as a `Uint8Array`, even when it's valid UTF-8.
+
+  JavaScript otherwise receives binaries that are valid UTF-8 as strings.
+  Use it in `send/1` messages and `run/3` arguments, at any depth.
+
+  ```elixir
+  Popcorn.JS.send(%{image: Popcorn.JS.bytes(png)})
+  ```
+  """
+  @spec bytes(binary()) :: bytes()
+  def bytes(binary) when is_binary(binary) do
+    bridge().bytes(binary)
   end
 
   @doc """

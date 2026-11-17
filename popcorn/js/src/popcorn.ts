@@ -215,7 +215,8 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private readonly eventHandlers = new Set<(event: PopcornEvent) => void>();
   private distNode: string | null = null;
   private distHandler:
-    ((event: DistNodeEvent | DistConnectionEvent) => void) | null = null;
+    | ((event: DistNodeEvent | DistConnectionEvent) => void)
+    | null = null;
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
   private readonly readyWaiters: Uint8Array[] = [];
@@ -734,15 +735,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     }
   }
 
-  private emitDistEvent(event: DistNodeEvent | DistConnectionEvent): void {
-    if (event.type === "message") {
-      // The VM sends data that is valid UTF-8 as strings
-      const data: unknown = event.data;
-      if (typeof data === "string") event.data = UTF8.encode(data);
-    }
-    this.distHandler?.(event);
-  }
-
   private handleNodeChange(node: string | null): void {
     const previous = this.distNode;
     if (node === previous) return;
@@ -753,6 +745,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     if (node !== null) {
       this.emitDistEvent({ type: "node_started", name: node });
     }
+  }
+
+  private emitDistEvent(event: DistNodeEvent | DistConnectionEvent): void {
+    this.distHandler?.(event);
   }
 
   private completeCall(id: string, payload: unknown): void {

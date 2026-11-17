@@ -34,6 +34,8 @@ defmodule Popcorn.JS.FakeBridge do
 
   def run_js(_code, args, opts), do: %{"args" => args, "opts" => opts}
 
+  def bytes(binary), do: {:__wasm_bytes__, binary}
+
   def send(message) do
     Process.put(:sent, message)
     :ok
@@ -82,7 +84,7 @@ defmodule Popcorn.JS.FakeBridge do
 
         chunks =
           for chunk <- Map.get(response, :chunks, []) do
-            %{"event" => "chunk", "data" => Base.encode64(chunk)}
+            %{"event" => "chunk", "data" => chunk}
           end
 
         events =

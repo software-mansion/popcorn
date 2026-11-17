@@ -32,6 +32,7 @@ Cycles, unsupported instances, functions, unsafe Numbers, and non-finite numbers
 | --- | --- |
 | Valid UTF-8 binary | String |
 | Other binary | Uint8Array |
+| Binary wrapped with `Popcorn.JS.bytes/1` or `wasm:bytes/1` | Uint8Array |
 | Integer | Number when safe, otherwise BigInt |
 | Float | Number |
 | List or tuple | Array |

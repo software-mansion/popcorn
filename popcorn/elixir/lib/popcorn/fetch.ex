@@ -69,30 +69,12 @@ defmodule Popcorn.Fetch do
   # Fetch runs asynchronously and sends response chunks to `target`.
   @start_js """
   (args, { send }) => {
-    const CHUNK = 2 ** 14;
 
     async function reply(message) {
       return send(args.target, {
         ...message,
         popcorn_fetch: args.popcorn_fetch,
       });
-    }
-
-    function toBase64(bytes) {
-      return btoa(String.fromCharCode.apply(null, bytes));
-    }
-
-    function fromBase64(str) {
-      return Uint8Array.from(atob(str), (c) => c.charCodeAt(0));
-    }
-
-    async function sendChunks(bytes) {
-      for (let i = 0; i < bytes.length; i += CHUNK) {
-        await reply({
-          event: "chunk",
-          data: toBase64(bytes.subarray(i, i + CHUNK)),
-        });
-      }
     }
 
     const controller = new AbortController();
@@ -105,7 +87,7 @@ defmodule Popcorn.Fetch do
           signal: controller.signal,
         };
         if (args.body !== undefined) {
-          init.body = fromBase64(args.body);
+          init.body = args.body;
         }
 
         const response = await fetch(args.url, init);
@@ -120,7 +102,7 @@ defmodule Popcorn.Fetch do
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            await sendChunks(value);
+            await reply({ event: "chunk", data: value });
           }
         }
         await reply({ event: "done" });
@@ -243,14 +225,14 @@ defmodule Popcorn.Fetch do
   end
 
   defp put_body(args, nil), do: args
-  defp put_body(args, body), do: Map.put(args, :body, Base.encode64(body))
+  defp put_body(args, body), do: Map.put(args, :body, JS.bytes(body))
 
   defp decode(%{"event" => "status", "status" => status, "headers" => headers}) do
     headers = Enum.map(headers, fn [name, value] -> {name, value} end)
     {:head, status, decompressed(headers)}
   end
 
-  defp decode(%{"event" => "chunk", "data" => data}), do: {:data, Base.decode64!(data)}
+  defp decode(%{"event" => "chunk", "data" => data}), do: {:data, data}
   defp decode(%{"event" => "done"}), do: :done
   defp decode(%{"event" => "error", "error" => message}), do: {:error, {:fetch, hint(message)}}
 
