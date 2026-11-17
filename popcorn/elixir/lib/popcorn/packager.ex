@@ -589,6 +589,8 @@ defmodule Popcorn.Packager do
     |> Path.join()
     |> Path.wildcard()
     |> reduce_while_ok(:ok, fn patch_path, :ok ->
+      # The patch's app may be not used in the project,
+      # so we can't use String.to_existing_atom/1
       app = patch_path |> Path.dirname() |> Path.basename() |> String.to_atom()
       name = Path.basename(patch_path, ".erl") <> ".beam"
 

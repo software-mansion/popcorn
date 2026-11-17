@@ -51,7 +51,7 @@ timeouts return `{:error, reason}`.
 
 ## Using `:httpc`
 
-`:httpc` support is there mostly for comparibility with existing libs, such as Hex. Popcorn patches `:httpc` and routes requests to `Popcorn.Fetch`. It should work normally, except that browser handles things like cookies or TLS, so respective options to `:httpc` are ignored.
+`:httpc` support is there mostly for compatibility with existing libs, such as Hex. Popcorn patches `:httpc` and routes requests to `Popcorn.Fetch`. It should work normally, except that browser handles things like cookies or TLS, so respective options to `:httpc` are ignored.
 
 ## Browser limits
 
