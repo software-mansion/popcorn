@@ -5,7 +5,8 @@ defmodule Popcorn.Fetch do
   ## Using Req
 
   Req is optional. Popcorn bundles a Req adapter if your application depends
-  on either Req or Mix (as Req may then be installed later with `Mix.install/2`).
+  on either Req or Mix (if `:mix` is in `extra_applications`, Req may be installed
+  with `Mix.install/2` during runtime).
   Popcorn preserves any adapter in Req's `:default_options` configuration.
   The adapter supports Req versions from `0.5.0` through `0.8.0-rc.0`.
 

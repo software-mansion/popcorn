@@ -11,7 +11,7 @@ Add Req to the application dependencies. We support Req 0.5 through 0.7 and 0.8.
 
 Popcorn installs its Req adapter when running in the browser. If you already customized the adapter, Popcorn won't install its own.
 
-The adapter is only packaged when either Req or Mix (that may install Req) is available.
+The adapter is only packaged when either Req or Mix (that may install Req) is also packaged.
 
 ```elixir
 response = Req.get!("https://api.example.com/status")
