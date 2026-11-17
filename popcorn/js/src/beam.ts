@@ -268,18 +268,17 @@ const NON_SCHEDULER_THREADS = 3;
 // Mimics how the BEAM calculates numbers of threads to spawn
 // for various purposes
 export function resolveThreadPoolSize(emulatorArgs: string[]): number {
-  const count = (flag: string, fallback: number) => {
-    const index = emulatorArgs.findLastIndex(
-      (arg) => arg === `-${flag}` || arg === `+${flag}`,
-    );
-    const value = index === -1 ? NaN : parseInt(emulatorArgs[index + 1]);
-    return Number.isNaN(value) ? fallback : value;
-  };
-  const base = count("S", navigator.hardwareConcurrency || 1);
-  const dirtyCpu = count("SDcpu", base);
-  const dirtyIo = count("SDio", 10);
-  const async = Math.max(count("A", 1), 1);
-  const poll = count("IOt", 1);
+  const flags = new Map(
+    Array.from(
+      emulatorArgs.join("\0").matchAll(/(?:^|\0)-([A-Za-z]+)\0?(\d[^\0]*)/g),
+      ([, flag, value]) => [flag, parseInt(value)] as const,
+    ),
+  );
+  const base = flags.get("S") ?? navigator.hardwareConcurrency ?? 1;
+  const dirtyCpu = flags.get("SDcpu") ?? base;
+  const dirtyIo = flags.get("SDio") ?? 10;
+  const async = Math.max(flags.get("A") ?? 1, 1);
+  const poll = flags.get("IOt") ?? 1;
   return NON_SCHEDULER_THREADS + base + dirtyCpu + dirtyIo + async + poll;
 }
 

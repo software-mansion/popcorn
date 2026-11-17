@@ -401,22 +401,27 @@ test.describe("boot", () => {
   // besides its schedulers, async threads and poll threads, and the thread
   // pool fits them. A pool that's too small would end up with as many
   // workers, the missing ones started later, so the test checks the pool size
-  // on its own.
-  test("thread pool", async ({ otp, page }) => {
-    const emulatorArgs = [
+  // on its own. The BEAM takes flag values apart or attached.
+  const threadFlags: Record<string, string[]> = {
+    "values apart": [
       ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
       ...["-A", "4", "-IOt", "2"],
-    ];
-    const vmThreads = 3 + 6 + 4 + 2;
-    expect(resolveThreadPoolSize(emulatorArgs)).toBe(vmThreads);
+    ],
+    "values attached": ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
+  };
+  for (const [form, emulatorArgs] of Object.entries(threadFlags)) {
+    test(`thread pool, ${form}`, async ({ otp, page }) => {
+      const vmThreads = 3 + 6 + 4 + 2;
+      expect(resolveThreadPoolSize(emulatorArgs)).toBe(vmThreads);
 
-    const boot = await otp.tryBoot({
-      beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
+      const boot = await otp.tryBoot({
+        beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
+      });
+      assert(boot.ok);
+
+      await expect.poll(() => page.workers().length).toBe(1 + vmThreads);
     });
-    assert(boot.ok);
-
-    await expect.poll(() => page.workers().length).toBe(1 + vmThreads);
-  });
+  }
 
   test("errors", async ({ createOtp, page }) => {
     const timedOut = await createOtp();
