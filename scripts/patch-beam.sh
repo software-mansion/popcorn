@@ -13,7 +13,6 @@ PATCHES_DIR="${OTP_PATCHES_DIR:-${PROJECT_ROOT}/popcorn/patches}"
 STAMP_FILE="${OTP_DIR}/.stamp-patched"
 BASE_REF="refs/popcorn/otp-base"
 PATCH_REF_PREFIX="refs/popcorn/otp-patches"
-GIT_IDENTITY=(-c user.name=Popcorn -c user.email=popcorn@localhost)
 
 usage() {
     cat << EOF
@@ -145,7 +144,7 @@ apply_feature_patches() {
     while IFS=$'\t' read -r _ name file _; do
         log "Applying $(basename "${file}")..."
         git -C "${OTP_DIR}" apply --index "${file}"
-        git -C "${OTP_DIR}" "${GIT_IDENTITY[@]}" commit --quiet \
+        git -C "${OTP_DIR}" "${GIT_COMMIT_CONFIG[@]}" commit --quiet \
             -m "OTP patch: ${name}" -m "Patch: ${name}"
         commit=$(git -C "${OTP_DIR}" rev-parse HEAD)
         git -C "${OTP_DIR}" update-ref "${PATCH_REF_PREFIX}/${name}" "${commit}"
@@ -329,7 +328,7 @@ build_regenerated_stack() {
         if git -C "${repo}" diff --cached --quiet; then
             error "Patch '${name}' has no changes."
         fi
-        git -C "${repo}" "${GIT_IDENTITY[@]}" commit --quiet \
+        git -C "${repo}" "${GIT_COMMIT_CONFIG[@]}" commit --quiet \
             -m "OTP patch: ${name}" -m "Patch: ${name}"
         commit=$(git -C "${repo}" rev-parse HEAD)
         printf '%s\t%s\n' "${name}" "${commit}" >> "${commits_file}"
