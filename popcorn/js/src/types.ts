@@ -162,6 +162,8 @@ export type EmscriptenModule = {
   preRun: ((mod: EmscriptenModule) => void)[];
   _malloc: (size: number) => number;
   _free: (ptr: number) => void;
+  /** Read by the runtime, as -sPTHREAD_POOL_SIZE=Module.pthreadPoolSize. */
+  pthreadPoolSize: number;
   onBeamMessage?: (text: string) => void | Promise<void>;
   onError?: (text: string) => void | Promise<void>;
   onStdinConsumed?: (size: number) => void;

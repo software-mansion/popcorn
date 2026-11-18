@@ -141,6 +141,7 @@ async function boot(
           type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
           payload: chunk,
         }),
+      pthreadPoolSize: resolveThreadPoolSize(emulatorArgs ?? []),
       arguments: buildArgs({
         appNames: fsData.appNames,
         entrypoint: fsData.entrypoint,
@@ -260,6 +261,26 @@ function buildArgs({
   }
 
   return args;
+}
+
+// Mimics how the BEAM calculates numbers of threads to spawn
+// for various purposes
+export function resolveThreadPoolSize(emulatorArgs: string[]): number {
+  const nonSchedulerThreads = 3;
+  const numericFlagRegex = /(?:^|\0)-(?<flag>[A-Za-z]+)\0?(?<value>\d[^\0]*)/g;
+
+  const flags = new Map(
+    Array.from(
+      emulatorArgs.join("\0").matchAll(numericFlagRegex),
+      ([, flag, value]) => [flag, parseInt(value)] as const,
+    ),
+  );
+  const base = flags.get("S") ?? navigator.hardwareConcurrency ?? 1;
+  const dirtyCpu = flags.get("SDcpu") ?? base;
+  const dirtyIo = flags.get("SDio") ?? 10;
+  const async = Math.max(flags.get("A") ?? 1, 1);
+  const poll = flags.get("IOt") ?? 1;
+  return nonSchedulerThreads + base + dirtyCpu + dirtyIo + async + poll;
 }
 
 function isBridgeMarker(
