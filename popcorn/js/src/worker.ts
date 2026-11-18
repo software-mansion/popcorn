@@ -1,11 +1,10 @@
-import createModule from "./beam.emu.mjs";
+import createModule, { wasmUrl } from "./beam.emu.mjs";
 
 import { start, type Beam } from "./beam";
 import { readMainEvent, toMain } from "./events";
 import { check, unreachable } from "./utils";
 
 let instance: Beam | null = null;
-
 self.onmessage = (event: MessageEvent<unknown>) => {
   void dispatch(event).catch((error: unknown) => {
     console.error(error);
@@ -35,9 +34,12 @@ async function dispatch(event: MessageEvent<unknown>): Promise<void> {
         extraArgs: data.payload.extraArgs,
         env: data.payload.env,
         maxMemoryBytes: data.payload.maxMemoryBytes,
+        crossOriginStorage: data.payload.crossOriginStorage,
+        extensionPort: data.payload.extensionPort,
         ttySize: data.payload.ttySize,
         noshell: data.payload.noshell,
         createModule,
+        wasmUrl,
         emit: toMain,
       });
       void instance.vmReady.then(() =>

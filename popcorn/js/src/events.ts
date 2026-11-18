@@ -19,7 +19,11 @@ type BootEvent = {
     | "maxMemoryBytes"
     | "ttySize"
     | "noshell"
-  > & { otpAssetsRoot?: string };
+    | "extensionPort"
+  > & {
+    otpAssetsRoot?: string;
+    crossOriginStorage?: boolean;
+  };
 };
 
 type StdinEvent = {
@@ -70,7 +74,11 @@ type BootEndEvent =
   | { type: "popcorn:boot-fail"; payload: SerializedError };
 
 export type MainToVmEvent =
-  BootEvent | SendEvent | BridgeReplyEvent | StdinEvent | TtyResizeEvent;
+  | BootEvent
+  | SendEvent
+  | BridgeReplyEvent
+  | StdinEvent
+  | TtyResizeEvent;
 
 /**
  * A decoded BEAM message payload.

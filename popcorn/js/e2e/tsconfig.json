@@ -11,7 +11,7 @@
     "esModuleInterop": true,
     "noUnusedLocals": true,
     "lib": ["es2023", "DOM"],
-    "types": ["node"],
+    "types": ["node", "wicg-cross-origin-storage"],
     "noEmit": true,
     "baseUrl": ".",
     "paths": {

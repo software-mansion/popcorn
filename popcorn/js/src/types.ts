@@ -80,6 +80,10 @@ export type BeamSendPayload = {
 
 export type BeamBootOptions = {
   otpAssetsRoot: string;
+  /** Set to `false` to skip Cross-Origin Storage. */
+  crossOriginStorage?: boolean;
+  /** Temporary transport for page-only COS extensions. */
+  extensionPort?: MessagePort;
   /**
    * Emulator flags before `--`.
    *
@@ -96,6 +100,7 @@ export type BeamBootOptions = {
   ttySize: TtySize;
   noshell: boolean;
   createModule: CreateModuleFn<EmscriptenModule>;
+  wasmUrl: string;
   emit: (event: BeamEvent) => void;
 };
 
@@ -137,6 +142,10 @@ export type TtySize = {
 /** Emscripten Module interface (subset exposed after instantiation). */
 export type EmscriptenModule = {
   wasmMemory?: WebAssembly.Memory;
+  instantiateWasm?: (
+    imports: WebAssembly.Imports,
+    receive: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+  ) => WebAssembly.Exports;
   ENV: Record<string, string>;
   FS_mkdirTree: (path: string) => void;
   FS_createDataFile: (

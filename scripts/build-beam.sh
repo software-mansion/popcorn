@@ -422,7 +422,7 @@ emulator_link_settings() {
     flags+=" -sINITIAL_MEMORY=64MB"
     flags+=" -sMAXIMUM_MEMORY=2GB"
     flags+=" -sALLOW_MEMORY_GROWTH=1"
-    flags+=" -sINCOMING_MODULE_JS_API=arguments,wasmMemory,preRun,print,printErr,onExit,onAbort,locateFile"
+    flags+=" -sINCOMING_MODULE_JS_API=arguments,wasmMemory,preRun,print,printErr,onExit,onAbort,locateFile,instantiateWasm"
     flags+=" -sEXPORTED_RUNTIME_METHODS=ENV,HEAPU8,ccall,stringToNewUTF8,lengthBytesUTF8,FS_mkdirTree,FS_createDataFile"
     flags+=" -sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
     flags+=" -sFORCE_FILESYSTEM=1"
@@ -510,6 +510,7 @@ copy_artifacts() {
 
     sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
         "${wasm_bin_dir}/beam.emu" > "${outdir}/beam.emu.mjs"
+    echo 'export const wasmUrl = new URL("beam.wasm", import.meta.url).href;' >> "${outdir}/beam.emu.mjs"
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"

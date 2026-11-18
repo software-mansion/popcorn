@@ -133,6 +133,10 @@ defmodule Popcorn.PackagerTest do
       assert "beam.wasm" = out_dir |> Path.join("beam.wasm.gz") |> File.read!() |> :zlib.gunzip()
 
       manifest = read_manifest(out_dir)
+
+      assert manifest["vm"]["sha256"] ==
+               :crypto.hash(:sha256, "beam.wasm") |> Base.encode16(case: :lower)
+
       assert Map.keys(manifest["bundles"]) |> Enum.sort() == ["app", "deps", "stdlib"]
       assert manifest["apps"]["user_app"]["bundle"] == "app"
       assert manifest["apps"]["extra_app"]["bundle"] == "deps"
@@ -182,10 +186,12 @@ defmodule Popcorn.PackagerTest do
       assert kernel_spec[:env][:start_distribution] == false
       assert length(report.tarPaths) == 3
 
-      for {group, %{"tar" => tar}} <- manifest["bundles"] do
+      for {group, bundle} <- manifest["bundles"] do
+        assert %{"tar" => tar, "sha256" => expected_hash} = bundle
         path = Path.join(out_dir, "otp/" <> tar)
         contents = File.read!(path)
         hash = :crypto.hash(:sha256, contents) |> Base.encode16(case: :lower)
+        assert expected_hash == hash
         assert tar == "lib/#{group}.#{hash}.tar"
         assert :zlib.gunzip(File.read!(path <> ".gz")) == contents
         assert {:ok, ^contents} = :brotli.decode(File.read!(path <> ".br"))

@@ -1,3 +1,4 @@
+import { Assets } from "./assets";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
 import { extractTar } from "./tar";
@@ -11,7 +12,6 @@ import type {
 import {
   check,
   dirname,
-  fetchBinary,
   fetchJson,
   objectWithKeys,
   unreachable,
@@ -84,7 +84,8 @@ async function boot(
     emit,
   } = opts;
   try {
-    const loadedFsData = await loadFsData(otpAssetsRoot);
+    const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
+    const loadedFsData = await loadFsData(otpAssetsRoot, assets);
     if (!loadedFsData.ok) {
       return { ok: false, error: loadedFsData.error };
     }
@@ -111,6 +112,7 @@ async function boot(
       emit({ type: "otp:error", payload });
     };
     const moduleConfig: Partial<EmscriptenModule> = {
+      ...(await assets.wasm(opts.wasmUrl, fsData.wasmSha256)),
       print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
       printErr: (text) =>
         emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
@@ -171,6 +173,7 @@ async function boot(
     const module = await createModule(moduleConfig);
     check(state.module === module);
     await ready;
+
     return { ok: true, data: null };
   } catch (error) {
     return { ok: false, error: toPopcornError(error) };
@@ -295,13 +298,15 @@ function isBridgeMarker(
 type BeamManifest = {
   entrypoint: string | null;
   apps: Record<string, { bundle: string }>;
-  bundles: Record<string, { tar: string }>;
+  bundles: Record<string, { tar: string; sha256?: string }>;
+  vm?: { sha256?: string };
 };
 
 type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
   tarballs: Uint8Array[];
+  wasmSha256?: string;
 };
 
 type InitFsArgs = {
@@ -309,7 +314,10 @@ type InitFsArgs = {
   fsData: LoadedFsData;
 };
 
-async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
+async function loadFsData(
+  assetsRoot: string,
+  assets: Assets,
+): Promise<Result<LoadedFsData>> {
   const manifestUrl = resolveAssetsPath(assetsRoot, MANIFEST_NAME);
   const manifest = await fetchJson<BeamManifest>(manifestUrl);
   if (manifest === null) {
@@ -338,9 +346,11 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
     Object.values(manifest.bundles).map(
       async (entry): Promise<Result<Uint8Array>> => {
         const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
-        const tar = await fetchBinary(tarUrl);
-        if (tar !== null) {
-          return { ok: true, data: tar };
+        try {
+          const data = await assets.binary({ url: tarUrl, sha256: entry.sha256 });
+          return { ok: true, data };
+        } catch {
+          // Preserve the asset error for network and body failures.
         }
 
         return {
@@ -366,6 +376,7 @@ async function loadFsData(assetsRoot: string): Promise<Result<LoadedFsData>> {
       appNames,
       entrypoint: manifest.entrypoint ?? null,
       tarballs,
+      wasmSha256: manifest.vm?.sha256,
     },
   };
 }

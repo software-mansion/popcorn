@@ -414,6 +414,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.6
+      '@types/wicg-cross-origin-storage':
+        specifier: ^2026.10.1
+        version: 2026.10.1
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
@@ -2153,6 +2156,9 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@types/wicg-cross-origin-storage@2026.10.1':
+    resolution: {integrity: sha512-OJlhqUamtFrVM5yFcmw5XPmfPNOB4dobhEEfTQOh5CcBn3C7I1JkHqV29dTJVGVHVJXj98JdcqRDE8my7xT9dg==}
 
   '@types/xxhashjs@0.2.4':
     resolution: {integrity: sha512-E2+ZoJY2JjmVPN0iQM5gJvZkk98O2PYXSi6HrciEk3EKF34+mauEk/HgwTeCz+2r8HXHMKpucrwy4qTT12OPaQ==}
@@ -5432,6 +5438,8 @@ snapshots:
   '@types/unist@2.0.11': {}
 
   '@types/unist@3.0.3': {}
+
+  '@types/wicg-cross-origin-storage@2026.10.1': {}
 
   '@types/xxhashjs@0.2.4':
     dependencies:

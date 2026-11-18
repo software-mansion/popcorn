@@ -40,12 +40,15 @@ defmodule Popcorn.Packager.BeamPatcher do
   end
 
   defp compile_patch(patch_path) do
-    case :compile.file(to_charlist(patch_path), [:binary, :debug_info, :return_errors, :to_core]) do
-      {:ok, _module, ast} ->
-        {:ok, ast}
-
-      {:error, errors, _warnings} ->
-        err(:bad_patch, {patch_path, errors})
+    case :compile.noenv_file(to_charlist(patch_path), [
+           :deterministic,
+           :binary,
+           :debug_info,
+           :return_errors,
+           :to_core
+         ]) do
+      {:ok, _module, ast} -> {:ok, ast}
+      {:error, errors, _warnings} -> err(:bad_patch, {patch_path, errors})
     end
   end
 
