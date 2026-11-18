@@ -604,6 +604,33 @@ test.describe("runtime", () => {
     }
   });
 
+  // Each process grows its heap with garbage collections, which free the
+  // previous heaps. Together, the heaps take several times the memory limit.
+  // The emulator args would place carriers in mmap's memory segments.
+  test("collected heaps' memory is reused", async ({ otp }) => {
+    const { beam } = evalOpts(`
+      Grow = fun() -> length(lists:seq(1, 2000000)) end,
+      [begin
+         {_, Ref} = spawn_monitor(Grow),
+         receive {'DOWN', Ref, process, _, normal} -> ok end
+       end || _ <- lists:seq(1, 20)],
+      wasm:send(#{grown => true}).
+    `);
+    const boot = await otp.tryBoot({
+      beam: {
+        ...beam,
+        emulatorArgs: ["-Mummc", "1024", "-Musac", "false"],
+        maxMemory: { desktop: "256M" },
+      },
+    });
+    assert(boot.ok);
+
+    const grown = otp.waitForEvent("grown");
+    expect(await Promise.race([grown, otp.waitForError()])).toEqual({
+      grown: true,
+    });
+  });
+
   test("spawning OS processes don't kill the VM", async ({ otp }) => {
     const boot = await otp.tryBoot(
       evalOpts(`
