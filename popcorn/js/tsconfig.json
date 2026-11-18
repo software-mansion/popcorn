@@ -12,9 +12,6 @@
     "noUnusedLocals": true,
     "lib": ["es2023", "WebWorker", "DOM"],
     "types": ["node", "wicg-cross-origin-storage"],
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "declarationDir": "../out/js",
     "rootDir": "src"
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
