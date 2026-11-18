@@ -9,10 +9,9 @@ browser `fetch()` API. You can use it directly, through `Req` or via `:httpc`.
 
 Add Req to the application dependencies. We support Req 0.5 through 0.7 and 0.8.0-rc.0.
 
-The adapter is compiled only when Req is available. If you add Req after
-Popcorn has already compiled, recompile it with `mix deps.compile popcorn --force`.
-
 Popcorn installs its Req adapter when running in the browser. If you already customized the adapter, Popcorn won't install its own.
+
+The adapter is only packaged when either Req or Mix (that may install Req) is also packaged.
 
 ```elixir
 response = Req.get!("https://api.example.com/status")
