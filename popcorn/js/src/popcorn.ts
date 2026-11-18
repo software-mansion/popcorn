@@ -22,7 +22,7 @@ import type {
   RunJsRequest,
   TtySize,
 } from "./types";
-import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
+import { check, objectWithKeys, unreachable } from "./utils";
 
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
@@ -1028,9 +1028,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       check(entry !== undefined);
       return entry.value;
     }
-    const pidToken = pidRefToken(value);
-    if (pidToken !== null) {
-      return new this.Pid(base64ToBytes(pidToken));
+    const pid = pidRefBytes(value);
+    if (pid !== null) {
+      return new this.Pid(pid);
     }
     if (Array.isArray(value)) {
       return value.map((item) => this.reviveHandles(item));
@@ -1050,24 +1050,6 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     check(Array.isArray(payload) && payload.length === 2);
     const [tag, data] = payload;
     switch (tag) {
-      case "binary":
-        check(typeof data === "string");
-        return base64ToBytes(data);
-      case "integer": {
-        const integer = readInteger(data);
-        const safe =
-          integer >= BigInt(Number.MIN_SAFE_INTEGER) &&
-          integer <= BigInt(Number.MAX_SAFE_INTEGER);
-        if (safe) return Number(integer);
-        return integer;
-      }
-      case "datetime": {
-        const milliseconds = readInteger(data);
-        const inRange =
-          milliseconds >= -377705116800000n && milliseconds <= 253402300799999n;
-        check(inRange);
-        return new Date(Number(milliseconds));
-      }
       case "set":
         check(Array.isArray(data));
         return new Set(data.map((item) => this.reviveHandles(item)));
@@ -1311,15 +1293,15 @@ function trackedRefKey(value: unknown): number | null {
   return key;
 }
 
-function pidRefToken(value: unknown): string | null {
+function pidRefBytes(value: unknown): Uint8Array | null {
   const marker = objectWithKeys(value, [PID_REF_KEY]);
   const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
   if (!hasOnlyMarker) {
     return null;
   }
-  const token = marker[PID_REF_KEY];
-  check(typeof token === "string");
-  return token;
+  const bytes = marker[PID_REF_KEY];
+  check(bytes instanceof Uint8Array);
+  return bytes;
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval
@@ -1366,10 +1348,4 @@ function defaultOnError(payload: OtpErrorPayload): void {
     default:
       unreachable();
   }
-}
-
-function readInteger(value: unknown): bigint {
-  check(typeof value === "string");
-  check(/^-?(0|[1-9][0-9]*)$/.test(value));
-  return BigInt(value);
 }

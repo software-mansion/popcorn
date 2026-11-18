@@ -544,17 +544,18 @@ test.describe("run_js", () => {
     });
   });
 
-  // Binaries other than short strings are sent after the message's JSON
-  test("attached binaries", async ({ otp }) => {
+  // Binaries are their bytes in the external term format
+  test("binaries", async ({ otp }) => {
     const boot = await otp.tryBoot(
       evalOpts(`
         Bytes = binary:copy(<<0, 165, 255>>, 349525),
         Text = binary:copy(<<"é"/utf8>>, 50000),
         Code = <<"// ", (binary:copy(<<"padding ">>, 200))/binary, "\\n",
-                 "({bytes, text, small, nested, marker}) => ({",
+                 "({bytes, text, bom, small, nested, marker}) => ({",
                  "  bytes: [bytes instanceof Uint8Array, bytes.length, bytes.buffer.byteLength,",
                  "          bytes[0], bytes[1], bytes[2], bytes[bytes.length - 1]],",
                  "  text: [typeof text, text.length, text[0]],",
+                 "  bom: [bom.length, bom.charCodeAt(0)],",
                  "  small: [small instanceof Uint8Array, ...small],",
                  "  nested: [nested.list[0].length, nested.tuple[1].length, nested.map.bytes.length],",
                  "  marker,",
@@ -563,6 +564,7 @@ test.describe("run_js", () => {
         Result = wasm:run_js(Code, #{
           bytes => Bytes,
           text => Text,
+          bom => <<16#FEFF/utf8, (binary:copy(<<"a">>, 2000))/binary>>,
           small => <<0, 255>>,
           nested => #{list => [Bytes], tuple => {1, Text}, map => #{bytes => Bytes}},
           marker => #{<<"popcorn_value">> => [<<"binary_attachment">>, 0]}
@@ -577,6 +579,7 @@ test.describe("run_js", () => {
     expect(await otp.waitForEvent("bytes")).toEqual({
       bytes: [true, 1048575, 1048575, 0, 165, 255, 255],
       text: ["string", 50000, "é"],
+      bom: [2001, 0xfeff],
       small: [true, 0, 255],
       nested: [1048575, 50000, 1048575],
       marker: { popcorn_value: ["binary_attachment", 0] },

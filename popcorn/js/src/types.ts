@@ -173,8 +173,8 @@ export type EmscriptenModule = {
   _free: (ptr: number) => void;
   /** Read by the runtime, as -sPTHREAD_POOL_SIZE=Module.pthreadPoolSize. */
   pthreadPoolSize: number;
-  /** Receives bytes for messages with attached binaries. */
-  onBeamMessage?: (message: string | Uint8Array) => void | Promise<void>;
+  /** Receives messages in the external term format. */
+  onBeamMessage?: (message: Uint8Array) => void | Promise<void>;
   onError?: (text: string) => void | Promise<void>;
   onStdinConsumed?: (size: number) => void;
   onTrackedValueDelete?: (key: number) => void;
