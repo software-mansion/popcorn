@@ -1384,6 +1384,8 @@ async function installAssetCache(
   return {
     hashes: () =>
       page.evaluate(async () => {
+        // TODO: Update the cache name whenever the COS-cached assets
+        // change and delete the old cache and create a new one.
         const cache = await caches.open("popcorn-e2e-cos");
         const keys = await cache.keys();
         return keys

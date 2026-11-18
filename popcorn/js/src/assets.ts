@@ -31,7 +31,7 @@ export class Assets {
     if (this.extensionPort === null) extensionPort?.close();
   }
 
-  // TODO: Remove this relay once the COS extension reliably exposes COS in workers.
+  // TODO: Remove this relay once the native COS implementation lands.
   static extension(
     enabled = true,
   ): { port: MessagePort; close: () => void } | undefined {
