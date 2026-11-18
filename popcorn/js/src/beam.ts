@@ -1,4 +1,5 @@
 import { Assets } from "./assets";
+import { controlType } from "./bridge-format";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
 import { extractTar } from "./tar";
@@ -9,13 +10,7 @@ import type {
   EmscriptenModule,
   OtpErrorPayload,
 } from "./types";
-import {
-  check,
-  dirname,
-  fetchJson,
-  objectWithKeys,
-  unreachable,
-} from "./utils";
+import { check, dirname, fetchJson, unreachable } from "./utils";
 
 const DEFAULT_USER = "web_user";
 const DEFAULT_HOME_DIR = "/home/web_user";
@@ -291,8 +286,7 @@ function isBridgeMarker(
   type: "vm_ready" | "boot_ready" | "boot_failed",
 ): boolean {
   if (event === null || event.type !== "otp:message") return false;
-  const popcorn = objectWithKeys(event.payload, ["_popcorn"])?._popcorn;
-  return objectWithKeys(popcorn, ["t"])?.t === type;
+  return controlType(event.payload) === type;
 }
 
 type BeamManifest = {

@@ -544,7 +544,7 @@ test.describe("run_js", () => {
     });
   });
 
-  // Binaries are their bytes in the external term format
+  // Binaries are sent as their bytes
   test("binaries", async ({ otp }) => {
     const boot = await otp.tryBoot(
       evalOpts(`

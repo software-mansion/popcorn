@@ -1,4 +1,5 @@
 import { Assets } from "./assets";
+import { decode, type Handles } from "./bridge-format";
 import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
@@ -28,7 +29,6 @@ type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
 
 const TRACKED_REF_KEY = "popcorn_ref";
-const PID_REF_KEY = "popcorn_pid";
 const UTF8 = new TextEncoder();
 const STDIN_QUEUE_CAPACITY_BYTES = 64 * 1024;
 const DEFAULT_TTY_SIZE: TtySize = { columns: 80, rows: 24 };
@@ -269,7 +269,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
       case "popcorn:boot-fail":
         return;
       case "otp:message":
-        this.emit(this.reviveHandles(data.payload));
+        this.emit(decode(data.payload, this.handles));
         return;
       case "otp:run_js":
         this.vmReady = true;
@@ -929,7 +929,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     try {
       const fn = this.jsWithCurrentEnv(request.code);
       assertRunJsFn(fn);
-      const args = this.reviveHandles(request.args);
+      const args = decode(request.args, this.handles);
       check(this.vmReady);
       const actions: RunJsActions = {
         send: async (target, payload) => {
@@ -1017,59 +1017,14 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     return make(this.TrackedValue);
   }
 
-  private reviveHandles(value: unknown): unknown {
-    const marker = objectWithKeys(value, ["popcorn_value"]);
-    if (marker !== null && Object.keys(marker).length === 1) {
-      return this.reviveValueTag(marker.popcorn_value);
-    }
-    const key = trackedRefKey(value);
-    if (key !== null) {
+  private readonly handles: Handles = {
+    pid: (external) => new this.Pid(external),
+    trackedValue: (key) => {
       const entry = this.trackedValues.get(key);
       check(entry !== undefined);
       return entry.value;
-    }
-    const pid = pidRefBytes(value);
-    if (pid !== null) {
-      return new this.Pid(pid);
-    }
-    if (Array.isArray(value)) {
-      return value.map((item) => this.reviveHandles(item));
-    }
-    const obj = objectWithKeys(value, []);
-    if (obj !== null) {
-      const entries = Object.entries(obj).map(([key, item]) => [
-        key,
-        this.reviveHandles(item),
-      ]);
-      return Object.fromEntries(entries);
-    }
-    return value;
-  }
-
-  private reviveValueTag(payload: unknown): unknown {
-    check(Array.isArray(payload) && payload.length === 2);
-    const [tag, data] = payload;
-    switch (tag) {
-      case "set":
-        check(Array.isArray(data));
-        return new Set(data.map((item) => this.reviveHandles(item)));
-      case "object": {
-        check(Array.isArray(data));
-        const entries: [string, unknown][] = [];
-        for (const entry of data) {
-          check(Array.isArray(entry) && entry.length === 2);
-          const [key, value] = entry;
-          check(typeof key === "string");
-          entries.push([key, this.reviveHandles(value)]);
-        }
-        const object = Object.fromEntries(entries);
-        check(Object.keys(object).length === entries.length);
-        return object;
-      }
-      default:
-        check(false, "unknown popcorn value tag");
-    }
-  }
+    },
+  };
 
   /** Maps pids and `TrackedValue`s during encoding, collecting handles into
    * `tracked` for the caller to register once encoding succeeds. */
@@ -1280,28 +1235,6 @@ function exitReason(payload: OtpErrorPayload): VmExitReason {
     default:
       return unreachable();
   }
-}
-
-function trackedRefKey(value: unknown): number | null {
-  const marker = objectWithKeys(value, [TRACKED_REF_KEY]);
-  const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
-  if (!hasOnlyMarker) {
-    return null;
-  }
-  const key = marker[TRACKED_REF_KEY];
-  check(typeof key === "number");
-  return key;
-}
-
-function pidRefBytes(value: unknown): Uint8Array | null {
-  const marker = objectWithKeys(value, [PID_REF_KEY]);
-  const hasOnlyMarker = marker !== null && Object.keys(marker).length === 1;
-  if (!hasOnlyMarker) {
-    return null;
-  }
-  const bytes = marker[PID_REF_KEY];
-  check(bytes instanceof Uint8Array);
-  return bytes;
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#direct_and_indirect_eval

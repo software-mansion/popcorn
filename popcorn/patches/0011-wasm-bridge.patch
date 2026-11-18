@@ -122,7 +122,7 @@ index 0000000000000000000000000000000000000000..3a03cf66dc36e38eeeb7142bb0817c4b
 +});
 diff --git a/erts/emulator/js_bridge/js_bridge.js b/erts/emulator/js_bridge/js_bridge.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..017af0896124104f1ce7ef7739d1f70b171e0d9e
+index 0000000000000000000000000000000000000000..ac5656b1b32d88758163cede0f4d488a324bde08
 --- /dev/null
 +++ b/erts/emulator/js_bridge/js_bridge.js
 @@ -0,0 +1,43 @@
@@ -133,7 +133,7 @@ index 0000000000000000000000000000000000000000..017af0896124104f1ce7ef7739d1f70b
 +    var envelope;
 +
 +    try {
-+      // In the external term format, see wasm.erl
++      // In the format of wasm.erl
 +      envelope = HEAPU8.slice(data, data + len);
 +    } finally {
 +      _free(data);
@@ -485,10 +485,10 @@ index 1538b23d107f1718c87e389d9bb42da913eca002..4aba419d0543181e34a61e873dae6aa5
          enif_mutex_destroy(tputs_mutex);
 diff --git a/erts/emulator/nifs/common/wasm_nif.c b/erts/emulator/nifs/common/wasm_nif.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..95e67dbdc8dc5a78f96d98d28c3f0d140f03f35d
+index 0000000000000000000000000000000000000000..0759839849f1d495f4a2874c3bc1fc294ecc384a
 --- /dev/null
 +++ b/erts/emulator/nifs/common/wasm_nif.c
-@@ -0,0 +1,658 @@
+@@ -0,0 +1,659 @@
 +/*
 + * %CopyrightBegin%
 + *
@@ -604,14 +604,15 @@ index 0000000000000000000000000000000000000000..95e67dbdc8dc5a78f96d98d28c3f0d14
 +int sendVmMessage(int target_kind, const char *target_name, int target_name_len,
 +                  const unsigned char *etf, int etf_len);
 +static void schedule_js_message(const unsigned char *data, size_t size);
-+/* term_to_binary(#{type => vm_message, data => #{'_popcorn' => #{t => vm_ready}}}) */
++/* wasm:encode_envelope(#{type => vm_message, data => #{'_popcorn' => #{t => vm_ready}}}) */
 +static const unsigned char vm_ready_message[] = {
-+    131, 116, 0, 0, 0, 2, 119, 4, 100, 97, 116, 97,
-+    116, 0, 0, 0, 1, 119, 8, 95, 112, 111, 112, 99,
-+    111, 114, 110, 116, 0, 0, 0, 1, 119, 1, 116, 119,
-+    8, 118, 109, 95, 114, 101, 97, 100, 121, 119, 4, 116,
-+    121, 112, 101, 119, 10, 118, 109, 95, 109, 101, 115, 115,
-+    97, 103, 101,
++    9, 0, 0, 0, 2, 0, 0, 0, 4, 116, 121, 112,
++    101, 5, 0, 0, 0, 10, 118, 109, 95, 109, 101, 115,
++    115, 97, 103, 101, 0, 0, 0, 4, 100, 97, 116, 97,
++    14, 9, 0, 0, 0, 1, 0, 0, 0, 8, 95, 112,
++    111, 112, 99, 111, 114, 110, 9, 0, 0, 0, 1, 0,
++    0, 0, 1, 116, 5, 0, 0, 0, 8, 118, 109, 95,
++    114, 101, 97, 100, 121,
 +};
 +#endif
 +
@@ -1187,10 +1188,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb7ca30b82
+index 0000000000000000000000000000000000000000..f4c679ae157b756877b5549f867587c339ad9b40
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,291 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1224,17 +1225,17 @@ index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
-+%% Accepts what JavaScript can receive, see check/1: also pids, bytes/1,
-+%% tuples and `{'__wasm_tracked_value__', _, _}` handles.
++%% Accepts what JavaScript can receive, see encode/1: also pids, bytes/1,
++%% tuples and `{'__wasm_tracked_value__', _}` handles.
 +-spec send(term()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
-+    ok = send_raw(encode(Envelope)),
++    ok = send_raw(encode_envelope(Envelope)),
 +    ?MODULE:keep_alive(Envelope),
 +    ok.
 +
 +%% Returns the decoded result, which may contain pids and, in `ref` mode, a
-+%% `{'__wasm_tracked_value__', _, _}` handle — so not strictly a json:decode_value().
++%% `{'__wasm_tracked_value__', _}` handle — so not strictly a json:decode_value().
 +-spec run_js(binary(), map()) -> term().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
 +    run_js(Code, Args, []).
@@ -1247,7 +1248,7 @@ index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb
 +    ReplyTo = bytes(term_to_binary({self(), Token})),
 +    Envelope = #{type => run_js, code => Code, args => Args,
 +                 reply_to => ReplyTo, return => Return},
-+    ok = send_raw(encode(Envelope)),
++    ok = send_raw(encode_envelope(Envelope)),
 +    Reply = receive
 +                {wasm, {Token, Payload}} -> Payload
 +            after Timeout ->
@@ -1269,7 +1270,7 @@ index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb
 +    Token = erlang:unique_integer(),
 +    ReplyTo = bytes(term_to_binary({self(), Token})),
 +    Envelope = #{type => await_ready, reply_to => ReplyTo},
-+    ok = send_raw(encode(Envelope)),
++    ok = send_raw(encode_envelope(Envelope)),
 +    Reply = receive
 +                {wasm, {Token, true}} -> ok
 +            after Timeout ->
@@ -1315,70 +1316,116 @@ index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb
 +unserializable_reason(<<"non-finite-float">>) -> non_finite_float;
 +unserializable_reason(<<"unsupported">>) -> unsupported.
 +
-+%% Messages are in the external term format, which term_to_binary/1 writes in
-+%% C, with binaries as their bytes, and etf.ts decodes in JavaScript. check/1
-+%% first raises the errors callers such as Popcorn.Proxy handle, for terms
-+%% that JavaScript can't receive.
-+encode(Envelope) ->
-+    case check(Envelope) of
-+        false -> term_to_binary(Envelope);
-+        true -> term_to_binary(name_float_keys(Envelope))
-+    end.
++%% Messages are values in a format of our own, which bridge-format.ts decodes.
++%% Each value is a tag and its content, with sizes and counts as 32-bit
++%% unsigned integers:
++-define(NULL, 0).
++-define(FALSE, 1).
++-define(TRUE, 2).
++%% A 64-bit float, for floats and safe integers
++-define(NUMBER, 3).
++%% A size and decimal digits, for other integers
++-define(BIGINT, 4).
++%% A size and UTF-8, for atoms
++-define(STRING, 5).
++%% A size and bytes, which JavaScript receives as a string if they're UTF-8
++-define(BINARY, 6).
++%% A size and bytes, for bytes/1
++-define(BYTES, 7).
++%% A count and values, for lists and tuples
++-define(ARRAY, 8).
++%% A count, and a size, a UTF-8 name and a value for each key
++-define(OBJECT, 9).
++%% A count and values, for MapSets
++-define(SET, 10).
++%% The Unix time in milliseconds, as a 64-bit float, for DateTimes
++-define(DATE, 11).
++%% A size and the pid in the external term format
++-define(PID, 12).
++%% A tracked value's key, as a 32-bit signed integer
++-define(TRACKED, 13).
++%% A value that's the rest of the message, which the worker passes to the page
++%% without decoding it
++-define(FRAMED, 14).
 +
-+%% Returns whether a map in Term has float keys, which JavaScript gets the
-+%% names of from name_float_keys/1
-+check(Term) when is_binary(Term); is_atom(Term); is_number(Term); is_pid(Term) ->
-+    false;
-+check({'__wasm_bytes__', Binary}) when is_binary(Binary) ->
-+    false;
-+check({'__wasm_tracked_value__', Key, Resource} = Tracked) ->
-+    Key =:= ref_key(Resource) orelse error({unsupported_type, Tracked}),
-+    false;
-+check(#{'__struct__' := 'Elixir.DateTime'} = DateTime) ->
-+    check_datetime(DateTime),
-+    false;
-+check(#{'__struct__' := 'Elixir.MapSet'} = Set) ->
-+    check_list('Elixir.MapSet':to_list(Set), false);
-+check(Map) when is_map(Map) ->
++-define(MAX_SAFE_INTEGER, 9007199254740991).
++
++%% The envelope's data or args are framed, last
++encode_envelope(Envelope) ->
++    {Framed, Fields} = lists:partition(fun({Key, _Value}) -> Key =:= data orelse Key =:= args end,
++                                       maps:to_list(Envelope)),
++    [<<?OBJECT, (map_size(Envelope)):32>>,
++     [[name(atom_to_binary(Key, utf8)), encode(Value)] || {Key, Value} <- Fields],
++     [[name(atom_to_binary(Key, utf8)), <<?FRAMED>>, encode(Value)] || {Key, Value} <- Framed]].
++
++%% Raises the errors callers such as Popcorn.Proxy handle, for terms that
++%% JavaScript can't receive
++encode(Binary) when is_binary(Binary) ->
++    [<<?BINARY, (byte_size(Binary)):32>>, Binary];
++encode(Integer) when is_integer(Integer), Integer >= -?MAX_SAFE_INTEGER,
++                     Integer =< ?MAX_SAFE_INTEGER ->
++    <<?NUMBER, Integer:64/float>>;
++encode(Integer) when is_integer(Integer) ->
++    Digits = integer_to_binary(Integer),
++    [<<?BIGINT, (byte_size(Digits)):32>>, Digits];
++encode(Float) when is_float(Float) ->
++    <<?NUMBER, Float:64/float>>;
++encode(true) ->
++    <<?TRUE>>;
++encode(false) ->
++    <<?FALSE>>;
++encode(nil) ->
++    <<?NULL>>;
++encode(null) ->
++    <<?NULL>>;
++encode(Atom) when is_atom(Atom) ->
++    Name = atom_to_binary(Atom, utf8),
++    [<<?STRING, (byte_size(Name)):32>>, Name];
++encode(List) when is_list(List) ->
++    Values = encode_list(List),
++    [<<?ARRAY, (length(List)):32>> | Values];
++encode(#{'__struct__' := 'Elixir.DateTime'} = DateTime) ->
++    <<?DATE, (milliseconds(DateTime)):64/float>>;
++encode(#{'__struct__' := 'Elixir.MapSet'} = Set) ->
++    Members = 'Elixir.MapSet':to_list(Set),
++    [<<?SET, (length(Members)):32>> | encode_list(Members)];
++encode(Map) when is_map(Map) ->
 +    Entries = maps:to_list(Map),
-+    case check_entries(Entries, none, false) of
-+        {mixed, Floats} ->
-+            check_names(Entries, #{}),
-+            Floats;
-+        {_Kind, Floats} ->
-+            Floats
-+    end;
-+check(Tuple) when is_tuple(Tuple) ->
-+    check_tuple(Tuple, tuple_size(Tuple), false);
-+check(List) when is_list(List) ->
-+    check_list(List, false);
-+check(Other) ->
++    [<<?OBJECT, (map_size(Map)):32>> | encode_entries(Entries, none, Entries)];
++encode({'__wasm_bytes__', Binary}) when is_binary(Binary) ->
++    [<<?BYTES, (byte_size(Binary)):32>>, Binary];
++encode({'__wasm_tracked_value__', Resource}) ->
++    <<?TRACKED, (ref_key(Resource)):32/signed>>;
++encode(Tuple) when is_tuple(Tuple) ->
++    [<<?ARRAY, (tuple_size(Tuple)):32>> | encode_list(tuple_to_list(Tuple))];
++encode(Pid) when is_pid(Pid) ->
++    External = term_to_binary(Pid),
++    [<<?PID, (byte_size(External)):32>>, External];
++encode(Other) ->
 +    error({unsupported_type, Other}).
 +
-+check_tuple(_Tuple, 0, Floats) ->
-+    Floats;
-+check_tuple(Tuple, Index, Floats) ->
-+    check_tuple(Tuple, Index - 1, check(element(Index, Tuple)) or Floats).
-+
-+check_list([Item | Rest], Floats) ->
-+    check_list(Rest, check(Item) or Floats);
-+check_list([], Floats) ->
-+    Floats;
-+check_list(Tail, _Floats) ->
++encode_list([Value | Rest]) ->
++    [encode(Value) | encode_list(Rest)];
++encode_list([]) ->
++    [];
++encode_list(Tail) ->
 +    error({unsupported_type, Tail}).
 +
 +%% Keys of one kind can't have the same name, so only maps with keys of
-+%% several kinds need check_names/2
-+check_entries([{Key, Value} | Rest], Kind, Floats) ->
-+    KeyKind = key_kind(Key),
-+    Kinds = case Kind of
-+                none -> KeyKind;
-+                KeyKind -> KeyKind;
-+                _ -> mixed
-+            end,
-+    check_entries(Rest, Kinds, check(Value) or (KeyKind =:= float) or Floats);
-+check_entries([], Kind, Floats) ->
-+    {Kind, Floats}.
++%% several kinds are checked for duplicate names. Atom keys, after the first,
++%% take the first clause.
++encode_entries([{Key, Value} | Rest], atom, Entries) when is_atom(Key) ->
++    [[name(atom_to_binary(Key, utf8)), encode(Value)] | encode_entries(Rest, atom, Entries)];
++encode_entries([{Key, Value} | Rest], Kind, Entries) ->
++    Kinds = add_kind(key_kind(Key), Kind, Entries),
++    [[name(key_name(Key)), encode(Value)] | encode_entries(Rest, Kinds, Entries)];
++encode_entries([], _Kind, _Entries) ->
++    [].
++
++add_kind(Kind, Kind, _Entries) -> Kind;
++add_kind(Kind, none, _Entries) -> Kind;
++add_kind(_Kind, mixed, _Entries) -> mixed;
++add_kind(_Kind, _Kinds, Entries) -> check_names(Entries, #{}), mixed.
 +
 +key_kind(Key) when is_atom(Key) -> atom;
 +key_kind(Key) when is_integer(Key) -> integer;
@@ -1403,34 +1450,20 @@ index 0000000000000000000000000000000000000000..efc7b3270a22c7ba1f44a0db1e5f62eb
 +key_name(Key) when is_float(Key) -> float_to_binary(Key, [short]);
 +key_name(Key) when is_binary(Key) -> Key.
 +
-+check_datetime(#{calendar := Calendar, microsecond := {Microsecond, _}} = DateTime) ->
++name(Name) ->
++    [<<(byte_size(Name)):32>>, Name].
++
++milliseconds(#{calendar := Calendar, microsecond := {Microsecond, _}} = DateTime) ->
 +    Calendar =:= 'Elixir.Calendar.ISO' andalso Microsecond rem 1000 =:= 0
 +        orelse error({unsupported_type, DateTime}),
 +    Milliseconds = 'Elixir.DateTime':to_unix(DateTime, millisecond),
 +    Milliseconds >= -377705116800000 andalso Milliseconds =< 253402300799999
 +        orelse error({unsupported_type, DateTime}),
-+    ok.
++    Milliseconds.
 +
-+%% JavaScript names object keys like key_name/1, but it can't name floats like
-+%% float_to_binary/2, so they're renamed here, in the rare maps that have them.
-+name_float_keys(#{'__struct__' := 'Elixir.MapSet'} = Set) ->
-+    'Elixir.MapSet':new([name_float_keys(Item) || Item <- 'Elixir.MapSet':to_list(Set)]);
-+name_float_keys(Map) when is_map(Map) ->
-+    #{float_key_name(Key) => name_float_keys(Value) || Key := Value <- Map};
-+name_float_keys(Tuple) when is_tuple(Tuple) ->
-+    list_to_tuple([name_float_keys(Item) || Item <- tuple_to_list(Tuple)]);
-+name_float_keys(List) when is_list(List) ->
-+    [name_float_keys(Item) || Item <- List];
-+name_float_keys(Other) ->
-+    Other.
-+
-+float_key_name(Key) when is_float(Key) -> float_to_binary(Key, [short]);
-+float_key_name(Key) -> Key.
-+
-+%% The key lets JavaScript find the value without decoding the resource
 +revive_refs(#{<<"popcorn_ref">> := Key} = Marker)
 +  when is_integer(Key), map_size(Marker) =:= 1 ->
-+    {'__wasm_tracked_value__', Key, materialize_ref(Key)};
++    {'__wasm_tracked_value__', materialize_ref(Key)};
 +revive_refs(Map) when is_map(Map) ->
 +    maps:map(fun(_K, V) -> revive_refs(V) end, Map);
 +revive_refs(List) when is_list(List) ->

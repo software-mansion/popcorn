@@ -23,13 +23,34 @@ self.onmessage = (event) => {
       ]);
     }
     self.postMessage({ type: "otp:stdin-consumed", payload: 1 });
-    self.postMessage({
-      type: "otp:message",
-      payload: command === 2 ? { ttySize, noshell } : { command },
-    });
+    emit(
+      "otp:message",
+      encode(command === 2 ? { ttySize, noshell } : { command }),
+    );
   }
 };
 
 function emit(type, bytes) {
   self.postMessage({ type, payload: new Uint8Array(bytes) });
+}
+
+// Like wasm.erl, which the page decodes
+function encode(value) {
+  if (typeof value === "boolean") return [value ? 2 : 1];
+  if (typeof value === "number") {
+    const number = new DataView(new ArrayBuffer(8));
+    number.setFloat64(0, value);
+    return [3, ...new Uint8Array(number.buffer)];
+  }
+  const entries = Object.entries(value);
+  const bytes = [9, ...uint32(entries.length)];
+  for (const [key, item] of entries) {
+    const name = new TextEncoder().encode(key);
+    bytes.push(...uint32(name.length), ...name, ...encode(item));
+  }
+  return bytes;
+}
+
+function uint32(value) {
+  return [value >>> 24, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
 }

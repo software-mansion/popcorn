@@ -109,14 +109,16 @@ export type BeamEvent =
   | { type: "otp:stderr"; payload: Uint8Array }
   | { type: "otp:stdin-consumed"; payload: number }
   | { type: "otp:error"; payload: OtpErrorPayload }
-  | { type: "otp:message"; payload: AnyValue }
+  /** The message's data, which the page decodes, see `bridge-format.ts` */
+  | { type: "otp:message"; payload: Uint8Array }
   | { type: "otp:run_js"; payload: RunJsRequest }
   | { type: "otp:await-ready"; payload: ReadyRequest }
   | { type: "otp:tracked-value-delete"; payload: number };
 
 export type RunJsRequest = {
   code: string;
-  args: AnyValue;
+  /** Which the page decodes, see `bridge-format.ts` */
+  args: Uint8Array;
   replyTo: Uint8Array;
   return: "value" | "ref";
 };
@@ -173,7 +175,7 @@ export type EmscriptenModule = {
   _free: (ptr: number) => void;
   /** Read by the runtime, as -sPTHREAD_POOL_SIZE=Module.pthreadPoolSize. */
   pthreadPoolSize: number;
-  /** Receives messages in the external term format. */
+  /** Receives messages in the format of `wasm.erl`. */
   onBeamMessage?: (message: Uint8Array) => void | Promise<void>;
   onError?: (text: string) => void | Promise<void>;
   onStdinConsumed?: (size: number) => void;

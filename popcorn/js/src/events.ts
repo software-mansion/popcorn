@@ -1,5 +1,6 @@
 import { type Result, type SerializedError } from "./errors";
-import { decode, encode, type Mapper } from "./etf";
+import { decodeEnvelope } from "./bridge-format";
+import { encode, type Mapper } from "./etf";
 import type {
   AnyValue,
   BeamBootOptions,
@@ -94,7 +95,7 @@ export type VmToMainEvent = RuntimeEvent | BootEndEvent;
 type BridgeEnvelope =
   | {
       type: "vm_message";
-      data?: AnyValue;
+      data: Uint8Array;
     }
   | {
       type: "vm_error";
@@ -103,7 +104,7 @@ type BridgeEnvelope =
   | {
       type: "run_js";
       code: string;
-      args: AnyValue;
+      args: Uint8Array;
       reply_to: Uint8Array;
       return: "value" | "ref";
     }
@@ -180,21 +181,16 @@ type BridgeEvent = Extract<
   { type: "otp:message" | "otp:error" | "otp:run_js" | "otp:await-ready" }
 >;
 
-// The buffers of binaries in events from the VM, which toMain() transfers
-// rather than copies
-const ownBuffers = new WeakMap<object, ArrayBuffer[]>();
-
-/** Reads a message from the VM, in the external term format, see `wasm.erl`. */
+/**
+ * Reads a message from the VM, see `wasm.erl`, except its data or args, which
+ * the page decodes.
+ */
 export function deserializeBridgeMessage(
   message: Uint8Array,
 ): BridgeEvent | null {
   try {
-    const { value, buffers } = decode(message);
-    if (!isBridgeEnvelope(value)) return null;
-
-    const event = bridgeEvent(value);
-    if (event !== null && buffers.length > 0) ownBuffers.set(event, buffers);
-    return event;
+    const value = decodeEnvelope(message);
+    return isBridgeEnvelope(value) ? bridgeEvent(value) : null;
   } catch {
     return null;
   }
@@ -203,6 +199,7 @@ export function deserializeBridgeMessage(
 function bridgeEvent(parsed: BridgeEnvelope): BridgeEvent | null {
   switch (parsed.type) {
     case "vm_message":
+      check(parsed.data instanceof Uint8Array);
       return { type: "otp:message", payload: parsed.data };
     case "vm_error":
       return {
@@ -210,6 +207,7 @@ function bridgeEvent(parsed: BridgeEnvelope): BridgeEvent | null {
         payload: { kind: "error", data: parsed.data },
       };
     case "run_js":
+      check(parsed.args instanceof Uint8Array);
       return {
         type: "otp:run_js",
         payload: {
@@ -244,12 +242,23 @@ export function toMain(event: VmToMainEvent): void {
 }
 
 function getTransferables(event: VmToMainEvent): Transferable[] {
-  const own = ownBuffers.get(event);
-  if (own !== undefined) return own;
-  const isTtyEvent = event.type === "otp:stdout" || event.type === "otp:stderr";
-  if (!isTtyEvent) return [];
-  check(event.payload.buffer instanceof ArrayBuffer);
-  return [event.payload.buffer];
+  switch (event.type) {
+    case "otp:stdout":
+    case "otp:stderr":
+      return [ownBuffer(event.payload)];
+    // The message's buffer, which the data or args are a part of
+    case "otp:message":
+      return [ownBuffer(event.payload)];
+    case "otp:run_js":
+      return [ownBuffer(event.payload.args)];
+    default:
+      return [];
+  }
+}
+
+function ownBuffer(bytes: Uint8Array): ArrayBuffer {
+  check(bytes.buffer instanceof ArrayBuffer);
+  return bytes.buffer;
 }
 
 function isBridgeEnvelope(value: unknown): value is BridgeEnvelope {
