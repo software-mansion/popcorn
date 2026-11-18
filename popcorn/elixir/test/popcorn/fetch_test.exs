@@ -136,7 +136,7 @@ defmodule Popcorn.FetchTest do
           {:ok, response, [event | acc], [event | state]}
         end
 
-        assert {:ok, response, acc, state} = Fetch.stream(request, [], callback, [])
+        assert {:ok, response, acc, state} = Fetch.Req.stream(request, [], callback, [])
         assert %Req.Response{status: 201, request: ^request} = response
         assert ["streamed"] = Req.Response.get_header(response, "x-fetch")
 
@@ -170,7 +170,7 @@ defmodule Popcorn.FetchTest do
         callback = fn event, response, acc, state -> {:ok, response, [event | acc], state} end
 
         assert {{:error, ^error}, response, :failed, [:wrapper]} =
-                 Fetch.stream(request, :start, callback, [:wrapper])
+                 Fetch.Req.stream(request, :start, callback, [:wrapper])
 
         assert %Req.Response{status: nil, body: nil, request: ^request} = response
         assert is_nil(FakeBridge.fetch_request())
@@ -181,7 +181,7 @@ defmodule Popcorn.FetchTest do
       FakeBridge.stub_fetch(%{status: 201, chunks: ["legacy"]})
       request = Req.new(method: :post, url: "https://example.test/", body: "payload")
 
-      assert {^request, %Req.Response{status: 201, body: "legacy"}} = Fetch.run(request)
+      assert {^request, %Req.Response{status: 201, body: "legacy"}} = Fetch.Req.run(request)
       assert %{body: encoded_body} = FakeBridge.fetch_request()
       assert Base.decode64!(encoded_body) == "payload"
     end
