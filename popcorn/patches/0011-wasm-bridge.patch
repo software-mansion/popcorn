@@ -1179,10 +1179,10 @@ index 3b672dc41a554cf7d5440ccfd94e85bd44b61d35..4e5efb04e7eb04556ff14dc3ba8e0d83
  	    ]},
 diff --git a/erts/preloaded/src/wasm.erl b/erts/preloaded/src/wasm.erl
 new file mode 100644
-index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77dcafd36c
+index 0000000000000000000000000000000000000000..e14f418399baeed615e07237d5b37cb7945981e2
 --- /dev/null
 +++ b/erts/preloaded/src/wasm.erl
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,210 @@
 +%%
 +%% %CopyrightBegin%
 +%%
@@ -1210,14 +1210,14 @@ index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77
 +%% on_load/0 is called explicitly from erl_init:start/2; do NOT use the
 +%% -on_load attribute (a preloaded module with one aborts the VM at boot).
 +-export([on_load/0, send/1, run_js/2, run_js/3, await_ready/0, await_ready/1,
-+         keep_alive/1]).
++         bytes/1, keep_alive/1]).
 +
 +-nifs([send_raw/1, materialize_ref/1, ref_key/1]).
 +
 +-define(RUN_JS_TIMEOUT, 5000).
 +
-+%% Accepts more than a json:encode_value(): pids, `{wasm_tracked_value, _}` handles and
-+%% tuples are encoded by encode_arg/2.
++%% Accepts more than a json:encode_value(): pids, bytes/1, tuples and
++%% `{'__wasm_tracked_value__', _}` handles are encoded by encode_arg/2.
 +-spec send(term()) -> ok.
 +send(Message) ->
 +    Envelope = #{type => vm_message, data => Message},
@@ -1226,7 +1226,7 @@ index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77
 +    ok.
 +
 +%% Returns the decoded result, which may contain pids and, in `ref` mode, a
-+%% `{wasm_tracked_value, _}` handle — so not strictly a json:decode_value().
++%% `{'__wasm_tracked_value__', _}` handle — so not strictly a json:decode_value().
 +-spec run_js(binary(), map()) -> term().
 +run_js(Code, Args) when is_binary(Code), is_map(Args) ->
 +    run_js(Code, Args, []).
@@ -1273,6 +1273,12 @@ index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77
 +        ok -> ok
 +    end.
 +
++%% A binary that JavaScript receives as a Uint8Array, even if it's valid UTF-8,
++%% which it would otherwise receive as a string
++-spec bytes(binary()) -> {'__wasm_bytes__', binary()}.
++bytes(Binary) when is_binary(Binary) ->
++    {'__wasm_bytes__', Binary}.
++
 +-spec keep_alive(Term) -> Term when Term :: term().
 +keep_alive(Term) ->
 +    Term.
@@ -1303,8 +1309,10 @@ index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77
 +
 +encode_arg(nil, Encoder) ->
 +    json:encode_value(null, Encoder);
-+encode_arg({wasm_tracked_value, Resource}, Encoder) ->
++encode_arg({'__wasm_tracked_value__', Resource}, Encoder) ->
 +    json:encode_value(#{popcorn_ref => ref_key(Resource)}, Encoder);
++encode_arg({'__wasm_bytes__', Binary}, Encoder) when is_binary(Binary) ->
++    value_tag(binary, base64:encode(Binary), Encoder);
 +encode_arg(Pid, Encoder) when is_pid(Pid) ->
 +    json:encode_value(#{popcorn_pid => base64:encode(term_to_binary(Pid))}, Encoder);
 +encode_arg(Integer, Encoder) when is_integer(Integer),
@@ -1365,7 +1373,7 @@ index 0000000000000000000000000000000000000000..432cd6c01587d1c5e12884542b6fde77
 +
 +revive_refs(#{<<"popcorn_ref">> := Key} = Marker)
 +  when is_integer(Key), map_size(Marker) =:= 1 ->
-+    {wasm_tracked_value, materialize_ref(Key)};
++    {'__wasm_tracked_value__', materialize_ref(Key)};
 +revive_refs(Map) when is_map(Map) ->
 +    maps:map(fun(_K, V) -> revive_refs(V) end, Map);
 +revive_refs(List) when is_list(List) ->

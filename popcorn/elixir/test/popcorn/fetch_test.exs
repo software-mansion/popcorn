@@ -2,6 +2,7 @@ defmodule Popcorn.FetchTest do
   use ExUnit.Case, async: false
 
   alias Popcorn.Fetch
+  alias Popcorn.JS
   alias Popcorn.JS.FakeBridge
 
   # Not UTF-8: catches any path that routes bytes through a JS string.
@@ -58,10 +59,10 @@ defmodule Popcorn.FetchTest do
                method: "POST",
                url: "https://example.test/things",
                headers: [["accept", "text/plain"]],
-               body: encoded_body
+               body: body
              } = FakeBridge.fetch_request()
 
-      assert Base.decode64!(encoded_body) == @binary
+      assert body == JS.bytes(@binary)
     end
 
     # The browser decompresses bodies, which these headers describe compressed
@@ -156,8 +157,8 @@ defmodule Popcorn.FetchTest do
                  {:status, 201}
                ] = state
 
-        assert %{body: encoded_body, headers: headers} = FakeBridge.fetch_request()
-        assert Base.decode64!(encoded_body) == "payload"
+        assert %{body: body, headers: headers} = FakeBridge.fetch_request()
+        assert body == JS.bytes("payload")
         assert ["x-request", "yes"] in headers
       end
 
@@ -182,8 +183,8 @@ defmodule Popcorn.FetchTest do
       request = Req.new(method: :post, url: "https://example.test/", body: "payload")
 
       assert {^request, %Req.Response{status: 201, body: "legacy"}} = Fetch.Req.run(request)
-      assert %{body: encoded_body} = FakeBridge.fetch_request()
-      assert Base.decode64!(encoded_body) == "payload"
+      assert %{body: body} = FakeBridge.fetch_request()
+      assert body == JS.bytes("payload")
     end
 
     test "translates requests and composes with Req steps" do
@@ -200,11 +201,11 @@ defmodule Popcorn.FetchTest do
                  headers: [{"x-test", "1"}]
                )
 
-      assert %{method: "POST", url: "https://example.test/x", body: encoded_body} =
+      assert %{method: "POST", url: "https://example.test/x", body: body} =
                FakeBridge.fetch_request()
 
       assert ["x-test", "1"] in FakeBridge.fetch_request().headers
-      assert Base.decode64!(encoded_body) == "payload"
+      assert body == JS.bytes("payload")
     end
 
     test "decodes bodies that the browser has decompressed" do

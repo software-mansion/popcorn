@@ -287,6 +287,42 @@ test.describe("events", () => {
     });
   });
 
+  // Binaries that are valid UTF-8 would otherwise arrive as strings
+  test("bytes", async ({ otp }) => {
+    const boot = await otp.tryBoot(
+      evalOpts(`
+      Text = <<"żółw"/utf8>>,
+      ok = wasm:send(#{bytes => #{text => wasm:bytes(Text),
+                                  empty => wasm:bytes(<<>>),
+                                  nested => [wasm:bytes(<<"a">>), <<"a">>]}}),
+      Check = <<"async ({text, other}) => [text instanceof Uint8Array, Array.from(text), typeof other]">>,
+      ok = wasm:send(#{run_js_bytes => wasm:run_js(Check, #{text => wasm:bytes(Text), other => Text})}),
+      ok = wasm:send(#{not_binary => element(1, catch wasm:bytes("charlist"))}),
+      receive stop -> ok end.
+    `),
+    );
+    assert(boot.ok);
+
+    const handle = await otp.eventValueHandle<{
+      text: Uint8Array;
+      empty: Uint8Array;
+      nested: [Uint8Array, string];
+    }>("bytes");
+    const received = await handle.evaluate(({ text, empty, nested }) => ({
+      text: text instanceof Uint8Array ? new TextDecoder().decode(text) : text,
+      empty: empty instanceof Uint8Array ? empty.length : empty,
+      nested: [nested[0] instanceof Uint8Array, nested[1]],
+    }));
+    await handle.dispose();
+    expect(received).toEqual({ text: "żółw", empty: 0, nested: [true, "a"] });
+    expect(await otp.waitForEvent("run_js_bytes")).toEqual({
+      run_js_bytes: [true, [197, 188, 195, 179, 197, 130, 119], "string"],
+    });
+    expect(await otp.waitForEvent("not_binary")).toEqual({
+      not_binary: "EXIT",
+    });
+  });
+
   test("native containers", async ({ otp, page }) => {
     const boot = await otp.tryBoot(
       evalOpts(`

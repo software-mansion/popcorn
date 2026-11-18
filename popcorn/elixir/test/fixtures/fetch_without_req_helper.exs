@@ -59,7 +59,7 @@ FakeBridge.stub_fetch(%{
 assert Popcorn.Fetch.request(request) ==
          {:ok, %{status: 201, headers: [{"x-fetch", "plain"}], body: request.body}}
 
-assert Base.decode64!(FakeBridge.fetch_request().body) == request.body
+assert FakeBridge.fetch_request().body == Popcorn.JS.bytes(request.body)
 
 FakeBridge.stub_fetch(:never_replies)
 assert Popcorn.Fetch.request(request, timeout: 0) == {:error, :timeout}

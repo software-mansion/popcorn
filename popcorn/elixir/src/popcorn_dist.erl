@@ -480,7 +480,8 @@ call(Pid, Request) ->
     end.
 
 send_message(Connection, Data) ->
-    to_js(#{type => message, connection => Connection, data => iolist_to_binary(Data)}).
+    to_js(#{type => message, connection => Connection,
+            data => wasm:bytes(iolist_to_binary(Data))}).
 
 %% A packet after the handshake, framed as TCP distribution does
 packet(Data) ->
