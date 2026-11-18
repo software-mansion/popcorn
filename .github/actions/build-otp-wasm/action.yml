@@ -80,28 +80,22 @@ runs:
 
     - name: Setup bootstrap Erlang
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
-      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
       with:
         # setup-beam always installs into $RUNNER_TEMP/.setup-beam, we need to avoid having
         # two installs with different version
         otp-version: ${{ inputs.host-otp-version }}
 
-    - name: Install autoconf 2.72
+    - name: Check autoconf 2.72
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -euo pipefail
 
-        if autoconf --version | head -n 1 | grep -q "2.72"; then
-          exit 0
+        if ! autoconf --version | head -n 1 | grep -q "2.72"; then
+          echo "::error::OTP build requires autoconf 2.72, provided by the ubuntu-26.04 runner"
+          exit 1
         fi
-
-        git config --global user.email "ci@ci.local"
-        git config --global user.name "CI"
-        wget -q https://mirrors.kernel.org/ubuntu/pool/main/a/autoconf/autoconf_2.72-3.1ubuntu2_all.deb
-        echo "9edd0db0fa94580ab013529d6842a8e89b8ed22ab337da5e95cbb43971978815  autoconf_2.72-3.1ubuntu2_all.deb" | sha256sum -c -
-        sudo apt-get -y install ./autoconf_2.72-3.1ubuntu2_all.deb
-        rm autoconf_2.72-3.1ubuntu2_all.deb
 
     - name: Cache OTP clone
       if: steps.otp-build-cache.outputs.cache-hit != 'true'

@@ -49,7 +49,7 @@ jobs:
 
       # Matches the toolchain the local views are built with, see setup-llv.
       - name: Set up Elixir
-        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.20.4"
           otp-version: "29.0.6"
@@ -71,7 +71,7 @@ jobs:
   # Popcorn's Wasm BEAM. Its views are plain Elixir, so they're tested natively.
   offline:
     name: Offline (LocalLiveView)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     defaults:

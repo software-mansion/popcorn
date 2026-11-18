@@ -16,7 +16,7 @@ on:
 
 jobs:
   otp-runtime:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -73,7 +73,7 @@ jobs:
           mix-exs: popcorn/elixir/mix.exs
       - id: toolchain
         uses: ./.github/actions/read-otp-toolchain
-      - uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           otp-version: ${{ steps.toolchain.outputs.otp }}
           elixir-version: ${{ steps.toolchain.outputs.elixir }}
