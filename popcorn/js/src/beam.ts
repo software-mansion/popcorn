@@ -41,6 +41,13 @@ const BASE_ARGS = [
   "-no_epmd",
 ];
 
+// Prevent the BEAM from using mmap for allocation. That's because
+// munmap only works in Emscripten when you unmap the a full mapping.
+// BEAM often unmaps parts of mappings, and that just leaks memory.
+// -Musac true is the default, it's here only to overwrite user's
+// value in case they set it to false.
+const ALLOCATOR_ARGS = ["-Mummc", "0", "-Musac", "true"];
+
 const CORE_APPS = new Set(["kernel", "stdlib", "compiler"]);
 
 type BeamState = {
@@ -243,7 +250,14 @@ function buildArgs({
   emulator,
   extra,
 }: BuildArgsArgs): string[] {
-  const args = [...emulator, "--", ...BASE_ARGS, "-boot", BOOT_NAME];
+  const args = [
+    ...emulator,
+    ...ALLOCATOR_ARGS,
+    "--",
+    ...BASE_ARGS,
+    "-boot",
+    BOOT_NAME,
+  ];
 
   if (noshell) args.push("-noshell");
 
