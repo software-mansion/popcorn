@@ -544,9 +544,27 @@ defmodule Popcorn.Packager do
         copy_writable!(priv_dir, Path.join(app_dir, "priv"))
       end
 
+      headers_dir = include_dir(app, info)
+
+      if headers_dir do
+        copy_writable!(headers_dir, Path.join(app_dir, "include"))
+      end
+
       {app, %{info | ebin_dir: ebin_dir}}
     end)
     |> Map.new()
+  end
+
+  defp include_dir(app, info) do
+    host_dirs =
+      case :code.lib_dir(app) do
+        {:error, :bad_name} -> []
+        dir -> [to_string(dir)]
+      end
+
+    [Path.dirname(info.ebin_dir) | host_dirs]
+    |> Enum.map(&Path.join(&1, "include"))
+    |> Enum.find(&File.dir?/1)
   end
 
   defp copy_writable!(source, destination) do
@@ -783,6 +801,7 @@ defmodule Popcorn.Packager do
 
     with {:ok, stats} <- run_treeshake(staged_apps, keep, drop, out_dir) do
       staged_apps = replace_beams(staged_apps, stats.output_dir)
+      remove_headers(staged_apps)
 
       report = %{
         modules_removed: Enum.map(stats.modules_removed, &to_string/1),
@@ -791,6 +810,12 @@ defmodule Popcorn.Packager do
       }
 
       {:ok, staged_apps, report}
+    end
+  end
+
+  defp remove_headers(staged_apps) do
+    for {_app, info} <- staged_apps do
+      File.rm_rf!(Path.join(Path.dirname(info.ebin_dir), "include"))
     end
   end
 
