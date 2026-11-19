@@ -1,0 +1,44 @@
+diff --git a/erts/emulator/beam/emu/macros.tab b/erts/emulator/beam/emu/macros.tab
+index b9f808a1b68b637b531707ca2b79866a369d4be4..20455111f10372caaadd5d75a4d505dbc10af4c2 100644
+--- a/erts/emulator/beam/emu/macros.tab
++++ b/erts/emulator/beam/emu/macros.tab
+@@ -39,8 +39,8 @@ GC_REGEXP=erts_garbage_collect|erts_gc|GcBifFunction;
+ // zero, except in a few bit syntax instructions.)
+ 
+ SET_I_REL(Offset) {
+-    ASSERT(VALID_INSTR(*(I + ($Offset) + $IP_ADJUSTMENT)));
+-    I += $Offset + $IP_ADJUSTMENT;
++    ASSERT(VALID_INSTR(*(I + (Sint)($Offset) + $IP_ADJUSTMENT)));
++    I += (Sint)($Offset) + $IP_ADJUSTMENT;
+ }
+ 
+ SET_CP_I_ABS(Target) {
+@@ -49,7 +49,7 @@ SET_CP_I_ABS(Target) {
+ }
+ 
+ SET_REL_I(Dst, Offset) {
+-    $Dst = I + ($Offset);
++    $Dst = I + (Sint)($Offset);
+     ASSERT(VALID_INSTR(*(const BeamInstr*)$Dst));
+ }
+ 
+diff --git a/erts/emulator/beam/erl_bits.h b/erts/emulator/beam/erl_bits.h
+index 94c410bff5f10351c4728f2ecd6c259666f8f241..ebd1e552b29e86ae690eb66e07e70544404888dd 100644
+--- a/erts/emulator/beam/erl_bits.h
++++ b/erts/emulator/beam/erl_bits.h
+@@ -198,12 +198,9 @@ typedef struct erl_bits_state ErlBitsState;
+  * state given a pointer to the X register array.
+  */
+ 
+-#define ERL_BITS_EBS_FROM_REG(Reg)                              \
+-    ((ErlBitsState *) ((char *)(Reg) +                          \
+-                       (offsetof(ErtsSchedulerRegisters,        \
+-                                 aux_regs.d.erl_bits_state) -   \
+-                        offsetof(ErtsSchedulerRegisters,        \
+-                                 x_reg_array.d))))
++#define ERL_BITS_EBS_FROM_REG(Reg)                                          \
++    (&ErtsContainerStruct_((Reg), ErtsSchedulerRegisters, x_reg_array.d)    \
++          ->aux_regs.d.erl_bits_state)
+ 
+ /*
+  * Return number of Eterm words needed for allocation with HAlloc(),
