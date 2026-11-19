@@ -15,6 +15,10 @@ NC='\033[0m'
 
 : "${LOG_PREFIX:=SCRIPT}"
 
+# For the commits that scripts make in OTP sources. Signing is disabled, as
+# there's no key for this identity.
+GIT_COMMIT_CONFIG=(-c user.name=Popcorn -c user.email=popcorn@localhost -c commit.gpgsign=false)
+
 log() { echo -e "${BLUE}${LOG_PREFIX} |${NC} $1" >&2; }
 success() { echo -e "${GREEN}${LOG_PREFIX} |${NC} $1" >&2; }
 error() { echo -e "${RED}${LOG_PREFIX}: ERROR |${NC} $1" >&2; exit 1; }

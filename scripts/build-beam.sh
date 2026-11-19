@@ -163,8 +163,7 @@ run_autoconf() {
 
     if ! git -C "${beam_dir}" diff --quiet; then
         git -C "${beam_dir}" add -u
-        git -C "${beam_dir}" \
-            -c user.name=Popcorn -c user.email=popcorn@localhost \
+        git -C "${beam_dir}" "${GIT_COMMIT_CONFIG[@]}" \
             commit --quiet -m "Update configure scripts" \
             -m "Popcorn-Build-Artifact: configure"
     fi
@@ -249,8 +248,7 @@ commit_preloaded_modules() {
     if git -C "${beam_dir}" diff --cached --quiet; then
         return
     fi
-    git -C "${beam_dir}" \
-        -c user.name=Popcorn -c user.email=popcorn@localhost \
+    git -C "${beam_dir}" "${GIT_COMMIT_CONFIG[@]}" \
         commit --quiet -m "Update preloaded modules" \
         -m "Popcorn-Build-Artifact: preloaded"
 }
