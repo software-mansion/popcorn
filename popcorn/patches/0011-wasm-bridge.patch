@@ -1,7 +1,39 @@
+diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
+index d77f46fc7cf16dd1644ed1777137762870ca7880..ae77630dba5020c6fb2e7329e4050312e4867947 100644
+--- a/erts/emulator/Makefile.in
++++ b/erts/emulator/Makefile.in
+@@ -806,7 +806,8 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/atomics.beam \
+ 		$(ERL_TOP)/erts/preloaded/ebin/counters.beam \
+-		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam
++		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam \
++		$(ERL_TOP)/erts/preloaded/ebin/wasm.beam
+ 
+ ifeq ($(TARGET),win32)
+ # On windows the preloaded objects are in a resource object.
+@@ -1216,6 +1217,7 @@ NIF_OBJS = \
+ 	$(OBJDIR)/erl_tracer_nif.o \
+ 	$(OBJDIR)/prim_buffer_nif.o \
+ 	$(OBJDIR)/prim_file_nif.o \
++	$(OBJDIR)/wasm_nif.o \
+ 	$(OBJDIR)/zlib_nif.o \
+ 	$(ESOCK_NIF_OBJS)
+ 
+@@ -1338,7 +1340,7 @@ EMU_LD=$(CC)
+ endif
+ $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
+ 	$(ld_verbose) $(EMU_LD) -o $@ \
+-	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
++	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(EXTRA_EMCC_LINK_FLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
+ 	$(STATIC_NIF_LIBS) $(STATIC_DRIVER_LIBS) $(LIBS)
+ 
+ endif
 diff --git a/erts/emulator/beam/erl_init.c b/erts/emulator/beam/erl_init.c
+index 3d246468859c25f1b25c63d9995a9f4bec702d18..9ebb110435c400bb185e6c38a3b1fa425ed0bd20 100644
 --- a/erts/emulator/beam/erl_init.c
 +++ b/erts/emulator/beam/erl_init.c
-@@ -2699,6 +2699,32 @@
+@@ -2709,6 +2709,32 @@ erts_exit_vv(int n, int flush, const char *fmt, va_list args1, va_list args2)
  {
      system_cleanup(flush);
  
@@ -34,37 +66,6 @@ diff --git a/erts/emulator/beam/erl_init.c b/erts/emulator/beam/erl_init.c
      if (fmt != NULL && *fmt != '\0')
  	erl_error(fmt, args2);	/* Print error message. */
  
-diff --git a/erts/emulator/Makefile.in b/erts/emulator/Makefile.in
-index d77f46fc7cf16dd1644ed1777137762870ca7880..ae77630dba5020c6fb2e7329e4050312e4867947 100644
---- a/erts/emulator/Makefile.in
-+++ b/erts/emulator/Makefile.in
-@@ -806,7 +806,8 @@ PRELOAD_BEAM =	$(ERL_TOP)/erts/preloaded/ebin/erts_code_purger.beam \
- 		$(ERL_TOP)/erts/preloaded/ebin/erts_dirty_process_signal_handler.beam \
- 		$(ERL_TOP)/erts/preloaded/ebin/atomics.beam \
- 		$(ERL_TOP)/erts/preloaded/ebin/counters.beam \
--		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam
-+		$(ERL_TOP)/erts/preloaded/ebin/persistent_term.beam \
-+		$(ERL_TOP)/erts/preloaded/ebin/wasm.beam
- 
- ifeq ($(TARGET),win32)
- # On windows the preloaded objects are in a resource object.
-@@ -1216,6 +1217,7 @@ NIF_OBJS = \
- 	$(OBJDIR)/erl_tracer_nif.o \
- 	$(OBJDIR)/prim_buffer_nif.o \
- 	$(OBJDIR)/prim_file_nif.o \
-+	$(OBJDIR)/wasm_nif.o \
- 	$(OBJDIR)/zlib_nif.o \
- 	$(ESOCK_NIF_OBJS)
- 
-@@ -1338,7 +1340,7 @@ EMU_LD=$(CC)
- endif
- $(BINDIR)/$(FLAVOR_EXECUTABLE): $(INIT_OBJS) $(OBJS) $(DEPLIBS)
- 	$(ld_verbose) $(EMU_LD) -o $@ \
--	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
-+	$(PROFILE_LDFLAGS) $(LDFLAGS) $(EMU_LDFLAGS) $(EXTRA_EMCC_LINK_FLAGS) $(DEXPORT) $(INIT_OBJS) $(OBJS) \
- 	$(STATIC_NIF_LIBS) $(STATIC_DRIVER_LIBS) $(LIBS)
- 
- endif
 diff --git a/erts/emulator/js_bridge/beam-bridge.pre.js b/erts/emulator/js_bridge/beam-bridge.pre.js
 new file mode 100644
 index 0000000000000000000000000000000000000000..3a03cf66dc36e38eeeb7142bb0817c4b6d6e8a7f
