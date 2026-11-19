@@ -20,7 +20,7 @@ env:
 jobs:
   e2e:
     name: Language Tour E2E tests
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
 
     steps:
@@ -34,7 +34,7 @@ jobs:
           with-crypto: "false"
 
       - name: Set up Elixir
-        uses: erlef/setup-beam@61e01a43a562a89bfc54c7f9a378ff67b03e4a21 # v1.16.0
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         with:
           elixir-version: "1.20.4"
           otp-version: *host_otp
