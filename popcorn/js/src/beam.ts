@@ -90,6 +90,7 @@ async function boot(
     createModule,
     emit,
   } = opts;
+  const emulator = resolveThreading(emulatorArgs ?? []);
   try {
     const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
     const loadedFsData = await loadFsData(otpAssetsRoot, assets);
@@ -150,12 +151,12 @@ async function boot(
           type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
           payload: chunk,
         }),
-      pthreadPoolSize: resolveThreadPoolSize(emulatorArgs ?? []),
+      pthreadPoolSize: emulator.threadPoolSize,
       arguments: buildArgs({
         appNames: fsData.appNames,
         entrypoint: fsData.entrypoint,
         noshell,
-        emulator: emulatorArgs ?? [],
+        emulator: emulator.args,
         extra: extraArgs ?? [],
       }),
       preRun: [
@@ -280,24 +281,43 @@ function buildArgs({
   return args;
 }
 
+export function resolveThreading(emulatorArgs: string[]): {
+  args: string[];
+  threadPoolSize: number;
+} {
+  const args = [...addDefaultSchedulers(emulatorArgs), ...emulatorArgs];
+  return { args, threadPoolSize: resolveThreadPoolSize(args) };
+}
+
 // Mimics how the BEAM calculates numbers of threads to spawn
 // for various purposes
-export function resolveThreadPoolSize(emulatorArgs: string[]): number {
+function resolveThreadPoolSize(emulatorArgs: string[]): number {
   const nonSchedulerThreads = 3;
+  const flags = parseNumericFlags(emulatorArgs);
+  const base = flags.get("S") ?? navigator.hardwareConcurrency ?? 1;
+  const dirtyCpu = Math.min(flags.get("SDcpu") ?? base, base);
+  const dirtyIo = flags.get("SDio") ?? 10;
+  const async = Math.max(flags.get("A") ?? 1, 1);
+  const poll = flags.get("IOt") ?? 1;
+  return nonSchedulerThreads + base + dirtyCpu + dirtyIo + async + poll;
+}
+
+function addDefaultSchedulers(emulatorArgs: string[]): string[] {
+  const flags = parseNumericFlags(emulatorArgs);
+  return ["S", "SDcpu", "SDio"]
+    .filter((flag) => !flags.has(flag))
+    .flatMap((flag) => [`-${flag}`, "1"]);
+}
+
+function parseNumericFlags(emulatorArgs: string[]): Map<string, number> {
   const numericFlagRegex = /(?:^|\0)-(?<flag>[A-Za-z]+)\0?(?<value>\d[^\0]*)/g;
 
-  const flags = new Map(
+  return new Map(
     Array.from(
       emulatorArgs.join("\0").matchAll(numericFlagRegex),
       ([, flag, value]) => [flag, parseInt(value)] as const,
     ),
   );
-  const base = flags.get("S") ?? navigator.hardwareConcurrency ?? 1;
-  const dirtyCpu = flags.get("SDcpu") ?? base;
-  const dirtyIo = flags.get("SDio") ?? 10;
-  const async = Math.max(flags.get("A") ?? 1, 1);
-  const poll = flags.get("IOt") ?? 1;
-  return nonSchedulerThreads + base + dirtyCpu + dirtyIo + async + poll;
 }
 
 function isBridgeMarker(
@@ -361,7 +381,10 @@ async function loadFsData(
       async (entry): Promise<Result<Uint8Array>> => {
         const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
         try {
-          const data = await assets.binary({ url: tarUrl, sha256: entry.sha256 });
+          const data = await assets.binary({
+            url: tarUrl,
+            sha256: entry.sha256,
+          });
           return { ok: true, data };
         } catch {
           // Preserve the asset error for network and body failures.

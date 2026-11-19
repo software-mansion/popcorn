@@ -323,14 +323,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     );
     const { maxMemory, ...beam } = opts.beam ?? {};
     this.maxMemoryBytes = resolveMaxMemory(maxMemory);
-    this.opts = {
-      ...opts,
-      beam: {
-        ...beam,
-        emulatorArgs:
-          beam.emulatorArgs ?? schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 }),
-      },
-    };
+    this.opts = { ...opts, beam };
     this.ttySize = { ...ttySize };
     this.onStdout = opts.onStdout;
     this.onStderr = opts.onStderr;

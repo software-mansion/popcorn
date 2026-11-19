@@ -1,7 +1,7 @@
 import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 import { PopcornError, type SerializedError } from "../src/errors";
-import { resolveThreadPoolSize } from "../src/beam";
+import { resolveThreading } from "../src/beam";
 import { Assets } from "../src/assets";
 import type { Page } from "@playwright/test";
 import { mock } from "node:test";
@@ -432,47 +432,67 @@ test.describe("boot", () => {
     expect(otp.errors).toEqual([{ kind: "error", data: diagnostic }]);
   });
 
-  test("schedulers", async ({ otp }) => {
-    const boot = await otp.tryBoot({
-      beam: {
-        emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
-        extraArgs: [
-          "-eval",
-          `
-            ok = wasm:send(#{
-              schedulers => erlang:system_info(schedulers),
-              dirty_cpu_schedulers => erlang:system_info(dirty_cpu_schedulers),
-              dirty_io_schedulers => erlang:system_info(dirty_io_schedulers)
-            }).
-          `,
-        ],
-      },
-    });
-    assert(boot.ok);
+  // Emulator flags and the scheduler counts they give, all of them online.
+  // Popcorn's default is one scheduler of each type, and emulator flags
+  // override only the counts they set.
+  const schedulerFlags: [string, string[] | undefined, number[]][] = [
+    ["no flags", undefined, [1, 1, 1]],
+    ["other flags", ["-sbwt", "none"], [1, 1, 1]],
+    ["all counts", schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }), [2, 2, 2]],
+    ["one count", ["-S", "2"], [2, 1, 1]],
+  ];
+  for (const [form, emulatorArgs, counts] of schedulerFlags) {
+    test(`schedulers, ${form}`, async ({ otp }) => {
+      const boot = await otp.tryBoot({
+        beam: {
+          emulatorArgs,
+          extraArgs: [
+            "-eval",
+            `
+              Info = fun erlang:system_info/1,
+              ok = wasm:send(#{
+                schedulers => Info(schedulers),
+                schedulers_online => Info(schedulers_online),
+                dirty_cpu_schedulers => Info(dirty_cpu_schedulers),
+                dirty_cpu_schedulers_online => Info(dirty_cpu_schedulers_online),
+                dirty_io_schedulers => Info(dirty_io_schedulers)
+              }).
+            `,
+          ],
+        },
+      });
+      assert(boot.ok);
 
-    expect(await otp.waitForEvent("schedulers")).toEqual({
-      schedulers: 2,
-      dirty_cpu_schedulers: 2,
-      dirty_io_schedulers: 2,
+      const [base, dirtyCpu, dirtyIo] = counts;
+      expect(await otp.waitForEvent("schedulers")).toEqual({
+        schedulers: base,
+        schedulers_online: base,
+        dirty_cpu_schedulers: dirtyCpu,
+        dirty_cpu_schedulers_online: dirtyCpu,
+        dirty_io_schedulers: dirtyIo,
+      });
     });
-  });
+  }
 
   // Each thread is a worker, next to Popcorn's own. The VM starts 3 threads
   // besides its schedulers, async threads and poll threads, and the thread
   // pool fits them. A pool that's too small would end up with as many
   // workers, the missing ones started later, so the test checks the pool size
-  // on its own. The BEAM takes flag values apart or attached.
+  // on its own. The BEAM takes flag values apart or attached, and runs no
+  // more dirty CPU schedulers than schedulers.
   const threadFlags: Record<string, string[]> = {
     "values apart": [
       ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
       ...["-A", "4", "-IOt", "2"],
     ],
     "values attached": ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
+    "dirty CPU capped": ["-S2", "-SDcpu4", "-SDio2", "-A4", "-IOt2"],
   };
   for (const [form, emulatorArgs] of Object.entries(threadFlags)) {
     test(`thread pool, ${form}`, async ({ otp, page }) => {
       const vmThreads = 3 + 6 + 4 + 2;
-      expect(resolveThreadPoolSize(emulatorArgs)).toBe(vmThreads);
+      const { threadPoolSize } = resolveThreading(emulatorArgs);
+      expect(threadPoolSize).toBe(vmThreads);
 
       const boot = await otp.tryBoot({
         beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
@@ -1095,8 +1115,12 @@ test.describe("fetch", () => {
       post_status: 201,
       post_body: "posted through httpc",
     });
-    expect(await otp.waitForEvent("streamed")).toEqual({ streamed: "browser-stream" });
-    expect(await otp.waitForEvent("profile_max_sessions")).toEqual({ profile_max_sessions: 2 });
+    expect(await otp.waitForEvent("streamed")).toEqual({
+      streamed: "browser-stream",
+    });
+    expect(await otp.waitForEvent("profile_max_sessions")).toEqual({
+      profile_max_sessions: 2,
+    });
   });
 });
 

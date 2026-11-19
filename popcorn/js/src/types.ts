@@ -87,7 +87,6 @@ export type BeamBootOptions = {
   /**
    * Emulator flags before `--`.
    *
-   * Overrides the default scheduler flags.
    * Use `schedulers()` to set thread counts.
    */
   emulatorArgs?: string[];
@@ -144,7 +143,10 @@ export type EmscriptenModule = {
   wasmMemory?: WebAssembly.Memory;
   instantiateWasm?: (
     imports: WebAssembly.Imports,
-    receive: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+    receive: (
+      instance: WebAssembly.Instance,
+      module: WebAssembly.Module,
+    ) => void,
   ) => WebAssembly.Exports;
   ENV: Record<string, string>;
   FS_mkdirTree: (path: string) => void;
