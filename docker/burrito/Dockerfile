@@ -3,35 +3,27 @@ ARG POPCORN_BASE_TAG=latest
 
 FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS builder
 
-COPY popcorn/elixir/ /build/popcorn/popcorn/elixir/
-COPY local-live-view/ /build/popcorn/local-live-view/
-
 WORKDIR /build/popcorn
-RUN CI=true pnpm install --no-frozen-lockfile --shamefully-hoist
+COPY . .
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    mise trust /build/popcorn && \
+    pnpm install --store-dir /pnpm/store --frozen-lockfile \
+      --filter ./popcorn/js... --filter ./local-live-view... && \
+    pnpm -F ./popcorn/js build
 
 WORKDIR /build/popcorn/examples/local-lv-burrito
 
-COPY examples/local-lv-burrito/mix.exs examples/local-lv-burrito/mix.lock ./
-RUN mix deps.get --only prod
-RUN mkdir -p config
-COPY examples/local-lv-burrito/config/config.exs examples/local-lv-burrito/config/prod.exs config/
-RUN mix deps.compile
-
-RUN mix tailwind.install --if-missing
-RUN mix esbuild.install --if-missing
-
-COPY examples/local-lv-burrito/local/ local/
-RUN mix llv.build
-
-COPY examples/local-lv-burrito/lib/ lib/
-COPY examples/local-lv-burrito/assets/ assets/
-RUN mix compile
-RUN mix esbuild burrito --minify
-RUN mix tailwind burrito --minify
-RUN mix phx.digest
-
-COPY examples/local-lv-burrito/config/runtime.exs config/
-RUN mix release
+RUN mix deps.get --only prod && \
+    mix deps.compile && \
+    mix tailwind.install --if-missing && \
+    mix esbuild.install --if-missing && \
+    mix llv.build && \
+    mix compile && \
+    mix esbuild burrito --minify && \
+    mix tailwind burrito --minify && \
+    mix phx.digest && \
+    mix release
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM ubuntu:noble AS final
