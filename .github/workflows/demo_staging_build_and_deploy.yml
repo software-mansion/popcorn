@@ -30,6 +30,10 @@ env:
   REGISTRY: ghcr.io
   ORG_NAME: software-mansion
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_docker_images:
     runs-on: ubuntu-latest
@@ -77,8 +81,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:staging"
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base,mode=max
 
       - name: Build landing Docker image
         id: build-and-push-landing
@@ -94,8 +98,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing:staging"
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:landing
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:landing,mode=max
 
       - name: Build burrito Docker image
         id: build-and-push-burrito
@@ -110,8 +114,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito:staging"
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:burrito
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:burrito,mode=max
 
       - name: Build language tour Docker image
         id: build-and-push-langtour
@@ -131,8 +135,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour:staging"
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:langtour
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:langtour,mode=max
 
   deploy_staging:
     runs-on: ubuntu-latest

@@ -7,6 +7,6 @@
     "test:headed": "playwright test --headed"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.1"
+    "@playwright/test": "catalog:"
   }
 }

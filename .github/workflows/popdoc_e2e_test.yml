@@ -60,7 +60,7 @@ jobs:
       - name: Setup Playwright
         uses: ./.github/actions/setup-playwright
         with:
-          version: "1.60.0"
+          version: "1.63.0"
 
       - name: Run e2e tests
         run: bash scripts/test.sh --popdoc

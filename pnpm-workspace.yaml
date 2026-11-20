@@ -19,6 +19,7 @@ allowBuilds:
   sharp: true
 
 catalog:
+  '@playwright/test': 1.63.0
   '@types/node': ^25.0.8
   eslint: ^10.10.0
   typescript: ^5.9.3
