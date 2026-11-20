@@ -1,62 +1,31 @@
 FROM ubuntu:noble
 
-ENV ERLANG_VERSION="29.0.6"
-ENV ELIXIR_VERSION="1.20.4-otp-29"
-ENV NODE_VERSION="22"
-ENV EMSDK_VERSION="6.0.13"
 ENV MIX_ENV=prod
 ENV LC_ALL=C.UTF-8
 ENV CI=true
-
 ENV DEBIAN_FRONTEND='noninteractive'
-ENV PATH="/build/emsdk:/build/emsdk/upstream/emscripten:/root/.local/share/mise/shims:$PATH"
-ENV EMSDK_QUIET='1'
-
-ARG COMMIT_REF
+ENV PATH="/root/.local/share/mise/shims:$PATH"
 
 WORKDIR /build/
 RUN mkdir -p popcorn out
 RUN apt-get -y update && \
-    apt-get -y install git curl zlib1g-dev \
-    automake make gcc g++ libssl-dev libncurses-dev \
-    default-jre-headless python3 xz-utils gpg wget
-
-RUN wget -q https://mirrors.kernel.org/ubuntu/pool/main/a/autoconf/autoconf_2.72-3.1ubuntu2_all.deb && \
-    echo "9edd0db0fa94580ab013529d6842a8e89b8ed22ab337da5e95cbb43971978815  autoconf_2.72-3.1ubuntu2_all.deb" | sha256sum -c - && \
-    apt-get -y install ./autoconf_2.72-3.1ubuntu2_all.deb && \
-    rm autoconf_2.72-3.1ubuntu2_all.deb
+    apt-get -y install --no-install-recommends \
+    ca-certificates git curl zlib1g-dev \
+    make gcc g++ libssl-dev libncurses-dev \
+    python3 xz-utils gpg wget && \
+    rm -rf /var/lib/apt/lists/*
 
 # install mise
 RUN install -dm 755 /etc/apt/keyrings && \
     wget -qO - https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /etc/apt/keyrings/mise-archive-keyring.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64,arm64] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list && \
-    apt update && \
-    apt install -y mise
+    apt-get update && \
+    apt-get install -y --no-install-recommends mise && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mise use --global node@"${NODE_VERSION}" && mise install
-RUN mise use --global pnpm@11 && mise install
-RUN mise use --global erlang@"${ERLANG_VERSION}" && mise install
-RUN mise use --global elixir@"${ELIXIR_VERSION}" && \
-    mise install && \
-    mix local.rebar --force && \
-    mix local.hex -if-missing --force
-RUN mise use --global emsdk@"${EMSDK_VERSION}" && mise install
-
-RUN git clone https://github.com/software-mansion/popcorn.git /build/popcorn && \
-    mise trust /build/popcorn
-RUN cd /build/popcorn && git fetch && git checkout "${COMMIT_REF}"
-
-# Install JS workspace dependencies
 WORKDIR /build/popcorn
-RUN pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=1
-
-# Build the OTP/BEAM runtime and canonical JavaScript package.
-RUN git config --global user.email "ci@ci.local" && \
-    git config --global user.name "CI"
-RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
-    scripts/build-beam.sh release
-# LocalLiveView (the burrito demo) needs the crypto runtime variant
-RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
-    scripts/build-beam.sh --with-crypto release
-RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
-    pnpm -F ./popcorn/js build
+COPY mise.toml ./
+RUN mise trust /build/popcorn && \
+    mise install node pnpm erlang elixir && \
+    mise exec -- mix local.rebar --force && \
+    mise exec -- mix local.hex --if-missing --force

@@ -5,7 +5,7 @@ inputs:
   build-mode:
     description: Build mode passed to scripts/build-beam.sh
     required: false
-    default: debug
+    default: release
   otp-tag:
     description: OTP git tag to build for Wasm
     required: false
@@ -21,40 +21,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - id: toolchain
+      uses: ./.github/actions/read-otp-toolchain
+
     - name: Compute OTP build cache key
       id: otp-build-cache-key
       shell: bash
       run: |
         set -euo pipefail
-
-        hash_files() {
-          sort | xargs sha256sum | sha256sum | cut -d' ' -f1
-        }
-
         {
-          printf 'key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-%s\n' "$(
-            {
-              find popcorn/patches popcorn/emscripten -type f -print
-              printf '%s\n' \
-                .github/actions/build-otp-wasm/action.yml \
-                scripts/_common.sh \
-                scripts/build-beam.sh \
-                scripts/build-openssl.sh \
-                scripts/export-otp-apps.escript \
-                scripts/patch-beam.sh \
-                scripts/runtime-manifest.sh
-            } | hash_files
-          )"
-
-          printf 'openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-%s\n' "$(
-            {
-              printf '%s\n' \
-                .github/actions/build-otp-wasm/action.yml \
-                scripts/_common.sh \
-                scripts/build-beam.sh \
-                scripts/build-openssl.sh
-            } | hash_files
-          )"
+          echo "key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-${{ steps.toolchain.outputs.wasm-hash }}"
+          echo "openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-${{ steps.toolchain.outputs.openssl-hash }}"
         } >> "$GITHUB_OUTPUT"
 
     - name: Cache built OTP output
@@ -113,19 +90,39 @@ runs:
           popcorn/sources/openssl-3.0.15-${{ inputs.build-mode }}-installed
         key: ${{ steps.otp-build-cache-key.outputs.openssl_key }}
 
-    - name: Diagnose environment size
-      if: steps.otp-build-cache.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        printf "env: %d bytes, %d vars\n" "$(env | wc -c)" "$(env | wc -l)"
-        env | awk -F'=' '{print length($0), $1}' | sort -rn | head -15
-        printf "ulimit -s: %s  ARG_MAX: %s\n" "$(ulimit -s)" "$(getconf ARG_MAX)"
-
-    - name: Build OTP/BEAM for Wasm
+    - name: Setup ccache
       if: steps.otp-build-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         set -euo pipefail
+        if ! command -v ccache &> /dev/null; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ccache
+        fi
+
+    - name: Cache ccache
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ccache-otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-${{ github.sha }}
+        restore-keys: |
+          ccache-otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-
+
+    - name: Build OTP/BEAM for Wasm
+      if: steps.otp-build-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        EM_COMPILER_WRAPPER: ccache
+        CCACHE_DIR: ${{ runner.temp }}/ccache
+        CCACHE_BASEDIR: ${{ github.workspace }}
+        CCACHE_NOHASHDIR: "1"
+        CCACHE_COMPRESS: "1"
+        CCACHE_MAXSIZE: 1G
+        CCACHE_SLOPPINESS: time_macros,include_file_mtime,include_file_ctime
+      run: |
+        set -euo pipefail
+        ccache --zero-stats
 
         build_args=(--otp-tag "${{ inputs.otp-tag }}" "${{ inputs.build-mode }}")
         if [[ "${{ inputs.with-crypto }}" == "true" ]]; then
@@ -133,3 +130,4 @@ runs:
         fi
 
         scripts/build-beam.sh "${build_args[@]}"
+        ccache --show-stats

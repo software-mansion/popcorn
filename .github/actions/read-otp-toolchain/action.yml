@@ -1,5 +1,5 @@
 name: Read OTP toolchain
-description: Read release tool versions from the OTP package configuration
+description: Read release tool versions from mise.toml and compute OTP Wasm build cache hashes
 outputs:
   otp:
     value: ${{ steps.versions.outputs.otp }}
@@ -10,17 +10,82 @@ outputs:
   otp-tag:
     value: ${{ steps.versions.outputs.otp-tag }}
     description: Wasm OTP source tag
+  node:
+    value: ${{ steps.versions.outputs.node }}
+    description: CI Node.js version
+  wasm-hash:
+    value: ${{ steps.versions.outputs.wasm-hash }}
+    description: Content hash of OTP Wasm build inputs
+  openssl-hash:
+    value: ${{ steps.versions.outputs.openssl-hash }}
+    description: Content hash of OpenSSL Wasm build inputs
+  core-cache-key:
+    value: ${{ steps.versions.outputs.core-cache-key }}
+    description: Release OTP Wasm cache key without crypto
+  crypto-cache-key:
+    value: ${{ steps.versions.outputs.crypto-cache-key }}
+    description: Release OTP Wasm cache key with crypto
 runs:
   using: composite
   steps:
     - id: versions
       shell: python
+      env:
+        RUNNER_OS: ${{ runner.os }}
       run: |
-        import os, tomllib
+        import hashlib, os, tomllib
         from pathlib import Path
 
         tools = tomllib.loads(Path("mise.toml").read_text())["tools"]
         otp = tools["erlang"]
         elixir = tools["elixir"].split("-otp-", 1)[0]
+        otp_tag = f"OTP-{otp}"
+        node = tools["node"]
+
+        def hash_paths(paths):
+            digest = hashlib.sha256()
+            for rel in sorted(paths):
+                file_hash = hashlib.sha256(Path(rel).read_bytes()).hexdigest()
+                digest.update(f"{file_hash}  {rel}\n".encode())
+            return digest.hexdigest()
+
+        wasm_files = [
+            ".github/actions/build-otp-wasm/action.yml",
+            ".github/actions/read-otp-toolchain/action.yml",
+            "scripts/_common.sh",
+            "scripts/build-beam.sh",
+            "scripts/build-openssl.sh",
+            "scripts/export-otp-apps.escript",
+            "scripts/patch-beam.sh",
+            "scripts/runtime-manifest.sh",
+        ]
+        for directory in ("popcorn/patches", "popcorn/emscripten"):
+            root = Path(directory)
+            if root.is_dir():
+                wasm_files.extend(
+                    p.as_posix() for p in root.rglob("*") if p.is_file()
+                )
+
+        openssl_files = [
+            ".github/actions/build-otp-wasm/action.yml",
+            ".github/actions/read-otp-toolchain/action.yml",
+            "scripts/_common.sh",
+            "scripts/build-beam.sh",
+            "scripts/build-openssl.sh",
+        ]
+
+        wasm_hash = hash_paths(wasm_files)
+        openssl_hash = hash_paths(openssl_files)
+        runner_os = os.environ["RUNNER_OS"]
+        core_key = f"otp-wasm-{runner_os}-{otp_tag}-release-false-{wasm_hash}"
+        crypto_key = f"otp-wasm-{runner_os}-{otp_tag}-release-true-{wasm_hash}"
+
         with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-            print(f"otp={otp}\nelixir={elixir}\notp-tag=OTP-{otp}", file=output)
+            print(f"otp={otp}", file=output)
+            print(f"elixir={elixir}", file=output)
+            print(f"otp-tag={otp_tag}", file=output)
+            print(f"node={node}", file=output)
+            print(f"wasm-hash={wasm_hash}", file=output)
+            print(f"openssl-hash={openssl_hash}", file=output)
+            print(f"core-cache-key={core_key}", file=output)
+            print(f"crypto-cache-key={crypto_key}", file=output)

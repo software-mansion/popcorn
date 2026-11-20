@@ -65,7 +65,7 @@
     }
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "catalog:",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "catalog:",
     "@types/wicg-cross-origin-storage": "^2026.10.1",

@@ -1,7 +1,7 @@
-name: Release LocalLiveView
+name: Release LLV
 
 # LocalLiveView releases on its own cadence, hence the separate `llv-v*` tag
-# namespace (the popcorn release workflows trigger on `v*`).
+# namespace (the popcorn release workflow triggers on `v*`).
 #
 # The JS bundle and the vendored Popcorn runtime files are NOT in git. They are
 # built here: `mix hex.publish` runs `mix llv.assets` (wired into the alias in
@@ -22,8 +22,12 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: read
+
 jobs:
   release:
+    name: hex
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:
@@ -41,10 +45,29 @@ jobs:
           package-json: local-live-view/package.json
           mix-exs: local-live-view/mix.exs
 
-      - name: Setup BEAM runtime and workspace
-        uses: ./.github/actions/setup-llv
+      - id: toolchain
+        uses: ./.github/actions/read-otp-toolchain
+
+      - name: Build OTP/BEAM for Wasm
+        uses: ./.github/actions/build-otp-wasm
         with:
+          host-otp-version: ${{ steps.toolchain.outputs.otp }}
+          otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
           build-mode: release
+          with-crypto: "true"
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+        with:
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - name: Cache Mix dependencies
+        uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: local-live-view
+          mix-env: dev
 
       - name: Publish to Hex
         working-directory: local-live-view

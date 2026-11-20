@@ -1,7 +1,7 @@
 [tools]
 elixir = "1.20.4-otp-29"
 erlang = "29.0.6"
-node = "22"
+node = "24.15.0"
 pnpm = "11"
 rebar = "latest"
 watchexec = "latest"

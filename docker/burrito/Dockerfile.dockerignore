@@ -1,6 +1,14 @@
 # Exclude everything
 **
 # Re-include only what the Dockerfile COPYs
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!mise.toml
+!**/package.json
+!popcorn/out/
+!popcorn/js/
 !popcorn/elixir/
 !local-live-view/
 !examples/local-lv-burrito/
@@ -8,3 +16,5 @@
 **/_build
 **/deps
 **/node_modules
+**/dist
+!popcorn/out/**

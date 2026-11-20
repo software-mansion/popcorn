@@ -1,0 +1,54 @@
+name: Setup Mix Cache
+description: Cache Mix deps and _build directories for an Elixir project
+
+inputs:
+  working-directory:
+    description: Path to the Elixir project containing mix.lock
+    required: true
+  mix-env:
+    description: MIX_ENV scope for the cache key
+    required: false
+    default: test
+  extra-paths:
+    description: Additional newline-separated paths to include in the cache
+    required: false
+    default: ""
+  extra-lockfile:
+    description: Optional second lockfile or mix.exs path to include in the cache key hash
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - id: toolchain
+      uses: ./.github/actions/read-otp-toolchain
+
+    - name: Compute Mix cache key
+      id: key
+      shell: bash
+      run: |
+        set -euo pipefail
+        slug="${{ inputs.working-directory }}"
+        slug="${slug//\//-}"
+        prefix="${{ runner.os }}-mix-${{ steps.toolchain.outputs.otp }}-${{ steps.toolchain.outputs.elixir }}-${{ inputs.mix-env }}-${slug}"
+        lock_hash="$(sha256sum "${{ inputs.working-directory }}/mix.lock" | cut -d' ' -f1)"
+        if [[ -n "${{ inputs.extra-lockfile }}" ]]; then
+          extra_hash="$(sha256sum "${{ inputs.extra-lockfile }}" | cut -d' ' -f1)"
+          lock_hash="${lock_hash}-${extra_hash}"
+        fi
+        {
+          echo "prefix=${prefix}-"
+          echo "key=${prefix}-${lock_hash}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Cache Mix dependencies and build
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ inputs.working-directory }}/deps
+          ${{ inputs.working-directory }}/_build
+          ${{ inputs.extra-paths }}
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: |
+          ${{ steps.key.outputs.prefix }}

@@ -7,17 +7,25 @@ ARG SENTRY_DSN
 ARG SENTRY_MODE
 ARG APP_VERSION
 
+WORKDIR /build/popcorn
+COPY . .
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    mise trust /build/popcorn && \
+    pnpm install --store-dir /pnpm/store --frozen-lockfile \
+      --filter ./popcorn/js... --filter ./language-tour... && \
+    pnpm -F ./popcorn/js build
+
 WORKDIR /build/popcorn/language-tour
 # Keep in sync with docker/landing.Dockerfile.
 RUN if [ "$SYNC_THIRD_PARTY_ASSETS" = "true" ]; then \
       curl -fsSL "https://cdn.cookie-script.com/s/19b5b47f7a8f2606f861864571339358.js" -o public/cookie-script.js; \
     fi
 RUN VITE_SENTRY_DSN="${SENTRY_DSN}" VITE_MODE="${SENTRY_MODE}" VITE_APP_VERSION="${APP_VERSION}" \
-    mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
-    pnpm run build
+    mise exec -- pnpm run build
 RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
-COPY --from=build_lang_tour  /build/popcorn/docker/langtour.nginx.conf /etc/nginx/nginx.conf
-COPY --from=build_lang_tour  /build/out /usr/share/nginx/html
+COPY --from=build_lang_tour /build/popcorn/docker/langtour.nginx.conf /etc/nginx/nginx.conf
+COPY --from=build_lang_tour /build/out /usr/share/nginx/html
 EXPOSE 8080

@@ -10,7 +10,7 @@
     "@swmansion/popcorn": "link:../../../popcorn/js"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "catalog:",
     "esbuild": "^0.25.0"
   }
 }

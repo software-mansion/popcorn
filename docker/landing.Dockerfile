@@ -4,16 +4,24 @@ FROM ${POPCORN_BASE_IMAGE}:${POPCORN_BASE_TAG} AS build_landing
 
 ARG SYNC_THIRD_PARTY_ASSETS=false
 
+WORKDIR /build/popcorn
+COPY . .
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    mise trust /build/popcorn && \
+    pnpm install --store-dir /pnpm/store --frozen-lockfile \
+      --filter ./popcorn/js... --filter ./local-live-view... --filter ./landing-page... && \
+    pnpm -F ./popcorn/js build
+
 WORKDIR /build/popcorn/landing-page
 # Keep in sync with docker/langtour.Dockerfile.
 RUN if [ "$SYNC_THIRD_PARTY_ASSETS" = "true" ]; then \
       curl -fsSL "https://cdn.cookie-script.com/s/19b5b47f7a8f2606f861864571339358.js" -o public/cookie-script.js; \
     fi
-RUN mise exec erlang@"${ERLANG_VERSION}" elixir@"${ELIXIR_VERSION}" -- \
-    pnpm run build
+RUN mise exec -- pnpm run build
 RUN cp -r dist/* /build/out
 
 FROM nginx:alpine AS runtime
-COPY --from=build_landing  /build/popcorn/docker/landing.nginx.conf /etc/nginx/nginx.conf
-COPY --from=build_landing  /build/out /usr/share/nginx/html
+COPY --from=build_landing /build/popcorn/docker/landing.nginx.conf /etc/nginx/nginx.conf
+COPY --from=build_landing /build/out /usr/share/nginx/html
 EXPOSE 8080

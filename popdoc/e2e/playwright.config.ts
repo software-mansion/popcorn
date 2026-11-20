@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: "html",
   use: {
     baseURL: "http://localhost:4000",
+    channel: process.env.PW_CHANNEL || undefined,
     trace: "on-first-retry",
   },
   projects: [

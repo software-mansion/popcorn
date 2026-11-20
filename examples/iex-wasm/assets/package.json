@@ -13,7 +13,7 @@
     "ghostty-web": "^0.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.0",
+    "@playwright/test": "catalog:",
     "esbuild": "^0.25.0"
   }
 }

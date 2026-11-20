@@ -55,8 +55,14 @@ defmodule LocalLvKanban.E2ETest do
   end
 
   test "playwright e2e suite passes" do
+    args =
+      case System.get_env("PLAYWRIGHT_SHARD") do
+        shard when is_binary(shard) and shard != "" -> ["test", "--shard=#{shard}"]
+        _ -> ["test"]
+      end
+
     {_output, status} =
-      System.cmd("pnpm", ["test"],
+      System.cmd("pnpm", args,
         cd: @playwright_dir,
         stderr_to_stdout: true,
         into: IO.stream()

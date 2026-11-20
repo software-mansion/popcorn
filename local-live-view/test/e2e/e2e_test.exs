@@ -28,8 +28,14 @@ defmodule LocalLiveView.E2ETest do
   end
 
   test "playwright suite passes" do
+    args =
+      case System.get_env("PLAYWRIGHT_SHARD") do
+        shard when is_binary(shard) and shard != "" -> ["test", "--shard=#{shard}"]
+        _ -> ["test"]
+      end
+
     {_output, status} =
-      System.cmd("pnpm", ["test"],
+      System.cmd("pnpm", args,
         cd: @playwright_dir,
         env: [{"BASE_URL", "http://localhost:#{@port}"}],
         stderr_to_stdout: true,

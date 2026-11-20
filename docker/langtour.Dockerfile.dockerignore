@@ -1,0 +1,20 @@
+# Exclude everything
+**
+# Re-include workspace manifests and language-tour inputs
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!mise.toml
+!**/package.json
+!popcorn/out/
+!popcorn/js/
+!popcorn/elixir/
+!language-tour/
+!docker/langtour.nginx.conf
+# Exclude local build artifacts
+**/_build
+**/deps
+**/node_modules
+**/dist
+!popcorn/out/**
