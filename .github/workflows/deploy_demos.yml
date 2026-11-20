@@ -7,7 +7,7 @@ on:
     paths:
       - "landing-page/**"
       - "language-tour/**"
-      - "examples/local-lv-burrito/**"
+      - "examples/livebook/**"
       - "local-live-view/**"
       - "popcorn/elixir/**"
       - "popcorn/js/**"
@@ -100,8 +100,10 @@ jobs:
           if [[ "$IS_PUSH" == "true" || "$DEPLOY_LANGTOUR" == "true" ]]; then
             apps=$(jq -c '. + [{"name":"langtour","file":"./docker/langtour.Dockerfile","image":"popcorn-langtour","wasm":"core"}]' <<< "$apps")
           fi
+          # Livebook, for now under burrito's image, which the hosts'
+          # popcorn-burrito.yml runs
           if [[ "$IS_PUSH" == "true" || "$DEPLOY_BURRITO" == "true" ]]; then
-            apps=$(jq -c '. + [{"name":"burrito","file":"./docker/burrito/Dockerfile","image":"popcorn-burrito","wasm":"crypto"}]' <<< "$apps")
+            apps=$(jq -c '. + [{"name":"livebook","file":"./docker/livebook.Dockerfile","image":"popcorn-burrito","wasm":"crypto"}]' <<< "$apps")
           fi
           echo "apps=$apps" >> "$GITHUB_OUTPUT"
 

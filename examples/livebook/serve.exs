@@ -18,7 +18,7 @@ defmodule Serve do
     {"cross-origin-embedder-policy", "require-corp"}
   ]
 
-  # Livebook's assets are only there gzipped
+  # The files' compressed copies, when they have them, like Livebook's assets
   @static Plug.Static.init(
             at: "/",
             from: @public,

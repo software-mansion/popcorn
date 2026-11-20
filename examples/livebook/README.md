@@ -25,6 +25,10 @@ Open [localhost:4000](http://localhost:4000).
 at [localhost:4001](http://localhost:4001). Unlike `mix popcorn.dev`, it serves
 the page for Livebook's links too, like `/import?url=…`.
 
+`mix cook` cooks `public/` as `mix popcorn.dev` does, without serving it. The
+demo deployment, `docker/livebook.Dockerfile`, serves it with nginx, configured
+like `serve.exs` in `docker/livebook.nginx.conf`.
+
 `pnpm test` in `test/playwright` hosts it the same way, then opens Livebook in
 headless Chromium, creates notebooks and evaluates cells in them. Set
 `LIVEBOOK_URL` to test another server. The suite is a member of the repo's pnpm
