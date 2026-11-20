@@ -1,4 +1,5 @@
 import type { Pid } from "@swmansion/popcorn";
+import { runInNewContext, runInThisContext } from "node:vm";
 import { a, atom, encode, t, tuple } from "../src/etf";
 import { assert, evalOpts, expect, test } from "./helpers";
 
@@ -83,6 +84,28 @@ test.describe("ETF", () => {
     assert.equal(hex(42n), hex(42));
     assert.equal(hex(safeBigInt), hex(safeInteger));
     assert.equal(largeInteger[1], 0x6f);
+  });
+
+  // Like an iframe's, whose built-ins and Object.prototype aren't this realm's
+  test("values of another realm", () => {
+    const source = `({
+      object: { a: 1 },
+      date: new Date(0),
+      map: new Map([["a", 1]]),
+      set: new Set([1]),
+      bytes: new Uint8Array([0, 128, 255]).buffer,
+    })`;
+    const foreign: unknown = runInNewContext(source);
+    const local: unknown = runInThisContext(source);
+    const shared: unknown = runInNewContext(
+      "const shared = new SharedArrayBuffer(3); new Uint8Array(shared).set([0, 128, 255]); shared",
+    );
+    const instance: unknown = runInNewContext("new (class Foo {})()");
+
+    assert(!(foreign instanceof Object) && local instanceof Object);
+    assert.equal(hex(foreign), hex(local));
+    assert.equal(hex(shared), "836d000000030080ff");
+    assert(!encode(instance).ok);
   });
 
   test("containers", () => {

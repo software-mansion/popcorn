@@ -209,11 +209,6 @@ class Encoder {
         return;
       }
 
-      if (value instanceof ArrayBuffer) {
-        const bytes = new Uint8Array(value);
-        this.binary(bytes);
-        return;
-      }
       if (ArrayBuffer.isView(value)) {
         const bytes = new Uint8Array(
           value.buffer,
@@ -223,25 +218,34 @@ class Encoder {
         this.binary(bytes);
         return;
       }
-      if (value instanceof Date) {
-        this.date(value);
-        return;
-      }
-      if (value instanceof Map) {
-        this.entries(value.entries(), value);
-        return;
-      }
-      if (value instanceof Set) {
-        this.set(value);
+      // With a realm's Object.prototype, or with none
+      const prototype: unknown = Object.getPrototypeOf(value);
+      const isObject =
+        prototype === null || Object.getPrototypeOf(prototype) === null;
+      if (isObject) {
+        this.entries(Object.entries(value), value);
         return;
       }
 
-      const prototype = Object.getPrototypeOf(value);
-      const isObject = prototype === Object.prototype || prototype === null;
-      if (!isObject) {
-        throw err("non-plain-object", value);
+      // toString works for objects created by other realms, unlike instanceof.
+      // Objects with spoofed toString may crash weirdly,
+      // we'll need per-type checks if that's a real case.
+      switch (Object.prototype.toString.call(value)) {
+        case "[object ArrayBuffer]":
+        case "[object SharedArrayBuffer]":
+          this.binary(new Uint8Array(value as ArrayBufferLike));
+          return;
+        case "[object Date]":
+          this.date(value as Date);
+          return;
+        case "[object Map]":
+          this.entries((value as Map<unknown, unknown>).entries(), value);
+          return;
+        case "[object Set]":
+          this.set(value as Set<unknown>);
+          return;
       }
-      this.entries(Object.entries(value), value);
+      throw err("non-plain-object", value);
     } finally {
       this.ancestors.delete(value);
     }
