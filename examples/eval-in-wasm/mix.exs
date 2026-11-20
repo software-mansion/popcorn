@@ -32,12 +32,14 @@ defmodule EvalInWasm.MixProject do
   end
 
   defp pnpm_install(_) do
-    {_, 0} =
-      System.cmd("pnpm", ["install"],
-        cd: File.cwd!(),
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
+    unless File.dir?(Path.join(File.cwd!(), "assets/node_modules")) do
+      {_, 0} =
+        System.cmd("pnpm", ["install"],
+          cd: File.cwd!(),
+          into: IO.stream(:stdio, :line),
+          stderr_to_stdout: true
+        )
+    end
   end
 
   defp build_js(_) do

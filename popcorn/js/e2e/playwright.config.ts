@@ -5,10 +5,11 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   reporter: "html",
   use: {
     baseURL: "http://127.0.0.1:5173",
+    channel: process.env.PW_CHANNEL || undefined,
     trace: "on-first-retry",
   },
   projects: [

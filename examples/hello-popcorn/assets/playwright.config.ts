@@ -12,6 +12,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL,
+    channel: process.env.PW_CHANNEL || undefined,
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
