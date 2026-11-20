@@ -124,15 +124,14 @@
           if (!socket) return;
           if ("close" in event) socket.closed(event.close);
           else if ("text" in event) socket.onmessage?.({ data: event.text });
-          else socket.onmessage?.({ data: toArrayBuffer(event.binary) });
+          else socket.onmessage?.({ data: socket.binaryFrame(toBytes(event.binary)) });
         },
       });
       status(`VM booted in ${Math.round(performance.now() - t0)} ms, starting Livebook…`);
 
       // Binary frames that are valid UTF-8 arrive as strings
-      function toArrayBuffer(data) {
-        const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
-        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      function toBytes(data) {
+        return typeof data === "string" ? new TextEncoder().encode(data) : data;
       }
 
       // Responses built in JavaScript can't set cookies, so the shell keeps them
@@ -208,6 +207,12 @@
 
         send(data) {
           popcorn.send(this.pid, typeof data === "string" ? { text: data } : { binary: data });
+        }
+
+        // Livebook's frame overrides it to make its own ArrayBuffers, see
+        // popcorn-frame.js
+        binaryFrame(bytes) {
+          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
         }
 
         close(code) {
