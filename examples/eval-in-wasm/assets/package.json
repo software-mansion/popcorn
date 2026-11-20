@@ -1,13 +1,16 @@
 {
   "name": "eval_in_wasm",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "playwright test"
   },
   "dependencies": {
     "@swmansion/popcorn": "link:../../../popcorn/js"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "esbuild": "^0.25.0"
   }
 }

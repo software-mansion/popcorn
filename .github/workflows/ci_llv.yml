@@ -21,7 +21,6 @@ on:
       - ".github/actions/build-otp-wasm/**"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-mix-cache/**"
-      - ".github/actions/setup-playwright/**"
       - ".github/actions/setup-workspace/**"
       - ".github/actions/verify-llv-app/**"
       - "mise.toml"
@@ -184,8 +183,6 @@ jobs:
 
       - name: Build JS bundle
         run: mix llv.assets
-
-      - uses: ./.github/actions/setup-playwright
 
       - name: Run installer e2e test
         run: mix test test/mix/tasks/llv_install_e2e_test.exs

@@ -21,7 +21,6 @@ on:
       - ".github/actions/build-otp-wasm/**"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-mix-cache/**"
-      - ".github/actions/setup-playwright/**"
       - ".github/actions/setup-workspace/**"
       - "mise.toml"
       - "pnpm-workspace.yaml"
@@ -160,29 +159,16 @@ jobs:
         run: mix deps.get
         working-directory: examples/${{ matrix.example }}
 
-      - name: Setup Playwright (eval-in-wasm)
-        if: matrix.example == 'eval-in-wasm'
-        uses: ./.github/actions/setup-playwright
-
-      - name: Build and test eval-in-wasm
-        if: matrix.example == 'eval-in-wasm'
-        working-directory: examples/eval-in-wasm
-        run: |
-          MIX_ENV=prod mix build
-          MIX_ENV=test mix test --no-start
-
       - name: Run unit tests
-        if: matrix.example == 'game-of-life' || matrix.example == 'hello-popcorn'
         working-directory: examples/${{ matrix.example }}
-        run: mix test
+        run: if [ -d test ]; then mix test; fi
 
       - name: Run e2e tests
-        if: matrix.example != 'eval-in-wasm'
         working-directory: examples/${{ matrix.example }}/assets
         run: pnpm test
 
       - name: Upload Playwright report
-        if: failure() && matrix.example != 'eval-in-wasm'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: example-${{ matrix.example }}-playwright-report

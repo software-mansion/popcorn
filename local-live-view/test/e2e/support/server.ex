@@ -26,9 +26,6 @@ defmodule LocalLiveView.E2E.Server do
 
     if status != 0, do: raise("building the Wasm runtime failed:\n#{output}")
 
-    # The esbuild package is held at 0.8 by playwright, and that version only
-    # verifies binaries npm signed before rotating its key in 2025.
-    Application.put_env(:esbuild, :version, "0.24.2")
     {:ok, _apps} = Application.ensure_all_started(:esbuild)
 
     Application.put_env(:esbuild, :llv_e2e,

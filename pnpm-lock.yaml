@@ -63,6 +63,9 @@ importers:
         specifier: link:../../../popcorn/js
         version: link:../../../popcorn/js
     devDependencies:
+      '@playwright/test':
+        specifier: 'catalog:'
+        version: 1.63.0
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

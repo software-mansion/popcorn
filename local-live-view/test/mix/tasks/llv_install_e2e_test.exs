@@ -14,19 +14,19 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
   use ExUnit.Case, async: false
 
   @moduletag :e2e
-  # Must exceed @assertion_timeout, else ExUnit kills the test before AssertionError fires.
-  @moduletag timeout: 180_000
+  @moduletag timeout: 240_000
 
+  @playwright_dir Path.expand("../../e2e/playwright", __DIR__)
   @port 4567
   @url "http://localhost:#{@port}"
   @server_ready_timeout 120_000
-  @assertion_timeout 60_000
 
   setup_all do
-    {:ok, _apps} = Application.ensure_all_started(:playwright)
+    {:ok, _} = Application.ensure_all_started(:inets)
 
-    {_pid, browser} = Playwright.BrowserType.launch(:chromium)
-    on_exit(fn -> Playwright.Browser.close(browser) end)
+    unless File.dir?(Path.join(@playwright_dir, "node_modules/@playwright/test")) do
+      {_output, 0} = System.cmd("pnpm", ["install"], cd: @playwright_dir, stderr_to_stdout: true)
+    end
 
     project_dir = setup_phoenix_project(File.cwd!())
 
@@ -41,33 +41,26 @@ defmodule Mix.Tasks.Llv.InstallE2ETest do
     kill_port(@port)
     start_phoenix_server(project_dir)
 
-    page = Playwright.Browser.new_page(browser)
-
     wait_for(
-      fn -> assert %{status: 200} = Playwright.Page.goto(page, @url) end,
+      fn ->
+        assert {:ok, {{_, 200, _}, _, _}} = :httpc.request(:get, {~c"#{@url}", []}, [], [])
+      end,
       @server_ready_timeout
     )
 
-    Playwright.Page.close(page)
-
-    [browser: browser]
+    :ok
   end
 
-  test "HelloLocal renders inside the Phoenix page via live_local route", %{browser: browser} do
-    page = Playwright.Browser.new_page(browser)
-    Playwright.Page.goto(page, "#{@url}/hello_wasm")
+  test "HelloLocal renders inside the Phoenix page via live_local route" do
+    {_output, status} =
+      System.cmd("pnpm", ["exec", "playwright", "test", "--config", "installer.config.js"],
+        cd: @playwright_dir,
+        env: [{"BASE_URL", @url}],
+        stderr_to_stdout: true,
+        into: IO.stream()
+      )
 
-    wait_for(
-      fn ->
-        text = Playwright.Page.text_content(page, "body")
-        assert text =~ "Hello from Wasm!"
-        # Server-side rendering shows the text too; this is the Wasm runtime
-        assert Playwright.Page.query_selector(page, "[data-pop-root].phx-connected")
-      end,
-      @assertion_timeout
-    )
-
-    Playwright.Page.close(page)
+    assert status == 0, "Playwright installer test failed (exit status #{status})"
   end
 
   # --- Project setup helpers ---

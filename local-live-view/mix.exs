@@ -74,12 +74,9 @@ defmodule LocalLiveView.MixProject do
       {:ex_doc, "~> 0.34",
        only: [:dev, :test], targets: [:all], runtime: false, warn_if_outdated: true},
       {:igniter, ">= 0.7.0", runtime: false},
-      {:playwright, "~> 1.49.1-alpha.2", runtime: false, only: :test},
-      # playwright pins cowlib ~> 2.7.0 which fails to compile on OTP 28
-      {:cowlib, "~> 2.13", override: true, runtime: false, only: :test},
       # For the e2e tests' app, see test/e2e/README.md
       {:bandit, "~> 1.5", runtime: false, only: :test},
-      {:esbuild, "~> 0.8", runtime: false, only: :test},
+      {:esbuild, "~> 0.10", runtime: false, only: :test},
       # Starting OTP apps of Phoenix and LiveView is not needed for LLV
       {:phoenix, "~> 1.8.4", runtime: Mix.target() != :wasm},
       {:phoenix_live_view, "~> 1.1", runtime: Mix.target() != :wasm},
