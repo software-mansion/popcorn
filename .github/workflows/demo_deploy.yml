@@ -1,0 +1,189 @@
+name: Demos
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "landing-page/**"
+      - "language-tour/**"
+      - "examples/local-lv-burrito/**"
+      - "local-live-view/**"
+      - "popcorn/elixir/**"
+      - "popcorn/js/**"
+      - "popcorn/patches/**"
+      - "popcorn/emscripten/**"
+      - "scripts/_common.sh"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/export-otp-apps.escript"
+      - "scripts/patch-beam.sh"
+      - "scripts/runtime-manifest.sh"
+      - "docker/**"
+      - ".github/workflows/demo_deploy.yml"
+      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/actions/build-otp-wasm/**"
+      - ".github/actions/read-otp-toolchain/**"
+      - ".github/actions/setup-workspace/**"
+      - "mise.toml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target deployment environment
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+concurrency:
+  group: demo-deploy-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: ${{ (inputs.environment || 'staging') != 'production' }}
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  ORG_NAME: software-mansion
+  TARGET_ENV: ${{ inputs.environment || 'staging' }}
+  IMAGE_TAG: ${{ (inputs.environment || 'staging') == 'production' && 'latest' || 'staging' }}
+
+jobs:
+  wasm:
+    name: OTP
+    uses: ./.github/workflows/build_otp_wasm.yml
+
+  build-base:
+    name: base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "false"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/base.Dockerfile
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:latest
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base:staging
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base,mode=max
+
+  build-apps:
+    name: build ${{ matrix.name }} (${{ inputs.environment || 'staging' }})
+    needs: [wasm, build-base]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: landing
+            file: ./docker/landing.Dockerfile
+            image: popcorn-landing
+            wasm: both
+          - name: langtour
+            file: ./docker/langtour.Dockerfile
+            image: popcorn-langtour
+            wasm: core
+          - name: burrito
+            file: ./docker/burrito/Dockerfile
+            image: popcorn-burrito
+            wasm: crypto
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "false"
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: ${{ matrix.wasm }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.image }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          build-args: |
+            POPCORN_BASE_TAG=latest
+            SYNC_THIRD_PARTY_ASSETS=true
+            SENTRY_DSN=${{ secrets.SENTRY_CLIENT_DSN }}
+            SENTRY_MODE=${{ env.TARGET_ENV }}
+            APP_VERSION=${{ github.sha }}
+          pull: true
+          push: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}"
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.name }}
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.name }},mode=max
+
+  deploy:
+    name: deploy (${{ inputs.environment || 'staging' }})
+    needs: build-apps
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy to ${{ env.TARGET_ENV }}
+        uses: appleboy/ssh-action@v1
+        env:
+          BURRITO_SECRET_KEY_BASE: ${{ secrets.BURRITO_SECRET_KEY_BASE }}
+        with:
+          host: ${{ env.TARGET_ENV == 'production' && secrets.POPCORN_HOSTS || secrets.STAG_POPCORN_HOST }}
+          username: ${{ secrets.POPCORN_USER }}
+          key: ${{ secrets.POPCORN_SSH_PRIV }}
+          port: ${{ env.TARGET_ENV == 'production' && secrets.POPCORN_PORT || secrets.STAG_POPCORN_PORT }}
+          envs: BURRITO_SECRET_KEY_BASE
+          script: |
+            set -euo pipefail
+            docker compose -f popcorn-landing.yml -p landing pull
+            docker compose -f popcorn-landing.yml -p landing up -d
+            docker compose -f elixir-langtour.yml -p langtour pull
+            docker compose -f elixir-langtour.yml -p langtour up -d
+            docker compose -f popcorn-burrito.yml -p burrito pull
+            docker compose -f popcorn-burrito.yml -p burrito up -d
