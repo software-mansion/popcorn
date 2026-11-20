@@ -4,8 +4,9 @@ defmodule NotebookVM.Rebar do
 
   Mix compiles rebar3 dependencies by running rebar3, and the browser can't run
   OS commands. This covers what most Hex packages need: the Erlang sources in
-  `src`, their Leex and Yecc files, and the `.app.src` file. Hooks, plugins and
-  port compilers aren't supported.
+  `src`, their Leex and Yecc files, and the `.app.src` file, or the `.app` file
+  in `ebin` that erlang.mk packages have instead. Hooks, plugins and port
+  compilers aren't supported.
   """
 
   @doc """
@@ -62,7 +63,10 @@ defmodule NotebookVM.Rebar do
         :debug_info,
         {:outdir, to_charlist(ebin)},
         {:i, to_charlist(Path.join(source_dir, "include"))},
-        {:i, to_charlist(src)}
+        {:i, to_charlist(src)},
+        # rebar3 compiles in the package's directory, so includes like
+        # "src/name.hrl" are relative to it
+        {:i, to_charlist(source_dir)}
       ] ++ erl_opts(config)
 
     first = for file <- Keyword.get(config, :erl_first_files, []), do: Path.join(source_dir, file)
@@ -105,8 +109,11 @@ defmodule NotebookVM.Rebar do
   end
 
   defp write_app(source_dir, src, ebin) do
-    case Path.wildcard(Path.join(src, "*.app.src")) do
-      [app_src] ->
+    app_srcs = Path.wildcard(Path.join(src, "*.app.src"))
+    app_files = Path.wildcard(Path.join([source_dir, "ebin", "*.app"]))
+
+    case app_srcs ++ app_files do
+      [app_src | _] ->
         {:ok, [{:application, app, props}]} = :file.consult(app_src)
 
         modules =
@@ -123,7 +130,7 @@ defmodule NotebookVM.Rebar do
         File.write!(app_file, :io_lib.format(~c"~p.~n", [{:application, app, props}]))
 
       [] ->
-        {:error, "No .app.src file in #{src}"}
+        {:error, "No .app.src file in #{src}, or .app file in #{Path.join(source_dir, "ebin")}"}
     end
   end
 
