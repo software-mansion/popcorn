@@ -1,7 +1,7 @@
 import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 import { PopcornError, type SerializedError } from "../src/errors";
-import { resolveThreadPoolSize } from "../src/beam";
+import { applyDefaults } from "../src/beam";
 import { Assets } from "../src/assets";
 import type { Page } from "@playwright/test";
 import { mock } from "node:test";
@@ -432,54 +432,74 @@ test.describe("boot", () => {
     expect(otp.errors).toEqual([{ kind: "error", data: diagnostic }]);
   });
 
-  test("schedulers", async ({ otp }) => {
-    const boot = await otp.tryBoot({
-      beam: {
-        emulatorArgs: schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
-        extraArgs: [
-          "-eval",
-          `
-            ok = wasm:send(#{
-              schedulers => erlang:system_info(schedulers),
-              dirty_cpu_schedulers => erlang:system_info(dirty_cpu_schedulers),
-              dirty_io_schedulers => erlang:system_info(dirty_io_schedulers)
-            }).
-          `,
-        ],
-      },
-    });
-    assert(boot.ok);
-
-    expect(await otp.waitForEvent("schedulers")).toEqual({
-      schedulers: 2,
-      dirty_cpu_schedulers: 2,
-      dirty_io_schedulers: 2,
-    });
-  });
-
-  // Each thread is a worker, next to Popcorn's own. The VM starts 3 threads
-  // besides its schedulers, async threads and poll threads, and the thread
-  // pool fits them. A pool that's too small would end up with as many
+  // Emulator flags, the scheduler counts they give, all of them online, and
+  // the VM's threads. Popcorn's default is one scheduler of each type, and
+  // emulator flags override only the counts they set. The BEAM takes flag
+  // values apart or attached, and runs no more dirty CPU schedulers than
+  // schedulers. Besides its schedulers, async threads and poll threads, the VM
+  // starts 3 threads. Each thread is a worker, next to Popcorn's own, and the
+  // thread pool fits them. A pool that's too small would end up with as many
   // workers, the missing ones started later, so the test checks the pool size
-  // on its own. The BEAM takes flag values apart or attached.
-  const threadFlags: Record<string, string[]> = {
-    "values apart": [
-      ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
-      ...["-A", "4", "-IOt", "2"],
-    ],
-    "values attached": ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
+  // on its own.
+  type Threading = { flags?: string[]; counts: number[]; threads: number };
+  const threading: Record<string, Threading> = {
+    "no flags": { counts: [1, 1, 1], threads: 8 },
+    "other flags": { flags: ["-sbwt", "none"], counts: [1, 1, 1], threads: 8 },
+    "one count": { flags: ["-S", "2"], counts: [2, 1, 1], threads: 9 },
+    "values apart": {
+      flags: [
+        ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
+        ...["-A", "4", "-IOt", "2"],
+      ],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
+    "values attached": {
+      flags: ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
+    "dirty CPU capped": {
+      flags: ["-S2", "-SDcpu4", "-SDio2", "-A4", "-IOt2"],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
   };
-  for (const [form, emulatorArgs] of Object.entries(threadFlags)) {
-    test(`thread pool, ${form}`, async ({ otp, page }) => {
-      const vmThreads = 3 + 6 + 4 + 2;
-      expect(resolveThreadPoolSize(emulatorArgs)).toBe(vmThreads);
+  for (const [form, { flags, counts, threads }] of Object.entries(threading)) {
+    test(`threads, ${form}`, async ({ otp, page }) => {
+      const { threadPoolSize } = applyDefaults(flags ?? []);
+      expect(threadPoolSize).toBe(threads);
 
       const boot = await otp.tryBoot({
-        beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
+        beam: {
+          emulatorArgs: flags,
+          extraArgs: [
+            "-eval",
+            `
+              Info = fun erlang:system_info/1,
+              ok = wasm:send(#{
+                schedulers => Info(schedulers),
+                schedulers_online => Info(schedulers_online),
+                dirty_cpu_schedulers => Info(dirty_cpu_schedulers),
+                dirty_cpu_schedulers_online => Info(dirty_cpu_schedulers_online),
+                dirty_io_schedulers => Info(dirty_io_schedulers)
+              }),
+              receive stop -> ok end.
+            `,
+          ],
+        },
       });
       assert(boot.ok);
 
-      await expect.poll(() => page.workers().length).toBe(1 + vmThreads);
+      const [base, dirtyCpu, dirtyIo] = counts;
+      expect(await otp.waitForEvent("schedulers")).toEqual({
+        schedulers: base,
+        schedulers_online: base,
+        dirty_cpu_schedulers: dirtyCpu,
+        dirty_cpu_schedulers_online: dirtyCpu,
+        dirty_io_schedulers: dirtyIo,
+      });
+      await expect.poll(() => page.workers().length).toBe(1 + threads);
     });
   }
 
@@ -1095,8 +1115,12 @@ test.describe("fetch", () => {
       post_status: 201,
       post_body: "posted through httpc",
     });
-    expect(await otp.waitForEvent("streamed")).toEqual({ streamed: "browser-stream" });
-    expect(await otp.waitForEvent("profile_max_sessions")).toEqual({ profile_max_sessions: 2 });
+    expect(await otp.waitForEvent("streamed")).toEqual({
+      streamed: "browser-stream",
+    });
+    expect(await otp.waitForEvent("profile_max_sessions")).toEqual({
+      profile_max_sessions: 2,
+    });
   });
 });
 
