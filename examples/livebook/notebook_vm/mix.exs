@@ -15,9 +15,10 @@ defmodule NotebookVM.MixProject do
 
   def application do
     [
-      # Mix for Mix.install/2, Leex and Yecc for the Erlang packages it compiles,
-      # and ExUnit for Livebook's doctests
-      extra_applications: [:logger, :mix, :parsetools, :ex_unit],
+      # Mix for Mix.install/2, Leex and Yecc and syntax_tools for the Erlang
+      # packages it compiles, like parse_trans's parse transforms, and ExUnit for
+      # Livebook's doctests
+      extra_applications: [:logger, :mix, :parsetools, :syntax_tools, :ex_unit],
       mod: {NotebookVM.Application, []}
     ]
   end

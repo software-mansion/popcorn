@@ -158,11 +158,12 @@ test("the code runs in a browser VM other than Livebook's", async () => {
 });
 
 // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on,
-// and Req, with Mint, whose Erlang code includes OTP's headers
+// Req, with Mint, whose Erlang code includes OTP's headers, and parse_trans,
+// whose parse transforms use syntax_tools
 test("Mix.install downloads and compiles packages", async () => {
   test.setTimeout(660_000);
   await evaluate(
-    `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req])`,
+    `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req, {:parse_trans, "~> 3.4"}])`,
     ":ok",
     600_000,
   );
