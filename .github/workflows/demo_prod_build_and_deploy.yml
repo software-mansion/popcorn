@@ -38,7 +38,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-base
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-landing
             ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-langtour
-            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito
+            ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-livebook
 
       - name: Build base Docker image
         id: build-base
@@ -72,18 +72,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build burrito Docker image
-        id: build-and-push-burrito
+      - name: Build Livebook Docker image
+        id: build-and-push-livebook
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./docker/burrito/Dockerfile
+          file: ./docker/livebook.Dockerfile
           build-args: |
             POPCORN_BASE_TAG=latest
           pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-burrito:latest"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-livebook:latest"
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -116,18 +116,15 @@ jobs:
     steps:
       - name: Deploy to production
         uses: appleboy/ssh-action@v1
-        env:
-          BURRITO_SECRET_KEY_BASE: ${{ secrets.BURRITO_SECRET_KEY_BASE }}
         with:
           host: ${{ secrets.POPCORN_HOSTS }}
           username: ${{ secrets.POPCORN_USER }}
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ secrets.POPCORN_PORT }}
-          envs: BURRITO_SECRET_KEY_BASE
           script: |
             docker compose -f popcorn-landing.yml -p landing pull
             docker compose -f popcorn-landing.yml -p landing up -d
             docker compose -f elixir-langtour.yml -p langtour pull
             docker compose -f elixir-langtour.yml -p langtour up -d
-            docker compose -f popcorn-burrito.yml -p burrito pull
-            docker compose -f popcorn-burrito.yml -p burrito up -d
+            docker compose -f popcorn-livebook.yml -p livebook pull
+            docker compose -f popcorn-livebook.yml -p livebook up -d

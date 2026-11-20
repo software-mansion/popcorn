@@ -33,6 +33,8 @@ defmodule LivebookWasm.MixProject do
   defp aliases do
     [
       "popcorn.dev": [&copy_livebook_static/1, &cook_notebook_vm/1, "popcorn.dev"],
+      # Builds public/ as `mix popcorn.dev` does, for a static host
+      cook: [&copy_livebook_static/1, &cook_notebook_vm/1, "popcorn.cook"],
       # The application starts Livebook, which the tests don't need
       test: "test --no-start"
     ]
@@ -51,13 +53,21 @@ defmodule LivebookWasm.MixProject do
 
   # The browser loads Livebook's static files from the network, not the VM
   defp copy_livebook_static(_args) do
+    static = "deps/livebook/priv/static"
+
     for dir <- ~w(assets images favicons iframe) do
-      File.cp_r!(Path.join("deps/livebook/priv/static", dir), Path.join("public", dir))
+      File.cp_r!(Path.join(static, dir), Path.join("public", dir))
     end
 
-    # Livebook serves the outputs' iframe pages only gzipped
-    for path <- Path.wildcard("public/iframe/*.html.gz") do
-      File.write!(Path.rootname(path), path |> File.read!() |> :zlib.gunzip())
+    # Livebook has many of its files only gzipped, for Plug.Static's `gzip`.
+    # Static hosts serve files that are there as they are, see
+    # docker/livebook.nginx.conf.
+    for dir <- ~w(assets images favicons iframe),
+        gzipped <- Path.wildcard(Path.join([static, dir, "**/*.gz"])),
+        file = Path.rootname(gzipped),
+        not File.exists?(file) do
+      target = Path.join("public", Path.relative_to(file, static))
+      File.write!(target, gzipped |> File.read!() |> :zlib.gunzip())
     end
   end
 end
