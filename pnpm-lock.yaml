@@ -164,6 +164,12 @@ importers:
         specifier: ^0.25.0
         version: 0.25.12
 
+  examples/livebook/test/playwright:
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
+
   examples/local-lv-kanban/test/playwright:
     devDependencies:
       '@playwright/test':

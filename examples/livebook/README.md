@@ -25,9 +25,10 @@ Open [localhost:4000](http://localhost:4000).
 at [localhost:4001](http://localhost:4001). Unlike `mix popcorn.dev`, it serves
 the page for Livebook's links too, like `/import?url=…`.
 
-`node scripts/check.mjs` hosts it the same way, then opens Livebook in headless
-Chromium, creates notebooks and evaluates cells in them. Pass it a URL to check
-another server.
+`pnpm test` in `test/playwright` hosts it the same way, then opens Livebook in
+headless Chromium, creates notebooks and evaluates cells in them. Set
+`LIVEBOOK_URL` to test another server. The suite is a member of the repo's pnpm
+workspace, so it needs `pnpm install` first.
 
 `mix test` tests `LivebookWasm.Plug` on the host.
 
@@ -115,4 +116,4 @@ another server.
   reload loses them, including the installed packages.
 - The runtime settings (Configure), which know only Livebook's own runtimes.
 - Evaluating right after typing can evaluate the cell's previous source; the
-  check waits half a second after typing.
+  tests wait half a second after typing.

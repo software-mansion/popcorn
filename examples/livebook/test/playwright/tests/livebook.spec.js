@@ -1,0 +1,382 @@
+// Opens Livebook in its browser VM, creates notebooks and evaluates cells in
+// them. The tests build on each other: they share one page, its Livebook and
+// the notebooks' VMs, so a failure skips the rest.
+import { expect, test } from "@playwright/test";
+
+test.describe.configure({ mode: "serial" });
+
+let context;
+let page;
+let app;
+// The new notebook's first code cell is the setup cell
+let cell;
+let output;
+// The browser console's messages, from all of the tests' pages
+const logs = [];
+// The node of the current notebook's VM
+let runtimeNode;
+
+const watch = (page, prefix = "") => {
+  page.on("console", (msg) => {
+    logs.push(`${prefix}[${msg.type()}] ${msg.text()}`);
+    if (process.env.VERBOSE)
+      console.log(`  [console] ${prefix}${msg.text().slice(0, 500)}`);
+  });
+  page.on("pageerror", (err) =>
+    logs.push(`${prefix}[pageerror] ${err.message}`),
+  );
+};
+
+test.beforeAll(async ({ browser }, testInfo) => {
+  const { baseURL, viewport } = testInfo.project.use;
+  context = await browser.newContext({ baseURL, viewport });
+  page = await context.newPage();
+  watch(page);
+  app = page.frameLocator("#livebook");
+  cell = app.locator("[data-el-cell][data-type='code']").last();
+  output = cell.locator("[data-el-outputs-container]");
+});
+
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus) return;
+  const lines = logs
+    .slice(-120)
+    .map((line) => (line.length > 800 ? line.slice(0, 800) + "…" : line));
+  await testInfo.attach("browser console", {
+    body: lines.join("\n"),
+    contentType: "text/plain",
+  });
+  await testInfo.attach("screenshot", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+});
+
+test.afterAll(async () => {
+  await context?.close();
+});
+
+// Livebook's paths are under the tab's
+const tabPath = (frame) =>
+  new URL(frame.url()).pathname.match(/^\/tab\/[^/]+/)[0];
+const newNotebook = () =>
+  app.getByText("New notebook").filter({ visible: true }).first();
+const sessionFrame = () =>
+  page.frames().find((frame) => frame.url().includes("/sessions/"));
+
+const run = async (code) => {
+  await cell.locator(".cm-content").click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type(code);
+  // Like a person: Livebook evaluates the source it has synced from the editor
+  await page.waitForTimeout(500);
+  await page.keyboard.press("ControlOrMeta+Enter");
+};
+
+// Evaluates the code in the cell, and returns its output once it has the
+// expected text
+const evaluate = async (code, expected, timeout = 120_000) => {
+  await run(code);
+  const t0 = Date.now();
+  const printed = new Set();
+
+  // Prints the cell's output while it runs, like Mix.install's
+  const progress = setInterval(async () => {
+    const text = await output.innerText().catch(() => "");
+    for (const line of text.split("\n").filter((line) => line.trim())) {
+      if (printed.has(line)) continue;
+      printed.add(line);
+      console.log(`  [${Math.round((Date.now() - t0) / 1000)} s] ${line}`);
+    }
+  }, 5_000);
+
+  const evaluated = output
+    .getByText(expected)
+    .filter({ visible: true })
+    .first()
+    .waitFor({ timeout });
+
+  // Fails as soon as the cell raises, rather than waiting for the timeout
+  const raised = output
+    .getByText("** (")
+    .first()
+    .waitFor({ timeout })
+    .then(
+      async () => {
+        throw new Error(`the cell raised:\n${await output.innerText()}`);
+      },
+      () => new Promise(() => {}),
+    );
+
+  try {
+    await Promise.race([evaluated, raised]);
+  } finally {
+    clearInterval(progress);
+  }
+  return (await output.innerText()).trim();
+};
+
+test("Livebook starts in the VM", async () => {
+  await page.goto("/");
+  await page.waitForFunction(() => window.livebookStarted, null, {
+    timeout: 180_000,
+  });
+  const started = await page.evaluate(() => window.livebookStarted);
+  console.log(`  Livebook started in ${started.ms} ms, as ${started.node}`);
+});
+
+test("the home page renders and connects", async () => {
+  await expect(newNotebook()).toBeVisible();
+  await expect(app.locator(".phx-connected").first()).toBeVisible();
+});
+
+test("a new notebook opens", async () => {
+  await newNotebook().click();
+  await expect(
+    app.locator("[data-el-cell][data-type='code'] .cm-content").first(),
+  ).toBeVisible();
+});
+
+// The first evaluation starts the notebook's runtime, in a VM of its own
+test("a cell evaluates in the notebook's VM", async () => {
+  await evaluate("Enum.sum(1..10)", "55");
+});
+
+test("the code runs in a browser VM other than Livebook's", async () => {
+  const result = await evaluate(
+    "{node(), :erlang.system_info(:system_architecture)}",
+    "wasm32-unknown-emscripten",
+  );
+  runtimeNode = result.match(/runtime_\d+@popcorn/)?.[0];
+  expect(runtimeNode, `the runtime's node in ${result}`).toBeDefined();
+  const booted = logs.find((line) =>
+    line.includes(`Runtime VM ${runtimeNode} booted`),
+  );
+  console.log(
+    `  ${runtimeNode} ${booted?.match(/booted in \d+ ms/)?.[0] ?? ""}`,
+  );
+});
+
+// Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on,
+// and Req, with Mint, whose Erlang code includes OTP's headers
+test("Mix.install downloads and compiles packages", async () => {
+  test.setTimeout(660_000);
+  await evaluate(
+    `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req])`,
+    ":ok",
+    600_000,
+  );
+});
+
+test("Kino.JS outputs render in their iframes", async () => {
+  await run(`Kino.HTML.new("<p>Rendered by Kino.JS</p>")`);
+  // Livebook keeps outputs' iframes outside the cells, over their placeholders
+  const frame = app
+    .locator("iframe[src*='/iframe/v6.html']")
+    .first()
+    .contentFrame();
+  await expect(frame.getByText("Rendered by Kino.JS")).toBeVisible({
+    timeout: 120_000,
+  });
+});
+
+// Binary payloads go as binary WebSocket frames: the initial one and "pong"
+// from the VM, "ping" to it. On one line, as the editor indents new lines and
+// Enter could pick a completion.
+test("Kino.JS.Live sends and receives binary payloads", async () => {
+  const js =
+    "export function init(ctx, payload) { " +
+    "const show = ([info, buffer]) => { ctx.root.innerText = info.message + ':' + new Uint8Array(buffer).join(','); }; " +
+    "show(payload); ctx.handleEvent('pong', show); ctx.pushEvent('ping', [{}, new Uint8Array([3]).buffer]); }";
+  await run(
+    "defmodule BinaryKino do use Kino.JS; use Kino.JS.Live; " +
+      "def new, do: Kino.JS.Live.new(__MODULE__, nil); " +
+      `def handle_connect(ctx), do: {:ok, {:binary, %{message: "hello"}, <<1, 2>>}, ctx}; ` +
+      `def handle_event("ping", {:binary, _info, bytes}, ctx) do broadcast_event(ctx, "pong", {:binary, %{message: "pong"}, <<1, 2, bytes::binary>>}); {:noreply, ctx} end; ` +
+      `asset "main.js", do: "${js}" end; BinaryKino.new()`,
+  );
+  await expect
+    .poll(async () => {
+      const outputs = page
+        .frames()
+        .filter((frame) => frame.url().includes("/iframe/v6.html"));
+      const texts = await Promise.all(
+        outputs.map((frame) =>
+          frame
+            .locator("body")
+            .innerText()
+            .catch(() => ""),
+        ),
+      );
+      return texts.join("\n");
+    })
+    .toContain("pong:1,2,3");
+});
+
+// Each tab runs a Livebook of its own, under a path with a Service Worker of
+// its own. Only the first tab's VM has its notebook.
+test("each tab's requests and navigations go to its own VM", async () => {
+  const other = await context.newPage();
+  watch(other, "[other tab] ");
+  try {
+    await other.goto("/");
+    await other.waitForFunction(() => window.livebookStarted, null, {
+      timeout: 180_000,
+    });
+    await expect(
+      other.frameLocator("#livebook").locator(".phx-connected").first(),
+    ).toBeVisible();
+
+    // Whether a notebook is under the frame's tab's path
+    const found = (frame, path) =>
+      frame.evaluate(async (path) => {
+        const base =
+          window.LIVEBOOK_BASE_URL_PATH ?? window.parent.LIVEBOOK_BASE_URL_PATH;
+        const resp = await fetch(base + path);
+        return resp.ok && !resp.redirected;
+      }, path);
+
+    const notebook = sessionFrame();
+    const kinoOutput = page
+      .frames()
+      .find((frame) => frame.url().includes("/iframe/v6.html"));
+    const otherTab = await (await other.$("#livebook")).contentFrame();
+    const path = new URL(notebook.url()).pathname.slice(
+      tabPath(notebook).length,
+    );
+
+    expect({
+      notebook: await found(notebook, path),
+      output: await found(kinoOutput, path),
+      otherTab: await found(otherTab, path),
+    }).toEqual({ notebook: true, output: true, otherTab: false });
+
+    // The other tab was opened last, which mustn't matter
+    const url = notebook.url();
+    const reloaded = page.waitForEvent(
+      "framenavigated",
+      (frame) => frame === notebook,
+    );
+    await notebook.evaluate(() => location.reload());
+    await reloaded;
+    await expect(
+      app.locator(".phx-connected [data-el-cell]").first(),
+    ).toBeVisible();
+    expect(notebook.url()).toBe(url);
+  } finally {
+    await other.close();
+  }
+});
+
+test("installed packages run", async () => {
+  await evaluate(
+    `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
+    `{[["1", "2"]], [1, 2]}`,
+  );
+});
+
+// With Popcorn's adapter, which it installs once Mix.install/2 has started Req.
+// jsDelivr compresses the JSON, which the browser decompresses.
+test("Req requests with the browser's fetch()", async () => {
+  await evaluate(
+    `resp = Req.get!("https://cdn.jsdelivr.net/npm/vega-datasets@2/data/gapminder.json")\n` +
+      `{Req.default_options()[:adapter] == Popcorn.Fetch.adapter(), resp.status, is_list(resp.body)}`,
+    "{true, 200, true}",
+  );
+});
+
+// Mix.install/2 installs once per VM
+test("another notebook installs other packages in a VM of its own", async () => {
+  test.setTimeout(660_000);
+  const session = sessionFrame();
+  await session.goto(new URL(`${tabPath(session)}/new`, page.url()).href);
+  await expect(cell.locator(".cm-content")).toBeVisible();
+
+  const result = await evaluate(
+    `Mix.install([{:jason, "~> 1.4"}])\n{node(), Jason.encode!(%{installed: true})}`,
+    "@popcorn",
+    600_000,
+  );
+  expect(result, "the first notebook's VM").not.toContain(runtimeNode);
+  expect(result).toContain(`{\\"installed\\":true}`);
+  runtimeNode = result.match(/runtime_\d+@popcorn/)[0];
+});
+
+test("reconnecting replaces the notebook's VM", async () => {
+  await app.locator("[data-el-runtime-info-toggle]").click();
+  await app
+    .locator("[data-el-runtime-info]")
+    .getByRole("button", { name: "Reconnect" })
+    .click();
+
+  // A result that the cell's previous output doesn't have
+  const result = await evaluate("{:reconnected, node()}", ":reconnected");
+  expect(result, "the same VM").not.toContain(runtimeNode);
+
+  const stopped = `Runtime VM ${runtimeNode} stopped`;
+  await expect
+    .poll(() => logs.some((line) => line.includes(stopped)), {
+      message: `${runtimeNode} kept running`,
+      timeout: 10_000,
+    })
+    .toBe(true);
+});
+
+// Where livebook.dev's "Run in Livebook" badges send people, with the
+// example's address as their Livebook's
+test("a link opens a notebook from GitHub", async () => {
+  const notebook =
+    "https://github.com/livebook-dev/livebook/blob/main/lib/livebook/notebook/learn/intro_to_livebook.livemd";
+  const linked = await context.newPage();
+  watch(linked, "[linked tab] ");
+  try {
+    await linked.goto(`/import?url=${encodeURIComponent(notebook)}`);
+    await linked.waitForFunction(() => window.livebookStarted, null, {
+      timeout: 180_000,
+    });
+    await linked.waitForFunction(
+      () =>
+        document
+          .querySelector("#livebook")
+          ?.contentWindow.location.pathname.includes("/sessions/"),
+      null,
+      { timeout: 60_000 },
+    );
+    await expect(
+      linked.frameLocator("#livebook").getByText("Welcome to Livebook").first(),
+    ).toBeVisible();
+
+    // So that reloading doesn't open the link again
+    await linked.waitForFunction(
+      () => location.pathname + location.search === "/",
+      null,
+      { timeout: 10_000 },
+    );
+  } finally {
+    await linked.close();
+  }
+});
+
+// LiveView uploads the file in binary WebSocket frames
+test("a notebook uploads through the form", async () => {
+  const livebook = await (await page.$("#livebook")).contentFrame();
+  await livebook.goto(
+    new URL(`${tabPath(livebook)}/open/upload`, page.url()).href,
+  );
+  // Before the LiveView connects, nothing handles the file
+  await expect(app.locator(".phx-connected #upload-file-form")).toBeVisible();
+  await app.locator("#upload-file-form input[type=file]").setInputFiles({
+    name: "uploaded.livemd",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "# Uploaded through the form\n\n```elixir\n1 + 1\n```\n",
+    ),
+  });
+  await app
+    .locator("#upload-file-form")
+    .getByRole("button", { name: "Import" })
+    .click();
+  await expect(
+    app.getByText("Uploaded through the form").first(),
+  ).toBeVisible();
+});
