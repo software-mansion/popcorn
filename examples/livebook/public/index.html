@@ -32,7 +32,7 @@
       // Livebook runs in the iframe under a path of its own, /tab/<id>/, whose
       // Service Worker sends the iframe's requests here, through a relay frame:
       // see sw.js. The iframe's WebSockets are created here.
-      import { Popcorn } from "/out/index.mjs";
+      import { Popcorn, schedulers } from "/out/index.mjs";
       import { createTabRelay } from "/distribution.js";
 
       const status = (text) => {
@@ -55,6 +55,8 @@
             distribution: relay,
             beam: {
               otpAssetsRoot: notebookVm,
+              // Notebooks run Erlang code on 2 threads, Livebook on Popcorn's 1
+              emulatorArgs: schedulers({ base: 2, dirtyCpu: 1, dirtyIo: 1 }),
               extraArgs: ["-name", node, "-setcookie", cookie],
             },
           });
