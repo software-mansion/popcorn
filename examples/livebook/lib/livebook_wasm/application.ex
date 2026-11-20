@@ -12,6 +12,9 @@ defmodule LivebookWasm.Application do
   defp start_livebook do
     started = System.monotonic_time(:millisecond)
     put_base_path()
+    # Each tab's, which the notebooks' VMs get too: tabs' VMs can connect to
+    # each other's, see public/distribution.js
+    Application.put_env(:livebook, :cookie, Livebook.Utils.random_cookie())
     {:ok, _apps} = Application.ensure_all_started(:livebook)
     plug = {LivebookWasm.Plug, plug: LivebookWeb.Endpoint}
     {:ok, _pid} = Supervisor.start_child(LivebookWasm.Supervisor, plug)

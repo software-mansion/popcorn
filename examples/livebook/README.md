@@ -73,8 +73,14 @@ workspace, so it needs `pnpm install` first.
   none of Livebook's code or dependencies: Livebook loads its runtime's code
   into the VM, as into the standalone runtime's OS process, and notebooks can
   install any packages.
-- The shell relays the nodes' distribution with Popcorn's
-  `createDistributionRelay()`.
+- The shell relays the nodes' distribution, also between tabs: see
+  `public/distribution.js`. The tabs register their nodes with a SharedWorker,
+  which gives two tabs a `MessageChannel` of their own for each connection, so
+  that other code of the origin can't listen in. A tab disconnects another's
+  nodes once its lock is free, when it closes. Nodes' names are random, to
+  differ across tabs, and each tab's nodes have a random cookie of their own.
+  So a notebook can connect to a node in another tab with the cookie from
+  there, as with `Node.set_cookie(:"runtime_…@popcorn", cookie)`.
 - The VMs' host differs from Livebook's, so that Livebook sends files rather
   than paths to them: each VM has its own file system.
 
