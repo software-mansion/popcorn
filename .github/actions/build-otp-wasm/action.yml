@@ -21,40 +21,17 @@ inputs:
 runs:
   using: composite
   steps:
+    - id: toolchain
+      uses: ./.github/actions/read-otp-toolchain
+
     - name: Compute OTP build cache key
       id: otp-build-cache-key
       shell: bash
       run: |
         set -euo pipefail
-
-        hash_files() {
-          sort | xargs sha256sum | sha256sum | cut -d' ' -f1
-        }
-
         {
-          printf 'key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-%s\n' "$(
-            {
-              find popcorn/patches popcorn/emscripten -type f -print
-              printf '%s\n' \
-                .github/actions/build-otp-wasm/action.yml \
-                scripts/_common.sh \
-                scripts/build-beam.sh \
-                scripts/build-openssl.sh \
-                scripts/export-otp-apps.escript \
-                scripts/patch-beam.sh \
-                scripts/runtime-manifest.sh
-            } | hash_files
-          )"
-
-          printf 'openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-%s\n' "$(
-            {
-              printf '%s\n' \
-                .github/actions/build-otp-wasm/action.yml \
-                scripts/_common.sh \
-                scripts/build-beam.sh \
-                scripts/build-openssl.sh
-            } | hash_files
-          )"
+          echo "key=otp-wasm-${{ runner.os }}-${{ inputs.otp-tag }}-${{ inputs.build-mode }}-${{ inputs.with-crypto }}-${{ steps.toolchain.outputs.wasm-hash }}"
+          echo "openssl_key=openssl-wasm-${{ runner.os }}-3.0.15-${{ inputs.build-mode }}-${{ steps.toolchain.outputs.openssl-hash }}"
         } >> "$GITHUB_OUTPUT"
 
     - name: Cache built OTP output
