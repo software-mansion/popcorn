@@ -1,0 +1,320 @@
+name: LLV
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "local-live-view/**"
+      - "examples/local-lv-thermostat/**"
+      - "examples/local-lv-compare/**"
+      - "examples/local-lv-forms/**"
+      - "examples/local-lv-kanban/**"
+      - "popcorn/**"
+      - "scripts/_common.sh"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/export-otp-apps.escript"
+      - "scripts/patch-beam.sh"
+      - "scripts/runtime-manifest.sh"
+      - ".github/workflows/ci_llv.yml"
+      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/actions/build-otp-wasm/**"
+      - ".github/actions/read-otp-toolchain/**"
+      - ".github/actions/setup-mix-cache/**"
+      - ".github/actions/setup-playwright/**"
+      - ".github/actions/setup-workspace/**"
+      - ".github/actions/verify-llv-app/**"
+      - "mise.toml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+
+concurrency:
+  group: ci-llv-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  PW_CHANNEL: chrome
+
+jobs:
+  wasm:
+    name: OTP
+    uses: ./.github/workflows/build_otp_wasm.yml
+    with:
+      core: false
+      crypto: true
+
+  unit-lint:
+    name: unit & lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      MIX_ENV: test
+    defaults:
+      run:
+        working-directory: local-live-view
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: local-live-view
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
+      - name: Install Phoenix installer (needed by Igniter.Test.phx_test_project)
+        run: mix archive.install hex phx_new --force
+
+      - name: Build JS bundle
+        run: mix llv.assets
+
+      - name: Typecheck, lint & format (JS)
+        run: pnpm run ci
+
+      - name: Lint (Elixir)
+        run: mix lint
+
+      - name: Unit tests
+        run: mix test --exclude e2e
+
+  e2e:
+    name: e2e (${{ matrix.shard }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      MIX_ENV: test
+    defaults:
+      run:
+        working-directory: local-live-view
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/3", "2/3", "3/3"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: crypto
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      # Distinct mix-env key so unit-lint does not clobber _build/e2e_local
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: local-live-view
+          mix-env: test-e2e
+          extra-lockfile: local-live-view/test/e2e/local/mix.exs
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
+      - name: Build JS bundle
+        run: mix llv.assets
+
+      - name: Run Playwright e2e suite
+        env:
+          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+        run: mix test test/e2e/e2e_test.exs
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llv-playwright-report-${{ strategy.job-index }}
+          path: |
+            local-live-view/test/e2e/playwright/playwright-report/
+            local-live-view/test/e2e/playwright/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  install-e2e:
+    name: installer
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      MIX_ENV: test
+    defaults:
+      run:
+        working-directory: local-live-view
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: crypto
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: local-live-view
+
+      - name: Cache Hex packages for generated Phoenix app
+        uses: actions/cache@v4
+        with:
+          path: ~/.hex/packages
+          key: ${{ runner.os }}-hex-packages-${{ hashFiles('local-live-view/mix.lock') }}
+          restore-keys: ${{ runner.os }}-hex-packages-
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
+      - name: Install Phoenix installer
+        run: mix archive.install hex phx_new --force
+
+      - name: Build JS bundle
+        run: mix llv.assets
+
+      - uses: ./.github/actions/setup-playwright
+
+      - name: Run installer e2e test
+        run: mix test test/mix/tasks/llv_install_e2e_test.exs
+
+  examples:
+    name: example (${{ matrix.example }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      MIX_ENV: test
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - thermostat
+          - compare
+          - forms
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: crypto
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: examples/local-lv-${{ matrix.example }}
+          mix-env: all
+          extra-paths: |
+            examples/local-lv-${{ matrix.example }}/local/deps
+            examples/local-lv-${{ matrix.example }}/local/_build
+          extra-lockfile: examples/local-lv-${{ matrix.example }}/local/mix.exs
+
+      - name: Test host Phoenix app
+        working-directory: examples/local-lv-${{ matrix.example }}
+        run: |
+          mix deps.get
+          mix test
+
+      - name: Test local LocalLiveView app
+        working-directory: examples/local-lv-${{ matrix.example }}/local
+        run: |
+          mix deps.get
+          mix test
+
+      - name: Verify setup and phx.server
+        uses: ./.github/actions/verify-llv-app
+        with:
+          working-directory: examples/local-lv-${{ matrix.example }}
+
+  kanban:
+    name: kanban (${{ matrix.shard }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: examples/local-lv-kanban
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: crypto
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: examples/local-lv-kanban
+          mix-env: all
+          extra-paths: |
+            examples/local-lv-kanban/local/deps
+            examples/local-lv-kanban/local/_build
+          extra-lockfile: examples/local-lv-kanban/local/mix.exs
+
+      - name: Install Hex dependencies
+        run: mix deps.get
+
+      - name: Build browser assets
+        run: |
+          MIX_ENV=dev mix llv.build
+          MIX_ENV=dev mix assets.setup
+          MIX_ENV=dev mix assets.build
+
+      - name: Run unit + e2e tests (shard 1)
+        if: matrix.shard == '1/2'
+        env:
+          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+        run: mix test
+
+      - name: Run e2e tests (shard 2)
+        if: matrix.shard != '1/2'
+        env:
+          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+        run: mix test --only e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kanban-playwright-report-${{ strategy.job-index }}
+          path: |
+            examples/local-lv-kanban/test/playwright/playwright-report
+            examples/local-lv-kanban/test/playwright/test-results
+          retention-days: 7
+          if-no-files-found: ignore
