@@ -8,9 +8,12 @@ test.describe.configure({ mode: "serial" });
 let context;
 let page;
 let app;
-// The new notebook's first code cell is the setup cell
+// The current notebook's last code cell, and functions that evaluate code in
+// it, see notebook/1
 let cell;
 let output;
+let run;
+let evaluate;
 // The browser console's messages, from all of the tests' pages
 const logs = [];
 // The node of the current notebook's VM
@@ -33,8 +36,7 @@ test.beforeAll(async ({ browser }, testInfo) => {
   page = await context.newPage();
   watch(page);
   app = page.frameLocator("#livebook");
-  cell = app.locator("[data-el-cell][data-type='code']").last();
-  output = cell.locator("[data-el-outputs-container]");
+  ({ cell, output, run, evaluate } = notebook(page));
 });
 
 test.afterEach(async ({}, testInfo) => {
@@ -64,56 +66,68 @@ const newNotebook = () =>
 const sessionFrame = () =>
   page.frames().find((frame) => frame.url().includes("/sessions/"));
 
-const run = async (code) => {
-  await cell.locator(".cm-content").click();
-  await page.keyboard.press("ControlOrMeta+A");
-  await page.keyboard.type(code);
-  // Like a person: Livebook evaluates the source it has synced from the editor
-  await page.waitForTimeout(500);
-  await page.keyboard.press("ControlOrMeta+Enter");
-};
+// The last code cell of the notebook open in a page's Livebook, and functions
+// that evaluate code in it. A new notebook's first code cell is the setup cell.
+const notebook = (page) => {
+  const cell = page
+    .frameLocator("#livebook")
+    .locator("[data-el-cell][data-type='code']")
+    .last();
+  const output = cell.locator("[data-el-outputs-container]");
 
-// Evaluates the code in the cell, and returns its output once it has the
-// expected text
-const evaluate = async (code, expected, timeout = 120_000) => {
-  await run(code);
-  const t0 = Date.now();
-  const printed = new Set();
+  const run = async (code) => {
+    await cell.locator(".cm-content").click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await page.keyboard.type(code);
+    // Like a person: Livebook evaluates the source it has synced from the editor
+    await page.waitForTimeout(500);
+    await page.keyboard.press("ControlOrMeta+Enter");
+  };
 
-  // Prints the cell's output while it runs, like Mix.install's
-  const progress = setInterval(async () => {
-    const text = await output.innerText().catch(() => "");
-    for (const line of text.split("\n").filter((line) => line.trim())) {
-      if (printed.has(line)) continue;
-      printed.add(line);
-      console.log(`  [${Math.round((Date.now() - t0) / 1000)} s] ${line}`);
+  // Evaluates the code in the cell, and returns its output once it has the
+  // expected text
+  const evaluate = async (code, expected, timeout = 120_000) => {
+    await run(code);
+    const t0 = Date.now();
+    const printed = new Set();
+
+    // Prints the cell's output while it runs, like Mix.install's
+    const progress = setInterval(async () => {
+      const text = await output.innerText().catch(() => "");
+      for (const line of text.split("\n").filter((line) => line.trim())) {
+        if (printed.has(line)) continue;
+        printed.add(line);
+        console.log(`  [${Math.round((Date.now() - t0) / 1000)} s] ${line}`);
+      }
+    }, 5_000);
+
+    const evaluated = output
+      .getByText(expected)
+      .filter({ visible: true })
+      .first()
+      .waitFor({ timeout });
+
+    // Fails as soon as the cell raises, rather than waiting for the timeout
+    const raised = output
+      .getByText("** (")
+      .first()
+      .waitFor({ timeout })
+      .then(
+        async () => {
+          throw new Error(`the cell raised:\n${await output.innerText()}`);
+        },
+        () => new Promise(() => {}),
+      );
+
+    try {
+      await Promise.race([evaluated, raised]);
+    } finally {
+      clearInterval(progress);
     }
-  }, 5_000);
+    return (await output.innerText()).trim();
+  };
 
-  const evaluated = output
-    .getByText(expected)
-    .filter({ visible: true })
-    .first()
-    .waitFor({ timeout });
-
-  // Fails as soon as the cell raises, rather than waiting for the timeout
-  const raised = output
-    .getByText("** (")
-    .first()
-    .waitFor({ timeout })
-    .then(
-      async () => {
-        throw new Error(`the cell raised:\n${await output.innerText()}`);
-      },
-      () => new Promise(() => {}),
-    );
-
-  try {
-    await Promise.race([evaluated, raised]);
-  } finally {
-    clearInterval(progress);
-  }
-  return (await output.innerText()).trim();
+  return { cell, output, run, evaluate };
 };
 
 test("Livebook starts in the VM", async () => {
@@ -147,7 +161,7 @@ test("the code runs in a browser VM other than Livebook's", async () => {
     "{node(), :erlang.system_info(:system_architecture)}",
     "wasm32-unknown-emscripten",
   );
-  runtimeNode = result.match(/runtime_\d+@popcorn/)?.[0];
+  runtimeNode = result.match(/runtime_[a-z2-7]+@popcorn/)?.[0];
   expect(runtimeNode, `the runtime's node in ${result}`).toBeDefined();
   const booted = logs.find((line) =>
     line.includes(`Runtime VM ${runtimeNode} booted`),
@@ -302,7 +316,7 @@ test("another notebook installs other packages in a VM of its own", async () => 
   );
   expect(result, "the first notebook's VM").not.toContain(runtimeNode);
   expect(result).toContain(`{\\"installed\\":true}`);
-  runtimeNode = result.match(/runtime_\d+@popcorn/)[0];
+  runtimeNode = result.match(/runtime_[a-z2-7]+@popcorn/)[0];
 });
 
 test("reconnecting replaces the notebook's VM", async () => {
@@ -323,6 +337,51 @@ test("reconnecting replaces the notebook's VM", async () => {
       timeout: 10_000,
     })
     .toBe(true);
+});
+
+// The tabs' VMs are nodes that connect across tabs, see public/distribution.js:
+// a notebook in another tab calls this notebook's VM, with this tab's cookie
+// only, and the VM learns when the other tab closes
+test("notebooks connect to other tabs' VMs", async () => {
+  const [, here, cookie] = (
+    await evaluate("{:here, node(), Node.get_cookie()}", ":here")
+  ).match(/(runtime_[a-z2-7]+@popcorn), :"?(c_[\w-]+)/);
+  const other = await context.newPage();
+  watch(other, "[other tab] ");
+  let there;
+  try {
+    await other.goto("/");
+    await other.waitForFunction(() => window.livebookStarted, null, {
+      timeout: 180_000,
+    });
+    const otherApp = other.frameLocator("#livebook");
+    await expect(otherApp.locator(".phx-connected").first()).toBeVisible();
+    await otherApp
+      .getByText("New notebook")
+      .filter({ visible: true })
+      .first()
+      .click();
+    const otherNotebook = notebook(other);
+    await expect(otherNotebook.cell.locator(".cm-content")).toBeVisible();
+
+    const result = await otherNotebook.evaluate(
+      `{node(), Node.connect(:"${here}"), Node.set_cookie(:"${here}", :"${cookie}"), ` +
+        `Node.connect(:"${here}"), :erpc.call(:"${here}", Node, :self, [])}`,
+      `false, true, true, :${here}}`,
+    );
+    there = result.match(/runtime_[a-z2-7]+@popcorn/)[0];
+    await evaluate(
+      `{:connected, :"${there}" in Node.list()}`,
+      "{:connected, true}",
+    );
+  } finally {
+    await other.close();
+  }
+
+  await evaluate(
+    `Enum.find_value(1..100, fn _ -> if :"${there}" in Node.list(), do: (Process.sleep(100); nil), else: :disconnected end)`,
+    ":disconnected",
+  );
 });
 
 // Where livebook.dev's "Run in Livebook" badges send people, with the

@@ -40,7 +40,7 @@ config :livebook,
   k8s_kubeconfig_pipeline: Kubereq.Kubeconfig.Default,
   random_boot_id: <<0, 0, 1>>,
   log_format: :text,
-  cookie: :popcorn_livebook,
+  # LivebookWasm.Application puts a random cookie, as config_runtime/0 would
   iframe_port: 8081,
   # Outputs' iframes load from Livebook's origin, where the Service Worker sends
   # their requests to the VM. Livebook's usual separate origin isolates them.

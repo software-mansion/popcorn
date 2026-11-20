@@ -34,7 +34,8 @@ defmodule LivebookWasm.Runtime do
   # The VMs' hosts differ from Livebook's, so that Livebook doesn't share file
   # paths with them: each VM has its own file system
   defp do_connect(runtime, caller) do
-    node = :"runtime_#{System.unique_integer([:positive])}@popcorn"
+    # Unique across tabs too, whose VMs can connect, see public/distribution.js
+    node = :"runtime_#{Livebook.Utils.random_short_id()}@popcorn"
     # The page sends `{:wasm, %{"error" => message}}` here if the VM doesn't boot
     start = %{livebook_runtime: "start", node: node, cookie: Node.get_cookie(), pid: self()}
     Popcorn.JS.send(start)
