@@ -218,7 +218,16 @@ class Encoder {
         this.binary(bytes);
         return;
       }
-      // toString works for objects created by other realms.
+      // With a realm's Object.prototype, or with none
+      const prototype: unknown = Object.getPrototypeOf(value);
+      const isObject =
+        prototype === null || Object.getPrototypeOf(prototype) === null;
+      if (isObject) {
+        this.entries(Object.entries(value), value);
+        return;
+      }
+
+      // toString works for objects created by other realms, unlike instanceof.
       // Objects with spoofed toString may crash weirdly,
       // we'll need per-type checks if that's a real case.
       switch (Object.prototype.toString.call(value)) {
@@ -236,15 +245,7 @@ class Encoder {
           this.set(value as Set<unknown>);
           return;
       }
-
-      // With a realm's Object.prototype, or with none
-      const prototype: unknown = Object.getPrototypeOf(value);
-      const isObject =
-        prototype === null || Object.getPrototypeOf(prototype) === null;
-      if (!isObject) {
-        throw err("non-plain-object", value);
-      }
-      this.entries(Object.entries(value), value);
+      throw err("non-plain-object", value);
     } finally {
       this.ancestors.delete(value);
     }
