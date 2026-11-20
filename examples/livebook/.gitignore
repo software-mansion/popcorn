@@ -11,6 +11,3 @@ erl_crash.dump
 /public/images/
 /public/favicons/
 /public/iframe/
-
-# Screenshot of a failed check.
-/check-failure.png

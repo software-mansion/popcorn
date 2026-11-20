@@ -1,0 +1,13 @@
+{
+  "name": "livebook-e2e",
+  "private": true,
+  "description": "End-to-end Playwright tests for the Livebook example.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
