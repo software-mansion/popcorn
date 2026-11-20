@@ -151,9 +151,38 @@ test("a new notebook opens", async () => {
   ).toBeVisible();
 });
 
-// The first evaluation starts the notebook's runtime, in a VM of its own
+// The first evaluation starts the notebook's runtime, in a VM of its own. It
+// boots from the package that the shell prefetched, so the server only
+// confirms that the cached files are current.
 test("a cell evaluates in the notebook's VM", async () => {
+  await page.evaluate(() => window.notebookVmPrefetched);
   await evaluate("Enum.sum(1..10)", "55");
+
+  // How much of each file of the package came from the network, as the VMs'
+  // Popcorn workers record it. The VMs' threads' workers can be blocked.
+  const files = [];
+  for (const worker of page
+    .workers()
+    .filter((worker) => worker.url().endsWith("/worker.mjs"))) {
+    const entries = await worker.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .filter((entry) => entry.name.includes("/notebook_vm/otp/"))
+        .map(({ name, transferSize, encodedBodySize }) => ({
+          name,
+          transferSize,
+          encodedBodySize,
+        })),
+    );
+    files.push(...entries);
+  }
+  expect(files.map((file) => file.name)).toContainEqual(
+    expect.stringContaining("/notebook_vm/otp/lib/"),
+  );
+  const downloaded = files.filter(
+    (file) => file.transferSize >= file.encodedBodySize,
+  );
+  expect(downloaded, "files downloaded again").toEqual([]);
 });
 
 test("the code runs in a browser VM other than Livebook's", async () => {

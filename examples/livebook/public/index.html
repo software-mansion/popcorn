@@ -45,6 +45,8 @@
       const sockets = new Map();
 
       const runtimes = new Map();
+      // The notebooks' VMs boot a package of their own, see notebook_vm/
+      const notebookVm = "/notebook_vm/otp/";
 
       async function handleRuntime({ livebook_runtime: action, node, cookie, pid }) {
         if (action === "start") {
@@ -52,8 +54,7 @@
           const runtime = Popcorn.init({
             distribution: relay,
             beam: {
-              // The notebooks' VMs boot a package of their own, see notebook_vm/
-              otpAssetsRoot: "/notebook_vm/otp/",
+              otpAssetsRoot: notebookVm,
               extraArgs: ["-name", node, "-setcookie", cookie],
             },
           });
@@ -259,6 +260,25 @@
       // Livebook has opened the link by the time its page loads, so reloading
       // mustn't open it again
       history.replaceState(null, "", "/");
+
+      // Now that Livebook's page has loaded, the HTTP cache gets the notebooks'
+      // VMs' package, which their workers fetch as they boot. Their runtime is
+      // Livebook's VM's, which the cache has.
+      window.notebookVmPrefetched = prefetchNotebookVm().catch((error) =>
+        console.warn(`[shell] Prefetching the notebooks' VM failed: ${error.message}`),
+      );
+
+      async function prefetchNotebookVm() {
+        const resp = await fetch(`${notebookVm}manifest.json`);
+        if (!resp.ok) throw new Error(`manifest.json: HTTP ${resp.status}`);
+        const { bundles } = await resp.json();
+        await Promise.all(
+          Object.values(bundles).map(async ({ tar }) => {
+            const bundle = await fetch(notebookVm + tar, { priority: "low" });
+            await bundle.arrayBuffer();
+          }),
+        );
+      }
 
       function addFrame(src, props) {
         const frame = Object.assign(document.createElement("iframe"), props, { src });
