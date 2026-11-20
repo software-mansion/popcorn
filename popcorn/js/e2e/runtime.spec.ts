@@ -432,20 +432,47 @@ test.describe("boot", () => {
     expect(otp.errors).toEqual([{ kind: "error", data: diagnostic }]);
   });
 
-  // Emulator flags and the scheduler counts they give, all of them online.
-  // Popcorn's default is one scheduler of each type, and emulator flags
-  // override only the counts they set.
-  const schedulerFlags: [string, string[] | undefined, number[]][] = [
-    ["no flags", undefined, [1, 1, 1]],
-    ["other flags", ["-sbwt", "none"], [1, 1, 1]],
-    ["all counts", schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }), [2, 2, 2]],
-    ["one count", ["-S", "2"], [2, 1, 1]],
-  ];
-  for (const [form, emulatorArgs, counts] of schedulerFlags) {
-    test(`schedulers, ${form}`, async ({ otp }) => {
+  // Emulator flags, the scheduler counts they give, all of them online, and
+  // the VM's threads. Popcorn's default is one scheduler of each type, and
+  // emulator flags override only the counts they set. The BEAM takes flag
+  // values apart or attached, and runs no more dirty CPU schedulers than
+  // schedulers. Besides its schedulers, async threads and poll threads, the VM
+  // starts 3 threads. Each thread is a worker, next to Popcorn's own, and the
+  // thread pool fits them. A pool that's too small would end up with as many
+  // workers, the missing ones started later, so the test checks the pool size
+  // on its own.
+  type Threading = { flags?: string[]; counts: number[]; threads: number };
+  const threading: Record<string, Threading> = {
+    "no flags": { counts: [1, 1, 1], threads: 8 },
+    "other flags": { flags: ["-sbwt", "none"], counts: [1, 1, 1], threads: 8 },
+    "one count": { flags: ["-S", "2"], counts: [2, 1, 1], threads: 9 },
+    "values apart": {
+      flags: [
+        ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
+        ...["-A", "4", "-IOt", "2"],
+      ],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
+    "values attached": {
+      flags: ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
+    "dirty CPU capped": {
+      flags: ["-S2", "-SDcpu4", "-SDio2", "-A4", "-IOt2"],
+      counts: [2, 2, 2],
+      threads: 15,
+    },
+  };
+  for (const [form, { flags, counts, threads }] of Object.entries(threading)) {
+    test(`threads, ${form}`, async ({ otp, page }) => {
+      const { threadPoolSize } = resolveThreading(flags ?? []);
+      expect(threadPoolSize).toBe(threads);
+
       const boot = await otp.tryBoot({
         beam: {
-          emulatorArgs,
+          emulatorArgs: flags,
           extraArgs: [
             "-eval",
             `
@@ -456,7 +483,8 @@ test.describe("boot", () => {
                 dirty_cpu_schedulers => Info(dirty_cpu_schedulers),
                 dirty_cpu_schedulers_online => Info(dirty_cpu_schedulers_online),
                 dirty_io_schedulers => Info(dirty_io_schedulers)
-              }).
+              }),
+              receive stop -> ok end.
             `,
           ],
         },
@@ -471,35 +499,7 @@ test.describe("boot", () => {
         dirty_cpu_schedulers_online: dirtyCpu,
         dirty_io_schedulers: dirtyIo,
       });
-    });
-  }
-
-  // Each thread is a worker, next to Popcorn's own. The VM starts 3 threads
-  // besides its schedulers, async threads and poll threads, and the thread
-  // pool fits them. A pool that's too small would end up with as many
-  // workers, the missing ones started later, so the test checks the pool size
-  // on its own. The BEAM takes flag values apart or attached, and runs no
-  // more dirty CPU schedulers than schedulers.
-  const threadFlags: Record<string, string[]> = {
-    "values apart": [
-      ...schedulers({ base: 2, dirtyCpu: 2, dirtyIo: 2 }),
-      ...["-A", "4", "-IOt", "2"],
-    ],
-    "values attached": ["-S2", "-SDcpu2", "-SDio2", "-A4", "-IOt2"],
-    "dirty CPU capped": ["-S2", "-SDcpu4", "-SDio2", "-A4", "-IOt2"],
-  };
-  for (const [form, emulatorArgs] of Object.entries(threadFlags)) {
-    test(`thread pool, ${form}`, async ({ otp, page }) => {
-      const vmThreads = 3 + 6 + 4 + 2;
-      const { threadPoolSize } = resolveThreading(emulatorArgs);
-      expect(threadPoolSize).toBe(vmThreads);
-
-      const boot = await otp.tryBoot({
-        beam: { emulatorArgs, extraArgs: ["-eval", "receive stop -> ok end."] },
-      });
-      assert(boot.ok);
-
-      await expect.poll(() => page.workers().length).toBe(1 + vmThreads);
+      await expect.poll(() => page.workers().length).toBe(1 + threads);
     });
   }
 
