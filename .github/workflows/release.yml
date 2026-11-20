@@ -1,4 +1,4 @@
-name: Release NPM Package
+name: Release
 
 on:
   push:
@@ -13,13 +13,25 @@ on:
         description: "Skip actual publish"
         type: boolean
         default: true
-# https://docs.npmjs.com/trusted-publishers
+      target:
+        description: "Package registry to publish to"
+        type: choice
+        options:
+          - all
+          - hex
+          - npm
+        default: all
+
 permissions:
-  id-token: write
   contents: read
+
+env:
+  CI: true
+  PW_CHANNEL: chrome
 
 jobs:
   otp-runtime:
+    name: runtime (${{ matrix.variant }})
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     strategy:
@@ -30,89 +42,162 @@ jobs:
             crypto: "false"
           - variant: crypto
             crypto: "true"
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
+
       - uses: ./.github/actions/check-release-versions
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           prefix: v
           package-json: popcorn/js/package.json
           mix-exs: popcorn/elixir/mix.exs
+
       - id: toolchain
         uses: ./.github/actions/read-otp-toolchain
+
       - uses: ./.github/actions/build-otp-wasm
         with:
           host-otp-version: ${{ steps.toolchain.outputs.otp }}
           otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
           build-mode: release
           with-crypto: ${{ matrix.crypto }}
-      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+
+      - uses: ./.github/actions/setup-workspace
         with:
-          otp-version: ${{ steps.toolchain.outputs.otp }}
-          elixir-version: ${{ steps.toolchain.outputs.elixir }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ steps.toolchain.outputs.node }}
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - uses: ./.github/actions/setup-playwright
-        with:
-          version: "1.63.0"
-      - run: pnpm -F ./popcorn/js e2e
-        env:
-          CI: "true"
+          elixir: "true"
+          node: "true"
+
+      - name: Run JS e2e verification
+        run: pnpm -F ./popcorn/js e2e
+
       - uses: actions/upload-artifact@v4
         with:
           name: runtime-${{ matrix.variant }}
           path: popcorn/out/runtimes/${{ matrix.variant }}
+          retention-days: 1
           if-no-files-found: error
 
-  otp-release:
+      # The core build may leave crypto out
+      - if: matrix.variant == 'crypto'
+        uses: actions/upload-artifact@v4
+        with:
+          name: otp-apps
+          path: popcorn/out/otp-apps
+          retention-days: 1
+          if-no-files-found: error
+
+  publish-hex:
+    name: hex
     needs: otp-runtime
+    if: (inputs.target || 'all') == 'all' || inputs.target == 'hex'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
+
       - uses: ./.github/actions/check-release-versions
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           prefix: v
           package-json: popcorn/js/package.json
           mix-exs: popcorn/elixir/mix.exs
-      - id: toolchain
-        uses: ./.github/actions/read-otp-toolchain
-      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+
+      - uses: ./.github/actions/setup-workspace
         with:
-          otp-version: ${{ steps.toolchain.outputs.otp }}
-          elixir-version: ${{ steps.toolchain.outputs.elixir }}
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+          elixir: "true"
+          node: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
         with:
-          node-version: ${{ steps.toolchain.outputs.node }}
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
-          registry-url: "https://registry.npmjs.org"
-      - run: pnpm install --frozen-lockfile
+          working-directory: popcorn/elixir
+
       - uses: actions/download-artifact@v4
         with:
           name: runtime-core
           path: popcorn/out/runtimes/core
+
       - uses: actions/download-artifact@v4
         with:
           name: runtime-crypto
           path: popcorn/out/runtimes/crypto
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: otp-apps
+          path: popcorn/out/otp-apps
+
+      - run: pnpm -F ./popcorn/js build
+
+      - name: Test and build Hex package
+        working-directory: popcorn/elixir
+        run: |
+          mix deps.get
+          mix test
+          mix docs --warnings-as-errors
+          mix hex.build
+
+      - name: Publish to Hex
+        working-directory: popcorn/elixir
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          flags=()
+          if [[ "$DRY_RUN" == "true" ]]; then flags=(--dry-run); fi
+          mix hex.publish --yes "${flags[@]}"
+
+  publish-npm:
+    name: npm
+    needs: otp-runtime
+    if: (inputs.target || 'all') == 'all' || inputs.target == 'npm'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # https://docs.npmjs.com/trusted-publishers
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.dry_run && github.sha || inputs.tag || github.ref }}
+
+      - uses: ./.github/actions/check-release-versions
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+          prefix: v
+          package-json: popcorn/js/package.json
+          mix-exs: popcorn/elixir/mix.exs
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          elixir: "true"
+          node: "true"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-core
+          path: popcorn/out/runtimes/core
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-crypto
+          path: popcorn/out/runtimes/crypto
+
       - name: Build package
         working-directory: popcorn/js
         run: |
           pnpm build
           pnpm lint
           pnpm pack --pack-destination output
+
       - name: Publish to NPM
         working-directory: popcorn/js/output
         env:
