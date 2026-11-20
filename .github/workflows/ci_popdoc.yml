@@ -1,21 +1,24 @@
-name: Popdoc e2e tests
+name: Popdoc
 
 on:
   push:
     branches: ["**"]
     paths:
       - "popdoc/**"
-      - ".github/workflows/popdoc_e2e_test.yml"
-      - ".github/actions/setup-playwright/action.yml"
+      - "scripts/test.sh"
+      - "scripts/_common.sh"
+      - ".github/workflows/ci_popdoc.yml"
+      - ".github/actions/read-otp-toolchain/**"
+      - ".github/actions/setup-mix-cache/**"
+      - ".github/actions/setup-workspace/**"
+      - "mise.toml"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "package.json"
       - ".npmrc"
-      - "scripts/test.sh"
-      - "scripts/_common.sh"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-popdoc-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -23,31 +26,30 @@ permissions:
 
 env:
   CI: true
+  PW_CHANNEL: chrome
 
 jobs:
   e2e:
-    name: Popdoc E2E tests
+    name: e2e
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Elixir and Erlang
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+      - uses: ./.github/actions/setup-workspace
         with:
-          elixir-version: "1.20.4"
-          otp-version: "29.0.6"
+          elixir: "true"
+          node: "true"
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-mix-cache
         with:
-          node-version: "24.15.0"
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install JS dependencies
-        run: pnpm install --frozen-lockfile
+          working-directory: popdoc
+          mix-env: dev
+          extra-paths: |
+            popdoc/e2e/fixture/deps
+            popdoc/e2e/fixture/_build
+          extra-lockfile: popdoc/e2e/fixture/mix.lock
 
       - name: Fetch Elixir dependencies
         run: mix deps.get
@@ -56,11 +58,6 @@ jobs:
       - name: Build popdoc runtime assets
         run: mix popdoc.build
         working-directory: popdoc
-
-      - name: Setup Playwright
-        uses: ./.github/actions/setup-playwright
-        with:
-          version: "1.63.0"
 
       - name: Run e2e tests
         run: bash scripts/test.sh --popdoc
@@ -74,3 +71,4 @@ jobs:
             popdoc/e2e/playwright-report/
             popdoc/e2e/test-results/
           retention-days: 7
+          if-no-files-found: ignore

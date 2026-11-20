@@ -1,0 +1,59 @@
+name: Build OTP Wasm
+
+on:
+  workflow_call:
+    inputs:
+      core:
+        description: Build release runtime without crypto
+        type: boolean
+        default: true
+      crypto:
+        description: Build release runtime with static OpenSSL crypto
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: build (core)
+    if: inputs.core
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "false"
+
+      - id: toolchain
+        uses: ./.github/actions/read-otp-toolchain
+
+      - uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: ${{ steps.toolchain.outputs.otp }}
+          otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
+          build-mode: release
+          with-crypto: "false"
+
+  crypto:
+    name: build (crypto)
+    if: inputs.crypto
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "false"
+
+      - id: toolchain
+        uses: ./.github/actions/read-otp-toolchain
+
+      - uses: ./.github/actions/build-otp-wasm
+        with:
+          host-otp-version: ${{ steps.toolchain.outputs.otp }}
+          otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
+          build-mode: release
+          with-crypto: "true"

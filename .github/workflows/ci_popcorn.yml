@@ -1,0 +1,237 @@
+name: Popcorn
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "popcorn/**"
+      - "examples/game-of-life/**"
+      - "examples/hello-popcorn/**"
+      - "examples/iex-wasm/**"
+      - "examples/eval-in-wasm/**"
+      - "language-tour/**"
+      - "scripts/_common.sh"
+      - "scripts/build-beam.sh"
+      - "scripts/build-openssl.sh"
+      - "scripts/export-otp-apps.escript"
+      - "scripts/patch-beam.sh"
+      - "scripts/runtime-manifest.sh"
+      - ".github/workflows/ci_popcorn.yml"
+      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/actions/build-otp-wasm/**"
+      - ".github/actions/read-otp-toolchain/**"
+      - ".github/actions/setup-mix-cache/**"
+      - ".github/actions/setup-playwright/**"
+      - ".github/actions/setup-workspace/**"
+      - "mise.toml"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".npmrc"
+
+concurrency:
+  group: ci-popcorn-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  PW_CHANNEL: chrome
+
+jobs:
+  wasm:
+    name: OTP
+    uses: ./.github/workflows/build_otp_wasm.yml
+
+  elixir:
+    name: elixir
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: popcorn/elixir
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          elixir: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: popcorn/elixir
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Run tests
+        run: mix test
+
+  js-types:
+    name: js types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          node: "true"
+
+      - name: Lint and typecheck package
+        working-directory: popcorn/js
+        run: |
+          pnpm lint
+          pnpm test:types
+          pnpm lint:e2e
+
+  js-e2e:
+    name: js e2e (${{ matrix.variant }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - core
+          - crypto
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: ${{ matrix.variant }}
+          elixir: "true"
+          node: "true"
+
+      - name: Run e2e tests
+        working-directory: popcorn/js
+        run: pnpm e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-js-playwright-${{ matrix.variant }}
+          path: |
+            popcorn/js/playwright-report/
+            popcorn/js/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  examples:
+    name: example (${{ matrix.example }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - game-of-life
+          - hello-popcorn
+          - iex-wasm
+          - eval-in-wasm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: core
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: examples/${{ matrix.example }}
+
+      - name: Install Elixir dependencies
+        run: mix deps.get
+        working-directory: examples/${{ matrix.example }}
+
+      - name: Setup Playwright (eval-in-wasm)
+        if: matrix.example == 'eval-in-wasm'
+        uses: ./.github/actions/setup-playwright
+
+      - name: Build and test eval-in-wasm
+        if: matrix.example == 'eval-in-wasm'
+        working-directory: examples/eval-in-wasm
+        run: |
+          MIX_ENV=prod mix build
+          MIX_ENV=test mix test --no-start
+
+      - name: Run unit tests
+        if: matrix.example == 'game-of-life' || matrix.example == 'hello-popcorn'
+        working-directory: examples/${{ matrix.example }}
+        run: mix test
+
+      - name: Run e2e tests
+        if: matrix.example != 'eval-in-wasm'
+        working-directory: examples/${{ matrix.example }}/assets
+        run: pnpm test
+
+      - name: Upload Playwright report
+        if: failure() && matrix.example != 'eval-in-wasm'
+        uses: actions/upload-artifact@v4
+        with:
+          name: example-${{ matrix.example }}-playwright-report
+          path: |
+            examples/${{ matrix.example }}/assets/playwright-report/
+            examples/${{ matrix.example }}/assets/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  langtour:
+    name: langtour (${{ matrix.shard }})
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          wasm: core
+          elixir: "true"
+          node: "true"
+          build-popcorn-js: "true"
+
+      - uses: ./.github/actions/setup-mix-cache
+        with:
+          working-directory: language-tour/elixir_tour
+          mix-env: dev
+
+      - name: Install Elixir dependencies
+        run: mix deps.get
+        working-directory: language-tour/elixir_tour
+
+      - name: Run e2e tests
+        working-directory: language-tour
+        run: pnpm test --shard=${{ matrix.shard }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-tour-playwright-${{ strategy.job-index }}
+          path: |
+            language-tour/playwright-report/
+            language-tour/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
