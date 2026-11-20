@@ -43,7 +43,7 @@ jobs:
         with:
           host-otp-version: ${{ steps.toolchain.outputs.otp }}
           otp-tag: ${{ steps.toolchain.outputs.otp-tag }}
-          build-mode: debug
+          build-mode: release
           with-crypto: "false"
 
       - name: Set up Elixir

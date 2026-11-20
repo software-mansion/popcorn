@@ -44,7 +44,7 @@ jobs:
         uses: ./.github/actions/build-otp-wasm
         with:
           host-otp-version: &host_otp "29.0.6"
-          build-mode: debug
+          build-mode: release
           with-crypto: "false"
 
       - name: Set up Elixir

@@ -6,7 +6,7 @@ description: >-
 inputs:
   build-mode:
     description: BEAM Wasm build mode
-    default: debug
+    default: release
 
 runs:
   using: composite
