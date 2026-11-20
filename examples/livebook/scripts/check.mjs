@@ -161,6 +161,31 @@ try {
     await frame.getByText("Rendered by Kino.JS").waitFor({ timeout: 120_000 });
   });
 
+  // Binary payloads go as binary WebSocket frames: the initial one and "pong"
+  // from the VM, "ping" to it. On one line, as the editor indents new lines and
+  // Enter could pick a completion.
+  await step("Kino.JS.Live sends and receives binary payloads", async () => {
+    const js =
+      "export function init(ctx, payload) { " +
+      "const show = ([info, buffer]) => { ctx.root.innerText = info.message + ':' + new Uint8Array(buffer).join(','); }; " +
+      "show(payload); ctx.handleEvent('pong', show); ctx.pushEvent('ping', [{}, new Uint8Array([3]).buffer]); }";
+    await run(
+      "defmodule BinaryKino do use Kino.JS; use Kino.JS.Live; " +
+        "def new, do: Kino.JS.Live.new(__MODULE__, nil); " +
+        `def handle_connect(ctx), do: {:ok, {:binary, %{message: "hello"}, <<1, 2>>}, ctx}; ` +
+        `def handle_event("ping", {:binary, _info, bytes}, ctx) do broadcast_event(ctx, "pong", {:binary, %{message: "pong"}, <<1, 2, bytes::binary>>}); {:noreply, ctx} end; ` +
+        `asset "main.js", do: "${js}" end; BinaryKino.new()`,
+    );
+    for (let i = 0; ; i++) {
+      for (const frame of page.frames().filter((frame) => frame.url().includes("/iframe/v6.html"))) {
+        const text = await frame.locator("body").innerText().catch(() => "");
+        if (text.includes("pong:1,2,3")) return text.trim();
+      }
+      if (i > 600) throw new Error("no pong:1,2,3 in the outputs' iframes");
+      await page.waitForTimeout(100);
+    }
+  });
+
   // Each tab runs a Livebook of its own, under a path with a Service Worker of
   // its own. Only the first tab's VM has its notebook.
   await step("each tab's requests and navigations go to its own VM", async () => {
@@ -279,6 +304,22 @@ try {
     } finally {
       await linked.close();
     }
+  });
+
+  // LiveView uploads the file in binary WebSocket frames
+  await step("a notebook uploads through the form", async () => {
+    const livebook = await (await page.$("#livebook")).contentFrame();
+    await livebook.goto(new URL(`${tabPath(livebook)}/open/upload`, url).href);
+    // Before the LiveView connects, nothing handles the file
+    await app.locator(".phx-connected #upload-file-form").waitFor({ timeout: 60_000 });
+    await app.locator("#upload-file-form input[type=file]").setInputFiles({
+      name: "uploaded.livemd",
+      mimeType: "text/plain",
+      buffer: Buffer.from("# Uploaded through the form\n\n```elixir\n1 + 1\n```\n"),
+    });
+    await app.locator("#upload-file-form").getByRole("button", { name: "Import" }).click();
+    await app.getByText("Uploaded through the form").first().waitFor({ timeout: 60_000 });
+    return livebook.url();
   });
 } catch {
   console.log("--- browser console ---");

@@ -12,7 +12,15 @@
     navigator.serviceWorker.startMessages();
 
     // Service Workers can't intercept WebSockets, so Livebook's pages' ones are
-    // created in the shell, with a socket process in the VM at their other end
-    window.WebSocket = bridge.WebSocket;
+    // created in the shell, with a socket process in the VM at their other end.
+    // Phoenix tells binary frames by this window's ArrayBuffer, which the
+    // shell's would fail, so they're made here.
+    window.WebSocket = class WebSocket extends bridge.WebSocket {
+      binaryFrame(bytes) {
+        const buffer = new ArrayBuffer(bytes.byteLength);
+        new Uint8Array(buffer).set(bytes);
+        return buffer;
+      }
+    };
   }
 }
