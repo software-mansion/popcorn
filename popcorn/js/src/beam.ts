@@ -1,6 +1,7 @@
 import { Assets } from "./assets";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
+import { schedulers } from "./popcorn";
 import { extractTar } from "./tar";
 import type {
   BeamBootOptions,
@@ -82,7 +83,7 @@ async function boot(
 ): Promise<Result<null>> {
   const {
     otpAssetsRoot,
-    emulatorArgs,
+    emulatorArgs: rawEmulatorArgs,
     extraArgs,
     env,
     ttySize,
@@ -90,7 +91,7 @@ async function boot(
     createModule,
     emit,
   } = opts;
-  const emulator = resolveThreading(emulatorArgs ?? []);
+  const { emulatorArgs, threadPoolSize } = applyDefaults(rawEmulatorArgs ?? []);
   try {
     const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
     const loadedFsData = await loadFsData(otpAssetsRoot, assets);
@@ -151,12 +152,12 @@ async function boot(
           type: fd === STDOUT_FD ? "otp:stdout" : "otp:stderr",
           payload: chunk,
         }),
-      pthreadPoolSize: emulator.threadPoolSize,
+      pthreadPoolSize: threadPoolSize,
       arguments: buildArgs({
         appNames: fsData.appNames,
         entrypoint: fsData.entrypoint,
         noshell,
-        emulator: emulator.args,
+        emulator: emulatorArgs,
         extra: extraArgs ?? [],
       }),
       preRun: [
@@ -281,12 +282,18 @@ function buildArgs({
   return args;
 }
 
-export function resolveThreading(emulatorArgs: string[]): {
-  args: string[];
+export function applyDefaults(rawEmulatorArgs: string[]): {
+  emulatorArgs: string[];
   threadPoolSize: number;
 } {
-  const args = [...addDefaultSchedulers(emulatorArgs), ...emulatorArgs];
-  return { args, threadPoolSize: resolveThreadPoolSize(args) };
+  const flags = parseNumericFlags(rawEmulatorArgs);
+  const defaultSchedulers = schedulers({ base: 1, dirtyCpu: 1, dirtyIo: 1 });
+  const defaultSchedulerFlags = [...parseNumericFlags(defaultSchedulers)]
+    .filter(([flag]) => !flags.has(flag))
+    .flatMap(([flag, value]) => [`-${flag}`, String(value)]);
+
+  const emulatorArgs = [...defaultSchedulerFlags, ...rawEmulatorArgs];
+  return { emulatorArgs, threadPoolSize: resolveThreadPoolSize(emulatorArgs) };
 }
 
 // Mimics how the BEAM calculates numbers of threads to spawn
@@ -300,13 +307,6 @@ function resolveThreadPoolSize(emulatorArgs: string[]): number {
   const async = Math.max(flags.get("A") ?? 1, 1);
   const poll = flags.get("IOt") ?? 1;
   return nonSchedulerThreads + base + dirtyCpu + dirtyIo + async + poll;
-}
-
-function addDefaultSchedulers(emulatorArgs: string[]): string[] {
-  const flags = parseNumericFlags(emulatorArgs);
-  return ["S", "SDcpu", "SDio"]
-    .filter((flag) => !flags.has(flag))
-    .flatMap((flag) => [`-${flag}`, "1"]);
 }
 
 function parseNumericFlags(emulatorArgs: string[]): Map<string, number> {

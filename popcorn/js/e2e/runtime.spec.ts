@@ -1,7 +1,7 @@
 import { schedulers, type PopcornOpts } from "@swmansion/popcorn";
 import { assert, evalOpts, expect, test } from "./helpers";
 import { PopcornError, type SerializedError } from "../src/errors";
-import { resolveThreading } from "../src/beam";
+import { applyDefaults } from "../src/beam";
 import { Assets } from "../src/assets";
 import type { Page } from "@playwright/test";
 import { mock } from "node:test";
@@ -467,7 +467,7 @@ test.describe("boot", () => {
   };
   for (const [form, { flags, counts, threads }] of Object.entries(threading)) {
     test(`threads, ${form}`, async ({ otp, page }) => {
-      const { threadPoolSize } = resolveThreading(flags ?? []);
+      const { threadPoolSize } = applyDefaults(flags ?? []);
       expect(threadPoolSize).toBe(threads);
 
       const boot = await otp.tryBoot({
