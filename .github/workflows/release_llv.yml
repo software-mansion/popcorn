@@ -1,4 +1,4 @@
-name: Release LLV
+name: Release LocalLiveView
 
 # LocalLiveView releases on its own cadence, hence the separate `llv-v*` tag
 # namespace (the popcorn release workflow triggers on `v*`).
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   release:
-    name: hex
+    name: Publish Hex
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     steps:

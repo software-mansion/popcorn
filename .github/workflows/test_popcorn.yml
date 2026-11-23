@@ -1,4 +1,4 @@
-name: Popcorn
+name: Test Popcorn
 
 on:
   push:
@@ -16,8 +16,8 @@ on:
       - "scripts/export-otp-apps.escript"
       - "scripts/patch-beam.sh"
       - "scripts/runtime-manifest.sh"
-      - ".github/workflows/ci_popcorn.yml"
-      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/workflows/test_popcorn.yml"
+      - ".github/workflows/_build_otp.yml"
       - ".github/actions/build-otp-wasm/**"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-mix-cache/**"
@@ -29,7 +29,7 @@ on:
       - ".npmrc"
 
 concurrency:
-  group: ci-popcorn-${{ github.ref }}
+  group: test-popcorn-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -41,11 +41,11 @@ env:
 
 jobs:
   wasm:
-    name: OTP
-    uses: ./.github/workflows/build_otp_wasm.yml
+    name: Build OTP
+    uses: ./.github/workflows/_build_otp.yml
 
   elixir:
-    name: elixir
+    name: Elixir tests
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
@@ -73,7 +73,7 @@ jobs:
         run: mix test
 
   js-types:
-    name: js types
+    name: JS lint & types
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -92,7 +92,7 @@ jobs:
           pnpm lint:e2e
 
   js-e2e:
-    name: js e2e (${{ matrix.variant }})
+    name: JS E2E (${{ matrix.variant }})
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -128,7 +128,7 @@ jobs:
           if-no-files-found: ignore
 
   examples:
-    name: example (${{ matrix.example }})
+    name: "Example: ${{ matrix.example }}"
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -179,14 +179,14 @@ jobs:
           if-no-files-found: ignore
 
   langtour:
-    name: langtour (${{ matrix.shard }})
+    name: Language Tour (${{ matrix.part }} of 2)
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: ["1/2", "2/2"]
+        part: [1, 2]
 
     steps:
       - uses: actions/checkout@v4
@@ -209,7 +209,7 @@ jobs:
 
       - name: Run e2e tests
         working-directory: language-tour
-        run: pnpm test --shard=${{ matrix.shard }}
+        run: pnpm test --shard=${{ matrix.part }}/2
 
       - name: Upload Playwright report
         if: failure()

@@ -1,4 +1,4 @@
-name: Release
+name: Release Popcorn
 
 on:
   push:
@@ -31,7 +31,7 @@ env:
 
 jobs:
   otp-runtime:
-    name: runtime (${{ matrix.variant }})
+    name: Build OTP (${{ matrix.variant }})
     runs-on: ubuntu-26.04
     timeout-minutes: 90
     strategy:
@@ -90,7 +90,7 @@ jobs:
           if-no-files-found: error
 
   publish-hex:
-    name: hex
+    name: Publish Hex
     needs: otp-runtime
     if: (inputs.target || 'all') == 'all' || inputs.target == 'hex'
     runs-on: ubuntu-24.04
@@ -153,7 +153,7 @@ jobs:
           mix hex.publish --yes "${flags[@]}"
 
   publish-npm:
-    name: npm
+    name: Publish npm
     needs: otp-runtime
     if: (inputs.target || 'all') == 'all' || inputs.target == 'npm'
     runs-on: ubuntu-24.04
