@@ -39,6 +39,18 @@ on:
           - staging
           - production
         default: staging
+      landing:
+        description: Deploy landing page
+        type: boolean
+        default: true
+      langtour:
+        description: Deploy language tour
+        type: boolean
+        default: true
+      burrito:
+        description: Deploy burrito demo
+        type: boolean
+        default: true
 
 concurrency:
   group: demo-deploy-${{ inputs.environment || 'staging' }}
@@ -56,17 +68,43 @@ env:
 jobs:
   wasm:
     name: Build OTP
+    if: github.event_name == 'push' || inputs.landing || inputs.langtour || inputs.burrito
     uses: ./.github/workflows/_build_otp.yml
+    with:
+      core: ${{ github.event_name == 'push' || inputs.landing || inputs.langtour }}
+      crypto: ${{ github.event_name == 'push' || inputs.landing || inputs.burrito }}
 
   build-base:
     name: Base image
+    if: github.event_name == 'push' || inputs.landing || inputs.langtour || inputs.burrito
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
+    outputs:
+      apps: ${{ steps.select.outputs.apps }}
 
     steps:
+      - id: select
+        env:
+          IS_PUSH: ${{ github.event_name == 'push' }}
+          DEPLOY_LANDING: ${{ inputs.landing }}
+          DEPLOY_LANGTOUR: ${{ inputs.langtour }}
+          DEPLOY_BURRITO: ${{ inputs.burrito }}
+        run: |
+          apps='[]'
+          if [[ "$IS_PUSH" == "true" || "$DEPLOY_LANDING" == "true" ]]; then
+            apps=$(jq -c '. + [{"name":"landing","file":"./docker/landing.Dockerfile","image":"popcorn-landing","wasm":"both"}]' <<< "$apps")
+          fi
+          if [[ "$IS_PUSH" == "true" || "$DEPLOY_LANGTOUR" == "true" ]]; then
+            apps=$(jq -c '. + [{"name":"langtour","file":"./docker/langtour.Dockerfile","image":"popcorn-langtour","wasm":"core"}]' <<< "$apps")
+          fi
+          if [[ "$IS_PUSH" == "true" || "$DEPLOY_BURRITO" == "true" ]]; then
+            apps=$(jq -c '. + [{"name":"burrito","file":"./docker/burrito/Dockerfile","image":"popcorn-burrito","wasm":"crypto"}]' <<< "$apps")
+          fi
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           submodules: "false"
@@ -98,7 +136,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base,mode=max
 
   build-apps:
-    name: Build ${{ matrix.name }} (${{ inputs.environment || 'staging' }})
+    name: Build ${{ matrix.app.name }} (${{ inputs.environment || 'staging' }})
     needs: [wasm, build-base]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -108,19 +146,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: landing
-            file: ./docker/landing.Dockerfile
-            image: popcorn-landing
-            wasm: both
-          - name: langtour
-            file: ./docker/langtour.Dockerfile
-            image: popcorn-langtour
-            wasm: core
-          - name: burrito
-            file: ./docker/burrito/Dockerfile
-            image: popcorn-burrito
-            wasm: crypto
+        app: ${{ fromJSON(needs.build-base.outputs.apps) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -129,7 +155,7 @@ jobs:
 
       - uses: ./.github/actions/setup-workspace
         with:
-          wasm: ${{ matrix.wasm }}
+          wasm: ${{ matrix.app.wasm }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -142,12 +168,12 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.app.image }}
 
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.file }}
+          file: ${{ matrix.app.file }}
           build-args: |
             POPCORN_BASE_TAG=latest
             SYNC_THIRD_PARTY_ASSETS=true
@@ -157,10 +183,10 @@ jobs:
           pull: true
           push: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.image }}:${{ env.IMAGE_TAG }}"
+          tags: "${{ env.REGISTRY }}/${{ env.ORG_NAME }}/${{ matrix.app.image }}:${{ env.IMAGE_TAG }}"
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.name }}
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.name }},mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.app.name }}
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.app.name }},mode=max
 
   deploy:
     name: Deploy (${{ inputs.environment || 'staging' }})
@@ -173,17 +199,26 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           BURRITO_SECRET_KEY_BASE: ${{ secrets.BURRITO_SECRET_KEY_BASE }}
+          DEPLOY_LANDING: ${{ github.event_name == 'push' || inputs.landing }}
+          DEPLOY_LANGTOUR: ${{ github.event_name == 'push' || inputs.langtour }}
+          DEPLOY_BURRITO: ${{ github.event_name == 'push' || inputs.burrito }}
         with:
           host: ${{ env.TARGET_ENV == 'production' && secrets.POPCORN_HOSTS || secrets.STAG_POPCORN_HOST }}
           username: ${{ secrets.POPCORN_USER }}
           key: ${{ secrets.POPCORN_SSH_PRIV }}
           port: ${{ env.TARGET_ENV == 'production' && secrets.POPCORN_PORT || secrets.STAG_POPCORN_PORT }}
-          envs: BURRITO_SECRET_KEY_BASE
+          envs: BURRITO_SECRET_KEY_BASE,DEPLOY_LANDING,DEPLOY_LANGTOUR,DEPLOY_BURRITO
           script: |
             set -euo pipefail
-            docker compose -f popcorn-landing.yml -p landing pull
-            docker compose -f popcorn-landing.yml -p landing up -d
-            docker compose -f elixir-langtour.yml -p langtour pull
-            docker compose -f elixir-langtour.yml -p langtour up -d
-            docker compose -f popcorn-burrito.yml -p burrito pull
-            docker compose -f popcorn-burrito.yml -p burrito up -d
+            if [[ "$DEPLOY_LANDING" == "true" ]]; then
+              docker compose -f popcorn-landing.yml -p landing pull
+              docker compose -f popcorn-landing.yml -p landing up -d
+            fi
+            if [[ "$DEPLOY_LANGTOUR" == "true" ]]; then
+              docker compose -f elixir-langtour.yml -p langtour pull
+              docker compose -f elixir-langtour.yml -p langtour up -d
+            fi
+            if [[ "$DEPLOY_BURRITO" == "true" ]]; then
+              docker compose -f popcorn-burrito.yml -p burrito pull
+              docker compose -f popcorn-burrito.yml -p burrito up -d
+            fi
