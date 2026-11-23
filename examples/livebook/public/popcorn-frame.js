@@ -14,7 +14,13 @@
     },
     true,
   );
-  window.popcornFrame = { failed };
+  window.popcornFrame = { failed, leaving: false };
+
+  // Leaving the page disconnects its LiveView, which the shell doesn't show as
+  // a lost connection. Going first, this listener runs before Phoenix's.
+  window.addEventListener("pagehide", () => {
+    window.popcornFrame.leaving = true;
+  });
 
   // Of the shell page, which runs the tab's VMs
   const bridge = window.parent === window ? null : window.parent.popcornBridge;

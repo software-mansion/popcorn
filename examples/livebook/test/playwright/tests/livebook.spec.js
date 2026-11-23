@@ -140,10 +140,10 @@ test("Livebook starts in the VM", async () => {
 
   // The shell's bar shows Livebook's state, and later its notebooks' VMs
   await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
-  await expect(page.locator("#status-text")).toHaveText(
-    `Livebook started in ${started.ms} ms, as ${started.node}`,
-  );
+  await expect(page.locator("#status-text")).toHaveText("Livebook started");
   await expect(page.locator("#notebook-vms")).toHaveText("");
+  // The loader that covered the page goes
+  await expect(page.locator("#loader:not(.done)")).toHaveCount(0);
 });
 
 test("the home page renders and connects", async () => {
@@ -523,6 +523,15 @@ test("a link opens a notebook from GitHub", async () => {
 
 // LiveView uploads the file in binary WebSocket frames
 test("a notebook uploads through the form", async () => {
+  // The bar's states while the frame opens another page, which mustn't show
+  // the previous page's leaving as a lost connection
+  await page.evaluate(() => {
+    const status = document.querySelector("#status");
+    window.barStates = [];
+    new MutationObserver(() =>
+      window.barStates.push(status.dataset.state),
+    ).observe(status, { attributeFilter: ["data-state"] });
+  });
   const livebook = await (await page.$("#livebook")).contentFrame();
   await livebook.goto(
     new URL(`${tabPath(livebook)}/open/upload`, page.url()).href,
@@ -545,6 +554,7 @@ test("a notebook uploads through the form", async () => {
   ).toBeVisible();
   // The page that the frame opened connected too
   await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
+  expect(await page.evaluate(() => window.barStates)).not.toContain("error");
 });
 
 // The bar says that Livebook started only once its page has loaded and
@@ -571,6 +581,11 @@ for (const [frame, request] of [
       );
       await expect(failing.locator("#status-text")).toHaveText(
         "Livebook's page didn't load: /popcorn-frame.js failed",
+      );
+      // The loader stays, without its animation
+      await expect(failing.locator("#loader")).toHaveAttribute(
+        "data-state",
+        "error",
       );
     } finally {
       await failing.close();
