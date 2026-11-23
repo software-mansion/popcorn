@@ -4,7 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Livebook in Popcorn</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="49x80" />
     <style>
+      /* popcorn.swmansion.com's colors, see landing-page/ */
+      :root {
+        --cream: #fffdf5;
+        --cream-soft: #fbf4e5;
+        --ink: #301b05;
+        --brown: #5f4122;
+        --brown-muted: #9c8b79;
+        --orange: #ef7c00;
+        --green: #5e9a48;
+        --red: #c03a17;
+      }
       html,
       body {
         margin: 0;
@@ -13,11 +26,98 @@
       body {
         display: flex;
         flex-direction: column;
-        font: 13px/1.5 system-ui;
+        font: 13px/1.5 system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--cream);
+      }
+      #bar {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        height: 40px;
+        padding: 0 16px;
+        background: var(--cream-soft);
+        border-bottom: 1px solid var(--ink);
       }
       #status {
-        padding: 4px 12px;
-        border-bottom: 1px solid #ddd;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        margin: 0;
+        font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        color: var(--brown);
+      }
+      #status-text,
+      #notebook-vms {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      #notebook-vms:not(:empty)::before {
+        content: "·";
+        margin-right: 8px;
+        color: var(--brown-muted);
+      }
+      #status .dot {
+        flex: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+      }
+      #status[data-state="loading"] .dot {
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      #status[data-state="ready"] .dot {
+        background: var(--green);
+      }
+      #status[data-state="error"] .dot {
+        background: var(--red);
+      }
+      #status[data-state="error"] #status-text {
+        color: var(--red);
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.3;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #status .dot {
+          animation: none !important;
+        }
+      }
+      #powered {
+        flex: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--ink);
+        text-decoration: none;
+        transition: color 0.15s;
+      }
+      #powered:hover,
+      #powered:focus-visible {
+        color: var(--orange);
+      }
+      /* The logo in the link's color */
+      #powered .logo {
+        width: 75px;
+        height: 20px;
+        background: currentColor;
+        -webkit-mask: url("/popcorn-logo.svg") center / contain no-repeat;
+        mask: url("/popcorn-logo.svg") center / contain no-repeat;
+      }
+      #powered .arrow {
+        color: var(--orange);
+      }
+      @media (max-width: 480px) {
+        #powered .by {
+          display: none;
+        }
       }
       iframe {
         flex: 1;
@@ -26,7 +126,18 @@
     </style>
   </head>
   <body>
-    <div id="status">Starting the VM…</div>
+    <header id="bar">
+      <p id="status" role="status" data-state="loading">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status-text">Starting the VM…</span>
+        <span id="notebook-vms"></span>
+      </p>
+      <a id="powered" href="https://popcorn.swmansion.com" target="_blank" rel="noreferrer" aria-label="Powered by Popcorn">
+        <span class="by">Powered by</span>
+        <span class="logo"></span>
+        <span class="arrow" aria-hidden="true">↗</span>
+      </a>
+    </header>
     <script type="module">
       // The shell owns the tab's VMs and outlives the iframe's navigations.
       // Livebook runs in the iframe under a path of its own, /tab/<id>/, whose
@@ -35,10 +146,23 @@
       import { Popcorn, schedulers } from "/out/index.mjs";
       import { createTabRelay } from "/distribution.js";
 
-      const status = (text) => {
-        document.querySelector("#status").textContent = text;
+      // The bar shows Livebook's VM's state: "loading", "ready" or "error"
+      const status = (text, state = "loading") => {
+        document.querySelector("#status").dataset.state = state;
+        document.querySelector("#status-text").textContent = text;
         console.log(`[shell] ${text}`);
       };
+
+      // And how many VMs the notebooks have
+      const notebookVms = { booting: 0, running: 0 };
+      function showNotebookVms() {
+        const { booting, running } = notebookVms;
+        const vms = (count) => `${count} notebook VM${count === 1 ? "" : "s"}`;
+        const parts = [];
+        if (running) parts.push(`${vms(running)} running`);
+        if (booting) parts.push(`${running ? booting : vms(booting)} starting…`);
+        document.querySelector("#notebook-vms").textContent = parts.join(", ");
+      }
 
       let onStarted;
       const started = new Promise((resolve) => (onStarted = resolve));
@@ -61,8 +185,11 @@
             },
           });
           runtimes.set(node, runtime);
+          notebookVms.booting++;
+          showNotebookVms();
           try {
             await runtime;
+            notebookVms.running++;
             console.log(`[shell] Runtime VM ${node} booted in ${Math.round(performance.now() - t0)} ms`);
           } catch (error) {
             // Livebook would wait for the node until it timed out
@@ -70,11 +197,19 @@
             console.warn(`[shell] Runtime VM ${node} didn't boot: ${message}`);
             runtimes.delete(node);
             popcorn.send(pid, { error: message });
+          } finally {
+            notebookVms.booting--;
+            showNotebookVms();
           }
         } else if (action === "stop") {
           const runtime = runtimes.get(node);
           runtimes.delete(node);
-          (await runtime?.catch(() => null))?.deinit();
+          const vm = await runtime?.catch(() => null);
+          if (vm) {
+            vm.deinit();
+            notebookVms.running--;
+            showNotebookVms();
+          }
           console.log(`[shell] Runtime VM ${node} stopped`);
         }
       }
@@ -94,7 +229,7 @@
       const relay = createTabRelay(tab);
       await removeClosedTabs();
       const workerReady = registerWorker().catch((error) => {
-        status(`The Service Worker didn't start: ${error.message}`);
+        status(`The Service Worker didn't start: ${error.message}`, "error");
         throw error;
       });
 
@@ -131,6 +266,9 @@
           else if ("text" in event) socket.onmessage?.({ data: event.text });
           else socket.onmessage?.({ data: socket.binaryFrame(toBytes(event.binary)) });
         },
+      }).catch((error) => {
+        status(`The VM didn't boot: ${error?.message ?? error}`, "error");
+        throw error;
       });
       status(`VM booted in ${Math.round(performance.now() - t0)} ms, starting Livebook…`);
 
@@ -248,7 +386,7 @@
 
       await workerReady;
       const event = await started;
-      status(`Livebook started in ${event.ms} ms, as ${event.node}`);
+      status(`Livebook started in ${event.ms} ms, as ${event.node}`, "ready");
       window.livebookStarted = event;
 
       // The relay frame goes first, as the Service Worker sends Livebook's

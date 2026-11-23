@@ -137,6 +137,13 @@ test("Livebook starts in the VM", async () => {
   });
   const started = await page.evaluate(() => window.livebookStarted);
   console.log(`  Livebook started in ${started.ms} ms, as ${started.node}`);
+
+  // The shell's bar shows Livebook's state, and later its notebooks' VMs
+  await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
+  await expect(page.locator("#status-text")).toHaveText(
+    `Livebook started in ${started.ms} ms, as ${started.node}`,
+  );
+  await expect(page.locator("#notebook-vms")).toHaveText("");
 });
 
 test("the home page renders and connects", async () => {
@@ -185,6 +192,9 @@ test("a new notebook opens", async () => {
 test("a cell evaluates in the notebook's VM", async () => {
   await page.evaluate(() => window.notebookVmPrefetched);
   await evaluate("Enum.sum(1..10)", "55");
+  await expect(page.locator("#notebook-vms")).toHaveText(
+    "1 notebook VM running",
+  );
 
   // How much of each file of the package came from the network, as the VMs'
   // Popcorn workers record it. The VMs' threads' workers can be blocked.
@@ -395,6 +405,9 @@ test("another notebook installs other packages in a VM of its own", async () => 
   expect(result, "the first notebook's VM").not.toContain(runtimeNode);
   expect(result).toContain(`{\\"installed\\":true}`);
   runtimeNode = result.match(/runtime_[a-z2-7]+@popcorn/)[0];
+  await expect(page.locator("#notebook-vms")).toHaveText(
+    "2 notebook VMs running",
+  );
 });
 
 test("reconnecting replaces the notebook's VM", async () => {
@@ -415,6 +428,9 @@ test("reconnecting replaces the notebook's VM", async () => {
       timeout: 10_000,
     })
     .toBe(true);
+  await expect(page.locator("#notebook-vms")).toHaveText(
+    "2 notebook VMs running",
+  );
 });
 
 // The tabs' VMs are nodes that connect across tabs, see public/distribution.js:
