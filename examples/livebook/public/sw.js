@@ -34,6 +34,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Only the shell's iframe reaches the tab's VM, so a page that opens in a tab
+  // of its own, like a link opened in a new tab, opens a new shell, with a
+  // Livebook of its own, on its home page: the new Livebook wouldn't have the
+  // tab's notebooks
+  if (event.request.mode === "navigate" && event.request.destination === "document") {
+    return event.respondWith(Response.redirect(new URL("/", location.origin).href, 302));
+  }
+
   // The rest is Livebook's, also outside the tab's path
   event.respondWith(toVm(event.request));
 });

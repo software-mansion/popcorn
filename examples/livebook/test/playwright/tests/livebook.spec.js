@@ -144,6 +144,34 @@ test("the home page renders and connects", async () => {
   await expect(app.locator(".phx-connected").first()).toBeVisible();
 });
 
+// Like a link of Livebook's opened in a new tab. Only the shell's iframe
+// reaches the tab's VM, so the page opens a new shell, with a Livebook of its
+// own, on its home page.
+test("a link opened in a new tab opens a Livebook of its own", async () => {
+  const livebook = await (await page.$("#livebook")).contentFrame();
+  const opened = await context.newPage();
+  watch(opened, "[opened tab] ");
+  try {
+    await opened.goto(
+      new URL(`${tabPath(livebook)}/settings`, page.url()).href,
+    );
+    await opened.waitForFunction(() => window.livebookStarted, null, {
+      timeout: 180_000,
+    });
+    await expect(
+      opened.frameLocator("#livebook").locator(".phx-connected").first(),
+    ).toBeVisible();
+    expect(new URL(opened.url()).pathname).toBe("/");
+    const openedLivebook = await (await opened.$("#livebook")).contentFrame();
+    expect(tabPath(openedLivebook)).not.toBe(tabPath(livebook));
+    expect(new URL(openedLivebook.url()).pathname).toBe(
+      `${tabPath(openedLivebook)}/`,
+    );
+  } finally {
+    await opened.close();
+  }
+});
+
 test("a new notebook opens", async () => {
   await newNotebook().click();
   await expect(

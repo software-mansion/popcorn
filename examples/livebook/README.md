@@ -50,6 +50,9 @@ workspace, so it needs `pnpm install` first.
   requests through a hidden relay frame under the path, as the shell isn't.
   Each tab holds a lock for its path, and the shell removes the workers of
   closed tabs.
+- Only the shell's iframe reaches the tab's VM, so the Service Worker
+  redirects a page that opens in a tab of its own, like a link opened in a new
+  tab, to a new shell, with a Livebook of its own, on its home page.
 - Service Workers can't intercept WebSockets, so the Service Worker adds
   `public/popcorn-frame.js` to Livebook's pages, which replaces `WebSocket` with
   one whose other end is a socket process in the VM. The script also passes the
