@@ -119,6 +119,11 @@ workspace, so it needs `pnpm install` first.
 - Livebook opens a notebook from a link to `/import?url=<notebook>`. That's
   where livebook.dev's "Run in Livebook" badges send people, with the Livebook
   address they set on livebook.dev, which can be this example's.
+- livebook.dev checks the address with a request for `/public/health`, from
+  its own pages, which Livebook answers with `{"application": "livebook"}`
+  and a CORS header. The shell's host answers it the same way, as `serve.exs`
+  does: the request doesn't reach the Service Worker, which only gets the
+  requests of the example's own pages.
 - The shell opens a link like that in its iframe, under the tab's path. Its
   host has to serve the shell's page for the link's path, as `serve.exs` does.
   Once Livebook has opened the link, the shell replaces its own URL with `/`,

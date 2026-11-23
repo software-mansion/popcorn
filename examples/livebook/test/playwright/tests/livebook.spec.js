@@ -462,6 +462,14 @@ test("notebooks connect to other tabs' VMs", async () => {
   );
 });
 
+// livebook.dev checks that the Livebook address set there is a Livebook's
+// with this request, from its own pages
+test("livebook.dev recognizes the example as a Livebook", async () => {
+  const resp = await page.request.get("/public/health");
+  expect(resp.headers()["access-control-allow-origin"]).toBe("*");
+  expect(await resp.json()).toEqual({ application: "livebook" });
+});
+
 // Where livebook.dev's "Run in Livebook" badges send people, with the
 // example's address as their Livebook's
 test("a link opens a notebook from GitHub", async () => {

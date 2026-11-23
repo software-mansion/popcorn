@@ -1,6 +1,6 @@
 # Hosts public/, as cooked by `mix popcorn.dev`, the way a static host would.
 # Unlike `mix popcorn.dev`, it serves the shell page for Livebook's links too,
-# like /import?url=…
+# like /import?url=…, and answers livebook.dev's health check.
 #
 # Usage: elixir serve.exs [port]
 
@@ -30,7 +30,16 @@ defmodule Serve do
   @impl true
   def init(opts), do: opts
 
+  # livebook.dev checks that the Livebook address set there is a Livebook's
+  # with this request, from its own pages. Livebook answers it the same way.
   @impl true
+  def call(%{path_info: ["public", "health"]} = conn, _opts) do
+    conn
+    |> put_resp_header("access-control-allow-origin", "*")
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, ~s({"application":"livebook"}))
+  end
+
   def call(conn, _opts) do
     conn
     |> merge_resp_headers(@headers)
