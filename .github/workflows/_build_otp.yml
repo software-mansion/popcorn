@@ -1,4 +1,4 @@
-name: Build OTP Wasm
+name: Build OTP
 
 on:
   workflow_call:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   core:
-    name: build (core)
+    name: core
     if: inputs.core
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -38,7 +38,7 @@ jobs:
           with-crypto: "false"
 
   crypto:
-    name: build (crypto)
+    name: crypto
     if: inputs.crypto
     runs-on: ubuntu-26.04
     timeout-minutes: 60

@@ -1,4 +1,4 @@
-name: Demos
+name: Deploy Demos
 
 on:
   push:
@@ -20,8 +20,8 @@ on:
       - "scripts/patch-beam.sh"
       - "scripts/runtime-manifest.sh"
       - "docker/**"
-      - ".github/workflows/demo_deploy.yml"
-      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/workflows/deploy_demos.yml"
+      - ".github/workflows/_build_otp.yml"
       - ".github/actions/build-otp-wasm/**"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-workspace/**"
@@ -55,11 +55,11 @@ env:
 
 jobs:
   wasm:
-    name: OTP
-    uses: ./.github/workflows/build_otp_wasm.yml
+    name: Build OTP
+    uses: ./.github/workflows/_build_otp.yml
 
   build-base:
-    name: base
+    name: Base image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -98,7 +98,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:base,mode=max
 
   build-apps:
-    name: build ${{ matrix.name }} (${{ inputs.environment || 'staging' }})
+    name: Build ${{ matrix.name }} (${{ inputs.environment || 'staging' }})
     needs: [wasm, build-base]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -163,7 +163,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.ORG_NAME }}/popcorn-cache:${{ matrix.name }},mode=max
 
   deploy:
-    name: deploy (${{ inputs.environment || 'staging' }})
+    name: Deploy (${{ inputs.environment || 'staging' }})
     needs: build-apps
     runs-on: ubuntu-24.04
     timeout-minutes: 15

@@ -1,4 +1,4 @@
-name: Popdoc
+name: Test Popdoc
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
       - "popdoc/**"
       - "scripts/test.sh"
       - "scripts/_common.sh"
-      - ".github/workflows/ci_popdoc.yml"
+      - ".github/workflows/test_popdoc.yml"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-mix-cache/**"
       - ".github/actions/setup-workspace/**"
@@ -18,7 +18,7 @@ on:
       - ".npmrc"
 
 concurrency:
-  group: ci-popdoc-${{ github.ref }}
+  group: test-popdoc-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -30,7 +30,7 @@ env:
 
 jobs:
   e2e:
-    name: e2e
+    name: E2E
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 

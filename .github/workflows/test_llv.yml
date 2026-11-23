@@ -1,4 +1,4 @@
-name: LLV
+name: Test LocalLiveView
 
 on:
   push:
@@ -16,8 +16,8 @@ on:
       - "scripts/export-otp-apps.escript"
       - "scripts/patch-beam.sh"
       - "scripts/runtime-manifest.sh"
-      - ".github/workflows/ci_llv.yml"
-      - ".github/workflows/build_otp_wasm.yml"
+      - ".github/workflows/test_llv.yml"
+      - ".github/workflows/_build_otp.yml"
       - ".github/actions/build-otp-wasm/**"
       - ".github/actions/read-otp-toolchain/**"
       - ".github/actions/setup-mix-cache/**"
@@ -30,7 +30,7 @@ on:
       - ".npmrc"
 
 concurrency:
-  group: ci-llv-${{ github.ref }}
+  group: test-llv-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -42,14 +42,14 @@ env:
 
 jobs:
   wasm:
-    name: OTP
-    uses: ./.github/workflows/build_otp_wasm.yml
+    name: Build OTP
+    uses: ./.github/workflows/_build_otp.yml
     with:
       core: false
       crypto: true
 
   unit-lint:
-    name: unit & lint
+    name: Unit & lint
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -90,7 +90,7 @@ jobs:
         run: mix test --exclude e2e
 
   e2e:
-    name: e2e (${{ matrix.shard }})
+    name: E2E (${{ matrix.part }} of 3)
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["1/3", "2/3", "3/3"]
+        part: [1, 2, 3]
 
     steps:
       - uses: actions/checkout@v4
@@ -129,7 +129,7 @@ jobs:
 
       - name: Run Playwright e2e suite
         env:
-          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+          PLAYWRIGHT_SHARD: ${{ matrix.part }}/3
         run: mix test test/e2e/e2e_test.exs
 
       - name: Upload Playwright report
@@ -144,7 +144,7 @@ jobs:
           if-no-files-found: ignore
 
   install-e2e:
-    name: installer
+    name: Installer E2E
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -188,7 +188,7 @@ jobs:
         run: mix test test/mix/tasks/llv_install_e2e_test.exs
 
   examples:
-    name: example (${{ matrix.example }})
+    name: "Example: ${{ matrix.example }}"
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -239,7 +239,7 @@ jobs:
           working-directory: examples/local-lv-${{ matrix.example }}
 
   kanban:
-    name: kanban (${{ matrix.shard }})
+    name: "Example: kanban (${{ matrix.part }} of 2)"
     needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -249,7 +249,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ["1/2", "2/2"]
+        part: [1, 2]
 
     services:
       postgres:
@@ -293,16 +293,16 @@ jobs:
           MIX_ENV=dev mix assets.setup
           MIX_ENV=dev mix assets.build
 
-      - name: Run unit + e2e tests (shard 1)
-        if: matrix.shard == '1/2'
+      - name: Run unit + e2e tests (part 1 of 2)
+        if: matrix.part == 1
         env:
-          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+          PLAYWRIGHT_SHARD: ${{ matrix.part }}/2
         run: mix test
 
-      - name: Run e2e tests (shard 2)
-        if: matrix.shard != '1/2'
+      - name: Run e2e tests (part 2 of 2)
+        if: matrix.part != 1
         env:
-          PLAYWRIGHT_SHARD: ${{ matrix.shard }}
+          PLAYWRIGHT_SHARD: ${{ matrix.part }}/2
         run: mix test --only e2e
 
       - name: Upload Playwright report
