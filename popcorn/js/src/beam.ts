@@ -94,12 +94,12 @@ async function boot(
   const { emulatorArgs, threadPoolSize } = applyDefaults(rawEmulatorArgs ?? []);
   try {
     const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
-    const loadedFsData = await loadFsData(otpAssetsRoot, assets);
-    if (!loadedFsData.ok) {
-      return { ok: false, error: loadedFsData.error };
+    const loaded = await loadAssets(otpAssetsRoot, opts.wasmUrl, assets);
+    if (!loaded.ok) {
+      return { ok: false, error: loaded.error };
     }
 
-    const fsData = loadedFsData.data;
+    const { fsData, wasm } = loaded;
     const { vmReady, handleVmReady } = vm;
     const { bootReady, handleBootReady } = trackBootReady();
 
@@ -121,7 +121,7 @@ async function boot(
       emit({ type: "otp:error", payload });
     };
     const moduleConfig: Partial<EmscriptenModule> = {
-      ...(await assets.wasm(opts.wasmUrl, fsData.wasmSha256)),
+      ...wasm,
       print: (text) => emit({ type: "otp:stdout", payload: UTF8.encode(text) }),
       printErr: (text) =>
         emit({ type: "otp:stderr", payload: UTF8.encode(text) }),
@@ -340,18 +340,26 @@ type LoadedFsData = {
   appNames: string[];
   entrypoint: string | null;
   tarballs: Uint8Array[];
-  wasmSha256?: string;
 };
+
+type LoadedAssets =
+  | {
+      ok: true;
+      fsData: LoadedFsData;
+      wasm: Awaited<ReturnType<Assets["wasm"]>>;
+    }
+  | { ok: false; error: PopcornError };
 
 type InitFsArgs = {
   module: EmscriptenModule;
   fsData: LoadedFsData;
 };
 
-async function loadFsData(
+async function loadAssets(
   assetsRoot: string,
+  wasmUrl: string,
   assets: Assets,
-): Promise<Result<LoadedFsData>> {
+): Promise<LoadedAssets> {
   const manifestUrl = resolveAssetsPath(assetsRoot, MANIFEST_NAME);
   const manifest = await fetchJson<BeamManifest>(manifestUrl);
   if (manifest === null) {
@@ -376,7 +384,7 @@ async function loadFsData(
     }
   }
 
-  const loadedTarballs = await Promise.all(
+  const loadTarballs = Promise.all(
     Object.values(manifest.bundles).map(
       async (entry): Promise<Result<Uint8Array>> => {
         const tarUrl = resolveAssetsPath(assetsRoot, entry.tar);
@@ -398,6 +406,11 @@ async function loadFsData(
     ),
   );
 
+  const [loadedTarballs, wasm] = await Promise.all([
+    loadTarballs,
+    assets.wasm(wasmUrl, manifest.vm?.sha256),
+  ]);
+
   const tarballs: Uint8Array[] = [];
   for (const tarball of loadedTarballs) {
     if (!tarball.ok) {
@@ -409,12 +422,8 @@ async function loadFsData(
 
   return {
     ok: true,
-    data: {
-      appNames,
-      entrypoint: manifest.entrypoint ?? null,
-      tarballs,
-      wasmSha256: manifest.vm?.sha256,
-    },
+    fsData: { appNames, entrypoint: manifest.entrypoint ?? null, tarballs },
+    wasm,
   };
 }
 

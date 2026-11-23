@@ -59,6 +59,22 @@ test.describe("boot", () => {
     expect(await cache.hashes()).toEqual(expectedHashes);
   });
 
+  // The VM's binary downloads alongside the bundles, not after them: here the
+  // bundles finish downloading only once it has started
+  test("parallel downloads", async ({ page, otp }) => {
+    let wasmRequested!: () => void;
+    const wasm = new Promise<void>((resolve) => (wasmRequested = resolve));
+    await page.route(/\.wasm(\?|$)/, (route) => {
+      wasmRequested();
+      return route.continue();
+    });
+    await page.route(/\.tar(\?|$)/, async (route) => {
+      await wasm;
+      return route.continue();
+    });
+    expect(await otp.tryBoot({})).toEqual({ ok: true, data: null });
+  });
+
   test("page extension", async ({ page, otp, createOtp }) => {
     const cache = await installAssetCache(page, "page");
     const hashes = await assetHashes(page);
