@@ -12,8 +12,9 @@ defmodule LivebookWasm.Runtime do
 
   @type t :: %__MODULE__{node: node() | nil, server_pid: pid() | nil}
 
-  # How long the page has to boot the VM
-  @boot_timeout 60_000
+  # How long the page has to boot the VM: longer than Popcorn's limits there,
+  # see public/index.html, so that the page tells why it didn't boot
+  @boot_timeout :timer.minutes(7)
 
   @spec new() :: t()
   def new, do: %__MODULE__{}

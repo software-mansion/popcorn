@@ -1,5 +1,21 @@
 // Loaded first in the tab's relay frame and in Livebook's pages, see sw.js.
 {
+  // The page's scripts and stylesheets that fail to load, as when the server
+  // has stopped, for the shell to show. Going first, this script sees them.
+  const failed = [];
+  window.addEventListener(
+    "error",
+    ({ target }) => {
+      if (
+        target.tagName === "SCRIPT" ||
+        (target.tagName === "LINK" && target.rel === "stylesheet")
+      )
+        failed.push(target.src || target.href);
+    },
+    true,
+  );
+  window.popcornFrame = { failed };
+
   // Of the shell page, which runs the tab's VMs
   const bridge = window.parent === window ? null : window.parent.popcornBridge;
 

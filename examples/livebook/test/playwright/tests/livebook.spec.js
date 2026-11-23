@@ -543,4 +543,37 @@ test("a notebook uploads through the form", async () => {
   await expect(
     app.getByText("Uploaded through the form").first(),
   ).toBeVisible();
+  // The page that the frame opened connected too
+  await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
 });
+
+// The bar says that Livebook started only once its page has loaded and
+// connected. The relay frame, which Livebook's pages load through, and
+// Livebook's pages load scripts from the server, which can stop after
+// Livebook's VM has started.
+for (const [frame, request] of [
+  ["the relay frame", 1],
+  ["Livebook's page", 2],
+]) {
+  test(`the bar shows that Livebook's page didn't load, without ${frame}'s script`, async () => {
+    const failing = await context.newPage();
+    watch(failing, "[failing tab] ");
+    let requests = 0;
+    await failing.route("**/popcorn-frame.js", (route) =>
+      ++requests === request ? route.abort() : route.continue(),
+    );
+    try {
+      await failing.goto("/");
+      await expect(failing.locator("#status")).toHaveAttribute(
+        "data-state",
+        "error",
+        { timeout: 180_000 },
+      );
+      await expect(failing.locator("#status-text")).toHaveText(
+        "Livebook's page didn't load: /popcorn-frame.js failed",
+      );
+    } finally {
+      await failing.close();
+    }
+  });
+}

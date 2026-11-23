@@ -149,7 +149,8 @@
       // The bar shows Livebook's VM's state: "loading", "ready" or "error"
       const status = (text, state = "loading") => {
         document.querySelector("#status").dataset.state = state;
-        document.querySelector("#status-text").textContent = text;
+        // The whole text, which the bar may cut
+        Object.assign(document.querySelector("#status-text"), { textContent: text, title: text });
         console.log(`[shell] ${text}`);
       };
 
@@ -168,6 +169,10 @@
       const started = new Promise((resolve) => (onStarted = resolve));
       const sockets = new Map();
 
+      // Popcorn's limit on booting a VM includes downloading its files, which
+      // take minutes on slow connections. LivebookWasm.Runtime waits longer.
+      const timeoutsMs = { boot: 5 * 60_000 };
+
       const runtimes = new Map();
       // The notebooks' VMs boot a package of their own, see notebook_vm/
       const notebookVm = "/notebook_vm/otp/";
@@ -177,6 +182,7 @@
           const t0 = performance.now();
           const runtime = Popcorn.init({
             distribution: relay,
+            timeoutsMs,
             beam: {
               otpAssetsRoot: notebookVm,
               // Notebooks run Erlang code on 2 threads, Livebook on Popcorn's 1
@@ -255,6 +261,7 @@
       const t0 = performance.now();
       const popcorn = await Popcorn.init({
         distribution: relay,
+        timeoutsMs,
         // Livebook's URLs are under the tab's path, see LivebookWasm.Application
         beam: { extraArgs: ["-livebook_wasm_base_path", base] },
         onEvent: (event) => {
@@ -386,27 +393,101 @@
 
       await workerReady;
       const event = await started;
-      status(`Livebook started in ${event.ms} ms, as ${event.node}`, "ready");
       window.livebookStarted = event;
+      status(`Livebook started in ${event.ms} ms, loading its page…`);
 
       // The relay frame goes first, as the Service Worker sends Livebook's
-      // first page through it
-      await addFrame(`${base}/popcorn-relay`, { hidden: true });
+      // pages through it
+      const relayFrame = addFrame(`${base}/popcorn-relay`, { hidden: true });
+      await loaded(relayFrame);
+      const relayFailure = frameFailure(relayFrame);
+      if (relayFailure) status(`Livebook's page didn't load: ${relayFailure}`, "error");
+      else await openLivebook(event);
 
-      // Livebook's links, like /import?url=…, open in the tab's Livebook
-      const path = location.pathname === "/index.html" ? "/" : location.pathname;
-      await addFrame(`${base}${path}${location.search}`, { id: "livebook" });
+      async function openLivebook({ ms, node }) {
+        // Livebook's links, like /import?url=…, open in the tab's Livebook
+        const path = location.pathname === "/index.html" ? "/" : location.pathname;
+        const frame = addFrame(`${base}${path}${location.search}`, { id: "livebook" });
+        watchLivebook(frame, `Livebook started in ${ms} ms, as ${node}`);
+        await loaded(frame);
 
-      // Livebook has opened the link by the time its page loads, so reloading
-      // mustn't open it again
-      history.replaceState(null, "", "/");
+        // Livebook has opened the link by the time its page loads, so reloading
+        // mustn't open it again
+        history.replaceState(null, "", "/");
 
-      // Now that Livebook's page has loaded, the HTTP cache gets the notebooks'
-      // VMs' package, which their workers fetch as they boot. Their runtime is
-      // Livebook's VM's, which the cache has.
-      window.notebookVmPrefetched = prefetchNotebookVm().catch((error) =>
-        console.warn(`[shell] Prefetching the notebooks' VM failed: ${error.message}`),
-      );
+        // Now that Livebook's page has loaded, the HTTP cache gets the notebooks'
+        // VMs' package, which their workers fetch as they boot. Their runtime is
+        // Livebook's VM's, which the cache has.
+        window.notebookVmPrefetched = prefetchNotebookVm().catch((error) =>
+          console.warn(`[shell] Prefetching the notebooks' VM failed: ${error.message}`),
+        );
+      }
+
+      // Why a frame's page didn't load, if it didn't. Its scripts and
+      // stylesheets load from the server, as when it has stopped, and
+      // popcorn-frame.js, which loads first, records those that fail.
+      function frameFailure(frame) {
+        let page;
+        try {
+          page = frame.contentWindow.popcornFrame;
+        } catch {
+          // The browser's error page, of another origin
+          return "the browser couldn't open it";
+        }
+        const failed = page?.failed ?? ["/popcorn-frame.js"];
+        const paths = failed.map((url) => new URL(url, location.href).pathname.replace(base, ""));
+        return paths.length ? `${paths.join(", ")} failed` : null;
+      }
+
+      // Livebook's page is ready once its LiveView connects to the VM, through
+      // the shell's WebSockets. The bar shows that, also for the pages that the
+      // frame opens later, and when the connection drops.
+      function watchLivebook(frame, ready) {
+        let shown;
+        let connected = false;
+        let timer;
+        let observer;
+        const show = (text, state) => {
+          if (text === shown) return;
+          shown = text;
+          status(text, state);
+        };
+        const giveUpAfter = (ms, text) => {
+          clearTimeout(timer);
+          timer = setTimeout(() => show(text, "error"), ms);
+        };
+        const check = (doc) => {
+          const view = doc.querySelector("[data-phx-main]");
+          if (view?.classList.contains("phx-connected")) {
+            clearTimeout(timer);
+            connected = true;
+            show(ready, "ready");
+          } else if (view?.classList.contains("phx-error")) {
+            const text = connected
+              ? "Livebook's page lost its connection to the VM, reconnecting…"
+              : "Livebook's page didn't connect to the VM, retrying…";
+            show(text, "error");
+          }
+        };
+
+        // Loading the page downloads its files, like booting the VM, and
+        // connecting goes through the VM only
+        giveUpAfter(timeoutsMs.boot, "Livebook's page didn't load");
+        frame.addEventListener("load", () => {
+          observer?.disconnect();
+          const failure = frameFailure(frame);
+          if (failure) {
+            clearTimeout(timer);
+            return show(`Livebook's page didn't load: ${failure}`, "error");
+          }
+          // LiveView sets the classes of its view's element
+          const doc = frame.contentDocument;
+          observer = new MutationObserver(() => check(doc));
+          observer.observe(doc, { subtree: true, childList: true, attributeFilter: ["class"] });
+          giveUpAfter(30_000, "Livebook's page didn't connect to the VM");
+          check(doc);
+        });
+      }
 
       async function prefetchNotebookVm() {
         const resp = await fetch(`${notebookVm}manifest.json`);
@@ -425,6 +506,10 @@
       function addFrame(src, props) {
         const frame = Object.assign(document.createElement("iframe"), props, { src });
         document.body.append(frame);
+        return frame;
+      }
+
+      function loaded(frame) {
         return new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
       }
     </script>
