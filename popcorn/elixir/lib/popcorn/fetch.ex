@@ -32,6 +32,7 @@ defmodule Popcorn.Fetch do
   - The browser follows redirects. Req's `:max_redirects` and `:redirect_log_level` options do not control those redirects.
   - The browser decompresses responses. Responses leave out the `content-encoding` and `content-length` headers of compressed bodies, and Req's `:raw` option cannot preserve compressed response bytes.
   - The browser controls restricted headers, such as `Host` and `Cookie`.
+  - Requests leave out the `User-Agent` header, which the browser sets.
   """
 
   alias Popcorn.JS
@@ -155,7 +156,11 @@ defmodule Popcorn.Fetch do
   @doc false
   def start(req, opts) when is_map(req) and is_list(opts) do
     id = System.unique_integer([:positive])
-    headers = Enum.map(Map.get(req, :headers, []), fn {name, value} -> [name, value] end)
+
+    headers =
+      for {name, value} <- Map.get(req, :headers, []),
+          String.downcase(name) != "user-agent",
+          do: [name, value]
 
     args =
       %{

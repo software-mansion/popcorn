@@ -981,6 +981,44 @@ test.describe("fetch", () => {
     expect((event as { header_count: number }).header_count).toBeGreaterThan(0);
   });
 
+  // Browsers that send a User-Agent set by the page preflight cross-origin
+  // requests that have one, which many servers, like jsDelivr, refuse. Chrome
+  // leaves it out, so the test checks the headers Popcorn passes to fetch().
+  test("leaves out User-Agent", async ({ otp, page }) => {
+    await page.evaluate(() => {
+      const fetch = window.fetch;
+      const fetched: string[][] = [];
+      Object.assign(window, { fetchedHeaders: fetched });
+      window.fetch = (input, init) => {
+        const names: string[] = [];
+        new Headers(init?.headers).forEach((_value, name) => names.push(name));
+        fetched.push(names);
+        return fetch(input, init);
+      };
+    });
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        {ok, #{status := Status}} = 'Elixir.Popcorn.Fetch':request(#{
+          method => <<"GET">>,
+          url => <<"${FETCH_URL}">>,
+          headers => [
+            {<<"User-Agent">>, <<"popcorn-test">>},
+            {<<"x-popcorn-test">>, <<"kept">>}
+          ]
+        }),
+        ok = wasm:send(#{fetched => Status}).
+      `),
+    );
+    assert(boot.ok);
+
+    expect(await otp.waitForEvent("fetched")).toEqual({ fetched: 200 });
+    const fetched = await page.evaluate(
+      () =>
+        (window as unknown as { fetchedHeaders: string[][] }).fetchedHeaders,
+    );
+    expect(fetched).toContainEqual(["x-popcorn-test"]);
+  });
+
   test("blocked request", async ({ otp }) => {
     const boot = await otp.tryBoot(
       evalOpts(`
