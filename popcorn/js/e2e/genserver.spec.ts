@@ -141,6 +141,16 @@ test("throwing APIs", async ({ page }) => {
       const invalidOptions = await failure(() =>
         window.Popcorn.init({ tty: { size: { columns: 0, rows: 24 } } }),
       );
+      const wholeFloatTimeout = await popcorn.call("counter", "get", {
+        timeoutMs: 1000.0,
+      });
+      const invalidTimeouts = await Promise.all(
+        [1500.5, -1, Number.NaN, Number.POSITIVE_INFINITY, 0x80000000].map(
+          (timeoutMs) =>
+            failure(() => popcorn.tryCall("counter", "get", { timeoutMs })),
+        ),
+      );
+      const afterInvalidTimeouts = await popcorn.call("counter", "get");
       popcorn.deinit();
       const closed = await failure(() => popcorn.send("controller", {}));
       const closedCast = await failure(() =>
@@ -171,6 +181,9 @@ test("throwing APIs", async ({ page }) => {
         overflow,
         invalidInput,
         invalidOptions,
+        wholeFloatTimeout,
+        invalidTimeouts,
+        afterInvalidTimeouts,
         closed,
         closedCast,
         closedStdin,
@@ -215,6 +228,15 @@ test("throwing APIs", async ({ page }) => {
       name: "Error",
       cause: undefined,
     },
+    wholeFloatTimeout: 4,
+    invalidTimeouts: [
+      { name: "Error", cause: undefined },
+      { name: "Error", cause: undefined },
+      { name: "Error", cause: undefined },
+      { name: "Error", cause: undefined },
+      { name: "Error", cause: undefined },
+    ],
+    afterInvalidTimeouts: 4,
     closed,
     closedCast: closed,
     closedStdin: closed,

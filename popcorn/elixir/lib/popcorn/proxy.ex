@@ -1,6 +1,10 @@
 defmodule Popcorn.Proxy do
   @default_name :popcorn_proxy
   @default_timeout_ms 5_000
+  @max_timeout_ms 0x7FFFFFFF
+
+  defguardp is_timeout(timeout)
+            when is_integer(timeout) and timeout >= 0 and timeout <= @max_timeout_ms
 
   @moduledoc """
   Connects JavaScript calls and casts to GenServers in the VM.
@@ -117,9 +121,12 @@ defmodule Popcorn.Proxy do
       {:noreply, state}
   end
 
-  defp dispatch({:wasm, %{"kind" => "call", "id" => id} = message}, state) do
+  defp dispatch(
+         {:wasm, %{"kind" => "call", "id" => id, "timeout_ms" => timeout} = message},
+         state
+       )
+       when is_timeout(timeout) do
     request = Map.fetch!(message, "request")
-    timeout = Map.get(message, "timeout_ms", @default_timeout_ms)
 
     case whereis(message["target"]) do
       nil ->

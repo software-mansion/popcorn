@@ -149,6 +149,8 @@ const LOG_PREFIX = "[Popcorn]";
 
 const DEFAULT_PROXY_NAME = "popcorn_proxy";
 const DEFAULT_CALL_TIMEOUT_MS = 5_000;
+const MAX_TIMEOUT_MS = 0x7fffffff;
+const INVALID_TIMEOUT_MSG = `timeoutMs must be an integer between 0 and ${MAX_TIMEOUT_MS}`;
 
 /** The process of the VM's distribution carrier, popcorn_dist. */
 const DIST_ROUTER = "popcorn_dist";
@@ -846,6 +848,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     opts?: CallOpts,
   ): Promise<Result<AnyValue>> {
     const timeoutMs = opts?.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS;
+    check(isValidTimeoutMs(timeoutMs), INVALID_TIMEOUT_MSG);
     const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
     const id = this.nextCallId();
 
@@ -1183,6 +1186,14 @@ function resolveMaxMemory(limits: MemoryLimits | undefined): number {
   const ipad =
     /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
   return mobile || ipad ? mobileLimit : desktopLimit;
+}
+
+function isValidTimeoutMs(timeoutMs: number): boolean {
+  return (
+    Number.isInteger(timeoutMs) &&
+    timeoutMs >= 0 &&
+    timeoutMs <= MAX_TIMEOUT_MS
+  );
 }
 
 function isValidTtySize({ columns, rows }: TtySize): boolean {
