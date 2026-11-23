@@ -59,7 +59,7 @@ end
 port =
   case System.argv() do
     [port] -> String.to_integer(port)
-    [] -> 4001
+    [] -> 4000
   end
 
 {:ok, server} = Bandit.start_link(plug: Serve, port: port, startup_log: false)

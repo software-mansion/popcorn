@@ -7,6 +7,7 @@ defmodule NotebookVM.Application do
   @impl true
   def start(_type, _args) do
     NotebookVM.MixInstall.setup()
-    Supervisor.start_link([], strategy: :one_for_one, name: NotebookVM.Supervisor)
+    children = [{Task, &NotebookVM.Docs.load/0}]
+    Supervisor.start_link(children, strategy: :one_for_one, name: NotebookVM.Supervisor)
   end
 end

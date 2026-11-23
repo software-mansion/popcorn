@@ -46,9 +46,37 @@ defmodule LivebookWasm.MixProject do
     command = "mix do deps.get + popcorn.cook --out-dir ../public/notebook_vm"
 
     case Mix.shell().cmd(command, cd: "notebook_vm") do
-      0 -> :ok
+      0 -> pack_notebook_vm_docs("public/notebook_vm")
       status -> Mix.raise("Cooking notebook_vm/ failed with status #{status}")
     end
+  end
+
+  # Elixir's and Erlang's docs, for Livebook's code completion and docs in the
+  # notebooks. Popcorn's package leaves them out, so they're in a tar of their
+  # own, which the VMs load after boot: see NotebookVM.Docs. They're the host's
+  # docs of the modules in the package's Elixir and OTP applications, as chunk
+  # files, where Code.fetch_docs/1 looks for docs that `.beam` files don't have.
+  # Hosts serve the tar's gzipped copy, which the browser decompresses.
+  defp pack_notebook_vm_docs(dir) do
+    manifest = Path.join(dir, "otp/manifest.json") |> File.read!() |> JSON.decode!()
+    stdlib = Path.join([dir, "otp", manifest["bundles"]["stdlib"]["tar"]])
+    {:ok, files} = :erl_tar.table(String.to_charlist(stdlib))
+
+    chunks =
+      for path <- files,
+          ["lib", app, "ebin", file] <- [Path.split(to_string(path))],
+          Path.extname(file) == ".beam",
+          module = Path.rootname(file),
+          {:docs_v1, _, _, _, _, _, _} = docs <- [Code.fetch_docs(String.to_atom(module))] do
+        chunk = :erlang.term_to_binary(docs, [:deterministic])
+        {~c"lib/#{app}/doc/chunks/#{module}.chunk", chunk}
+      end
+
+    # The same docs make the same files, which browsers have cached
+    tar = Path.join(dir, "docs.tar")
+    opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
+    :ok = :erl_tar.create(String.to_charlist(tar), chunks, opts)
+    File.write!(tar <> ".gz", :zlib.gzip(File.read!(tar)))
   end
 
   # The browser loads Livebook's static files from the network, not the VM

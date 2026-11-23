@@ -228,6 +228,27 @@ test("the code runs in a browser VM other than Livebook's", async () => {
   );
 });
 
+// The notebook's VM loads Elixir's and Erlang's docs after boot, where
+// Code.fetch_docs/1, which Livebook's code completion and docs use, finds
+// them. It fetches them on the shell's page, which prefetched them.
+test("the notebook's VM gets Elixir's and Erlang's docs", async () => {
+  await evaluate(
+    "Enum.find_value(1..100, fn _ -> match?({:docs_v1, _, _, _, _, _, _}, Code.fetch_docs(:lists)) or (Process.sleep(100) && nil) end) && " +
+      "{:docs, elem(Code.fetch_docs(Enum), 0), elem(Code.fetch_docs(:lists), 0)}",
+    "{:docs, :docs_v1, :docs_v1}",
+  );
+  const downloaded = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .filter((entry) => entry.name.endsWith("/notebook_vm/docs.tar"))
+      .map((entry) => entry.transferSize >= entry.encodedBodySize),
+  );
+  expect(downloaded, "the prefetch's and the VM's downloads").toEqual([
+    true,
+    false,
+  ]);
+});
+
 // Kino, a Mix package and a rebar3-only one, which Livebook doesn't depend on,
 // Req, with Mint, whose Erlang code includes OTP's headers, parse_trans,
 // whose parse transforms use syntax_tools, ranch, built with erlang.mk, which

@@ -274,9 +274,11 @@
         const resp = await fetch(`${notebookVm}manifest.json`);
         if (!resp.ok) throw new Error(`manifest.json: HTTP ${resp.status}`);
         const { bundles } = await resp.json();
+        // The VMs load Elixir's and Erlang's docs after boot, see notebook_vm/
+        const urls = [...Object.values(bundles).map(({ tar }) => notebookVm + tar), "/notebook_vm/docs.tar"];
         await Promise.all(
-          Object.values(bundles).map(async ({ tar }) => {
-            const bundle = await fetch(notebookVm + tar, { priority: "low" });
+          urls.map(async (url) => {
+            const bundle = await fetch(url, { priority: "low" });
             await bundle.arrayBuffer();
           }),
         );

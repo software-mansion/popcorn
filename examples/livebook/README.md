@@ -22,8 +22,9 @@ of the notebooks' VMs, and cooks it, but only recooks Livebook's on changes.
 Open [localhost:4000](http://localhost:4000).
 
 `elixir serve.exs` hosts what `mix popcorn.dev` cooked, as a static host would,
-at [localhost:4001](http://localhost:4001). Unlike `mix popcorn.dev`, it serves
-the page for Livebook's links too, like `/import?url=…`.
+at [localhost:4000](http://localhost:4000) too, or at another port, as with
+`elixir serve.exs 4001`. Unlike `mix popcorn.dev`, it serves the page for
+Livebook's links too, like `/import?url=…`.
 
 `mix cook` cooks `public/` as `mix popcorn.dev` does, without serving it. The
 demo deployment, `docker/livebook.Dockerfile`, serves it with nginx, configured
@@ -80,6 +81,13 @@ workspace, so it needs `pnpm install` first.
   none of Livebook's code or dependencies: Livebook loads its runtime's code
   into the VM, as into the standalone runtime's OS process, and notebooks can
   install any packages.
+- Popcorn's package leaves out Elixir's and Erlang's docs, which Livebook's
+  code completion and docs need, so `mix popcorn.dev` packs the host's docs of
+  the package's modules in `public/notebook_vm/docs.tar`, with a gzipped copy
+  for the host to serve. The VMs boot without them, and `NotebookVM.Docs`
+  loads them after. Specs and types aren't there:
+  they'd need the modules' debug info. Neither are the docs of the VM's
+  preloaded modules, like `:erlang`.
 - The shell relays the nodes' distribution, also between tabs: see
   `public/distribution.js`. The tabs register their nodes with a SharedWorker,
   which gives two tabs a `MessageChannel` of their own for each connection, so
