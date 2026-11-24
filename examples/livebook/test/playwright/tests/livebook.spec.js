@@ -151,6 +151,20 @@ test("the home page renders and connects", async () => {
   await expect(app.locator(".phx-connected").first()).toBeVisible();
 });
 
+// LivebookWasm.Application stars the example notebooks of priv/notebooks/
+test("the home page lists the example notebooks", async () => {
+  const starred = app.locator("#starred-notebooks");
+  for (const title of [
+    "Charts with VegaLite",
+    "Maps with MapLibre",
+    "Processes and supervisors",
+    "Tensors with Nx",
+    "Nodes across tabs",
+    "Testing and benchmarking",
+  ])
+    await expect(starred.getByText(title, { exact: true })).toBeVisible();
+});
+
 // Like a link of Livebook's opened in a new tab. Only the shell's iframe
 // reaches the tab's VM, so the page opens a new shell, with a Livebook of its
 // own, on its home page.

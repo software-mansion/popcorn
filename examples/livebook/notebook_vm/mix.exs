@@ -17,9 +17,10 @@ defmodule NotebookVM.MixProject do
     [
       # Mix for Mix.install/2, Leex and Yecc and syntax_tools for the Erlang
       # packages it compiles, like parse_trans's parse transforms, EEx for the
-      # Elixir ones that compile templates, like Ecto's Mix tasks, and ExUnit
-      # for Livebook's doctests
-      extra_applications: [:logger, :mix, :parsetools, :syntax_tools, :eex, :ex_unit],
+      # Elixir ones that compile templates, like Ecto's Mix tasks, IEx for the
+      # ones that call its helpers, like Kino, and ExUnit for Livebook's
+      # doctests
+      extra_applications: [:logger, :mix, :parsetools, :syntax_tools, :eex, :iex, :ex_unit],
       mod: {NotebookVM.Application, []}
     ]
   end

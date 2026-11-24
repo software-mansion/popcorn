@@ -1,0 +1,58 @@
+# Testing and benchmarking
+
+```elixir
+Mix.install([
+  {:stream_data, "~> 1.4"},
+  {:benchee, "~> 1.5"}
+])
+```
+
+## Two ways of flattening
+
+This notebook writes a function in two ways, checks both with a property test, then benchmarks them. The function follows each number of a list with its square, so `[1, 2, 3]` becomes `[1, 1, 2, 4, 3, 9]`. For benchmarking, it's important that the functions are within a module - otherwise they would be interpreted (instead of compiled) and perform worse.
+
+```elixir
+defmodule Flatten do
+  def flat_map(list), do: Enum.flat_map(list, &[&1, &1 * &1])
+  def map_flatten(list), do: list |> Enum.map(&[&1, &1 * &1]) |> List.flatten()
+end
+```
+
+## Property tests
+
+StreamData generates random lists, and ExUnit checks that both ways return the same, and that it's each number followed by its square.
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule FlattenTest do
+  use ExUnit.Case
+  use ExUnitProperties
+
+  property "follows each number with its square" do
+    check all list <- list_of(integer()) do
+      result = Flatten.flat_map(list)
+      assert Flatten.map_flatten(list) == result
+      assert Enum.chunk_every(result, 2) == Enum.map(list, &[&1, &1 * &1])
+    end
+  end
+end
+
+ExUnit.run()
+```
+
+## Benchmarks
+
+Benchee also tries to read the CPU and memory information by running programs like `cat`, which doesn't work in the browser, so it prints errors before the results.
+
+```elixir
+Benchee.run(
+  %{
+    "flat_map" => &Flatten.flat_map/1,
+    "map.flatten" => &Flatten.map_flatten/1
+  },
+  inputs: %{"10k integers" => Enum.to_list(1..10_000)}
+)
+
+:ok
+```

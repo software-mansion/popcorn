@@ -65,6 +65,10 @@ workspace, so it needs `pnpm install` first.
 - `LivebookWasm.Application` starts Livebook after its stand-ins, and
   `LivebookWasm.Plug` after Livebook: memsup, which Livebook calls for memory
   usage, doesn't run in the browser.
+- The home page lists the example notebooks of `priv/notebooks/`, which
+  Popcorn packages: `LivebookWasm.Application` copies them to the VM's home
+  directory and stars them. Livebook's own notebooks, under Learn, are part of
+  its code.
 - `config/config.exs` has the settings Livebook's config files and
   `Livebook.config_runtime/0` would make, as Popcorn evaluates only this file.
 - Outputs' iframes, like Kino's JavaScript outputs', load from Livebook's

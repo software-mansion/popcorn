@@ -1,0 +1,80 @@
+# Nodes across tabs
+
+```elixir
+Mix.install([{:kino, "~> 0.19"}])
+```
+
+## Connecting to another tab
+
+This notebook connects to the same notebook in another browser tab with Erlang's distribution, then creates a slider that is synchronized between the nodes.
+
+To try it, open this demo in another tab, open this notebook there too, and evaluate this cell in both tabs.
+
+```elixir
+{node(), Node.get_cookie()}
+```
+
+Then, in one tab, paste the other tab's node and cookie in place of the `nil`s, and evaluate the cell. Connecting from one tab is enough: `Node.list()` shows the connected nodes, here and in the other tab.
+
+```elixir
+{other_node, other_cookie} = {nil, nil}
+
+if other_node do
+  Node.set_cookie(other_node, other_cookie)
+  Node.connect(other_node)
+end
+
+Node.list()
+```
+
+## A synchronized slider
+
+Evaluate this cell in both tabs, then move one tab's slider: the other's follows. In each tab, a process named `:slider` shows the slider and its value in frames, and gets the slider's changes. When the slider moves, the process sends the value to the `:slider` processes of the connected nodes.
+
+```elixir
+defmodule Slider do
+  use GenServer
+
+  def start_link(frame), do: GenServer.start_link(__MODULE__, frame, name: :slider)
+
+  @impl true
+  def init(frame), do: {:ok, frame, {:continue, :show}}
+
+  # After init, as Kino can't start frames while it's starting this process
+  @impl true
+  def handle_continue(:show, frame) do
+    {slider_frame, value_frame} = {Kino.Frame.new(), Kino.Frame.new()}
+    Kino.Frame.render(frame, Kino.Layout.grid([slider_frame, value_frame], gap: 0))
+    state = %{slider_frame: slider_frame, value_frame: value_frame, slider: nil}
+    {:noreply, show_slider(state, 50)}
+  end
+
+  # Moved in this tab
+  @impl true
+  def handle_info({:moved, %{value: value}}, state) do
+    show_value(state, value)
+    for other <- Node.list(), do: send({:slider, other}, {:move, value})
+    {:noreply, state}
+  end
+
+  # Moved in another tab
+  def handle_info({:move, value}, state), do: {:noreply, show_slider(state, value)}
+
+  defp show_slider(state, value) do
+    if state.slider, do: Kino.Control.unsubscribe(state.slider)
+    slider = Kino.Input.range("", default: value)
+    Kino.Control.subscribe(slider, :moved)
+    Kino.Frame.render(state.slider_frame, slider)
+    show_value(state, value)
+    %{state | slider: slider}
+  end
+
+  defp show_value(state, value) do
+    Kino.Frame.render(state.value_frame, Kino.Text.new("Value: #{round(value)}"))
+  end
+end
+
+frame = Kino.Frame.new()
+Kino.start_child({Slider, frame})
+frame
+```
