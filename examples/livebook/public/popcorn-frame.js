@@ -44,5 +44,19 @@
         return buffer;
       }
     };
+
+    // Livebook opens some of its own pages in a new tab, like the dashboard,
+    // where a new shell would open its own Livebook on its home page (see
+    // sw.js). They open here instead, in the tab's Livebook, whose paths are
+    // under the tab's. So do clicks that ask for a new tab, with Cmd or Ctrl.
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest?.("a[target='_blank'][href]");
+      if (!link || event.defaultPrevented) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin === location.origin && url.pathname.startsWith(`${bridge.base}/`)) {
+        event.preventDefault();
+        location.assign(url.href);
+      }
+    });
   }
 }

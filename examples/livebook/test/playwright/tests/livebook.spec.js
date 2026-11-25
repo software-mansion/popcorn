@@ -200,6 +200,32 @@ test("a new notebook opens", async () => {
   ).toBeVisible();
 });
 
+// Livebook opens its dashboard in a new tab, where a new shell would open its
+// own Livebook on its home page, so the shell's Livebook opens it instead
+test("the notebook's menu opens the dashboard in the tab's Livebook", async () => {
+  const notebookUrl = (await (await page.$("#livebook")).contentFrame()).url();
+  const pages = context.pages().length;
+  await app.getByRole("button", { name: "open notebook menu" }).click();
+  await app.getByRole("menuitem", { name: "See on Dashboard" }).click();
+  // The session's process
+  await expect(app.getByText("Livebook.Session.init/1").first()).toBeVisible();
+  const livebook = await (await page.$("#livebook")).contentFrame();
+  expect(new URL(livebook.url()).pathname).toContain(
+    `${tabPath(livebook)}/dashboard/`,
+  );
+  expect(context.pages(), "the pages, with no new tab").toHaveLength(pages);
+
+  // Back to the notebook, which only the iframe navigates to, unlike what
+  // page.goBack() waits for
+  await page.evaluate(() => history.back());
+  await expect(
+    app.locator("[data-el-cell][data-type='code'] .cm-content").first(),
+  ).toBeVisible();
+  expect((await (await page.$("#livebook")).contentFrame()).url()).toBe(
+    notebookUrl,
+  );
+});
+
 // The first evaluation starts the notebook's runtime, in a VM of its own. It
 // boots from the package that the shell prefetched, so the server only
 // confirms that the cached files are current.

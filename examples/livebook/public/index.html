@@ -473,7 +473,7 @@
         }
       }
 
-      window.popcornBridge = { WebSocket: PopcornWebSocket, serve };
+      window.popcornBridge = { WebSocket: PopcornWebSocket, serve, base };
 
       await workerReady;
       const event = await started;
