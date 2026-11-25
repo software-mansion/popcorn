@@ -24,6 +24,8 @@ import type {
 } from "./types";
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
 
+export { schedulers, type SchedulerOptions } from "./beam";
+
 type TrackedEntry = { value: unknown; cleanup?: () => void };
 type PendingTracked = TrackedEntry & { key: number };
 
@@ -1183,34 +1185,6 @@ function parseMemorySize(size: string): number {
     "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
   );
   return bytes;
-}
-
-/**
- * Thread counts for {@link schedulers}.
- *
- * Each count must be positive.
- */
-export type SchedulerOptions = {
-  /** Regular schedulers. */
-  base: number;
-  /** Dirty CPU schedulers. */
-  dirtyCpu: number;
-  /** Dirty I/O schedulers. */
-  dirtyIo: number;
-};
-
-/**
- * Builds `beam.emulatorArgs` for scheduler counts.
- *
- * Defaults to one scheduler of each type.
- */
-export function schedulers(opts: SchedulerOptions): string[] {
-  const { base, dirtyCpu, dirtyIo } = opts;
-  check(base > 0);
-  check(dirtyCpu > 0);
-  check(dirtyIo > 0);
-
-  return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
 }
 
 function isValidTtySize({ columns, rows }: TtySize): boolean {

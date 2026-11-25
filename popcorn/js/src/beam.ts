@@ -1,7 +1,6 @@
 import { Assets } from "./assets";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
-import { schedulers } from "./popcorn";
 import { extractTar } from "./tar";
 import type {
   BeamBootOptions,
@@ -280,6 +279,34 @@ function buildArgs({
   }
 
   return args;
+}
+
+/**
+ * Thread counts for {@link schedulers}.
+ *
+ * Each count must be positive.
+ */
+export type SchedulerOptions = {
+  /** Regular schedulers. */
+  base: number;
+  /** Dirty CPU schedulers. */
+  dirtyCpu: number;
+  /** Dirty I/O schedulers. */
+  dirtyIo: number;
+};
+
+/**
+ * Builds `beam.emulatorArgs` for scheduler counts.
+ *
+ * Defaults to one scheduler of each type.
+ */
+export function schedulers(opts: SchedulerOptions): string[] {
+  const { base, dirtyCpu, dirtyIo } = opts;
+  check(base > 0);
+  check(dirtyCpu > 0);
+  check(dirtyIo > 0);
+
+  return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
 }
 
 export function applyDefaults(rawEmulatorArgs: string[]): {
