@@ -238,6 +238,45 @@ test.describe("events", () => {
     await receiver.dispose();
   });
 
+  // A scheduler thread grows the VM's memory and keeps what it allocated, so
+  // the payload lands in memory that the worker's thread hasn't seen grow
+  test("large payloads after the memory grows", async ({ otp, page }) => {
+    const size = 1024 * 1024;
+    const boot = await otp.tryBoot(
+      evalOpts(`
+        true = register(term_receiver, self()),
+        ok = wasm:send(#{ready => true}),
+        receive {wasm, <<"grow">>} -> ok end,
+        Held = binary:copy(<<1>>, 64 * 1024 * 1024),
+        receive
+          {wasm, Bytes} ->
+            ok = wasm:send(#{received => {byte_size(Bytes), byte_size(Held)}})
+        end.
+      `),
+    );
+    assert(boot.ok);
+    await otp.waitForEvent("ready");
+    expect(await otp.trySend("term_receiver", "grow")).toEqual({
+      ok: true,
+      data: null,
+    });
+    // The VM can't tell when it's done: its messages would let the worker's
+    // thread see the memory grow
+    await page.waitForTimeout(1000);
+    const bytes = await page.evaluateHandle(
+      (size) => new Uint8Array(size).fill(1),
+      size,
+    );
+    expect(await otp.trySend("term_receiver", bytes)).toEqual({
+      ok: true,
+      data: null,
+    });
+    await bytes.dispose();
+    expect(await otp.waitForEvent("received")).toEqual({
+      received: [size, 64 * 1024 * 1024],
+    });
+  });
+
   test("binary patterns", async ({ otp }) => {
     // No bit syntax may run before the receive.
     const boot = await otp.tryBoot(

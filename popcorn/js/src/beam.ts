@@ -176,13 +176,11 @@ async function boot(
       ],
     };
 
-    if (opts.maxMemoryBytes !== undefined) {
-      moduleConfig.wasmMemory = new WebAssembly.Memory({
-        initial: INITIAL_MEMORY_BYTES / WASM_PAGE_BYTES,
-        maximum: opts.maxMemoryBytes / WASM_PAGE_BYTES,
-        shared: true,
-      });
-    }
+    moduleConfig.wasmMemory = new WebAssembly.Memory({
+      initial: INITIAL_MEMORY_BYTES / WASM_PAGE_BYTES,
+      maximum: opts.maxMemoryBytes / WASM_PAGE_BYTES,
+      shared: true,
+    });
     const ready = Promise.all([vmReady, bootReady]);
     const module = await createModule(moduleConfig);
     check(state.module === module);
@@ -549,7 +547,10 @@ function send(
   }
   let status: unknown;
   try {
-    if (useHeap) module.HEAPU8.set(message.etf, etfPtr);
+    if (useHeap) {
+      check(module.wasmMemory !== undefined);
+      new Uint8Array(module.wasmMemory.buffer).set(message.etf, etfPtr);
+    }
     status = module.ccall(
       "sendVmMessage",
       "number",
