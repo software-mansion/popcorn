@@ -73,6 +73,8 @@ defmodule Popcorn.Proxy do
 
   alias Popcorn.JS
 
+  require Logger
+
   @doc """
   Starts a proxy linked to the current process.
 
@@ -98,7 +100,24 @@ defmodule Popcorn.Proxy do
   end
 
   @impl GenServer
-  def handle_info({:wasm, %{"kind" => "call", "id" => id} = message}, state) do
+  def handle_info(message, state) do
+    dispatch(message, state)
+  catch
+    kind, reason ->
+      reason = report_error(kind, reason, __STACKTRACE__)
+
+      case message do
+        {:wasm, %{"kind" => "call", "id" => id}} ->
+          send_error(id, %{kind: "proxy", reason: reason})
+
+        _ ->
+          :ok
+      end
+
+      {:noreply, state}
+  end
+
+  defp dispatch({:wasm, %{"kind" => "call", "id" => id} = message}, state) do
     request = Map.fetch!(message, "request")
     timeout = Map.get(message, "timeout_ms", @default_timeout_ms)
 
@@ -109,14 +128,21 @@ defmodule Popcorn.Proxy do
 
       pid ->
         request_id = :gen_server.send_request(pid, request)
-        timer = Process.send_after(self(), {:call_timeout, id}, timeout)
-        requests = :gen_server.reqids_add(request_id, id, state.requests)
-        pending = Map.put(state.pending, id, {request_id, timer})
-        {:noreply, %{state | requests: requests, pending: pending}}
+
+        try do
+          timer = Process.send_after(self(), {:call_timeout, id}, timeout)
+          requests = :gen_server.reqids_add(request_id, id, state.requests)
+          pending = Map.put(state.pending, id, {request_id, timer})
+          {:noreply, %{state | requests: requests, pending: pending}}
+        catch
+          kind, reason ->
+            :gen_server.receive_response(request_id, 0)
+            :erlang.raise(kind, reason, __STACKTRACE__)
+        end
     end
   end
 
-  def handle_info({:wasm, %{"kind" => "cast"} = message}, state) do
+  defp dispatch({:wasm, %{"kind" => "cast"} = message}, state) do
     case whereis(message["target"]) do
       nil -> :ok
       pid -> GenServer.cast(pid, Map.fetch!(message, "request"))
@@ -125,7 +151,7 @@ defmodule Popcorn.Proxy do
     {:noreply, state}
   end
 
-  def handle_info({:call_timeout, id}, state) do
+  defp dispatch({:call_timeout, id}, state) do
     case Map.pop(state.pending, id) do
       {nil, _pending} ->
         {:noreply, state}
@@ -151,7 +177,7 @@ defmodule Popcorn.Proxy do
     end
   end
 
-  def handle_info(message, state) do
+  defp dispatch(message, state) do
     case :gen_server.check_response(message, state.requests, true) do
       {{:reply, value}, id, requests} ->
         state = complete_request(state, id, requests)
@@ -180,21 +206,34 @@ defmodule Popcorn.Proxy do
     end)
   end
 
-  defp send_result(id, {:ok, value}) do
-    try do
-      reply(id, %{ok: true, value: value})
-    catch
-      :error, {kind, _term} when kind in [:unsupported_type, :duplicate_key] ->
-        reply(id, %{ok: false, error: %{kind: "unserializable"}})
-    end
+  defp send_result(id, result) do
+    payload =
+      case result do
+        {:ok, value} -> %{ok: true, value: value}
+        {:exit, reason} -> %{ok: false, error: %{kind: "exit", reason: inspect(reason)}}
+        :timeout -> %{ok: false, error: %{kind: "timeout"}}
+      end
+
+    reply(id, payload)
+  catch
+    :error, {kind, _term} when kind in [:unsupported_type, :duplicate_key] ->
+      send_error(id, %{kind: "unserializable"})
+
+    kind, reason ->
+      reason = report_error(kind, reason, __STACKTRACE__)
+      send_error(id, %{kind: "proxy", reason: reason})
   end
 
-  defp send_result(id, {:exit, reason}) do
-    reply(id, %{ok: false, error: %{kind: "exit", reason: inspect(reason)}})
+  defp send_error(id, error) do
+    reply(id, %{ok: false, error: error})
+  catch
+    kind, reason -> report_error(kind, reason, __STACKTRACE__)
   end
 
-  defp send_result(id, :timeout) do
-    reply(id, %{ok: false, error: %{kind: "timeout"}})
+  defp report_error(kind, reason, stacktrace) do
+    formatted = Exception.format(kind, reason, stacktrace)
+    Logger.error("Popcorn.Proxy request failed:\n" <> formatted)
+    formatted
   end
 
   defp reply(id, payload) do

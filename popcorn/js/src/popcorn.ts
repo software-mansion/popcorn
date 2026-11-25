@@ -178,6 +178,7 @@ type RunJsFn = (args: AnyValue, actions: RunJsActions) => AnyValue;
 type CallOpts = { timeoutMs?: number; proxy?: string };
 type PendingCall = {
   settle: (result: Result<AnyValue>) => void;
+  reject: (error: Error) => void;
   target: string | Pid;
   timeoutMs: number;
 };
@@ -188,6 +189,7 @@ type ProxyReply =
       error:
         | { kind: "noproc" }
         | { kind: "exit"; reason: string }
+        | { kind: "proxy"; reason: string }
         | { kind: "unserializable" }
         | { kind: "timeout" };
     };
@@ -769,6 +771,11 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     if (lateReply) return;
 
     this.pendingCalls.delete(id);
+    const reply = payload as ProxyReply;
+    if (!reply.ok && reply.error.kind === "proxy") {
+      pending.reject(new Error(`Proxy request failed: ${reply.error.reason}`));
+      return;
+    }
     pending.settle(this.parseCallReply(pending, payload));
   }
 
@@ -842,7 +849,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     const proxy = opts?.proxy ?? DEFAULT_PROXY_NAME;
     const id = this.nextCallId();
 
-    const result = new Promise<Result<AnyValue>>((resolve) => {
+    const result = new Promise<Result<AnyValue>>((resolve, reject) => {
       const timer = setTimeout(() => {
         const isUnresolved = this.pendingCalls.delete(id);
         if (isUnresolved) {
@@ -859,6 +866,10 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         settle: (settled) => {
           clearTimeout(timer);
           resolve(settled);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
         },
       });
     });
