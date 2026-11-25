@@ -27,6 +27,12 @@ const BOOT_MODULE = "Elixir.Popcorn.Boot";
 const STDOUT_FD = 1;
 const MAX_STACK_ETF_BYTES = 32 * 1024;
 const UTF8 = new TextEncoder();
+
+// The VM's memory must fit beam.wasm's limits, build-beam.sh's
+// INITIAL_MEMORY and MAXIMUM_MEMORY
+const WASM_PAGE_BYTES = 64 * 1024;
+const INITIAL_MEMORY_BYTES = 64 * 1024 ** 2;
+const MAXIMUM_MEMORY_BYTES = 2 * 1024 ** 3;
 const BASE_ARGS = [
   "-root",
   "/",
@@ -172,8 +178,8 @@ async function boot(
 
     if (opts.maxMemoryBytes !== undefined) {
       moduleConfig.wasmMemory = new WebAssembly.Memory({
-        initial: 1024,
-        maximum: opts.maxMemoryBytes / 65536,
+        initial: INITIAL_MEMORY_BYTES / WASM_PAGE_BYTES,
+        maximum: opts.maxMemoryBytes / WASM_PAGE_BYTES,
         shared: true,
       });
     }
@@ -279,6 +285,21 @@ function buildArgs({
   }
 
   return args;
+}
+
+/** Converts a `maxMemory` limit, such as "256M" or "2G", to bytes. */
+export function parseMemorySize(size: string): number {
+  const match = /^(\d+(?:\.\d+)?)([MG])$/.exec(size);
+  check(match !== null, 'maxMemory must use M or G, such as "256M" or "2G"');
+  const bytes = Number(match[1]) * (match[2] === "M" ? 1024 ** 2 : 1024 ** 3);
+  check(
+    Number.isSafeInteger(bytes) &&
+      bytes >= INITIAL_MEMORY_BYTES &&
+      bytes <= MAXIMUM_MEMORY_BYTES &&
+      bytes % WASM_PAGE_BYTES === 0,
+    "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
+  );
+  return bytes;
 }
 
 /**

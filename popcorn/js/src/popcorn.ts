@@ -1,4 +1,5 @@
 import { Assets } from "./assets";
+import { parseMemorySize } from "./beam";
 import { PopcornError, err, unwrap, type Result } from "./errors";
 import { RawTerm, atom, tuple, type Mapper } from "./etf";
 import {
@@ -1171,20 +1172,6 @@ function resolveMaxMemory(limits: MemoryLimits | undefined): number {
   const ipad =
     /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
   return mobile || ipad ? mobileLimit : desktopLimit;
-}
-
-function parseMemorySize(size: string): number {
-  const match = /^(\d+(?:\.\d+)?)([MG])$/.exec(size);
-  check(match !== null, 'maxMemory must use M or G, such as "256M" or "2G"');
-  const bytes = Number(match[1]) * (match[2] === "M" ? 1024 ** 2 : 1024 ** 3);
-  check(
-    Number.isSafeInteger(bytes) &&
-      bytes >= 64 * 1024 * 1024 &&
-      bytes <= 2 * 1024 * 1024 * 1024 &&
-      bytes % 65536 === 0,
-    "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
-  );
-  return bytes;
 }
 
 function isValidTtySize({ columns, rows }: TtySize): boolean {
