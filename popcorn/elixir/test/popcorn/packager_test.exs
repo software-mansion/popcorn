@@ -49,18 +49,13 @@ defmodule Popcorn.PackagerTest do
     File.write!(Path.join(app_dir, "priv/nested/fixture.txt"), "from priv")
 
     File.mkdir_p!(static_dir)
-    File.write!(Path.join(static_dir, "index.mjs"), "index.mjs")
-    File.write!(Path.join(static_dir, "worker.mjs"), "import createModule from './beam.emu.mjs';")
+    for file <- ["index.mjs", "worker.mjs"], do: File.write!(Path.join(static_dir, file), file)
 
     for {variant, crypto} <- [core: false, crypto: true] do
       runtime_dir = Path.join(static_dir, "runtimes/#{variant}")
       File.mkdir_p!(runtime_dir)
       File.write!(Path.join(runtime_dir, "beam.wasm"), "beam.wasm")
-
-      File.write!(
-        Path.join(runtime_dir, "beam.emu.mjs"),
-        ~s|new Worker(new URL("beam.emu.mjs", import.meta.url)); new URL("beam.wasm", import.meta.url); // #{variant}|
-      )
+      File.write!(Path.join(runtime_dir, "beam.emu.mjs"), "beam.emu.mjs // #{variant}")
 
       manifest = %{
         vm: %{
@@ -128,16 +123,14 @@ defmodule Popcorn.PackagerTest do
       assert "core" = report.runtimeVariant
       assert %{popcorn: _app} = report.apps
 
-      # The VM's files have their hashes in their names. The script's covers
-      # the wasm's name, which it refers to. The worker imports the script, and
-      # the script starts the VM's threads from its own name.
+      # The VM's files have their hashes in their names and are referenced from
+      # otp/manifest.json alongside the bundles.
       wasm_hash = :crypto.hash(:sha256, "beam.wasm") |> Base.encode16(case: :lower)
-      wasm = "beam.#{wasm_hash}.wasm"
+      wasm = "otp/vm/beam.#{wasm_hash}.wasm"
 
-      script =
-        ~s|new Worker(new URL("beam.emu.mjs", import.meta.url)); new URL("#{wasm}", import.meta.url); // core|
-
-      vm_script = "beam.emu.#{:crypto.hash(:sha256, script) |> Base.encode16(case: :lower)}.mjs"
+      script_contents = "beam.emu.mjs // core"
+      script_hash = :crypto.hash(:sha256, script_contents) |> Base.encode16(case: :lower)
+      vm_script = "otp/vm/beam.emu.#{script_hash}.mjs"
 
       for file <- ["index.mjs", "worker.mjs", vm_script, wasm],
           variant <- ["", ".gz", ".br"] do
@@ -146,20 +139,21 @@ defmodule Popcorn.PackagerTest do
 
       refute File.exists?(Path.join(out_dir, "beam.emu.mjs"))
       refute File.exists?(Path.join(out_dir, "beam.wasm"))
+      refute File.exists?(Path.join(out_dir, "otp/vm/beam.emu.mjs"))
+      refute File.exists?(Path.join(out_dir, "otp/vm/beam.wasm"))
 
-      assert File.read!(Path.join(out_dir, "worker.mjs")) ==
-               ~s|import createModule from './#{vm_script}';|
-
-      assert File.read!(Path.join(out_dir, vm_script)) ==
-               ~s|new Worker(new URL("#{vm_script}", import.meta.url)); new URL("#{wasm}", import.meta.url); // core|
+      assert File.read!(Path.join(out_dir, "worker.mjs")) == "worker.mjs"
+      assert File.read!(Path.join(out_dir, vm_script)) == script_contents
 
       assert out_dir |> Path.join(vm_script <> ".gz") |> File.read!() |> :zlib.gunzip() ==
-               File.read!(Path.join(out_dir, vm_script))
+               script_contents
 
       assert "beam.wasm" = out_dir |> Path.join(wasm <> ".gz") |> File.read!() |> :zlib.gunzip()
 
       manifest = read_manifest(out_dir)
       assert manifest["vm"]["sha256"] == wasm_hash
+      assert manifest["vm"]["wasm"] == "vm/beam.#{wasm_hash}.wasm"
+      assert manifest["vm"]["script"] == "vm/beam.emu.#{script_hash}.mjs"
 
       assert Map.keys(manifest["bundles"]) |> Enum.sort() == ["app", "deps", "stdlib"]
       assert manifest["apps"]["user_app"]["bundle"] == "app"

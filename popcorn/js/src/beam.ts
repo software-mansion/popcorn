@@ -6,6 +6,7 @@ import type {
   BeamBootOptions,
   BeamSendPayload,
   BeamTarget,
+  CreateModuleFn,
   EmscriptenModule,
   OtpErrorPayload,
 } from "./types";
@@ -93,18 +94,17 @@ async function boot(
     env,
     ttySize,
     noshell,
-    createModule,
     emit,
   } = opts;
   const { emulatorArgs, threadPoolSize } = applyDefaults(rawEmulatorArgs ?? []);
   try {
     const assets = new Assets(opts.crossOriginStorage, opts.extensionPort);
-    const loaded = await loadAssets(otpAssetsRoot, opts.wasmUrl, assets);
+    const loaded = await loadAssets(otpAssetsRoot, assets);
     if (!loaded.ok) {
       return { ok: false, error: loaded.error };
     }
 
-    const { fsData, wasm } = loaded;
+    const { fsData, wasm, createModule } = loaded;
     const { vmReady, handleVmReady } = vm;
     const { bootReady, handleBootReady } = trackBootReady();
 
@@ -379,7 +379,7 @@ type BeamManifest = {
   entrypoint: string | null;
   apps: Record<string, { bundle: string }>;
   bundles: Record<string, { tar: string; sha256?: string }>;
-  vm?: { sha256?: string };
+  vm: { script: string; wasm: string; sha256?: string };
 };
 
 type LoadedFsData = {
@@ -393,6 +393,7 @@ type LoadedAssets =
       ok: true;
       fsData: LoadedFsData;
       wasm: Awaited<ReturnType<Assets["wasm"]>>;
+      createModule: CreateModuleFn<EmscriptenModule>;
     }
   | { ok: false; error: PopcornError };
 
@@ -403,7 +404,6 @@ type InitFsArgs = {
 
 async function loadAssets(
   assetsRoot: string,
-  wasmUrl: string,
   assets: Assets,
 ): Promise<LoadedAssets> {
   const manifestUrl = resolveAssetsPath(assetsRoot, MANIFEST_NAME);
@@ -452,9 +452,32 @@ async function loadAssets(
     ),
   );
 
-  const [loadedTarballs, wasm] = await Promise.all([
+  const wasmUrl = resolveAssetsPath(assetsRoot, manifest.vm.wasm);
+  const loadWasm = assets.wasm(wasmUrl, manifest.vm.sha256).then(
+    (data): Result<Awaited<ReturnType<Assets["wasm"]>>> => ({
+      ok: true,
+      data,
+    }),
+    (error): Result<never> => ({ ok: false, error: toPopcornError(error) }),
+  );
+
+  const scriptUrl = resolveAssetsPath(assetsRoot, manifest.vm.script);
+  const loadScript = (
+    import(/* @vite-ignore */ scriptUrl) as Promise<{
+      default: CreateModuleFn<EmscriptenModule>;
+    }>
+  ).then(
+    (mod): Result<CreateModuleFn<EmscriptenModule>> => ({
+      ok: true,
+      data: mod.default,
+    }),
+    (error): Result<never> => ({ ok: false, error: toPopcornError(error) }),
+  );
+
+  const [loadedTarballs, wasm, createModule] = await Promise.all([
     loadTarballs,
-    assets.wasm(wasmUrl, manifest.vm?.sha256),
+    loadWasm,
+    loadScript,
   ]);
 
   const tarballs: Uint8Array[] = [];
@@ -466,10 +489,19 @@ async function loadAssets(
     tarballs.push(tarball.data);
   }
 
+  if (!wasm.ok) {
+    return { ok: false, error: wasm.error };
+  }
+
+  if (!createModule.ok) {
+    return { ok: false, error: createModule.error };
+  }
+
   return {
     ok: true,
     fsData: { appNames, entrypoint: manifest.entrypoint ?? null, tarballs },
-    wasm,
+    wasm: wasm.data,
+    createModule: createModule.data,
   };
 }
 

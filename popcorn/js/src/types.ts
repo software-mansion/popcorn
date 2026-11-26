@@ -1,4 +1,4 @@
-type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
+export type CreateModuleFn<Mod> = (overrides?: Partial<Mod>) => Promise<Mod>;
 
 /**
  * A value exchanged with BEAM. Containers convert their contents recursively.
@@ -98,8 +98,6 @@ export type BeamBootOptions = {
   maxMemoryBytes: number;
   ttySize: TtySize;
   noshell: boolean;
-  createModule: CreateModuleFn<EmscriptenModule>;
-  wasmUrl: string;
   emit: (event: BeamEvent) => void;
 };
 

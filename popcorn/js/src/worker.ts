@@ -1,5 +1,3 @@
-import createModule, { wasmUrl } from "./beam.emu.mjs";
-
 import { start, type Beam } from "./beam";
 import { readMainEvent, toMain } from "./events";
 import { check, unreachable } from "./utils";
@@ -38,8 +36,6 @@ async function dispatch(event: MessageEvent<unknown>): Promise<void> {
         extensionPort: data.payload.extensionPort,
         ttySize: data.payload.ttySize,
         noshell: data.payload.noshell,
-        createModule,
-        wasmUrl,
         emit: toMain,
       });
       void instance.vmReady.then(() =>

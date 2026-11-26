@@ -5,7 +5,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin, ResolvedConfig } from "vite";
 import {
   popcorn as prepare,
-  runtimeDirectory,
   type Options,
   type Prepared,
 } from "./shared";
@@ -37,17 +36,6 @@ type Res = ServerResponse<IncomingMessage>;
  * @see {@link Options} for production server requirements.
  */
 export function popcorn(options: Options): Plugin {
-  const resolveRuntime: Plugin["resolveId"] = async (source, importer) => {
-    if (
-      importer !== undefined &&
-      resolve(dirname(importer.split("?")[0]), source) ===
-        join(distDir, "beam.emu.mjs")
-    ) {
-      const { runtimeVariant } = await ensurePrepared();
-      const runtimeDir = runtimeDirectory(runtimeVariant);
-      return join(runtimeDir, "beam.emu.mjs");
-    }
-  };
   let prepared: Prepared | undefined;
   let repacking: Promise<Prepared> | undefined;
   let dirty = false;
@@ -149,8 +137,6 @@ export function popcorn(options: Options): Plugin {
 
   return {
     name: "popcorn-otp",
-    enforce: "pre",
-    resolveId: resolveRuntime,
 
     config() {
       return {
@@ -158,13 +144,6 @@ export function popcorn(options: Options): Plugin {
         optimizeDeps: { exclude: ["@swmansion/popcorn"] },
         worker: {
           format: "es",
-          plugins: () => [
-            {
-              name: "popcorn-runtime",
-              enforce: "pre",
-              resolveId: resolveRuntime,
-            },
-          ],
         },
       };
     },
@@ -215,7 +194,9 @@ export function popcorn(options: Options): Plugin {
 }
 
 function isCompressible(path: string): boolean {
-  return path.endsWith(".tar") || path.endsWith(".wasm");
+  return (
+    path.endsWith(".tar") || path.endsWith(".wasm") || path.endsWith(".mjs")
+  );
 }
 
 function selectEncoding(

@@ -31,9 +31,9 @@ good, and the few files that name them tell browsers which ones are current.
   built-ins, your code, and your dependencies. Tree-shaking runs on all
   applications, so a change in your app may include or drop a module from a
   standard library and change its hash too.
-- `beam.<hash>.wasm`: the VM.
-- `beam.emu.<hash>.mjs`: the script that loads the VM. Each of the VM's threads
-  loads it in a worker of its own, so unless it's cached, the browser
+- `otp/vm/beam.<hash>.wasm`: the VM.
+- `otp/vm/beam.emu.<hash>.mjs`: the script that loads the VM. Each of the VM's
+  threads loads it in a worker of its own, so unless it's cached, the browser
   revalidates it once for each thread, one request after another.
 
 Serve them with:
@@ -46,9 +46,9 @@ Browsers then don't request them again until their names change.
 
 ### Other files
 
-`otp/manifest.json` names the archives, and `worker.mjs` names the VM's script,
-which names the VM. They and the rest of the output, like `index.mjs`, keep
-their names, so serve them with:
+`otp/manifest.json` names the archives, the VM, and its script. They and the rest
+of the output, like `index.mjs` and `worker.mjs`, keep their names, so serve
+them with:
 
 ```http
 Cache-Control: no-cache

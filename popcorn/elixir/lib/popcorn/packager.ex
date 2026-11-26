@@ -11,7 +11,6 @@ defmodule Popcorn.Packager do
   @app_capabilities %{asn1: "crypto", crypto: "crypto", public_key: "crypto", ssl: "crypto"}
 
   @boot_name "bin/vm.boot"
-  @runtime_files ~w(beam.emu.mjs beam.wasm)
   @brotli_block_bits 20
   @brotli_block_bytes 1024 * 1024
 
@@ -335,6 +334,17 @@ defmodule Popcorn.Packager do
       tar_paths =
         Enum.map(~w(stdlib app deps), &Path.join(out_dir, Map.fetch!(bundles, &1).tar))
 
+      variant_dir = Path.join(runtimes_dir, variant)
+      wasm_hash = sha256_file(Path.join(variant_dir, "beam.wasm"))
+      script_hash = sha256_file(Path.join(variant_dir, "beam.emu.mjs"))
+
+      vm = %{
+        version: vm_version,
+        sha256: wasm_hash,
+        wasm: Path.join("vm", fingerprinted_name("beam.wasm", wasm_hash)),
+        script: Path.join("vm", fingerprinted_name("beam.emu.mjs", script_hash))
+      }
+
       manifest = %{
         entrypoint: entrypoint_app,
         runtimeVariant: variant,
@@ -342,10 +352,7 @@ defmodule Popcorn.Packager do
         bundles: bundles,
         notes: diagnostics,
         toolchain: toolchain,
-        vm: %{
-          version: vm_version,
-          sha256: sha256_file(Path.join([runtimes_dir, variant, "beam.wasm"]))
-        }
+        vm: vm
       }
 
       File.write!(manifest_path, JSON.encode!(manifest))
@@ -358,6 +365,7 @@ defmodule Popcorn.Packager do
         tarPaths: tar_paths,
         apps: packed_apps,
         bundles: bundles,
+        vm: vm,
         notes: diagnostics,
         toolchain: toolchain,
         treeshake: treeshake_report
@@ -371,10 +379,16 @@ defmodule Popcorn.Packager do
     variant_dir = Path.join([static_dir, "runtimes", report.runtimeVariant])
 
     js_files = Enum.map(~w(index.mjs worker.mjs), &{&1, Path.join(static_dir, &1)})
-    vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
+
+    vm_files = [
+      {Path.join("otp", report.vm.script), Path.join(variant_dir, "beam.emu.mjs")},
+      {Path.join("otp", report.vm.wasm), Path.join(variant_dir, "beam.wasm")}
+    ]
+
+    File.mkdir_p!(Path.join(out_dir, "otp/vm"))
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
-      for filename <- ["index.mjs", "worker.mjs" | fingerprint_vm(out_dir)] do
+      for {filename, _source} <- js_files ++ vm_files do
         compress(Path.join(out_dir, filename), brotli_effort)
       end
 
@@ -400,32 +414,6 @@ defmodule Popcorn.Packager do
            tarPaths: tar_paths
        }}
     end
-  end
-
-  defp fingerprint_vm(out_dir) do
-    wasm = fingerprint_referenced!(out_dir, "beam.wasm", ["beam.emu.mjs"])
-    script = fingerprint_referenced!(out_dir, "beam.emu.mjs", ["beam.emu.mjs", "worker.mjs"])
-    [script, wasm]
-  end
-
-  # Like fingerprint/1, but also changes the name in files that refer to it
-  # (referrers). Reference is the name in quotes, optionally prefixed with ./
-  defp fingerprint_referenced!(out_dir, name, referrers) do
-    {new_name, _hash} = fingerprint(Path.join(out_dir, name))
-    pattern = ~r/(["'])(\.\/)?#{Regex.escape(name)}\1/
-
-    for referrer <- referrers do
-      referrer = Path.join(out_dir, if(referrer == name, do: new_name, else: referrer))
-      contents = File.read!(referrer)
-
-      if not Regex.match?(pattern, contents) do
-        raise "#{referrer} has no reference to #{name}"
-      end
-
-      File.write!(referrer, Regex.replace(pattern, contents, "\\g{1}\\g{2}#{new_name}\\g{1}"))
-    end
-
-    new_name
   end
 
   defp copy_assets(files, out_dir) do
@@ -1053,9 +1041,14 @@ defmodule Popcorn.Packager do
 
   defp fingerprint(path) do
     hash = sha256_file(path)
-    target = Path.rootname(path) <> ".#{hash}" <> Path.extname(path)
+    name = fingerprinted_name(Path.basename(path), hash)
+    target = Path.join(Path.dirname(path), name)
     File.rename!(path, target)
-    {Path.basename(target), hash}
+    {name, hash}
+  end
+
+  defp fingerprinted_name(name, hash) do
+    Path.rootname(name) <> ".#{hash}" <> Path.extname(name)
   end
 
   defp sha256_file(path) do

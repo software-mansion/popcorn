@@ -1,9 +1,8 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
 
 const execFileAsync = promisify(execFile);
 
@@ -60,11 +59,6 @@ export async function popcorn(options: Options): Promise<Prepared> {
     await rm(dir, { recursive: true, force: true });
     throw error;
   }
-}
-
-export function runtimeDirectory(variant: RuntimeVariant): string {
-  const distDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  return resolve(distDir, "runtimes", variant);
 }
 
 function assert(ok: boolean, message: string): asserts ok {

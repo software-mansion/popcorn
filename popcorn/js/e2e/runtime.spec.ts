@@ -567,6 +567,7 @@ test.describe("boot", () => {
                       compiler: { bundle: "core" },
                     },
               bundles: { core: { tar: "kernel.tar" } },
+              vm: { script: "vm/beam.emu.mjs", wasm: "vm/beam.wasm" },
             },
           });
         }

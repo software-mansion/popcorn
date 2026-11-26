@@ -115,12 +115,12 @@ async function buildEntrypointFixture(env: NodeJS.ProcessEnv): Promise<void> {
   );
 }
 
-// Served by Vite from public/, in its own Mix environment, which the fixture's
-// config packages without an entrypoint
+// Served by Vite from the project root, in its own Mix environment, which the
+// fixture's config packages without an entrypoint
 async function cookWithoutEntrypoint(env: NodeJS.ProcessEnv): Promise<void> {
   await runCommand(
     "mix",
-    ["popcorn.cook", "--out-dir", resolve(__dirname, "public/no-entrypoint")],
+    ["popcorn.cook", "--out-dir", resolve(__dirname, "no-entrypoint")],
     resolve(__dirname, "entrypoint-app"),
     "cooking the entrypoint fixture without an entrypoint",
     { ...env, MIX_ENV: "no_entrypoint" },

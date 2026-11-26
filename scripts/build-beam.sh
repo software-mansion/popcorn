@@ -506,9 +506,8 @@ copy_artifacts() {
     wasm_size=$(du -h "${outdir}/beam.wasm" | cut -f1)
     log "beam.wasm: ${wasm_size}"
 
-    sed 's/"beam\.emu"/"beam.emu.mjs"/g' \
+    sed -E 's/new URL\("beam\.emu",[[:space:]]*import\.meta\.url\)/import.meta.url/g' \
         "${wasm_bin_dir}/beam.emu" > "${outdir}/beam.emu.mjs"
-    echo 'export const wasmUrl = new URL("beam.wasm", import.meta.url).href;' >> "${outdir}/beam.emu.mjs"
 
     local runtime_dir="${outdir}/runtimes/${variant}"
     mkdir -p "${runtime_dir}"
