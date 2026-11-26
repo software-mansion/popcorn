@@ -95,7 +95,7 @@ export type BeamBootOptions = {
   /** VM environment variables. */
   env?: Record<string, string>;
   /** Resolved maximum Wasm linear memory in bytes. */
-  maxMemoryBytes?: number;
+  maxMemoryBytes: number;
   ttySize: TtySize;
   noshell: boolean;
   createModule: CreateModuleFn<EmscriptenModule>;
@@ -158,7 +158,6 @@ export type EmscriptenModule = {
     canWrite: boolean,
     canOwn: boolean,
   ) => void;
-  HEAPU8: Uint8Array;
   ccall: (
     ident: string,
     returnType: string | null,

@@ -1,7 +1,6 @@
 import { Assets } from "./assets";
 import { PopcornError, err, isErr, type Result } from "./errors";
 import { deserializeBridgeMessage } from "./events";
-import { schedulers } from "./popcorn";
 import { extractTar } from "./tar";
 import type {
   BeamBootOptions,
@@ -28,6 +27,12 @@ const BOOT_MODULE = "Elixir.Popcorn.Boot";
 const STDOUT_FD = 1;
 const MAX_STACK_ETF_BYTES = 32 * 1024;
 const UTF8 = new TextEncoder();
+
+// The VM's memory must fit beam.wasm's limits, build-beam.sh's
+// INITIAL_MEMORY and MAXIMUM_MEMORY
+const WASM_PAGE_BYTES = 64 * 1024;
+const INITIAL_MEMORY_BYTES = 64 * 1024 ** 2;
+const MAXIMUM_MEMORY_BYTES = 2 * 1024 ** 3;
 const BASE_ARGS = [
   "-root",
   "/",
@@ -171,13 +176,11 @@ async function boot(
       ],
     };
 
-    if (opts.maxMemoryBytes !== undefined) {
-      moduleConfig.wasmMemory = new WebAssembly.Memory({
-        initial: 1024,
-        maximum: opts.maxMemoryBytes / 65536,
-        shared: true,
-      });
-    }
+    moduleConfig.wasmMemory = new WebAssembly.Memory({
+      initial: INITIAL_MEMORY_BYTES / WASM_PAGE_BYTES,
+      maximum: opts.maxMemoryBytes / WASM_PAGE_BYTES,
+      shared: true,
+    });
     const ready = Promise.all([vmReady, bootReady]);
     const module = await createModule(moduleConfig);
     check(state.module === module);
@@ -280,6 +283,49 @@ function buildArgs({
   }
 
   return args;
+}
+
+/** Converts a `maxMemory` limit, such as "256M" or "2G", to bytes. */
+export function parseMemorySize(size: string): number {
+  const match = /^(\d+(?:\.\d+)?)([MG])$/.exec(size);
+  check(match !== null, 'maxMemory must use M or G, such as "256M" or "2G"');
+  const bytes = Number(match[1]) * (match[2] === "M" ? 1024 ** 2 : 1024 ** 3);
+  check(
+    Number.isSafeInteger(bytes) &&
+      bytes >= INITIAL_MEMORY_BYTES &&
+      bytes <= MAXIMUM_MEMORY_BYTES &&
+      bytes % WASM_PAGE_BYTES === 0,
+    "maxMemory must be a multiple of 64 KiB between 64 MiB and 2 GiB",
+  );
+  return bytes;
+}
+
+/**
+ * Thread counts for {@link schedulers}.
+ *
+ * Each count must be positive.
+ */
+export type SchedulerOptions = {
+  /** Regular schedulers. */
+  base: number;
+  /** Dirty CPU schedulers. */
+  dirtyCpu: number;
+  /** Dirty I/O schedulers. */
+  dirtyIo: number;
+};
+
+/**
+ * Builds `beam.emulatorArgs` for scheduler counts.
+ *
+ * Defaults to one scheduler of each type.
+ */
+export function schedulers(opts: SchedulerOptions): string[] {
+  const { base, dirtyCpu, dirtyIo } = opts;
+  check(base > 0);
+  check(dirtyCpu > 0);
+  check(dirtyIo > 0);
+
+  return ["-S", base, "-SDcpu", dirtyCpu, "-SDio", dirtyIo].map(String);
 }
 
 export function applyDefaults(rawEmulatorArgs: string[]): {
@@ -501,7 +547,10 @@ function send(
   }
   let status: unknown;
   try {
-    if (useHeap) module.HEAPU8.set(message.etf, etfPtr);
+    if (useHeap) {
+      check(module.wasmMemory !== undefined);
+      new Uint8Array(module.wasmMemory.buffer).set(message.etf, etfPtr);
+    }
     status = module.ccall(
       "sendVmMessage",
       "number",
