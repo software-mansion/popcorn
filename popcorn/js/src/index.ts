@@ -13,6 +13,9 @@ export type {
   DistTransport,
   Pid,
   OtpErrorPayload,
+  TcpConnection,
+  TcpConnector,
+  TcpPeer,
   TtySize,
 } from "./types";
 export type { PopcornErrors, Result, SerializedError } from "./errors";

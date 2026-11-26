@@ -70,6 +70,51 @@ export type DistTransport = (
   endpoint: DistEndpoint,
 ) => (event: DistNodeEvent | DistConnectionEvent) => void;
 
+/**
+ * The VM's end of a TCP connection, which {@link TcpConnector} gets.
+ *
+ * Stops delivering once the connection or the VM closes.
+ */
+export type TcpPeer = {
+  /** Delivers data to the VM's socket. */
+  readonly deliver: (data: Uint8Array) => void;
+  /** Closes the VM's socket, as when a server closes a connection. */
+  readonly close: () => void;
+};
+
+/** The JavaScript end of a TCP connection, which {@link TcpConnector} opens. */
+export type TcpConnection = {
+  /** Receives the data that the VM sends, in order. */
+  readonly send: (data: Uint8Array) => void;
+  /** Called when the VM closes the socket, or shuts down. */
+  readonly close: () => void;
+};
+
+/**
+ * Opens the TCP connections that the VM's `gen_tcp` opens with the
+ * `{tcp_module, popcorn_tcp}` option, as the VM has no sockets of its own.
+ * JavaScript carries them, for example to a server reached through a
+ * WebSocket, or to one that runs in the page.
+ *
+ * Returns the connection, or throws (rejects) to refuse it: `gen_tcp` then
+ * returns `{error, econnrefused}`.
+ *
+ * @example
+ * ```erlang
+ * {ok, Socket} = gen_tcp:connect("pglite", 5432, [binary, {tcp_module, popcorn_tcp}])
+ * ```
+ */
+export type TcpConnector = (
+  address: { host: string; port: number },
+  peer: TcpPeer,
+) => TcpConnection | Promise<TcpConnection>;
+
+/** Events of the VM's TCP connections, see popcorn_tcp.erl. */
+export type TcpVmEvent =
+  | { type: "connect"; connection: string; host: string; port: number }
+  | { type: "data"; connection: string; data: Uint8Array }
+  | { type: "close"; connection: string };
+
 /** Internal wire target. The public `send` accepts `string | Pid` instead. */
 export type BeamTarget = { name: string } | { pid: Uint8Array };
 

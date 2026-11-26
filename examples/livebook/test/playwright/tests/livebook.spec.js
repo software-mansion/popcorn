@@ -154,6 +154,8 @@ test("the home page renders and connects", async () => {
 // LivebookWasm.Application stars the example notebooks of priv/notebooks/
 test("the home page lists the example notebooks", async () => {
   const starred = app.locator("#starred-notebooks");
+  // Livebook shows 6, and the others on request
+  await starred.getByRole("button", { name: "Show more" }).click();
   for (const title of [
     "Charts with VegaLite",
     "Maps with MapLibre",
@@ -161,8 +163,10 @@ test("the home page lists the example notebooks", async () => {
     "Tensors with Nx",
     "Nodes across tabs",
     "Testing and benchmarking",
+    "Background jobs with Oban",
   ])
     await expect(starred.getByText(title, { exact: true })).toBeVisible();
+  await starred.getByRole("button", { name: "Show less" }).click();
 });
 
 // Like a link of Livebook's opened in a new tab. Only the shell's iframe
@@ -307,7 +311,7 @@ test("the notebook's VM gets Elixir's and Erlang's docs", async () => {
 test("Mix.install downloads and compiles packages", async () => {
   test.setTimeout(660_000);
   await evaluate(
-    `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req, {:parse_trans, "~> 3.4"}, {:ranch, "~> 2.2"}, {:seshat, "~> 1.0"}])`,
+    `Mix.install([{:kino, "~> 0.18.0"}, {:nimble_csv, "~> 1.2"}, {:jsone, "~> 1.9"}, :req, {:parse_trans, "~> 3.4"}, {:ranch, "~> 2.2"}, {:seshat, "~> 1.0"}, {:postgrex, "~> 0.20"}])`,
     ":ok",
     600_000,
   );
@@ -417,6 +421,17 @@ test("installed packages run", async () => {
   await evaluate(
     `{NimbleCSV.RFC4180.parse_string("a,b\\n1,2\\n"), :jsone.decode("[1,2]")}`,
     `{[["1", "2"]], [1, 2]}`,
+  );
+});
+
+// PGlite, which runs in the page, see public/pglite.js. Popcorn's popcorn_tcp
+// carries the connection, as the VM has no sockets.
+test("Postgrex queries Postgres in the page", async () => {
+  await evaluate(
+    `{:ok, conn} = Postgrex.start_link(hostname: "pglite", socket_options: [tcp_module: :popcorn_tcp], database: "postgres", username: "postgres", password: "postgres", prepare: :unnamed)\n` +
+      `Postgrex.query!(conn, "select 'from ' || $1 || ' ' || version()", ["Postgrex"]).rows`,
+    "from Postgrex PostgreSQL",
+    120_000,
   );
 });
 

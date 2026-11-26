@@ -215,6 +215,7 @@
       // see sw.js. The iframe's WebSockets are created here.
       import { Popcorn, schedulers } from "/out/index.mjs";
       import { createTabRelay } from "/distribution.js";
+      import { connectPglite } from "/pglite.js";
 
       // The bar shows Livebook's VM's state: "loading", "ready" or "error". The
       // console also gets how long the step took, if given.
@@ -266,6 +267,8 @@
           const t0 = performance.now();
           const runtime = Popcorn.init({
             distribution: relay,
+            // Postgres in the page, for the notebooks' connections to "pglite"
+            tcp: connectPglite,
             timeoutsMs,
             beam: {
               otpAssetsRoot: notebookVm,

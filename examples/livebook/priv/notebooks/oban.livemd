@@ -1,0 +1,105 @@
+# Background jobs with Oban
+
+```elixir
+Mix.install([
+  {:oban, "~> 2.20"},
+  {:ecto_sql, "~> 3.13"},
+  {:postgrex, "~> 0.20"},
+  {:jason, "~> 1.4"},
+  {:kino, "~> 0.19"}
+])
+
+Logger.configure(level: :info)
+```
+
+## A database in the page
+
+This notebook runs background jobs with Oban, which keeps them in Postgres, then watches them run, fail and retry. The browser has no TCP sockets, so Postgres can't be reached over the network here: instead, it runs in the page, as PGlite, Postgres compiled to WebAssembly. Popcorn connects Postgrex to it, with gen_tcp's `tcp_module` option. The database is in memory, and the notebooks of this tab share it.
+
+```elixir
+defmodule Repo do
+  use Ecto.Repo, otp_app: :demo, adapter: Ecto.Adapters.Postgres
+end
+
+defmodule AddOban do
+  use Ecto.Migration
+  def up, do: Oban.Migrations.up()
+  def down, do: Oban.Migrations.down()
+end
+
+Kino.start_child(
+  {Repo,
+   # Postgres in the page, which Popcorn connects to
+   hostname: "pglite",
+   socket_options: [tcp_module: :popcorn_tcp],
+   database: "postgres",
+   username: "postgres",
+   password: "postgres",
+   # PGlite has a single session: more connections could wait for each other
+   pool_size: 1,
+   prepare: :unnamed}
+)
+
+Ecto.Migrator.run(Repo, [{1, AddOban}], :up, all: true, migration_lock: false, log: false)
+```
+
+## Jobs
+
+A worker greets the name it gets, taking a second for it. Flaky fails at first, so Oban retries it a few seconds later.
+
+```elixir
+defmodule Greeter do
+  use Oban.Worker, max_attempts: 3
+
+  @impl true
+  def perform(%Oban.Job{args: %{"name" => name}, attempt: attempt}) do
+    Process.sleep(1000)
+    if name == "Flaky" and attempt == 1, do: raise("Flaky failed")
+    {:ok, "Hello, #{name}!"}
+  end
+
+  # The first retry is soon, rather than after Oban's default 15 seconds or so
+  @impl true
+  def backoff(_job), do: 3
+end
+
+Kino.start_child(
+  {Oban,
+   repo: Repo,
+   queues: [default: 2],
+   # Without Postgres notifications, which PGlite doesn't send to other
+   # connections, Oban's nodes talk through Erlang's process groups
+   notifier: Oban.Notifiers.PG,
+   peer: Oban.Peers.Global}
+)
+
+Oban.insert_all([
+  Greeter.new(%{name: "Ada"}),
+  Greeter.new(%{name: "Grace"}),
+  Greeter.new(%{name: "Flaky"}),
+  Greeter.new(%{name: "Later"}, schedule_in: 5)
+])
+
+:ok
+```
+
+The jobs table, every second:
+
+```elixir
+import Ecto.Query
+
+Kino.animate(1000, fn _ ->
+  from(j in Oban.Job,
+    order_by: j.id,
+    select: %{
+      id: j.id,
+      name: j.args["name"],
+      state: j.state,
+      attempt: j.attempt,
+      scheduled_at: j.scheduled_at
+    }
+  )
+  |> Repo.all()
+  |> Kino.DataTable.new(name: "Jobs", keys: [:id, :name, :state, :attempt, :scheduled_at])
+end)
+```

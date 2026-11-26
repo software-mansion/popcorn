@@ -118,6 +118,26 @@ workspace, so it needs `pnpm install` first.
 - Req requests with the browser's `fetch()` too: Popcorn installs its Req
   adapter once `Mix.install/2` has started Req.
 
+### Postgres in the page
+
+- The notebooks can use Postgres: PGlite, Postgres compiled to WebAssembly,
+  which the shell loads from jsDelivr on the first connection. The tab has one
+  database, in memory, which its notebooks share.
+- The VMs have no sockets, so Postgrex connects with gen_tcp's
+  `{tcp_module, popcorn_tcp}` option, `socket_options: [tcp_module:
+  :popcorn_tcp]`, to the host `pglite`. Popcorn's `popcorn_tcp` passes the
+  connection's data to its `tcp` option, which the shell sets to
+  `public/pglite.js`. That passes Postgres' wire protocol to PGlite.
+- PGlite has a single session, which the connections share. A connection has it
+  from its first message until Postgres is ready for a query out of a
+  transaction. So a connection that waits for another while in a transaction
+  waits forever, as Ecto's migration lock and Postgrex's type server would with
+  a bigger pool: repos use `pool_size: 1`, and migrations `migration_lock:
+  false`. Named prepared statements are shared too, so repos use `prepare:
+  :unnamed`.
+- PGlite doesn't send notifications to other connections, so Oban uses its
+  `Oban.Notifiers.PG` notifier: see `priv/notebooks/oban.livemd`.
+
 ### Opening notebooks from links
 
 - Livebook opens a notebook from a link to `/import?url=<notebook>`. That's

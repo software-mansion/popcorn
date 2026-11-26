@@ -24,7 +24,7 @@ defmodule LivebookWasm.Application do
   end
 
   # The example notebooks, in the order of their cards on the home page
-  @examples ~w(charts maps processes nx nodes testing)
+  @examples ~w(charts maps processes nx nodes testing oban)
 
   # Livebook's home page shows starred notebooks first, so the examples are
   # starred. They're copied to the home directory, so that editing them leaves

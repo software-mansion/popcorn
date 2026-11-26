@@ -85,7 +85,10 @@ defmodule Popcorn.Packager do
     # Local views are looked up by name (string) and called dynamically
     behaviour_impls: LocalLiveView,
     # Ecto schemas
-    referenced_modules_defining: {:__changeset__, 0}
+    referenced_modules_defining: {:__changeset__, 0},
+    # TCP connections over JavaScript, which only gen_tcp's `tcp_module`
+    # option names
+    mod: :popcorn_tcp
   ]
 
   @kept_for_distribution [

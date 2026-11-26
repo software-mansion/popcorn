@@ -21,6 +21,9 @@ import type {
   OtpErrorPayload,
   Pid,
   RunJsRequest,
+  TcpConnection,
+  TcpConnector,
+  TcpVmEvent,
   TtySize,
 } from "./types";
 import { base64ToBytes, check, objectWithKeys, unreachable } from "./utils";
@@ -127,6 +130,13 @@ export type PopcornOpts<Output extends TtyOutput = "text"> = {
    */
   distribution?: DistTransport;
   /**
+   * Opens the TCP connections of the VM's `gen_tcp`, for the sockets it
+   * opens with the `{tcp_module, popcorn_tcp}` option. See {@link TcpConnector}.
+   *
+   * Without it, these connections are refused.
+   */
+  tcp?: TcpConnector;
+  /**
    * Module worker URL.
    *
    * Defaults to the worker included with the package.
@@ -152,6 +162,17 @@ const DEFAULT_CALL_TIMEOUT_MS = 5_000;
 
 /** The process of the VM's distribution carrier, popcorn_dist. */
 const DIST_ROUTER = "popcorn_dist";
+
+/** The process that routes the VM's TCP connections, popcorn_tcp. */
+const TCP_ROUTER = "popcorn_tcp";
+
+/** A TCP connection of the VM, until it closes. */
+type TcpEntry = {
+  /** Once the connector opened it. */
+  connection: TcpConnection | null;
+  /** Once the connection or the VM closed it. */
+  closed: boolean;
+};
 
 type VmExitReason =
   | { reason: "deinit" }
@@ -228,6 +249,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
   private distHandler:
     | ((event: DistNodeEvent | DistConnectionEvent) => void)
     | null = null;
+  private readonly tcpConnections = new Map<string, TcpEntry>();
   private readonly pendingSends = new Map<string, PendingSend>();
   private readonly pendingCalls = new Map<string, PendingCall>();
   private readonly readyWaiters: Uint8Array[] = [];
@@ -696,6 +718,7 @@ export class Popcorn<Output extends TtyOutput = "text"> {
     this.vmWorker.terminate();
     this.assetsRelay?.close();
     this.assetsRelay = undefined;
+    this.closeTcpConnections();
     try {
       this.handleNodeChange(null);
     } finally {
@@ -731,6 +754,9 @@ export class Popcorn<Output extends TtyOutput = "text"> {
         case "dist_node":
           this.handleNodeChange(envelope.payload as string | null);
           return;
+        case "tcp":
+          this.handleTcpEvent(envelope.payload as TcpVmEvent);
+          return;
         default:
           unreachable();
       }
@@ -761,6 +787,93 @@ export class Popcorn<Output extends TtyOutput = "text"> {
 
   private emitDistEvent(event: DistNodeEvent | DistConnectionEvent): void {
     this.distHandler?.(event);
+  }
+
+  private handleTcpEvent(event: TcpVmEvent): void {
+    switch (event.type) {
+      case "connect":
+        this.openTcpConnection(event);
+        return;
+      case "data":
+        this.tcpConnections.get(event.connection)?.connection?.send(event.data);
+        return;
+      case "close": {
+        const entry = this.tcpConnections.get(event.connection);
+        if (entry === undefined) return;
+        this.tcpConnections.delete(event.connection);
+        entry.closed = true;
+        entry.connection?.close();
+        return;
+      }
+    }
+  }
+
+  private openTcpConnection(
+    event: Extract<TcpVmEvent, { type: "connect" }>,
+  ): void {
+    const { connection: id, host, port } = event;
+    // Sends directly to the worker, so that a stale connection doesn't send to
+    // a new one
+    const worker = this.vmWorker;
+    const sendToRouter = (payload: Record<string, unknown>) => {
+      const message = serializeSendPayload(
+        { name: TCP_ROUTER },
+        { ...payload, connection: id },
+      );
+      if (message.ok) sendBridgeReply(worker, message.data);
+    };
+
+    const entry: TcpEntry = { connection: null, closed: false };
+    this.tcpConnections.set(id, entry);
+    const closeEntry = (reason: string) => {
+      if (entry.closed) return;
+      entry.closed = true;
+      this.tcpConnections.delete(id);
+      sendToRouter({ type: "closed", reason });
+    };
+
+    const peer = Object.freeze({
+      deliver: (data: Uint8Array) => {
+        if (!entry.closed) sendToRouter({ type: "data", data });
+      },
+      close: () => closeEntry("closed"),
+    });
+
+    const connector = this.opts.tcp;
+    if (connector === undefined) {
+      closeEntry("econnrefused");
+      return;
+    }
+    Promise.resolve()
+      .then(() => connector({ host, port }, peer))
+      .then(
+        (connection) => {
+          if (entry.closed) {
+            connection.close();
+            return;
+          }
+          entry.connection = connection;
+          sendToRouter({ type: "connected" });
+        },
+        (error: unknown) => {
+          console.warn(
+            `${LOG_PREFIX} TCP connection to ${host}:${port} refused:`,
+            error,
+          );
+          closeEntry("econnrefused");
+        },
+      );
+  }
+
+  private closeTcpConnections(): void {
+    const entries = [...this.tcpConnections.values()];
+    this.tcpConnections.clear();
+    for (const entry of entries) {
+      entry.closed = true;
+      try {
+        entry.connection?.close();
+      } catch {}
+    }
   }
 
   private completeCall(id: string, payload: unknown): void {
