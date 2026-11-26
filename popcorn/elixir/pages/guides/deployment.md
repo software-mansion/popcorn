@@ -18,22 +18,46 @@ In development, both `mix popcorn.dev` and the Vite plugin set them.
 1. Serve `.wasm` files with `Content-Type: application/wasm`.
 2. Set `Content-Encoding: gzip` or `Content-Encoding: br` to serve compressed assets. Popcorn generates them automatically. `br` is Brotli compression and works better than Gzip. Compression level is configurable in the packager. Set `Vary: Accept-Encoding` when selecting a representation.
 
-## Cache bundles independently
+## Caching
 
-The packager emits three archives: `stdlib.<hash>.tar` for selected Erlang/Elixir
-built-ins, `app.<hash>.tar` for user code, and `deps.<hash>.tar` for dependencies.
+Most of the packager's output has a SHA-256 hash of its contents in its
+filename, so a new version gets a new name. Browsers can cache these files for
+good, and the few files that name them tell browsers which ones are current.
 
-Each filename contains the SHA-256 of its final uncompressed contents. The boot
-script also has a content hash in its filename.
-Tree-shaking runs on all applications which means a change in your app may include or drop a module from a standard library and change the hash.
+### Hashed files
 
-Serve hashed tarballs with:
+- `otp/lib/stdlib.<hash>.tar`, `otp/lib/app.<hash>.tar` and
+  `otp/lib/deps.<hash>.tar`: the archives of the selected Erlang/Elixir
+  built-ins, your code, and your dependencies. Tree-shaking runs on all
+  applications, so a change in your app may include or drop a module from a
+  standard library and change its hash too.
+- `beam.<hash>.wasm`: the VM.
+- `beam.emu.<hash>.mjs`: the script that loads the VM. Each of the VM's threads
+  loads it in a worker of its own, so unless it's cached, the browser
+  revalidates it once for each thread, one request after another.
+
+Serve them with:
 
 ```http
 Cache-Control: public, max-age=31536000, immutable
 ```
 
-This prevent re-requesting them if they didn't change. They're referenced by `manifest.json` which should be checked periodically for using new hashed tarballs.
+Browsers then don't request them again until their names change.
+
+### Other files
+
+`otp/manifest.json` names the archives, and `worker.mjs` names the VM's script,
+which names the VM. They and the rest of the output, like `index.mjs`, keep
+their names, so serve them with:
+
+```http
+Cache-Control: no-cache
+```
+
+It makes browsers always verify that their cache is up-to-date.
+
+The [sample nginx config](#sample-nginx-config-for-hosting-popcorn-applications)
+below sets both headers.
 
 ## Avoid transforming the output
 
@@ -68,7 +92,7 @@ http {
 
     map $uri $popcorn_cache_control {
         default "no-cache";
-        "~\.[a-f0-9]{64}\.(tar|boot)$" "public, max-age=31536000, immutable";
+        "~\.[a-f0-9]{64}\.(tar|mjs|wasm)$" "public, max-age=31536000, immutable";
     }
 
     server {

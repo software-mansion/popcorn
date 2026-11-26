@@ -374,7 +374,7 @@ defmodule Popcorn.Packager do
     vm_files = Enum.map(@runtime_files, &{&1, Path.join(variant_dir, &1)})
 
     with :ok <- copy_assets(js_files ++ vm_files, out_dir) do
-      for {filename, _source} <- js_files ++ vm_files do
+      for filename <- ["index.mjs", "worker.mjs" | fingerprint_vm(out_dir)] do
         compress(Path.join(out_dir, filename), brotli_effort)
       end
 
@@ -400,6 +400,32 @@ defmodule Popcorn.Packager do
            tarPaths: tar_paths
        }}
     end
+  end
+
+  defp fingerprint_vm(out_dir) do
+    wasm = fingerprint_referenced!(out_dir, "beam.wasm", ["beam.emu.mjs"])
+    script = fingerprint_referenced!(out_dir, "beam.emu.mjs", ["beam.emu.mjs", "worker.mjs"])
+    [script, wasm]
+  end
+
+  # Like fingerprint/1, but also changes the name in files that refer to it
+  # (referrers). Reference is the name in quotes, optionally prefixed with ./
+  defp fingerprint_referenced!(out_dir, name, referrers) do
+    {new_name, _hash} = fingerprint(Path.join(out_dir, name))
+    pattern = ~r/(["'])(\.\/)?#{Regex.escape(name)}\1/
+
+    for referrer <- referrers do
+      referrer = Path.join(out_dir, if(referrer == name, do: new_name, else: referrer))
+      contents = File.read!(referrer)
+
+      if not Regex.match?(pattern, contents) do
+        raise "#{referrer} has no reference to #{name}"
+      end
+
+      File.write!(referrer, Regex.replace(pattern, contents, "\\g{1}\\g{2}#{new_name}\\g{1}"))
+    end
+
+    new_name
   end
 
   defp copy_assets(files, out_dir) do
@@ -1020,8 +1046,8 @@ defmodule Popcorn.Packager do
     opts = [mtime: 0, atime: 0, ctime: 0, uid: 0, gid: 0]
     :ok = :erl_tar.create(to_charlist(path), entries, opts)
 
-    {target, hash} = fingerprint(path)
-    tar = Path.join("lib", Path.basename(target))
+    {name, hash} = fingerprint(path)
+    tar = Path.join("lib", name)
     %{tar: tar, sha256: hash}
   end
 
@@ -1029,7 +1055,7 @@ defmodule Popcorn.Packager do
     hash = sha256_file(path)
     target = Path.rootname(path) <> ".#{hash}" <> Path.extname(path)
     File.rename!(path, target)
-    {target, hash}
+    {Path.basename(target), hash}
   end
 
   defp sha256_file(path) do
