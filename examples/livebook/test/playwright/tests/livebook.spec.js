@@ -233,6 +233,36 @@ test("a new notebook opens", async () => {
   ).toBeVisible();
 });
 
+// Whether Popcorn's card is open, once Livebook has had the time to take the
+// focus back from the shell
+const cardOpen = async () => {
+  await page.waitForTimeout(300);
+  return page.locator("#card").evaluate((card) => card.matches(":popover-open"));
+};
+
+// The new notebook's cell editor takes the focus back from the shell, which
+// mustn't close the card
+test("Popcorn's button toggles its card on a notebook", async () => {
+  const button = page.locator("#popcorn");
+  for (let i = 0; i < 2; i++) {
+    await button.click();
+    expect(await cardOpen()).toBe(true);
+    await button.click();
+    expect(await cardOpen()).toBe(false);
+  }
+
+  await button.click();
+  await page.locator("#card p").first().click();
+  expect(await cardOpen(), "after a click in the card").toBe(true);
+  // An empty part of the notebook's page
+  await app.locator("body").click({ position: { x: 1180, y: 600 } });
+  expect(await cardOpen(), "after a click on Livebook's page").toBe(false);
+
+  await button.click();
+  await page.keyboard.press("Escape");
+  expect(await cardOpen(), "after Escape in Livebook's page").toBe(false);
+});
+
 // Livebook opens its dashboard in a new tab, where a new shell would open its
 // own Livebook on its home page, so the shell's Livebook opens it instead
 test("the notebook's menu opens the dashboard in the tab's Livebook", async () => {
@@ -354,6 +384,16 @@ test("Kino.JS outputs render in their iframes", async () => {
   await expect(frame.getByText("Rendered by Kino.JS")).toBeVisible({
     timeout: 120_000,
   });
+
+  // A click on the output, right of Popcorn's card, closes the card
+  await page.locator("#popcorn").click();
+  expect(await cardOpen()).toBe(true);
+  const box = await app
+    .locator("iframe[src*='/iframe/v6.html']")
+    .first()
+    .boundingBox();
+  await page.mouse.click(box.x + box.width - 20, box.y + box.height / 2);
+  expect(await cardOpen(), "after a click on the output").toBe(false);
 });
 
 // Binary payloads go as binary WebSocket frames: the initial one and "pong"

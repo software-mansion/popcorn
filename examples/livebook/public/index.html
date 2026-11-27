@@ -409,11 +409,12 @@
         }
       }
 
-      // The button toggles the card, and Escape, clicks elsewhere on the shell
-      // and clicks on Livebook's page close it. The card is a manual popover,
+      // The button toggles the card, and Escape and clicks elsewhere, on the
+      // shell or in Livebook's frame, close it. The card is a manual popover,
       // which the browser doesn't close on its own, so that a click on the
       // button only toggles it.
       const hideCard = () => card.matches(":popover-open") && card.hidePopover();
+      const hideOnEscape = (event) => event.key === "Escape" && hideCard();
       button.addEventListener("click", () => {
         openedForStatus = false;
         card.togglePopover();
@@ -424,10 +425,28 @@
       document.addEventListener("pointerdown", ({ target }) => {
         if (!button.contains(target) && !card.contains(target)) hideCard();
       });
-      document.addEventListener("keydown", (event) => event.key === "Escape" && hideCard());
-      // Livebook's page, in the iframe, takes the focus from the shell
-      window.addEventListener("blur", hideCard);
+      document.addEventListener("keydown", hideOnEscape);
       status("Loading VM…");
+
+      // Livebook's pages are watched for clicks, rather than the shell for
+      // losing the focus: Livebook takes the focus back from the shell for the
+      // editor of a cell that it edits. Clicks on outputs' frames, from the
+      // shell or Livebook's page, move the focus to them.
+      function hideCardFrom(frame) {
+        const hideOnOutputFocus = () =>
+          setTimeout(() => frame.contentDocument?.activeElement?.localName === "iframe" && hideCard());
+        window.addEventListener("blur", hideOnOutputFocus);
+        frame.addEventListener("load", () => {
+          try {
+            const page = frame.contentWindow;
+            page.addEventListener("pointerdown", hideCard, true);
+            page.addEventListener("keydown", hideOnEscape, true);
+            page.addEventListener("blur", hideOnOutputFocus);
+          } catch {
+            // The browser's error page, of another origin
+          }
+        });
+      }
 
       // The loader follows the state too, until Livebook's page is first ready
       function updateLoader(state) {
@@ -695,6 +714,7 @@
         const path = location.pathname === "/index.html" ? "/" : location.pathname;
         const frame = addFrame(`${base}${path}${location.search}`, { id: "livebook" });
         watchLivebook(frame, "Running");
+        hideCardFrom(frame);
         await loaded(frame);
 
         // Livebook has opened the link by the time its page loads, so reloading
