@@ -58,5 +58,13 @@
         location.assign(url.href);
       }
     });
+
+    // Livebook's banner about its newer versions, which this Livebook can't be
+    // updated to, is hidden. It links to the update instructions, whose URL
+    // config/config.exs sets.
+    const instructions = "https://livebook.dev/#update-check";
+    const hidden = document.createElement("style");
+    hidden.textContent = `div:has(> span > a[href="${instructions}"]) { display: none; }`;
+    document.head.append(hidden);
   }
 }

@@ -7,16 +7,23 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="49x80" />
     <style>
-      /* popcorn.swmansion.com's colors, see landing-page/ */
+      /* popcorn.swmansion.com's colors and font, see landing-page/ */
       :root {
         --cream: #fffdf5;
         --cream-soft: #fbf4e5;
+        --cream-muted: #c4b7a6;
         --ink: #301b05;
         --brown: #5f4122;
         --brown-muted: #9c8b79;
         --orange: #ef7c00;
         --green: #5e9a48;
         --red: #c03a17;
+      }
+      @font-face {
+        font-family: "DM Sans";
+        src: url("/fonts/dm-sans.woff2") format("woff2");
+        font-weight: 100 1000;
+        font-display: swap;
       }
       html,
       body {
@@ -26,107 +33,233 @@
       body {
         display: flex;
         flex-direction: column;
-        font: 13px/1.5 system-ui, sans-serif;
+        font: 14px/1.55 "DM Sans", system-ui, sans-serif;
         color: var(--ink);
         background: var(--cream);
       }
-      #bar {
+      iframe {
+        flex: 1;
+        border: 0;
+      }
+      /* Popcorn's mark, in its element's color */
+      .mark {
         flex: none;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        height: 40px;
-        padding: 0 16px;
+        background: currentColor;
+        -webkit-mask: url("/favicon.svg") center / contain no-repeat;
+        mask: url("/favicon.svg") center / contain no-repeat;
+      }
+
+      /* The button's place, next to Livebook's logo or menu button. Livebook's
+         notebooks and its other pages put those in different places, which
+         change at its breakpoints, 640px and 768px wide. The script sets the
+         body's data-livebook to the page's layout. */
+      body {
+        --x: 8px;
+        --y: 8px;
+        --size: 42px;
+      }
+      /* After the menu button, in the top bar */
+      body[data-livebook="home"] {
+        --x: 48px;
+        --y: 7px;
+      }
+      /* After the button that hides the sidebar */
+      body[data-livebook="notebook"] {
+        --x: 112px;
+        --y: 3px;
+      }
+      @media (max-width: 639px) {
+        /* Or, when the sidebar is hidden, after the button that shows it */
+        body[data-livebook="notebook"][data-sidebar="hidden"] {
+          --x: 48px;
+        }
+      }
+      @media (min-width: 640px) {
+        /* Between the sidebar's logo and the notebook's title */
+        body[data-livebook="notebook"] {
+          --x: 53px;
+          --y: 22px;
+          --size: 36px;
+        }
+      }
+      @media (min-width: 768px) {
+        /* At the end of the sidebar's top row, after Livebook's version */
+        body[data-livebook="home"] {
+          --x: 222px;
+          --y: 19px;
+        }
+        /* Right of the sidebar */
+        body[data-livebook="notebook"] {
+          --x: 72px;
+          --y: 19px;
+          --size: 42px;
+        }
+      }
+
+      /* Floats over Livebook's page, and opens the card */
+      #popcorn {
+        position: fixed;
+        top: var(--y);
+        left: var(--x);
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        width: var(--size);
+        height: var(--size);
+        padding: 0;
+        border: 1.5px solid var(--ink);
+        border-radius: 12px;
+        color: var(--ink);
+        background: var(--cream);
+        box-shadow: 0 2px 8px rgb(48 27 5 / 0.12);
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      #popcorn:hover,
+      #popcorn:focus-visible {
         background: var(--cream-soft);
-        border-bottom: 1px solid var(--ink);
       }
-      #status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-        margin: 0;
-        font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-        color: var(--brown);
+      #popcorn .mark {
+        width: calc(var(--size) * 0.36);
+        height: calc(var(--size) * 0.6);
       }
-      #status-text,
-      #notebook-vms {
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-      #notebook-vms:not(:empty)::before {
-        content: "·";
-        margin-right: 8px;
-        color: var(--brown-muted);
-      }
-      #status .dot {
-        flex: none;
+      /* Livebook's state, until it's ready */
+      #popcorn .dot {
+        position: absolute;
+        top: -4px;
+        right: -4px;
         width: 8px;
         height: 8px;
+        border: 2px solid var(--cream);
         border-radius: 50%;
         background: var(--orange);
       }
-      #status[data-state="loading"] .dot {
+      #popcorn[data-state="loading"] .dot {
         animation: pulse 1.2s ease-in-out infinite;
       }
-      #status[data-state="ready"] .dot {
-        background: var(--green);
+      #popcorn[data-state="ready"] .dot {
+        display: none;
       }
-      #status[data-state="error"] .dot {
+      #popcorn[data-state="error"] .dot {
         background: var(--red);
-      }
-      #status[data-state="error"] #status-text {
-        color: var(--red);
       }
       @keyframes pulse {
         50% {
           opacity: 0.3;
         }
       }
-      @media (prefers-reduced-motion: reduce) {
-        #status .dot {
-          animation: none !important;
-        }
+
+      /* Under the button, within the window. It grows with the window, and
+         spans phones' width. */
+      #card {
+        --width: min(100vw - 16px, clamp(340px, 40vw, 600px));
+        container-type: inline-size;
+        inset: auto;
+        top: calc(var(--y) + var(--size) + 8px);
+        left: max(8px, min(var(--x), 100vw - var(--width) - 8px));
+        box-sizing: border-box;
+        width: var(--width);
+        max-height: calc(100vh - var(--y) - var(--size) - 16px);
+        overflow-y: auto;
+        margin: 0;
+        padding: 18px 20px 20px;
+        border: 1.5px solid var(--ink);
+        border-radius: 14px;
+        color: var(--brown);
+        background: var(--cream);
+        box-shadow: 0 8px 24px rgb(48 27 5 / 0.14);
       }
-      #powered {
-        flex: none;
-        display: flex;
+      #card .title {
+        display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        font-size: 18px;
         color: var(--ink);
         text-decoration: none;
         transition: color 0.15s;
       }
-      #powered:hover,
-      #powered:focus-visible {
+      #card .title:hover,
+      #card .title:focus-visible {
         color: var(--orange);
       }
-      /* The logo in the link's color */
-      #powered .logo {
-        width: 75px;
-        height: 20px;
-        background: currentColor;
-        -webkit-mask: url("/popcorn-logo.svg") center / contain no-repeat;
-        mask: url("/popcorn-logo.svg") center / contain no-repeat;
+      #card .title .mark {
+        width: 13px;
+        height: 21px;
       }
-      #powered .arrow {
+      #card .title .arrow {
+        font-size: 14px;
         color: var(--orange);
       }
-      @media (max-width: 480px) {
-        #powered .by {
-          display: none;
+      #card p {
+        margin: 10px 0 14px;
+      }
+      #card h2 {
+        margin: 12px 0 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--brown-muted);
+      }
+      #card ul {
+        margin: 0 0 16px;
+        padding: 0;
+        list-style: none;
+        font-size: 13px;
+      }
+      #card li {
+        display: flex;
+        gap: 8px;
+      }
+      #card li::before {
+        flex: none;
+        width: 1em;
+        text-align: center;
+      }
+      #card .works li::before {
+        content: "✓";
+        color: var(--green);
+      }
+      #card .missing li::before {
+        content: "✕";
+        color: var(--red);
+      }
+      @media (max-width: 639px) {
+        #card {
+          --width: calc(100vw - 16px);
         }
       }
-      iframe {
-        flex: 1;
-        border: 0;
+      /* Side by side, when the card is wide enough */
+      @container (min-width: 440px) {
+        #card .lists {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0 24px;
+        }
       }
-      /* Covers the page under the bar until Livebook's page is ready */
+      #card dl {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 24px;
+        margin: 0;
+        padding-top: 16px;
+        border-top: 1px solid var(--cream-muted);
+      }
+      #card dt {
+        color: var(--brown-muted);
+      }
+      #card dd {
+        margin: 0;
+        color: var(--ink);
+      }
+      #status[data-state="error"] {
+        color: var(--red);
+      }
+
+      /* Covers the page until Livebook's page is ready */
       #loader {
         position: fixed;
-        inset: 41px 0 0;
+        inset: 0;
         z-index: 1;
         display: flex;
         flex-direction: column;
@@ -185,25 +318,55 @@
       }
       @media (prefers-reduced-motion: reduce) {
         #loader .mark,
-        #loader .shadow {
+        #loader .shadow,
+        #popcorn .dot {
           animation: none;
         }
       }
     </style>
   </head>
   <body>
-    <header id="bar">
-      <p id="status" role="status" data-state="loading">
-        <span class="dot" aria-hidden="true"></span>
-        <span id="status-text">Loading VM…</span>
-        <span id="notebook-vms"></span>
-      </p>
-      <a id="powered" href="https://popcorn.swmansion.com" target="_blank" rel="noreferrer" aria-label="Powered by Popcorn">
-        <span class="by">Powered by</span>
-        <span class="logo"></span>
+    <button id="popcorn" type="button" aria-controls="card" aria-expanded="false" data-state="loading" aria-label="Popcorn">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="dot" aria-hidden="true"></span>
+    </button>
+    <section id="card" popover="manual" aria-label="Popcorn">
+      <a class="title" href="https://popcorn.swmansion.com" target="_blank" rel="noreferrer">
+        <span class="mark" aria-hidden="true"></span>
+        Popcorn
         <span class="arrow" aria-hidden="true">↗</span>
       </a>
-    </header>
+      <p>This is Popcorn-based Livebook, running in this browser tab.
+        Popcorn runs the BEAM in WebAssembly, so the code never leaves the browser.
+        Each notebook is a separate VM, like in regular Livebook. Notebooks are saved
+        in a virtual file system, which is cleaned up after a page reload.</p>
+      <div class="lists">
+        <div>
+          <h2>What works</h2>
+          <ul class="works">
+            <li>Mix.install</li>
+            <li>Kino</li>
+            <li>Req and httpc (CORS limitations apply)</li>
+            <li>Distribution across browser tabs</li>
+            <li>Files (via a virtual file system)</li>
+          </ul>
+        </div>
+        <div>
+          <h2>What doesn't work</h2>
+          <ul class="missing">
+            <li>Native code (NIFs)</li>
+            <li>Running programs, like System.cmd</li>
+            <li>Plain TCP/UDP</li>
+          </ul>
+        </div>
+      </div>
+      <dl>
+        <dt>Livebook</dt>
+        <dd id="status" role="status" data-state="loading"><span id="status-text">Loading VM…</span></dd>
+        <dt>Notebook VMs</dt>
+        <dd id="notebook-vms">None</dd>
+      </dl>
+    </section>
     <div id="loader" data-state="loading" aria-hidden="true">
       <div class="mark"></div>
       <div class="shadow"></div>
@@ -216,15 +379,55 @@
       import { Popcorn, schedulers } from "/out/index.mjs";
       import { createTabRelay } from "/distribution.js";
 
-      // The bar shows Livebook's VM's state: "loading", "ready" or "error". The
-      // console also gets how long the step took, if given.
+      // Popcorn's card shows Livebook's state: "loading", "ready" or "error",
+      // and its button a dot until it's ready. The console also gets how long
+      // the step took, if given.
+      const button = document.querySelector("#popcorn");
+      const card = document.querySelector("#card");
+      let shownState;
       const status = (text, state = "loading", ms = null) => {
         document.querySelector("#status").dataset.state = state;
-        // The whole text, which the bar may cut
-        Object.assign(document.querySelector("#status-text"), { textContent: text, title: text });
+        document.querySelector("#status-text").textContent = text;
+        button.dataset.state = state;
+        button.ariaLabel = `Popcorn. Livebook: ${text}`;
+        if (state !== shownState) showCard(state);
+        shownState = state;
         updateLoader(state);
-        console.log(`[shell] ${text}${ms === null ? "" : ` (${Math.round(ms)} ms)`}`);
+        console.log(`[shell] Livebook: ${text}${ms === null ? "" : ` (${Math.round(ms)} ms)`}`);
       };
+
+      // The card opens itself when Livebook fails, and closes itself once
+      // Livebook is ready again, unless the button opened it
+      let openedForStatus = false;
+      function showCard(state) {
+        const open = card.matches(":popover-open");
+        if (state === "ready") {
+          if (open && openedForStatus) card.hidePopover();
+        } else if (state === "error" && !open) {
+          card.showPopover();
+          openedForStatus = true;
+        }
+      }
+
+      // The button toggles the card, and Escape, clicks elsewhere on the shell
+      // and clicks on Livebook's page close it. The card is a manual popover,
+      // which the browser doesn't close on its own, so that a click on the
+      // button only toggles it.
+      const hideCard = () => card.matches(":popover-open") && card.hidePopover();
+      button.addEventListener("click", () => {
+        openedForStatus = false;
+        card.togglePopover();
+      });
+      card.addEventListener("toggle", (event) => {
+        button.ariaExpanded = String(event.newState === "open");
+      });
+      document.addEventListener("pointerdown", ({ target }) => {
+        if (!button.contains(target) && !card.contains(target)) hideCard();
+      });
+      document.addEventListener("keydown", (event) => event.key === "Escape" && hideCard());
+      // Livebook's page, in the iframe, takes the focus from the shell
+      window.addEventListener("blur", hideCard);
+      status("Loading VM…");
 
       // The loader follows the state too, until Livebook's page is first ready
       function updateLoader(state) {
@@ -242,11 +445,10 @@
       const notebookVms = { booting: 0, running: 0 };
       function showNotebookVms() {
         const { booting, running } = notebookVms;
-        const vms = (count) => `${count} notebook VM${count === 1 ? "" : "s"}`;
         const parts = [];
-        if (running) parts.push(`${vms(running)} running`);
-        if (booting) parts.push(`${running ? booting : vms(booting)} starting…`);
-        document.querySelector("#notebook-vms").textContent = parts.join(", ");
+        if (running) parts.push(`${running} running`);
+        if (booting) parts.push(`${booting} starting…`);
+        document.querySelector("#notebook-vms").textContent = parts.join(", ") || "None";
       }
 
       let onStarted;
@@ -358,10 +560,10 @@
           else socket.onmessage?.({ data: socket.binaryFrame(toBytes(event.binary)) });
         },
       }).catch((error) => {
-        status(`The VM didn't boot: ${error?.message ?? error}`, "error");
+        status(`Its VM didn't boot: ${error?.message ?? error}`, "error");
         throw error;
       });
-      status("VM booted, starting Livebook…", "loading", performance.now() - t0);
+      status("Starting…", "loading", performance.now() - t0);
 
       // Binary frames that are valid UTF-8 arrive as strings
       function toBytes(data) {
@@ -478,21 +680,21 @@
       await workerReady;
       const event = await started;
       window.livebookStarted = event;
-      status("Livebook started, loading its page…", "loading", event.ms);
+      status("Loading its page…", "loading", event.ms);
 
       // The relay frame goes first, as the Service Worker sends Livebook's
       // pages through it
       const relayFrame = addFrame(`${base}/popcorn-relay`, { hidden: true });
       await loaded(relayFrame);
       const relayFailure = frameFailure(relayFrame);
-      if (relayFailure) status(`Livebook's page didn't load: ${relayFailure}`, "error");
+      if (relayFailure) status(`Its page didn't load: ${relayFailure}`, "error");
       else await openLivebook();
 
       async function openLivebook() {
         // Livebook's links, like /import?url=…, open in the tab's Livebook
         const path = location.pathname === "/index.html" ? "/" : location.pathname;
         const frame = addFrame(`${base}${path}${location.search}`, { id: "livebook" });
-        watchLivebook(frame, "Livebook started");
+        watchLivebook(frame, "Running");
         await loaded(frame);
 
         // Livebook has opened the link by the time its page loads, so reloading
@@ -524,7 +726,7 @@
       }
 
       // Livebook's page is ready once its LiveView connects to the VM, through
-      // the shell's WebSockets. The bar shows that, also for the pages that the
+      // the shell's WebSockets. The card shows that, also for the pages that the
       // frame opens later, and when the connection drops.
       function watchLivebook(frame, ready) {
         let shown;
@@ -543,6 +745,12 @@
         const check = (doc) => {
           // Leaving the page disconnects it, see popcorn-frame.js
           if (doc.defaultView?.popcornFrame?.leaving) return;
+          // The page's layout, for Popcorn's button's place, see the styles
+          const sidebar = doc.querySelector("nav[data-el-sidebar]");
+          Object.assign(document.body.dataset, {
+            livebook: doc.querySelector("[data-el-session]") ? "notebook" : sidebar ? "home" : "other",
+            sidebar: sidebar?.classList.contains("hidden") ? "hidden" : "shown",
+          });
           const view = doc.querySelector("[data-phx-main]");
           if (view?.classList.contains("phx-connected")) {
             clearTimeout(timer);
@@ -550,21 +758,21 @@
             show(ready, "ready");
           } else if (view?.classList.contains("phx-error")) {
             const text = connected
-              ? "Livebook's page lost its connection to the VM, reconnecting…"
-              : "Livebook's page didn't connect to the VM, retrying…";
+              ? "Its page lost its connection to the VM, reconnecting…"
+              : "Its page didn't connect to the VM, retrying…";
             show(text, "error");
           }
         };
 
         // Loading the page downloads its files, like booting the VM, and
         // connecting goes through the VM only
-        giveUpAfter(timeoutsMs.boot, "Livebook's page didn't load");
+        giveUpAfter(timeoutsMs.boot, "Its page didn't load");
         frame.addEventListener("load", () => {
           observer?.disconnect();
           const failure = frameFailure(frame);
           if (failure) {
             clearTimeout(timer);
-            return show(`Livebook's page didn't load: ${failure}`, "error");
+            return show(`Its page didn't load: ${failure}`, "error");
           }
           // LiveView sets the classes of its view's element
           const doc = frame.contentDocument;
@@ -574,9 +782,9 @@
           // Then the frame loads the next page
           frame.contentWindow.addEventListener("pagehide", () => {
             pageObserver.disconnect();
-            giveUpAfter(timeoutsMs.boot, "Livebook's page didn't load");
+            giveUpAfter(timeoutsMs.boot, "Its page didn't load");
           });
-          giveUpAfter(30_000, "Livebook's page didn't connect to the VM");
+          giveUpAfter(30_000, "Its page didn't connect to the VM");
           check(doc);
         });
       }

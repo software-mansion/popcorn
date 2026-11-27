@@ -132,16 +132,23 @@ const notebook = (page) => {
 
 test("Livebook starts in the VM", async () => {
   await page.goto("/");
+  // Popcorn's button shows that Livebook is loading, with its card closed
+  await expect(page.locator("#popcorn")).toHaveAttribute(
+    "data-state",
+    "loading",
+  );
+  await expect(page.locator("#card")).toBeHidden();
   await page.waitForFunction(() => window.livebookStarted, null, {
     timeout: 180_000,
   });
   const started = await page.evaluate(() => window.livebookStarted);
   console.log(`  Livebook started in ${started.ms} ms, as ${started.node}`);
 
-  // The shell's bar shows Livebook's state, and later its notebooks' VMs
+  // The card shows Livebook's state, and later its notebooks' VMs
   await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
-  await expect(page.locator("#status-text")).toHaveText("Livebook started");
-  await expect(page.locator("#notebook-vms")).toHaveText("");
+  await expect(page.locator("#status-text")).toHaveText("Running");
+  await expect(page.locator("#notebook-vms")).toHaveText("None");
+  await expect(page.locator("#card")).toBeHidden();
   // The loader that covered the page goes
   await expect(page.locator("#loader:not(.done)")).toHaveCount(0);
 });
@@ -149,6 +156,32 @@ test("Livebook starts in the VM", async () => {
 test("the home page renders and connects", async () => {
   await expect(newNotebook()).toBeVisible();
   await expect(app.locator(".phx-connected").first()).toBeVisible();
+});
+
+// Popcorn's button toggles its card, which Escape and clicking Livebook's page
+// close too
+test("Popcorn's button opens its card", async () => {
+  const button = page.locator("#popcorn");
+  const card = page.locator("#card");
+  for (let i = 0; i < 3; i++) {
+    await button.click();
+    await expect(card).toBeVisible();
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    await button.click();
+    await expect(card).toBeHidden();
+    await expect(button).toHaveAttribute("aria-expanded", "false");
+  }
+
+  await button.click();
+  await expect(card).toContainText("Running");
+  await page.keyboard.press("Escape");
+  await expect(card).toBeHidden();
+
+  await button.click();
+  await expect(card).toBeVisible();
+  // Right of the card, which opens in the top left corner
+  await app.locator("body").click({ position: { x: 1000, y: 300 } });
+  await expect(card).toBeHidden();
 });
 
 // LivebookWasm.Application stars the example notebooks of priv/notebooks/
@@ -232,9 +265,7 @@ test("the notebook's menu opens the dashboard in the tab's Livebook", async () =
 test("a cell evaluates in the notebook's VM", async () => {
   await page.evaluate(() => window.notebookVmPrefetched);
   await evaluate("Enum.sum(1..10)", "55");
-  await expect(page.locator("#notebook-vms")).toHaveText(
-    "1 notebook VM running",
-  );
+  await expect(page.locator("#notebook-vms")).toHaveText("1 running");
 
   // How much of each file of the package came from the network, as the VMs'
   // Popcorn workers record it. The VMs' threads' workers can be blocked.
@@ -445,9 +476,7 @@ test("another notebook installs other packages in a VM of its own", async () => 
   expect(result, "the first notebook's VM").not.toContain(runtimeNode);
   expect(result).toContain(`{\\"installed\\":true}`);
   runtimeNode = result.match(/runtime_[a-z2-7]+@popcorn/)[0];
-  await expect(page.locator("#notebook-vms")).toHaveText(
-    "2 notebook VMs running",
-  );
+  await expect(page.locator("#notebook-vms")).toHaveText("2 running");
 });
 
 test("reconnecting replaces the notebook's VM", async () => {
@@ -468,9 +497,7 @@ test("reconnecting replaces the notebook's VM", async () => {
       timeout: 10_000,
     })
     .toBe(true);
-  await expect(page.locator("#notebook-vms")).toHaveText(
-    "2 notebook VMs running",
-  );
+  await expect(page.locator("#notebook-vms")).toHaveText("2 running");
 });
 
 // The tabs' VMs are nodes that connect across tabs, see public/distribution.js:
@@ -563,13 +590,13 @@ test("a link opens a notebook from GitHub", async () => {
 
 // LiveView uploads the file in binary WebSocket frames
 test("a notebook uploads through the form", async () => {
-  // The bar's states while the frame opens another page, which mustn't show
+  // Livebook's states while the frame opens another page, which mustn't show
   // the previous page's leaving as a lost connection
   await page.evaluate(() => {
     const status = document.querySelector("#status");
-    window.barStates = [];
+    window.statusStates = [];
     new MutationObserver(() =>
-      window.barStates.push(status.dataset.state),
+      window.statusStates.push(status.dataset.state),
     ).observe(status, { attributeFilter: ["data-state"] });
   });
   const livebook = await (await page.$("#livebook")).contentFrame();
@@ -594,10 +621,10 @@ test("a notebook uploads through the form", async () => {
   ).toBeVisible();
   // The page that the frame opened connected too
   await expect(page.locator("#status")).toHaveAttribute("data-state", "ready");
-  expect(await page.evaluate(() => window.barStates)).not.toContain("error");
+  expect(await page.evaluate(() => window.statusStates)).not.toContain("error");
 });
 
-// The bar says that Livebook started only once its page has loaded and
+// Popcorn's card says that Livebook runs only once its page has loaded and
 // connected. The relay frame, which Livebook's pages load through, and
 // Livebook's pages load scripts from the server, which can stop after
 // Livebook's VM has started.
@@ -605,7 +632,7 @@ for (const [frame, request] of [
   ["the relay frame", 1],
   ["Livebook's page", 2],
 ]) {
-  test(`the bar shows that Livebook's page didn't load, without ${frame}'s script`, async () => {
+  test(`the card shows that Livebook's page didn't load, without ${frame}'s script`, async () => {
     const failing = await context.newPage();
     watch(failing, "[failing tab] ");
     let requests = 0;
@@ -620,8 +647,9 @@ for (const [frame, request] of [
         { timeout: 180_000 },
       );
       await expect(failing.locator("#status-text")).toHaveText(
-        "Livebook's page didn't load: /popcorn-frame.js failed",
+        "Its page didn't load: /popcorn-frame.js failed",
       );
+      await expect(failing.locator("#card")).toBeVisible();
       // The loader stays, without its animation
       await expect(failing.locator("#loader")).toHaveAttribute(
         "data-state",

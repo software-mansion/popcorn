@@ -35,7 +35,9 @@ config :livebook,
   teams_auth: nil,
   teams_url: "https://teams.livebook.dev",
   github_release_info: %{repo: "livebook-dev/livebook", version: "0.19.10"},
-  update_instructions_url: nil,
+  # LIVEBOOK_UPDATE_INSTRUCTIONS_URL's. public/popcorn-frame.js hides the
+  # banner about Livebook's newer versions, which links here.
+  update_instructions_url: "https://livebook.dev/#update-check",
   within_iframe: false,
   k8s_kubeconfig_pipeline: Kubereq.Kubeconfig.Default,
   random_boot_id: <<0, 0, 1>>,
