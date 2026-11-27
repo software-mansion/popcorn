@@ -1,0 +1,52 @@
+# Processes and supervisors
+
+```elixir
+Mix.install([{:kino, "~> 0.19"}])
+```
+
+## Message passing
+
+This notebook spawns processes that exchange messages, starts a supervision tree, and kills one of its processes to see it restarted, while Kino draws what happens. First, three processes compute squares concurrently and send them back.
+
+```elixir
+Kino.Process.render_seq_trace(fn ->
+  parent = self()
+  for i <- 1..3, do: spawn(fn -> send(parent, {:square, i * i}) end)
+
+  for _ <- 1..3 do
+    receive do
+      {:square, square} -> square
+    end
+  end
+end)
+```
+
+## A supervision tree
+
+```elixir
+children = [
+  {Agent, fn -> %{} end},
+  Task.Supervisor,
+  {DynamicSupervisor, strategy: :one_for_one}
+]
+
+{:ok, supervisor} = Supervisor.start_link(children, strategy: :one_for_one)
+Kino.Process.sup_tree(supervisor)
+```
+
+## Crashing and restarting
+
+Kill the agent: its supervisor starts a new one in its place.
+
+```elixir
+agent = fn ->
+  {Agent, pid, _, _} = List.keyfind(Supervisor.which_children(supervisor), Agent, 0)
+  pid
+end
+
+before = agent.()
+Process.exit(before, :kill)
+Process.sleep(100)
+
+[before: before, after: agent.()]
+```

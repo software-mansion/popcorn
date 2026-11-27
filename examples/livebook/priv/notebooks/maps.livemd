@@ -1,0 +1,48 @@
+# Maps with MapLibre
+
+```elixir
+Mix.install([{:kino_maplibre, "~> 0.1.13"}])
+
+alias MapLibre, as: Ml
+```
+
+## A map
+
+This notebook shows an interactive map with MapLibre, then pins a few cities on another. Drag the map, zoom it, and tilt it with the right mouse button.
+
+```elixir
+Ml.new(center: {19.94, 50.06}, zoom: 4)
+|> Kino.MapLibre.add_nav_controls()
+```
+
+## Markers
+
+Markers pin a few cities, and a layer of text names them.
+
+```elixir
+cities = [
+  {"Kraków", {19.94, 50.06}},
+  {"Berlin", {13.40, 52.52}},
+  {"Paris", {2.35, 48.86}},
+  {"Rome", {12.50, 41.90}}
+]
+
+markers = for {_name, location} <- cities, do: [location, color: "#ef7c00"]
+
+names = %Geo.GeometryCollection{
+  geometries:
+    for {name, location} <- cities do
+      %Geo.Point{coordinates: location, properties: %{name: name}}
+    end
+}
+
+Ml.new(center: {10.0, 48.0}, zoom: 3)
+|> Ml.add_geo_source("cities", names)
+|> Ml.add_layer(
+  id: "names",
+  type: :symbol,
+  source: "cities",
+  layout: [text_field: ["get", "name"], text_font: ["Open Sans Semibold"], text_anchor: "top"]
+)
+|> Kino.MapLibre.add_markers(markers)
+```

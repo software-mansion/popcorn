@@ -1,0 +1,28 @@
+# Exclude everything
+**
+# Re-include workspace manifests and the Livebook example's inputs
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!mise.toml
+!**/package.json
+!popcorn/out/
+!popcorn/js/
+!popcorn/elixir/
+!examples/livebook/
+!docker/livebook.nginx.conf
+# Exclude local build artifacts, and what `mix cook` writes to public/
+**/_build
+**/deps
+**/node_modules
+**/dist
+**/erl_crash.dump
+examples/livebook/tmp
+examples/livebook/public/out
+examples/livebook/public/notebook_vm
+examples/livebook/public/assets
+examples/livebook/public/images
+examples/livebook/public/favicons
+examples/livebook/public/iframe
+!popcorn/out/**

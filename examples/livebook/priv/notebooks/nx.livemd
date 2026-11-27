@@ -1,0 +1,44 @@
+# Tensors with Nx
+
+```elixir
+Mix.install([{:nx, "~> 1.0"}])
+```
+
+## Tensors
+
+This notebook multiplies and sums tensors with Nx, then writes a softmax and a derivative as numerical definitions. Compilers like EXLA are native code and don't work in the browser, so Nx runs on its pure-Elixir backend.
+
+```elixir
+matrix = Nx.tensor([[1, 2], [3, 4]])
+Nx.dot(matrix, matrix)
+```
+
+```elixir
+Nx.iota({3, 4}) |> Nx.multiply(10) |> Nx.sum(axes: [1])
+```
+
+## Numerical definitions
+
+`defn` functions are written in a subset of Elixir where operators like `/` work on tensors. Nx can compile them, or evaluate them as here.
+
+```elixir
+defmodule Activations do
+  import Nx.Defn
+
+  defn softmax(t), do: Nx.exp(t) / Nx.sum(Nx.exp(t))
+end
+
+Activations.softmax(Nx.tensor([1.0, 2.0, 3.0]))
+```
+
+And `grad/2` computes gradients inside `defn`, here of x³ at 3, which is 3 · 3² = 27:
+
+```elixir
+defmodule Slopes do
+  import Nx.Defn
+
+  defn cube_slope(x), do: grad(x, fn x -> x * x * x end)
+end
+
+Slopes.cube_slope(3.0)
+```

@@ -1,0 +1,45 @@
+# Charts with VegaLite
+
+```elixir
+Mix.install([
+  {:kino_vega_lite, "~> 0.1.13"},
+  {:req, "~> 0.7"}
+])
+
+alias VegaLite, as: Vl
+```
+
+## Fetching the data
+
+This notebook downloads the Gapminder dataset with Req and plots the countries' fertility against their life expectancy in 2005 with VegaLite. In the browser, Req downloads with `fetch()`, so it only works with servers that allow cross-origin requests, like jsDelivr's mirror of npm packages.
+
+```elixir
+countries =
+  Req.get!("https://cdn.jsdelivr.net/npm/vega-datasets@2/data/gapminder.json").body
+  |> Enum.filter(&(&1["year"] == 2005))
+
+length(countries)
+```
+
+## Plotting it
+
+Hover over a point to see its country.
+
+```elixir
+Vl.new(width: 600, height: 400, title: "Fertility and life expectancy in 2005")
+|> Vl.data_from_values(countries)
+|> Vl.mark(:circle, opacity: 0.8)
+|> Vl.encode_field(:x, "fertility", type: :quantitative, title: "Children per woman")
+|> Vl.encode_field(:y, "life_expect",
+  type: :quantitative,
+  title: "Life expectancy",
+  scale: [zero: false]
+)
+|> Vl.encode_field(:size, "pop",
+  type: :quantitative,
+  title: "Population",
+  scale: [range: [25, 1500]]
+)
+|> Vl.encode_field(:color, "cluster", type: :nominal, legend: nil)
+|> Vl.encode_field(:tooltip, "country", type: :nominal)
+```
