@@ -28,7 +28,13 @@ Livebook's links too, like `/import?url=…`.
 
 `mix cook` cooks `public/` as `mix popcorn.dev` does, without serving it. The
 demo deployment, `docker/livebook.Dockerfile`, serves it with nginx, configured
-like `serve.exs` in `docker/livebook.nginx.conf`.
+like `serve.exs` in `docker/livebook.nginx.conf`. It also sets the Sentry DSN,
+environment and release of `public/index.html` from its `SENTRY_DSN`,
+`SENTRY_MODE` and `APP_VERSION` build arguments. With a DSN, `public/sentry.js`
+reports the shell page's JavaScript errors, Livebook's VM's crashes and the VMs
+that boot or don't, but nothing of the notebooks: not their code, output, errors,
+or their VMs' crashes once they've booted. Without one, as locally, it loads
+nothing.
 
 `pnpm test` in `test/playwright` hosts it the same way, then opens Livebook in
 headless Chromium, creates notebooks and evaluates cells in them. Set
