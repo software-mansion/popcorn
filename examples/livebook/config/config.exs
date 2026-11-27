@@ -61,6 +61,6 @@ config :os_mon,
   start_memsup: false,
   start_os_sup: false
 
-config :logger, level: :info
+config :logger, level: :warning
 config :phoenix, :json_library, JSON
 config :mime, :types, %{"audio/m4a" => ["m4a"], "text/plain" => ["livemd"]}
